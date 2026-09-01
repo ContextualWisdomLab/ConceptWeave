@@ -70,11 +70,7 @@ fn authoritative_published_release_is_admitted_offline() {
 fn client_fails_closed_on_unpublished_or_non_authoritative_release() {
     let client = SemanticReleaseClient::new("1.0.0").unwrap();
 
-    let reviewed = release(
-        "1.0.0",
-        TruthStatus::Inferred,
-        PublicationState::Reviewed,
-    );
+    let reviewed = release("1.0.0", TruthStatus::Inferred, PublicationState::Reviewed);
     assert_eq!(
         client.validate_for_authoritative_use(&reviewed),
         Err(ReleaseContractError::ReleaseNotPublished {
@@ -82,11 +78,7 @@ fn client_fails_closed_on_unpublished_or_non_authoritative_release() {
         })
     );
 
-    let wrong_truth = release(
-        "1.0.0",
-        TruthStatus::Proposed,
-        PublicationState::Published,
-    );
+    let wrong_truth = release("1.0.0", TruthStatus::Proposed, PublicationState::Published);
     assert_eq!(
         client.validate_for_authoritative_use(&wrong_truth),
         Err(ReleaseContractError::ReleaseNotAuthoritative {
@@ -184,7 +176,9 @@ fn digest_contract_rejects_non_sha256_and_malformed_hex() {
         Err(ReleaseContractError::InvalidDigest)
     );
     assert_eq!(
-        ReleaseDigest::new("sha256:gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"),
+        ReleaseDigest::new(
+            "sha256:gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+        ),
         Err(ReleaseContractError::InvalidDigest)
     );
 }
@@ -193,6 +187,8 @@ fn digest_contract_rejects_non_sha256_and_malformed_hex() {
 fn client_requires_non_blank_supported_contract_version() {
     assert_eq!(
         SemanticReleaseClient::new(" "),
-        Err(ReleaseContractError::EmptyField("supported_contract_version"))
+        Err(ReleaseContractError::EmptyField(
+            "supported_contract_version"
+        ))
     );
 }

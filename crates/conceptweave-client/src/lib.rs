@@ -123,9 +123,7 @@ impl SemanticRelease {
         for concept_id in &concept_ids {
             require_non_blank(concept_id, "concept_id")?;
             if !unique_concepts.insert(concept_id.as_str()) {
-                return Err(ReleaseContractError::DuplicateConceptId(
-                    concept_id.clone(),
-                ));
+                return Err(ReleaseContractError::DuplicateConceptId(concept_id.clone()));
             }
         }
 
@@ -192,10 +190,7 @@ impl SemanticReleaseClient {
         supported_contract_version: impl Into<String>,
     ) -> Result<Self, ReleaseContractError> {
         let supported_contract_version = supported_contract_version.into();
-        require_non_blank(
-            &supported_contract_version,
-            "supported_contract_version",
-        )?;
+        require_non_blank(&supported_contract_version, "supported_contract_version")?;
         Ok(Self {
             supported_contract_version,
         })
