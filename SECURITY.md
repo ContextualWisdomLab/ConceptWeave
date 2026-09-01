@@ -15,7 +15,7 @@ All source artifacts, generated candidate payloads, external ontology files, mod
 - no source-system writes from discovery or validation;
 - reviewed authorization required before publication;
 - future tenant isolation applies to source snapshots, candidates, review receipts, releases, exports, and object storage;
-- published artifacts retain origin/provenance and cannot silently overwrite prior releases.
+- published semantic truth is immutable: a published artifact must never be overwritten in place, including when an audit trail exists; corrections are issued as a new release that explicitly supersedes the prior release while retaining both releases and their provenance.
 
 ## Threats tracked from foundation
 
@@ -28,6 +28,7 @@ All source artifacts, generated candidate payloads, external ontology files, mod
 7. malicious or oversized schema/API artifacts;
 8. external-source SSRF or credential leakage;
 9. model/provider compromise or unexpected retention;
-10. governance bypass from Proposed/Validated directly to Published.
+10. governance bypass from Proposed/Validated directly to Published;
+11. in-place mutation or overwrite of previously published semantic truth.
 
 Security findings become tests before the related runtime capability can be marked release-ready.
