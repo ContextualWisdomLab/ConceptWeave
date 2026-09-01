@@ -122,6 +122,19 @@ impl EvidenceReference {
 }
 
 /// A governed candidate for an ontology or semantic-layer artifact.
+///
+/// External consumers must not be able to mutate evidence or governance state
+/// without a validated domain operation. This compile-fail example is an
+/// executable boundary test: it must fail once the invariant is correctly
+/// encapsulated.
+///
+/// ```compile_fail
+/// use conceptweave_domain::{CandidateKind, EvidenceReference, SemanticCandidate};
+///
+/// let evidence = EvidenceReference::new("source-1", "sha256:abc", "public.orders").unwrap();
+/// let mut candidate = SemanticCandidate::new("candidate-1", CandidateKind::Concept, vec![evidence]).unwrap();
+/// candidate.evidence.clear();
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SemanticCandidate {
     /// Stable candidate identifier within the owning tenant or workspace.
