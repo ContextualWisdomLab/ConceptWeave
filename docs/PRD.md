@@ -32,7 +32,7 @@ Produce candidates for concepts, taxonomies, non-taxonomic relations, semantic c
 
 ### FR-3 Evidence and provenance
 
-Every candidate must retain source identity, digest, location, observation time, parser/extractor revision, and discovery method. Unsupported candidates fail closed.
+The current v0.1 candidate contract requires every candidate to retain exact source identity, source digest, and source location through `EvidenceReference`. Issue #2 must add immutable Source Observation and proposal-receipt contracts that also retain observation time, parser/extractor revision, and discovery method before the first Generation release. Until those receipt contracts exist, the Rust `SemanticCandidate` and `contracts/semantic-candidate.schema.json` must not be described as already carrying those deferred coordinates. Unsupported candidates fail closed.
 
 ### FR-4 Deterministic validation
 
