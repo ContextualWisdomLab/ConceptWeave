@@ -1,4 +1,4 @@
-name: Product CI
+name: Product
 
 on:
   pull_request:
@@ -9,17 +9,23 @@ permissions:
   contents: read
 
 jobs:
-  product:
+  rust-quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout exact source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
           persist-credentials: false
 
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: 1.98.0
-          components: rustfmt, clippy
+      - name: Verify exact source revision
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Show pinned Rust toolchain
+        run: rustc --version && cargo --version
 
       - name: Format
         run: cargo fmt --all --check
@@ -30,21 +36,29 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-      - name: Rustdoc
+      - name: Public documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
         run: cargo doc --workspace --no-deps
 
-      - name: Coverage
-        run: bash scripts/check_coverage.sh
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@1ed6d7be6168f6c9046541087ff549b6bc581fdf # v2.87.2
+        with:
+          tool: cargo-llvm-cov
 
-      - name: Validate semantic candidate schema
+      - name: Exact owned coverage
+        run: ./scripts/check_coverage.sh
+
+      - name: Validate public JSON contract
         run: |
           npx --yes ajv-cli@5.0.0 compile \
             --spec=draft2020 \
             -s contracts/semantic-candidate.schema.json
-          npx --yes ajv-cli@5.0.0 validate \
+          npx --yes ajv-cli@5.0.0 test \
             --spec=draft2020 \
             -s contracts/semantic-candidate.schema.json \
-            -d contracts/fixtures/semantic-candidate.valid.json
+            -d contracts/fixtures/semantic-candidate.valid.json \
+            --valid
           npx --yes ajv-cli@5.0.0 test \
             --spec=draft2020 \
             -s contracts/semantic-candidate.schema.json \
