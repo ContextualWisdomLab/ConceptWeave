@@ -167,4 +167,6 @@ The standards/research register and design implications live in [`docs/doctoring
 
 Before changing the domain contract or lifecycle, read [`AGENTS.md`](AGENTS.md), the PRD/TRD, architecture, applicable ADRs, and the current product-gap baseline. Behavioral changes should preserve the repository's test-first and evidence-bound publication discipline and update the matching public contracts/documentation in the same change.
 
-No license claim is made here unless and until the repository contains an explicit license grant.
+## License
+
+ConceptWeave is licensed under the [Apache License 2.0](LICENSE). Third-party tools and future adapters retain their own licenses and must satisfy the repository's commercial-use and attribution policy before incorporation.
