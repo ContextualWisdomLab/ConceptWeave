@@ -12,7 +12,11 @@
     "evidence"
   ],
   "properties": {
-    "candidate_id": {"type": "string", "minLength": 1},
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
     "kind": {
       "enum": [
         "concept",
@@ -53,11 +57,38 @@
         "additionalProperties": false,
         "required": ["source_id", "source_digest", "location"],
         "properties": {
-          "source_id": {"type": "string", "minLength": 1},
-          "source_digest": {"type": "string", "minLength": 1},
-          "location": {"type": "string", "minLength": 1}
+          "source_id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": ".*\\S.*"
+          },
+          "source_digest": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": ".*\\S.*"
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": ".*\\S.*"
+          }
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "publication_state": {"const": "published"}
+        },
+        "required": ["publication_state"]
+      },
+      "then": {
+        "properties": {
+          "truth_status": {"const": "authoritative"}
+        }
+      }
+    }
+  ]
 }
