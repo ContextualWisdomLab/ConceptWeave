@@ -50,10 +50,31 @@ jobs:
         run: ./scripts/check_coverage.sh
 
       - name: Validate public JSON contract
-        run: jq -e . contracts/semantic-candidate.schema.json >/dev/null
+        run: |
+          npx --yes ajv-cli@5.0.0 compile \
+            --spec=draft2020 \
+            -s contracts/semantic-candidate.schema.json
+          npx --yes ajv-cli@5.0.0 test \
+            --spec=draft2020 \
+            -s contracts/semantic-candidate.schema.json \
+            -d contracts/fixtures/semantic-candidate.valid.json \
+            --valid
+          npx --yes ajv-cli@5.0.0 test \
+            --spec=draft2020 \
+            -s contracts/semantic-candidate.schema.json \
+            -d contracts/fixtures/semantic-candidate.invalid-whitespace.json \
+            --invalid
+          npx --yes ajv-cli@5.0.0 test \
+            --spec=draft2020 \
+            -s contracts/semantic-candidate.schema.json \
+            -d contracts/fixtures/semantic-candidate.invalid-published-truth.json \
+            --invalid
 
       - name: Lockfile freshness
-        run: cargo generate-lockfile && git diff --exit-code -- Cargo.lock
+        run: |
+          cargo generate-lockfile
+          git ls-files --error-unmatch Cargo.lock >/dev/null
+          test -z "$(git status --porcelain=v1 --untracked-files=all -- Cargo.lock)"
 
       - name: Clean working tree
-        run: git diff --exit-code
+        run: test -z "$(git status --porcelain=v1 --untracked-files=all)"
