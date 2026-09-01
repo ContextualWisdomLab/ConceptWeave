@@ -182,6 +182,41 @@ impl SemanticRelease {
     }
 }
 
+/// Deterministic concept-level change between two admitted semantic releases.
+///
+/// This value reports only public semantic-contract differences. It does not
+/// authorize downstream queries, mutate either release, or infer business-domain
+/// consequences for a consuming product.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SemanticReleaseDiff {
+    previous_release_id: String,
+    current_release_id: String,
+    added_concept_ids: Vec<String>,
+    removed_concept_ids: Vec<String>,
+}
+
+impl SemanticReleaseDiff {
+    /// Returns the stable identity of the earlier release.
+    pub fn previous_release_id(&self) -> &str {
+        &self.previous_release_id
+    }
+
+    /// Returns the stable identity of the later release.
+    pub fn current_release_id(&self) -> &str {
+        &self.current_release_id
+    }
+
+    /// Returns concept identities present only in the later release.
+    pub fn added_concept_ids(&self) -> &[String] {
+        &self.added_concept_ids
+    }
+
+    /// Returns concept identities present only in the earlier release.
+    pub fn removed_concept_ids(&self) -> &[String] {
+        &self.removed_concept_ids
+    }
+}
+
 /// Offline admission policy for one supported semantic-release contract version.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SemanticReleaseClient {
@@ -231,6 +266,42 @@ impl SemanticReleaseClient {
             });
         }
         Ok(())
+    }
+
+    /// Compares two admitted releases and reports deterministic concept changes.
+    ///
+    /// Both releases pass the same authoritative-use admission gate before any
+    /// difference is exposed. This prevents diff inspection from becoming a
+    /// compatibility or publication-state bypass. Concept identifiers are sorted
+    /// deterministically so the result is reproducible offline.
+    pub fn diff(
+        &self,
+        previous: &SemanticRelease,
+        current: &SemanticRelease,
+    ) -> Result<SemanticReleaseDiff, ReleaseContractError> {
+        self.validate_for_authoritative_use(previous)?;
+        self.validate_for_authoritative_use(current)?;
+
+        let previous_concepts: BTreeSet<&str> =
+            previous.concept_ids().iter().map(String::as_str).collect();
+        let current_concepts: BTreeSet<&str> =
+            current.concept_ids().iter().map(String::as_str).collect();
+
+        let added_concept_ids = current_concepts
+            .difference(&previous_concepts)
+            .map(|concept_id| (*concept_id).to_string())
+            .collect();
+        let removed_concept_ids = previous_concepts
+            .difference(&current_concepts)
+            .map(|concept_id| (*concept_id).to_string())
+            .collect();
+
+        Ok(SemanticReleaseDiff {
+            previous_release_id: previous.release_id().to_string(),
+            current_release_id: current.release_id().to_string(),
+            added_concept_ids,
+            removed_concept_ids,
+        })
     }
 }
 
