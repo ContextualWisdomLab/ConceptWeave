@@ -123,10 +123,8 @@ impl EvidenceReference {
 
 /// A governed candidate for an ontology or semantic-layer artifact.
 ///
-/// External consumers must not be able to mutate evidence or governance state
-/// without a validated domain operation. This compile-fail example is an
-/// executable boundary test: it must fail once the invariant is correctly
-/// encapsulated.
+/// External consumers cannot mutate evidence or governance state without a
+/// validated domain operation.
 ///
 /// ```compile_fail
 /// use conceptweave_domain::{CandidateKind, EvidenceReference, SemanticCandidate};
@@ -137,16 +135,11 @@ impl EvidenceReference {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SemanticCandidate {
-    /// Stable candidate identifier within the owning tenant or workspace.
-    pub candidate_id: String,
-    /// Kind of semantic artifact proposed by the candidate.
-    pub kind: CandidateKind,
-    /// Current epistemic status.
-    pub truth_status: TruthStatus,
-    /// Current governance/publication state.
-    pub publication_state: PublicationState,
-    /// Exact source evidence supporting the candidate.
-    pub evidence: Vec<EvidenceReference>,
+    candidate_id: String,
+    kind: CandidateKind,
+    truth_status: TruthStatus,
+    publication_state: PublicationState,
+    evidence: Vec<EvidenceReference>,
 }
 
 impl SemanticCandidate {
@@ -173,11 +166,39 @@ impl SemanticCandidate {
         })
     }
 
+    /// Returns the stable candidate identifier.
+    pub fn candidate_id(&self) -> &str {
+        &self.candidate_id
+    }
+
+    /// Returns the semantic artifact kind proposed by this candidate.
+    pub fn kind(&self) -> CandidateKind {
+        self.kind
+    }
+
+    /// Returns the candidate's current epistemic status.
+    pub fn truth_status(&self) -> TruthStatus {
+        self.truth_status
+    }
+
+    /// Returns the candidate's current governance/publication state.
+    pub fn publication_state(&self) -> PublicationState {
+        self.publication_state
+    }
+
+    /// Returns the immutable evidence references supporting this candidate.
+    pub fn evidence(&self) -> &[EvidenceReference] {
+        &self.evidence
+    }
+
     /// Moves the candidate through the fail-closed governance lifecycle.
     pub fn transition(&mut self, target: PublicationState) -> Result<(), ContractError> {
         let from = self.publication_state;
         if !ALLOWED_TRANSITIONS.contains(&(from, target)) {
             return Err(ContractError::InvalidTransition { from, to: target });
+        }
+        if target == PublicationState::Published && self.evidence.is_empty() {
+            return Err(ContractError::MissingEvidence);
         }
         self.publication_state = target;
         self.truth_status = truth_for_state(target);
@@ -294,20 +315,30 @@ mod tests {
     }
 
     #[test]
+    fn candidate_accessors_expose_read_only_domain_state() {
+        let candidate = candidate();
+        assert_eq!(candidate.candidate_id(), "candidate-1");
+        assert_eq!(candidate.kind(), CandidateKind::Concept);
+        assert_eq!(candidate.truth_status(), TruthStatus::Inferred);
+        assert_eq!(candidate.publication_state(), PublicationState::Draft);
+        assert_eq!(candidate.evidence().len(), 1);
+    }
+
+    #[test]
     fn reviewed_candidate_can_be_published() {
         let mut candidate = candidate();
-        assert_eq!(candidate.truth_status, TruthStatus::Inferred);
+        assert_eq!(candidate.truth_status(), TruthStatus::Inferred);
         assert!(!candidate.is_publishable());
 
         candidate.transition(PublicationState::Proposed).unwrap();
-        assert_eq!(candidate.truth_status, TruthStatus::Proposed);
+        assert_eq!(candidate.truth_status(), TruthStatus::Proposed);
         candidate.transition(PublicationState::Validated).unwrap();
-        assert_eq!(candidate.truth_status, TruthStatus::Inferred);
+        assert_eq!(candidate.truth_status(), TruthStatus::Inferred);
         candidate.transition(PublicationState::Reviewed).unwrap();
-        assert_eq!(candidate.truth_status, TruthStatus::Inferred);
+        assert_eq!(candidate.truth_status(), TruthStatus::Inferred);
         assert!(candidate.is_publishable());
         candidate.transition(PublicationState::Published).unwrap();
-        assert_eq!(candidate.truth_status, TruthStatus::Authoritative);
+        assert_eq!(candidate.truth_status(), TruthStatus::Authoritative);
         assert!(!candidate.is_publishable());
     }
 
@@ -322,7 +353,7 @@ mod tests {
             })
         );
         candidate.transition(PublicationState::Rejected).unwrap();
-        assert_eq!(candidate.truth_status, TruthStatus::Rejected);
+        assert_eq!(candidate.truth_status(), TruthStatus::Rejected);
         assert_eq!(
             candidate.transition(PublicationState::Proposed),
             Err(ContractError::InvalidTransition {
@@ -344,7 +375,7 @@ mod tests {
             candidate.transition(state).unwrap();
         }
         candidate.transition(PublicationState::Superseded).unwrap();
-        assert_eq!(candidate.truth_status, TruthStatus::Superseded);
+        assert_eq!(candidate.truth_status(), TruthStatus::Superseded);
         assert_eq!(
             candidate.transition(PublicationState::Rejected),
             Err(ContractError::InvalidTransition {
@@ -371,8 +402,8 @@ mod tests {
             candidate.transition(PublicationState::Published),
             Err(ContractError::MissingEvidence)
         );
-        assert_eq!(candidate.publication_state, PublicationState::Reviewed);
-        assert_eq!(candidate.truth_status, TruthStatus::Inferred);
+        assert_eq!(candidate.publication_state(), PublicationState::Reviewed);
+        assert_eq!(candidate.truth_status(), TruthStatus::Inferred);
     }
 
     #[test]
