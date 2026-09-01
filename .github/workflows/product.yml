@@ -61,7 +61,7 @@ jobs:
       - name: Exact owned coverage
         run: ./scripts/check_coverage.sh
 
-      - name: Validate public JSON contract
+      - name: Validate public JSON contracts
         run: |
           npx --yes ajv-cli@5.0.0 compile \
             --spec=draft2020 \
@@ -80,6 +80,29 @@ jobs:
             --spec=draft2020 \
             -s contracts/semantic-candidate.schema.json \
             -d contracts/fixtures/semantic-candidate.invalid-published-truth.json \
+            --invalid
+          npx --yes ajv-cli@5.0.0 compile \
+            --spec=draft2020 \
+            -s contracts/semantic-release.schema.json
+          npx --yes ajv-cli@5.0.0 test \
+            --spec=draft2020 \
+            -s contracts/semantic-release.schema.json \
+            -d contracts/fixtures/semantic-release.valid.json \
+            --valid
+          npx --yes ajv-cli@5.0.0 test \
+            --spec=draft2020 \
+            -s contracts/semantic-release.schema.json \
+            -d contracts/fixtures/semantic-release.invalid-published-truth.json \
+            --invalid
+          npx --yes ajv-cli@5.0.0 test \
+            --spec=draft2020 \
+            -s contracts/semantic-release.schema.json \
+            -d contracts/fixtures/semantic-release.invalid-duplicate-concept.json \
+            --invalid
+          npx --yes ajv-cli@5.0.0 test \
+            --spec=draft2020 \
+            -s contracts/semantic-release.schema.json \
+            -d contracts/fixtures/semantic-release.invalid-digest.json \
             --invalid
 
       - name: Lockfile freshness
