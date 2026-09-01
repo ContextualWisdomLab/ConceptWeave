@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.contextualwisdomlab.org/conceptweave/semantic-release/1.0.0",
+  "title": "ConceptWeave Semantic Release",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "release_id",
+    "contract_version",
+    "ontology_version",
+    "truth_status",
+    "publication_state",
+    "artifact_digest",
+    "provenance",
+    "concept_ids"
+  ],
+  "properties": {
+    "release_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "contract_version": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "ontology_version": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "truth_status": {
+      "enum": [
+        "observed",
+        "inferred",
+        "proposed",
+        "authoritative",
+        "superseded",
+        "rejected"
+      ]
+    },
+    "publication_state": {
+      "enum": [
+        "draft",
+        "proposed",
+        "validated",
+        "reviewed",
+        "published",
+        "superseded",
+        "rejected"
+      ]
+    },
+    "artifact_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9A-Fa-f]{64}$"
+    },
+    "provenance": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source_id", "source_digest", "location"],
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": ".*\\S.*"
+          },
+          "source_digest": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": ".*\\S.*"
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": ".*\\S.*"
+          }
+        }
+      }
+    },
+    "concept_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": ".*\\S.*"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "publication_state": {"const": "published"}
+        },
+        "required": ["publication_state"]
+      },
+      "then": {
+        "properties": {
+          "truth_status": {"const": "authoritative"}
+        }
+      }
+    }
+  ]
+}
