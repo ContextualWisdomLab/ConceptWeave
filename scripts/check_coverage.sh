@@ -21,6 +21,14 @@ jq -r '
   | "COVERAGE_GAP file=\(.filename) lines=\(.summary.lines.percent) functions=\(.summary.functions.percent) regions=\(.summary.regions.percent) branches=\(.summary.branches.percent)"
 ' coverage.json
 
+jq -r '
+  .data[0].files[]
+  | .filename as $file
+  | (.branches // [])[]
+  | select((.[4] // 0) == 0 or (.[5] // 0) == 0)
+  | "BRANCH_GAP file=\($file) start=\(.[0]):\(.[1]) end=\(.[2]):\(.[3]) true_count=\(.[4]) false_count=\(.[5])"
+' coverage.json
+
 jq -e '
   .data[0].totals.lines.percent == 100 and
   .data[0].totals.functions.percent == 100 and
