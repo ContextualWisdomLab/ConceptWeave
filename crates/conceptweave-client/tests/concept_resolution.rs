@@ -44,8 +44,14 @@ fn exact_concept_resolution_is_deterministic_and_does_not_fuzzy_match() {
         client.resolve_concept(&release, "control.internal_control"),
         Ok(Some("control.internal_control"))
     );
-    assert_eq!(client.resolve_concept(&release, "internal control"), Ok(None));
-    assert_eq!(client.resolve_concept(&release, "CONTROL.INTERNAL_CONTROL"), Ok(None));
+    assert_eq!(
+        client.resolve_concept(&release, "internal control"),
+        Ok(None)
+    );
+    assert_eq!(
+        client.resolve_concept(&release, "CONTROL.INTERNAL_CONTROL"),
+        Ok(None)
+    );
 }
 
 #[test]
