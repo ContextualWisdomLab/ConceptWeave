@@ -44,6 +44,18 @@ fn authoritative_published_release_is_admitted_offline() {
         PublicationState::Published,
     );
 
+    assert_eq!(client.supported_contract_version(), "1.0.0");
+    assert_eq!(release.release_id(), "semantic-release-grc-2026-09-01");
+    assert_eq!(release.contract_version(), "1.0.0");
+    assert_eq!(release.ontology_version(), "grc-ontology-2026-09");
+    assert_eq!(release.truth_status(), TruthStatus::Authoritative);
+    assert_eq!(release.publication_state(), PublicationState::Published);
+    assert_eq!(
+        release.artifact_digest().as_str(),
+        "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    );
+    assert_eq!(release.provenance().len(), 1);
+    assert_eq!(release.concept_ids(), ["control.evidence", "control.owner"]);
     assert_eq!(client.validate_for_authoritative_use(&release), Ok(()));
 }
 
@@ -95,20 +107,26 @@ fn client_rejects_unsupported_contract_version_before_use() {
 }
 
 #[test]
-fn release_requires_identity_provenance_and_unique_non_blank_concepts() {
-    assert_eq!(
-        SemanticRelease::new(
-            " ",
-            "1.0.0",
-            "ontology-1",
-            TruthStatus::Authoritative,
-            PublicationState::Published,
-            digest(),
-            vec![evidence()],
-            vec!["concept.one".to_string()],
-        ),
-        Err(ReleaseContractError::EmptyField("release_id"))
-    );
+fn release_requires_identity_versions_provenance_and_unique_non_blank_concepts() {
+    for (release_id, contract_version, ontology_version, expected_field) in [
+        (" ", "1.0.0", "ontology-1", "release_id"),
+        ("release-1", " ", "ontology-1", "contract_version"),
+        ("release-1", "1.0.0", " ", "ontology_version"),
+    ] {
+        assert_eq!(
+            SemanticRelease::new(
+                release_id,
+                contract_version,
+                ontology_version,
+                TruthStatus::Authoritative,
+                PublicationState::Published,
+                digest(),
+                vec![evidence()],
+                vec!["concept.one".to_string()],
+            ),
+            Err(ReleaseContractError::EmptyField(expected_field))
+        );
+    }
 
     assert_eq!(
         SemanticRelease::new(
