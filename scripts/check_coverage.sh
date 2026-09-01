@@ -2,6 +2,7 @@
 set -euo pipefail
 
 coverage_toolchain="${COVERAGE_TOOLCHAIN:-nightly-2026-08-20}"
+trap 'rm -f coverage.json source-branches.json' EXIT
 
 cargo "+${coverage_toolchain}" llvm-cov \
   --workspace \
