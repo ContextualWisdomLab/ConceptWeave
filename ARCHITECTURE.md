@@ -24,13 +24,21 @@ flowchart LR
 
 | Context | Type | Owns | Does not own |
 | --- | --- | --- | --- |
-| Source Observation | Supporting | immutable observations, parser receipts, evidence locations | source-system business truth |
+| Source Observation | Supporting | immutable observations, parser/extractor receipts, evidence locations | source-system business truth, semantic inference |
 | Semantic Discovery | Core | candidate generation and evidence binding | publication authority |
 | Model Validation | Supporting | deterministic validation reports | human review decisions |
 | Governance & Publication | Core | proposal lifecycle, review receipts, releases, supersession | catalog/search runtime |
 | Interoperability | Supporting | versioned import/export and ACL adapters | foreign product internals |
 
-## Aggregate boundaries
+## Aggregate and value-object boundaries
+
+### PostgresSchemaSnapshot
+
+Immutable Source Observation aggregate for one bounded relational metadata capture. It owns source-connection reference, snapshot digest identity, extractor revision, observation time, and exact qualified table observations. Qualified identifiers are preserved rather than normalized; duplicate table coordinates fail closed.
+
+### TableObservation / ColumnObservation
+
+Immutable Source Observation value objects. Table observations keep exact schema/table identity. Column observations keep exact source name, one-based ordinal, source type, nullability, and optional source comment. Duplicate names or ordinals within a table fail closed, and read APIs return deterministic source order.
 
 ### SemanticCandidate
 
@@ -61,11 +69,12 @@ Truth status and publication workflow are distinct. A source observation can be 
 
 No direct cross-service application-table SQL is permitted.
 
-## Foundation directory structure
+## Current directory structure
 
 ```text
 crates/
-  conceptweave-domain/       # Core domain contract only
+  conceptweave-domain/       # Core candidate/evidence lifecycle contract
+  conceptweave-observation/  # Provider-independent immutable source-observation contract
 contracts/                   # Versioned public schemas
 docs/
   adr/                       # Binding architecture decisions

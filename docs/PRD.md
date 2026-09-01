@@ -26,13 +26,15 @@ Given an enterprise source estate, produce a **reviewable semantic model proposa
 
 Accept immutable snapshots or versioned contracts for relational schema, OpenAPI, AsyncAPI/event models, documents/glossaries, source-code structure, existing ontology/vocabulary, and lineage/provenance. Raw source authority remains with its owning system.
 
+The first active relational slice defines an immutable PostgreSQL schema-snapshot contract before a live adapter exists. It preserves exact schema/table/column identifiers, source column ordinals, source type/nullability/comment metadata, source-connection reference, snapshot digest, extractor revision, and observation-time evidence. It must not normalize identifiers in ways that erase PostgreSQL quoting or schema boundaries.
+
 ### FR-2 Candidate discovery
 
 Produce candidates for concepts, taxonomies, non-taxonomic relations, semantic constraints, dimensions, measures, and physical-to-semantic mappings. Each candidate starts as inferred rather than authoritative.
 
 ### FR-3 Evidence and provenance
 
-The current v0.1 candidate contract requires every candidate to retain exact source identity, source digest, and source location through `EvidenceReference`. Issue #2 must add immutable Source Observation and proposal-receipt contracts that also retain observation time, parser/extractor revision, and discovery method before the first Generation release. Until those receipt contracts exist, the Rust `SemanticCandidate` and `contracts/semantic-candidate.schema.json` must not be described as already carrying those deferred coordinates. Unsupported candidates fail closed.
+The current v0.1 candidate contract requires every candidate to retain exact source identity, source digest, and source location through `EvidenceReference`. The active Source Observation slice additionally retains snapshot digest, observation time, and extractor revision at the relational snapshot boundary. Issue #2 must still add proposal-receipt/discovery-method provenance and bind candidate evidence to exact observation locations before the first Generation release. Unsupported candidates fail closed.
 
 ### FR-4 Deterministic validation
 
