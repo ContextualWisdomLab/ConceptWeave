@@ -153,7 +153,10 @@ impl EvidenceReference {
 /// A governed candidate for an ontology or semantic-layer artifact.
 ///
 /// External consumers cannot mutate evidence or governance state without a
-/// validated domain operation.
+/// validated domain operation. The public transition API deliberately stops at
+/// the semantic-steward boundary: entering `Reviewed`, entering `Published`, or
+/// superseding/rejecting an already reviewed artifact requires the separate
+/// Governance & Publication context to establish authority first.
 ///
 /// ```compile_fail
 /// use conceptweave_domain::{CandidateKind, EvidenceReference, SemanticCandidate};
@@ -218,21 +221,29 @@ impl SemanticCandidate {
         &self.evidence
     }
 
-    /// Moves the candidate through the fail-closed governance lifecycle.
+    /// Moves a candidate through transitions that do not require steward authority.
+    ///
+    /// Deterministic discovery and validation code may propose, validate, or
+    /// reject a candidate. Crossing into a steward-reviewed or published state,
+    /// or changing an already reviewed/published artifact, fails closed until
+    /// the Governance & Publication bounded context supplies an authorized path.
     pub fn transition(&mut self, target: PublicationState) -> Result<(), ContractError> {
         let from = self.publication_state;
         if !ALLOWED_TRANSITIONS.contains(&(from, target)) {
             return Err(ContractError::InvalidTransition { from, to: target });
         }
-        if target == PublicationState::Published {
-            validate_evidence(&self.evidence)?;
+        if requires_governance_authorization(from, target) {
+            return Err(ContractError::GovernanceAuthorizationRequired { target });
         }
         self.publication_state = target;
         self.truth_status = truth_for_state(target);
         Ok(())
     }
 
-    /// Returns whether the candidate is immediately eligible for publication.
+    /// Returns whether the current reviewed candidate has valid publication evidence.
+    ///
+    /// This is an eligibility check only. It does not grant steward authority or
+    /// publish the candidate.
     pub fn is_publishable(&self) -> bool {
         self.publication_state == PublicationState::Reviewed
             && validate_evidence(&self.evidence).is_ok()
@@ -247,6 +258,19 @@ fn validate_evidence(evidence: &[EvidenceReference]) -> Result<(), ContractError
         reference.validate()?;
     }
     Ok(())
+}
+
+fn requires_governance_authorization(
+    from: PublicationState,
+    target: PublicationState,
+) -> bool {
+    matches!(
+        from,
+        PublicationState::Reviewed | PublicationState::Published
+    ) || matches!(
+        target,
+        PublicationState::Reviewed | PublicationState::Published | PublicationState::Superseded
+    )
 }
 
 const ALLOWED_TRANSITIONS: &[(PublicationState, PublicationState)] = &[
@@ -280,6 +304,11 @@ pub enum ContractError {
     EmptyField(&'static str),
     /// A candidate was created without any supporting evidence.
     MissingEvidence,
+    /// A caller attempted to cross a steward-governed lifecycle boundary.
+    GovernanceAuthorizationRequired {
+        /// Requested state that requires the Governance & Publication context.
+        target: PublicationState,
+    },
     /// A governance state transition attempted to skip or reverse required review.
     InvalidTransition {
         /// State before the rejected transition.
@@ -296,6 +325,10 @@ impl fmt::Display for ContractError {
             Self::MissingEvidence => {
                 write!(formatter, "semantic candidates require source evidence")
             }
+            Self::GovernanceAuthorizationRequired { target } => write!(
+                formatter,
+                "publication state {target:?} requires authorized governance"
+            ),
             Self::InvalidTransition { from, to } => write!(
                 formatter,
                 "publication transition from {from:?} to {to:?} is not permitted"
@@ -316,6 +349,13 @@ mod tests {
 
     fn candidate() -> SemanticCandidate {
         SemanticCandidate::new("candidate-1", CandidateKind::Concept, vec![evidence()]).unwrap()
+    }
+
+    fn reviewed_candidate_for_governance_test() -> SemanticCandidate {
+        let mut candidate = candidate();
+        candidate.publication_state = PublicationState::Reviewed;
+        candidate.truth_status = truth_for_state(PublicationState::Reviewed);
+        candidate
     }
 
     #[test]
@@ -366,21 +406,19 @@ mod tests {
     }
 
     #[test]
-    fn reviewed_candidate_can_be_published() {
+    fn deterministic_lifecycle_stops_at_governance_boundary() {
         let mut candidate = candidate();
-        assert_eq!(candidate.truth_status(), TruthStatus::Inferred);
-        assert!(!candidate.is_publishable());
-
         candidate.transition(PublicationState::Proposed).unwrap();
-        assert_eq!(candidate.truth_status(), TruthStatus::Proposed);
         candidate.transition(PublicationState::Validated).unwrap();
+
+        assert_eq!(
+            candidate.transition(PublicationState::Reviewed),
+            Err(ContractError::GovernanceAuthorizationRequired {
+                target: PublicationState::Reviewed,
+            })
+        );
+        assert_eq!(candidate.publication_state(), PublicationState::Validated);
         assert_eq!(candidate.truth_status(), TruthStatus::Inferred);
-        candidate.transition(PublicationState::Reviewed).unwrap();
-        assert_eq!(candidate.truth_status(), TruthStatus::Inferred);
-        assert!(candidate.is_publishable());
-        candidate.transition(PublicationState::Published).unwrap();
-        assert_eq!(candidate.truth_status(), TruthStatus::Authoritative);
-        assert!(!candidate.is_publishable());
     }
 
     #[test]
@@ -405,68 +443,60 @@ mod tests {
     }
 
     #[test]
-    fn published_candidate_can_only_be_superseded() {
-        let mut candidate = candidate();
-        for state in [
-            PublicationState::Proposed,
-            PublicationState::Validated,
-            PublicationState::Reviewed,
-            PublicationState::Published,
-        ] {
-            candidate.transition(state).unwrap();
-        }
-        candidate.transition(PublicationState::Superseded).unwrap();
-        assert_eq!(candidate.truth_status(), TruthStatus::Superseded);
+    fn reviewed_and_published_state_changes_require_governance() {
+        let mut candidate = reviewed_candidate_for_governance_test();
+        assert!(candidate.is_publishable());
+        assert_eq!(
+            candidate.transition(PublicationState::Published),
+            Err(ContractError::GovernanceAuthorizationRequired {
+                target: PublicationState::Published,
+            })
+        );
         assert_eq!(
             candidate.transition(PublicationState::Rejected),
-            Err(ContractError::InvalidTransition {
-                from: PublicationState::Superseded,
-                to: PublicationState::Rejected,
+            Err(ContractError::GovernanceAuthorizationRequired {
+                target: PublicationState::Rejected,
+            })
+        );
+
+        candidate.publication_state = PublicationState::Published;
+        candidate.truth_status = truth_for_state(PublicationState::Published);
+        assert_eq!(candidate.truth_status(), TruthStatus::Authoritative);
+        assert_eq!(
+            candidate.transition(PublicationState::Superseded),
+            Err(ContractError::GovernanceAuthorizationRequired {
+                target: PublicationState::Superseded,
             })
         );
     }
 
     #[test]
-    fn publication_rechecks_evidence_at_authority_boundary() {
-        let mut candidate = candidate();
-        for state in [
-            PublicationState::Proposed,
-            PublicationState::Validated,
-            PublicationState::Reviewed,
-        ] {
-            candidate.transition(state).unwrap();
-        }
+    fn publication_eligibility_rechecks_evidence() {
+        let mut candidate = reviewed_candidate_for_governance_test();
+        assert!(candidate.is_publishable());
 
         candidate.evidence.clear();
-
-        assert_eq!(
-            candidate.transition(PublicationState::Published),
-            Err(ContractError::MissingEvidence)
-        );
-        assert_eq!(candidate.publication_state(), PublicationState::Reviewed);
-        assert_eq!(candidate.truth_status(), TruthStatus::Inferred);
+        assert!(!candidate.is_publishable());
     }
 
     #[test]
-    fn publication_revalidates_each_evidence_reference() {
-        let mut candidate = candidate();
-        for state in [
-            PublicationState::Proposed,
-            PublicationState::Validated,
-            PublicationState::Reviewed,
-        ] {
-            candidate.transition(state).unwrap();
-        }
-
+    fn publication_eligibility_revalidates_each_evidence_reference() {
+        let mut candidate = reviewed_candidate_for_governance_test();
         candidate.evidence[0].source_id = " ".into();
 
         assert!(!candidate.is_publishable());
+    }
+
+    #[test]
+    fn truth_mapping_preserves_published_and_superseded_semantics() {
         assert_eq!(
-            candidate.transition(PublicationState::Published),
-            Err(ContractError::EmptyField("source_id"))
+            truth_for_state(PublicationState::Published),
+            TruthStatus::Authoritative
         );
-        assert_eq!(candidate.publication_state(), PublicationState::Reviewed);
-        assert_eq!(candidate.truth_status(), TruthStatus::Inferred);
+        assert_eq!(
+            truth_for_state(PublicationState::Superseded),
+            TruthStatus::Superseded
+        );
     }
 
     #[test]
@@ -478,6 +508,13 @@ mod tests {
         assert_eq!(
             ContractError::MissingEvidence.to_string(),
             "semantic candidates require source evidence"
+        );
+        assert_eq!(
+            ContractError::GovernanceAuthorizationRequired {
+                target: PublicationState::Reviewed,
+            }
+            .to_string(),
+            "publication state Reviewed requires authorized governance"
         );
         assert_eq!(
             ContractError::InvalidTransition {
