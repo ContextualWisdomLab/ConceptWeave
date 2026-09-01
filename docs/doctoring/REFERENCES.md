@@ -20,7 +20,7 @@ World Wide Web Consortium. (2020). *JSON-LD 1.1*. https://www.w3.org/TR/json-ld1
 
 W3C RDF-star Working Group. (2026). *RDF 1.2 concepts and abstract data model* (Candidate Recommendation Snapshot, April 7, 2026). World Wide Web Consortium. https://www.w3.org/TR/rdf12-concepts/
 
-W3C Data Shapes Working Group. (2026). *SHACL 1.2 Core* (Working Draft, August 3, 2026). World Wide Web Consortium. https://www.w3.org/TR/shacl12-core/
+W3C Data Shapes Working Group. (2026). *SHACL 1.2 Core* (Working Draft, August 3, 2026). World Wide Web Consortium. https://www.w3.org/TR/2026/WD-shacl12-core-20260803/
 
 Apache Software Foundation. (2026). *Apache Ossie (incubating)*. https://ossie.apache.org/  
 Formerly Open Semantic Interchange (OSI); tracked as an emerging vendor-neutral semantic-model exchange specification rather than a W3C/ISO standard.
