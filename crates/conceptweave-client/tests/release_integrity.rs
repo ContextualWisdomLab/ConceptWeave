@@ -5,7 +5,7 @@ use conceptweave_domain::{EvidenceReference, PublicationState, TruthStatus};
 
 const DETACHED_ARTIFACT_BYTES: &[u8] = b"conceptweave-semantic-model-artifact-v1";
 const DETACHED_ARTIFACT_DIGEST: &str =
-    "sha256:f7e5724361404225839436726782e8c8bcfe66cfc1b7e844df6c8b93d616244a";
+    "sha256:13b5f6c3d51da7bd481e8d267a135f0c7ef2a7a4e3987ceb6a1b610e215ccefd";
 
 fn release_with_state(digest: &str, publication_state: PublicationState) -> SemanticRelease {
     SemanticRelease::new(
