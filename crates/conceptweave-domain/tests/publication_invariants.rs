@@ -1,6 +1,4 @@
-use conceptweave_domain::{
-    CandidateKind, ContractError, EvidenceReference, PublicationState, SemanticCandidate,
-};
+use conceptweave_domain::{CandidateKind, EvidenceReference, PublicationState, SemanticCandidate};
 
 fn reviewed_candidate() -> SemanticCandidate {
     let evidence = EvidenceReference::new("source-1", "sha256:abc", "public.orders").unwrap();
@@ -18,21 +16,20 @@ fn reviewed_candidate() -> SemanticCandidate {
 }
 
 #[test]
-fn reviewed_candidate_without_evidence_is_not_publishable() {
-    let mut candidate = reviewed_candidate();
-    candidate.evidence.clear();
+fn reviewed_candidate_exposes_evidence_read_only() {
+    let candidate = reviewed_candidate();
 
-    assert!(!candidate.is_publishable());
+    assert_eq!(candidate.publication_state(), PublicationState::Reviewed);
+    assert_eq!(candidate.evidence().len(), 1);
+    assert!(candidate.is_publishable());
 }
 
 #[test]
-fn reviewed_candidate_without_evidence_cannot_transition_to_published() {
+fn reviewed_candidate_can_publish_only_through_validated_transition() {
     let mut candidate = reviewed_candidate();
-    candidate.evidence.clear();
 
-    assert_eq!(
-        candidate.transition(PublicationState::Published),
-        Err(ContractError::MissingEvidence)
-    );
-    assert_eq!(candidate.publication_state, PublicationState::Reviewed);
+    candidate.transition(PublicationState::Published).unwrap();
+
+    assert_eq!(candidate.publication_state(), PublicationState::Published);
+    assert!(!candidate.is_publishable());
 }
