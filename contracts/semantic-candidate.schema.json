@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.contextualwisdomlab.org/conceptweave/semantic-candidate/0.1.0",
+  "title": "ConceptWeave Semantic Candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "candidate_id",
+    "kind",
+    "truth_status",
+    "publication_state",
+    "evidence"
+  ],
+  "properties": {
+    "candidate_id": {"type": "string", "minLength": 1},
+    "kind": {
+      "enum": [
+        "concept",
+        "taxonomy_relation",
+        "semantic_relation",
+        "constraint",
+        "dimension",
+        "measure",
+        "physical_mapping"
+      ]
+    },
+    "truth_status": {
+      "enum": [
+        "observed",
+        "inferred",
+        "proposed",
+        "authoritative",
+        "superseded",
+        "rejected"
+      ]
+    },
+    "publication_state": {
+      "enum": [
+        "draft",
+        "proposed",
+        "validated",
+        "reviewed",
+        "published",
+        "superseded",
+        "rejected"
+      ]
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source_id", "source_digest", "location"],
+        "properties": {
+          "source_id": {"type": "string", "minLength": 1},
+          "source_digest": {"type": "string", "minLength": 1},
+          "location": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

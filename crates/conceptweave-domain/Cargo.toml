@@ -1,0 +1,10 @@
+[package]
+name = "conceptweave-domain"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "Core domain contracts for governed ontology and semantic-layer engineering"
+
+[lib]
+path = "src/lib.rs"
