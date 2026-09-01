@@ -58,11 +58,13 @@ All LLM-backed induction uses `contextual-orchestrator`. Model output is untrust
 
 A consuming product can inspect a versioned `semantic_release` offline and fail closed before authoritative use. The first Client slice requires stable release identity, contract and ontology versions, truth/publication state, declared SHA-256 digest identity, provenance references, and unique concept identifiers. Admission requires an explicitly supported contract version plus `Published` and `Authoritative` state. Consuming products retain their own tenant/purpose authorization and physical data/query execution.
 
+An admitted client can also compare two releases deterministically without contacting a model/provider. Release diff applies the same authoritative-use admission policy to both inputs before returning stable previous/current release identity and sorted added/removed concept identifiers. Diff is semantic-contract evidence only; it does not authorize downstream data access, calculate business measures, mutate either release, or infer consuming-domain impact automatically.
+
 The current digest value object validates the declared `sha256:<64 hex>` identity shape. Cryptographic integrity is not claimed until a later verifier hashes the exact serialized artifact bytes and compares the result.
 
 ## 6. First Generation ↔ Client vertical
 
-`relational schema snapshot -> observed tables/columns/foreign keys -> concept/relation/dimension/measure/mapping candidates -> evidence-bound validation -> steward review -> immutable semantic_release -> offline client admission -> consuming-product ACL/query boundary`.
+`relational schema snapshot -> observed tables/columns/foreign keys -> concept/relation/dimension/measure/mapping candidates -> evidence-bound validation -> steward review -> immutable semantic_release -> offline client admission/diff -> consuming-product ACL/query boundary`.
 
 `ContextualWisdomLab/governance-risk-compliance` is the first reference source/client scenario, not a special-case algorithm. A shared golden fixture must exercise both Generation and Client without copying GRC truth into ConceptWeave or giving ConceptWeave direct GRC application-table access.
 
@@ -89,5 +91,6 @@ The current digest value object validates the declared `sha256:<64 hex>` identit
 - malformed/hostile source contracts rejected with bounded resource use;
 - semantic-model release can be reproduced from source receipts and approved proposal receipts;
 - consumer can validate release schema/version/governance state offline before authoritative use;
+- consumer can deterministically diff admitted releases without provider access or bypassing release admission;
 - exact serialized artifact digest verification exists before integrity is claimed;
 - buyer can inspect why each published artifact exists and which evidence supported it.
