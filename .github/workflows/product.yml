@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   rust-quality:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout exact source revision
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -27,6 +27,9 @@ jobs:
         env:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Validate Product CI contract
+        run: python3 scripts/check_ci_contract.py
 
       - name: Show pinned Rust toolchain
         run: rustc --version && cargo --version
