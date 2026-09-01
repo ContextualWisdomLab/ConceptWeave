@@ -10,7 +10,7 @@ fn contract_errors_explain_the_failed_admission_invariant() {
         ),
         (
             ReleaseContractError::InvalidDigest,
-            "release digest must use sha256:<64 hex>".to_string(),
+            "release digest must use sha256:<64 lowercase hex>".to_string(),
         ),
         (
             ReleaseContractError::MissingProvenance,

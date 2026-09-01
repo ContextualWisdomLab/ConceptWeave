@@ -13,9 +13,10 @@ use std::collections::BTreeSet;
 
 /// A validated content-digest identity carried by a semantic release.
 ///
-/// The current contract accepts only the explicit `sha256:<64 hex>` shape. This
-/// value object validates digest identity syntax; byte-for-byte cryptographic
-/// re-hashing belongs to the serialized-artifact verification adapter.
+/// The current contract accepts only the canonical `sha256:<64 lowercase hex>`
+/// shape. This value object validates digest identity syntax; byte-for-byte
+/// cryptographic re-hashing belongs to the serialized-artifact verification
+/// adapter.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReleaseDigest(String);
 
@@ -29,7 +30,10 @@ impl ReleaseDigest {
         if hex.len() != 64 {
             return Err(ReleaseContractError::InvalidDigest);
         }
-        if !hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        if !hex
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+        {
             return Err(ReleaseContractError::InvalidDigest);
         }
         Ok(Self(value))
@@ -242,7 +246,7 @@ fn require_non_blank(value: &str, field: &'static str) -> Result<(), ReleaseCont
 pub enum ReleaseContractError {
     /// A required stable identity or version field was blank.
     EmptyField(&'static str),
-    /// The declared release digest is not `sha256:<64 hex>`.
+    /// The declared release digest is not canonical `sha256:<64 lowercase hex>`.
     InvalidDigest,
     /// The release carries no provenance evidence.
     MissingProvenance,
@@ -271,7 +275,10 @@ impl fmt::Display for ReleaseContractError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::EmptyField(field) => write!(formatter, "required field `{field}` is blank"),
-            Self::InvalidDigest => write!(formatter, "release digest must use sha256:<64 hex>"),
+            Self::InvalidDigest => write!(
+                formatter,
+                "release digest must use sha256:<64 lowercase hex>"
+            ),
             Self::MissingProvenance => {
                 write!(formatter, "semantic releases require provenance evidence")
             }
