@@ -11,11 +11,11 @@ Only the repository bootstrap README exists before the foundation PR. No product
 | Area | Status | Evidence / next action |
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | PRD/TRD/ADR/context map define Semantic Model Engineering and CWL boundaries. |
-| Truth/publication lifecycle | ACTIVE_PR | Rust domain contract + JSON Schema enforce evidence and reviewed-before-published lifecycle. |
+| Truth/publication lifecycle | ACTIVE_PR | Rust domain lifecycle defines Draft -> Proposed -> Validated -> Reviewed -> Published. Draft 2020-12 JSON Schema enforces candidate shape, non-blank evidence identities, and Published -> Authoritative consistency; lifecycle history/pre-Reviewed publication is not a JSON-Schema responsibility. A test-first regression currently requires Reviewed -> Published to fail if required evidence is absent before this slice can be merge-ready. |
 | Rust baseline | ACTIVE_PR | Rust 1.98.0 workspace, unsafe forbidden, public docs required. |
-| Quality gate | ACTIVE_PR | Product workflow for fmt/clippy/tests/docs/coverage/schema/lock/clean-tree. |
-| Standards/research | ACTIVE_PR | Stable-vs-draft standards and ontology-engineering research doctoring. |
-| Security/test/operability | ACTIVE_PR | Baselines added; no production service claimed. |
+| Quality gate | ACTIVE_PR | Product workflow for fmt/clippy/tests/docs/coverage/Draft-2020-12 schema fixtures/lock/clean-tree; exact current-head hosted execution remains required. |
+| Standards/research | ACTIVE_PR | Stable-vs-draft standards plus paper-by-paper Generation/Client/Bridge/cross-cutting capability and evaluation traceability. |
+| Security/test/operability | ACTIVE_PR | Baselines added; published semantic truth is specified as immutable with correction by superseding release; no production service claimed. |
 
 ## P0 product gaps after foundation
 
