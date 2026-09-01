@@ -3,9 +3,9 @@ use conceptweave_client::{
 };
 use conceptweave_domain::{EvidenceReference, PublicationState, TruthStatus};
 
-const ARTIFACT_BYTES: &[u8] = b"conceptweave-semantic-release-v1";
-const ARTIFACT_DIGEST: &str =
-    "sha256:a141df3d94076487b7063ccb10d62a723f922b4440fa145fa16fd661d7259d1d";
+const DETACHED_ARTIFACT_BYTES: &[u8] = b"conceptweave-semantic-model-artifact-v1";
+const DETACHED_ARTIFACT_DIGEST: &str =
+    "sha256:f7e5724361404225839436726782e8c8bcfe66cfc1b7e844df6c8b93d616244a";
 
 fn release_with_state(digest: &str, publication_state: PublicationState) -> SemanticRelease {
     SemanticRelease::new(
@@ -36,23 +36,25 @@ fn published_release(digest: &str) -> SemanticRelease {
 }
 
 #[test]
-fn serialized_artifact_digest_verification_accepts_exact_bytes_offline() {
+fn detached_artifact_digest_verification_accepts_exact_bytes_offline() {
     let client = SemanticReleaseClient::new("1.0.0").unwrap();
-    let release = published_release(ARTIFACT_DIGEST);
+    let release = published_release(DETACHED_ARTIFACT_DIGEST);
 
     assert_eq!(
-        client.verify_serialized_artifact(&release, ARTIFACT_BYTES),
+        client.verify_detached_artifact(&release, DETACHED_ARTIFACT_BYTES),
         Ok(())
     );
 }
 
 #[test]
-fn serialized_artifact_digest_verification_rejects_changed_bytes() {
+fn detached_artifact_digest_verification_rejects_changed_bytes() {
     let client = SemanticReleaseClient::new("1.0.0").unwrap();
-    let release = published_release(ARTIFACT_DIGEST);
+    let release = published_release(DETACHED_ARTIFACT_DIGEST);
 
-    let result =
-        client.verify_serialized_artifact(&release, b"conceptweave-semantic-release-v1-tampered");
+    let result = client.verify_detached_artifact(
+        &release,
+        b"conceptweave-semantic-model-artifact-v1-tampered",
+    );
 
     assert!(matches!(
         result,
@@ -61,12 +63,15 @@ fn serialized_artifact_digest_verification_rejects_changed_bytes() {
 }
 
 #[test]
-fn serialized_artifact_digest_verification_rejects_unpublished_release() {
+fn detached_artifact_digest_verification_rejects_unpublished_release() {
     let client = SemanticReleaseClient::new("1.0.0").unwrap();
-    let release = release_with_state(ARTIFACT_DIGEST, PublicationState::Proposed);
+    let release = release_with_state(
+        DETACHED_ARTIFACT_DIGEST,
+        PublicationState::Proposed,
+    );
 
     assert_eq!(
-        client.verify_serialized_artifact(&release, ARTIFACT_BYTES),
+        client.verify_detached_artifact(&release, DETACHED_ARTIFACT_BYTES),
         Err(ReleaseContractError::ReleaseNotPublished {
             actual: PublicationState::Proposed,
         })
