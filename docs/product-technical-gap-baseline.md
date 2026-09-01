@@ -11,11 +11,11 @@ Only the repository bootstrap README exists before the foundation PR. No product
 | Area | Owner | Status | Evidence / action / next verification |
 | --- | --- | --- | --- |
 | Product boundary | ConceptWeave | ACTIVE_PR | PRD/TRD/ADR/context map define Semantic Model Engineering and CWL boundaries. Revalidate against the exact PR #1 head before merge. |
-| Truth/publication lifecycle | Governance & Publication | ACTIVE_PR | Rust domain lifecycle defines Draft -> Proposed -> Validated -> Reviewed -> Published. Draft 2020-12 candidate schema enforces candidate shape and Published -> Authoritative consistency. |
+| Truth/publication lifecycle | Governance & Publication | ACTIVE_PR | Rust domain lifecycle defines Draft -> Proposed -> Validated while the public transition API fails closed at steward-reviewed/publication boundaries; Draft 2020-12 candidate schema enforces public candidate shape and Published -> Authoritative consistency. |
 | Rust baseline | ConceptWeave | ACTIVE_PR | Rust 1.98.0 workspace, unsafe forbidden, public docs required. |
-| Quality gate | ConceptWeave | ACTIVE_PR | Product workflow checks exact checkout, fmt, Clippy, tests, docs, exact owned coverage, JSON contracts, lock freshness, and clean tree. Repository-owned Product was green on foundation head `5cd7d1de742fe34aa99900641cc8b124e7c65f9e`; predecessor results never transfer to a newer head. |
+| Quality gate | ConceptWeave | ACTIVE_PR | Product workflow checks exact checkout, CI contract, fmt, Clippy, tests, rustdoc, exact owned 100% line/function/region/source-branch coverage, JSON contracts, lock freshness, and clean tree. Foundation PR #1 current exact head must supply fresh evidence; predecessor evidence never transfers. |
 | Standards/research | ConceptWeave | ACTIVE_PR | Stable-vs-draft standards plus paper-by-paper Generation/Client/Bridge/cross-cutting capability and evaluation traceability. |
-| Security/test/operability | ConceptWeave | ACTIVE_PR | Baselines added; published semantic truth is immutable with correction by superseding release; no production service claimed. |
+| Security/test/operability | ConceptWeave + central `.github` security workflow | ACTIVE_PR / CONTROL_PLANE_BLOCKED | Product and SAST execute on the exact foundation head. Security Scan is fail-closed because Dependency Review authoritative comparison evidence is currently unavailable; sibling scanners do not substitute. |
 
 ## Active Client Consumption slice — PR #5 / Issue #3
 
@@ -32,9 +32,11 @@ PR #5 is intentionally stacked on PR #1 because the client reuses only the found
 | Query-plan contract | Client Consumption | GAP | Issue #3 requires plans without owning physical execution. | Define versioned semantic query-plan DTO and consuming-product ACL seam. | GRC golden round-trip with no cross-service SQL. |
 | Consumer authorization | Downstream product / Keyverse boundary | EXTERNAL_OWNERSHIP | ConceptWeave client performs governance/compatibility admission only. | Keep tenant/purpose authorization and physical execution in consuming products. | Cross-tenant/purpose denial tests in each consumer. |
 
-## Causal control-plane gap
+## Central control-plane evidence
 
-Organization-required Security/SAST runner admission is owned by `ContextualWisdomLab/.github`, not by a leaf ConceptWeave source workaround. Central PR #1618 pins the affected required workflows from floating `ubuntu-latest` to explicit `ubuntu-24.04` with a regression contract and has demonstrated Security Scan and SAST Semgrep success on its own exact head. ConceptWeave must continue to require fresh exact-head central evidence after that control-plane repair lands; no predecessor result, no-op retrigger, or governance bypass is acceptable.
+The runner-admission defect was repaired at the owning central boundary: `ContextualWisdomLab/.github` PR #1618 merged after changing the affected organization-required Security Scan/SAST runner selectors from the observed-starved floating `ubuntu-latest` to explicit `ubuntu-24.04` while retaining exact-head validation, scanner logic, permissions, thresholds and immutable action pins.
+
+Fresh foundation PR #1 head `bba351b77bf5f1ab5cfd55979fbb2bd158f78b81` proves the runner repair reached this repository: Product run `33527150325` and SAST run `33527150417` are terminal success, and Security Scan run `33527150445` acquired an Ubuntu 24.04 runner and checked out the exact head. Security then failed at a different central evidence boundary: dependency-review job `99920784712` received HTTP `403` with curl exit `0` from the exact dependency-graph comparison `main@f4f440dd58c77d7cd90dff8a1eb2eeb9a9940425...bba351b77bf5f1ab5cfd55979fbb2bd158f78b81`. The fail-closed workflow correctly did not run the pinned Dependency Review action. Central `.github#810` owns this availability/configuration incident; ConceptWeave must not weaken the gate or substitute OSV/Trivy/Scorecard. GREEN requires an unchanged public non-fork head where the exact comparison returns HTTP 200 and the pinned Dependency Review action actually executes terminally.
 
 ## Remaining P0 product gaps
 
