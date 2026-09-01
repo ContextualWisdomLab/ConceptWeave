@@ -26,7 +26,10 @@ fn release(release_id: &str, concept_ids: &[&str], state: PublicationState) -> S
         )
         .unwrap(),
         vec![evidence()],
-        concept_ids.iter().map(|value| (*value).to_string()).collect(),
+        concept_ids
+            .iter()
+            .map(|value| (*value).to_string())
+            .collect(),
     )
     .unwrap()
 }
