@@ -114,7 +114,11 @@ jobs:
         run: |
           cargo generate-lockfile --locked
           git ls-files --error-unmatch Cargo.lock >/dev/null
-          test -z "$(git status --porcelain=v1 --untracked-files=all -- Cargo.lock)"
+          if ! test -z "$(git status --porcelain=v1 --untracked-files=all -- Cargo.lock)"; then
+            echo "::error::Cargo.lock changed while validating the declared dependency graph"
+            git diff -- Cargo.lock
+            exit 1
+          fi
 
       - name: Clean working tree
         run: test -z "$(git status --porcelain=v1 --untracked-files=all)"

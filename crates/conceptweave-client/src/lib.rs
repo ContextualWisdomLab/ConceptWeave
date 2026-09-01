@@ -9,14 +9,16 @@
 
 use conceptweave_domain::{EvidenceReference, PublicationState, TruthStatus};
 use core::fmt;
+use core::fmt::Write as _;
+use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 /// A validated content-digest identity carried by a semantic release.
 ///
 /// The current contract accepts only the canonical `sha256:<64 lowercase hex>`
-/// shape. This value object validates digest identity syntax; byte-for-byte
-/// cryptographic re-hashing belongs to the serialized-artifact verification
-/// adapter.
+/// shape. This value object validates digest identity syntax; exact serialized
+/// bytes are cryptographically verified by
+/// [`SemanticReleaseClient::verify_serialized_artifact`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReleaseDigest(String);
 
@@ -268,6 +270,36 @@ impl SemanticReleaseClient {
         Ok(())
     }
 
+    /// Verifies the SHA-256 digest of exact serialized semantic-release bytes.
+    ///
+    /// The release must first satisfy the same authoritative-use admission gate
+    /// as other Client operations. The caller supplies the exact bytes whose
+    /// identity is declared by [`SemanticRelease::artifact_digest`]; this method
+    /// performs no network access, parsing, provider call, or source-system read.
+    pub fn verify_serialized_artifact(
+        &self,
+        release: &SemanticRelease,
+        artifact_bytes: &[u8],
+    ) -> Result<(), ReleaseContractError> {
+        self.validate_for_authoritative_use(release)?;
+
+        let digest = Sha256::digest(artifact_bytes);
+        let mut computed = String::with_capacity("sha256:".len() + digest.len() * 2);
+        computed.push_str("sha256:");
+        for byte in digest {
+            write!(&mut computed, "{byte:02x}").expect("writing to String cannot fail");
+        }
+
+        let declared = release.artifact_digest().as_str();
+        if computed != declared {
+            return Err(ReleaseContractError::ArtifactDigestMismatch {
+                declared: declared.to_string(),
+                computed,
+            });
+        }
+        Ok(())
+    }
+
     /// Compares two admitted releases and reports deterministic concept changes.
     ///
     /// Both releases pass the same authoritative-use admission gate before any
@@ -319,6 +351,13 @@ pub enum ReleaseContractError {
     EmptyField(&'static str),
     /// The declared release digest is not canonical `sha256:<64 lowercase hex>`.
     InvalidDigest,
+    /// Exact serialized bytes do not match the digest declared by the release.
+    ArtifactDigestMismatch {
+        /// Digest coordinate declared by the semantic release.
+        declared: String,
+        /// SHA-256 digest computed from the exact supplied bytes.
+        computed: String,
+    },
     /// The release carries no provenance evidence.
     MissingProvenance,
     /// The release repeats one semantic concept identity.
@@ -349,6 +388,10 @@ impl fmt::Display for ReleaseContractError {
             Self::InvalidDigest => write!(
                 formatter,
                 "release digest must use sha256:<64 lowercase hex>"
+            ),
+            Self::ArtifactDigestMismatch { declared, computed } => write!(
+                formatter,
+                "semantic release artifact digest mismatch: declared `{declared}`, computed `{computed}`"
             ),
             Self::MissingProvenance => {
                 write!(formatter, "semantic releases require provenance evidence")

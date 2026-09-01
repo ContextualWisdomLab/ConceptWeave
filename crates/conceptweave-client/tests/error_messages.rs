@@ -13,6 +13,14 @@ fn contract_errors_explain_the_failed_admission_invariant() {
             "release digest must use sha256:<64 lowercase hex>".to_string(),
         ),
         (
+            ReleaseContractError::ArtifactDigestMismatch {
+                declared: "sha256:declared".to_string(),
+                computed: "sha256:computed".to_string(),
+            },
+            "semantic release artifact digest mismatch: declared `sha256:declared`, computed `sha256:computed`"
+                .to_string(),
+        ),
+        (
             ReleaseContractError::MissingProvenance,
             "semantic releases require provenance evidence".to_string(),
         ),

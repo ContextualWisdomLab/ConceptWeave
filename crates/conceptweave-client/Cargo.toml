@@ -9,3 +9,4 @@ description = "Offline semantic-release admission contracts for ConceptWeave con
 
 [dependencies]
 conceptweave-domain = { path = "../conceptweave-domain" }
+sha2 = "0.10.9"
