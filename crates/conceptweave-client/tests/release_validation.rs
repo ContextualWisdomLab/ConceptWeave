@@ -1,5 +1,5 @@
 use conceptweave_client::{
-    ReleaseContractError, ReleaseDigest, SemanticRelease, SemanticReleaseClient,
+    ReleaseContractError, ReleaseDigest, ReleaseMetadata, SemanticRelease, SemanticReleaseClient,
 };
 use conceptweave_domain::{EvidenceReference, PublicationState, TruthStatus};
 
@@ -17,15 +17,22 @@ fn digest() -> ReleaseDigest {
         .unwrap()
 }
 
+fn metadata(contract_version: &str) -> ReleaseMetadata {
+    ReleaseMetadata::new(
+        "semantic-release-grc-2026-09-01",
+        contract_version,
+        "grc-ontology-2026-09",
+    )
+    .unwrap()
+}
+
 fn release(
     contract_version: &str,
     truth_status: TruthStatus,
     publication_state: PublicationState,
 ) -> SemanticRelease {
     SemanticRelease::new(
-        "semantic-release-grc-2026-09-01",
-        contract_version,
-        "grc-ontology-2026-09",
+        metadata(contract_version),
         truth_status,
         publication_state,
         digest(),
@@ -107,32 +114,29 @@ fn client_rejects_unsupported_contract_version_before_use() {
 }
 
 #[test]
-fn release_requires_identity_versions_provenance_and_unique_non_blank_concepts() {
+fn metadata_requires_non_blank_release_contract_and_ontology_versions() {
     for (release_id, contract_version, ontology_version, expected_field) in [
         (" ", "1.0.0", "ontology-1", "release_id"),
         ("release-1", " ", "ontology-1", "contract_version"),
         ("release-1", "1.0.0", " ", "ontology_version"),
     ] {
         assert_eq!(
-            SemanticRelease::new(
-                release_id,
-                contract_version,
-                ontology_version,
-                TruthStatus::Authoritative,
-                PublicationState::Published,
-                digest(),
-                vec![evidence()],
-                vec!["concept.one".to_string()],
-            ),
+            ReleaseMetadata::new(release_id, contract_version, ontology_version),
             Err(ReleaseContractError::EmptyField(expected_field))
         );
     }
 
+    let metadata = ReleaseMetadata::new("release-1", "1.0.0", "ontology-1").unwrap();
+    assert_eq!(metadata.release_id(), "release-1");
+    assert_eq!(metadata.contract_version(), "1.0.0");
+    assert_eq!(metadata.ontology_version(), "ontology-1");
+}
+
+#[test]
+fn release_requires_provenance_and_unique_non_blank_concepts() {
     assert_eq!(
         SemanticRelease::new(
-            "release-1",
-            "1.0.0",
-            "ontology-1",
+            metadata("1.0.0"),
             TruthStatus::Authoritative,
             PublicationState::Published,
             digest(),
@@ -144,9 +148,7 @@ fn release_requires_identity_versions_provenance_and_unique_non_blank_concepts()
 
     assert_eq!(
         SemanticRelease::new(
-            "release-1",
-            "1.0.0",
-            "ontology-1",
+            metadata("1.0.0"),
             TruthStatus::Authoritative,
             PublicationState::Published,
             digest(),
@@ -158,9 +160,7 @@ fn release_requires_identity_versions_provenance_and_unique_non_blank_concepts()
 
     assert_eq!(
         SemanticRelease::new(
-            "release-1",
-            "1.0.0",
-            "ontology-1",
+            metadata("1.0.0"),
             TruthStatus::Authoritative,
             PublicationState::Published,
             digest(),
