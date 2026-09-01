@@ -18,12 +18,14 @@ fn release_with_digest(digest: &str) -> SemanticRelease {
         TruthStatus::Authoritative,
         PublicationState::Published,
         ReleaseDigest::new(digest).unwrap(),
-        vec![EvidenceReference::new(
-            "snapshot:grc-schema-2026-09-01",
-            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "public.control_evidence.control_identifier",
-        )
-        .unwrap()],
+        vec![
+            EvidenceReference::new(
+                "snapshot:grc-schema-2026-09-01",
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "public.control_evidence.control_identifier",
+            )
+            .unwrap(),
+        ],
         vec!["control.evidence".to_string()],
     )
     .unwrap()
@@ -34,7 +36,10 @@ fn serialized_artifact_digest_verification_accepts_exact_bytes_offline() {
     let client = SemanticReleaseClient::new("1.0.0").unwrap();
     let release = release_with_digest(ARTIFACT_DIGEST);
 
-    assert_eq!(client.verify_serialized_artifact(&release, ARTIFACT_BYTES), Ok(()));
+    assert_eq!(
+        client.verify_serialized_artifact(&release, ARTIFACT_BYTES),
+        Ok(())
+    );
 }
 
 #[test]
@@ -42,10 +47,8 @@ fn serialized_artifact_digest_verification_rejects_changed_bytes() {
     let client = SemanticReleaseClient::new("1.0.0").unwrap();
     let release = release_with_digest(ARTIFACT_DIGEST);
 
-    let result = client.verify_serialized_artifact(
-        &release,
-        b"conceptweave-semantic-release-v1-tampered",
-    );
+    let result =
+        client.verify_serialized_artifact(&release, b"conceptweave-semantic-release-v1-tampered");
 
     assert!(matches!(
         result,
