@@ -1,5 +1,7 @@
 # ConceptWeave
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ContextualWisdomLab/ConceptWeave)
+
 **Automatic ontology and semantic-layer engineering for governed enterprise meaning.**
 
 ConceptWeave turns heterogeneous enterprise evidence—schemas, APIs, event contracts, documents, code structure, existing vocabularies, and lineage—into **reviewable semantic-model candidates**. It does not make model-generated meaning authoritative by itself. Candidates must retain source evidence, pass deterministic validation, and move through an explicit governance lifecycle before publication.
@@ -48,4 +50,4 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-See [`docs/PRD.md`](docs/PRD.md), [`docs/TRD.md`](docs/TRD.md), and [`ARCHITECTURE.md`](ARCHITECTURE.md).
+See [`docs/PRD.md`](docs/PRD.md), [`docs/TRD.md`](docs/TRD.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), and the [documentation home](docs/index.md).
