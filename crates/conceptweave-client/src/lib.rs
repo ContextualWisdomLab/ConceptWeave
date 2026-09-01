@@ -9,7 +9,6 @@
 
 use conceptweave_domain::{EvidenceReference, PublicationState, TruthStatus};
 use core::fmt;
-use core::fmt::Write as _;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
@@ -283,11 +282,15 @@ impl SemanticReleaseClient {
     ) -> Result<(), ReleaseContractError> {
         self.validate_for_authoritative_use(release)?;
 
+        const HEX: &[u8; 16] = b"0123456789abcdef";
         let digest = Sha256::digest(artifact_bytes);
         let mut computed = String::with_capacity("sha256:".len() + digest.len() * 2);
         computed.push_str("sha256:");
         for byte in digest {
-            write!(&mut computed, "{byte:02x}").expect("writing to String cannot fail");
+            let high_nibble = usize::from(byte >> 4);
+            let low_nibble = usize::from(byte & 0x0f);
+            computed.push(char::from(HEX[high_nibble]));
+            computed.push(char::from(HEX[low_nibble]));
         }
 
         let declared = release.artifact_digest().as_str();
