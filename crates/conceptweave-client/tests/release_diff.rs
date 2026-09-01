@@ -59,21 +59,25 @@ fn release_diff_reports_deterministic_added_and_removed_concepts() {
 #[test]
 fn release_diff_fails_closed_when_either_release_is_not_admissible() {
     let client = SemanticReleaseClient::new("1.0.0").unwrap();
-    let previous = release(
-        "semantic-release-grc-v1",
+    let published = release(
+        "semantic-release-grc-published",
         &["control.evidence"],
         PublicationState::Published,
     );
-    let reviewed = release(
-        "semantic-release-grc-v2",
+    let reviewed_previous = release(
+        "semantic-release-grc-reviewed-previous",
+        &["control.owner"],
+        PublicationState::Reviewed,
+    );
+    let reviewed_current = release(
+        "semantic-release-grc-reviewed-current",
         &["control.effectiveness"],
         PublicationState::Reviewed,
     );
+    let expected = Err(ReleaseContractError::ReleaseNotPublished {
+        actual: PublicationState::Reviewed,
+    });
 
-    assert_eq!(
-        client.diff(&previous, &reviewed),
-        Err(ReleaseContractError::ReleaseNotPublished {
-            actual: PublicationState::Reviewed,
-        })
-    );
+    assert_eq!(client.diff(&reviewed_previous, &published), expected);
+    assert_eq!(client.diff(&published, &reviewed_current), expected);
 }
