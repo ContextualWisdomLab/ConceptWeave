@@ -41,12 +41,58 @@ impl ReleaseDigest {
     }
 }
 
-/// Immutable client-visible metadata required to admit a semantic release.
+/// Stable identity and version metadata for one semantic release.
+///
+/// Keeping these related identity fields in one value object prevents call sites
+/// from relying on a long positional constructor and makes later compatibility
+/// policy explicit without exposing mutable release internals.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SemanticRelease {
+pub struct ReleaseMetadata {
     release_id: String,
     contract_version: String,
     ontology_version: String,
+}
+
+impl ReleaseMetadata {
+    /// Creates validated stable release, contract, and ontology identities.
+    pub fn new(
+        release_id: impl Into<String>,
+        contract_version: impl Into<String>,
+        ontology_version: impl Into<String>,
+    ) -> Result<Self, ReleaseContractError> {
+        let release_id = release_id.into();
+        let contract_version = contract_version.into();
+        let ontology_version = ontology_version.into();
+        require_non_blank(&release_id, "release_id")?;
+        require_non_blank(&contract_version, "contract_version")?;
+        require_non_blank(&ontology_version, "ontology_version")?;
+        Ok(Self {
+            release_id,
+            contract_version,
+            ontology_version,
+        })
+    }
+
+    /// Returns the stable semantic-release identity.
+    pub fn release_id(&self) -> &str {
+        &self.release_id
+    }
+
+    /// Returns the client contract version encoded by the release.
+    pub fn contract_version(&self) -> &str {
+        &self.contract_version
+    }
+
+    /// Returns the ontology/model version encoded by the release.
+    pub fn ontology_version(&self) -> &str {
+        &self.ontology_version
+    }
+}
+
+/// Immutable client-visible metadata required to admit a semantic release.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SemanticRelease {
+    metadata: ReleaseMetadata,
     truth_status: TruthStatus,
     publication_state: PublicationState,
     artifact_digest: ReleaseDigest,
@@ -57,28 +103,18 @@ pub struct SemanticRelease {
 impl SemanticRelease {
     /// Constructs a structurally valid semantic release contract.
     ///
-    /// Construction validates stable identity, version metadata, provenance and
-    /// concept identity uniqueness. Whether the release is safe for authoritative
-    /// use is a separate client-policy decision performed by
-    /// [`SemanticReleaseClient::validate_for_authoritative_use`].
-    #[allow(clippy::too_many_arguments)]
+    /// Construction validates provenance and concept identity uniqueness while
+    /// [`ReleaseMetadata`] validates stable release/version identities. Whether
+    /// the release is safe for authoritative use is a separate client-policy
+    /// decision performed by [`SemanticReleaseClient::validate_for_authoritative_use`].
     pub fn new(
-        release_id: impl Into<String>,
-        contract_version: impl Into<String>,
-        ontology_version: impl Into<String>,
+        metadata: ReleaseMetadata,
         truth_status: TruthStatus,
         publication_state: PublicationState,
         artifact_digest: ReleaseDigest,
         provenance: Vec<EvidenceReference>,
         concept_ids: Vec<String>,
     ) -> Result<Self, ReleaseContractError> {
-        let release_id = release_id.into();
-        let contract_version = contract_version.into();
-        let ontology_version = ontology_version.into();
-
-        require_non_blank(&release_id, "release_id")?;
-        require_non_blank(&contract_version, "contract_version")?;
-        require_non_blank(&ontology_version, "ontology_version")?;
         if provenance.is_empty() {
             return Err(ReleaseContractError::MissingProvenance);
         }
@@ -94,9 +130,7 @@ impl SemanticRelease {
         }
 
         Ok(Self {
-            release_id,
-            contract_version,
-            ontology_version,
+            metadata,
             truth_status,
             publication_state,
             artifact_digest,
@@ -107,17 +141,17 @@ impl SemanticRelease {
 
     /// Returns the stable semantic-release identity.
     pub fn release_id(&self) -> &str {
-        &self.release_id
+        self.metadata.release_id()
     }
 
     /// Returns the client contract version encoded by this release.
     pub fn contract_version(&self) -> &str {
-        &self.contract_version
+        self.metadata.contract_version()
     }
 
     /// Returns the ontology/model version carried by this release.
     pub fn ontology_version(&self) -> &str {
-        &self.ontology_version
+        self.metadata.ontology_version()
     }
 
     /// Returns the release truth status.
@@ -181,10 +215,10 @@ impl SemanticReleaseClient {
         &self,
         release: &SemanticRelease,
     ) -> Result<(), ReleaseContractError> {
-        if release.contract_version != self.supported_contract_version {
+        if release.contract_version() != self.supported_contract_version {
             return Err(ReleaseContractError::UnsupportedContractVersion {
                 expected: self.supported_contract_version.clone(),
-                actual: release.contract_version.clone(),
+                actual: release.contract_version().to_string(),
             });
         }
         if release.publication_state != PublicationState::Published {
