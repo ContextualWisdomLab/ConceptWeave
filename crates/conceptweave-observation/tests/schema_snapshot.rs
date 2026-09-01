@@ -157,10 +157,34 @@ fn source_identifiers_and_evidence_reject_unicode_whitespace_only_values() {
     );
 
     for (source_connection_key, snapshot_digest, extractor_revision, observed_at_utc, field) in [
-        ("\t", "digest", "extractor", "time", "source_connection_key"),
-        ("source", "\u{2003}", "extractor", "time", "snapshot_digest"),
-        ("source", "digest", "\n", "time", "extractor_revision"),
-        ("source", "digest", "extractor", " ", "observed_at_utc"),
+        (
+            "\t",
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "extractor",
+            "time",
+            "source_connection_key",
+        ),
+        (
+            "source",
+            "\u{2003}",
+            "extractor",
+            "time",
+            "snapshot_digest",
+        ),
+        (
+            "source",
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "\n",
+            "time",
+            "extractor_revision",
+        ),
+        (
+            "source",
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "extractor",
+            " ",
+            "observed_at_utc",
+        ),
     ] {
         let error = PostgresSchemaSnapshot::new(
             source_connection_key,
@@ -171,6 +195,31 @@ fn source_identifiers_and_evidence_reject_unicode_whitespace_only_values() {
         )
         .expect_err("blank snapshot evidence must fail closed");
         assert_eq!(error, ObservationError::InvalidObservationField { field });
+    }
+}
+
+#[test]
+fn snapshot_digest_requires_canonical_sha256_identity() {
+    for digest in [
+        "digest",
+        "sha256:abc",
+        "sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "sha512:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    ] {
+        let error = PostgresSchemaSnapshot::new(
+            "warehouse-primary",
+            digest,
+            "postgres-introspector/1",
+            "2026-09-02T00:00:00Z",
+            Vec::new(),
+        )
+        .expect_err("snapshot digests must be canonical lowercase SHA-256 identities");
+        assert_eq!(
+            error,
+            ObservationError::InvalidObservationField {
+                field: "snapshot_digest"
+            }
+        );
     }
 }
 
