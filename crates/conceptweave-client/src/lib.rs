@@ -269,6 +269,25 @@ impl SemanticReleaseClient {
         Ok(())
     }
 
+    /// Resolves one exact concept identifier from an admitted semantic release.
+    ///
+    /// Resolution is deliberately exact and deterministic: it performs no
+    /// case-folding, fuzzy matching, ontology inference, provider call, or
+    /// mutation. The release must first pass authoritative-use admission.
+    pub fn resolve_concept<'release>(
+        &self,
+        release: &'release SemanticRelease,
+        concept_id: &str,
+    ) -> Result<Option<&'release str>, ReleaseContractError> {
+        require_non_blank(concept_id, "concept_id")?;
+        self.validate_for_authoritative_use(release)?;
+        Ok(release
+            .concept_ids()
+            .iter()
+            .map(String::as_str)
+            .find(|candidate| *candidate == concept_id))
+    }
+
     /// Verifies the SHA-256 digest of exact serialized semantic-release bytes.
     ///
     /// The release must first satisfy the same authoritative-use admission gate
