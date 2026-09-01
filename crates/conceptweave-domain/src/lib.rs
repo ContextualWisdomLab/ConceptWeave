@@ -84,14 +84,25 @@ pub enum PublicationState {
 }
 
 /// A stable reference to the evidence supporting a semantic candidate.
+///
+/// Evidence identity is immutable outside this crate. Callers must construct a
+/// reference through [`EvidenceReference::new`], which rejects blank identity
+/// fields, and can inspect values only through read-only accessors.
+///
+/// ```compile_fail
+/// use conceptweave_domain::EvidenceReference;
+///
+/// let reference = EvidenceReference {
+///     source_id: "source-1".into(),
+///     source_digest: "sha256:abc".into(),
+///     location: "public.orders".into(),
+/// };
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvidenceReference {
-    /// Stable identifier of the observed source snapshot or artifact.
-    pub source_id: String,
-    /// Content digest of the exact source revision used as evidence.
-    pub source_digest: String,
-    /// Human- and machine-readable location within the source artifact.
-    pub location: String,
+    source_id: String,
+    source_digest: String,
+    location: String,
 }
 
 impl EvidenceReference {
@@ -101,23 +112,41 @@ impl EvidenceReference {
         source_digest: impl Into<String>,
         location: impl Into<String>,
     ) -> Result<Self, ContractError> {
-        let source_id = source_id.into();
-        let source_digest = source_digest.into();
-        let location = location.into();
-        if source_id.trim().is_empty() {
+        let reference = Self {
+            source_id: source_id.into(),
+            source_digest: source_digest.into(),
+            location: location.into(),
+        };
+        reference.validate()?;
+        Ok(reference)
+    }
+
+    /// Returns the stable identifier of the observed source snapshot or artifact.
+    pub fn source_id(&self) -> &str {
+        &self.source_id
+    }
+
+    /// Returns the content digest of the exact source revision used as evidence.
+    pub fn source_digest(&self) -> &str {
+        &self.source_digest
+    }
+
+    /// Returns the human- and machine-readable location within the source artifact.
+    pub fn location(&self) -> &str {
+        &self.location
+    }
+
+    fn validate(&self) -> Result<(), ContractError> {
+        if self.source_id.trim().is_empty() {
             return Err(ContractError::EmptyField("source_id"));
         }
-        if source_digest.trim().is_empty() {
+        if self.source_digest.trim().is_empty() {
             return Err(ContractError::EmptyField("source_digest"));
         }
-        if location.trim().is_empty() {
+        if self.location.trim().is_empty() {
             return Err(ContractError::EmptyField("location"));
         }
-        Ok(Self {
-            source_id,
-            source_digest,
-            location,
-        })
+        Ok(())
     }
 }
 
@@ -143,7 +172,7 @@ pub struct SemanticCandidate {
 }
 
 impl SemanticCandidate {
-    /// Creates an inferred draft candidate with at least one evidence reference.
+    /// Creates an inferred draft candidate with at least one valid evidence reference.
     pub fn new(
         candidate_id: impl Into<String>,
         kind: CandidateKind,
@@ -153,9 +182,7 @@ impl SemanticCandidate {
         if candidate_id.trim().is_empty() {
             return Err(ContractError::EmptyField("candidate_id"));
         }
-        if evidence.is_empty() {
-            return Err(ContractError::MissingEvidence);
-        }
+        validate_evidence(&evidence)?;
         let publication_state = PublicationState::Draft;
         Ok(Self {
             candidate_id,
@@ -197,8 +224,8 @@ impl SemanticCandidate {
         if !ALLOWED_TRANSITIONS.contains(&(from, target)) {
             return Err(ContractError::InvalidTransition { from, to: target });
         }
-        if target == PublicationState::Published && self.evidence.is_empty() {
-            return Err(ContractError::MissingEvidence);
+        if target == PublicationState::Published {
+            validate_evidence(&self.evidence)?;
         }
         self.publication_state = target;
         self.truth_status = truth_for_state(target);
@@ -207,8 +234,19 @@ impl SemanticCandidate {
 
     /// Returns whether the candidate is immediately eligible for publication.
     pub fn is_publishable(&self) -> bool {
-        self.publication_state == PublicationState::Reviewed && !self.evidence.is_empty()
+        self.publication_state == PublicationState::Reviewed
+            && validate_evidence(&self.evidence).is_ok()
     }
+}
+
+fn validate_evidence(evidence: &[EvidenceReference]) -> Result<(), ContractError> {
+    if evidence.is_empty() {
+        return Err(ContractError::MissingEvidence);
+    }
+    for reference in evidence {
+        reference.validate()?;
+    }
+    Ok(())
 }
 
 const ALLOWED_TRANSITIONS: &[(PublicationState, PublicationState)] = &[
@@ -281,9 +319,9 @@ mod tests {
     #[test]
     fn evidence_reference_accepts_valid_values() {
         let reference = evidence();
-        assert_eq!(reference.source_id, "source-1");
-        assert_eq!(reference.source_digest, "sha256:abc");
-        assert_eq!(reference.location, "schema.orders.total");
+        assert_eq!(reference.source_id(), "source-1");
+        assert_eq!(reference.source_digest(), "sha256:abc");
+        assert_eq!(reference.location(), "schema.orders.total");
     }
 
     #[test]
@@ -322,6 +360,7 @@ mod tests {
         assert_eq!(candidate.truth_status(), TruthStatus::Inferred);
         assert_eq!(candidate.publication_state(), PublicationState::Draft);
         assert_eq!(candidate.evidence().len(), 1);
+        assert_eq!(candidate.evidence()[0].source_id(), "source-1");
     }
 
     #[test]
@@ -401,6 +440,28 @@ mod tests {
         assert_eq!(
             candidate.transition(PublicationState::Published),
             Err(ContractError::MissingEvidence)
+        );
+        assert_eq!(candidate.publication_state(), PublicationState::Reviewed);
+        assert_eq!(candidate.truth_status(), TruthStatus::Inferred);
+    }
+
+    #[test]
+    fn publication_revalidates_each_evidence_reference() {
+        let mut candidate = candidate();
+        for state in [
+            PublicationState::Proposed,
+            PublicationState::Validated,
+            PublicationState::Reviewed,
+        ] {
+            candidate.transition(state).unwrap();
+        }
+
+        candidate.evidence[0].source_id = " ".into();
+
+        assert!(!candidate.is_publishable());
+        assert_eq!(
+            candidate.transition(PublicationState::Published),
+            Err(ContractError::EmptyField("source_id"))
         );
         assert_eq!(candidate.publication_state(), PublicationState::Reviewed);
         assert_eq!(candidate.truth_status(), TruthStatus::Inferred);
