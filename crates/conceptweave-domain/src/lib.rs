@@ -293,7 +293,9 @@ impl fmt::Display for ContractError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::EmptyField(field) => write!(formatter, "required field `{field}` is blank"),
-            Self::MissingEvidence => write!(formatter, "semantic candidates require source evidence"),
+            Self::MissingEvidence => {
+                write!(formatter, "semantic candidates require source evidence")
+            }
             Self::InvalidTransition { from, to } => write!(
                 formatter,
                 "publication transition from {from:?} to {to:?} is not permitted"
