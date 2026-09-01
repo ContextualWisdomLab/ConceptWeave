@@ -260,10 +260,7 @@ fn validate_evidence(evidence: &[EvidenceReference]) -> Result<(), ContractError
     Ok(())
 }
 
-fn requires_governance_authorization(
-    from: PublicationState,
-    target: PublicationState,
-) -> bool {
+fn requires_governance_authorization(from: PublicationState, target: PublicationState) -> bool {
     matches!(
         from,
         PublicationState::Reviewed | PublicationState::Published
