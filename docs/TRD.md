@@ -10,15 +10,16 @@ ConceptWeave starts as a Rust-first modular monolith with explicit bounded conte
 2. **Semantic Discovery** — evidence-bound candidate generation.
 3. **Model Validation** — deterministic structural, ontology, constraint, and semantic-model validation.
 4. **Governance & Publication** — review decisions, immutable releases, supersession.
-5. **Interoperability** — import/export adapters and CWL anti-corruption layers.
+5. **Client Consumption** — release admission, compatibility and future diff/match/resolve/query-plan contracts.
+6. **Interoperability** — import/export adapters and CWL anti-corruption layers.
 
-The Core Domain is **Semantic Model Engineering**, represented by the discovery-to-publication lifecycle. Identity, LLM routing, outbound web access, observability, and catalog consumption are external/generic responsibilities.
+The Core Domain is **Semantic Model Engineering**, represented by the discovery-to-publication lifecycle. Client Consumption is a supporting subdomain that protects downstream consumers from incompatible or non-governed releases. Identity, LLM routing, outbound web access, observability, catalog/search and consuming-product authorization are external/generic responsibilities.
 
 ## 3. Dependency direction
 
 `domain <- application <- ports/contracts <- adapters <- delivery`
 
-Domain code must not import web frameworks, databases, provider SDKs, LLM SDKs, or another CWL product's internals.
+Client Consumption depends only on versioned public release/domain contracts. Domain and client code must not import web frameworks, databases, provider SDKs, LLM SDKs, generator-private adapters, or another CWL product's internals.
 
 ## 4. Source observation contract
 
@@ -37,22 +38,40 @@ Every observed source will eventually carry at least:
 
 The initial Rust and JSON contracts cover candidate kind, truth status, publication state, and source evidence. Later revisions add ontology IRIs, language-tagged labels, relation endpoints, cardinality, units, measure expressions, physical mappings, confidence/evaluation receipts, and temporal validity without breaking v0.1 consumers.
 
-## 6. LLM boundary
+## 6. Semantic-release client contract
 
-LLM calls go through `contextual-orchestrator`. The application sends bounded evidence/context and receives structured proposals. LLM output is never a database command, publication decision, validation result, or source-system mutation. Deterministic checks must be able to reject the output without another model call.
+The first Rust Client Consumption slice and Draft 2020-12 JSON Schema define an immutable consumer-visible contract containing:
 
-## 7. Standards strategy
+- `release_id`;
+- `contract_version`;
+- `ontology_version`;
+- truth and publication state;
+- declared artifact digest identity;
+- one or more provenance references;
+- unique stable concept identifiers.
+
+`SemanticReleaseClient` supports deterministic offline admission for one explicit contract version. Authoritative use is rejected unless the release is both `Published` and `Authoritative`. Structural construction and client admission do not grant publication authority.
+
+`ReleaseDigest` currently validates only the declared `sha256:<64 hex>` identity syntax. A later integrity adapter must hash the exact serialized bytes and compare that digest before cryptographic integrity can be claimed. The serialized contract, compatibility rules and verifier remain versioned public boundaries.
+
+Future #3 work adds older-supported compatibility policy, supersession/staleness handling, release diff, deterministic resolve, research-backed match/alignment, explain and query-plan operations. LLM-assisted client operations are optional; deterministic admission remains available with no provider call.
+
+## 7. LLM boundary
+
+LLM calls go through `contextual-orchestrator`. The application sends bounded evidence/context and receives structured proposals. LLM output is never a database command, publication decision, validation result, source-system mutation, client authorization decision, or automatic authoritative alignment. Deterministic checks must be able to reject the output without another model call.
+
+## 8. Standards strategy
 
 Stable publication targets use stable recommendations first: RDF 1.1, OWL 2, SKOS, SHACL 1.0, JSON-LD 1.1, and PROV-O as applicable. RDF 1.2 and SHACL 1.2 are tracked as 2026 drafts/candidate work and are not silently treated as final standards. Apache Ossie (incubating; formerly OSI) is tracked as an emerging semantic-model exchange format for metrics, dimensions, relationships, and datasets.
 
-## 8. Persistence
+## 9. Persistence
 
-No durable product database is claimed by the foundation slice. When persistence is introduced it must be PostgreSQL, 3NF by default, use descriptive two-or-more-word `snake_case` objects, preserve business/effective time separately from system-recorded time when facts vary over time, enforce tenant-scoped references, and use explicit migration ownership rather than runtime DDL races.
+No durable product database is claimed by the current slices. When persistence is introduced it must be PostgreSQL, 3NF by default, use descriptive two-or-more-word `snake_case` objects, preserve business/effective time separately from system-recorded time when facts vary over time, enforce tenant-scoped references, and use explicit migration ownership rather than runtime DDL races. Published releases are immutable; correction creates a superseding release. Item-level UPSERT behavior must be explicit and idempotency-tested before any mutable pre-publication persistence is introduced.
 
-## 9. Security
+## 10. Security
 
-Source artifacts are untrusted input. Adapters must enforce source size/type bounds, parser timeouts, archive/decompression limits, SSRF-safe outbound access where external retrieval exists, and prompt-injection isolation for LLM-assisted extraction. Credentials and raw secrets never become semantic evidence.
+Source artifacts and release payloads are untrusted input. Adapters must enforce source size/type bounds, parser timeouts, archive/decompression limits, SSRF-safe outbound access where external retrieval exists, and prompt-injection isolation for LLM-assisted extraction. Credentials and raw secrets never become semantic evidence. Client admission validates governance/compatibility but does not replace consuming-product tenant/purpose authorization.
 
-## 10. Evaluation
+## 11. Evaluation
 
-Evaluation must separate extraction recall, semantic correctness, structural correctness, ontology consistency, mapping accuracy, measure correctness, and governance outcomes. Model-judge scores may supplement but never replace deterministic golden fixtures and human-reviewed expert cases.
+Evaluation must separate extraction recall, semantic correctness, structural correctness, ontology consistency, mapping accuracy, measure correctness, release compatibility/admission correctness, and governance outcomes. Model-judge scores may supplement but never replace deterministic golden fixtures and human-reviewed expert cases. Client matching later uses OAEI-style precision/recall/F1 and candidate-retrieval recall; release admission uses deterministic malformed/version/state/provenance/digest fixtures.

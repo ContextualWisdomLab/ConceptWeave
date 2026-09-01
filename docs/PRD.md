@@ -2,11 +2,11 @@
 
 ## 1. Product statement
 
-ConceptWeave converts heterogeneous enterprise evidence into a governed ontology and semantic layer without collapsing observed facts, model inference, and human-approved meaning into the same truth state.
+ConceptWeave converts heterogeneous enterprise evidence into a governed ontology and semantic layer without collapsing observed facts, model inference, and human-approved meaning into the same truth state. It also exposes a stable consumer contract so downstream products can reject incompatible or non-authoritative releases without understanding generation internals.
 
 ## 2. Buyer problem
 
-Enterprise teams repeatedly hand-build business glossaries, ontologies, metric definitions, semantic mappings, and data relationships from database schemas, API contracts, documents, and tribal knowledge. The work is slow, inconsistent across tools, difficult to audit, and unsafe to delegate entirely to an LLM because inferred semantics can be plausible but wrong.
+Enterprise teams repeatedly hand-build business glossaries, ontologies, metric definitions, semantic mappings, and data relationships from database schemas, API contracts, documents, and tribal knowledge. The work is slow, inconsistent across tools, difficult to audit, and unsafe to delegate entirely to an LLM because inferred semantics can be plausible but wrong. Even after a model is published, consumers need a deterministic way to determine whether a release is compatible, governed, and safe to use.
 
 ## 3. Primary buyers and users
 
@@ -18,7 +18,7 @@ Enterprise teams repeatedly hand-build business glossaries, ontologies, metric d
 
 ## 4. Core job to be done
 
-Given an enterprise source estate, produce a **reviewable semantic model proposal** in which every concept, relationship, constraint, dimension, measure, and physical mapping is linked to exact evidence and can be validated, rejected, reviewed, published, superseded, and reproduced.
+Given an enterprise source estate, produce a **reviewable semantic model proposal** in which every concept, relationship, constraint, dimension, measure, and physical mapping is linked to exact evidence and can be validated, rejected, reviewed, published, superseded, reproduced, and then safely admitted by downstream clients through a stable public contract.
 
 ## 5. Functional requirements
 
@@ -52,20 +52,30 @@ Support stable adapters for `semantic-data-portal`, `LineageWeave`, `context-gra
 
 ### FR-8 LLM assistance
 
-All LLM-backed induction uses `contextual-orchestrator`. Model output is untrusted proposal data and may not skip deterministic validation or review.
+All LLM-backed induction uses `contextual-orchestrator`. Model output is untrusted proposal data and may not skip deterministic validation or review. Optional future client matching/explanation also routes through this boundary and cannot silently promote a correspondence to authority.
 
-## 6. First vertical slice
+### FR-9 Client consumption
 
-Relational schema snapshot -> observed tables/columns/foreign keys -> concept/relation/dimension/measure/mapping candidates -> evidence-bound validation report -> reviewable proposal package.
+A consuming product can inspect a versioned `semantic_release` offline and fail closed before authoritative use. The first Client slice requires stable release identity, contract and ontology versions, truth/publication state, declared SHA-256 digest identity, provenance references, and unique concept identifiers. Admission requires an explicitly supported contract version plus `Published` and `Authoritative` state. Consuming products retain their own tenant/purpose authorization and physical data/query execution.
+
+The current digest value object validates the declared `sha256:<64 hex>` identity shape. Cryptographic integrity is not claimed until a later verifier hashes the exact serialized artifact bytes and compares the result.
+
+## 6. First Generation ↔ Client vertical
+
+`relational schema snapshot -> observed tables/columns/foreign keys -> concept/relation/dimension/measure/mapping candidates -> evidence-bound validation -> steward review -> immutable semantic_release -> offline client admission -> consuming-product ACL/query boundary`.
+
+`ContextualWisdomLab/governance-risk-compliance` is the first reference source/client scenario, not a special-case algorithm. A shared golden fixture must exercise both Generation and Client without copying GRC truth into ConceptWeave or giving ConceptWeave direct GRC application-table access.
 
 ## 7. Non-goals for v0.1
 
 - replacing `semantic-data-portal` as the enterprise catalog;
+- owning downstream tenant/purpose authorization or physical query execution;
 - arbitrary write access to source systems;
 - automatic publication without review;
 - treating vector similarity as semantic truth;
 - copying every external ontology into one CWL namespace;
 - building a generic LLM gateway or browser crawler;
+- claiming digest syntax validation is cryptographic byte verification;
 - claiming an emerging draft semantic-layer format is a stable standard.
 
 ## 8. Acceptance criteria for the first commercial candidate
@@ -78,4 +88,6 @@ Relational schema snapshot -> observed tables/columns/foreign keys -> concept/re
 - cross-tenant access denial when tenancy is introduced;
 - malformed/hostile source contracts rejected with bounded resource use;
 - semantic-model release can be reproduced from source receipts and approved proposal receipts;
+- consumer can validate release schema/version/governance state offline before authoritative use;
+- exact serialized artifact digest verification exists before integrity is claimed;
 - buyer can inspect why each published artifact exists and which evidence supported it.

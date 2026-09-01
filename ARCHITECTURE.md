@@ -2,7 +2,7 @@
 
 ## Product responsibility
 
-ConceptWeave owns the process that turns observed enterprise evidence into governed semantic-model releases. It does not own source-system truth or downstream catalog/query experiences.
+ConceptWeave owns the process that turns observed enterprise evidence into governed semantic-model releases and the stable client contract used to inspect those releases. It does not own source-system truth, consuming-product authorization, physical query execution, or downstream catalog/search experiences.
 
 ```mermaid
 flowchart LR
@@ -11,13 +11,15 @@ flowchart LR
     D --> V[Model Validation]
     V --> G[Governance & Publication]
     G --> P[Versioned semantic release]
+    P --> C[Client Consumption]
 
-    CO[contextual-orchestrator] -. proposal assistance .-> D
+    CO[contextual-orchestrator] -. proposal or optional alignment assistance .-> D
+    CO -. optional bounded matching assistance .-> C
     LW[LineageWeave] -. inferred/proposed lineage .-> O
     CG[context-graph-contracts] -. shared graph/provenance contracts .-> P
-    P --> SDP[semantic-data-portal]
-    P --> GRC[governance-risk-compliance]
-    P --> EA[enterprise-architecture-core]
+    C --> SDP[semantic-data-portal]
+    C --> GRC[governance-risk-compliance]
+    C --> EA[enterprise-architecture-core]
 ```
 
 ## DDD context map
@@ -28,17 +30,28 @@ flowchart LR
 | Semantic Discovery | Core | candidate generation and evidence binding | publication authority |
 | Model Validation | Supporting | deterministic validation reports | human review decisions |
 | Governance & Publication | Core | proposal lifecycle, review receipts, releases, supersession | catalog/search runtime |
+| Client Consumption | Supporting | release admission, compatibility, future diff/match/resolve/query-plan contracts | generator internals, consumer authorization, physical query execution |
 | Interoperability | Supporting | versioned import/export and ACL adapters | foreign product internals |
 
-## Aggregate boundaries
+The generation-to-client dependency crosses only versioned public release contracts. Client code may reuse public domain value types, but it must not import generator-private adapters, prompts, persistence tables, or orchestration state.
+
+## Aggregate and value-object boundaries
 
 ### SemanticCandidate
 
 Smallest consistency boundary for a single proposed semantic artifact and its evidence-bound publication state. It cannot jump directly from Draft to Published.
 
-### SemanticModelRelease (planned)
+### SemanticModelRelease
 
-Immutable publication aggregate containing approved candidate identities, release version, artifact digests, validation receipts, reviewer receipts, and supersession metadata. It will reference candidates rather than copy foreign source records.
+Planned Governance & Publication aggregate for immutable publication. The current Client slice defines only the consumer-visible release contract: stable release identity, contract and ontology versions, truth/publication state, declared artifact digest identity, provenance references, and stable concept identifiers. Release construction is not publication authority.
+
+### ReleaseDigest
+
+Client value object for a declared `sha256:<64 hex>` digest identity. It validates digest syntax only. A later serialized-artifact verifier must hash the exact bytes and compare the result before integrity is claimed.
+
+### SemanticReleaseClient
+
+A stateless domain service in Client Consumption that admits a release for authoritative use only when the contract version is supported and the release is both `Published` and `Authoritative`. It performs no network, LLM, database, tenant-authorization, or physical-query work.
 
 ## Truth model
 
@@ -49,24 +62,26 @@ Immutable publication aggregate containing approved candidate identities, releas
 - `superseded`: formerly authoritative and replaced;
 - `rejected`: explicitly rejected.
 
-Truth status and publication workflow are distinct. A source observation can be authoritative in its source domain without making an inferred semantic interpretation authoritative.
+Truth status and publication workflow are distinct. A source observation can be authoritative in its source domain without making an inferred semantic interpretation authoritative. Client admission fails closed rather than coercing these states.
 
 ## Integration boundaries
 
-- `contextual-orchestrator`: LLM/model routing only.
+- `contextual-orchestrator`: all production LLM/model routing; optional future matching/explanation is still proposal evidence.
 - `LineageWeave`: inferred/proposed lineage evidence only.
 - `semantic-data-portal`: published semantic artifact consumer/governance/catalog plane; it is not ConceptWeave's internal database.
 - `context-graph-contracts`: shared cross-product identifiers, truth/provenance/event contracts where adopted.
 - Keyverse: future identity/tenant authentication boundary.
+- Consuming products: retain tenant/purpose authorization, business-domain truth, and physical data/query execution behind their own ACLs.
 
 No direct cross-service application-table SQL is permitted.
 
-## Foundation directory structure
+## Current directory structure
 
 ```text
 crates/
-  conceptweave-domain/       # Core domain contract only
-contracts/                   # Versioned public schemas
+  conceptweave-domain/       # Core candidate/evidence lifecycle contracts
+  conceptweave-client/       # Offline release admission and compatibility boundary
+contracts/                   # Versioned public JSON Schemas and fixtures
 docs/
   adr/                       # Binding architecture decisions
   doctoring/                 # Standards/research evidence
