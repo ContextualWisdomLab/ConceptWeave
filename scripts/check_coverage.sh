@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cargo llvm-cov --workspace --branch --json --output-path coverage.json
+coverage_toolchain="${COVERAGE_TOOLCHAIN:-nightly-2026-08-20}"
+
+cargo "+${coverage_toolchain}" llvm-cov \
+  --workspace \
+  --branch \
+  --json \
+  --output-path coverage.json
 
 jq -e '
   .data[0].totals.lines.percent == 100 and

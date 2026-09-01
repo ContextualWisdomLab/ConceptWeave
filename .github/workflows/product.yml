@@ -15,6 +15,8 @@ permissions:
 jobs:
   rust-quality:
     runs-on: ubuntu-24.04
+    env:
+      COVERAGE_TOOLCHAIN: nightly-2026-08-20
     steps:
       - name: Checkout exact source revision
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -52,6 +54,9 @@ jobs:
         uses: taiki-e/install-action@1ed6d7be6168f6c9046541087ff549b6bc581fdf # v2.87.2
         with:
           tool: cargo-llvm-cov
+
+      - name: Install pinned branch-coverage toolchain
+        run: rustup toolchain install "$COVERAGE_TOOLCHAIN" --profile minimal --component llvm-tools-preview
 
       - name: Exact owned coverage
         run: ./scripts/check_coverage.sh
