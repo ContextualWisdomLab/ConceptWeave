@@ -355,6 +355,27 @@ mod tests {
     }
 
     #[test]
+    fn publication_rechecks_evidence_at_authority_boundary() {
+        let mut candidate = candidate();
+        for state in [
+            PublicationState::Proposed,
+            PublicationState::Validated,
+            PublicationState::Reviewed,
+        ] {
+            candidate.transition(state).unwrap();
+        }
+
+        candidate.evidence.clear();
+
+        assert_eq!(
+            candidate.transition(PublicationState::Published),
+            Err(ContractError::MissingEvidence)
+        );
+        assert_eq!(candidate.publication_state, PublicationState::Reviewed);
+        assert_eq!(candidate.truth_status, TruthStatus::Inferred);
+    }
+
+    #[test]
     fn contract_errors_explain_the_failure() {
         assert_eq!(
             ContractError::EmptyField("field").to_string(),
