@@ -40,6 +40,10 @@ Immutable Source Observation aggregate for one bounded relational metadata captu
 
 Immutable Source Observation value objects. Table observations keep exact schema/table identity. Column observations keep exact source name, one-based ordinal, source type, nullability, and optional source comment. Duplicate names or ordinals within a table fail closed, and read APIs return deterministic source order.
 
+### PrimaryKeyObservation / UniqueConstraintObservation / ForeignKeyObservation
+
+Immutable Source Observation value objects for deterministic key and relationship evidence. Composite key order is preserved exactly. Foreign keys retain ordered local and referenced coordinates, including cross-schema targets. Constraint names must be unique within a table observation; empty or duplicate coordinate lists fail closed; every local constraint column must exist in the same observed table. These contracts preserve source metadata only and do not infer join semantics or business meaning.
+
 ### SemanticCandidate
 
 Smallest consistency boundary for a single proposed semantic artifact and its evidence-bound publication state. It cannot jump directly from Draft to Published.
