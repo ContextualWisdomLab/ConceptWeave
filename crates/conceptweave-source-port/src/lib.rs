@@ -8,6 +8,8 @@
 
 use std::collections::BTreeSet;
 
+const MAX_SOURCE_CONNECTION_KEY_BYTES: usize = 128;
+
 /// Invalid zero-valued resource bounds for one source-observation request.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ObservationLimitError {
@@ -86,7 +88,7 @@ impl ObservationLimits {
 /// Invalid source-observation request metadata.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ObservationRequestError {
-    /// The stable source-connection reference was blank.
+    /// The source-connection registry key was blank or not a bounded multiword snake_case key.
     InvalidSourceConnectionKey,
     /// No source schema was explicitly authorized for observation.
     EmptySchemaAllowlist,
@@ -101,8 +103,10 @@ pub enum ObservationRequestError {
 
 /// One fail-closed request to observe explicitly authorized source schemas.
 ///
-/// `source_connection_key` is a stable reference resolved by the adapter's credential boundary; it
-/// must never contain a password, token, or connection string. Schema identifiers retain exact
+/// `source_connection_key` is an opaque registry identifier resolved by the adapter's credential
+/// boundary. It is deliberately restricted to a bounded, lowercase, multiword `snake_case` key so
+/// DSNs, URLs, shell-style connection parameters, or other credential-bearing connection material
+/// cannot accidentally cross this port as a connection reference. Schema identifiers retain exact
 /// source spelling and are sorted only to make request identity deterministic.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ObservationRequest {
@@ -119,7 +123,7 @@ impl ObservationRequest {
         limits: ObservationLimits,
     ) -> Result<Self, ObservationRequestError> {
         let source_connection_key = source_connection_key.into();
-        if source_connection_key.trim().is_empty() {
+        if !is_valid_source_connection_key(&source_connection_key) {
             return Err(ObservationRequestError::InvalidSourceConnectionKey);
         }
         if allowed_schema_names.is_empty() {
@@ -146,7 +150,7 @@ impl ObservationRequest {
         })
     }
 
-    /// Returns the stable source-connection reference, never a credential.
+    /// Returns the opaque source-connection registry key, never a DSN or credential.
     #[must_use]
     pub fn source_connection_key(&self) -> &str {
         &self.source_connection_key
@@ -163,6 +167,30 @@ impl ObservationRequest {
     pub const fn limits(&self) -> ObservationLimits {
         self.limits
     }
+}
+
+fn is_valid_source_connection_key(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    if bytes.len() > MAX_SOURCE_CONNECTION_KEY_BYTES {
+        return false;
+    }
+
+    let mut word_count = 0_u8;
+    for word in value.split('_') {
+        let mut word_bytes = word.bytes();
+        let Some(first) = word_bytes.next() else {
+            return false;
+        };
+        if !first.is_ascii_lowercase() {
+            return false;
+        }
+        if !word_bytes.all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit()) {
+            return false;
+        }
+        word_count = word_count.saturating_add(1);
+    }
+
+    word_count >= 2
 }
 
 /// Caller-owned cooperative cancellation signal passed across the Source Observation port.
