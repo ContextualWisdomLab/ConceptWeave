@@ -42,7 +42,7 @@ Immutable Source Observation value objects. Table observations keep exact schema
 
 ### PrimaryKeyObservation / UniqueConstraintObservation / ForeignKeyObservation
 
-Immutable Source Observation value objects for deterministic key and relationship evidence. Composite key order is preserved exactly. Foreign keys retain ordered local and referenced coordinates, including cross-schema targets. Constraint names must be unique within a table observation; empty or duplicate coordinate lists fail closed; every local constraint column must exist in the same observed table. These contracts preserve source metadata only and do not infer join semantics or business meaning.
+Immutable Source Observation value objects for deterministic key and relationship evidence. Composite key order is preserved exactly. Foreign keys retain ordered local and referenced coordinates, including cross-schema targets. When the source adapter observes foreign-key reference behavior, `ForeignKeyReferenceBehavior` preserves exact `ON UPDATE` and `ON DELETE` actions, match type, and deferrability/initial timing; when that metadata was not observed, the contract retains `None` rather than deriving PostgreSQL defaults. Constraint names must be unique within a table observation; empty or duplicate coordinate lists fail closed; every local constraint column must exist in the same observed table. These contracts preserve source metadata only and do not infer join semantics or business meaning.
 
 ### SemanticCandidate
 
