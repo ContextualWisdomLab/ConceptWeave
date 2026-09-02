@@ -29,11 +29,30 @@ fn contract_errors_explain_the_failed_admission_invariant() {
             "semantic release contains duplicate concept id `concept.one`".to_string(),
         ),
         (
+            ReleaseContractError::CurrentContractVersionMarkedLegacy("2.0.0".to_string()),
+            "current semantic release contract version `2.0.0` cannot also be marked legacy"
+                .to_string(),
+        ),
+        (
+            ReleaseContractError::SelfSupersession("semantic_release_2026_09".to_string()),
+            "semantic release `semantic_release_2026_09` cannot supersede itself".to_string(),
+        ),
+        (
+            ReleaseContractError::SupersededReleaseReferenceMismatch,
+            "supersession predecessor reference does not match the exact supplied release"
+                .to_string(),
+        ),
+        (
+            ReleaseContractError::SuccessorReleaseReferenceMismatch,
+            "supersession successor reference does not match the exact supplied release"
+                .to_string(),
+        ),
+        (
             ReleaseContractError::UnsupportedContractVersion {
                 expected: "1.0.0".to_string(),
                 actual: "2.0.0".to_string(),
             },
-            "semantic release contract version `2.0.0` is unsupported; expected `1.0.0`"
+            "semantic release contract version `2.0.0` is unsupported; current version is `1.0.0`"
                 .to_string(),
         ),
         (
