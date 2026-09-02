@@ -58,12 +58,18 @@ fn supersession_preserves_exact_immutable_release_references_and_rationale() {
         declaration.superseded().release_id(),
         "semantic_release_2026_09"
     );
-    assert_eq!(declaration.superseded().artifact_digest(), previous.artifact_digest());
+    assert_eq!(
+        declaration.superseded().artifact_digest(),
+        previous.artifact_digest()
+    );
     assert_eq!(
         declaration.successor().release_id(),
         "semantic_release_2026_10"
     );
-    assert_eq!(declaration.successor().artifact_digest(), successor.artifact_digest());
+    assert_eq!(
+        declaration.successor().artifact_digest(),
+        successor.artifact_digest()
+    );
     assert_eq!(
         declaration.rationale(),
         "Correct the governed control taxonomy while preserving the prior release."
@@ -125,49 +131,65 @@ fn client_accepts_only_an_explicit_supersession_bound_to_both_exact_release_iden
         Ok(())
     );
 
-    let wrong_previous = release(
-        "semantic_release_2026_08",
+    let wrong_previous_digest = release(
+        "semantic_release_2026_09",
         'd',
         PublicationState::Published,
     );
     assert_eq!(
-        client.validate_supersession(&declaration, &wrong_previous, &successor),
+        client.validate_supersession(&declaration, &wrong_previous_digest, &successor),
         Err(ReleaseContractError::SupersededReleaseReferenceMismatch)
     );
 
-    let wrong_successor = release(
-        "semantic_release_2026_11",
+    let wrong_successor_digest = release(
+        "semantic_release_2026_10",
         'e',
         PublicationState::Published,
     );
     assert_eq!(
-        client.validate_supersession(&declaration, &previous, &wrong_successor),
+        client.validate_supersession(&declaration, &previous, &wrong_successor_digest),
         Err(ReleaseContractError::SuccessorReleaseReferenceMismatch)
     );
 }
 
 #[test]
-fn supersession_never_bypasses_authoritative_release_admission() {
+fn supersession_never_bypasses_either_authoritative_release_admission_gate() {
     let client = SemanticReleaseClient::new("2.0.0").expect("client policy is valid");
-    let previous = release(
+    let reviewed_previous = release(
         "semantic_release_2026_09",
         'b',
         PublicationState::Reviewed,
     );
-    let successor = release(
+    let published_previous = release(
+        "semantic_release_2026_09",
+        'b',
+        PublicationState::Published,
+    );
+    let published_successor = release(
         "semantic_release_2026_10",
         'c',
         PublicationState::Published,
     );
+    let reviewed_successor = release(
+        "semantic_release_2026_10",
+        'c',
+        PublicationState::Reviewed,
+    );
     let declaration = ReleaseSupersession::new(
-        SemanticReleaseReference::from_release(&previous),
-        SemanticReleaseReference::from_release(&successor),
+        SemanticReleaseReference::from_release(&published_previous),
+        SemanticReleaseReference::from_release(&published_successor),
         "attempted supersession",
     )
     .expect("supersession declaration is structurally valid");
 
     assert_eq!(
-        client.validate_supersession(&declaration, &previous, &successor),
+        client.validate_supersession(&declaration, &reviewed_previous, &published_successor),
+        Err(ReleaseContractError::ReleaseNotPublished {
+            actual: PublicationState::Reviewed,
+        })
+    );
+    assert_eq!(
+        client.validate_supersession(&declaration, &published_previous, &reviewed_successor),
         Err(ReleaseContractError::ReleaseNotPublished {
             actual: PublicationState::Reviewed,
         })
