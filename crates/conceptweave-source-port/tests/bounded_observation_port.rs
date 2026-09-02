@@ -73,6 +73,13 @@ fn request_rejects_non_registry_source_connection_keys_before_adapter_access() {
             "source connection keys must be opaque multiword snake_case registry identifiers: {source_connection_key}"
         );
     }
+
+    let oversized_key = format!("source_{}", "a".repeat(122));
+    assert_eq!(oversized_key.len(), 129);
+    assert_eq!(
+        ObservationRequest::new(oversized_key, vec!["public".to_owned()], limits()),
+        Err(ObservationRequestError::InvalidSourceConnectionKey)
+    );
 }
 
 #[test]
