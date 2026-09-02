@@ -47,11 +47,11 @@ Planned Governance & Publication aggregate for immutable publication. The curren
 
 ### ReleaseDigest
 
-Client value object for a declared `sha256:<64 hex>` digest identity. It validates digest syntax only. A later serialized-artifact verifier must hash the exact bytes and compare the result before integrity is claimed.
+Client value object for a declared `sha256:<64 hex>` digest identity. It validates digest syntax only. Exact detached artifact bytes must be hashed and compared before integrity is claimed.
 
 ### SemanticReleaseClient
 
-A stateless domain service in Client Consumption that admits a release for authoritative use only when the contract version is supported and the release is both `Published` and `Authoritative`. It performs no network, LLM, database, tenant-authorization, or physical-query work.
+A stateless domain service in Client Consumption. Its compatibility policy has one explicit current contract version and an explicit set of supported legacy versions; it never infers compatibility from semantic-version ordering. Unknown versions fail closed. Current and supported-legacy releases pass the same `Published` plus `Authoritative` gate before resolution, diff, or artifact verification. It performs no network, LLM, database, tenant-authorization, or physical-query work.
 
 ## Truth model
 
