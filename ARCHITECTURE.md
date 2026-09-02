@@ -6,7 +6,8 @@ ConceptWeave owns the process that turns observed enterprise evidence into gover
 
 ```mermaid
 flowchart LR
-    S[Source systems and artifacts] --> O[Source Observation]
+    S[Source systems and artifacts] --> SP[Source Observation port]
+    SP --> O[Immutable Source Observation]
     O --> D[Semantic Discovery]
     D --> V[Model Validation]
     V --> G[Governance & Publication]
@@ -24,7 +25,7 @@ flowchart LR
 
 | Context | Type | Owns | Does not own |
 | --- | --- | --- | --- |
-| Source Observation | Supporting | immutable observations, parser/extractor receipts, evidence locations | source-system business truth, semantic inference |
+| Source Observation | Supporting | bounded source-access port policy, immutable observations, parser/extractor receipts, evidence locations | credentials, source-system business truth, semantic inference |
 | Semantic Discovery | Core | candidate generation and evidence binding | publication authority |
 | Model Validation | Supporting | deterministic validation reports | human review decisions |
 | Governance & Publication | Core | proposal lifecycle, review receipts, releases, supersession | catalog/search runtime |
@@ -32,9 +33,13 @@ flowchart LR
 
 ## Aggregate and value-object boundaries
 
+### ObservationRequest / ObservationLimits
+
+Provider-independent Source Observation port value objects. A request contains only a stable non-credential source reference, an explicit non-empty exact-schema allowlist, and positive statement-timeout/row/byte/concurrency budgets. Blank or duplicate schema identifiers fail closed. Caller cancellation and source-disappearance/resource-limit outcomes are part of the typed port seam. Concrete PostgreSQL drivers, credentials, catalog SQL, and scheduling remain adapter responsibilities outside the domain and observation-fact crates. ADR 0004 remains Proposed until a concrete adapter and conformance evidence are integrated.
+
 ### PostgresSchemaSnapshot
 
-Immutable Source Observation aggregate for one bounded relational metadata capture. It owns source-connection reference, snapshot digest identity, extractor revision, observation time, and exact qualified table observations. Qualified identifiers are preserved rather than normalized; duplicate table coordinates fail closed.
+Immutable Source Observation aggregate for one bounded relational metadata capture. It owns source-connection reference, snapshot digest identity, extractor revision, observation time, and exact qualified table observations. Qualified identifiers are preserved rather than normalized; duplicate table coordinates fail closed. A concrete adapter may construct this aggregate only after a complete bounded capture; cancellation, source disappearance, or resource exhaustion must not produce a partial snapshot.
 
 ### TableObservation / ColumnObservation
 
@@ -73,20 +78,21 @@ Truth status and publication workflow are distinct. A source observation can be 
 - `context-graph-contracts`: shared cross-product identifiers, truth/provenance/event contracts where adopted.
 - Keyverse: future identity/tenant authentication boundary.
 
-No direct cross-service application-table SQL is permitted.
+No direct cross-service application-table SQL is permitted. A PostgreSQL Source Observation adapter may access only explicitly authorized read-only metadata through the port contract and must not become a hidden foreign-product repository.
 
 ## Current directory structure
 
 ```text
 crates/
   conceptweave-domain/       # Core candidate/evidence lifecycle contract
-  conceptweave-observation/  # Provider-independent immutable source-observation contract
+  conceptweave-observation/  # Provider-independent immutable source-observation facts
+  conceptweave-source-port/  # Provider-independent source-access budgets/cancellation/failure seam
 contracts/                   # Versioned public schemas
 docs/
-  adr/                       # Binding architecture decisions
+  adr/                       # Binding/proposed architecture decisions
   doctoring/                 # Standards/research evidence
 scripts/                     # Deterministic repository-quality helpers
 .github/workflows/           # CI evidence
 ```
 
-Adapters and application services are added only when their bounded responsibility exists; generic `utils`, `helpers`, or `services` dumping grounds are prohibited.
+Concrete adapters and application services are added only when their bounded responsibility exists; generic `utils`, `helpers`, or `services` dumping grounds are prohibited.
