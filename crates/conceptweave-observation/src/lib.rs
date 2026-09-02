@@ -4,6 +4,7 @@
 //! PostgreSQL adapter belongs outside this crate and must supply bounded, read-only metadata. The
 //! contract preserves exact identifiers rather than normalizing case or quoting semantics.
 #![forbid(unsafe_code)]
+#![deny(missing_docs)]
 
 use std::collections::BTreeSet;
 use std::error::Error;
@@ -87,6 +88,11 @@ pub enum ObservationError {
         /// Exact source table identifier.
         table_name: String,
     },
+    /// An evidence receipt requested a coordinate absent from the immutable snapshot.
+    UnknownObservationLocation {
+        /// Canonical escaped location requested by the caller.
+        location: String,
+    },
 }
 
 impl Display for ObservationError {
@@ -153,6 +159,9 @@ impl Display for ObservationError {
                 schema_name,
                 table_name,
             } => write!(formatter, "duplicate table observation: {schema_name}.{table_name}"),
+            Self::UnknownObservationLocation { location } => {
+                write!(formatter, "unobserved source location: {location}")
+            }
         }
     }
 }
@@ -519,6 +528,204 @@ impl TableObservation {
     }
 }
 
+/// Stable type discriminator for an exact observed relational evidence coordinate.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ObservationLocationKind {
+    /// A qualified table observation.
+    Table,
+    /// A qualified column observation.
+    Column,
+    /// A qualified table-constraint observation.
+    Constraint,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum ObservationElement {
+    Table,
+    Column(String),
+    Constraint(String),
+}
+
+/// Exact structured location inside an immutable PostgreSQL schema snapshot.
+///
+/// Exact identifiers are retained separately instead of being parsed from dotted SQL names. The
+/// canonical string form applies RFC 6901 reference-token escaping (`~` -> `~0`, `/` -> `~1`) so
+/// quoted source identifiers containing path delimiters remain collision-safe without case or
+/// Unicode normalization.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ObservationLocation {
+    schema_name: String,
+    table_name: String,
+    element: ObservationElement,
+}
+
+impl ObservationLocation {
+    /// Creates a location for an exact qualified table.
+    pub fn table(
+        schema_name: impl Into<String>,
+        table_name: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        Self::new(schema_name, table_name, ObservationElement::Table)
+    }
+
+    /// Creates a location for an exact qualified column.
+    pub fn column(
+        schema_name: impl Into<String>,
+        table_name: impl Into<String>,
+        column_name: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        let column_name = column_name.into();
+        validate_nonblank(&column_name, "column_name")?;
+        Self::new(
+            schema_name,
+            table_name,
+            ObservationElement::Column(column_name),
+        )
+    }
+
+    /// Creates a location for an exact qualified table constraint.
+    pub fn constraint(
+        schema_name: impl Into<String>,
+        table_name: impl Into<String>,
+        constraint_name: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        let constraint_name = constraint_name.into();
+        validate_nonblank(&constraint_name, "constraint_name")?;
+        Self::new(
+            schema_name,
+            table_name,
+            ObservationElement::Constraint(constraint_name),
+        )
+    }
+
+    fn new(
+        schema_name: impl Into<String>,
+        table_name: impl Into<String>,
+        element: ObservationElement,
+    ) -> Result<Self, ObservationError> {
+        let schema_name = schema_name.into();
+        let table_name = table_name.into();
+        validate_nonblank(&schema_name, "schema_name")?;
+        validate_nonblank(&table_name, "table_name")?;
+        Ok(Self {
+            schema_name,
+            table_name,
+            element,
+        })
+    }
+
+    /// Returns the coordinate kind without exposing mutable representation details.
+    #[must_use]
+    pub fn kind(&self) -> ObservationLocationKind {
+        match self.element {
+            ObservationElement::Table => ObservationLocationKind::Table,
+            ObservationElement::Column(_) => ObservationLocationKind::Column,
+            ObservationElement::Constraint(_) => ObservationLocationKind::Constraint,
+        }
+    }
+
+    /// Returns the exact source schema identifier.
+    #[must_use]
+    pub fn schema_name(&self) -> &str {
+        &self.schema_name
+    }
+
+    /// Returns the exact source table identifier.
+    #[must_use]
+    pub fn table_name(&self) -> &str {
+        &self.table_name
+    }
+
+    /// Returns the exact source column identifier for a column coordinate.
+    #[must_use]
+    pub fn column_name(&self) -> Option<&str> {
+        match &self.element {
+            ObservationElement::Column(column_name) => Some(column_name),
+            ObservationElement::Table | ObservationElement::Constraint(_) => None,
+        }
+    }
+
+    /// Returns the exact source constraint identifier for a constraint coordinate.
+    #[must_use]
+    pub fn constraint_name(&self) -> Option<&str> {
+        match &self.element {
+            ObservationElement::Constraint(constraint_name) => Some(constraint_name),
+            ObservationElement::Table | ObservationElement::Column(_) => None,
+        }
+    }
+
+    /// Returns a deterministic collision-safe evidence location string.
+    ///
+    /// The vocabulary segments (`schemas`, `tables`, `columns`, `constraints`) are ConceptWeave
+    /// coordinate labels; identifier tokens use RFC 6901 escaping and retain exact case/text.
+    #[must_use]
+    pub fn canonical_location(&self) -> String {
+        let mut location = format!(
+            "/schemas/{}/tables/{}",
+            escape_json_pointer_token(&self.schema_name),
+            escape_json_pointer_token(&self.table_name)
+        );
+        match &self.element {
+            ObservationElement::Table => {}
+            ObservationElement::Column(column_name) => {
+                location.push_str("/columns/");
+                location.push_str(&escape_json_pointer_token(column_name));
+            }
+            ObservationElement::Constraint(constraint_name) => {
+                location.push_str("/constraints/");
+                location.push_str(&escape_json_pointer_token(constraint_name));
+            }
+        }
+        location
+    }
+}
+
+/// Immutable receipt binding one exact observed source coordinate to snapshot provenance.
+///
+/// Receipts are issued only by [`PostgresSchemaSnapshot::source_receipt`], which verifies that the
+/// requested coordinate actually exists in that snapshot. `source_id` is the stable source
+/// connection reference supplied to the snapshot, never a credential.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SourceObservationReceipt {
+    source_id: String,
+    source_digest: String,
+    extractor_revision: String,
+    observed_at_utc: String,
+    location: ObservationLocation,
+}
+
+impl SourceObservationReceipt {
+    /// Returns the stable source reference used by candidate evidence binding.
+    #[must_use]
+    pub fn source_id(&self) -> &str {
+        &self.source_id
+    }
+
+    /// Returns the immutable canonical snapshot digest.
+    #[must_use]
+    pub fn source_digest(&self) -> &str {
+        &self.source_digest
+    }
+
+    /// Returns the exact extractor implementation/configuration revision.
+    #[must_use]
+    pub fn extractor_revision(&self) -> &str {
+        &self.extractor_revision
+    }
+
+    /// Returns the exact UTC observation-time evidence supplied by the adapter.
+    #[must_use]
+    pub fn observed_at_utc(&self) -> &str {
+        &self.observed_at_utc
+    }
+
+    /// Returns the verified exact source coordinate inside the snapshot.
+    #[must_use]
+    pub const fn location(&self) -> &ObservationLocation {
+        &self.location
+    }
+}
+
 /// Immutable evidence that one bounded PostgreSQL schema snapshot was observed.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PostgresSchemaSnapshot {
@@ -602,6 +809,45 @@ impl PostgresSchemaSnapshot {
     pub fn tables(&self) -> &[TableObservation] {
         &self.tables
     }
+
+    /// Issues provenance for an exact coordinate only when that coordinate exists in this snapshot.
+    pub fn source_receipt(
+        &self,
+        location: ObservationLocation,
+    ) -> Result<SourceObservationReceipt, ObservationError> {
+        if !self.contains_location(&location) {
+            return Err(ObservationError::UnknownObservationLocation {
+                location: location.canonical_location(),
+            });
+        }
+        Ok(SourceObservationReceipt {
+            source_id: self.source_connection_key.clone(),
+            source_digest: self.snapshot_digest.clone(),
+            extractor_revision: self.extractor_revision.clone(),
+            observed_at_utc: self.observed_at_utc.clone(),
+            location,
+        })
+    }
+
+    fn contains_location(&self, location: &ObservationLocation) -> bool {
+        let Some(table) = self.tables.iter().find(|table| {
+            table.schema_name == location.schema_name && table.table_name == location.table_name
+        }) else {
+            return false;
+        };
+
+        match &location.element {
+            ObservationElement::Table => true,
+            ObservationElement::Column(column_name) => table
+                .columns
+                .iter()
+                .any(|column| column.column_name == *column_name),
+            ObservationElement::Constraint(constraint_name) => table
+                .constraints
+                .iter()
+                .any(|constraint| constraint.constraint_name() == constraint_name),
+        }
+    }
 }
 
 fn validate_constraint_columns(
@@ -625,6 +871,10 @@ fn validate_constraint_columns(
         }
     }
     Ok(())
+}
+
+fn escape_json_pointer_token(value: &str) -> String {
+    value.replace('~', "~0").replace('/', "~1")
 }
 
 fn validate_snapshot_digest(value: &str) -> Result<(), ObservationError> {
