@@ -26,7 +26,7 @@ Given an enterprise source estate, produce a **reviewable semantic model proposa
 
 Accept immutable snapshots or versioned contracts for relational schema, OpenAPI, AsyncAPI/event models, documents/glossaries, source-code structure, existing ontology/vocabulary, and lineage/provenance. Raw source authority remains with its owning system.
 
-The first active relational slice defines an immutable PostgreSQL schema-snapshot contract before a live adapter exists. It preserves exact schema/table/column identifiers, source column ordinals, source type/nullability/comment metadata, source-connection reference, snapshot digest, extractor revision, and observation-time evidence. It must not normalize identifiers in ways that erase PostgreSQL quoting or schema boundaries.
+The first active relational slice defines an immutable PostgreSQL schema-snapshot contract before a live adapter exists. It preserves exact schema/table/column identifiers, source column ordinals, source type/nullability/comment metadata, source-connection reference, snapshot digest, extractor revision, observation-time evidence, and PK/unique/FK coordinates. For foreign keys, observed `ON UPDATE`/`ON DELETE` actions, match type, and deferrability/initial timing are retained as typed source evidence; if the adapter did not observe those fields, the contract retains explicit absence rather than inventing defaults. It must not normalize identifiers in ways that erase PostgreSQL quoting or schema boundaries.
 
 ### FR-2 Candidate discovery
 
@@ -34,7 +34,7 @@ Produce candidates for concepts, taxonomies, non-taxonomic relations, semantic c
 
 ### FR-3 Evidence and provenance
 
-The current v0.1 candidate contract requires every candidate to retain exact source identity, source digest, and source location through `EvidenceReference`. The active Source Observation slice additionally retains snapshot digest, observation time, and extractor revision at the relational snapshot boundary. Issue #2 must still add proposal-receipt/discovery-method provenance and bind candidate evidence to exact observation locations before the first Generation release. Unsupported candidates fail closed.
+The current v0.1 candidate contract requires every candidate to retain exact source identity, source digest, and source location through `EvidenceReference`. The active Source Observation slice additionally retains snapshot digest, observation time, extractor revision, typed table/column/constraint locations, and exact foreign-key relationship behavior when observed. Issue #2 must still add proposal-receipt/discovery-method provenance and bind generated candidates to verified source receipts before the first Generation release. Unsupported candidates fail closed.
 
 ### FR-4 Deterministic validation
 
