@@ -11,6 +11,7 @@ All notable changes to ConceptWeave are documented here.
 - Rust-first `conceptweave-observation` contract for immutable PostgreSQL schema snapshots with exact qualified identifiers, deterministic source ordering, canonical lowercase `sha256:<64 hex>` snapshot identity, snapshot/extractor/time evidence, and fail-closed duplicate or blank metadata validation.
 - Immutable PostgreSQL primary-key, unique-constraint, and foreign-key observations with exact composite-column order, cross-schema referenced coordinates, deterministic table binding, and fail-closed duplicate/unknown/mismatched constraint evidence.
 - Exact optional PostgreSQL foreign-key reference behavior, preserving observed `ON UPDATE`/`ON DELETE` actions, match type, and deferrability/initial timing without inventing defaults when source behavior was not observed.
+- Exact optional PostgreSQL foreign-key validation/enforcement evidence, preserving observed `convalidated` and `conenforced` booleans (including explicit `false`) while retaining `None` when the adapter did not observe those catalog fields.
 - PostgreSQL 18 `CHECK` constraint observations preserving the reconstructed source definition plus validation, enforcement, and `NO INHERIT` status without guessing expression-to-column dependencies.
 - Fail-closed Draft -> Proposed -> Validated -> Reviewed -> Published lifecycle with explicit rejection and supersession.
 - Draft 2020-12 JSON Schema for the semantic-candidate public contract.
