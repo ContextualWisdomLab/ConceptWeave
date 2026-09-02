@@ -35,7 +35,7 @@ Every observed source will eventually carry at least:
 
 The active PostgreSQL slice already preserves exact schema/table/column identifiers, deterministic column ordinals, source type/nullability/comments, composite PK/unique/FK coordinates, exact optional FK update/delete/match/deferrability behavior, CHECK reconstructed definitions, CHECK validation/enforcement/`NO INHERIT` state, canonical lowercase `sha256:<64 hex>` snapshot identity, extractor revision, observation time, and verified table/column/constraint receipts. CHECK SQL is evidence, not a license to infer ordered expression-column dependencies.
 
-A live PostgreSQL adapter must operate read-only behind a Source Observation port. It must use bounded catalog queries, explicit statement/operation timeout, caller cancellation, row/byte/concurrency limits, exact identifier handling, and immutable extractor receipts. It must fail closed on partial or ambiguous catalog evidence and must not read another product's application tables through hidden coupling. PostgreSQL catalog reconstruction functions are treated as source rendering, not original DDL text.
+A live PostgreSQL adapter must operate read-only behind the Source Observation port. The port accepts only an opaque source registry key of at most 128 bytes in lowercase multiword `snake_case`; the concrete adapter resolves that key to least-privilege credentials inside its Anti-Corruption Layer. Raw DSNs, URLs, shell-style connection parameters, and provider connection objects cannot cross the port. The adapter must use bounded catalog queries, explicit statement/operation timeout, caller cancellation, row/byte/concurrency limits, exact identifier handling, and immutable extractor receipts. It must fail closed on partial or ambiguous catalog evidence and must not read another product's application tables through hidden coupling. PostgreSQL catalog reconstruction functions are treated as source rendering, not original DDL text.
 
 ## 5. Candidate contract
 
@@ -57,7 +57,7 @@ No durable product database is claimed by the foundation slice. When persistence
 
 ## 9. Security
 
-Source artifacts are untrusted input. Adapters must enforce source size/type bounds, parser timeouts, archive/decompression limits, SSRF-safe outbound access where external retrieval exists, and prompt-injection isolation for LLM-assisted extraction. Credentials and raw secrets never become semantic evidence. Database adapters must use least-privilege read-only credentials, avoid interpolating source identifiers into SQL, and expose cancellation/resource-limit failure as typed non-success outcomes rather than truncated success.
+Source artifacts are untrusted input. Adapters must enforce source size/type bounds, parser timeouts, archive/decompression limits, SSRF-safe outbound access where external retrieval exists, and prompt-injection isolation for LLM-assisted extraction. Credentials and raw secrets never become semantic evidence. Database adapters must use least-privilege read-only credentials, resolve credentials only from approved opaque registry keys, avoid interpolating source identifiers into SQL, and expose cancellation/resource-limit failure as typed non-success outcomes rather than truncated success.
 
 ## 10. Evaluation
 
