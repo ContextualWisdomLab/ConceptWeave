@@ -304,6 +304,69 @@ impl UniqueConstraintObservation {
     }
 }
 
+/// Immutable observation of one PostgreSQL `CHECK` constraint.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CheckConstraintObservation {
+    constraint_name: String,
+    definition: String,
+    validated: bool,
+    enforced: bool,
+    no_inherit: bool,
+}
+
+impl CheckConstraintObservation {
+    /// Creates a `CHECK` observation from exact source definition and status metadata.
+    pub fn new(
+        constraint_name: impl Into<String>,
+        definition: impl Into<String>,
+        validated: bool,
+        enforced: bool,
+        no_inherit: bool,
+    ) -> Result<Self, ObservationError> {
+        let constraint_name = constraint_name.into();
+        let definition = definition.into();
+        validate_nonblank(&constraint_name, "constraint_name")?;
+        validate_nonblank(&definition, "check_definition")?;
+        Ok(Self {
+            constraint_name,
+            definition,
+            validated,
+            enforced,
+            no_inherit,
+        })
+    }
+
+    /// Returns the exact source constraint identifier.
+    #[must_use]
+    pub fn constraint_name(&self) -> &str {
+        &self.constraint_name
+    }
+
+    /// Returns the exact source `CHECK` definition rendered by the adapter.
+    #[must_use]
+    pub fn definition(&self) -> &str {
+        &self.definition
+    }
+
+    /// Returns whether PostgreSQL reports the constraint as validated.
+    #[must_use]
+    pub const fn validated(&self) -> bool {
+        self.validated
+    }
+
+    /// Returns whether PostgreSQL reports the constraint as enforced.
+    #[must_use]
+    pub const fn enforced(&self) -> bool {
+        self.enforced
+    }
+
+    /// Returns whether PostgreSQL reports the `CHECK` constraint as `NO INHERIT`.
+    #[must_use]
+    pub const fn no_inherit(&self) -> bool {
+        self.no_inherit
+    }
+}
+
 /// PostgreSQL referential action preserved from a foreign-key definition.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ForeignKeyAction {
@@ -515,7 +578,7 @@ impl ForeignKeyObservation {
     }
 }
 
-/// Immutable table-level key or relationship evidence.
+/// Immutable table-level constraint evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TableConstraintObservation {
     /// Primary-key evidence.
@@ -524,6 +587,8 @@ pub enum TableConstraintObservation {
     Unique(UniqueConstraintObservation),
     /// Foreign-key relationship evidence.
     ForeignKey(ForeignKeyObservation),
+    /// `CHECK`-constraint evidence.
+    Check(CheckConstraintObservation),
 }
 
 impl TableConstraintObservation {
@@ -534,16 +599,21 @@ impl TableConstraintObservation {
             Self::PrimaryKey(observation) => observation.constraint_name(),
             Self::Unique(observation) => observation.constraint_name(),
             Self::ForeignKey(observation) => observation.constraint_name(),
+            Self::Check(observation) => observation.constraint_name(),
         }
     }
 
-    /// Returns local source columns in the exact constraint ordinal order.
+    /// Returns exact local-column coordinates when the source constraint exposes them.
+    ///
+    /// `CHECK` expressions intentionally return an empty slice instead of inferring expression
+    /// dependencies that PostgreSQL did not provide as an ordered constraint-column coordinate.
     #[must_use]
     pub fn column_names(&self) -> &[String] {
         match self {
             Self::PrimaryKey(observation) => observation.column_names(),
             Self::Unique(observation) => observation.column_names(),
             Self::ForeignKey(observation) => observation.column_names(),
+            Self::Check(_) => &[],
         }
     }
 }
@@ -567,10 +637,11 @@ impl TableObservation {
         Self::with_constraints(schema_name, table_name, columns, Vec::new())
     }
 
-    /// Creates one table observation with deterministic key and relationship evidence.
+    /// Creates one table observation with deterministic constraint evidence.
     ///
-    /// Collection order is canonicalized, exact identifiers are never normalized, and every local
-    /// constraint column must be present in the same table observation.
+    /// Collection order is canonicalized and exact identifiers are never normalized. Constraints
+    /// that expose local-column coordinates must refer to columns in the same table observation;
+    /// `CHECK` expression dependencies are not inferred from SQL text.
     pub fn with_constraints(
         schema_name: impl Into<String>,
         table_name: impl Into<String>,
