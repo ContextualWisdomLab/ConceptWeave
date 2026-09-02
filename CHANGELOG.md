@@ -13,6 +13,7 @@ All notable changes to ConceptWeave are documented here.
 - Exact optional PostgreSQL foreign-key reference behavior, preserving observed `ON UPDATE`/`ON DELETE` actions, match type, and deferrability/initial timing without inventing defaults when source behavior was not observed.
 - Exact optional PostgreSQL foreign-key validation/enforcement evidence, preserving observed `convalidated` and `conenforced` booleans (including explicit `false`) while retaining `None` when the adapter did not observe those catalog fields.
 - PostgreSQL 18 `CHECK` constraint observations preserving the reconstructed source definition plus validation, enforcement, and `NO INHERIT` status without guessing expression-to-column dependencies.
+- Rust-first `conceptweave-source-port` contract with positive statement-timeout/row/byte/concurrency limits, exact non-empty schema allowlists, stable non-credential source references, caller cancellation, and typed fail-closed source-disappearance/resource-limit outcomes; a live PostgreSQL adapter remains open work.
 - Fail-closed Draft -> Proposed -> Validated -> Reviewed -> Published lifecycle with explicit rejection and supersession.
 - Draft 2020-12 JSON Schema for the semantic-candidate public contract.
 - Standards and research doctoring covering stable W3C ontology standards, 2026 RDF/SHACL work in progress, Apache Ossie, and recent LLM ontology-engineering research.
@@ -20,4 +21,4 @@ All notable changes to ConceptWeave are documented here.
 ### Security
 
 - Model-generated semantics remain non-authoritative until deterministic validation and authorized review.
-- Unsafe Rust is forbidden in owned domain and source-observation contract crates.
+- Unsafe Rust is forbidden in owned domain, source-observation, and source-port contract crates.
