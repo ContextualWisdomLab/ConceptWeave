@@ -109,6 +109,24 @@ jobs:
             -s contracts/semantic-release.schema.json \
             -d contracts/fixtures/semantic-release.invalid-uppercase-digest.json \
             --invalid
+          npx --yes ajv-cli@5.0.0 compile \
+            --spec=draft2020 \
+            -s contracts/semantic-release-supersession.schema.json
+          npx --yes ajv-cli@5.0.0 test \
+            --spec=draft2020 \
+            -s contracts/semantic-release-supersession.schema.json \
+            -d contracts/fixtures/semantic-release-supersession.valid.json \
+            --valid
+          npx --yes ajv-cli@5.0.0 test \
+            --spec=draft2020 \
+            -s contracts/semantic-release-supersession.schema.json \
+            -d contracts/fixtures/semantic-release-supersession.invalid-digest.json \
+            --invalid
+          npx --yes ajv-cli@5.0.0 test \
+            --spec=draft2020 \
+            -s contracts/semantic-release-supersession.schema.json \
+            -d contracts/fixtures/semantic-release-supersession.invalid-rationale.json \
+            --invalid
 
       - name: Lockfile freshness
         run: |
