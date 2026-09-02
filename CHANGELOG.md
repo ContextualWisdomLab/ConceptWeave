@@ -14,6 +14,7 @@ All notable changes to ConceptWeave are documented here.
 - Deterministic offline semantic-release diff that first applies the same authoritative-use admission policy, then reports stable previous/current release identity and sorted added/removed concept identifiers without network or model calls.
 - Exact offline SHA-256 verification of caller-supplied serialized semantic-release bytes, with typed digest-mismatch evidence and the same fail-closed authoritative-use admission gate.
 - Explicit semantic-release compatibility policy that distinguishes the current contract version, caller-declared supported legacy versions, and unknown versions without inferring compatibility from version ordering; supported legacy releases still pass the same Published/Authoritative gate.
+- Explicit immutable semantic-release supersession references that bind predecessor and successor release ids to their exact artifact digests, require a rationale, reject self-supersession, and validate both releases through the ordinary authoritative-use gate without inferring replacement from version order or timestamps.
 - Draft 2020-12 `semantic-release` public JSON Schema with valid and fail-closed fixtures for non-authoritative publication, duplicate concept identifiers, and malformed digest identity.
 - Standards and research doctoring covering stable W3C ontology standards, 2026 RDF/SHACL work in progress, Apache Ossie, and recent LLM ontology-engineering/matching research.
 
@@ -25,4 +26,5 @@ All notable changes to ConceptWeave are documented here.
 - Release diff validates both compared releases through the same fail-closed authoritative-use gate so comparison cannot bypass contract-version, publication-state, or truth-status policy.
 - Serialized-artifact integrity verification first applies authoritative-use admission, then computes SHA-256 over the exact supplied bytes and rejects any mismatch with the declared release digest.
 - Digest syntax validation remains distinct from byte verification so a syntactically valid digest is never treated as proof that serialized content matches it.
+- Supersession validation requires exact predecessor/successor id-and-digest references and leaves the prior published release immutable; a correction is not inferred from ordering, timestamps, or semantic similarity.
 - Unsafe Rust is forbidden in the core domain and client crates.
