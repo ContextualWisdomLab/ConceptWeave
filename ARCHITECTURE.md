@@ -29,11 +29,11 @@ flowchart LR
 | Source Observation | Supporting | immutable observations, parser receipts, evidence locations | source-system business truth |
 | Semantic Discovery | Core | candidate generation and evidence binding | publication authority |
 | Model Validation | Supporting | deterministic validation reports | human review decisions |
-| Governance & Publication | Core | proposal lifecycle, review receipts, releases, supersession | catalog/search runtime |
-| Client Consumption | Supporting | release admission, compatibility, future diff/match/resolve/query-plan contracts | generator internals, consumer authorization, physical query execution |
+| Governance & Publication | Core | proposal lifecycle, review receipts, releases, supersession authority | catalog/search runtime |
+| Client Consumption | Supporting | release admission, compatibility, exact byte verification, diff/resolution, explicit immutable supersession validation, future match/query-plan contracts | generator internals, consumer authorization, publication authority, physical query execution |
 | Interoperability | Supporting | versioned import/export and ACL adapters | foreign product internals |
 
-The generation-to-client dependency crosses only versioned public release contracts. Client code may reuse public domain value types, but it must not import generator-private adapters, prompts, persistence tables, or orchestration state.
+The generation-to-client dependency crosses only versioned public release contracts. Client code may reuse public domain value types, but it must not import generator-private adapters, prompts, persistence tables, Source Observation internals, or orchestration state.
 
 ## Aggregate and value-object boundaries
 
@@ -47,11 +47,19 @@ Planned Governance & Publication aggregate for immutable publication. The curren
 
 ### ReleaseDigest
 
-Client value object for a declared `sha256:<64 hex>` digest identity. It validates digest syntax only. Exact detached artifact bytes must be hashed and compared before integrity is claimed.
+Client value object for a declared canonical `sha256:<64 lowercase hex>` digest identity. It validates digest syntax only. Exact detached artifact bytes must be hashed and compared before integrity is claimed.
+
+### SemanticReleaseReference
+
+Client value object that binds a stable semantic-release id to its exact artifact digest. It is an immutable coordinate for published release identity and avoids treating a mutable name or version number alone as sufficient supersession evidence.
+
+### ReleaseSupersession
+
+Client-visible immutable declaration naming an exact predecessor reference, exact successor reference, and nonblank rationale. It rejects self-supersession. Client validation requires both releases to pass normal Published + Authoritative compatibility admission and both id+digest references to match exactly. The declaration does not mutate either release and never infers replacement from version ordering, timestamps, diff size, or semantic similarity. Governance & Publication remains the authority that creates the eventual publication/supersession receipt; the Client only validates the consumer-visible contract.
 
 ### SemanticReleaseClient
 
-A stateless domain service in Client Consumption. Its compatibility policy has one explicit current contract version and an explicit set of supported legacy versions; it never infers compatibility from semantic-version ordering. Unknown versions fail closed. Current and supported-legacy releases pass the same `Published` plus `Authoritative` gate before resolution, diff, or artifact verification. It performs no network, LLM, database, tenant-authorization, or physical-query work.
+A stateless domain service in Client Consumption. Its compatibility policy has one explicit current contract version and an explicit set of supported legacy versions; it never infers compatibility from semantic-version ordering. Unknown versions fail closed. Current and supported-legacy releases pass the same `Published` plus `Authoritative` gate before resolution, diff, artifact verification, or supersession validation. It performs no network, LLM, database, tenant-authorization, publication-decision, or physical-query work.
 
 ## Truth model
 
@@ -59,10 +67,10 @@ A stateless domain service in Client Consumption. Its compatibility policy has o
 - `inferred`: derived candidate;
 - `proposed`: submitted for governance;
 - `authoritative`: explicitly reviewed and published;
-- `superseded`: formerly authoritative and replaced;
+- `superseded`: formerly authoritative and replaced through explicit release evidence;
 - `rejected`: explicitly rejected.
 
-Truth status and publication workflow are distinct. A source observation can be authoritative in its source domain without making an inferred semantic interpretation authoritative. Client admission fails closed rather than coercing these states.
+Truth status and publication workflow are distinct. A source observation can be authoritative in its source domain without making an inferred semantic interpretation authoritative. Client admission fails closed rather than coercing these states. Supersession preserves the immutable prior release rather than overwriting it.
 
 ## Integration boundaries
 
@@ -80,13 +88,15 @@ No direct cross-service application-table SQL is permitted.
 ```text
 crates/
   conceptweave-domain/       # Core candidate/evidence lifecycle contracts
-  conceptweave-client/       # Offline release admission and compatibility boundary
+  conceptweave-client/       # Offline release admission, compatibility, integrity and supersession validation
 contracts/                   # Versioned public JSON Schemas and fixtures
 docs/
-  adr/                       # Binding architecture decisions
+  adr/                       # Proposed/accepted architecture decisions
   doctoring/                 # Standards/research evidence
 scripts/                     # Deterministic repository-quality helpers
 .github/workflows/           # CI evidence
 ```
 
 Adapters and application services are added only when their bounded responsibility exists; generic `utils`, `helpers`, or `services` dumping grounds are prohibited.
+
+ADR 0004 remains Proposed while PR #5 is Draft and current-head checks/governance are incomplete; implementation on an unintegrated head is not sufficient to mark the architecture decision Accepted.
