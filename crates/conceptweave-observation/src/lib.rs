@@ -464,6 +464,8 @@ pub struct ForeignKeyObservation {
     referenced_table_name: String,
     referenced_column_names: Vec<String>,
     reference_behavior: Option<ForeignKeyReferenceBehavior>,
+    validated: Option<bool>,
+    enforced: Option<bool>,
 }
 
 impl ForeignKeyObservation {
@@ -538,7 +540,21 @@ impl ForeignKeyObservation {
             referenced_table_name,
             referenced_column_names,
             reference_behavior,
+            validated: None,
+            enforced: None,
         })
+    }
+
+    /// Adds exact PostgreSQL validation and enforcement state when the adapter observed it.
+    ///
+    /// `None` remains the representation for metadata that was not observed. Supplying explicit
+    /// booleans, including `false`, preserves PostgreSQL 18 `convalidated` and `conenforced`
+    /// evidence without deriving defaults.
+    #[must_use]
+    pub fn with_validation_and_enforcement(mut self, validated: bool, enforced: bool) -> Self {
+        self.validated = Some(validated);
+        self.enforced = Some(enforced);
+        self
     }
 
     /// Returns the exact source constraint identifier.
@@ -575,6 +591,18 @@ impl ForeignKeyObservation {
     #[must_use]
     pub const fn reference_behavior(&self) -> Option<&ForeignKeyReferenceBehavior> {
         self.reference_behavior.as_ref()
+    }
+
+    /// Returns PostgreSQL `convalidated` state when observed, or `None` when unavailable.
+    #[must_use]
+    pub const fn validated(&self) -> Option<bool> {
+        self.validated
+    }
+
+    /// Returns PostgreSQL `conenforced` state when observed, or `None` when unavailable.
+    #[must_use]
+    pub const fn enforced(&self) -> Option<bool> {
+        self.enforced
     }
 }
 
