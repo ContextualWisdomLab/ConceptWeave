@@ -218,30 +218,93 @@ impl SemanticReleaseDiff {
     }
 }
 
-/// Offline admission policy for one supported semantic-release contract version.
+/// Compatibility classification for one semantic-release contract version.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContractVersionCompatibility {
+    /// The release uses the client's current contract version.
+    Current,
+    /// The release uses a legacy version explicitly admitted by client policy.
+    SupportedLegacy,
+    /// The release version is neither current nor explicitly supported legacy.
+    Unsupported,
+}
+
+/// Offline admission policy for current and explicitly supported legacy contract versions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SemanticReleaseClient {
     supported_contract_version: String,
+    supported_legacy_contract_versions: BTreeSet<String>,
 }
 
 impl SemanticReleaseClient {
-    /// Creates a client pinned to one explicit semantic-release contract version.
+    /// Creates a client pinned to one explicit current semantic-release contract version.
     pub fn new(
         supported_contract_version: impl Into<String>,
     ) -> Result<Self, ReleaseContractError> {
+        Self::with_supported_legacy_contract_versions(supported_contract_version, Vec::new())
+    }
+
+    /// Creates a client with an explicit current version and explicit supported legacy versions.
+    ///
+    /// Legacy support is opt-in rather than inferred from version ordering. Blank versions and the
+    /// current version repeated as legacy are rejected so admission policy remains unambiguous.
+    pub fn with_supported_legacy_contract_versions(
+        supported_contract_version: impl Into<String>,
+        supported_legacy_contract_versions: Vec<String>,
+    ) -> Result<Self, ReleaseContractError> {
         let supported_contract_version = supported_contract_version.into();
         require_non_blank(&supported_contract_version, "supported_contract_version")?;
+
+        let mut validated_legacy_versions = BTreeSet::new();
+        for legacy_version in supported_legacy_contract_versions {
+            require_non_blank(
+                &legacy_version,
+                "supported_legacy_contract_version",
+            )?;
+            if legacy_version == supported_contract_version {
+                return Err(ReleaseContractError::CurrentContractVersionMarkedLegacy(
+                    legacy_version,
+                ));
+            }
+            validated_legacy_versions.insert(legacy_version);
+        }
+
         Ok(Self {
             supported_contract_version,
+            supported_legacy_contract_versions: validated_legacy_versions,
         })
     }
 
-    /// Returns the exact semantic-release contract version this client accepts.
+    /// Returns the exact current semantic-release contract version this client accepts.
     pub fn supported_contract_version(&self) -> &str {
         &self.supported_contract_version
     }
 
-    /// Fails closed unless a release is compatible, Published and Authoritative.
+    /// Returns explicitly supported legacy contract versions in deterministic order.
+    pub fn supported_legacy_contract_versions(&self) -> impl Iterator<Item = &str> {
+        self.supported_legacy_contract_versions
+            .iter()
+            .map(String::as_str)
+    }
+
+    /// Classifies a release against the client's explicit compatibility policy.
+    ///
+    /// Version ordering is deliberately not inferred. A version is compatible only when it equals
+    /// the current version or appears in the explicit legacy allow-set.
+    pub fn compatibility(&self, release: &SemanticRelease) -> ContractVersionCompatibility {
+        if release.contract_version() == self.supported_contract_version {
+            ContractVersionCompatibility::Current
+        } else if self
+            .supported_legacy_contract_versions
+            .contains(release.contract_version())
+        {
+            ContractVersionCompatibility::SupportedLegacy
+        } else {
+            ContractVersionCompatibility::Unsupported
+        }
+    }
+
+    /// Fails closed unless a release is explicitly compatible, Published and Authoritative.
     ///
     /// This check is deterministic and performs no network or model calls. It is
     /// suitable as an admission gate before a consuming product performs its own
@@ -250,7 +313,7 @@ impl SemanticReleaseClient {
         &self,
         release: &SemanticRelease,
     ) -> Result<(), ReleaseContractError> {
-        if release.contract_version() != self.supported_contract_version {
+        if self.compatibility(release) == ContractVersionCompatibility::Unsupported {
             return Err(ReleaseContractError::UnsupportedContractVersion {
                 expected: self.supported_contract_version.clone(),
                 actual: release.contract_version().to_string(),
@@ -384,9 +447,11 @@ pub enum ReleaseContractError {
     MissingProvenance,
     /// The release repeats one semantic concept identity.
     DuplicateConceptId(String),
+    /// The configured current contract version was also supplied as a legacy version.
+    CurrentContractVersionMarkedLegacy(String),
     /// The release uses a contract version this client does not support.
     UnsupportedContractVersion {
-        /// Contract version required by the client.
+        /// Current contract version required by the client when no explicit compatibility exists.
         expected: String,
         /// Contract version supplied by the release.
         actual: String,
@@ -422,9 +487,13 @@ impl fmt::Display for ReleaseContractError {
                 formatter,
                 "semantic release contains duplicate concept id `{concept_id}`"
             ),
+            Self::CurrentContractVersionMarkedLegacy(contract_version) => write!(
+                formatter,
+                "current semantic release contract version `{contract_version}` cannot also be marked legacy"
+            ),
             Self::UnsupportedContractVersion { expected, actual } => write!(
                 formatter,
-                "semantic release contract version `{actual}` is unsupported; expected `{expected}`"
+                "semantic release contract version `{actual}` is unsupported; current version is `{expected}`"
             ),
             Self::ReleaseNotPublished { actual } => {
                 write!(formatter, "semantic release is {actual:?}, not Published")
