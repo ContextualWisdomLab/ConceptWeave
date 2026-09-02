@@ -6,7 +6,7 @@ ConceptWeave converts heterogeneous enterprise evidence into a governed ontology
 
 ## 2. Buyer problem
 
-Enterprise teams repeatedly hand-build business glossaries, ontologies, metric definitions, semantic mappings, and data relationships from database schemas, API contracts, documents, and tribal knowledge. The work is slow, inconsistent across tools, difficult to audit, and unsafe to delegate entirely to an LLM because inferred semantics can be plausible but wrong. Even after a model is published, consumers need a deterministic way to determine whether a release is compatible, governed, and safe to use.
+Enterprise teams repeatedly hand-build business glossaries, ontologies, metric definitions, semantic mappings, and data relationships from database schemas, API contracts, documents, and tribal knowledge. The work is slow, inconsistent across tools, difficult to audit, and unsafe to delegate entirely to an LLM because inferred semantics can be plausible but wrong. Even after a model is published, consumers need a deterministic way to determine whether a release is compatible, governed, immutable, superseded by an explicit successor, and safe to use.
 
 ## 3. Primary buyers and users
 
@@ -44,7 +44,7 @@ A candidate cannot become authoritative solely because an LLM or automated extra
 
 ### FR-6 Publication
 
-Publish versioned artifacts for ontology and semantic-layer consumers while retaining the exact input snapshot and proposal/review receipts that produced the release.
+Publish versioned immutable artifacts for ontology and semantic-layer consumers while retaining the exact input snapshot and proposal/review receipts that produced the release. A correction must create a distinct successor release rather than overwrite a published artifact in place. Supersession authority belongs to Governance & Publication and must produce an explicit predecessor/successor receipt; version ordering or timestamps alone are never replacement evidence.
 
 ### FR-7 Interoperability
 
@@ -62,9 +62,11 @@ An admitted client can compare two releases deterministically without contacting
 
 The digest value object validates canonical `sha256:<64 lowercase hex>` identity syntax. Cryptographic integrity is a separate operation: `SemanticReleaseClient::verify_serialized_artifact` first applies authoritative-use admission, then hashes the exact caller-supplied detached artifact bytes and requires an exact digest match. Syntax validity alone is never integrity evidence.
 
+A client can also validate an explicit immutable supersession declaration. `SemanticReleaseReference` binds a release id to its exact artifact digest. `ReleaseSupersession` names distinct predecessor/successor references plus a nonblank rationale, rejects self-supersession, and `validate_supersession` requires both releases to pass ordinary authoritative-use admission and both id+digest coordinates to match exactly. This is consumer-side validation only; it does not grant publication authority or infer supersession from version order, time, diff, or semantic similarity. A language-neutral supersession/publication-receipt schema remains required before cross-language client completeness is claimed.
+
 ## 6. First Generation ↔ Client vertical
 
-`relational schema snapshot -> observed tables/columns/foreign keys -> concept/relation/dimension/measure/mapping candidates -> evidence-bound validation -> steward review -> immutable semantic_release -> offline client admission/diff/integrity verification -> consuming-product ACL/query boundary`.
+`relational schema snapshot -> observed tables/columns/foreign keys -> concept/relation/dimension/measure/mapping candidates -> evidence-bound validation -> steward review -> immutable semantic_release -> offline client admission/diff/integrity/supersession validation -> consuming-product ACL/query boundary`.
 
 `ContextualWisdomLab/governance-risk-compliance` is the first reference source/client scenario, not a special-case algorithm. A shared golden fixture must exercise both Generation and Client without copying GRC truth into ConceptWeave or giving ConceptWeave direct GRC application-table access.
 
@@ -79,6 +81,8 @@ The digest value object validates canonical `sha256:<64 lowercase hex>` identity
 - building a generic LLM gateway or browser crawler;
 - treating digest syntax validation alone as cryptographic integrity evidence;
 - inferring backward compatibility merely because one version number is older;
+- inferring supersession from version order, timestamps, semantic similarity, or diff size;
+- overwriting a published semantic release in place;
 - claiming an emerging draft semantic-layer format is a stable standard.
 
 ## 8. Acceptance criteria for the first commercial candidate
@@ -95,4 +99,6 @@ The digest value object validates canonical `sha256:<64 lowercase hex>` identity
 - current, explicitly supported legacy, and unknown contract versions have deterministic fail-closed compatibility outcomes;
 - consumer can deterministically diff admitted releases without provider access or bypassing release admission;
 - exact detached artifact digest verification succeeds only for matching bytes;
-- buyer can inspect why each published artifact exists and which evidence supported it.
+- corrections preserve the immutable predecessor and identify an explicit distinct successor by exact release id plus digest rather than version-order inference;
+- a language-neutral supersession/publication receipt is validated before cross-language release consumption is called complete;
+- buyer can inspect why each published artifact exists, which evidence supported it, and why/when it was explicitly superseded.
