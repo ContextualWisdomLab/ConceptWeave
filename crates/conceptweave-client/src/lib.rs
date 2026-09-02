@@ -183,6 +183,96 @@ impl SemanticRelease {
     }
 }
 
+/// Immutable reference to the exact bytes of one published semantic release.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SemanticReleaseReference {
+    release_id: String,
+    artifact_digest: ReleaseDigest,
+}
+
+impl SemanticReleaseReference {
+    /// Creates an exact release reference from a stable release id and canonical digest.
+    pub fn new(
+        release_id: impl Into<String>,
+        artifact_digest: ReleaseDigest,
+    ) -> Result<Self, ReleaseContractError> {
+        let release_id = release_id.into();
+        require_non_blank(&release_id, "release_reference_id")?;
+        Ok(Self {
+            release_id,
+            artifact_digest,
+        })
+    }
+
+    /// Captures the immutable id-and-digest identity of a release contract.
+    #[must_use]
+    pub fn from_release(release: &SemanticRelease) -> Self {
+        Self {
+            release_id: release.release_id().to_owned(),
+            artifact_digest: release.artifact_digest().clone(),
+        }
+    }
+
+    /// Returns the referenced stable semantic-release id.
+    pub fn release_id(&self) -> &str {
+        &self.release_id
+    }
+
+    /// Returns the referenced immutable semantic-release artifact digest.
+    pub fn artifact_digest(&self) -> &ReleaseDigest {
+        &self.artifact_digest
+    }
+}
+
+/// Explicit immutable declaration that one release is superseded by another release.
+///
+/// Supersession is never inferred from semantic version ordering, timestamps, or diffs. Both
+/// references are bound to exact release ids and artifact digests so a correction preserves the
+/// prior published release while naming the precise steward-approved successor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReleaseSupersession {
+    superseded: SemanticReleaseReference,
+    successor: SemanticReleaseReference,
+    rationale: String,
+}
+
+impl ReleaseSupersession {
+    /// Creates an explicit supersession declaration between two distinct release identities.
+    pub fn new(
+        superseded: SemanticReleaseReference,
+        successor: SemanticReleaseReference,
+        rationale: impl Into<String>,
+    ) -> Result<Self, ReleaseContractError> {
+        let rationale = rationale.into();
+        require_non_blank(&rationale, "supersession_rationale")?;
+        if superseded.release_id() == successor.release_id() {
+            return Err(ReleaseContractError::SelfSupersession(
+                superseded.release_id().to_owned(),
+            ));
+        }
+        Ok(Self {
+            superseded,
+            successor,
+            rationale,
+        })
+    }
+
+    /// Returns the exact immutable release reference being superseded.
+    pub fn superseded(&self) -> &SemanticReleaseReference {
+        &self.superseded
+    }
+
+    /// Returns the exact immutable successor release reference.
+    pub fn successor(&self) -> &SemanticReleaseReference {
+        &self.successor
+    }
+
+    /// Returns the explicit steward-facing reason for supersession.
+    pub fn rationale(&self) -> &str {
+        &self.rationale
+    }
+}
+
 /// Deterministic concept-level change between two admitted semantic releases.
 ///
 /// This value reports only public semantic-contract differences. It does not
@@ -385,6 +475,29 @@ impl SemanticReleaseClient {
         Ok(())
     }
 
+    /// Validates an explicit immutable supersession declaration between two admitted releases.
+    ///
+    /// Both releases must independently pass the normal authoritative-use gate. The declaration
+    /// must then match each exact release id and artifact digest. No version order, timestamp,
+    /// content diff, or ontology similarity is treated as implicit supersession evidence.
+    pub fn validate_supersession(
+        &self,
+        declaration: &ReleaseSupersession,
+        superseded: &SemanticRelease,
+        successor: &SemanticRelease,
+    ) -> Result<(), ReleaseContractError> {
+        self.validate_for_authoritative_use(superseded)?;
+        self.validate_for_authoritative_use(successor)?;
+
+        if declaration.superseded() != &SemanticReleaseReference::from_release(superseded) {
+            return Err(ReleaseContractError::SupersededReleaseReferenceMismatch);
+        }
+        if declaration.successor() != &SemanticReleaseReference::from_release(successor) {
+            return Err(ReleaseContractError::SuccessorReleaseReferenceMismatch);
+        }
+        Ok(())
+    }
+
     /// Compares two admitted releases and reports deterministic concept changes.
     ///
     /// Both releases pass the same authoritative-use admission gate before any
@@ -449,6 +562,12 @@ pub enum ReleaseContractError {
     DuplicateConceptId(String),
     /// The configured current contract version was also supplied as a legacy version.
     CurrentContractVersionMarkedLegacy(String),
+    /// A release attempted to supersede the same stable release identity.
+    SelfSupersession(String),
+    /// The declared superseded id-and-digest reference does not match the supplied release.
+    SupersededReleaseReferenceMismatch,
+    /// The declared successor id-and-digest reference does not match the supplied release.
+    SuccessorReleaseReferenceMismatch,
     /// The release uses a contract version this client does not support.
     UnsupportedContractVersion {
         /// Current contract version required by the client when no explicit compatibility exists.
@@ -490,6 +609,18 @@ impl fmt::Display for ReleaseContractError {
             Self::CurrentContractVersionMarkedLegacy(contract_version) => write!(
                 formatter,
                 "current semantic release contract version `{contract_version}` cannot also be marked legacy"
+            ),
+            Self::SelfSupersession(release_id) => write!(
+                formatter,
+                "semantic release `{release_id}` cannot supersede itself"
+            ),
+            Self::SupersededReleaseReferenceMismatch => write!(
+                formatter,
+                "supersession predecessor reference does not match the exact supplied release"
+            ),
+            Self::SuccessorReleaseReferenceMismatch => write!(
+                formatter,
+                "supersession successor reference does not match the exact supplied release"
             ),
             Self::UnsupportedContractVersion { expected, actual } => write!(
                 formatter,
