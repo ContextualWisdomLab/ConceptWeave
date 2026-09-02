@@ -40,9 +40,11 @@ Immutable Source Observation aggregate for one bounded relational metadata captu
 
 Immutable Source Observation value objects. Table observations keep exact schema/table identity. Column observations keep exact source name, one-based ordinal, source type, nullability, and optional source comment. Duplicate names or ordinals within a table fail closed, and read APIs return deterministic source order.
 
-### PrimaryKeyObservation / UniqueConstraintObservation / ForeignKeyObservation
+### PrimaryKeyObservation / UniqueConstraintObservation / ForeignKeyObservation / CheckConstraintObservation
 
-Immutable Source Observation value objects for deterministic key and relationship evidence. Composite key order is preserved exactly. Foreign keys retain ordered local and referenced coordinates, including cross-schema targets. When the source adapter observes foreign-key reference behavior, `ForeignKeyReferenceBehavior` preserves exact `ON UPDATE` and `ON DELETE` actions, match type, and deferrability/initial timing; when that metadata was not observed, the contract retains `None` rather than deriving PostgreSQL defaults. Constraint names must be unique within a table observation; empty or duplicate coordinate lists fail closed; every local constraint column must exist in the same observed table. These contracts preserve source metadata only and do not infer join semantics or business meaning.
+Immutable Source Observation value objects for deterministic constraint evidence. Composite key order is preserved exactly. Foreign keys retain ordered local and referenced coordinates, including cross-schema targets. When the source adapter observes foreign-key reference behavior, `ForeignKeyReferenceBehavior` preserves exact `ON UPDATE` and `ON DELETE` actions, match type, and deferrability/initial timing; when that metadata was not observed, the contract retains `None` rather than deriving PostgreSQL defaults.
+
+`CheckConstraintObservation` retains the reconstructed PostgreSQL definition together with validation, enforcement, and `NO INHERIT` status. PostgreSQL stores a CHECK expression internally and recommends `pg_get_constraintdef()` for reconstruction, so ConceptWeave preserves that adapter-supplied definition as source evidence rather than parsing it into guessed ordered column coordinates. Constraint names remain unique within a table observation, while explicit PK/unique/FK coordinate lists must bind to observed local columns. These contracts preserve source metadata only and do not infer join semantics, CHECK dependencies, or business meaning.
 
 ### SemanticCandidate
 
