@@ -9,6 +9,8 @@ use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
+const SHA256_DIGEST_PREFIX: &str = "sha256:";
+
 /// Fail-closed validation errors for immutable schema observations.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ObservationError {
@@ -240,7 +242,7 @@ impl PostgresSchemaSnapshot {
         let extractor_revision = extractor_revision.into();
         let observed_at_utc = observed_at_utc.into();
         validate_nonblank(&source_connection_key, "source_connection_key")?;
-        validate_nonblank(&snapshot_digest, "snapshot_digest")?;
+        validate_snapshot_digest(&snapshot_digest)?;
         validate_nonblank(&extractor_revision, "extractor_revision")?;
         validate_nonblank(&observed_at_utc, "observed_at_utc")?;
 
@@ -296,6 +298,21 @@ impl PostgresSchemaSnapshot {
     pub fn tables(&self) -> &[TableObservation] {
         &self.tables
     }
+}
+
+fn validate_snapshot_digest(value: &str) -> Result<(), ObservationError> {
+    let value_bytes = value.as_bytes();
+    let is_canonical = value_bytes.len() == SHA256_DIGEST_PREFIX.len() + 64
+        && value_bytes.starts_with(SHA256_DIGEST_PREFIX.as_bytes())
+        && value_bytes[SHA256_DIGEST_PREFIX.len()..]
+            .iter()
+            .all(|byte| matches!(*byte, b'0'..=b'9' | b'a'..=b'f'));
+    if !is_canonical {
+        return Err(ObservationError::InvalidObservationField {
+            field: "snapshot_digest",
+        });
+    }
+    Ok(())
 }
 
 fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
