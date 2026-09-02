@@ -39,6 +39,47 @@ pub enum ObservationError {
         /// Duplicated one-based source ordinal position.
         ordinal_position: u32,
     },
+    /// A key or relationship constraint did not name any source columns.
+    EmptyConstraintColumns {
+        /// Exact source constraint identifier.
+        constraint_name: String,
+    },
+    /// The same exact source column appeared twice within one constraint coordinate list.
+    DuplicateConstraintColumn {
+        /// Exact source constraint identifier.
+        constraint_name: String,
+        /// Exact duplicated source column identifier.
+        column_name: String,
+    },
+    /// The same exact source constraint name appeared more than once on one table.
+    DuplicateConstraintName {
+        /// Exact source schema identifier.
+        schema_name: String,
+        /// Exact source table identifier.
+        table_name: String,
+        /// Exact duplicated source constraint identifier.
+        constraint_name: String,
+    },
+    /// A table constraint referred to a local column absent from the same observation.
+    UnknownConstraintColumn {
+        /// Exact source schema identifier.
+        schema_name: String,
+        /// Exact source table identifier.
+        table_name: String,
+        /// Exact source constraint identifier.
+        constraint_name: String,
+        /// Exact missing local source column identifier.
+        column_name: String,
+    },
+    /// A foreign key did not provide a one-to-one local-to-referenced column coordinate mapping.
+    ForeignKeyArityMismatch {
+        /// Exact source constraint identifier.
+        constraint_name: String,
+        /// Number of local source columns in the relationship coordinate.
+        local_column_count: usize,
+        /// Number of referenced source columns in the relationship coordinate.
+        referenced_column_count: usize,
+    },
     /// The same exact `(schema_name, table_name)` observation appeared more than once.
     DuplicateTableObservation {
         /// Exact source schema identifier.
@@ -54,7 +95,9 @@ impl Display for ObservationError {
             Self::InvalidObservationField { field } => {
                 write!(formatter, "invalid observation field: {field}")
             }
-            Self::InvalidOrdinalPosition => write!(formatter, "column ordinal position must be positive"),
+            Self::InvalidOrdinalPosition => {
+                write!(formatter, "column ordinal position must be positive")
+            }
             Self::DuplicateColumnName {
                 schema_name,
                 table_name,
@@ -70,6 +113,41 @@ impl Display for ObservationError {
             } => write!(
                 formatter,
                 "duplicate column ordinal in {schema_name}.{table_name}: {ordinal_position}"
+            ),
+            Self::EmptyConstraintColumns { constraint_name } => {
+                write!(formatter, "constraint has no columns: {constraint_name}")
+            }
+            Self::DuplicateConstraintColumn {
+                constraint_name,
+                column_name,
+            } => write!(
+                formatter,
+                "duplicate constraint column in {constraint_name}: {column_name}"
+            ),
+            Self::DuplicateConstraintName {
+                schema_name,
+                table_name,
+                constraint_name,
+            } => write!(
+                formatter,
+                "duplicate constraint observation on {schema_name}.{table_name}: {constraint_name}"
+            ),
+            Self::UnknownConstraintColumn {
+                schema_name,
+                table_name,
+                constraint_name,
+                column_name,
+            } => write!(
+                formatter,
+                "constraint {constraint_name} on {schema_name}.{table_name} references unknown local column {column_name}"
+            ),
+            Self::ForeignKeyArityMismatch {
+                constraint_name,
+                local_column_count,
+                referenced_column_count,
+            } => write!(
+                formatter,
+                "foreign key {constraint_name} has {local_column_count} local columns but {referenced_column_count} referenced columns"
             ),
             Self::DuplicateTableObservation {
                 schema_name,
@@ -147,20 +225,215 @@ impl ColumnObservation {
     }
 }
 
+/// Immutable observation of one PostgreSQL primary-key constraint.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PrimaryKeyObservation {
+    constraint_name: String,
+    column_names: Vec<String>,
+}
+
+impl PrimaryKeyObservation {
+    /// Creates a primary-key observation while preserving exact source column order.
+    pub fn new(
+        constraint_name: impl Into<String>,
+        column_names: Vec<String>,
+    ) -> Result<Self, ObservationError> {
+        let constraint_name = constraint_name.into();
+        validate_nonblank(&constraint_name, "constraint_name")?;
+        validate_constraint_columns(&constraint_name, &column_names, "constraint_column_name")?;
+        Ok(Self {
+            constraint_name,
+            column_names,
+        })
+    }
+
+    /// Returns the exact source constraint identifier.
+    #[must_use]
+    pub fn constraint_name(&self) -> &str {
+        &self.constraint_name
+    }
+
+    /// Returns source columns in the exact key ordinal order reported by PostgreSQL.
+    #[must_use]
+    pub fn column_names(&self) -> &[String] {
+        &self.column_names
+    }
+}
+
+/// Immutable observation of one PostgreSQL unique constraint.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UniqueConstraintObservation {
+    constraint_name: String,
+    column_names: Vec<String>,
+}
+
+impl UniqueConstraintObservation {
+    /// Creates a unique-constraint observation while preserving exact source column order.
+    pub fn new(
+        constraint_name: impl Into<String>,
+        column_names: Vec<String>,
+    ) -> Result<Self, ObservationError> {
+        let constraint_name = constraint_name.into();
+        validate_nonblank(&constraint_name, "constraint_name")?;
+        validate_constraint_columns(&constraint_name, &column_names, "constraint_column_name")?;
+        Ok(Self {
+            constraint_name,
+            column_names,
+        })
+    }
+
+    /// Returns the exact source constraint identifier.
+    #[must_use]
+    pub fn constraint_name(&self) -> &str {
+        &self.constraint_name
+    }
+
+    /// Returns source columns in the exact unique-key ordinal order reported by PostgreSQL.
+    #[must_use]
+    pub fn column_names(&self) -> &[String] {
+        &self.column_names
+    }
+}
+
+/// Immutable observation of one PostgreSQL foreign-key relationship.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ForeignKeyObservation {
+    constraint_name: String,
+    column_names: Vec<String>,
+    referenced_schema_name: String,
+    referenced_table_name: String,
+    referenced_column_names: Vec<String>,
+}
+
+impl ForeignKeyObservation {
+    /// Creates a foreign-key observation with an exact ordered local-to-referenced mapping.
+    pub fn new(
+        constraint_name: impl Into<String>,
+        column_names: Vec<String>,
+        referenced_schema_name: impl Into<String>,
+        referenced_table_name: impl Into<String>,
+        referenced_column_names: Vec<String>,
+    ) -> Result<Self, ObservationError> {
+        let constraint_name = constraint_name.into();
+        let referenced_schema_name = referenced_schema_name.into();
+        let referenced_table_name = referenced_table_name.into();
+        validate_nonblank(&constraint_name, "constraint_name")?;
+        validate_nonblank(&referenced_schema_name, "referenced_schema_name")?;
+        validate_nonblank(&referenced_table_name, "referenced_table_name")?;
+        validate_constraint_columns(&constraint_name, &column_names, "constraint_column_name")?;
+        validate_constraint_columns(
+            &constraint_name,
+            &referenced_column_names,
+            "referenced_column_name",
+        )?;
+        if column_names.len() != referenced_column_names.len() {
+            return Err(ObservationError::ForeignKeyArityMismatch {
+                constraint_name,
+                local_column_count: column_names.len(),
+                referenced_column_count: referenced_column_names.len(),
+            });
+        }
+        Ok(Self {
+            constraint_name,
+            column_names,
+            referenced_schema_name,
+            referenced_table_name,
+            referenced_column_names,
+        })
+    }
+
+    /// Returns the exact source constraint identifier.
+    #[must_use]
+    pub fn constraint_name(&self) -> &str {
+        &self.constraint_name
+    }
+
+    /// Returns local source columns in the exact relationship ordinal order.
+    #[must_use]
+    pub fn column_names(&self) -> &[String] {
+        &self.column_names
+    }
+
+    /// Returns the exact referenced schema identifier.
+    #[must_use]
+    pub fn referenced_schema_name(&self) -> &str {
+        &self.referenced_schema_name
+    }
+
+    /// Returns the exact referenced table identifier.
+    #[must_use]
+    pub fn referenced_table_name(&self) -> &str {
+        &self.referenced_table_name
+    }
+
+    /// Returns referenced source columns in the exact relationship ordinal order.
+    #[must_use]
+    pub fn referenced_column_names(&self) -> &[String] {
+        &self.referenced_column_names
+    }
+}
+
+/// Immutable table-level key or relationship evidence.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TableConstraintObservation {
+    /// Primary-key evidence.
+    PrimaryKey(PrimaryKeyObservation),
+    /// Unique-constraint evidence.
+    Unique(UniqueConstraintObservation),
+    /// Foreign-key relationship evidence.
+    ForeignKey(ForeignKeyObservation),
+}
+
+impl TableConstraintObservation {
+    /// Returns the exact source constraint identifier.
+    #[must_use]
+    pub fn constraint_name(&self) -> &str {
+        match self {
+            Self::PrimaryKey(observation) => observation.constraint_name(),
+            Self::Unique(observation) => observation.constraint_name(),
+            Self::ForeignKey(observation) => observation.constraint_name(),
+        }
+    }
+
+    /// Returns local source columns in the exact constraint ordinal order.
+    #[must_use]
+    pub fn column_names(&self) -> &[String] {
+        match self {
+            Self::PrimaryKey(observation) => observation.column_names(),
+            Self::Unique(observation) => observation.column_names(),
+            Self::ForeignKey(observation) => observation.column_names(),
+        }
+    }
+}
+
 /// Immutable observation of one qualified PostgreSQL table.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TableObservation {
     schema_name: String,
     table_name: String,
     columns: Vec<ColumnObservation>,
+    constraints: Vec<TableConstraintObservation>,
 }
 
 impl TableObservation {
-    /// Creates one table observation and canonicalizes only collection order, never identifiers.
+    /// Creates one table observation without key or relationship evidence.
     pub fn new(
         schema_name: impl Into<String>,
         table_name: impl Into<String>,
+        columns: Vec<ColumnObservation>,
+    ) -> Result<Self, ObservationError> {
+        Self::with_constraints(schema_name, table_name, columns, Vec::new())
+    }
+
+    /// Creates one table observation with deterministic key and relationship evidence.
+    ///
+    /// Collection order is canonicalized, exact identifiers are never normalized, and every local
+    /// constraint column must be present in the same table observation.
+    pub fn with_constraints(
+        schema_name: impl Into<String>,
+        table_name: impl Into<String>,
         mut columns: Vec<ColumnObservation>,
+        mut constraints: Vec<TableConstraintObservation>,
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let table_name = table_name.into();
@@ -185,14 +458,39 @@ impl TableObservation {
                 });
             }
         }
+
+        let mut constraint_names = BTreeSet::new();
+        for constraint in &constraints {
+            let constraint_name = constraint.constraint_name();
+            if !constraint_names.insert(constraint_name.to_owned()) {
+                return Err(ObservationError::DuplicateConstraintName {
+                    schema_name,
+                    table_name,
+                    constraint_name: constraint_name.to_owned(),
+                });
+            }
+            for column_name in constraint.column_names() {
+                if !column_names.contains(column_name) {
+                    return Err(ObservationError::UnknownConstraintColumn {
+                        schema_name,
+                        table_name,
+                        constraint_name: constraint_name.to_owned(),
+                        column_name: column_name.clone(),
+                    });
+                }
+            }
+        }
+
         columns.sort_by(|left, right| {
             (left.ordinal_position, left.column_name.as_str())
                 .cmp(&(right.ordinal_position, right.column_name.as_str()))
         });
+        constraints.sort_by(|left, right| left.constraint_name().cmp(right.constraint_name()));
         Ok(Self {
             schema_name,
             table_name,
             columns,
+            constraints,
         })
     }
 
@@ -212,6 +510,12 @@ impl TableObservation {
     #[must_use]
     pub fn columns(&self) -> &[ColumnObservation] {
         &self.columns
+    }
+
+    /// Returns constraints in deterministic exact source-name order.
+    #[must_use]
+    pub fn constraints(&self) -> &[TableConstraintObservation] {
+        &self.constraints
     }
 }
 
@@ -298,6 +602,29 @@ impl PostgresSchemaSnapshot {
     pub fn tables(&self) -> &[TableObservation] {
         &self.tables
     }
+}
+
+fn validate_constraint_columns(
+    constraint_name: &str,
+    column_names: &[String],
+    field: &'static str,
+) -> Result<(), ObservationError> {
+    if column_names.is_empty() {
+        return Err(ObservationError::EmptyConstraintColumns {
+            constraint_name: constraint_name.to_owned(),
+        });
+    }
+    let mut seen_columns = BTreeSet::new();
+    for column_name in column_names {
+        validate_nonblank(column_name, field)?;
+        if !seen_columns.insert(column_name.as_str()) {
+            return Err(ObservationError::DuplicateConstraintColumn {
+                constraint_name: constraint_name.to_owned(),
+                column_name: column_name.clone(),
+            });
+        }
+    }
+    Ok(())
 }
 
 fn validate_snapshot_digest(value: &str) -> Result<(), ObservationError> {
