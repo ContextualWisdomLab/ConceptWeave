@@ -56,6 +56,37 @@ fn foreign_key_without_observed_reference_behavior_remains_explicitly_unknown() 
 }
 
 #[test]
+fn foreign_key_preserves_postgresql_validation_and_enforcement_state_when_observed() {
+    let foreign_key = ForeignKeyObservation::new(
+        "event_account_fk",
+        local_columns(),
+        "identity",
+        "account_record",
+        referenced_columns(),
+    )
+    .expect("foreign-key metadata is valid")
+    .with_validation_and_enforcement(false, false);
+
+    assert_eq!(foreign_key.validated(), Some(false));
+    assert_eq!(foreign_key.enforced(), Some(false));
+}
+
+#[test]
+fn foreign_key_does_not_invent_validation_or_enforcement_state() {
+    let foreign_key = ForeignKeyObservation::new(
+        "event_account_fk",
+        local_columns(),
+        "identity",
+        "account_record",
+        referenced_columns(),
+    )
+    .expect("foreign-key metadata is valid");
+
+    assert_eq!(foreign_key.validated(), None);
+    assert_eq!(foreign_key.enforced(), None);
+}
+
+#[test]
 fn reference_behavior_represents_all_postgresql_action_and_timing_states_without_strings() {
     let actions = [
         ForeignKeyAction::NoAction,
