@@ -29,9 +29,9 @@ PR #6 is stacked on the foundation and advances the first Generation-side commer
 | Identifier preservation | IMPLEMENTED_PENDING_CHECKS | Exact schema/table/column text is preserved; no lowercasing, fuzzy matching, or quoted-identifier normalization occurs. Same table names in different schemas remain distinct. |
 | Deterministic ordering | IMPLEMENTED_PENDING_CHECKS | Tables sort by exact `(schema_name, table_name)` and columns by one-based source ordinal then exact name. |
 | Fail-closed metadata | IMPLEMENTED_PENDING_CHECKS | Unicode-whitespace-only required fields, zero ordinals, duplicate table coordinates, duplicate column names, and duplicate ordinals are rejected with typed errors. |
-| Snapshot provenance | PARTIAL | Source connection reference, snapshot digest identity, extractor revision, and observation time are retained. Candidate-level discovery method and exact observation-location binding remain open. |
+| Snapshot provenance | IMPLEMENTED_PENDING_CHECKS | Source connection reference, canonical lowercase `sha256:<64 hex>` snapshot identity, extractor revision, and observation time are retained. Test-only head `4e961c1ad221e0b0b71ae113485bddf42be8e561` established the contract against production that accepted any nonblank digest; production commit `47f21bfdb4657048b98ca719fa3ce14c7237d598` added the minimal canonical digest validator. Candidate-level discovery method and exact observation-location binding remain open. |
 | PostgreSQL adapter | OPEN | No live adapter is claimed. Next implementation must be read-only and bounded, observe constraints/keys/types/comments safely, and preserve source evidence without direct foreign application-table coupling. |
-| Verification | WAITING | Test-first commit `c9b98dec13631d72a3616e99e73d59ced2ed0559` preceded production implementation. Exact-head Product evidence is required; queued/no-runner state is non-passing. |
+| Verification | WAITING_EXACT_HEAD | The prior Product run for `4e961c1…` remained queued before checkout. Production and documentation commits changed the head, so predecessor workflow results are non-transferable; the resulting exact PR head must receive fresh Product/security/SAST/review evidence before this slice can be called GREEN. |
 
 ## Causal control-plane state
 
