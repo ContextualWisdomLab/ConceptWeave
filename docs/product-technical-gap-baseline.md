@@ -28,11 +28,18 @@ PR #6 is stacked on the foundation and advances the first Generation-side commer
 | Immutable relational snapshot | IMPLEMENTED_PENDING_CHECKS | `conceptweave-observation` defines `PostgresSchemaSnapshot`, `TableObservation`, and `ColumnObservation` as private-field Rust contracts. |
 | Identifier preservation | IMPLEMENTED_PENDING_CHECKS | Exact schema/table/column text is preserved; no lowercasing, fuzzy matching, or quoted-identifier normalization occurs. Same table names in different schemas remain distinct. |
 | Deterministic ordering | IMPLEMENTED_PENDING_CHECKS | Tables sort by exact `(schema_name, table_name)`, columns by one-based source ordinal then exact name, and constraints by exact source constraint name. |
-| Fail-closed metadata | IMPLEMENTED_PENDING_CHECKS | Unicode-whitespace-only required fields, zero ordinals, duplicate table coordinates, duplicate column names/ordinals, empty/duplicate constraint coordinates, duplicate constraint names, unknown local constraint columns, and foreign-key arity mismatch are rejected with typed errors. |
+| Fail-closed metadata | IMPLEMENTED_PENDING_CHECKS | Unicode-whitespace-only required fields, zero ordinals, duplicate table coordinates, duplicate column names/ordinals, empty/duplicate ordered constraint coordinates, duplicate constraint names, unknown local coordinate columns, blank CHECK definitions, and foreign-key arity mismatch are rejected with typed errors. |
 | Snapshot provenance | IMPLEMENTED_PENDING_CHECKS | Source connection reference, canonical lowercase `sha256:<64 hex>` snapshot identity, extractor revision, observation time, and verified typed table/column/constraint locations are retained. Candidate-level discovery-method/proposal provenance remains open. |
-| Key/relationship evidence | IMPLEMENTED_PENDING_CHECKS | Existing test-first and production slices preserve composite PK/unique/FK evidence, deterministic table binding, local-column existence, and exact cross-schema referenced coordinates. Test-first commit `91f6dc57ee6f522b4154c878daa2c27eddbe3059` then specified exact foreign-key `ON UPDATE`/`ON DELETE`, match type, deferrability/initial timing, plus explicit absence when source behavior was not observed. Production was added on the same writer branch without deriving defaults; the direct RED-to-latest-code compare changed only `crates/conceptweave-observation/src/lib.rs` with 134 additions and one deletion. CHECK constraints, domains, enums, indexes, and a live adapter remain open. |
-| PostgreSQL adapter | OPEN | No live adapter is claimed. Next implementation must be read-only and bounded, introspect catalog metadata safely, populate the existing typed contracts, preserve exact source evidence, enforce timeout/cancellation/resource limits, and avoid direct foreign application-table coupling. |
-| Verification | WAITING_EXACT_HEAD | Hosted Product evidence for the latest implementation/documentation head must execute on that unchanged SHA. The first post-implementation Product run observed in this iteration was queued; predecessor workflow results are non-transferable. Local Rust validation is not claimed because the available runtime did not expose `cargo`/`rustc`/`rustfmt`. |
+| PK/unique/FK relationship evidence | IMPLEMENTED_PENDING_CHECKS | Composite PK/unique/FK evidence preserves deterministic table binding, local-column existence, exact cross-schema referenced coordinates, and column order. Test-first commit `91f6dc57ee6f522b4154c878daa2c27eddbe3059` specified exact foreign-key `ON UPDATE`/`ON DELETE`, match type, deferrability/initial timing, plus explicit absence when source behavior was not observed. Production retains typed reference behavior without deriving defaults. |
+| PostgreSQL 18 CHECK evidence | IMPLEMENTED_PENDING_CHECKS | Test-first commit `416d012676edf0dbe03670e8fdec7bbb28b0f0fd` specified exact CHECK definition plus `validated`, `enforced`, and `no_inherit` status and required blank definitions to fail closed. Production commit `098972ae64ee754f1f0e21b72fcb9832cbc0fddc` added `CheckConstraintObservation` and table binding. The RED-to-production compare modified only `crates/conceptweave-observation/src/lib.rs` (+76/-5). CHECK expression text is retained as evidence without guessing ordered expression-column coordinates. This matches PostgreSQL 18 `pg_constraint` (`conenforced`, `convalidated`, `connoinherit`, `conbin`) and its recommendation to use `pg_get_constraintdef()` to reconstruct CHECK definitions; PostgreSQL 18 added `NOT ENFORCED` support for CHECK and foreign-key constraints. |
+| PostgreSQL adapter | OPEN | No live adapter is claimed. Next implementation must be read-only and bounded, introspect catalog metadata safely, populate the existing typed contracts, preserve exact source evidence, enforce timeout/cancellation/resource limits, and avoid direct foreign application-table coupling. Domains/enums/indexes, remaining comments/type details, source disappearance, and a frozen GRC fixture remain open. |
+| Verification | WAITING_EXACT_HEAD | Hosted Product evidence for the latest implementation/documentation head must execute on that unchanged SHA. Predecessor workflow results are non-transferable. Local Rust validation is not claimed because the available runtime did not expose `cargo`/`rustc`/`rustfmt`. |
+
+### PostgreSQL 18 authoritative references
+
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: `pg_constraint`*. https://www.postgresql.org/docs/18/catalog-pg-constraint.html
+- PostgreSQL Global Development Group. (2025). *PostgreSQL 18 release notes*. https://www.postgresql.org/docs/18/release-18.html
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: system information functions and operators*. https://www.postgresql.org/docs/18/functions-info.html
 
 ## Causal control-plane state
 
@@ -40,9 +47,11 @@ PR #6 is stacked on the foundation and advances the first Generation-side commer
 
 The active organization ruleset still requires one approving review on the default branch while declaring no required reviewers; `.github#772` owns the solo-maintainer governance repair. No self-approval, administrator bypass, or gate weakening is accepted here.
 
+The central review scheduler already has a distinct stacked-PR dispatch lane and `ORG_SWEEP_STACKED_REVIEW_DISPATCH_LIMIT`; `.github#1219` owns measured throughput/fairness acceptance rather than leaf workflow duplication. ConceptWeave PR #5/#6 remain live stacked canaries and require exact-head OpenCode evidence before that control-plane gap can be called complete.
+
 ## P0 product gaps after current slices
 
-1. **Source Observation adapter** — real PostgreSQL introspection behind a port, immutable bounded receipts, CHECK/domain/enum/index/comment evidence, hostile-input/resource bounds, cancellation, and source-disappearance behavior; populate the already implemented PK/unique/FK/reference-behavior contracts rather than duplicating relationship semantics in the adapter.
+1. **Source Observation adapter** — real PostgreSQL introspection behind a port, immutable bounded receipts, domain/enum/index/comment evidence, hostile-input/resource bounds, cancellation, source-disappearance behavior, and a frozen GRC reference fixture; populate implemented PK/unique/FK/CHECK/reference-behavior contracts rather than duplicate relationship semantics in the adapter.
 2. **Observation-to-candidate provenance** — exact source location plus discovery method/proposal receipt so every candidate remains traceable to one immutable observation snapshot.
 3. **Ontology induction** — deterministic observations plus contextual-orchestrator structured candidate generation for concepts, taxonomy, and non-taxonomic relations.
 4. **Semantic-layer induction** — dimensions, measures, grain, units, relationships, and physical mappings with deterministic calculation contracts.
@@ -60,7 +69,7 @@ The active organization ruleset still requires one approving review on the defau
 - No generic `utils/helpers/services/common` domain buckets are permitted.
 - Adapters must remain outside `conceptweave-domain` and `conceptweave-observation`.
 - Source Observation preserves evidence and ordering; it does not infer semantics or claim source-system authority.
-- Source key/relationship observations are source facts only; they must not be promoted to semantic relationships without candidate generation, validation, and governance.
+- Source key/relationship/CHECK observations are source facts only; they must not be promoted to semantic relationships or rules without candidate generation, validation, and governance.
 - Client Consumption may depend only on versioned public release/domain contracts, never generator-private classes or persistence.
 - Foreign product DTOs require Anti-Corruption Layers.
 - `semantic-data-portal` must not become ConceptWeave persistence, and ConceptWeave must not become an SDP clone.
