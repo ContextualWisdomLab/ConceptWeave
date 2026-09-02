@@ -52,6 +52,30 @@ fn request_preserves_exact_source_reference_and_canonicalizes_allowlist_only_by_
 }
 
 #[test]
+fn request_rejects_non_registry_source_connection_keys_before_adapter_access() {
+    for source_connection_key in [
+        "postgres://reader:secret@example.invalid/database",
+        "host=example.invalid password=secret",
+        "warehouse",
+        "Warehouse_primary",
+        "warehouse-primary",
+        "warehouse__primary",
+        "_warehouse_primary",
+        "warehouse_primary_",
+    ] {
+        assert_eq!(
+            ObservationRequest::new(
+                source_connection_key,
+                vec!["public".to_owned()],
+                limits(),
+            ),
+            Err(ObservationRequestError::InvalidSourceConnectionKey),
+            "source connection keys must be opaque multiword snake_case registry identifiers: {source_connection_key}"
+        );
+    }
+}
+
+#[test]
 fn request_rejects_blank_source_empty_or_blank_schema_and_exact_duplicates() {
     assert_eq!(
         ObservationRequest::new("  ", vec!["public".to_owned()], limits()),
