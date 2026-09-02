@@ -65,15 +65,18 @@ fn snapshot_issues_exact_evidence_receipt_for_observed_column() {
 #[test]
 fn canonical_locations_are_typed_and_collision_safe() {
     let table = ObservationLocation::table("public", "event_record").expect("valid table");
-    let column = ObservationLocation::column("public", "event_record", "event_key")
-        .expect("valid column");
+    let column =
+        ObservationLocation::column("public", "event_record", "event_key").expect("valid column");
     let constraint = ObservationLocation::constraint("public", "event_record", "event_identity_pk")
         .expect("valid constraint");
 
     assert_eq!(table.kind(), ObservationLocationKind::Table);
     assert_eq!(column.kind(), ObservationLocationKind::Column);
     assert_eq!(constraint.kind(), ObservationLocationKind::Constraint);
-    assert_eq!(table.canonical_location(), "/schemas/public/tables/event_record");
+    assert_eq!(
+        table.canonical_location(),
+        "/schemas/public/tables/event_record"
+    );
     assert_eq!(
         column.canonical_location(),
         "/schemas/public/tables/event_record/columns/event_key"
@@ -104,20 +107,23 @@ fn snapshot_rejects_receipt_for_unobserved_location() {
 
 #[test]
 fn snapshot_receipts_existing_constraint_coordinates() {
-    let location = ObservationLocation::constraint(
-        "Sales/~North",
-        "Order/Line",
-        "Order/Account~FK",
-    )
-    .expect("constraint location is valid");
+    let location =
+        ObservationLocation::constraint("Sales/~North", "Order/Line", "Order/Account~FK")
+            .expect("constraint location is valid");
 
     let receipt = snapshot()
         .source_receipt(location)
         .expect("observed constraint can be receipted");
 
-    assert_eq!(receipt.location().kind(), ObservationLocationKind::Constraint);
+    assert_eq!(
+        receipt.location().kind(),
+        ObservationLocationKind::Constraint
+    );
     assert_eq!(receipt.location().column_name(), None);
-    assert_eq!(receipt.location().constraint_name(), Some("Order/Account~FK"));
+    assert_eq!(
+        receipt.location().constraint_name(),
+        Some("Order/Account~FK")
+    );
     assert_eq!(
         receipt.location().canonical_location(),
         "/schemas/Sales~1~0North/tables/Order~1Line/constraints/Order~1Account~0FK"

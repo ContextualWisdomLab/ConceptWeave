@@ -53,7 +53,11 @@ fn table_preserves_composite_primary_unique_and_foreign_key_evidence() {
         .collect();
     assert_eq!(
         constraint_names,
-        vec!["event_account_fk", "event_external_ref_uq", "event_identity_pk"]
+        vec![
+            "event_account_fk",
+            "event_external_ref_uq",
+            "event_identity_pk"
+        ]
     );
 
     let TableConstraintObservation::ForeignKey(observed_fk) = &table.constraints()[0] else {
@@ -98,16 +102,12 @@ fn table_rejects_constraints_that_reference_unknown_local_columns() {
 
 #[test]
 fn table_rejects_duplicate_constraint_names() {
-    let primary_key = PrimaryKeyObservation::new(
-        "event_identity_key",
-        vec!["event_key".to_owned()],
-    )
-    .expect("primary key is valid");
-    let unique_key = UniqueConstraintObservation::new(
-        "event_identity_key",
-        vec!["event_key".to_owned()],
-    )
-    .expect("unique key is valid");
+    let primary_key =
+        PrimaryKeyObservation::new("event_identity_key", vec!["event_key".to_owned()])
+            .expect("primary key is valid");
+    let unique_key =
+        UniqueConstraintObservation::new("event_identity_key", vec!["event_key".to_owned()])
+            .expect("unique key is valid");
 
     let error = TableObservation::with_constraints(
         "public",

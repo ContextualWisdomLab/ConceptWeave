@@ -158,7 +158,10 @@ impl Display for ObservationError {
             Self::DuplicateTableObservation {
                 schema_name,
                 table_name,
-            } => write!(formatter, "duplicate table observation: {schema_name}.{table_name}"),
+            } => write!(
+                formatter,
+                "duplicate table observation: {schema_name}.{table_name}"
+            ),
             Self::UnknownObservationLocation { location } => {
                 write!(formatter, "unobserved source location: {location}")
             }

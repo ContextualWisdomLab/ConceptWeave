@@ -28,14 +28,9 @@ fn check_constraint_preserves_exact_definition_and_postgresql_18_status_flags() 
 
 #[test]
 fn check_constraint_definition_must_be_observed_not_blank() {
-    let error = CheckConstraintObservation::new(
-        "order_quantity_positive",
-        " \t\n ",
-        true,
-        true,
-        false,
-    )
-    .expect_err("blank source definition must fail closed");
+    let error =
+        CheckConstraintObservation::new("order_quantity_positive", " \t\n ", true, true, false)
+            .expect_err("blank source definition must fail closed");
 
     assert_eq!(
         error,

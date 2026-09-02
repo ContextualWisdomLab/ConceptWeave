@@ -72,7 +72,10 @@ fn snapshot_rejects_duplicate_qualified_tables() {
             table_name: "events".to_owned(),
         }
     );
-    assert_eq!(error.to_string(), "duplicate table observation: public.events");
+    assert_eq!(
+        error.to_string(),
+        "duplicate table observation: public.events"
+    );
 }
 
 #[test]
@@ -227,8 +230,8 @@ fn column_rejects_zero_ordinal_and_preserves_missing_comment() {
         "column ordinal position must be positive"
     );
 
-    let observed = ColumnObservation::new("event_key", 1, "uuid", false, None)
-        .expect("column is valid");
+    let observed =
+        ColumnObservation::new("event_key", 1, "uuid", false, None).expect("column is valid");
     assert!(!observed.nullable());
     assert_eq!(observed.source_comment(), None);
 }
