@@ -35,7 +35,7 @@ flowchart LR
 
 ### ObservationRequest / ObservationLimits
 
-Provider-independent Source Observation port value objects. A request contains only a stable non-credential source reference, an explicit non-empty exact-schema allowlist, and positive statement-timeout/row/byte/concurrency budgets. Blank or duplicate schema identifiers fail closed. Caller cancellation and source-disappearance/resource-limit outcomes are part of the typed port seam. Concrete PostgreSQL drivers, credentials, catalog SQL, and scheduling remain adapter responsibilities outside the domain and observation-fact crates. ADR 0004 remains Proposed until a concrete adapter and conformance evidence are integrated.
+Provider-independent Source Observation port value objects. A request contains only a bounded opaque source registry key (at most 128 bytes, lowercase multiword `snake_case`) that is resolved behind the adapter credential boundary, an explicit non-empty exact-schema allowlist, and positive statement-timeout/row/byte/concurrency budgets. Raw DSNs, URLs, shell-style connection parameters, one-word/generic keys, and malformed registry identifiers fail closed before adapter access. Blank or duplicate schema identifiers also fail closed. Caller cancellation and source-disappearance/resource-limit outcomes are part of the typed port seam. Concrete PostgreSQL drivers, credentials, catalog SQL, and scheduling remain adapter responsibilities outside the domain and observation-fact crates. ADR 0004 remains Proposed until a concrete adapter and conformance evidence are integrated.
 
 ### PostgresSchemaSnapshot
 
