@@ -347,10 +347,7 @@ impl SemanticReleaseClient {
 
         let mut validated_legacy_versions = BTreeSet::new();
         for legacy_version in supported_legacy_contract_versions {
-            require_non_blank(
-                &legacy_version,
-                "supported_legacy_contract_version",
-            )?;
+            require_non_blank(&legacy_version, "supported_legacy_contract_version")?;
             if legacy_version == supported_contract_version {
                 return Err(ReleaseContractError::CurrentContractVersionMarkedLegacy(
                     legacy_version,

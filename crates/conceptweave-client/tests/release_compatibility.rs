@@ -63,7 +63,10 @@ fn supported_legacy_release_passes_the_same_authoritative_use_gate() {
     )
     .expect("explicit compatibility policy is valid");
 
-    assert_eq!(client.validate_for_authoritative_use(&release("1.0.0")), Ok(()));
+    assert_eq!(
+        client.validate_for_authoritative_use(&release("1.0.0")),
+        Ok(())
+    );
 }
 
 #[test]

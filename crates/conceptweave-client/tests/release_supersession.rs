@@ -1,6 +1,6 @@
 use conceptweave_client::{
-    ReleaseContractError, ReleaseDigest, ReleaseMetadata, ReleaseSupersession,
-    SemanticRelease, SemanticReleaseClient, SemanticReleaseReference,
+    ReleaseContractError, ReleaseDigest, ReleaseMetadata, ReleaseSupersession, SemanticRelease,
+    SemanticReleaseClient, SemanticReleaseReference,
 };
 use conceptweave_domain::{EvidenceReference, PublicationState, TruthStatus};
 
@@ -37,16 +37,8 @@ fn release(
 
 #[test]
 fn supersession_preserves_exact_immutable_release_references_and_rationale() {
-    let previous = release(
-        "semantic_release_2026_09",
-        'b',
-        PublicationState::Published,
-    );
-    let successor = release(
-        "semantic_release_2026_10",
-        'c',
-        PublicationState::Published,
-    );
+    let previous = release("semantic_release_2026_09", 'b', PublicationState::Published);
+    let successor = release("semantic_release_2026_10", 'c', PublicationState::Published);
     let declaration = ReleaseSupersession::new(
         SemanticReleaseReference::from_release(&previous),
         SemanticReleaseReference::from_release(&successor),
@@ -109,16 +101,8 @@ fn supersession_rejects_blank_reference_fields_blank_rationale_and_self_superses
 #[test]
 fn client_accepts_only_an_explicit_supersession_bound_to_both_exact_release_identities() {
     let client = SemanticReleaseClient::new("2.0.0").expect("client policy is valid");
-    let previous = release(
-        "semantic_release_2026_09",
-        'b',
-        PublicationState::Published,
-    );
-    let successor = release(
-        "semantic_release_2026_10",
-        'c',
-        PublicationState::Published,
-    );
+    let previous = release("semantic_release_2026_09", 'b', PublicationState::Published);
+    let successor = release("semantic_release_2026_10", 'c', PublicationState::Published);
     let declaration = ReleaseSupersession::new(
         SemanticReleaseReference::from_release(&previous),
         SemanticReleaseReference::from_release(&successor),
@@ -131,21 +115,15 @@ fn client_accepts_only_an_explicit_supersession_bound_to_both_exact_release_iden
         Ok(())
     );
 
-    let wrong_previous_digest = release(
-        "semantic_release_2026_09",
-        'd',
-        PublicationState::Published,
-    );
+    let wrong_previous_digest =
+        release("semantic_release_2026_09", 'd', PublicationState::Published);
     assert_eq!(
         client.validate_supersession(&declaration, &wrong_previous_digest, &successor),
         Err(ReleaseContractError::SupersededReleaseReferenceMismatch)
     );
 
-    let wrong_successor_digest = release(
-        "semantic_release_2026_10",
-        'e',
-        PublicationState::Published,
-    );
+    let wrong_successor_digest =
+        release("semantic_release_2026_10", 'e', PublicationState::Published);
     assert_eq!(
         client.validate_supersession(&declaration, &previous, &wrong_successor_digest),
         Err(ReleaseContractError::SuccessorReleaseReferenceMismatch)
@@ -155,26 +133,10 @@ fn client_accepts_only_an_explicit_supersession_bound_to_both_exact_release_iden
 #[test]
 fn supersession_never_bypasses_either_authoritative_release_admission_gate() {
     let client = SemanticReleaseClient::new("2.0.0").expect("client policy is valid");
-    let reviewed_previous = release(
-        "semantic_release_2026_09",
-        'b',
-        PublicationState::Reviewed,
-    );
-    let published_previous = release(
-        "semantic_release_2026_09",
-        'b',
-        PublicationState::Published,
-    );
-    let published_successor = release(
-        "semantic_release_2026_10",
-        'c',
-        PublicationState::Published,
-    );
-    let reviewed_successor = release(
-        "semantic_release_2026_10",
-        'c',
-        PublicationState::Reviewed,
-    );
+    let reviewed_previous = release("semantic_release_2026_09", 'b', PublicationState::Reviewed);
+    let published_previous = release("semantic_release_2026_09", 'b', PublicationState::Published);
+    let published_successor = release("semantic_release_2026_10", 'c', PublicationState::Published);
+    let reviewed_successor = release("semantic_release_2026_10", 'c', PublicationState::Reviewed);
     let declaration = ReleaseSupersession::new(
         SemanticReleaseReference::from_release(&published_previous),
         SemanticReleaseReference::from_release(&published_successor),
