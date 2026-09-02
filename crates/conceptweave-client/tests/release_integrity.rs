@@ -65,10 +65,7 @@ fn detached_artifact_digest_verification_rejects_changed_bytes() {
 #[test]
 fn detached_artifact_digest_verification_rejects_unpublished_release() {
     let client = SemanticReleaseClient::new("1.0.0").unwrap();
-    let release = release_with_state(
-        DETACHED_ARTIFACT_DIGEST,
-        PublicationState::Proposed,
-    );
+    let release = release_with_state(DETACHED_ARTIFACT_DIGEST, PublicationState::Proposed);
 
     assert_eq!(
         client.verify_detached_artifact(&release, DETACHED_ARTIFACT_BYTES),
