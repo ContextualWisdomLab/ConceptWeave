@@ -164,13 +164,7 @@ fn source_identifiers_and_evidence_reject_unicode_whitespace_only_values() {
             "time",
             "source_connection_key",
         ),
-        (
-            "source",
-            "\u{2003}",
-            "extractor",
-            "time",
-            "snapshot_digest",
-        ),
+        ("source", "\u{2003}", "extractor", "time", "snapshot_digest"),
         (
             "source",
             "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
