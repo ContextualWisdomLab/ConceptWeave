@@ -27,11 +27,12 @@ PR #6 is stacked on the foundation and advances the first Generation-side commer
 | --- | --- | --- |
 | Immutable relational snapshot | IMPLEMENTED_PENDING_CHECKS | `conceptweave-observation` defines `PostgresSchemaSnapshot`, `TableObservation`, and `ColumnObservation` as private-field Rust contracts. |
 | Identifier preservation | IMPLEMENTED_PENDING_CHECKS | Exact schema/table/column text is preserved; no lowercasing, fuzzy matching, or quoted-identifier normalization occurs. Same table names in different schemas remain distinct. |
-| Deterministic ordering | IMPLEMENTED_PENDING_CHECKS | Tables sort by exact `(schema_name, table_name)` and columns by one-based source ordinal then exact name. |
-| Fail-closed metadata | IMPLEMENTED_PENDING_CHECKS | Unicode-whitespace-only required fields, zero ordinals, duplicate table coordinates, duplicate column names, and duplicate ordinals are rejected with typed errors. |
-| Snapshot provenance | IMPLEMENTED_PENDING_CHECKS | Source connection reference, canonical lowercase `sha256:<64 hex>` snapshot identity, extractor revision, and observation time are retained. Test-only head `4e961c1ad221e0b0b71ae113485bddf42be8e561` established the contract against production that accepted any nonblank digest; production commit `47f21bfdb4657048b98ca719fa3ce14c7237d598` added the minimal canonical digest validator. Candidate-level discovery method and exact observation-location binding remain open. |
-| PostgreSQL adapter | OPEN | No live adapter is claimed. Next implementation must be read-only and bounded, observe constraints/keys/types/comments safely, and preserve source evidence without direct foreign application-table coupling. |
-| Verification | WAITING_EXACT_HEAD | The prior Product run for `4e961c1…` remained queued before checkout. Production and documentation commits changed the head, so predecessor workflow results are non-transferable; the resulting exact PR head must receive fresh Product/security/SAST/review evidence before this slice can be called GREEN. |
+| Deterministic ordering | IMPLEMENTED_PENDING_CHECKS | Tables sort by exact `(schema_name, table_name)`, columns by one-based source ordinal then exact name, and constraints by exact source constraint name. |
+| Fail-closed metadata | IMPLEMENTED_PENDING_CHECKS | Unicode-whitespace-only required fields, zero ordinals, duplicate table coordinates, duplicate column names/ordinals, empty/duplicate constraint coordinates, duplicate constraint names, unknown local constraint columns, and foreign-key arity mismatch are rejected with typed errors. |
+| Snapshot provenance | IMPLEMENTED_PENDING_CHECKS | Source connection reference, canonical lowercase `sha256:<64 hex>` snapshot identity, extractor revision, and observation time are retained. Test-only head `4e961c1ad221e0b0b71ae113485bddf42be8e561` established the digest contract against production that accepted any nonblank digest; production commit `47f21bfdb4657048b98ca719fa3ce14c7237d598` added the minimal canonical digest validator. Candidate-level discovery method and exact observation-location binding remain open. |
+| Key/relationship evidence | IMPLEMENTED_PENDING_CHECKS | Test-first head `64f053ea289c7c8da2c5a0af27fa56743d5e8fe7` specified composite PK/unique/FK evidence before the API existed. Production commit `245b4df3e7a814d4e341bfc98a0be1f19cd66c6b` added immutable `PrimaryKeyObservation`, `UniqueConstraintObservation`, `ForeignKeyObservation`, deterministic table binding, local-column existence checks, and exact cross-schema referenced coordinates. Source delete/update actions, deferrability, indexes, CHECK constraints, domains, enums, and a live adapter remain open. |
+| PostgreSQL adapter | OPEN | No live adapter is claimed. Next implementation must be read-only and bounded, introspect catalog metadata safely, populate the constraint contracts above, preserve exact source evidence, enforce timeout/cancellation/resource limits, and avoid direct foreign application-table coupling. |
+| Verification | WAITING_EXACT_HEAD | The test-first key/relationship head and subsequent production/documentation heads each require their own evidence. Predecessor workflow results are non-transferable; the resulting exact PR head must receive fresh Product/security/SAST/review evidence before this slice can be called GREEN. |
 
 ## Causal control-plane state
 
@@ -41,7 +42,7 @@ The active organization ruleset still requires one approving review on the defau
 
 ## P0 product gaps after current slices
 
-1. **Source Observation adapter** — real PostgreSQL introspection behind a port, immutable bounded receipts, PK/unique/FK/domain/enum/index/comment evidence, hostile-input/resource bounds, cancellation, and source-disappearance behavior.
+1. **Source Observation adapter** — real PostgreSQL introspection behind a port, immutable bounded receipts, CHECK/domain/enum/index/comment evidence, FK actions/deferrability, hostile-input/resource bounds, cancellation, and source-disappearance behavior; populate the already implemented PK/unique/FK contracts rather than duplicating relationship semantics in the adapter.
 2. **Observation-to-candidate provenance** — exact source location plus discovery method/proposal receipt so every candidate remains traceable to one immutable observation snapshot.
 3. **Ontology induction** — deterministic observations plus contextual-orchestrator structured candidate generation for concepts, taxonomy, and non-taxonomic relations.
 4. **Semantic-layer induction** — dimensions, measures, grain, units, relationships, and physical mappings with deterministic calculation contracts.
@@ -59,6 +60,7 @@ The active organization ruleset still requires one approving review on the defau
 - No generic `utils/helpers/services/common` domain buckets are permitted.
 - Adapters must remain outside `conceptweave-domain` and `conceptweave-observation`.
 - Source Observation preserves evidence and ordering; it does not infer semantics or claim source-system authority.
+- Source key/relationship observations are source facts only; they must not be promoted to semantic relationships without candidate generation, validation, and governance.
 - Client Consumption may depend only on versioned public release/domain contracts, never generator-private classes or persistence.
 - Foreign product DTOs require Anti-Corruption Layers.
 - `semantic-data-portal` must not become ConceptWeave persistence, and ConceptWeave must not become an SDP clone.
