@@ -19,7 +19,7 @@ Introduce **Client Consumption** as a Supporting Bounded Context and `conceptwea
 
 The current `semantic_release` public contract carries stable release identity, explicit contract and ontology/model versions, truth/publication state, a canonical declared artifact digest identity, provenance references, and unique stable concept identifiers. `SemanticReleaseClient` admits authoritative use only when the release uses the explicit current contract version or an explicitly configured supported-legacy version and is both `Published` and `Authoritative`. Compatibility is never inferred from semantic-version ordering.
 
-`ReleaseDigest` accepts only canonical `sha256:<64 lowercase hex>` identity. `SemanticReleaseClient::verify_serialized_artifact` separately hashes the exact caller-supplied detached bytes and requires an exact digest match after authoritative-use admission. Digest syntax and byte-integrity evidence therefore remain distinct.
+`ReleaseDigest` accepts only canonical `sha256:<64 lowercase hex>` identity. `SemanticReleaseClient::verify_detached_artifact` separately hashes the exact caller-supplied detached immutable semantic-artifact bytes and requires an exact digest match after authoritative-use admission. The manifest declares that detached artifact digest; the contract deliberately avoids a self-referential requirement to hash the manifest bytes containing the digest field. Digest syntax and byte-integrity evidence therefore remain distinct.
 
 `SemanticReleaseClient::diff` admits both releases through the same authoritative-use gate and reports deterministic sorted concept additions/removals. Exact concept resolution is deterministic and performs no fuzzy matching or model call.
 
@@ -62,11 +62,11 @@ LLM-assisted future `match`, ambiguity explanation, and candidate ranking operat
 
 ## Verification evidence on the active branch
 
-- Existing Rust integration tests cover authoritative admission, compatibility, non-Published/non-Authoritative states, provenance/identity requirements, duplicate concepts, digest syntax, exact byte verification, diff, and exact concept resolution.
+- Existing Rust integration tests cover authoritative admission, compatibility, non-Published/non-Authoritative states, provenance/identity requirements, duplicate concepts, digest syntax, exact detached-byte verification, diff, and exact concept resolution.
 - Test-first supersession commit `67132eda0e25d23a4185d4b98f0c6dc3b11e17a4` introduced an API that did not yet exist and required immutable id+digest predecessor/successor references, rationale, self-supersession rejection, exact-reference validation, and ordinary authoritative admission.
 - Production commit `2c4a7954ad3a4fb0dd0a5482a6870fcc0d2996a3` implements that bounded contract. Follow-up edge coverage binds mismatch checks to digest as well as id and exercises both predecessor and successor admission paths.
-- Error-message coverage includes new supersession failures and reconciles the explicit compatibility wording.
-- Hosted exact-head Product evidence is still required on the final unchanged documentation head; queued/predecessor results are not GREEN.
+- Detached-artifact contract RED was observed on predecessor head `0c32a7b55d3c687ab76cee789962866573496ba1`: Product run `33664177838`, job `100361706615` acquired an Ubuntu 24.04 runner, verified the exact checkout, passed the CI contract/toolchain/fmt steps, then Clippy failed with `E0599` because `verify_detached_artifact` did not yet exist. Production head `9c278598001c502a733100d11e901538c3dc2677` applies only the causal API/rustdoc repair.
+- Hosted exact-head GREEN is still required on the final unchanged documentation head; queued/predecessor results are not GREEN.
 
 ## Follow-up / acceptance for Accepted status
 

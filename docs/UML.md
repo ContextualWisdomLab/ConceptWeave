@@ -38,13 +38,14 @@ sequenceDiagram
     Validator->>Steward: validated proposal
     Steward->>Publisher: reviewed acceptance
     Publisher-->>Source: no source mutation
-    Publisher-->>Client: immutable versioned semantic_release
+    Publisher-->>Client: immutable versioned semantic_release + detached artifact digest
     Client->>Client: validate contract version + Published + Authoritative
+    Client->>Client: verify_detached_artifact(exact bytes)
     Client-->>Consumer: admitted public release contract
     Consumer->>Consumer: tenant/purpose authorization + physical query planning/execution
 ```
 
-## Client admission decision
+## Client admission and integrity decision
 
 ```mermaid
 flowchart TD
@@ -54,8 +55,12 @@ flowchart TD
     P -- no --> X2[Reject: not published]
     P -- yes --> T{Truth status = Authoritative?}
     T -- no --> X3[Reject: not authoritative]
-    T -- yes --> A[Admit for downstream authorization]
-    A --> H[Future: hash exact serialized bytes and compare digest]
+    T -- yes --> A[Admit for deterministic client operations]
+    A --> H[verify_detached_artifact: hash exact detached bytes]
+    H --> M{Digest equals declared artifact digest?}
+    M -- no --> X4[Reject: artifact digest mismatch]
+    M -- yes --> C[Integrity evidence established for supplied artifact bytes]
+    C --> D[Consuming product performs tenant/purpose authorization]
 ```
 
-Client admission is not publication authority and is not downstream authorization. `ReleaseDigest` currently validates the declared digest identity syntax; the future hash step is required before cryptographic integrity is claimed.
+Client admission is not publication authority and is not downstream authorization. `ReleaseDigest` validates canonical digest identity syntax; `SemanticReleaseClient::verify_detached_artifact` separately proves whether the exact detached artifact bytes supplied by the caller match that declared identity.

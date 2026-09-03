@@ -10,7 +10,7 @@ ConceptWeave starts as a Rust-first modular monolith with explicit bounded conte
 2. **Semantic Discovery** — evidence-bound candidate generation.
 3. **Model Validation** — deterministic structural, ontology, constraint, and semantic-model validation.
 4. **Governance & Publication** — review decisions, immutable releases, supersession.
-5. **Client Consumption** — release admission, compatibility and future diff/match/resolve/query-plan contracts.
+5. **Client Consumption** — release admission, compatibility, diff, exact resolution, detached-artifact integrity and supersession validation; later match/align/explain/query-plan contracts.
 6. **Interoperability** — import/export adapters and CWL anti-corruption layers.
 
 The Core Domain is **Semantic Model Engineering**, represented by the discovery-to-publication lifecycle. Client Consumption is a supporting subdomain that protects downstream consumers from incompatible or non-governed releases. Identity, LLM routing, outbound web access, observability, catalog/search and consuming-product authorization are external/generic responsibilities.
@@ -40,7 +40,7 @@ The initial Rust and JSON contracts cover candidate kind, truth status, publicat
 
 ## 6. Semantic-release client contract
 
-The first Rust Client Consumption slice and Draft 2020-12 JSON Schema define an immutable consumer-visible contract containing:
+The Rust Client Consumption slice and Draft 2020-12 JSON Schema define an immutable consumer-visible contract containing:
 
 - `release_id`;
 - `contract_version`;
@@ -50,11 +50,13 @@ The first Rust Client Consumption slice and Draft 2020-12 JSON Schema define an 
 - one or more provenance references;
 - unique stable concept identifiers.
 
-`SemanticReleaseClient` supports deterministic offline admission for one explicit contract version. Authoritative use is rejected unless the release is both `Published` and `Authoritative`. Structural construction and client admission do not grant publication authority.
+`SemanticReleaseClient` performs deterministic offline authoritative-use admission. A release is accepted only when its contract version is the explicit current version or one of the caller's explicit supported-legacy versions and its state is both `Published` and `Authoritative`. Compatibility is never inferred from version ordering. Structural construction and client admission do not grant publication authority.
 
-`ReleaseDigest` currently validates only the declared `sha256:<64 hex>` identity syntax. A later integrity adapter must hash the exact serialized bytes and compare that digest before cryptographic integrity can be claimed. The serialized contract, compatibility rules and verifier remain versioned public boundaries.
+`ReleaseDigest` validates canonical `sha256:<64 lowercase hex>` digest identity. `SemanticReleaseClient::verify_detached_artifact` then verifies cryptographic integrity of the exact detached immutable semantic-artifact bytes supplied by the caller, after applying the same authoritative-use admission gate. The release manifest declares the detached artifact digest; the digest is not specified as a self-referential hash of the manifest bytes containing that field.
 
-Future #3 work adds older-supported compatibility policy, supersession/staleness handling, release diff, deterministic resolve, research-backed match/alignment, explain and query-plan operations. LLM-assisted client operations are optional; deterministic admission remains available with no provider call.
+The current Client slice also provides deterministic release diff, exact concept resolution, and explicit immutable supersession validation. `ReleaseSupersession` binds predecessor and successor release ids to their exact artifact digests and never infers replacement from ordering, timestamps, semantic diff, or similarity. A language-neutral supersession/publication-receipt schema is still required before cross-language completeness is claimed.
+
+Remaining Issue #3 work includes signature/provenance-chain validation when Governance & Publication stabilizes a signing contract; relation/mapping/dimension/measure resolution; research-backed match/alignment/explanation; semantic query-plan contracts; GRC reference-client fixtures; and generated bindings after the language-neutral seam stabilizes. LLM-assisted client operations are optional and route only through `contextual-orchestrator`; admission, compatibility, diff, exact resolution, integrity and supersession validation remain deterministic and provider-independent.
 
 ## 7. LLM boundary
 
@@ -70,8 +72,8 @@ No durable product database is claimed by the current slices. When persistence i
 
 ## 10. Security
 
-Source artifacts and release payloads are untrusted input. Adapters must enforce source size/type bounds, parser timeouts, archive/decompression limits, SSRF-safe outbound access where external retrieval exists, and prompt-injection isolation for LLM-assisted extraction. Credentials and raw secrets never become semantic evidence. Client admission validates governance/compatibility but does not replace consuming-product tenant/purpose authorization.
+Source artifacts and release payloads are untrusted input. Adapters must enforce source size/type bounds, parser timeouts, archive/decompression limits, SSRF-safe outbound access where external retrieval exists, and prompt-injection isolation for LLM-assisted extraction. Credentials and raw secrets never become semantic evidence. Client admission validates governance/compatibility but does not replace consuming-product tenant/purpose authorization. Exact detached artifact integrity must be verified against the declared digest before bytes are trusted as the referenced semantic artifact.
 
 ## 11. Evaluation
 
-Evaluation must separate extraction recall, semantic correctness, structural correctness, ontology consistency, mapping accuracy, measure correctness, release compatibility/admission correctness, and governance outcomes. Model-judge scores may supplement but never replace deterministic golden fixtures and human-reviewed expert cases. Client matching later uses OAEI-style precision/recall/F1 and candidate-retrieval recall; release admission uses deterministic malformed/version/state/provenance/digest fixtures.
+Evaluation must separate extraction recall, semantic correctness, structural correctness, ontology consistency, mapping accuracy, measure correctness, release compatibility/admission correctness, and governance outcomes. Model-judge scores may supplement but never replace deterministic golden fixtures and human-reviewed expert cases. Client matching later uses OAEI-style precision/recall/F1 and candidate-retrieval recall; release admission and integrity use deterministic malformed/version/state/provenance/digest/tamper fixtures.

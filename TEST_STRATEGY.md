@@ -12,17 +12,22 @@
 
 ## Current Client Consumption tests
 
-- authoritative + Published release admits offline for the exact supported contract version;
+- authoritative + Published release admits offline for the exact current or explicitly supported legacy contract version;
 - Reviewed/unpublished and Published/non-Authoritative releases fail closed;
-- unsupported contract versions fail closed;
+- unsupported contract versions fail closed without version-order inference;
 - release/contract/ontology identifiers reject blank values;
 - provenance is required;
 - concept identifiers reject blanks and duplicates;
-- declared digest identity rejects unsupported algorithm, wrong length, and non-hex payloads;
-- public error messages identify the rejected admission invariant;
+- declared digest identity rejects unsupported algorithm, wrong length, uppercase and non-hex payloads;
+- `SemanticReleaseClient::verify_detached_artifact` hashes exact detached immutable semantic-artifact bytes only after authoritative-use admission;
+- exact bytes pass only when SHA-256 equals the declared artifact digest; changed/truncated/wrong bytes fail with typed mismatch evidence;
+- release diff admits both releases and returns deterministic sorted concept changes;
+- exact concept resolution is provider-independent and rejects blank identifiers;
+- supersession validation binds distinct predecessor/successor release ids and digests, rejects self-supersession and blank rationale, and applies ordinary admission to both releases;
+- public error messages identify the rejected admission/integrity/supersession invariant;
 - JSON Schema fixtures mirror Published -> Authoritative, unique concepts, provenance and digest-shape constraints.
 
-Digest identity tests do not claim byte integrity. A future verifier must add golden exact-byte hashing plus one-byte mutation, truncation, serialization/canonicalization, wrong-digest and signature/provenance cases before integrity is release-ready.
+Digest identity syntax and detached-byte integrity remain separate controls. The current verifier does not claim signature authenticity or provenance-chain trust. Those cases require a stable Governance & Publication signing contract before they become release gates.
 
 ## Future product test families
 
@@ -36,7 +41,7 @@ Golden concept/type/taxonomy/relation sets; mapping precision/recall; multilingu
 
 ### Client compatibility and alignment
 
-Current, older-supported, unsupported, malformed, partial, conflicting, stale and superseded releases; exact release diff; candidate-retrieval recall; OAEI-style matching precision/recall/F1; deterministic preprocessing ablations; abstention/ambiguity handling; LLM-call reduction against naive full-prompt baselines. Optional model calls use `contextual-orchestrator`; no model judge is sole truth.
+Malformed, partial, conflicting, stale and superseded releases beyond the currently implemented explicit compatibility/diff/supersession contracts; candidate-retrieval recall; OAEI-style matching precision/recall/F1; deterministic preprocessing ablations; abstention/ambiguity handling; LLM-call reduction against naive full-prompt baselines. Optional model calls use `contextual-orchestrator`; no model judge is sole truth.
 
 ### Query-plan seam
 
@@ -56,7 +61,7 @@ No bypass of Reviewed before Published, immutable published releases, rejection,
 
 ### Security
 
-Prompt injection, malicious ontology/source/release content, SSRF, cross-tenant leakage, secret leakage, expression injection, resource exhaustion, replay, malformed source provenance, hostile export values, compatibility downgrade, stale/superseded use, and artifact tampering.
+Prompt injection, malicious ontology/source/release content, SSRF, cross-tenant leakage, secret leakage, expression injection, resource exhaustion, replay, malformed source provenance, hostile export values, compatibility downgrade, stale/superseded use, and detached-artifact tampering.
 
 ### Evaluation
 
