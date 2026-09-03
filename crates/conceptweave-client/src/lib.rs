@@ -15,9 +15,9 @@ use std::collections::BTreeSet;
 /// A validated content-digest identity carried by a semantic release.
 ///
 /// The current contract accepts only the canonical `sha256:<64 lowercase hex>`
-/// shape. This value object validates digest identity syntax; exact serialized
-/// bytes are cryptographically verified by
-/// [`SemanticReleaseClient::verify_serialized_artifact`].
+/// shape. This value object validates digest identity syntax; exact detached
+/// artifact bytes are cryptographically verified by
+/// [`SemanticReleaseClient::verify_detached_artifact`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReleaseDigest(String);
 
@@ -438,13 +438,13 @@ impl SemanticReleaseClient {
             .find(|candidate| *candidate == concept_id))
     }
 
-    /// Verifies the SHA-256 digest of exact serialized semantic-release bytes.
+    /// Verifies the SHA-256 digest of exact detached semantic-artifact bytes.
     ///
     /// The release must first satisfy the same authoritative-use admission gate
-    /// as other Client operations. The caller supplies the exact bytes whose
-    /// identity is declared by [`SemanticRelease::artifact_digest`]; this method
-    /// performs no network access, parsing, provider call, or source-system read.
-    pub fn verify_serialized_artifact(
+    /// as other Client operations. The caller supplies the exact detached bytes
+    /// whose identity is declared by [`SemanticRelease::artifact_digest`]; this
+    /// method performs no network access, parsing, provider call, or source-system read.
+    pub fn verify_detached_artifact(
         &self,
         release: &SemanticRelease,
         artifact_bytes: &[u8],
@@ -546,7 +546,7 @@ pub enum ReleaseContractError {
     EmptyField(&'static str),
     /// The declared release digest is not canonical `sha256:<64 lowercase hex>`.
     InvalidDigest,
-    /// Exact serialized bytes do not match the digest declared by the release.
+    /// Exact detached semantic-artifact bytes do not match the digest declared by the release.
     ArtifactDigestMismatch {
         /// Digest coordinate declared by the semantic release.
         declared: String,
