@@ -975,7 +975,8 @@ impl PostgresSchemaSnapshot {
     /// Creates a deterministic snapshot contract from already-bounded source metadata.
     ///
     /// Collection order is canonicalized by exact qualified table identifier. Exact source text is
-    /// preserved, including case and characters that would require quoting in PostgreSQL.
+    /// preserved, including case and characters that would require quoting in PostgreSQL. The
+    /// observation time must be an RFC 3339-style timestamp with an explicit UTC `Z` designator.
     pub fn new(
         source_connection_key: impl Into<String>,
         snapshot_digest: impl Into<String>,
@@ -990,7 +991,7 @@ impl PostgresSchemaSnapshot {
         validate_nonblank(&source_connection_key, "source_connection_key")?;
         validate_snapshot_digest(&snapshot_digest)?;
         validate_nonblank(&extractor_revision, "extractor_revision")?;
-        validate_nonblank(&observed_at_utc, "observed_at_utc")?;
+        validate_observed_at_utc(&observed_at_utc)?;
 
         let mut table_coordinates = BTreeSet::new();
         for table in &tables {
@@ -1125,6 +1126,80 @@ fn validate_snapshot_digest(value: &str) -> Result<(), ObservationError> {
         });
     }
     Ok(())
+}
+
+fn validate_observed_at_utc(value: &str) -> Result<(), ObservationError> {
+    let invalid = || ObservationError::InvalidObservationField {
+        field: "observed_at_utc",
+    };
+    let Some(without_z) = value.strip_suffix('Z') else {
+        return Err(invalid());
+    };
+    let (core, fraction) = match without_z.split_once('.') {
+        Some((core, fraction)) if !fraction.is_empty() && fraction.bytes().all(|byte| byte.is_ascii_digit()) => {
+            (core, Some(fraction))
+        }
+        Some(_) => return Err(invalid()),
+        None => (without_z, None),
+    };
+    let bytes = core.as_bytes();
+    let [
+        year_0 @ b'0'..=b'9',
+        year_1 @ b'0'..=b'9',
+        year_2 @ b'0'..=b'9',
+        year_3 @ b'0'..=b'9',
+        b'-',
+        month_0 @ b'0'..=b'9',
+        month_1 @ b'0'..=b'9',
+        b'-',
+        day_0 @ b'0'..=b'9',
+        day_1 @ b'0'..=b'9',
+        b'T',
+        hour_0 @ b'0'..=b'9',
+        hour_1 @ b'0'..=b'9',
+        b':',
+        minute_0 @ b'0'..=b'9',
+        minute_1 @ b'0'..=b'9',
+        b':',
+        second_0 @ b'0'..=b'9',
+        second_1 @ b'0'..=b'9',
+    ] = bytes
+    else {
+        return Err(invalid());
+    };
+
+    let year = u32::from(*year_0 - b'0') * 1000
+        + u32::from(*year_1 - b'0') * 100
+        + u32::from(*year_2 - b'0') * 10
+        + u32::from(*year_3 - b'0');
+    let month = u32::from(*month_0 - b'0') * 10 + u32::from(*month_1 - b'0');
+    let day = u32::from(*day_0 - b'0') * 10 + u32::from(*day_1 - b'0');
+    let hour = u32::from(*hour_0 - b'0') * 10 + u32::from(*hour_1 - b'0');
+    let minute = u32::from(*minute_0 - b'0') * 10 + u32::from(*minute_1 - b'0');
+    let second = u32::from(*second_0 - b'0') * 10 + u32::from(*second_1 - b'0');
+
+    let max_day = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if is_gregorian_leap_year(year) => 29,
+        2 => 28,
+        _ => return Err(invalid()),
+    };
+    let valid_calendar_and_clock = day != 0
+        && day <= max_day
+        && hour <= 23
+        && minute <= 59
+        && second <= 60
+        && (second != 60 || (hour == 23 && minute == 59));
+    if !valid_calendar_and_clock {
+        return Err(invalid());
+    }
+    let _ = fraction;
+    Ok(())
+}
+
+fn is_gregorian_leap_year(year: u32) -> bool {
+    (year.is_multiple_of(4) && !year.is_multiple_of(100)) || year.is_multiple_of(400)
 }
 
 fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
