@@ -49,8 +49,8 @@ fn snapshot_rejects_impossible_calendar_dates_and_clock_values() {
         "2024-02-30T12:00:00Z",
         "2026-09-02T24:00:00Z",
         "2026-09-02T23:60:00Z",
-        "2026-09-02T23:59:60Z",
         "2026-09-02T23:59:61Z",
+        "2026-09-02T12:00:60Z",
     ] {
         assert_invalid_timestamp(observed_at_utc);
     }
@@ -65,6 +65,7 @@ fn snapshot_accepts_canonical_utc_observation_timestamps() {
         "2025-02-28T00:00:00Z",
         "2024-02-29T00:00:00Z",
         "2000-02-29T00:00:00Z",
+        "2024-06-30T23:59:60Z",
     ] {
         let snapshot = PostgresSchemaSnapshot::new(
             "warehouse-primary",
