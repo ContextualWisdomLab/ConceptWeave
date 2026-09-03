@@ -15,6 +15,7 @@ All notable changes to ConceptWeave are documented here.
 - PostgreSQL 18 `CHECK` constraint observations preserving the reconstructed source definition plus validation, enforcement, and `NO INHERIT` status without guessing expression-to-column dependencies.
 - Rust-first `conceptweave-source-port` contract with positive statement-timeout/row/byte/concurrency limits, exact non-empty schema allowlists, bounded opaque source registry keys, caller cancellation, and typed fail-closed source-disappearance/resource-limit outcomes; a live PostgreSQL adapter remains open work.
 - Source registry keys now require at most 128 bytes of lowercase multiword `snake_case`, rejecting raw DSNs, URLs, shell-style connection parameters, generic one-word identifiers, and malformed registry identifiers before adapter credential resolution.
+- Source Observation timestamps now fail closed unless they use an explicit canonical UTC `Z` form with a valid Gregorian calendar date and clock value; optional fractional seconds are preserved, and numeric/local offsets are not silently normalized into provenance.
 - Fail-closed Draft -> Proposed -> Validated -> Reviewed -> Published lifecycle with explicit rejection and supersession.
 - Draft 2020-12 JSON Schema for the semantic-candidate public contract.
 - Standards and research doctoring covering stable W3C ontology standards, 2026 RDF/SHACL work in progress, Apache Ossie, and recent LLM ontology-engineering research.
