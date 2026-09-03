@@ -26,6 +26,6 @@ Production commit `e27ffaf4a40d746781b8012e9fe71467e7e6511f` replaces nonblank-o
 
 Klyne, G., & Newman, C. (2002). *Date and time on the Internet: Timestamps* (RFC 3339). Internet Engineering Task Force. https://www.rfc-editor.org/rfc/rfc3339
 
-Postel, J., et al. [RFC Editor record]. (2024). *Date and time on the Internet: Timestamps with additional information* (RFC 9557). Internet Engineering Task Force. https://www.rfc-editor.org/rfc/rfc9557
+Sharma, U., & Bormann, C. (2024). *Date and time on the Internet: Timestamps with additional information* (RFC 9557). Internet Engineering Task Force. https://www.rfc-editor.org/rfc/rfc9557
 
 PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: Date/time types*. https://www.postgresql.org/docs/18/datatype-datetime.html
