@@ -33,7 +33,10 @@ fn release(
         publication_state,
         digest(digest_hex),
         vec![evidence()],
-        concept_ids.iter().map(|value| (*value).to_owned()).collect(),
+        concept_ids
+            .iter()
+            .map(|value| (*value).to_owned())
+            .collect(),
     )
     .expect("release fixture must be structurally valid")
 }
@@ -136,8 +139,12 @@ fn supersession_rejects_a_predecessor_with_only_one_superseded_state() {
 fn supersession_rejects_an_incompatible_governed_predecessor() {
     let client = SemanticReleaseClient::new("1.0.0").expect("client policy must be valid");
     let previous = SemanticRelease::new(
-        ReleaseMetadata::new("semantic_release_previous", "2.0.0", "ontology_client_review")
-            .unwrap(),
+        ReleaseMetadata::new(
+            "semantic_release_previous",
+            "2.0.0",
+            "ontology_client_review",
+        )
+        .unwrap(),
         TruthStatus::Superseded,
         PublicationState::Superseded,
         digest('b'),
