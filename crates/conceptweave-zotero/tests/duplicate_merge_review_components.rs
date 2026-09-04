@@ -128,7 +128,7 @@ fn duplicate_review_binds_every_item_revision_to_the_reviewed_snapshot() {
             item("B", 2, "Same title", "10.1000/same"),
         ],
     );
-    let reviewed = ReviewedDuplicateMergeSet {
+    let mut reviewed = ReviewedDuplicateMergeSet {
         review_id: "review-revisions".into(),
         authority_receipt: "authority-revisions".into(),
         library_version: report.library_version,
@@ -150,5 +150,17 @@ fn duplicate_review_binds_every_item_revision_to_the_reviewed_snapshot() {
     assert_eq!(
         build_duplicate_merge_review_manifest(&report, &reviewed, |_| true),
         Err(DuplicateReviewError::SnapshotMismatch)
+    );
+
+    report.snapshot_items[0].item_version -= 1;
+    for decision in &mut reviewed.decisions {
+        decision.retained_item_key = "B".into();
+    }
+    for candidate in &mut report.duplicate_candidates {
+        candidate.item_keys[0] = "missing".into();
+    }
+    assert_eq!(
+        build_duplicate_merge_review_manifest(&report, &reviewed, |_| true),
+        Err(DuplicateReviewError::InvalidReview)
     );
 }
