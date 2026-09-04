@@ -1,4 +1,4 @@
-use conceptweave_zotero::{classify_snapshot, AbstentionReason, Disposition, ItemData, ZoteroItem};
+use conceptweave_zotero::{AbstentionReason, Disposition, ItemData, ZoteroItem, classify_snapshot};
 
 fn item(key: &str, title: &str, doi: &str) -> ZoteroItem {
     ZoteroItem {
