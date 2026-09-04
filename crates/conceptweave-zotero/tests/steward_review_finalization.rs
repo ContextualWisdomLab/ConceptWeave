@@ -75,6 +75,17 @@ fn complete_worksheet_becomes_a_snapshot_bound_golden_set() {
 fn finalization_rejects_each_invalid_identity_coordinate() {
     let worksheet = complete_worksheet();
 
+    let mut invalid_report = report();
+    invalid_report.rule_revision = "";
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(
+            &invalid_report,
+            &worksheet,
+            approval(&worksheet)
+        ),
+        Err(EvaluationError::InvalidReview)
+    );
+
     let mut invalid_approval = approval(&worksheet);
     invalid_approval.receipt_id.clear();
     assert_eq!(
@@ -134,6 +145,25 @@ fn finalization_rejects_each_invalid_identity_coordinate() {
     );
 
     let mut invalid = worksheet.clone();
+    invalid.library_version += 1;
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(&report(), &invalid, approval(&invalid)),
+        Err(EvaluationError::SnapshotMismatch)
+    );
+    let mut invalid = worksheet.clone();
+    invalid.rule_revision.push_str("-changed");
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(&report(), &invalid, approval(&invalid)),
+        Err(EvaluationError::SnapshotMismatch)
+    );
+    let mut invalid = worksheet.clone();
+    invalid.snapshot_digest.push_str("-changed");
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(&report(), &invalid, approval(&invalid)),
+        Err(EvaluationError::SnapshotMismatch)
+    );
+
+    let mut invalid = worksheet.clone();
     invalid.decisions[0].item_key.clear();
     assert_eq!(
         reviewed_golden_set_from_worksheet(&report(), &invalid, approval(&invalid)),
@@ -141,6 +171,12 @@ fn finalization_rejects_each_invalid_identity_coordinate() {
     );
     let mut invalid = worksheet.clone();
     invalid.decisions[0].item_version += 1;
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(&report(), &invalid, approval(&invalid)),
+        Err(EvaluationError::InvalidReview)
+    );
+    let mut invalid = worksheet.clone();
+    invalid.decisions[0].proposed_disposition = Disposition::AlignmentVersioning;
     assert_eq!(
         reviewed_golden_set_from_worksheet(&report(), &invalid, approval(&invalid)),
         Err(EvaluationError::InvalidReview)
@@ -164,6 +200,30 @@ fn finalization_rejects_each_invalid_identity_coordinate() {
     invalid.decisions.pop();
     assert_eq!(
         reviewed_golden_set_from_worksheet(&report(), &invalid, approval(&invalid)),
+        Err(EvaluationError::IncompleteReview)
+    );
+
+    let empty_report = classify_snapshot(
+        "9.0.6".into(),
+        None,
+        42,
+        vec![ZoteroItem {
+            key: "NOTE".into(),
+            version: 1,
+            data: ItemData {
+                item_type: "note".into(),
+                title: String::new(),
+                abstract_note: String::new(),
+                doi: String::new(),
+                parent_item: String::new(),
+                collections: vec![],
+                tags: vec![],
+            },
+        }],
+    );
+    let empty = build_steward_review_worksheet(&empty_report).unwrap();
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(&empty_report, &empty, approval(&empty)),
         Err(EvaluationError::IncompleteReview)
     );
 }
