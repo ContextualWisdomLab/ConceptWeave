@@ -36,10 +36,7 @@ where
     Ok(request)
 }
 
-fn write_private_output(
-    path: &Path,
-    content: &[u8],
-) -> io::Result<()> {
+fn write_private_output(path: &Path, content: &[u8]) -> io::Result<()> {
     write_private_output_with(path, content, |writer, bytes| {
         writer.write_all(bytes)?;
         writer.flush()
@@ -201,7 +198,10 @@ mod tests {
         let output = unique_temp_path("failed-output");
         let _ = fs::remove_file(&output);
         let error = write_private_output_with(&output, b"content", |_, _| {
-            Err(io::Error::new(io::ErrorKind::WriteZero, "injected write failure"))
+            Err(io::Error::new(
+                io::ErrorKind::WriteZero,
+                "injected write failure",
+            ))
         })
         .unwrap_err();
         assert_eq!(error.kind(), io::ErrorKind::WriteZero);
