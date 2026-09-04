@@ -140,6 +140,7 @@ fn worksheet_rejects_each_inconsistent_report_coordinate() {
 
     let mut invalid = report();
     invalid.classified_items[0].child_item_keys = vec![String::new()];
+    invalid.audit_summary.provenance_complete_count -= 1;
     assert_eq!(
         build_steward_review_worksheet(&invalid),
         Err(WorksheetError::InvalidReport)
@@ -161,6 +162,7 @@ fn worksheet_rejects_each_inconsistent_report_coordinate() {
 
     let mut invalid = report();
     invalid.classified_items[0].item_key.clear();
+    invalid.audit_summary.provenance_complete_count -= 1;
     assert_eq!(
         build_steward_review_worksheet(&invalid),
         Err(WorksheetError::InvalidReport)
