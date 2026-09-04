@@ -30,7 +30,8 @@ Source artifacts, imported ontologies, provider responses, model outputs, web-re
 7. tenant/workspace evidence disclosure;
 8. SSRF, DNS rebinding, unsafe redirects, or unbounded external retrieval;
 9. dependency/provider compromise or unexpected retention;
-10. write-back without reviewed before/after/rollback evidence and exact preconditions.
+10. write-back without reviewed before/after/rollback evidence and exact preconditions;
+11. same-host filesystem races replacing a checked owner-only review artifact path with a symlink before the file descriptor is opened.
 
 ## Zotero 10+ Local API transport boundary
 
@@ -63,6 +64,14 @@ Neither path may reinterpret `Zotero-Server-ID` as cryptographic peer authentica
 - approved writes preserve exact before/after evidence, partial-failure reconciliation, and rollback coordinates;
 - attachments and bibliographic source records are not deleted by classification write-back;
 - descendant integration evidence never back-proves an unresolved predecessor contract.
+
+## Owner-only review artifact filesystem boundary
+
+Saved report, worksheet, approval, progress, and golden-set artifacts are sensitive local review material. Path policy alone is not the security boundary. A direct-temp-child path may be checked as a regular non-symlink and still be replaced by a symlink before a later symlink-following open.
+
+The opened file descriptor must therefore be obtained with a Unix final-component no-follow primitive such as `O_NOFOLLOW` or an equivalent safe abstraction. After open, ConceptWeave still verifies that the opened device/inode matches the checked regular file, link count is one, mode is exactly `0600`, and the bounded-read contract is satisfied. A second pathname check is not an equivalent repair because it leaves another check/open race window.
+
+The exact PR #30 test-only contract records this invariant. Until that contract executes RED and the minimum no-follow open repair reaches one unchanged exact-head GREEN, offline review/finalization artifacts remain acceptance-gated even though existing direct-symlink and inode-alias tests pass.
 
 ## Release gate
 
