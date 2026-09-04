@@ -3,6 +3,8 @@ use conceptweave_observation::{
     ObservationLocationKind, PostgresSchemaSnapshot, TableConstraintObservation, TableObservation,
 };
 
+mod support;
+
 const SNAPSHOT_DIGEST: &str =
     "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
@@ -29,7 +31,7 @@ fn snapshot() -> PostgresSchemaSnapshot {
     .expect("table fixture is valid");
 
     PostgresSchemaSnapshot::new(
-        "warehouse_source",
+        &support::resolved_source("warehouse_source"),
         SNAPSHOT_DIGEST,
         "catalog-v1",
         "2026-09-02T06:00:00Z",

@@ -1,33 +1,13 @@
 use conceptweave_observation::{ObservationError, PostgresSchemaSnapshot};
-use conceptweave_source_port::{
-    ObservationLimits, ObservationRequest, ResolvedSourceConnection, SourceConnectionRegistry,
-};
+
+mod support;
 
 const SNAPSHOT_DIGEST: &str =
     "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
-struct TestRegistry;
-
-impl SourceConnectionRegistry for TestRegistry {
-    fn contains_source_connection(&self, source_connection_key: &str) -> bool {
-        source_connection_key == "grc_readonly_connection"
-    }
-}
-
-fn resolved_source() -> ResolvedSourceConnection {
-    ObservationRequest::new(
-        "grc_readonly_connection",
-        vec!["public".to_owned()],
-        ObservationLimits::new(1_000, 10, 1_024, 1).unwrap(),
-    )
-    .unwrap()
-    .resolve_source_connection(&TestRegistry)
-    .unwrap()
-}
-
 fn snapshot_with_source() -> Result<PostgresSchemaSnapshot, ObservationError> {
     PostgresSchemaSnapshot::new(
-        &resolved_source(),
+        &support::resolved_source("grc_readonly_connection"),
         SNAPSHOT_DIGEST,
         "postgres_introspector_v1",
         "2026-09-03T13:00:00Z",

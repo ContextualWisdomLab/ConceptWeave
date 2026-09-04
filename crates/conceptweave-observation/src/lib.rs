@@ -10,7 +10,8 @@ use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
-const MAX_SOURCE_CONNECTION_KEY_BYTES: usize = 128;
+use conceptweave_source_port::ResolvedSourceConnection;
+
 const SHA256_DIGEST_PREFIX: &str = "sha256:";
 
 /// Fail-closed validation errors for immutable schema observations.
@@ -1026,22 +1027,21 @@ impl PostgresSchemaSnapshot {
     ///
     /// Collection order is canonicalized by exact qualified table identifier. Exact source text is
     /// preserved, including case and characters that would require quoting in PostgreSQL. The
-    /// source connection reference must remain the same bounded lowercase multiword `snake_case`
-    /// registry identity admitted by the Source Observation port; raw DSNs or credentials are
-    /// rejected even when callers construct the immutable aggregate directly. The observation time
-    /// must be an RFC 3339-style timestamp with an explicit UTC `Z` designator.
+    /// source connection reference must be a registry-resolved capability issued by the Source
+    /// Observation port; a caller cannot substitute raw connection text when constructing the
+    /// immutable aggregate. The observation time must be an RFC 3339-style timestamp with an
+    /// explicit UTC `Z` designator.
     pub fn new(
-        source_connection_key: impl Into<String>,
+        source_connection: &ResolvedSourceConnection,
         snapshot_digest: impl Into<String>,
         extractor_revision: impl Into<String>,
         observed_at_utc: impl Into<String>,
         mut tables: Vec<TableObservation>,
     ) -> Result<Self, ObservationError> {
-        let source_connection_key = source_connection_key.into();
+        let source_connection_key = source_connection.source_connection_key().to_owned();
         let snapshot_digest = snapshot_digest.into();
         let extractor_revision = extractor_revision.into();
         let observed_at_utc = observed_at_utc.into();
-        validate_source_connection_key(&source_connection_key)?;
         validate_snapshot_digest(&snapshot_digest)?;
         validate_nonblank(&extractor_revision, "extractor_revision")?;
         validate_observed_at_utc(&observed_at_utc)?;
@@ -1164,34 +1164,6 @@ fn validate_constraint_columns(
 
 fn escape_json_pointer_token(value: &str) -> String {
     value.replace('~', "~0").replace('/', "~1")
-}
-
-fn validate_source_connection_key(value: &str) -> Result<(), ObservationError> {
-    let bytes = value.as_bytes();
-    let mut word_count = 0_u8;
-    let is_valid = !bytes.is_empty()
-        && bytes.len() <= MAX_SOURCE_CONNECTION_KEY_BYTES
-        && value.split('_').all(|word| {
-            let mut word_bytes = word.bytes();
-            let Some(first) = word_bytes.next() else {
-                return false;
-            };
-            if !first.is_ascii_lowercase() {
-                return false;
-            }
-            if !word_bytes.all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit()) {
-                return false;
-            }
-            word_count = word_count.saturating_add(1);
-            true
-        })
-        && word_count >= 2;
-    if !is_valid {
-        return Err(ObservationError::InvalidObservationField {
-            field: "source_connection_key",
-        });
-    }
-    Ok(())
 }
 
 fn validate_snapshot_digest(value: &str) -> Result<(), ObservationError> {

@@ -47,6 +47,9 @@ impl ObservationLimits {
         max_bytes: u64,
         max_concurrent_queries: u32,
     ) -> Result<Self, ObservationLimitError> {
+        if statement_timeout_ms == 0 {
+            return Err(ObservationLimitError::ZeroStatementTimeout);
+        }
         Self::with_timeouts(
             statement_timeout_ms,
             statement_timeout_ms,

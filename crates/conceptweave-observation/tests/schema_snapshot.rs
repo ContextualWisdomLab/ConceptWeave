@@ -2,6 +2,8 @@ use conceptweave_observation::{
     ColumnObservation, ObservationError, PostgresSchemaSnapshot, TableObservation,
 };
 
+mod support;
+
 fn column(name: &str, ordinal_position: u32) -> ColumnObservation {
     ColumnObservation::new(
         name,
@@ -16,7 +18,7 @@ fn column(name: &str, ordinal_position: u32) -> ColumnObservation {
 #[test]
 fn snapshot_preserves_evidence_and_qualified_identifiers_without_normalization() {
     let snapshot = PostgresSchemaSnapshot::new(
-        "warehouse_primary",
+        &support::resolved_source("warehouse_primary"),
         "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "postgres-introspector/1",
         "2026-09-02T00:00:00Z",
@@ -57,7 +59,7 @@ fn snapshot_rejects_duplicate_qualified_tables() {
     let duplicate = TableObservation::new("public", "events", vec![column("event_key", 1)])
         .expect("table is valid");
     let error = PostgresSchemaSnapshot::new(
-        "warehouse_primary",
+        &support::resolved_source("warehouse_primary"),
         "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "postgres-introspector/1",
         "2026-09-02T00:00:00Z",
@@ -159,24 +161,15 @@ fn source_identifiers_and_evidence_reject_unicode_whitespace_only_values() {
         }
     );
 
-    for (source_connection_key, snapshot_digest, extractor_revision, observed_at_utc, field) in [
+    for (snapshot_digest, extractor_revision, observed_at_utc, field) in [
+        ("\u{2003}", "extractor", "time", "snapshot_digest"),
         (
-            "\t",
-            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "extractor",
-            "time",
-            "source_connection_key",
-        ),
-        ("source", "\u{2003}", "extractor", "time", "snapshot_digest"),
-        (
-            "source",
             "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "\n",
             "time",
             "extractor_revision",
         ),
         (
-            "source",
             "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "extractor",
             " ",
@@ -184,7 +177,7 @@ fn source_identifiers_and_evidence_reject_unicode_whitespace_only_values() {
         ),
     ] {
         let error = PostgresSchemaSnapshot::new(
-            source_connection_key,
+            &support::resolved_source("warehouse_primary"),
             snapshot_digest,
             extractor_revision,
             observed_at_utc,
@@ -204,7 +197,7 @@ fn snapshot_digest_requires_canonical_sha256_identity() {
         "sha512:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     ] {
         let error = PostgresSchemaSnapshot::new(
-            "warehouse_primary",
+            &support::resolved_source("warehouse_primary"),
             digest,
             "postgres-introspector/1",
             "2026-09-02T00:00:00Z",
