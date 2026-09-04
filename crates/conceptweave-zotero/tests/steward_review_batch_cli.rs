@@ -28,7 +28,10 @@ fn review_batch_cli_writes_sensitive_context_owner_only() {
     assert_eq!(output["remaining_count"], 2);
     assert_eq!(output["decisions"].as_array().unwrap().len(), 1);
     assert_eq!(output["decisions"][0]["item_key"], "A");
-    assert_eq!(output["decisions"][0]["reviewed_disposition"], serde_json::Value::Null);
+    assert_eq!(
+        output["decisions"][0]["reviewed_disposition"],
+        serde_json::Value::Null
+    );
     assert!(output.get("snapshot_items").is_none());
     assert!(output.get("duplicate_candidates").is_none());
     assert_eq!(
@@ -43,12 +46,7 @@ fn review_batch_cli_writes_sensitive_context_owner_only() {
 
 #[test]
 fn review_batch_cli_emits_nothing_for_complete_or_existing_output() {
-    let report = classify_snapshot(
-        "9.0.6".into(),
-        None,
-        42,
-        vec![item("A", "unmatched")],
-    );
+    let report = classify_snapshot("9.0.6".into(), None, 42, vec![item("A", "unmatched")]);
     let mut worksheet = build_steward_review_worksheet(&report).unwrap();
     worksheet.decisions[0].reviewed_disposition = Some(Disposition::OutOfScope);
     let report_path = private_input("batch-complete-report", &report);

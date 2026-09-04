@@ -40,12 +40,23 @@ fn review_batch_is_deterministic_bounded_and_patch_compatible() {
     assert_eq!(batch.decisions.len(), 1);
     assert_eq!(batch.decisions[0].item_key, "B");
     assert_eq!(batch.decisions[0].title, "unmatched B");
-    assert_eq!(batch.decisions[0].review_abstract_note.as_deref(), Some("context B"));
+    assert_eq!(
+        batch.decisions[0].review_abstract_note.as_deref(),
+        Some("context B")
+    );
     assert_eq!(batch.decisions[0].reviewed_disposition, None);
-    assert_eq!(build_steward_review_batch(&report, &worksheet, 1).unwrap(), batch);
+    assert_eq!(
+        build_steward_review_batch(&report, &worksheet, 1).unwrap(),
+        batch
+    );
     let serialized = serde_json::to_string(&batch).unwrap();
     assert_eq!(serialized.matches("context B").count(), 1);
-    for omitted in ["snapshot_items", "child_item_keys", "model_receipt", "audit_summary"] {
+    for omitted in [
+        "snapshot_items",
+        "child_item_keys",
+        "model_receipt",
+        "audit_summary",
+    ] {
         assert!(!serialized.contains(omitted));
     }
 
