@@ -69,7 +69,7 @@ fn transitive_duplicate_component_accepts_one_component_level_canonical_key() {
 
 #[test]
 fn duplicate_review_rejects_blank_snapshot_item_identity() {
-    let report = classify_snapshot(
+    let mut report = classify_snapshot(
         "9.0.6".into(),
         None,
         42,
@@ -98,5 +98,12 @@ fn duplicate_review_rejects_blank_snapshot_item_identity() {
         build_duplicate_merge_review_manifest(&report, &reviewed, |_| true),
         Err(DuplicateReviewError::InvalidReview),
         "blank Zotero keys are not stable provenance identities and must fail closed before manifest materialization"
+    );
+
+    report.snapshot_items.remove(0);
+    assert_eq!(
+        build_duplicate_merge_review_manifest(&report, &reviewed, |_| true),
+        Err(DuplicateReviewError::InvalidReview),
+        "every duplicate candidate must resolve to an immutable snapshot revision"
     );
 }
