@@ -3,7 +3,7 @@
 
 use conceptweave_zotero::read_local_snapshot;
 use std::env;
-use std::fs::{self, OpenOptions};
+use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
@@ -46,6 +46,17 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
     Ok(path)
 }
 
+fn create_report_file(path: &Path) -> io::Result<File> {
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    options.open(path)
+}
+
 #[cfg_attr(coverage_nightly, coverage(off))]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
@@ -56,10 +67,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if report.zotero_version.starts_with("9.") {
         eprintln!("Zotero 9 Local API is read-only; writing a local proposal report only");
     }
-    let file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(output)?;
+    let file = create_report_file(&output)?;
     let mut writer = BufWriter::new(file);
     serde_json::to_writer_pretty(&mut writer, &report)?;
     writer.flush()?;
