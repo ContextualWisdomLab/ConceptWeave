@@ -30,6 +30,7 @@ enum OutputRequest {
     },
 }
 
+/// Parses one mutually exclusive report, worksheet, or finalization request.
 fn parse_output_request<I, S>(args: I) -> Result<OutputRequest, &'static str>
 where
     I: IntoIterator<Item = S>,
@@ -93,6 +94,7 @@ struct ArtifactIdentity {
     inode: u64,
 }
 
+/// Opens, validates, bounds, and deserializes one owner-only review artifact.
 fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<(T, ArtifactIdentity)> {
     let path = PathBuf::from(raw);
     if !path.is_absolute() {
@@ -136,6 +138,7 @@ fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<(T, ArtifactI
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
+/// Opens a review input once and returns metadata from the opened handle.
 fn open_with_metadata(path: &Path) -> io::Result<(File, fs::Metadata)> {
     let file = File::open(path)?;
     let metadata = file.metadata()?;
@@ -143,6 +146,7 @@ fn open_with_metadata(path: &Path) -> io::Result<(File, fs::Metadata)> {
 }
 
 #[cfg(unix)]
+/// Proves the opened Unix file matches the checked path and owner-only contract.
 fn validate_opened_identity(
     path_metadata: &fs::Metadata,
     opened_metadata: &fs::Metadata,
@@ -164,6 +168,7 @@ fn validate_opened_identity(
     })
 }
 
+/// Reads JSON without allowing the input to exceed or grow past the artifact limit.
 fn read_bounded_json<T: DeserializeOwned>(
     reader: &mut dyn Read,
     advertised_len: u64,
@@ -188,20 +193,24 @@ fn read_bounded_json<T: DeserializeOwned>(
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
 }
 
+/// Preserves an input error kind while naming the rejected artifact.
 fn label_input(name: &str, error: io::Error) -> io::Error {
     io::Error::new(error.kind(), format!("{name}: {error}"))
 }
 
+/// Writes one create-new owner-only artifact and removes a failed partial write.
 fn write_private_output(path: &Path, content: &[u8]) -> io::Result<()> {
     write_private_output_with(path, content, write_all_and_flush)
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
+/// Writes and flushes the complete serialized artifact.
 fn write_all_and_flush(writer: &mut BufWriter<File>, content: &[u8]) -> io::Result<()> {
     writer.write_all(content)?;
     writer.flush()
 }
 
+/// Runs the private-output boundary with an injectable writer for failure testing.
 fn write_private_output_with(
     path: &Path,
     content: &[u8],
