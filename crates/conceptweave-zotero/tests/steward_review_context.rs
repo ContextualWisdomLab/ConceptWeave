@@ -31,6 +31,11 @@ fn abstentions_retain_only_the_abstract_needed_for_local_steward_review() {
                 "This abstract must not be copied into review-only context.",
             ),
             item("EMPTY001", "Unmatched title", ""),
+            item(
+                "CONFLICT",
+                "Unmatched title",
+                "Ontology learning and ontology matching are compared.",
+            ),
         ],
     );
 
@@ -60,4 +65,18 @@ fn abstentions_retain_only_the_abstract_needed_for_local_steward_review() {
         .unwrap();
     assert_eq!(empty.proposed_disposition, Disposition::NeedsStewardReview);
     assert!(empty.review_abstract_note.is_none());
+
+    let conflict = report
+        .classified_items
+        .iter()
+        .find(|item| item.item_key == "CONFLICT")
+        .unwrap();
+    assert_eq!(
+        conflict.proposed_disposition,
+        Disposition::NeedsStewardReview
+    );
+    assert!(conflict.evidence.field_values.contains_key("abstract_note"));
+    assert!(conflict.review_abstract_note.is_none());
+    let serialized = serde_json::to_string(conflict).unwrap();
+    assert_eq!(serialized.matches("Ontology learning").count(), 1);
 }
