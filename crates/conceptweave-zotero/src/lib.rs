@@ -1133,8 +1133,7 @@ pub fn build_steward_review_worksheet(
     let mut decision_keys = BTreeSet::new();
     let mut decisions = Vec::with_capacity(report.classified_items.len());
     for item in &report.classified_items {
-        if item.item_key.trim().is_empty()
-            || !decision_keys.insert(item.item_key.as_str())
+        if !decision_keys.insert(item.item_key.as_str())
             || snapshot_versions.get(item.item_key.as_str()) != Some(&item.item_version)
             || (item.proposed_disposition == Disposition::NeedsStewardReview)
                 != item.abstention_reason.is_some()
