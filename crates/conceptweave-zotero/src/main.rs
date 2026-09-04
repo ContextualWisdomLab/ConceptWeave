@@ -8,6 +8,7 @@ use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 #[cfg_attr(coverage_nightly, coverage(off))]
+/// Returns canonical directories in which a sensitive report may be created.
 fn allowed_output_parents() -> Vec<PathBuf> {
     let mut parents = vec![
         env::temp_dir()
@@ -19,6 +20,7 @@ fn allowed_output_parents() -> Vec<PathBuf> {
     parents
 }
 
+/// Validates that a report path is a new direct child of an allowed temp directory.
 fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
     let path = PathBuf::from(raw);
     if !path.is_absolute() {
@@ -48,6 +50,7 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
     Ok(path)
 }
 
+/// Creates a new sensitive report file or fails closed on unsupported platforms.
 fn create_report_file(path: &Path) -> io::Result<File> {
     #[cfg(not(unix))]
     return Err(io::Error::new(
@@ -62,6 +65,7 @@ fn create_report_file(path: &Path) -> io::Result<File> {
 }
 
 #[cfg(unix)]
+/// Restores exact owner-only permissions after process umask application.
 fn set_owner_only_permissions(file: &File) -> io::Result<()> {
     use std::os::unix::fs::PermissionsExt;
 
@@ -69,6 +73,7 @@ fn set_owner_only_permissions(file: &File) -> io::Result<()> {
 }
 
 #[cfg(unix)]
+/// Creates a private file and removes it if final permission enforcement fails.
 fn create_report_file_with(
     path: &Path,
     set_permissions: fn(&File) -> io::Result<()>,
@@ -87,6 +92,7 @@ fn create_report_file_with(
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
+/// Reads one Zotero snapshot and writes its sensitive local proposal report.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
         .nth(1)
@@ -137,12 +143,18 @@ mod tests {
             .is_err()
         );
 
-        let conventional = Path::new("/tmp").join(format!(
-            "conceptweave-zotero-{}-conventional.json",
-            std::process::id()
-        ));
-        let _ = fs::remove_file(&conventional);
-        assert!(validate_output_path(conventional.to_str().unwrap()).is_ok());
+        #[cfg(unix)]
+        {
+            let conventional = Path::new("/tmp").join(format!(
+                "conceptweave-zotero-{}-conventional.json",
+                std::process::id()
+            ));
+            let _ = fs::remove_file(&conventional);
+            assert!(validate_output_path(conventional.to_str().unwrap()).is_ok());
+        }
+
+        #[cfg(not(unix))]
+        assert!(validate_output_path("/tmp/conceptweave-zotero.json").is_err());
 
         let nested_dir =
             env::temp_dir().join(format!("conceptweave-zotero-{}-nested", std::process::id()));
