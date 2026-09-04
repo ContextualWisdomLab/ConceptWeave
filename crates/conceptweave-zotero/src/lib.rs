@@ -13,6 +13,8 @@ pub const RULE_REVISION: &str = "ontology-research-v1";
 
 const PAGE_LIMIT: usize = 100;
 const MAX_PAGE_BYTES: u64 = 8 * 1024 * 1024;
+const MAX_SNAPSHOT_ITEMS: usize = 50_000;
+const MAX_SNAPSHOT_BYTES: u64 = 256 * 1024 * 1024;
 const LOCAL_API: &str = "http://127.0.0.1:23119/api/users/0/items";
 
 /// A Zotero item returned by the Local API.
@@ -79,6 +81,18 @@ pub enum Disposition {
     NeedsStewardReview,
 }
 
+/// Deterministic reason that a bibliographic item requires steward review.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AbstentionReason {
+    /// Title, abstract, and tags contain no classification metadata.
+    MissingClassificationMetadata,
+    /// Metadata uses vocabulary outside the current deterministic rule set.
+    UnsupportedRuleVocabulary,
+    /// Metadata is present but no deterministic rule phrase matches it.
+    NoDeterministicRuleMatch,
+}
+
 /// Evidence for a deterministic proposed disposition.
 #[derive(Debug, Serialize)]
 pub struct ClassificationEvidence {
@@ -105,6 +119,8 @@ pub struct ClassifiedItem {
     pub tags: Vec<String>,
     /// Proposed disposition; never an authoritative governance decision.
     pub proposed_disposition: Disposition,
+    /// Deterministic reason for abstention, absent when a rule proposes a disposition.
+    pub abstention_reason: Option<AbstentionReason>,
     /// Deterministic supporting evidence.
     pub evidence: ClassificationEvidence,
     /// Child note and attachment keys linked to the top-level item.
@@ -152,6 +168,8 @@ pub enum ReadError {
     Header(&'static str),
     /// A later page did not belong to the first page's snapshot.
     SnapshotChanged,
+    /// Configured whole-snapshot resource budget was exceeded.
+    Budget(&'static str),
     /// Zotero returned malformed JSON.
     Json(serde_json::Error),
     /// Response body exceeded the configured bound or could not be read.
@@ -164,6 +182,7 @@ impl fmt::Display for ReadError {
             Self::Http(error) => write!(formatter, "local API request failed: {error}"),
             Self::Header(name) => write!(formatter, "local API response lacks valid {name}"),
             Self::SnapshotChanged => write!(formatter, "Zotero library changed during the read"),
+            Self::Budget(kind) => write!(formatter, "Zotero snapshot exceeds {kind} budget"),
             Self::Json(error) => write!(formatter, "local API returned invalid JSON: {error}"),
             Self::Body(error) => write!(formatter, "local API response body failed: {error}"),
         }
@@ -184,6 +203,7 @@ pub fn read_local_snapshot() -> Result<ClassificationReport, ReadError> {
         .build();
     let agent = ureq::Agent::new_with_config(config);
     let mut items = Vec::new();
+    let mut snapshot_bytes = 0_u64;
     let mut expected = None;
     let mut library_version = None;
     let mut zotero_version = None;
@@ -191,6 +211,11 @@ pub fn read_local_snapshot() -> Result<ClassificationReport, ReadError> {
     let mut metadata_initialized = false;
 
     loop {
+        if expected.is_some_and(|total| items.len() < total)
+            && (items.len() >= MAX_SNAPSHOT_ITEMS || snapshot_bytes >= MAX_SNAPSHOT_BYTES)
+        {
+            return Err(ReadError::Budget("whole-snapshot"));
+        }
         let url = format!(
             "{LOCAL_API}?format=json&include=data&limit={PAGE_LIMIT}&start={}",
             items.len()
@@ -201,6 +226,9 @@ pub fn read_local_snapshot() -> Result<ClassificationReport, ReadError> {
             .map_err(|error| ReadError::Http(error.to_string()))?;
         let headers = response.headers();
         let page_total = header_u64(headers, "Total-Results")? as usize;
+        if page_total > MAX_SNAPSHOT_ITEMS {
+            return Err(ReadError::Budget("item-count"));
+        }
         let page_version = header_u64(headers, "Last-Modified-Version")?;
         let page_zotero = header_string(headers, "X-Zotero-Version")?;
         let page_server = optional_header(headers, "Zotero-Server-ID");
@@ -227,14 +255,22 @@ pub fn read_local_snapshot() -> Result<ClassificationReport, ReadError> {
             .limit(MAX_PAGE_BYTES)
             .read_to_string()
             .map_err(|error| ReadError::Body(error.to_string()))?;
+        let body_bytes =
+            u64::try_from(body.len()).map_err(|_| ReadError::Budget("byte-count"))?;
         let page: Vec<ZoteroItem> = serde_json::from_str(&body).map_err(ReadError::Json)?;
         if page.is_empty() && items.len() < page_total {
             return Err(ReadError::SnapshotChanged);
         }
+        let (next_item_count, next_snapshot_bytes) = checked_snapshot_usage(
+            items.len(),
+            page.len(),
+            snapshot_bytes,
+            body_bytes,
+            page_total,
+        )?;
         items.extend(page);
-        if items.len() > page_total {
-            return Err(ReadError::SnapshotChanged);
-        }
+        snapshot_bytes = next_snapshot_bytes;
+        debug_assert_eq!(items.len(), next_item_count);
         if items.len() == page_total {
             break;
         }
@@ -256,6 +292,34 @@ pub fn read_local_snapshot() -> Result<ClassificationReport, ReadError> {
         library_version.ok_or(ReadError::Header("Last-Modified-Version"))?,
         items,
     ))
+}
+
+fn checked_snapshot_usage(
+    current_items: usize,
+    page_items: usize,
+    current_bytes: u64,
+    page_bytes: u64,
+    advertised_total: usize,
+) -> Result<(usize, u64), ReadError> {
+    if advertised_total > MAX_SNAPSHOT_ITEMS {
+        return Err(ReadError::Budget("item-count"));
+    }
+    let next_items = current_items
+        .checked_add(page_items)
+        .ok_or(ReadError::Budget("item-count"))?;
+    if next_items > MAX_SNAPSHOT_ITEMS {
+        return Err(ReadError::Budget("item-count"));
+    }
+    if next_items > advertised_total {
+        return Err(ReadError::SnapshotChanged);
+    }
+    let next_bytes = current_bytes
+        .checked_add(page_bytes)
+        .ok_or(ReadError::Budget("byte-count"))?;
+    if next_bytes > MAX_SNAPSHOT_BYTES {
+        return Err(ReadError::Budget("byte-count"));
+    }
+    Ok((next_items, next_bytes))
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -411,6 +475,8 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
             break;
         }
     }
+    let abstention_reason = (disposition == Disposition::NeedsStewardReview)
+        .then(|| classify_abstention_reason(&fields));
     ClassifiedItem {
         item_key: item.key.clone(),
         item_version: item.version,
@@ -419,6 +485,7 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
         collection_keys: item.data.collections.clone(),
         tags: item.data.tags.iter().map(|tag| tag.tag.clone()).collect(),
         proposed_disposition: disposition,
+        abstention_reason,
         evidence: ClassificationEvidence {
             fields: matched_fields.into_iter().collect(),
             matched_phrases: matched_phrases.into_iter().collect(),
@@ -426,6 +493,20 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
         child_item_keys,
         model_receipt: None,
     }
+}
+
+fn classify_abstention_reason(fields: &[(&'static str, &str)]) -> AbstentionReason {
+    if fields.iter().all(|(_, value)| value.trim().is_empty()) {
+        return AbstentionReason::MissingClassificationMetadata;
+    }
+    if fields.iter().any(|(_, value)| {
+        value
+            .chars()
+            .any(|character| character.is_alphabetic() && !character.is_ascii())
+    }) {
+        return AbstentionReason::UnsupportedRuleVocabulary;
+    }
+    AbstentionReason::NoDeterministicRuleMatch
 }
 
 fn contains_phrase(value: &str, phrase: &str) -> bool {
@@ -470,6 +551,8 @@ fn normalize_doi(value: &str) -> Option<String> {
     let normalized = normalized
         .strip_prefix("https://doi.org/")
         .or_else(|| normalized.strip_prefix("http://doi.org/"))
+        .or_else(|| normalized.strip_prefix("https://dx.doi.org/"))
+        .or_else(|| normalized.strip_prefix("http://dx.doi.org/"))
         .or_else(|| normalized.strip_prefix("doi:"))
         .unwrap_or(&normalized)
         .trim();
@@ -537,9 +620,14 @@ mod tests {
             Disposition::NeedsStewardReview
         );
         assert_eq!(
+            report.classified_items[0].abstention_reason,
+            Some(AbstentionReason::NoDeterministicRuleMatch)
+        );
+        assert_eq!(
             report.classified_items[1].proposed_disposition,
             Disposition::Generation
         );
+        assert_eq!(report.classified_items[1].abstention_reason, None);
         assert_eq!(report.classified_items[1].child_item_keys, ["C"]);
         assert_eq!(report.classified_items[1].evidence.fields, ["title"]);
     }
@@ -576,6 +664,42 @@ mod tests {
     }
 
     #[test]
+    fn abstention_reasons_distinguish_missing_unsupported_and_unmatched_metadata() {
+        let missing = classify_snapshot(
+            "10".into(),
+            None,
+            1,
+            vec![item("A", "book", "", "", "")],
+        );
+        assert_eq!(
+            missing.classified_items[0].abstention_reason,
+            Some(AbstentionReason::MissingClassificationMetadata)
+        );
+
+        let unsupported = classify_snapshot(
+            "10".into(),
+            None,
+            1,
+            vec![item("A", "book", "온톨로지 정렬", "", "")],
+        );
+        assert_eq!(
+            unsupported.classified_items[0].abstention_reason,
+            Some(AbstentionReason::UnsupportedRuleVocabulary)
+        );
+
+        let unmatched = classify_snapshot(
+            "10".into(),
+            None,
+            1,
+            vec![item("A", "book", "Other evidence", "", "")],
+        );
+        assert_eq!(
+            unmatched.classified_items[0].abstention_reason,
+            Some(AbstentionReason::NoDeterministicRuleMatch)
+        );
+    }
+
+    #[test]
     fn duplicate_candidates_are_reversible_and_normalized() {
         let report = classify_snapshot(
             "10".into(),
@@ -601,7 +725,9 @@ mod tests {
         assert_eq!(normalize_title("---"), None);
         assert_eq!(normalize_doi("http://doi.org/A"), Some("a".into()));
         assert_eq!(normalize_doi("https://doi.org/B"), Some("b".into()));
-        assert_eq!(normalize_doi("C"), Some("c".into()));
+        assert_eq!(normalize_doi("http://dx.doi.org/C"), Some("c".into()));
+        assert_eq!(normalize_doi("https://dx.doi.org/D"), Some("d".into()));
+        assert_eq!(normalize_doi("E"), Some("e".into()));
         assert_eq!(normalize_title(" A---B "), Some("a b".into()));
         assert_eq!(normalize_title(" A--- "), Some("a".into()));
         let untitled = item("Z", "book", "", "", "");
@@ -623,9 +749,31 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_usage_is_bounded_before_accumulation() {
+        assert_eq!(checked_snapshot_usage(1, 1, 10, 20, 2).unwrap(), (2, 30));
+        assert!(matches!(
+            checked_snapshot_usage(0, 1, 0, 1, MAX_SNAPSHOT_ITEMS + 1),
+            Err(ReadError::Budget("item-count"))
+        ));
+        assert!(matches!(
+            checked_snapshot_usage(MAX_SNAPSHOT_ITEMS, 1, 0, 1, MAX_SNAPSHOT_ITEMS),
+            Err(ReadError::Budget("item-count"))
+        ));
+        assert!(matches!(
+            checked_snapshot_usage(0, 1, MAX_SNAPSHOT_BYTES, 1, 1),
+            Err(ReadError::Budget("byte-count"))
+        ));
+        assert!(matches!(
+            checked_snapshot_usage(1, 1, 0, 1, 1),
+            Err(ReadError::SnapshotChanged)
+        ));
+    }
+
+    #[test]
     fn read_errors_are_actionable() {
         assert!(ReadError::Header("x").to_string().contains('x'));
         assert!(ReadError::SnapshotChanged.to_string().contains("changed"));
+        assert!(ReadError::Budget("items").to_string().contains("budget"));
         assert!(ReadError::Http("down".into()).to_string().contains("down"));
         assert!(
             ReadError::Body("large".into())
