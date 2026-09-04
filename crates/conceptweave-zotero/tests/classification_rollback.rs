@@ -1,8 +1,8 @@
 use conceptweave_zotero::{
     ClassificationItemState, ClassificationRollbackOutcome, ClassificationWriteRequest,
-    Disposition, ItemData, ItemTag, ReviewedClassificationChange,
-    ReviewedClassificationWriteSet, WriteMode, ZoteroItem, build_classification_write_plan,
-    classify_snapshot, execute_classification_rollback, execute_classification_write_plan,
+    Disposition, ItemData, ItemTag, ReviewedClassificationChange, ReviewedClassificationWriteSet,
+    WriteMode, ZoteroItem, build_classification_write_plan, classify_snapshot,
+    execute_classification_rollback, execute_classification_write_plan,
 };
 
 fn tag(name: &str) -> ItemTag {
@@ -84,7 +84,11 @@ fn applied_receipt() -> conceptweave_zotero::ClassificationWriteReceipt {
     execute_classification_write_plan(
         &plan,
         |key| {
-            let operation = plan.operations().iter().find(|item| item.item_key == key).unwrap();
+            let operation = plan
+                .operations()
+                .iter()
+                .find(|item| item.item_key == key)
+                .unwrap();
             Ok::<_, ()>(ClassificationItemState {
                 server_id: "server-1".into(),
                 library_version: 42,
@@ -114,8 +118,14 @@ fn rollback_preflights_every_item_then_restores_in_receipt_order() {
     let receipt = applied_receipt();
     assert_eq!(receipt.rollback_operations[0].item_key, "B");
     assert_eq!(receipt.rollback_operations[0].server_id, "server-1");
-    assert_eq!(receipt.rollback_operations[0].expected_collection_keys, ["evaluation"]);
-    assert_eq!(receipt.rollback_operations[0].expected_tags, [tag("Evaluation")]);
+    assert_eq!(
+        receipt.rollback_operations[0].expected_collection_keys,
+        ["evaluation"]
+    );
+    assert_eq!(
+        receipt.rollback_operations[0].expected_tags,
+        [tag("Evaluation")]
+    );
 
     let mut reads = Vec::new();
     let mut writes = Vec::new();
@@ -123,7 +133,11 @@ fn rollback_preflights_every_item_then_restores_in_receipt_order() {
         &receipt.rollback_operations,
         |key| {
             reads.push(key.to_owned());
-            let operation = receipt.rollback_operations.iter().find(|item| item.item_key == key).unwrap();
+            let operation = receipt
+                .rollback_operations
+                .iter()
+                .find(|item| item.item_key == key)
+                .unwrap();
             Ok::<_, ()>(ClassificationItemState {
                 server_id: operation.server_id.clone(),
                 library_version: 44,
@@ -151,33 +165,50 @@ fn rollback_preflights_every_item_then_restores_in_receipt_order() {
 
 #[test]
 fn rollback_is_one_shot_and_second_execution_fails_before_write() {
+    use std::cell::Cell;
+
     let receipt = applied_receipt();
-    let mut restored = false;
-    let mut writes = 0;
-    let mut run = || {
+    let restored = Cell::new(false);
+    let writes = Cell::new(0);
+    let run = || {
         execute_classification_rollback(
             &receipt.rollback_operations,
             |key| {
-                let operation = receipt.rollback_operations.iter().find(|item| item.item_key == key).unwrap();
+                let operation = receipt
+                    .rollback_operations
+                    .iter()
+                    .find(|item| item.item_key == key)
+                    .unwrap();
                 Ok::<_, ()>(ClassificationItemState {
                     server_id: operation.server_id.clone(),
-                    library_version: if restored { 46 } else { 44 },
+                    library_version: if restored.get() { 46 } else { 44 },
                     item_key: key.into(),
-                    item_version: operation.item_version + u64::from(restored),
-                    collection_keys: if restored { operation.collection_keys.clone() } else { operation.expected_collection_keys.clone() },
-                    tags: if restored { operation.tags.clone() } else { operation.expected_tags.clone() },
+                    item_version: operation.item_version + u64::from(restored.get()),
+                    collection_keys: if restored.get() {
+                        operation.collection_keys.clone()
+                    } else {
+                        operation.expected_collection_keys.clone()
+                    },
+                    tags: if restored.get() {
+                        operation.tags.clone()
+                    } else {
+                        operation.expected_tags.clone()
+                    },
                 })
             },
             |request| {
-                writes += 1;
+                writes.set(writes.get() + 1);
                 Ok::<_, ()>(written(request))
             },
         )
     };
     assert_eq!(run().outcome, ClassificationRollbackOutcome::Restored);
-    restored = true;
-    assert_eq!(run().outcome, ClassificationRollbackOutcome::PreflightFailure);
-    assert_eq!(writes, 2);
+    restored.set(true);
+    assert_eq!(
+        run().outcome,
+        ClassificationRollbackOutcome::PreflightFailure
+    );
+    assert_eq!(writes.get(), 2);
 }
 
 #[test]
@@ -193,25 +224,50 @@ fn rollback_reconciles_failed_write_without_guessing() {
             &receipt.rollback_operations,
             |key| {
                 reads += 1;
-                let operation = receipt.rollback_operations.iter().find(|item| item.item_key == key).unwrap();
+                let operation = receipt
+                    .rollback_operations
+                    .iter()
+                    .find(|item| item.item_key == key)
+                    .unwrap();
                 let reconciliation = reads > receipt.rollback_operations.len();
                 Ok::<_, ()>(ClassificationItemState {
                     server_id: operation.server_id.clone(),
-                    library_version: if reconciliation { 45 } else { 44 },
+                    library_version: if reconciliation && current != "unchanged" {
+                        45
+                    } else {
+                        44
+                    },
                     item_key: key.into(),
-                    item_version: operation.item_version + u64::from(reconciliation),
-                    collection_keys: if reconciliation && current == "restored" { operation.collection_keys.clone() } else if reconciliation && current == "indeterminate" { vec!["other".into()] } else { operation.expected_collection_keys.clone() },
-                    tags: if reconciliation && current == "restored" { operation.tags.clone() } else { operation.expected_tags.clone() },
+                    item_version: operation.item_version
+                        + u64::from(reconciliation && current != "unchanged"),
+                    collection_keys: if reconciliation && current == "restored" {
+                        operation.collection_keys.clone()
+                    } else if reconciliation && current == "indeterminate" {
+                        vec!["other".into()]
+                    } else {
+                        operation.expected_collection_keys.clone()
+                    },
+                    tags: if reconciliation && current == "restored" {
+                        operation.tags.clone()
+                    } else {
+                        operation.expected_tags.clone()
+                    },
                 })
             },
             |_| Err::<ClassificationItemState, _>(()),
         );
-        assert_eq!(result.outcome, ClassificationRollbackOutcome::PartialFailure);
+        assert_eq!(
+            result.outcome,
+            ClassificationRollbackOutcome::PartialFailure
+        );
         assert_eq!(result.restored_item_keys, expected_outcome.0);
         assert_eq!(result.failed_item_key.as_deref(), Some("B"));
         assert_eq!(result.indeterminate_item_key.as_deref(), expected_outcome.1);
         assert_eq!(result.not_attempted_item_keys, ["A"]);
-        assert_eq!(result.remaining_operations.len(), if current == "restored" { 1 } else { 2 });
+        assert_eq!(
+            result.remaining_operations.len(),
+            if current == "restored" { 1 } else { 2 }
+        );
     }
 }
 
@@ -223,4 +279,123 @@ fn rollback_receipts_are_secret_free_serializable_evidence() {
     assert!(text.contains("server-1"));
     assert!(text.contains("expected_collection_keys"));
     assert!(!text.to_ascii_lowercase().contains("api_key"));
+}
+
+#[test]
+fn rollback_preflight_rejects_unreadable_mixed_or_mismatched_state() {
+    let receipt = applied_receipt();
+    let failed = execute_classification_rollback(
+        &receipt.rollback_operations,
+        |_| Err::<ClassificationItemState, _>(()),
+        |_| -> Result<ClassificationItemState, ()> { panic!("preflight must prevent writes") },
+    );
+    assert_eq!(
+        failed.outcome,
+        ClassificationRollbackOutcome::PreflightFailure
+    );
+
+    let mismatches: [fn(&mut ClassificationItemState); 6] = [
+        |state| state.server_id = "other-server".into(),
+        |state| state.item_key = "other-item".into(),
+        |state| state.item_version += 1,
+        |state| state.collection_keys = vec!["other".into()],
+        |state| state.tags = vec![tag("Other")],
+        |state| state.collection_keys.push(" ".into()),
+    ];
+    for mismatch in mismatches {
+        let failed = execute_classification_rollback(
+            &receipt.rollback_operations,
+            |key| {
+                let operation = receipt
+                    .rollback_operations
+                    .iter()
+                    .find(|item| item.item_key == key)
+                    .unwrap();
+                let mut state = ClassificationItemState {
+                    server_id: operation.server_id.clone(),
+                    library_version: 44,
+                    item_key: key.into(),
+                    item_version: operation.item_version,
+                    collection_keys: operation.expected_collection_keys.clone(),
+                    tags: operation.expected_tags.clone(),
+                };
+                if key == "B" {
+                    mismatch(&mut state);
+                }
+                Ok::<_, ()>(state)
+            },
+            |_| -> Result<ClassificationItemState, ()> { panic!("preflight must prevent writes") },
+        );
+        assert_eq!(
+            failed.outcome,
+            ClassificationRollbackOutcome::PreflightFailure
+        );
+    }
+
+    let mixed = execute_classification_rollback(
+        &receipt.rollback_operations,
+        |key| {
+            let operation = receipt
+                .rollback_operations
+                .iter()
+                .find(|item| item.item_key == key)
+                .unwrap();
+            Ok::<_, ()>(ClassificationItemState {
+                server_id: operation.server_id.clone(),
+                library_version: if key == "B" { 44 } else { 45 },
+                item_key: key.into(),
+                item_version: operation.item_version,
+                collection_keys: operation.expected_collection_keys.clone(),
+                tags: operation.expected_tags.clone(),
+            })
+        },
+        |_| -> Result<ClassificationItemState, ()> { panic!("preflight must prevent writes") },
+    );
+    assert_eq!(
+        mixed.outcome,
+        ClassificationRollbackOutcome::PreflightFailure
+    );
+}
+
+#[test]
+fn rollback_rejects_each_unverified_restoration_response() {
+    let receipt = applied_receipt();
+    let mismatches: [fn(&mut ClassificationItemState); 6] = [
+        |state| state.server_id = "other-server".into(),
+        |state| state.library_version = 44,
+        |state| state.item_key = "other-item".into(),
+        |state| state.item_version -= 1,
+        |state| state.collection_keys = vec!["other".into()],
+        |state| state.tags = vec![tag("Other")],
+    ];
+    for mismatch in mismatches {
+        let failed = execute_classification_rollback(
+            &receipt.rollback_operations,
+            |key| {
+                let operation = receipt
+                    .rollback_operations
+                    .iter()
+                    .find(|item| item.item_key == key)
+                    .unwrap();
+                Ok::<_, ()>(ClassificationItemState {
+                    server_id: operation.server_id.clone(),
+                    library_version: 44,
+                    item_key: key.into(),
+                    item_version: operation.item_version,
+                    collection_keys: operation.expected_collection_keys.clone(),
+                    tags: operation.expected_tags.clone(),
+                })
+            },
+            |request| {
+                let mut state = written(request);
+                mismatch(&mut state);
+                Ok::<_, ()>(state)
+            },
+        );
+        assert_eq!(
+            failed.outcome,
+            ClassificationRollbackOutcome::PartialFailure
+        );
+        assert_eq!(failed.indeterminate_item_key, None);
+    }
 }

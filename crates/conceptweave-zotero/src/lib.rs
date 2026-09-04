@@ -827,14 +827,49 @@ pub struct ClassificationWriteRequest {
 /// A conditional inverse write created only after a verified successful write.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ClassificationRollbackOperation {
+    /// Local API server identity that produced the state to undo.
+    pub server_id: String,
     /// Stable Zotero item key.
     pub item_key: String,
     /// Post-write item revision required by a rollback adapter.
     pub item_version: u64,
+    /// Complete post-write collection state that must still be current.
+    pub expected_collection_keys: Vec<String>,
+    /// Complete post-write typed-tag state that must still be current.
+    pub expected_tags: Vec<ItemTag>,
     /// Complete collection state to restore.
     pub collection_keys: Vec<String>,
     /// Complete typed-tag state to restore.
     pub tags: Vec<ItemTag>,
+}
+
+/// Observable result of one rollback execution attempt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClassificationRollbackOutcome {
+    /// Every inverse write was verified.
+    Restored,
+    /// No inverse write began because complete preflight could not be proven.
+    PreflightFailure,
+    /// An inverse write or its response failed after preflight.
+    PartialFailure,
+}
+
+/// Secret-free evidence for restored, failed, indeterminate, and pending inverse writes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ClassificationRollbackReceipt {
+    /// Overall rollback outcome.
+    pub outcome: ClassificationRollbackOutcome,
+    /// Items whose restored state was verified, in receipt order.
+    pub restored_item_keys: Vec<String>,
+    /// First item whose preflight, write, or response failed.
+    pub failed_item_key: Option<String>,
+    /// Item whose state could not be proven after an unverifiable response.
+    pub indeterminate_item_key: Option<String>,
+    /// Items whose inverse write was not attempted.
+    pub not_attempted_item_keys: Vec<String>,
+    /// Operations still required for a complete restoration.
+    pub remaining_operations: Vec<ClassificationRollbackOperation>,
 }
 
 /// Observable result of a write-plan execution attempt.
@@ -1583,8 +1618,11 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
             if let Some(state) = reconciled_state.filter(|_| reconciled_after) {
                 applied_item_keys.push(operation.item_key.clone());
                 rollback_operations.push(ClassificationRollbackOperation {
+                    server_id: server_id.to_owned(),
                     item_key: operation.item_key.clone(),
                     item_version: state.item_version,
+                    expected_collection_keys: operation.after_collection_keys.clone(),
+                    expected_tags: operation.after_tags.clone(),
                     collection_keys: operation.rollback_collection_keys.clone(),
                     tags: operation.rollback_tags.clone(),
                 });
@@ -1601,8 +1639,11 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
         current_library_version = state.library_version;
         applied_item_keys.push(operation.item_key.clone());
         rollback_operations.push(ClassificationRollbackOperation {
+            server_id: server_id.to_owned(),
             item_key: operation.item_key.clone(),
             item_version: state.item_version,
+            expected_collection_keys: operation.after_collection_keys.clone(),
+            expected_tags: operation.after_tags.clone(),
             collection_keys: operation.rollback_collection_keys.clone(),
             tags: operation.rollback_tags.clone(),
         });
@@ -1632,6 +1673,147 @@ pub fn execute_classification_write_plan_with_zotero10(
         |item_key| adapter.get_item(item_key),
         |request| adapter.write_item(request),
     )
+}
+
+/// Executes verified inverse operations in their existing safe receipt order.
+pub fn execute_classification_rollback<PreflightError, WriteError>(
+    operations: &[ClassificationRollbackOperation],
+    mut preflight: impl FnMut(&str) -> Result<ClassificationItemState, PreflightError>,
+    mut write_item: impl FnMut(
+        &ClassificationWriteRequest,
+    ) -> Result<ClassificationItemState, WriteError>,
+) -> ClassificationRollbackReceipt {
+    let mut preflight_states = Vec::with_capacity(operations.len());
+    let mut library_version = None;
+    for operation in operations {
+        let Ok(state) = preflight(&operation.item_key) else {
+            return rollback_preflight_failure(operations, &operation.item_key);
+        };
+        let same_library = library_version.is_none_or(|version| version == state.library_version);
+        if !same_library || !matches_rollback_current(&state, operation) {
+            return rollback_preflight_failure(operations, &operation.item_key);
+        }
+        library_version = Some(state.library_version);
+        preflight_states.push(state);
+    }
+
+    let mut current_library_version = library_version.unwrap_or_default();
+    let mut restored_item_keys = Vec::new();
+    for (index, (operation, state)) in operations.iter().zip(preflight_states).enumerate() {
+        let request = ClassificationWriteRequest {
+            server_id: operation.server_id.clone(),
+            library_version: current_library_version,
+            item_key: operation.item_key.clone(),
+            item_version: state.item_version,
+            collection_keys: operation.collection_keys.clone(),
+            tags: operation.tags.clone(),
+        };
+        let verified = write_item(&request)
+            .ok()
+            .filter(|state| matches_rollback_restored(state, current_library_version, operation));
+        if let Some(state) = verified {
+            current_library_version = state.library_version;
+            restored_item_keys.push(operation.item_key.clone());
+            continue;
+        }
+
+        let reconciled = preflight(&operation.item_key).ok();
+        let restored = reconciled.as_ref().is_some_and(|state| {
+            matches_rollback_restored(state, current_library_version, operation)
+        });
+        let unchanged = reconciled.as_ref().is_some_and(|state| {
+            matches_rollback_current_at(state, current_library_version, operation)
+        });
+        if restored {
+            restored_item_keys.push(operation.item_key.clone());
+        }
+        let remaining_start = index + usize::from(restored);
+        return ClassificationRollbackReceipt {
+            outcome: ClassificationRollbackOutcome::PartialFailure,
+            restored_item_keys,
+            failed_item_key: Some(operation.item_key.clone()),
+            indeterminate_item_key: (!restored && !unchanged).then(|| operation.item_key.clone()),
+            not_attempted_item_keys: operations[index + 1..]
+                .iter()
+                .map(|operation| operation.item_key.clone())
+                .collect(),
+            remaining_operations: operations[remaining_start..].to_vec(),
+        };
+    }
+    ClassificationRollbackReceipt {
+        outcome: ClassificationRollbackOutcome::Restored,
+        restored_item_keys,
+        failed_item_key: None,
+        indeterminate_item_key: None,
+        not_attempted_item_keys: Vec::new(),
+        remaining_operations: Vec::new(),
+    }
+}
+
+/// Executes rollback evidence through one server-bound Zotero 10 adapter.
+pub fn execute_classification_rollback_with_zotero10(
+    operations: &[ClassificationRollbackOperation],
+    adapter: &Zotero10LocalAdapter,
+) -> ClassificationRollbackReceipt {
+    execute_classification_rollback(
+        operations,
+        |item_key| adapter.get_item(item_key),
+        |request| adapter.write_item(request),
+    )
+}
+
+fn rollback_preflight_failure(
+    operations: &[ClassificationRollbackOperation],
+    failed_item_key: &str,
+) -> ClassificationRollbackReceipt {
+    ClassificationRollbackReceipt {
+        outcome: ClassificationRollbackOutcome::PreflightFailure,
+        restored_item_keys: Vec::new(),
+        failed_item_key: Some(failed_item_key.to_owned()),
+        indeterminate_item_key: None,
+        not_attempted_item_keys: operations
+            .iter()
+            .map(|item| item.item_key.clone())
+            .collect(),
+        remaining_operations: operations.to_vec(),
+    }
+}
+
+fn matches_rollback_current(
+    state: &ClassificationItemState,
+    operation: &ClassificationRollbackOperation,
+) -> bool {
+    matches_rollback_current_at(state, state.library_version, operation)
+}
+
+fn matches_rollback_current_at(
+    state: &ClassificationItemState,
+    library_version: u64,
+    operation: &ClassificationRollbackOperation,
+) -> bool {
+    normalized_metadata(&state.collection_keys, &state.tags).is_ok_and(|(collections, tags)| {
+        state.server_id == operation.server_id
+            && state.library_version == library_version
+            && state.item_key == operation.item_key
+            && state.item_version == operation.item_version
+            && collections == operation.expected_collection_keys
+            && tags == operation.expected_tags
+    })
+}
+
+fn matches_rollback_restored(
+    state: &ClassificationItemState,
+    library_version: u64,
+    operation: &ClassificationRollbackOperation,
+) -> bool {
+    normalized_metadata(&state.collection_keys, &state.tags).is_ok_and(|(collections, tags)| {
+        state.server_id == operation.server_id
+            && state.library_version > library_version
+            && state.item_key == operation.item_key
+            && state.item_version > operation.item_version
+            && collections == operation.collection_keys
+            && tags == operation.tags
+    })
 }
 
 fn matches_before_state(
@@ -2432,6 +2614,42 @@ mod tests {
         assert_eq!(receipt.outcome, ClassificationWriteOutcome::Applied);
         assert_eq!(receipt.applied_item_keys, ["ABCD2345"]);
         assert_eq!(receipt.rollback_operations[0].item_version, 43);
+        assert_eq!(server.join().unwrap().len(), 4);
+    }
+
+    #[test]
+    fn approved_zotero10_adapter_executes_the_rollback_boundary() {
+        let operation = ClassificationRollbackOperation {
+            server_id: "server-10".into(),
+            item_key: "ABCD2345".into(),
+            item_version: 43,
+            expected_collection_keys: vec!["CDEF4567".into()],
+            expected_tags: vec![ItemTag {
+                tag: "classified".into(),
+                tag_type: None,
+            }],
+            collection_keys: vec!["BCDE3456".into()],
+            tags: vec![ItemTag {
+                tag: "kept".into(),
+                tag_type: Some(1),
+            }],
+        };
+        let before = library_response("server-10", 44);
+        let item_body = r#"{"key":"ABCD2345","version":43,"data":{"itemType":"book","collections":["CDEF4567"],"tags":[{"tag":"classified"}]}}"#;
+        let item = raw_response(Some("server-10"), Some(43), item_body);
+        let after = library_response("server-10", 44);
+        let written = write_response("server-10", 45, 45);
+        let (base, server) = serve(vec![
+            Box::leak(before.into_boxed_str()),
+            Box::leak(item.into_boxed_str()),
+            Box::leak(after.into_boxed_str()),
+            Box::leak(written.into_boxed_str()),
+        ]);
+
+        let receipt = execute_classification_rollback_with_zotero10(&[operation], &transport(base));
+
+        assert_eq!(receipt.outcome, ClassificationRollbackOutcome::Restored);
+        assert_eq!(receipt.restored_item_keys, ["ABCD2345"]);
         assert_eq!(server.join().unwrap().len(), 4);
     }
 
