@@ -573,7 +573,13 @@ mod tests {
         let patch = "/tmp/patch.json";
         let output = "/tmp/updated-worksheet.json";
         assert_eq!(
-            parse_output_request(vec!["--apply-decision-patch", report, worksheet, patch, output]),
+            parse_output_request(vec![
+                "--apply-decision-patch",
+                report,
+                worksheet,
+                patch,
+                output
+            ]),
             Ok(OutputRequest::ApplyDecisionPatch {
                 report: report.to_owned(),
                 worksheet: worksheet.to_owned(),
@@ -588,16 +594,34 @@ mod tests {
             parse_output_request(vec!["--apply-decision-patch", report, worksheet, patch]).is_err()
         );
         assert!(
-            parse_output_request(vec!["--apply-decision-patch", report, worksheet, patch, report])
-                .is_err()
+            parse_output_request(vec![
+                "--apply-decision-patch",
+                report,
+                worksheet,
+                patch,
+                report
+            ])
+            .is_err()
         );
         assert!(
-            parse_output_request(vec!["--apply-decision-patch", report, worksheet, worksheet, output])
-                .is_err()
+            parse_output_request(vec![
+                "--apply-decision-patch",
+                report,
+                worksheet,
+                worksheet,
+                output
+            ])
+            .is_err()
         );
         assert!(
-            parse_output_request(vec!["--apply-decision-patch", report, report, patch, output])
-                .is_err()
+            parse_output_request(vec![
+                "--apply-decision-patch",
+                report,
+                report,
+                patch,
+                output
+            ])
+            .is_err()
         );
         assert!(
             parse_output_request(vec![

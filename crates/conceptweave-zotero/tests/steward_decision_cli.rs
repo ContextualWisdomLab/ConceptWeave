@@ -82,7 +82,10 @@ fn decision_patch_cli_writes_one_owner_only_updated_worksheet() {
         .status()
         .unwrap();
     assert!(replay_status.success());
-    assert_eq!(fs::read(&replay_path).unwrap(), fs::read(&output_path).unwrap());
+    assert_eq!(
+        fs::read(&replay_path).unwrap(),
+        fs::read(&output_path).unwrap()
+    );
 
     for path in [
         report_path,
