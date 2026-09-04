@@ -106,20 +106,25 @@ fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<(T, ArtifactI
     let parent = path
         .parent()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "review input has no parent"))?;
-    if !allowed_output_parents().contains(&parent.canonicalize()?) {
+    let resolved_parent = parent.canonicalize()?;
+    if !allowed_output_parents().contains(&resolved_parent) {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             "review input must be a direct child of the system temp directory",
         ));
     }
-    let path_metadata = fs::symlink_metadata(&path)?;
+    let file_name = path.file_name().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidInput, "review input has no file name")
+    })?;
+    let validated_path = resolved_parent.join(file_name);
+    let path_metadata = fs::symlink_metadata(&validated_path)?;
     if path_metadata.file_type().is_symlink() || !path_metadata.is_file() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "review input must be a regular file",
         ));
     }
-    let (file, opened_metadata) = open_with_metadata(&path)?;
+    let (file, opened_metadata) = open_with_metadata(&validated_path)?;
     #[cfg(not(unix))]
     {
         let _ = (path_metadata, opened_metadata, file);
