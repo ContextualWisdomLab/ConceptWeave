@@ -134,4 +134,18 @@ mod tests {
         fs::remove_file(link).unwrap();
         fs::remove_file(target).unwrap();
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn report_output_is_owner_readable_and_writable_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let output = unique_temp_path("private");
+        let _ = fs::remove_file(&output);
+        let file = create_report_file(&output).unwrap();
+        let mode = file.metadata().unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        drop(file);
+        fs::remove_file(output).unwrap();
+    }
 }
