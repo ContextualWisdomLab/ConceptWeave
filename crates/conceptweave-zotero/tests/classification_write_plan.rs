@@ -255,6 +255,71 @@ fn write_plan_fails_closed_for_untrusted_stale_or_unsafe_changes() {
         )
         .is_ok()
     );
+    let no_server = classify_snapshot(
+        "10.0.0".into(),
+        None,
+        42,
+        vec![ZoteroItem {
+            key: "A".into(),
+            version: 7,
+            data: ItemData {
+                item_type: "journalArticle".into(),
+                title: "ontology learning".into(),
+                abstract_note: String::new(),
+                doi: String::new(),
+                parent_item: String::new(),
+                collections: vec![],
+                tags: vec![],
+            },
+        }],
+    );
+    let mut no_server_review = ReviewedClassificationWriteSet {
+        review_id: "review".into(),
+        authority_receipt: "authority".into(),
+        server_id: None,
+        library_version: no_server.library_version,
+        rule_revision: no_server.rule_revision.into(),
+        snapshot_digest: no_server.snapshot_digest.clone(),
+        changes: vec![ReviewedClassificationChange {
+            item_key: "A".into(),
+            item_version: 7,
+            reviewed_disposition: Disposition::Generation,
+            before_collection_keys: vec![],
+            after_collection_keys: vec!["generation_collection".into()],
+            before_tags: vec![],
+            after_tags: vec![],
+        }],
+    };
+    assert_eq!(
+        build_classification_write_plan(&no_server, &no_server_review, WriteMode::Execute, |_| {
+            true
+        }),
+        Err(WritePlanError::MissingServerIdentity)
+    );
+    no_server_review.server_id = Some(" ".into());
+    let mut blank_server_report = no_server;
+    blank_server_report.server_id = Some(" ".into());
+    assert_eq!(
+        build_classification_write_plan(
+            &blank_server_report,
+            &no_server_review,
+            WriteMode::Execute,
+            |_| true
+        ),
+        Err(WritePlanError::MissingServerIdentity)
+    );
+
+    let mut duplicate_report = classification_report("10.0.0");
+    duplicate_report.classified_items[1].item_key = "A".into();
+    assert_eq!(
+        build_classification_write_plan(
+            &duplicate_report,
+            &reviewed(&duplicate_report),
+            WriteMode::DryRun,
+            |_| true
+        ),
+        Err(WritePlanError::InvalidReview)
+    );
     let malformed_version = classification_report("unknown");
     assert_eq!(
         build_classification_write_plan(
@@ -277,6 +342,7 @@ fn write_plan_fails_closed_for_untrusted_stale_or_unsafe_changes() {
         (WritePlanError::NoChange, "no metadata"),
         (WritePlanError::UnreviewedDisposition, "cannot be written"),
         (WritePlanError::UnsupportedExecute, "does not support"),
+        (WritePlanError::MissingServerIdentity, "server identity"),
     ] {
         assert!(error.to_string().contains(fragment));
     }

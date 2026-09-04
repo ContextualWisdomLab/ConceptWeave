@@ -369,6 +369,8 @@ pub enum WritePlanError {
     UnreviewedDisposition,
     /// Execute mode is unsupported by this Zotero major version.
     UnsupportedExecute,
+    /// Execute mode lacks a nonblank Local API server identity.
+    MissingServerIdentity,
 }
 
 impl fmt::Display for WritePlanError {
@@ -384,6 +386,7 @@ impl fmt::Display for WritePlanError {
             Self::NoChange => "classification write contains no metadata change",
             Self::UnreviewedDisposition => "steward-review abstention cannot be written",
             Self::UnsupportedExecute => "this Zotero version does not support local execution",
+            Self::MissingServerIdentity => "local execution requires a Zotero server identity",
         })
     }
 }
@@ -852,7 +855,25 @@ where
     {
         return Err(WritePlanError::UnsupportedExecute);
     }
+    if mode == WriteMode::Execute
+        && reviewed
+            .server_id
+            .as_deref()
+            .is_none_or(|server_id| server_id.trim().is_empty())
+    {
+        return Err(WritePlanError::MissingServerIdentity);
+    }
 
+    if report
+        .classified_items
+        .iter()
+        .map(|item| item.item_key.as_str())
+        .collect::<BTreeSet<_>>()
+        .len()
+        != report.classified_items.len()
+    {
+        return Err(WritePlanError::InvalidReview);
+    }
     let classified = report
         .classified_items
         .iter()
