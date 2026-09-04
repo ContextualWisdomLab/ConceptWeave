@@ -54,6 +54,7 @@ sequenceDiagram
     end
     Intake->>Intake: classify or abstain; link children; find duplicate candidates
     Intake->>Report: write proposals and evidence
+    Intake->>Report: derive snapshot-bound decision worksheet without bibliographic text
     Report->>Steward: review dispositions and merge candidates
     Steward->>Intake: verified labels for every bibliographic item
     Intake-->>Steward: aggregate completion evidence or incomplete-review failure
