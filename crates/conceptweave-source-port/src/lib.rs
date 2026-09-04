@@ -124,6 +124,8 @@ impl ObservationLimits {
 pub enum ObservationRequestError {
     /// The source-connection registry key was blank or not a bounded multiword snake_case key.
     InvalidSourceConnectionKey,
+    /// The syntactically valid key was absent from the caller's authorized source registry.
+    UnknownSourceConnectionKey,
     /// No source schema was explicitly authorized for observation.
     EmptySchemaAllowlist,
     /// One authorized source schema identifier was blank.
@@ -133,6 +135,26 @@ pub enum ObservationRequestError {
         /// Exact duplicated source schema identifier.
         schema_name: String,
     },
+}
+
+/// Read-only registry boundary used to authorize an opaque source connection key.
+pub trait SourceConnectionRegistry {
+    /// Returns whether the exact key names a source the caller may observe.
+    fn contains_source_connection(&self, source_connection_key: &str) -> bool;
+}
+
+/// Opaque proof that a source key was resolved by an authorized registry boundary.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResolvedSourceConnection {
+    source_connection_key: String,
+}
+
+impl ResolvedSourceConnection {
+    /// Returns the resolved opaque registry key, never connection material.
+    #[must_use]
+    pub fn source_connection_key(&self) -> &str {
+        &self.source_connection_key
+    }
 }
 
 /// One fail-closed request to observe explicitly authorized source schemas.
@@ -188,6 +210,19 @@ impl ObservationRequest {
     #[must_use]
     pub fn source_connection_key(&self) -> &str {
         &self.source_connection_key
+    }
+
+    /// Resolves this request's opaque key through the caller's authorized registry.
+    pub fn resolve_source_connection(
+        &self,
+        registry: &dyn SourceConnectionRegistry,
+    ) -> Result<ResolvedSourceConnection, ObservationRequestError> {
+        if !registry.contains_source_connection(&self.source_connection_key) {
+            return Err(ObservationRequestError::UnknownSourceConnectionKey);
+        }
+        Ok(ResolvedSourceConnection {
+            source_connection_key: self.source_connection_key.clone(),
+        })
     }
 
     /// Returns exact authorized schema identifiers in deterministic lexical order.
