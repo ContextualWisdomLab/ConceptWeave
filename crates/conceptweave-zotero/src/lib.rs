@@ -2350,12 +2350,8 @@ mod tests {
     }
 
     fn transport(base: String) -> Zotero10LocalAdapter {
-        Zotero10LocalAdapter::new_with_base(
-            "0123456789abcdef0123456789abcdef",
-            "server-10",
-            base,
-        )
-        .unwrap()
+        Zotero10LocalAdapter::new_with_base("0123456789abcdef0123456789abcdef", "server-10", base)
+            .unwrap()
     }
 
     fn authorization_error(
@@ -2657,8 +2653,7 @@ mod tests {
         assert_eq!(state.item_version, 43);
         let requests = server.join().unwrap();
         assert!(requests[0].starts_with("POST /api/users/0/items HTTP/1.1\r\n"));
-        assert!(requests[0]
-            .contains("zotero-api-key: 0123456789abcdef0123456789abcdef\r\n"));
+        assert!(requests[0].contains("zotero-api-key: 0123456789abcdef0123456789abcdef\r\n"));
         assert!(requests[0].contains("zotero-server-id: server-10\r\n"));
         assert!(requests[0].contains("if-unmodified-since-version: 42\r\n"));
         assert!(requests[0].contains("content-type: application/json\r\n"));
@@ -2759,11 +2754,8 @@ mod tests {
                 ZoteroTransportError::InvalidCredentials
             );
         }
-        let adapter = Zotero10LocalAdapter::new(
-            "0123456789abcdef0123456789abcdef",
-            "server-10",
-        )
-        .unwrap();
+        let adapter =
+            Zotero10LocalAdapter::new("0123456789abcdef0123456789abcdef", "server-10").unwrap();
         for key in ["ABCD234", "ABCD2340", "abcd2345", "ABCD2345/../X"] {
             assert_eq!(
                 adapter.get_item(key).unwrap_err(),
@@ -2956,13 +2948,9 @@ mod tests {
 
     #[test]
     fn zotero10_transport_never_formats_or_serializes_the_key() {
-        let adapter = Zotero10LocalAdapter::new(
-            "0123456789abcdef0123456789abcdef",
-            "server-10",
-        )
-        .unwrap();
-        assert!(!std::any::type_name_of_val(&adapter)
-            .contains("0123456789abcdef0123456789abcdef"));
+        let adapter =
+            Zotero10LocalAdapter::new("0123456789abcdef0123456789abcdef", "server-10").unwrap();
+        assert!(!std::any::type_name_of_val(&adapter).contains("0123456789abcdef0123456789abcdef"));
         assert_eq!(
             format!("{:?}", ZoteroTransportError::RequestFailed),
             "RequestFailed"
