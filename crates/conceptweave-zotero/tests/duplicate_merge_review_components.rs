@@ -40,6 +40,7 @@ fn transitive_duplicate_component_accepts_one_component_level_canonical_key() {
         library_version: report.library_version,
         rule_revision: report.rule_revision.into(),
         snapshot_digest: report.snapshot_digest.clone(),
+        snapshot_items: report.snapshot_items.clone(),
         decisions: report
             .duplicate_candidates
             .iter()
@@ -58,6 +59,8 @@ fn transitive_duplicate_component_accepts_one_component_level_canonical_key() {
     assert_eq!(manifest.operations.len(), 3);
     for operation in manifest.operations {
         assert_eq!(operation.retained_item_key, "A");
+        assert_eq!(operation.source_items.len(), 4);
+        assert!(operation.source_items.iter().any(|item| item.item_key == "A"));
         assert!(
             operation
                 .after_canonical_keys
@@ -87,6 +90,7 @@ fn duplicate_review_rejects_blank_snapshot_item_identity() {
         library_version: report.library_version,
         rule_revision: report.rule_revision.into(),
         snapshot_digest: report.snapshot_digest.clone(),
+        snapshot_items: report.snapshot_items.clone(),
         decisions: vec![DuplicateMergeDecision {
             identity_kind: candidate.identity_kind.into(),
             normalized_identity: candidate.normalized_identity.clone(),
@@ -105,5 +109,41 @@ fn duplicate_review_rejects_blank_snapshot_item_identity() {
         build_duplicate_merge_review_manifest(&report, &reviewed, |_| true),
         Err(DuplicateReviewError::InvalidReview),
         "every duplicate candidate must resolve to an immutable snapshot revision"
+    );
+}
+
+#[test]
+fn duplicate_review_binds_every_item_revision_to_the_reviewed_snapshot() {
+    let mut report = classify_snapshot(
+        "9.0.6".into(),
+        None,
+        42,
+        vec![
+            item("A", 1, "Same title", "10.1000/same"),
+            item("B", 2, "Same title", "10.1000/same"),
+        ],
+    );
+    let reviewed = ReviewedDuplicateMergeSet {
+        review_id: "review-revisions".into(),
+        authority_receipt: "authority-revisions".into(),
+        library_version: report.library_version,
+        rule_revision: report.rule_revision.into(),
+        snapshot_digest: report.snapshot_digest.clone(),
+        snapshot_items: report.snapshot_items.clone(),
+        decisions: report
+            .duplicate_candidates
+            .iter()
+            .map(|candidate| DuplicateMergeDecision {
+                identity_kind: candidate.identity_kind.into(),
+                normalized_identity: candidate.normalized_identity.clone(),
+                retained_item_key: "A".into(),
+            })
+            .collect(),
+    };
+    report.snapshot_items[0].item_version += 1;
+
+    assert_eq!(
+        build_duplicate_merge_review_manifest(&report, &reviewed, |_| true),
+        Err(DuplicateReviewError::SnapshotMismatch)
     );
 }

@@ -174,6 +174,8 @@ pub struct ReviewedDuplicateMergeSet {
     pub rule_revision: String,
     /// Exact raw-snapshot digest reviewed by the steward.
     pub snapshot_digest: String,
+    /// Exact item-key/item-version coordinates reviewed by the steward.
+    pub snapshot_items: Vec<SnapshotItemRevision>,
     /// Exactly one decision for every duplicate candidate.
     pub decisions: Vec<DuplicateMergeDecision>,
 }
