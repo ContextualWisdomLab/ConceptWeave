@@ -2779,6 +2779,41 @@ mod tests {
     }
 
     #[test]
+    fn zotero10_adapter_reconciles_an_indeterminate_rollback_without_writing() {
+        let operation = ClassificationRollbackOperation {
+            server_id: "server-10".into(),
+            item_key: "ABCD2345".into(),
+            item_version: 43,
+            expected_collection_keys: vec!["CDEF4567".into()],
+            expected_tags: vec![ItemTag {
+                tag: "classified".into(),
+                tag_type: None,
+            }],
+            collection_keys: vec!["BCDE3456".into()],
+            tags: vec![ItemTag {
+                tag: "kept".into(),
+                tag_type: Some(1),
+            }],
+        };
+        let item_body = r#"{"key":"ABCD2345","version":43,"data":{"itemType":"book","collections":["CDEF4567"],"tags":[{"tag":"classified"}]}}"#;
+        let responses = vec![
+            Box::leak(library_response("server-10", 99).into_boxed_str()),
+            Box::leak(
+                raw_response(Some("server-10"), Some(43), item_body).into_boxed_str(),
+            ),
+            Box::leak(library_response("server-10", 99).into_boxed_str()),
+        ];
+        let (base, server) = serve(responses);
+
+        let receipt =
+            reconcile_classification_rollback_with_zotero10(&operation, &transport(base));
+
+        assert_eq!(receipt.state, ClassificationRollbackState::Unchanged);
+        assert_eq!(receipt.retry_operation, Some(operation));
+        assert_eq!(server.join().unwrap().len(), 3);
+    }
+
+    #[test]
     fn zotero10_authorization_uses_exact_wire_contract_and_builds_adapter() {
         let body = r#"{"key":"0123456789abcdef0123456789abcdef","remember":true}"#;
         let response = authorize_response("200 OK", Some("server-10"), body);
