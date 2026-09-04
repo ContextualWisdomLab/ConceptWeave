@@ -111,8 +111,13 @@ where
     Ok(request)
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
-fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<T> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+struct ArtifactIdentity {
+    device: u64,
+    inode: u64,
+}
+
+fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<(T, ArtifactIdentity)> {
     let path = PathBuf::from(raw);
     if !path.is_absolute() {
         return Err(io::Error::new(
@@ -136,35 +141,66 @@ fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<T> {
             "review input must be a regular file",
         ));
     }
-    let file = File::open(&path)?;
-    let opened_metadata = file.metadata()?;
+    let (file, opened_metadata) = open_with_metadata(&path)?;
+    #[cfg(not(unix))]
+    {
+        let _ = (path_metadata, opened_metadata, file);
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "private review input requires a Unix platform",
+        ));
+    }
+    #[cfg(unix)]
+    let identity = validate_opened_identity(&path_metadata, &opened_metadata)?;
     #[cfg(unix)]
     {
-        use std::os::unix::fs::{MetadataExt, PermissionsExt};
-        if opened_metadata.dev() != path_metadata.dev()
-            || opened_metadata.ino() != path_metadata.ino()
-            || opened_metadata.nlink() != 1
-            || opened_metadata.permissions().mode() & 0o777 != 0o600
-        {
-            return Err(io::Error::new(
-                io::ErrorKind::PermissionDenied,
-                "review input identity or permissions are unsafe",
-            ));
-        }
+        let parsed = read_bounded_json(&mut { file }, opened_metadata.len())?;
+        Ok((parsed, identity))
     }
-    #[cfg(not(unix))]
-    return Err(io::Error::new(
-        io::ErrorKind::Unsupported,
-        "private review input requires a Unix platform",
-    ));
-    if opened_metadata.len() > MAX_ARTIFACT_BYTES {
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+fn open_with_metadata(path: &Path) -> io::Result<(File, fs::Metadata)> {
+    let file = File::open(path)?;
+    let metadata = file.metadata()?;
+    Ok((file, metadata))
+}
+
+#[cfg(unix)]
+fn validate_opened_identity(
+    path_metadata: &fs::Metadata,
+    opened_metadata: &fs::Metadata,
+) -> io::Result<ArtifactIdentity> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    if (opened_metadata.dev(), opened_metadata.ino()) != (path_metadata.dev(), path_metadata.ino())
+        || opened_metadata.nlink() != 1
+        || opened_metadata.permissions().mode() & 0o777 != 0o600
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "review input identity or permissions are unsafe",
+        ));
+    }
+    Ok(ArtifactIdentity {
+        device: opened_metadata.dev(),
+        inode: opened_metadata.ino(),
+    })
+}
+
+fn read_bounded_json<T: DeserializeOwned>(
+    reader: &mut dyn Read,
+    advertised_len: u64,
+) -> io::Result<T> {
+    if advertised_len > MAX_ARTIFACT_BYTES {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
             "review input exceeds the artifact size limit",
         ));
     }
-    let mut content = Vec::with_capacity(opened_metadata.len() as usize);
-    file.take(MAX_ARTIFACT_BYTES + 1)
+    let mut content = Vec::with_capacity(advertised_len as usize);
+    reader
+        .take(MAX_ARTIFACT_BYTES + 1)
         .read_to_end(&mut content)?;
     if content.len() as u64 > MAX_ARTIFACT_BYTES {
         return Err(io::Error::new(
@@ -174,6 +210,10 @@ fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<T> {
     }
     serde_json::from_slice(&content)
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+}
+
+fn label_input(name: &str, error: io::Error) -> io::Error {
+    io::Error::new(error.kind(), format!("{name}: {error}"))
 }
 
 fn write_private_output(path: &Path, content: &[u8]) -> io::Result<()> {
@@ -319,8 +359,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             output,
         } => {
             let output = validate_output_path(&output)?;
-            let report: ClassificationReport = read_private_json(&report)?;
-            let worksheet: StewardReviewWorksheet = read_private_json(&worksheet)?;
+            let (report, report_identity): (ClassificationReport, _) =
+                read_private_json(&report).map_err(|error| label_input("report", error))?;
+            let (worksheet, worksheet_identity): (StewardReviewWorksheet, _) =
+                read_private_json(&worksheet).map_err(|error| label_input("worksheet", error))?;
+            if report_identity == worksheet_identity {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "review progress inputs must be distinct files",
+                )
+                .into());
+            }
             let progress = assess_steward_review_progress(&report, &worksheet)?;
             write_private_output(&output, &serde_json::to_vec_pretty(&progress)?)?;
         }
@@ -331,9 +380,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             output,
         } => {
             let output = validate_output_path(&output)?;
-            let report: ClassificationReport = read_private_json(&report)?;
-            let worksheet: StewardReviewWorksheet = read_private_json(&worksheet)?;
-            let approval: GoldenSetApproval = read_private_json(&approval)?;
+            let (report, report_identity): (ClassificationReport, _) =
+                read_private_json(&report).map_err(|error| label_input("report", error))?;
+            let (worksheet, worksheet_identity): (StewardReviewWorksheet, _) =
+                read_private_json(&worksheet).map_err(|error| label_input("worksheet", error))?;
+            let (approval, approval_identity): (GoldenSetApproval, _) =
+                read_private_json(&approval).map_err(|error| label_input("approval", error))?;
+            if BTreeSet::from([report_identity, worksheet_identity, approval_identity]).len() != 3 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "finalization inputs must be distinct files",
+                )
+                .into());
+            }
             let golden = reviewed_golden_set_from_worksheet(&report, &worksheet, approval)?;
             write_private_output(&output, &serde_json::to_vec_pretty(&golden)?)?;
         }
@@ -442,10 +501,27 @@ mod tests {
         let _ = fs::remove_file(&valid);
         fs::write(&valid, br#"{"accepted":true}"#).unwrap();
         fs::set_permissions(&valid, fs::Permissions::from_mode(0o600)).unwrap();
-        let parsed: serde_json::Value = read_private_json(valid.to_str().unwrap()).unwrap();
+
+        fs::set_permissions(&valid, fs::Permissions::from_mode(0o000)).unwrap();
+        assert!(read_private_json::<serde_json::Value>(valid.to_str().unwrap()).is_err());
+        fs::set_permissions(&valid, fs::Permissions::from_mode(0o600)).unwrap();
+        let (parsed, _): (serde_json::Value, _) =
+            read_private_json(valid.to_str().unwrap()).unwrap();
         assert_eq!(parsed["accepted"], true);
         assert!(read_private_json::<serde_json::Value>("relative.json").is_err());
         assert!(read_private_json::<serde_json::Value>("/").is_err());
+        assert!(
+            read_private_json::<serde_json::Value>(
+                unique_temp_path("missing-input").to_str().unwrap()
+            )
+            .is_err()
+        );
+        assert!(
+            read_private_json::<serde_json::Value>(
+                "/tmp/conceptweave-zotero-missing-directory/input.json"
+            )
+            .is_err()
+        );
         assert!(
             read_private_json::<serde_json::Value>(
                 env::current_dir()
@@ -493,6 +569,55 @@ mod tests {
         fs::set_permissions(&oversized, fs::Permissions::from_mode(0o600)).unwrap();
         assert!(read_private_json::<serde_json::Value>(oversized.to_str().unwrap()).is_err());
         fs::remove_file(oversized).unwrap();
+
+        let identity_left = unique_temp_path("identity-left");
+        let identity_right = unique_temp_path("identity-right");
+        fs::write(&identity_left, b"{}").unwrap();
+        fs::write(&identity_right, b"{}").unwrap();
+        fs::set_permissions(&identity_left, fs::Permissions::from_mode(0o600)).unwrap();
+        fs::set_permissions(&identity_right, fs::Permissions::from_mode(0o600)).unwrap();
+        assert!(
+            validate_opened_identity(
+                &fs::metadata(&identity_left).unwrap(),
+                &fs::metadata(&identity_right).unwrap()
+            )
+            .is_err()
+        );
+        fs::remove_file(identity_left).unwrap();
+        fs::remove_file(identity_right).unwrap();
+    }
+
+    #[test]
+    fn bounded_json_reader_and_input_labels_cover_failures() {
+        struct FailingReader;
+        impl Read for FailingReader {
+            fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
+                Err(io::Error::other("injected read failure"))
+            }
+        }
+
+        let oversized =
+            read_bounded_json::<serde_json::Value>(&mut io::empty(), MAX_ARTIFACT_BYTES + 1)
+                .unwrap_err();
+        assert_eq!(oversized.kind(), io::ErrorKind::InvalidData);
+
+        let grown = read_bounded_json::<serde_json::Value>(
+            &mut io::repeat(b' ').take(MAX_ARTIFACT_BYTES + 1),
+            0,
+        )
+        .unwrap_err();
+        assert_eq!(grown.kind(), io::ErrorKind::InvalidData);
+
+        let read_failure =
+            read_bounded_json::<serde_json::Value>(&mut FailingReader, 0).unwrap_err();
+        assert_eq!(read_failure.kind(), io::ErrorKind::Other);
+
+        let labeled = label_input(
+            "worksheet",
+            io::Error::new(io::ErrorKind::PermissionDenied, "unsafe"),
+        );
+        assert_eq!(labeled.kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(labeled.to_string(), "worksheet: unsafe");
     }
 
     #[test]
