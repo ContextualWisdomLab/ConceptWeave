@@ -92,6 +92,17 @@ fn decision_patch_rejects_invalid_identity_and_truth() {
         Err(WorksheetError::InvalidReport)
     );
 
+    let mut abstaining_worksheet = worksheet.clone();
+    abstaining_worksheet.decisions[1].reviewed_disposition = Some(Disposition::NeedsStewardReview);
+    assert_eq!(
+        apply_steward_decision_patch(
+            &report,
+            &abstaining_worksheet,
+            &patch("A", 7, Disposition::AlignmentVersioning)
+        ),
+        Err(WorksheetError::InvalidReport)
+    );
+
     let mut invalid = patch("A", 7, Disposition::AlignmentVersioning);
     invalid.library_version += 1;
     assert_eq!(
