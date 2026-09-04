@@ -132,6 +132,13 @@ jobs:
             -s contracts/semantic-release-supersession.schema.json \
             -d contracts/fixtures/semantic-release-supersession.invalid-rationale.json \
             --invalid
+          python3 scripts/validate_semantic_release_supersession.py \
+            contracts/fixtures/semantic-release-supersession.valid.json
+          if python3 scripts/validate_semantic_release_supersession.py \
+            contracts/fixtures/semantic-release-supersession.invalid-self.json; then
+            echo "::error::self-supersession fixture unexpectedly passed semantic validation"
+            exit 1
+          fi
 
       - name: Lockfile freshness
         run: |
