@@ -29,7 +29,10 @@ fn checked_path_can_be_swapped_to_a_symlink_that_preserves_inode_identity() {
     symlink(&moved, &original).unwrap();
 
     let followed = fs::File::open(&original).unwrap().metadata().unwrap();
-    assert_eq!((checked.dev(), checked.ino()), (followed.dev(), followed.ino()));
+    assert_eq!(
+        (checked.dev(), checked.ino()),
+        (followed.dev(), followed.ino())
+    );
     assert_eq!(followed.nlink(), 1);
     assert_eq!(followed.permissions().mode() & 0o777, 0o600);
 
@@ -44,9 +47,7 @@ fn owner_only_input_open_must_not_follow_final_component_symlinks() {
         .find("fn open_with_metadata")
         .expect("private artifact open helper must remain present");
     let open_tail = &source[open_start..];
-    let open_end = open_tail
-        .find("\n#[cfg(unix)]")
-        .unwrap_or(open_tail.len());
+    let open_end = open_tail.find("\n#[cfg(unix)]").unwrap_or(open_tail.len());
     let open_body = &open_tail[..open_end];
 
     assert!(
