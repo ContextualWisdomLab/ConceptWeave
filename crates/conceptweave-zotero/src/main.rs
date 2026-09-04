@@ -3,7 +3,6 @@
 
 use conceptweave_zotero::{build_steward_review_worksheet, read_local_snapshot};
 use std::env;
-use std::error::Error;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -39,11 +38,22 @@ where
 
 fn write_private_output(
     path: &Path,
-    write: impl FnOnce(&mut BufWriter<File>) -> Result<(), Box<dyn Error>>,
-) -> Result<(), Box<dyn Error>> {
+    content: &[u8],
+) -> io::Result<()> {
+    write_private_output_with(path, content, |writer, bytes| {
+        writer.write_all(bytes)?;
+        writer.flush()
+    })
+}
+
+fn write_private_output_with(
+    path: &Path,
+    content: &[u8],
+    write: fn(&mut BufWriter<File>, &[u8]) -> io::Result<()>,
+) -> io::Result<()> {
     let file = create_report_file(path)?;
     let mut writer = BufWriter::new(file);
-    if let Err(error) = write(&mut writer).and_then(|()| writer.flush().map_err(Into::into)) {
+    if let Err(error) = write(&mut writer, content) {
         drop(writer);
         let _ = fs::remove_file(path);
         return Err(error);
@@ -150,22 +160,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     if let Some(report_output) = report_output {
         let worksheet = build_steward_review_worksheet(&report)?;
-        write_private_output(&report_output, |writer| {
-            serde_json::to_writer_pretty(writer, &report)?;
-            Ok(())
-        })?;
-        if let Err(error) = write_private_output(&output, |writer| {
-            serde_json::to_writer_pretty(writer, &worksheet)?;
-            Ok(())
-        }) {
+        let report_content = serde_json::to_vec_pretty(&report)?;
+        let worksheet_content = serde_json::to_vec_pretty(&worksheet)?;
+        write_private_output(&report_output, &report_content)?;
+        if let Err(error) = write_private_output(&output, &worksheet_content) {
             let _ = fs::remove_file(report_output);
             return Err(error);
         }
     } else {
-        write_private_output(&output, |writer| {
-            serde_json::to_writer_pretty(writer, &report)?;
-            Ok(())
-        })?;
+        write_private_output(&output, &serde_json::to_vec_pretty(&report)?)?;
     }
     Ok(())
 }
@@ -197,15 +200,16 @@ mod tests {
     fn failed_private_output_is_removed_for_retry() {
         let output = unique_temp_path("failed-output");
         let _ = fs::remove_file(&output);
-        let error = write_private_output(&output, |_| {
-            Err(io::Error::new(io::ErrorKind::WriteZero, "injected write failure").into())
+        let error = write_private_output_with(&output, b"content", |_, _| {
+            Err(io::Error::new(io::ErrorKind::WriteZero, "injected write failure"))
         })
         .unwrap_err();
-        assert_eq!(
-            error.downcast_ref::<io::Error>().unwrap().kind(),
-            io::ErrorKind::WriteZero
-        );
+        assert_eq!(error.kind(), io::ErrorKind::WriteZero);
         assert!(!output.exists());
+
+        write_private_output(&output, b"complete").unwrap();
+        assert_eq!(fs::read(&output).unwrap(), b"complete");
+        fs::remove_file(output).unwrap();
     }
 
     fn unique_temp_path(suffix: &str) -> PathBuf {
