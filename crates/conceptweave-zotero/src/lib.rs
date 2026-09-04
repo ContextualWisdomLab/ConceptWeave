@@ -67,7 +67,7 @@ pub struct ItemTag {
 }
 
 /// One mutually exclusive proposed disposition.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Disposition {
     /// Evidence about ontology or taxonomy generation.
@@ -170,6 +170,154 @@ pub struct ClassificationReport {
     pub classified_items: Vec<ClassifiedItem>,
     /// Reversible DOI/title duplicate candidates.
     pub duplicate_candidates: Vec<DuplicateCandidate>,
+}
+
+/// One steward-reviewed expected disposition in a local golden set.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct GoldenLabel {
+    /// Zotero item key used only to join the local report and local review set.
+    pub item_key: String,
+    /// Steward-approved disposition used as evaluation truth.
+    pub expected_disposition: Disposition,
+}
+
+impl GoldenLabel {
+    /// Creates a local golden label.
+    pub fn new(item_key: impl Into<String>, expected_disposition: Disposition) -> Self {
+        Self {
+            item_key: item_key.into(),
+            expected_disposition,
+        }
+    }
+}
+
+/// Version-bound steward labels that remain outside the repository.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct ReviewedGoldenSet {
+    /// Opaque review receipt identifier.
+    pub review_id: String,
+    /// Zotero library version reviewed by the steward.
+    pub library_version: u64,
+    /// Classifier rule revision whose proposals were reviewed.
+    pub rule_revision: String,
+    /// Item-level expected dispositions.
+    pub labels: Vec<GoldenLabel>,
+}
+
+/// Integer evidence from which precision and recall can be calculated exactly.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+pub struct DispositionEvaluation {
+    /// Correct predictions for this disposition.
+    pub true_positive: usize,
+    /// All classifier predictions for reviewed items in this disposition.
+    pub predicted: usize,
+    /// All steward labels expecting this disposition.
+    pub expected: usize,
+}
+
+/// Aggregate-only evaluation result; item keys and bibliographic text are omitted.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct GoldenSetEvaluation {
+    /// Opaque review receipt identifier.
+    pub review_id: String,
+    /// Number of steward-reviewed items.
+    pub reviewed_count: usize,
+    /// Number of exact disposition matches.
+    pub correct_count: usize,
+    /// Number of reviewed items on which the classifier abstained.
+    pub abstention_count: usize,
+    /// Precision/recall numerators and denominators per observed disposition.
+    pub by_disposition: BTreeMap<Disposition, DispositionEvaluation>,
+}
+
+/// A fail-closed golden-set contract violation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EvaluationError {
+    /// Review receipt, labels, or revisions are missing or incompatible.
+    InvalidReview,
+    /// The golden set was reviewed against another library or rule revision.
+    SnapshotMismatch,
+    /// A reviewed key is absent from the classification report.
+    UnknownItem,
+    /// A reviewed key occurs more than once.
+    DuplicateItem,
+}
+
+impl fmt::Display for EvaluationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::InvalidReview => "golden-set review metadata or labels are invalid",
+            Self::SnapshotMismatch => "golden set does not match the report snapshot",
+            Self::UnknownItem => "golden set contains an item absent from the report",
+            Self::DuplicateItem => "golden set contains a duplicate item",
+        })
+    }
+}
+
+impl std::error::Error for EvaluationError {}
+
+/// Evaluates reviewed labels without copying item identities into the result.
+pub fn evaluate_reviewed_golden_set(
+    report: &ClassificationReport,
+    golden: &ReviewedGoldenSet,
+) -> Result<GoldenSetEvaluation, EvaluationError> {
+    if golden.review_id.trim().is_empty()
+        || golden.labels.is_empty()
+        || golden.rule_revision.trim().is_empty()
+    {
+        return Err(EvaluationError::InvalidReview);
+    }
+    if golden.library_version != report.library_version
+        || golden.rule_revision != report.rule_revision
+    {
+        return Err(EvaluationError::SnapshotMismatch);
+    }
+
+    let classified = report
+        .classified_items
+        .iter()
+        .map(|item| (item.item_key.as_str(), item.proposed_disposition))
+        .collect::<BTreeMap<_, _>>();
+    if classified.len() != report.classified_items.len() {
+        return Err(EvaluationError::InvalidReview);
+    }
+    let mut seen = BTreeSet::new();
+    let mut correct_count = 0;
+    let mut abstention_count = 0;
+    let mut by_disposition = BTreeMap::<Disposition, DispositionEvaluation>::new();
+
+    for label in &golden.labels {
+        if label.item_key.trim().is_empty() {
+            return Err(EvaluationError::InvalidReview);
+        }
+        if !seen.insert(label.item_key.as_str()) {
+            return Err(EvaluationError::DuplicateItem);
+        }
+        let predicted = classified
+            .get(label.item_key.as_str())
+            .copied()
+            .ok_or(EvaluationError::UnknownItem)?;
+        by_disposition.entry(predicted).or_default().predicted += 1;
+        by_disposition
+            .entry(label.expected_disposition)
+            .or_default()
+            .expected += 1;
+        if predicted == label.expected_disposition {
+            correct_count += 1;
+            by_disposition.entry(predicted).or_default().true_positive += 1;
+        }
+        if predicted == Disposition::NeedsStewardReview {
+            abstention_count += 1;
+        }
+    }
+
+    Ok(GoldenSetEvaluation {
+        review_id: golden.review_id.clone(),
+        reviewed_count: golden.labels.len(),
+        correct_count,
+        abstention_count,
+        by_disposition,
+    })
 }
 
 /// Failure raised when a bounded, immutable Local API read cannot be proven.

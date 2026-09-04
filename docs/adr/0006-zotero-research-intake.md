@@ -19,6 +19,8 @@ The adapter links child records, emits exactly one deterministic proposed dispos
 
 Matched metadata values are copied into the local-only evidence receipt for replay. This is necessary for abstract-only matches because a later Zotero revision cannot reconstruct the exact text used for an earlier proposal from item key/version alone. DOI/title matches remain reversible duplicate candidates, including legacy `dx.doi.org` resolver forms.
 
+Classifier quality is measured only against local steward-reviewed labels bound to the same library and rule revisions. Evaluation returns aggregate integer evidence for precision, recall, exact matches, and abstentions; Zotero keys and bibliographic text are deliberately omitted from evaluation output. Missing, stale, unknown, or duplicate review identities fail closed.
+
 The reader fails closed above 50,000 items or 256 MiB of cumulative response bodies, while retaining the 8 MiB per-page bound, finite request timeouts, redirect denial, total-count checks, snapshot-version checks, and duplicate-key detection. Pagination, consistency, resource-budget, and provider-contract behavior are separated from the narrow `ureq` transport so deterministic tests exercise the production reader core rather than excluding the entire reader from coverage.
 
 Report output is restricted to a new direct child of the operating system temporary directory. Relative paths, nested paths, existing files, and symlinks are rejected before write; the file is opened with create-new semantics so a path swap cannot cause repository or arbitrary-file overwrite. The buffered writer is explicitly flushed and a final filesystem error fails the command. Reports stay local and are never committed.

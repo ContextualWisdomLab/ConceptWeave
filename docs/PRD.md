@@ -58,6 +58,8 @@ All LLM-backed induction uses `contextual-orchestrator`. Model output is untrust
 
 Read one immutable Zotero Local API library-version snapshot and propose exactly one research disposition for every top-level bibliographic item. Each proposal retains the item key/version, exact matched metadata values, rule revision, linked child records, and any model receipt. Weak evidence and evidence that matches multiple specific disposition families must abstain into steward review. Duplicate DOI/title identities are review candidates only: intake never merges, deletes, or silently mutates Zotero records.
 
+Evaluate classifier quality only against a version-bound, steward-reviewed local golden set. Evaluation emits aggregate counts for exact matches, abstentions, and per-disposition true-positive/predicted/expected totals; it must not copy Zotero keys or bibliographic text into the result.
+
 ## 6. First vertical slice
 
 Relational schema snapshot -> observed tables/columns/foreign keys -> concept/relation/dimension/measure/mapping candidates -> evidence-bound validation report -> reviewable proposal package.
