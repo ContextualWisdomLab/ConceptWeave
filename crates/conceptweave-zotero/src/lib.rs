@@ -2164,6 +2164,16 @@ mod tests {
         )
     }
 
+    fn authorize_response(status: &str, server_id: Option<&str>, body: &str) -> String {
+        let server = server_id
+            .map(|value| format!("Zotero-Server-ID: {value}\r\n"))
+            .unwrap_or_default();
+        format!(
+            "HTTP/1.1 {status}\r\n{server}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        )
+    }
+
     fn write_request() -> ClassificationWriteRequest {
         ClassificationWriteRequest {
             server_id: "server-10".into(),
@@ -2180,6 +2190,140 @@ mod tests {
 
     fn transport(base: String) -> Zotero10LocalAdapter {
         Zotero10LocalAdapter::new_with_base("top-secret-key", "server-10", base).unwrap()
+    }
+
+    #[test]
+    fn zotero10_authorization_uses_exact_wire_contract_and_builds_adapter() {
+        let body = r#"{"key":"0123456789abcdef0123456789abcdef","remember":true}"#;
+        let response = authorize_response("200 OK", Some("server-10"), body);
+        let (items_base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+        let authorize_base = items_base.replace("/api/users/0/items", "");
+
+        let authorization = Zotero10LocalAuthorization::request_with_base(
+            "ConceptWeave",
+            "server-10",
+            authorize_base,
+        )
+        .unwrap();
+        assert!(authorization.remembered());
+        let _adapter = authorization.into_adapter().unwrap();
+
+        let request = &server.join().unwrap()[0];
+        assert!(request.starts_with("POST /api/local/authorize HTTP/1.1\r\n"));
+        assert!(request.contains("content-type: application/json\r\n"));
+        assert!(request.contains("zotero-server-id: server-10\r\n"));
+        assert!(request.ends_with(r#"{"appName":"ConceptWeave"}"#));
+        assert!(!request.contains("0123456789abcdef0123456789abcdef"));
+    }
+
+    #[test]
+    fn zotero10_authorization_rejects_invalid_input_and_unproven_success() {
+        for app_name in ["", " ", &"x".repeat(MAX_AUTH_APP_NAME_BYTES + 1)] {
+            assert_eq!(
+                Zotero10LocalAuthorization::request(app_name, "server-10").unwrap_err(),
+                ZoteroTransportError::InvalidCredentials
+            );
+        }
+
+        for response in [
+            authorize_response(
+                "200 OK",
+                None,
+                r#"{"key":"0123456789abcdef0123456789abcdef","remember":false}"#,
+            ),
+            authorize_response(
+                "200 OK",
+                Some("other-server"),
+                r#"{"key":"0123456789abcdef0123456789abcdef","remember":false}"#,
+            ),
+            authorize_response(
+                "200 OK",
+                Some("server-10"),
+                r#"{"key":"too-short","remember":false}"#,
+            ),
+            authorize_response("200 OK", Some("server-10"), "{"),
+            authorize_response(
+                "200 OK",
+                Some("server-10"),
+                &format!(r#"{{"key":"{}","remember":false}}"#, "x".repeat(1024)),
+            ),
+        ] {
+            let (items_base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+            let error = Zotero10LocalAuthorization::request_with_base(
+                "ConceptWeave",
+                "server-10",
+                items_base.replace("/api/users/0/items", ""),
+            )
+            .unwrap_err();
+            assert!(matches!(
+                error,
+                ZoteroTransportError::InvalidResponse | ZoteroTransportError::ServerMismatch
+            ));
+            server.join().unwrap();
+        }
+    }
+
+    #[test]
+    fn zotero10_authorization_denial_and_rate_limit_are_single_attempt_errors() {
+        for (response, expected) in [
+            (
+                "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    .to_owned(),
+                ZoteroTransportError::Denied,
+            ),
+            (
+                "HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    .to_owned(),
+                ZoteroTransportError::Unauthorized,
+            ),
+            (
+                "HTTP/1.1 429 Too Many Requests\r\nRetry-After: 17\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    .to_owned(),
+                ZoteroTransportError::RateLimited {
+                    retry_after_seconds: Some(17),
+                },
+            ),
+            (
+                "HTTP/1.1 429 Too Many Requests\r\nRetry-After: 999999999999\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    .to_owned(),
+                ZoteroTransportError::RateLimited {
+                    retry_after_seconds: None,
+                },
+            ),
+        ] {
+            let (items_base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+            assert_eq!(
+                Zotero10LocalAuthorization::request_with_base(
+                    "ConceptWeave",
+                    "server-10",
+                    items_base.replace("/api/users/0/items", ""),
+                )
+                .unwrap_err(),
+                expected
+            );
+            assert_eq!(server.join().unwrap().len(), 1);
+        }
+    }
+
+    #[test]
+    fn zotero10_write_names_reauthorization_and_stale_precondition() {
+        for (status, expected) in [
+            (
+                "401 Unauthorized",
+                ZoteroTransportError::ReauthorizationRequired,
+            ),
+            (
+                "412 Precondition Failed",
+                ZoteroTransportError::StalePrecondition,
+            ),
+        ] {
+            let response = format!(
+                "HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            );
+            let (base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+            assert_eq!(transport(base).write_item(&write_request()).unwrap_err(), expected);
+            assert_eq!(server.join().unwrap().len(), 1);
+        }
     }
 
     fn assert_write_invalid(response: String) {
