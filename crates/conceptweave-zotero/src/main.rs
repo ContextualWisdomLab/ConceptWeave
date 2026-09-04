@@ -130,20 +130,25 @@ fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<(T, ArtifactI
     let parent = path
         .parent()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "review input has no parent"))?;
-    if !allowed_output_parents().contains(&parent.canonicalize()?) {
+    let resolved_parent = parent.canonicalize()?;
+    if !allowed_output_parents().contains(&resolved_parent) {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             "review input must be a direct child of the system temp directory",
         ));
     }
-    let path_metadata = fs::symlink_metadata(&path)?;
+    let file_name = path.file_name().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidInput, "review input has no file name")
+    })?;
+    let validated_path = resolved_parent.join(file_name);
+    let path_metadata = fs::symlink_metadata(&validated_path)?;
     if path_metadata.file_type().is_symlink() || !path_metadata.is_file() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "review input must be a regular file",
         ));
     }
-    let (file, opened_metadata) = open_with_metadata(&path)?;
+    let (file, opened_metadata) = open_with_metadata(&validated_path)?;
     #[cfg(not(unix))]
     {
         let _ = (path_metadata, opened_metadata, file);
@@ -232,7 +237,6 @@ fn write_private_output(path: &Path, content: &[u8]) -> io::Result<()> {
     write_private_output_with(path, content, write_all_and_flush)
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
 /// Writes and flushes the complete serialized artifact.
 fn write_all_and_flush(writer: &mut BufWriter<File>, content: &[u8]) -> io::Result<()> {
     writer.write_all(content)?;
@@ -255,7 +259,6 @@ fn write_private_output_with(
     Ok(())
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
 /// Returns canonical directories in which a sensitive report may be created.
 fn allowed_output_parents() -> Vec<PathBuf> {
     let mut parents = vec![
@@ -524,6 +527,7 @@ mod tests {
         assert_eq!(parsed["accepted"], true);
         assert!(read_private_json::<serde_json::Value>("relative.json").is_err());
         assert!(read_private_json::<serde_json::Value>("/").is_err());
+        assert!(read_private_json::<serde_json::Value>("/tmp/..").is_err());
         assert!(
             read_private_json::<serde_json::Value>(
                 unique_temp_path("missing-input").to_str().unwrap()
@@ -652,6 +656,12 @@ mod tests {
         assert_eq!(fs::read(&output).unwrap(), b"complete");
         assert!(write_private_output(&output, b"replacement").is_err());
         fs::remove_file(output).unwrap();
+
+        let read_only = unique_temp_path("read-only-writer");
+        fs::write(&read_only, b"input").unwrap();
+        let mut writer = BufWriter::with_capacity(1, File::open(&read_only).unwrap());
+        assert!(write_all_and_flush(&mut writer, b"content").is_err());
+        fs::remove_file(read_only).unwrap();
     }
 
     fn unique_temp_path(suffix: &str) -> PathBuf {
