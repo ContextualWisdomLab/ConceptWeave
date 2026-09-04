@@ -1143,6 +1143,11 @@ pub fn build_steward_review_worksheet(
                 .insert(item.item_key.as_str());
         }
     }
+    if snapshot_coordinates.values().any(|(_, parent_key)| {
+        parent_key.is_some_and(|parent_key| !snapshot_coordinates.contains_key(parent_key))
+    }) {
+        return Err(WorksheetError::InvalidReport);
+    }
 
     let mut decision_keys = BTreeSet::new();
     let mut decisions = Vec::with_capacity(report.classified_items.len());
@@ -1168,9 +1173,6 @@ pub fn build_steward_review_worksheet(
             abstention_reason: item.abstention_reason,
             reviewed_disposition: None,
         });
-    }
-    if !expected_child_keys.is_empty() {
-        return Err(WorksheetError::InvalidReport);
     }
     decisions.sort_by(|left, right| left.item_key.cmp(&right.item_key));
 
