@@ -1,6 +1,6 @@
 # Product / Technical Gap Baseline
 
-**Snapshot:** 2026-09-03
+**Snapshot:** 2026-09-04
 
 ## Shipped on protected `main`
 
@@ -37,7 +37,9 @@ PR #5 is intentionally stacked on PR #1 because the client reuses only the found
 
 ## Parallel Source Observation slice — PR #6 / Issue #2
 
-PR #6 is a sibling stacked on PR #1 and is not copied into PR #5. Fresh live evidence on 2026-09-03 identifies exact head `2817df62d0b7b41c0b0dd1bcbd34a444b8a5a092`. Its Product run `33696875090`, rust-quality job `100467545647`, remains queued before checkout on explicit `ubuntu-24.04`; queued evidence is non-passing. The branch retains immutable PostgreSQL snapshot/source receipts, PK/unique/FK/CHECK evidence, FK reference behavior, PostgreSQL 18 FK validation/enforcement state, and the provider-independent `conceptweave-source-port` with explicit statement-timeout/row/byte/concurrency bounds, exact non-empty schema allowlists, caller cancellation, and typed source-disappearance/resource-limit outcomes. The current test-only lane tightens `observed_at_utc`; production validation must wait until that exact test head executes and demonstrates the intended RED. A concrete Rust read-only PostgreSQL adapter remains open.
+PR #6 is a sibling stacked on PR #1 and is not copied into PR #5. Fresh live evidence on 2026-09-04 identifies test-only exact head `c9af2255fb721b8e05e608e6b2525017b1f59151`. Its Product run `33760465773`, rust-quality job `100665220457`, remains queued before runner assignment on explicit `ubuntu-24.04` with `runner_id=0` and `steps=[]`; queued evidence is non-passing. The branch retains immutable PostgreSQL snapshot/source receipts, PK/unique/FK/CHECK evidence, FK reference behavior, PostgreSQL 18 FK validation/enforcement state, and the provider-independent `conceptweave-source-port` with explicit statement-timeout/row/byte/concurrency bounds, exact non-empty schema allowlists, caller cancellation, typed source-disappearance/resource-limit outcomes, and opaque bounded source registry keys.
+
+The prior UTC-provenance RED executed on predecessor `2817df62d0b7b41c0b0dd1bcbd34a444b8a5a092`: Product `33696875090`, job `100467545647`, passed exact checkout/CI/Rust/fmt/Clippy and failed because malformed `observed_at_utc="time"` was accepted. Production `e27ffaf4a40d746781b8012e9fe71467e7e6511f` repaired that boundary with deterministic explicit-UTC validation. The current test-only lane instead covers a separate invariant: public `PostgresSchemaSnapshot::new` must enforce the same opaque ≤128-byte lowercase multiword `snake_case` registry-key boundary as `ObservationRequest`, so DSN/credential-shaped or malformed identities cannot be copied into immutable `source_id` provenance. Production remains intentionally unchanged until exact head `c9af2255...` executes the intended RED. A concrete Rust read-only PostgreSQL adapter remains open after that RED -> minimal fix -> exact-head GREEN sequence.
 
 ## Central control-plane evidence
 
@@ -48,7 +50,7 @@ PR #6 is a sibling stacked on PR #1 and is not copied into PR #5. Fresh live evi
 
 ## Remaining P0 product gaps
 
-1. **Source Observation adapter** — implement the new bounded source port with a real Rust read-only PostgreSQL adapter, immutable receipts, domains/enums/indexes/comments, hostile-input/resource bounds, cancellation/source-disappearance behavior, and a frozen anonymized GRC fixture.
+1. **Source Observation adapter** — after the current registry-identity RED -> minimal production repair -> exact-head GREEN, implement a concrete Rust read-only PostgreSQL adapter behind the existing bounded source port with immutable receipts, domains/enums/indexes/comments, hostile-input/resource bounds, cancellation/source-disappearance behavior, and a frozen anonymized GRC fixture.
 2. **Observation-to-candidate provenance** — exact source receipt plus discovery method/proposal receipt for every generated candidate.
 3. **Ontology induction** — deterministic observations plus `contextual-orchestrator` structured candidate generation for concepts, taxonomy and non-taxonomic relations.
 4. **Semantic-layer induction** — dimensions, measures, grain, units, relationships and physical mappings with deterministic calculation contracts.
