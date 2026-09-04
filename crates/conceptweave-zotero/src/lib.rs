@@ -1142,15 +1142,12 @@ pub fn build_steward_review_worksheet(
     for item in &report.classified_items {
         if !decision_keys.insert(item.item_key.as_str())
             || snapshot_coordinates.get(item.item_key.as_str()) != Some(&(item.item_version, None))
-            || item
-                .child_item_keys
-                .iter()
-                .any(|child_key| {
-                    !matches!(
-                        snapshot_coordinates.get(child_key.as_str()),
-                        Some((_, Some(parent_key))) if *parent_key == item.item_key
-                    )
-                })
+            || item.child_item_keys.iter().any(|child_key| {
+                !matches!(
+                    snapshot_coordinates.get(child_key.as_str()),
+                    Some((_, Some(parent_key))) if *parent_key == item.item_key
+                )
+            })
             || (item.proposed_disposition == Disposition::NeedsStewardReview)
                 != item.abstention_reason.is_some()
         {

@@ -99,8 +99,7 @@ fn restored_report_rejects_classified_or_reused_child_provenance() {
     );
     let serialized = serde_json::to_vec(&report).unwrap();
 
-    let mut classified_child: ClassificationReport =
-        serde_json::from_slice(&serialized).unwrap();
+    let mut classified_child: ClassificationReport = serde_json::from_slice(&serialized).unwrap();
     classified_child.classified_items[0].child_item_keys = vec!["PARENT_A".into()];
     assert_eq!(
         build_steward_review_worksheet(&classified_child),
