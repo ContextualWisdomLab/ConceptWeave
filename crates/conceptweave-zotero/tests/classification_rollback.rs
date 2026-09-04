@@ -266,7 +266,7 @@ fn rollback_reconciles_failed_write_without_guessing() {
         assert_eq!(result.not_attempted_item_keys, ["A"]);
         assert_eq!(
             result.remaining_operations.len(),
-            if current == "restored" { 1 } else { 2 }
+            if current == "unchanged" { 2 } else { 1 }
         );
     }
 }
@@ -353,6 +353,22 @@ fn rollback_preflight_rejects_unreadable_mixed_or_mismatched_state() {
     );
     assert_eq!(
         mixed.outcome,
+        ClassificationRollbackOutcome::PreflightFailure
+    );
+
+    let mut cross_server = receipt.rollback_operations.clone();
+    cross_server[1].server_id = "other-server".into();
+    let failed = execute_classification_rollback(
+        &cross_server,
+        |_| -> Result<ClassificationItemState, ()> {
+            panic!("mixed-server receipt must be rejected before reads")
+        },
+        |_| -> Result<ClassificationItemState, ()> {
+            panic!("mixed-server receipt must be rejected before writes")
+        },
+    );
+    assert_eq!(
+        failed.outcome,
         ClassificationRollbackOutcome::PreflightFailure
     );
 }
