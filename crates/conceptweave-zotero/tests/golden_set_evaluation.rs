@@ -26,6 +26,14 @@ fn complete_review_requires_one_steward_label_per_bibliographic_item() {
     assert_eq!(
         evaluate_complete_reviewed_classification(
             &report,
+            &golden(vec![]),
+            verify_synthetic_approval,
+        ),
+        Err(EvaluationError::InvalidReview)
+    );
+    assert_eq!(
+        evaluate_complete_reviewed_classification(
+            &report,
             &golden(vec![
                 GoldenLabel::new("A", Disposition::Generation),
                 GoldenLabel::new("B", Disposition::EvaluationGovernance),
