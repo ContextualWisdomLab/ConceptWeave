@@ -1,6 +1,8 @@
 use conceptweave_zotero::{
-    Disposition, ItemData, ItemTag, ReviewedClassificationChange, ReviewedClassificationWriteSet,
-    WriteMode, WritePlanError, ZoteroItem, build_classification_write_plan, classify_snapshot,
+    ClassificationItemState, ClassificationWriteOutcome, Disposition, ItemData, ItemTag,
+    ReviewedClassificationChange, ReviewedClassificationWriteSet, WriteMode, WritePlanError,
+    ZoteroItem, build_classification_write_plan, classify_snapshot,
+    execute_classification_write_plan,
 };
 
 fn tag(name: &str, tag_type: Option<u64>) -> ItemTag {
@@ -8,6 +10,86 @@ fn tag(name: &str, tag_type: Option<u64>) -> ItemTag {
         tag: name.into(),
         tag_type,
     }
+}
+
+#[test]
+fn execution_preflights_every_item_and_returns_reversible_partial_failure() {
+    let report = classification_report("10.0.0");
+    let plan = build_classification_write_plan(
+        &report,
+        &reviewed(&report),
+        WriteMode::Execute,
+        |_| true,
+    )
+    .unwrap();
+    let mut preflighted = Vec::new();
+    let mut written = Vec::new();
+    let receipt = execute_classification_write_plan(
+        &plan,
+        |item_key| {
+            preflighted.push(item_key.to_owned());
+            let operation = plan
+                .operations
+                .iter()
+                .find(|operation| operation.item_key == item_key)
+                .unwrap();
+            Ok::<_, ()>(ClassificationItemState {
+                server_id: "server-1".into(),
+                library_version: 42,
+                item_key: item_key.into(),
+                item_version: operation.item_version,
+                collection_keys: operation.before_collection_keys.clone(),
+                tags: operation.before_tags.clone(),
+            })
+        },
+        |request| {
+            written.push(request.item_key.clone());
+            if request.item_key == "B" {
+                return Err(());
+            }
+            Ok(ClassificationItemState {
+                server_id: request.server_id.clone(),
+                library_version: request.library_version + 1,
+                item_key: request.item_key.clone(),
+                item_version: request.item_version + 1,
+                collection_keys: request.collection_keys.clone(),
+                tags: request.tags.clone(),
+            })
+        },
+    );
+
+    assert_eq!(preflighted, ["A", "B"]);
+    assert_eq!(written, ["A", "B"]);
+    assert_eq!(receipt.outcome, ClassificationWriteOutcome::PartialFailure);
+    assert_eq!(receipt.failed_item_key.as_deref(), Some("B"));
+    assert!(receipt.not_attempted_item_keys.is_empty());
+    assert_eq!(receipt.applied_item_keys, ["A"]);
+    assert_eq!(receipt.rollback_operations.len(), 1);
+    assert_eq!(receipt.rollback_operations[0].item_key, "A");
+    assert_eq!(receipt.rollback_operations[0].item_version, 8);
+    assert_eq!(receipt.rollback_operations[0].collection_keys, Vec::<String>::new());
+    assert!(receipt.rollback_operations[0].tags.is_empty());
+}
+
+#[test]
+fn dry_run_execution_never_calls_the_write_boundary() {
+    let report = classification_report("10.0.0");
+    let plan = build_classification_write_plan(
+        &report,
+        &reviewed(&report),
+        WriteMode::DryRun,
+        |_| true,
+    )
+    .unwrap();
+    let receipt = execute_classification_write_plan(
+        &plan,
+        |_| -> Result<ClassificationItemState, ()> { panic!("dry-run must not preflight") },
+        |_| -> Result<ClassificationItemState, ()> { panic!("dry-run must not write") },
+    );
+
+    assert_eq!(receipt.outcome, ClassificationWriteOutcome::DryRun);
+    assert!(receipt.applied_item_keys.is_empty());
+    assert!(receipt.rollback_operations.is_empty());
 }
 
 fn classification_report(version: &str) -> conceptweave_zotero::ClassificationReport {
