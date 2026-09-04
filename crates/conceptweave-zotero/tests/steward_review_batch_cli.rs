@@ -93,7 +93,15 @@ fn completed_review_batch_cli_validates_context_before_updating_worksheet() {
     let tampered_path = private_input("apply-batch-tampered", &tampered);
     let rejected_path = temp_path("apply-batch-rejected");
     let _ = fs::remove_file(&rejected_path);
-    assert!(!run_apply_batch(&report_path, &worksheet_path, &tampered_path, &rejected_path).success());
+    assert!(
+        !run_apply_batch(
+            &report_path,
+            &worksheet_path,
+            &tampered_path,
+            &rejected_path
+        )
+        .success()
+    );
     assert!(!rejected_path.exists());
 
     for path in [
