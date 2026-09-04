@@ -19,8 +19,7 @@ where
     let (worksheet, output) = if first == "--worksheet" {
         (
             true,
-            args.next()
-                .ok_or("--worksheet requires an output path")?,
+            args.next().ok_or("--worksheet requires an output path")?,
         )
     } else {
         (false, first)
