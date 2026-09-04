@@ -18,14 +18,18 @@ fn item(key: &str, title: &str) -> ZoteroItem {
     }
 }
 
-#[test]
-fn worksheet_is_snapshot_bound_complete_and_contains_no_bibliographic_text() {
-    let report = classify_snapshot(
+fn report() -> conceptweave_zotero::ClassificationReport {
+    classify_snapshot(
         "9.0.6".into(),
         None,
         42,
         vec![item("B", "unmatched title"), item("A", "ontology learning")],
-    );
+    )
+}
+
+#[test]
+fn worksheet_is_snapshot_bound_complete_and_contains_no_bibliographic_text() {
+    let report = report();
 
     let worksheet = build_steward_review_worksheet(&report).unwrap();
 
@@ -52,6 +56,79 @@ fn worksheet_is_snapshot_bound_complete_and_contains_no_bibliographic_text() {
     assert!(!serialized.contains("unmatched title"));
     assert!(!serialized.contains("sensitive abstract"));
     assert!(!serialized.contains("field_values"));
+}
+
+#[test]
+fn worksheet_rejects_each_inconsistent_report_coordinate() {
+    let mut invalid = report();
+    invalid.rule_revision = "";
+    assert_eq!(
+        build_steward_review_worksheet(&invalid),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut invalid = report();
+    invalid.snapshot_digest.clear();
+    assert_eq!(
+        build_steward_review_worksheet(&invalid),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut invalid = report();
+    invalid.observed_item_count += 1;
+    assert_eq!(
+        build_steward_review_worksheet(&invalid),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut invalid = report();
+    invalid.audit_summary.bibliographic_item_count += 1;
+    assert_eq!(
+        build_steward_review_worksheet(&invalid),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut invalid = report();
+    invalid.audit_summary.proposed_disposition_count += 1;
+    assert_eq!(
+        build_steward_review_worksheet(&invalid),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut invalid = report();
+    invalid.snapshot_items[0].item_key.clear();
+    assert_eq!(
+        build_steward_review_worksheet(&invalid),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut invalid = report();
+    invalid.snapshot_items[1].item_key = invalid.snapshot_items[0].item_key.clone();
+    assert_eq!(
+        build_steward_review_worksheet(&invalid),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut invalid = report();
+    invalid.classified_items[0].item_key.clear();
+    assert_eq!(
+        build_steward_review_worksheet(&invalid),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut invalid = report();
+    invalid.classified_items[1].item_key = invalid.classified_items[0].item_key.clone();
+    assert_eq!(
+        build_steward_review_worksheet(&invalid),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut invalid = report();
+    invalid.classified_items[0].item_version += 1;
+    assert_eq!(
+        build_steward_review_worksheet(&invalid),
+        Err(WorksheetError::InvalidReport)
+    );
 }
 
 #[test]
