@@ -1,7 +1,8 @@
 #![cfg(unix)]
 
 use conceptweave_zotero::{
-    Disposition, ItemData, ZoteroItem, build_steward_review_worksheet, classify_snapshot,
+    Disposition, ItemData, StewardReviewBatch, StewardReviewWorksheet, ZoteroItem,
+    build_steward_review_batch, build_steward_review_worksheet, classify_snapshot,
 };
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
@@ -67,6 +68,45 @@ fn review_batch_cli_emits_nothing_for_complete_or_existing_output() {
     }
 }
 
+#[test]
+fn completed_review_batch_cli_validates_context_before_updating_worksheet() {
+    let report = classify_snapshot("9.0.6".into(), None, 42, vec![item("A", "unmatched")]);
+    let worksheet = build_steward_review_worksheet(&report).unwrap();
+    let mut batch = build_steward_review_batch(&report, &worksheet, 1).unwrap();
+    batch.decisions[0].reviewed_disposition = Some(Disposition::OutOfScope);
+    let report_path = private_input("apply-batch-report", &report);
+    let worksheet_path = private_input("apply-batch-worksheet", &worksheet);
+    let batch_path = private_input("apply-batch-input", &batch);
+    let output_path = temp_path("apply-batch-output");
+    let _ = fs::remove_file(&output_path);
+
+    assert!(run_apply_batch(&report_path, &worksheet_path, &batch_path, &output_path).success());
+    let updated: StewardReviewWorksheet =
+        serde_json::from_slice(&fs::read(&output_path).unwrap()).unwrap();
+    assert_eq!(
+        updated.decisions[0].reviewed_disposition,
+        Some(Disposition::OutOfScope)
+    );
+
+    let mut tampered: StewardReviewBatch = batch;
+    tampered.decisions[0].title = "different context".into();
+    let tampered_path = private_input("apply-batch-tampered", &tampered);
+    let rejected_path = temp_path("apply-batch-rejected");
+    let _ = fs::remove_file(&rejected_path);
+    assert!(!run_apply_batch(&report_path, &worksheet_path, &tampered_path, &rejected_path).success());
+    assert!(!rejected_path.exists());
+
+    for path in [
+        report_path,
+        worksheet_path,
+        batch_path,
+        output_path,
+        tampered_path,
+    ] {
+        fs::remove_file(path).unwrap();
+    }
+}
+
 fn item(key: &str, title: &str) -> ZoteroItem {
     ZoteroItem {
         key: key.into(),
@@ -103,6 +143,24 @@ fn run_batch(
             report.to_str().unwrap(),
             worksheet.to_str().unwrap(),
             limit,
+            output.to_str().unwrap(),
+        ])
+        .status()
+        .unwrap()
+}
+
+fn run_apply_batch(
+    report: &Path,
+    worksheet: &Path,
+    batch: &Path,
+    output: &Path,
+) -> std::process::ExitStatus {
+    Command::new(env!("CARGO_BIN_EXE_conceptweave-zotero"))
+        .args([
+            "--apply-review-batch",
+            report.to_str().unwrap(),
+            worksheet.to_str().unwrap(),
+            batch.to_str().unwrap(),
             output.to_str().unwrap(),
         ])
         .status()
