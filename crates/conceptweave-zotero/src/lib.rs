@@ -2364,6 +2364,62 @@ mod tests {
     }
 
     #[test]
+    fn approved_zotero10_adapter_executes_the_reviewed_plan_boundary() {
+        let plan = ClassificationWritePlan {
+            mode: WriteMode::Execute,
+            review_id: "review-1".into(),
+            authority_receipt: "authority-1".into(),
+            server_id: Some("server-10".into()),
+            zotero_version: "10.0.0".into(),
+            library_version: 42,
+            rule_revision: "ontology-research-v2".into(),
+            snapshot_digest: "sha256:reviewed".into(),
+            operations: vec![ClassificationWriteOperation {
+                item_key: "ABCD2345".into(),
+                item_version: 7,
+                reviewed_disposition: Disposition::Generation,
+                before_collection_keys: vec!["BCDE3456".into()],
+                after_collection_keys: vec!["CDEF4567".into()],
+                rollback_collection_keys: vec!["BCDE3456".into()],
+                before_tags: vec![ItemTag {
+                    tag: "kept".into(),
+                    tag_type: Some(1),
+                }],
+                after_tags: vec![ItemTag {
+                    tag: "classified".into(),
+                    tag_type: None,
+                }],
+                rollback_tags: vec![ItemTag {
+                    tag: "kept".into(),
+                    tag_type: Some(1),
+                }],
+            }],
+            source_records_preserved: true,
+        };
+        let before = library_response("server-10", 42);
+        let item = item_response("server-10", 7);
+        let after = library_response("server-10", 42);
+        let written_body = r#"{"successful":{"0":{"key":"ABCD2345","version":43,"data":{"itemType":"book","collections":["CDEF4567"],"tags":[{"tag":"classified"}]}}}}"#;
+        let written = format!(
+            "HTTP/1.1 200 OK\r\nZotero-Server-ID: server-10\r\nLast-Modified-Version: 43\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{written_body}",
+            written_body.len()
+        );
+        let (base, server) = serve(vec![
+            Box::leak(before.into_boxed_str()),
+            Box::leak(item.into_boxed_str()),
+            Box::leak(after.into_boxed_str()),
+            Box::leak(written.into_boxed_str()),
+        ]);
+
+        let receipt = execute_classification_write_plan_with_zotero10(&plan, &transport(base));
+
+        assert_eq!(receipt.outcome, ClassificationWriteOutcome::Applied);
+        assert_eq!(receipt.applied_item_keys, ["ABCD2345"]);
+        assert_eq!(receipt.rollback_operations[0].item_version, 43);
+        assert_eq!(server.join().unwrap().len(), 4);
+    }
+
+    #[test]
     fn zotero10_authorization_uses_exact_wire_contract_and_builds_adapter() {
         let body = r#"{"key":"0123456789abcdef0123456789abcdef","remember":true}"#;
         let response = authorize_response("200 OK", Some("server-10"), body);
