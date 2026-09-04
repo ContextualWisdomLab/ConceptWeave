@@ -1,7 +1,7 @@
 use conceptweave_zotero::{
-    Disposition, ItemData, StewardDecisionPatch, WorksheetError, ZoteroItem,
-    apply_steward_decision_patch, build_steward_review_batch, build_steward_review_worksheet,
-    classify_snapshot, decision_patch_from_review_batch,
+    Disposition, ItemData, ItemTag, StewardDecisionPatch, StewardReviewBatch, WorksheetError,
+    ZoteroItem, apply_steward_decision_patch, build_steward_review_batch,
+    build_steward_review_worksheet, classify_snapshot, decision_patch_from_review_batch,
 };
 
 fn item(key: &str, title: &str, abstract_note: &str) -> ZoteroItem {
@@ -15,7 +15,10 @@ fn item(key: &str, title: &str, abstract_note: &str) -> ZoteroItem {
             doi: String::new(),
             parent_item: String::new(),
             collections: vec!["COLLECTION".into()],
-            tags: vec![],
+            tags: vec![ItemTag {
+                tag: "review tag".into(),
+                tag_type: Some(1),
+            }],
         },
     }
 }
@@ -201,4 +204,31 @@ fn completed_review_batch_must_preserve_the_context_shown_to_the_steward() {
         decision_patch_from_review_batch(&report, &worksheet, &oversized),
         Err(WorksheetError::InvalidBatchLimit)
     );
+}
+
+#[test]
+fn review_batch_json_rejects_unknown_context_at_every_object_boundary() {
+    let report = classify_snapshot(
+        "9.0.6".into(),
+        None,
+        42,
+        vec![item("A", "unmatched", "review context")],
+    );
+    let worksheet = build_steward_review_worksheet(&report).unwrap();
+    let batch = build_steward_review_batch(&report, &worksheet, 1).unwrap();
+    let original = serde_json::to_value(batch).unwrap();
+
+    let mut invalid = vec![
+        original.clone(),
+        original.clone(),
+        original.clone(),
+        original,
+    ];
+    invalid[0]["unexpected"] = serde_json::json!("root");
+    invalid[1]["decisions"][0]["unexpected"] = serde_json::json!("decision");
+    invalid[2]["decisions"][0]["evidence"]["unexpected"] = serde_json::json!("evidence");
+    invalid[3]["decisions"][0]["tags"][0]["unexpected"] = serde_json::json!("tag");
+    for invalid in invalid {
+        assert!(serde_json::from_value::<StewardReviewBatch>(invalid).is_err());
+    }
 }
