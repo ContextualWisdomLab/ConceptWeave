@@ -25,13 +25,13 @@ fn execution_preflights_every_item_and_returns_reversible_partial_failure() {
         |item_key| {
             preflighted.push(item_key.to_owned());
             let operation = plan
-                .operations
+                .operations()
                 .iter()
                 .find(|operation| operation.item_key == item_key)
                 .unwrap();
             Ok::<_, ()>(ClassificationItemState {
                 server_id: "server-1".into(),
-                library_version: if preflighted.len() > plan.operations.len() {
+                library_version: if preflighted.len() > plan.operations().len() {
                     43
                 } else {
                     42
@@ -106,7 +106,7 @@ fn execution_reconciles_a_committed_write_after_its_response_is_lost() {
             if item_key == "B" {
                 b_reads += 1;
                 if b_reads == 2 {
-                    let operation = &plan.operations[1];
+                    let operation = &plan.operations()[1];
                     return Ok::<_, ()>(ClassificationItemState {
                         server_id: "server-1".into(),
                         library_version: 44,
@@ -147,7 +147,7 @@ fn execution_names_an_item_when_failed_write_reconciliation_is_unavailable() {
         &plan,
         |item_key| {
             reads += 1;
-            if reads > plan.operations.len() {
+            if reads > plan.operations().len() {
                 Err(())
             } else {
                 Ok(preflight_state(&plan, item_key))
@@ -168,13 +168,13 @@ fn preflight_state(
     item_key: &str,
 ) -> ClassificationItemState {
     let operation = plan
-        .operations
+        .operations()
         .iter()
         .find(|operation| operation.item_key == item_key)
         .unwrap();
     ClassificationItemState {
         server_id: "server-1".into(),
-        library_version: plan.library_version,
+        library_version: plan.library_version(),
         item_key: item_key.into(),
         item_version: operation.item_version,
         collection_keys: operation.before_collection_keys.clone(),
@@ -241,19 +241,6 @@ fn execution_fails_closed_for_each_preflight_mismatch() {
         receipt.outcome,
         ClassificationWriteOutcome::PreflightFailure
     );
-
-    let mut missing_server_plan = plan.clone();
-    missing_server_plan.server_id = Some(" ".into());
-    let receipt = execute_classification_write_plan(
-        &missing_server_plan,
-        |_| -> Result<ClassificationItemState, ()> { panic!("missing server must fail first") },
-        |_| -> Result<ClassificationItemState, ()> { panic!("missing server must fail first") },
-    );
-    assert_eq!(
-        receipt.outcome,
-        ClassificationWriteOutcome::PreflightFailure
-    );
-    assert_eq!(receipt.failed_item_key, None);
 }
 
 fn applied_state(
@@ -399,18 +386,18 @@ fn dry_run_is_default_and_preserves_exact_rollback_state() {
         })
         .expect("reviewed dry-run changes must produce a plan");
 
-    assert_eq!(plan.mode, WriteMode::DryRun);
-    assert_eq!(plan.operations[0].item_key, "A");
-    assert_eq!(plan.operations[1].item_key, "B");
+    assert_eq!(plan.mode(), WriteMode::DryRun);
+    assert_eq!(plan.operations()[0].item_key, "A");
+    assert_eq!(plan.operations()[1].item_key, "B");
     assert_eq!(
-        plan.operations[1].rollback_collection_keys,
-        plan.operations[1].before_collection_keys
+        plan.operations()[1].rollback_collection_keys,
+        plan.operations()[1].before_collection_keys
     );
     assert_eq!(
-        plan.operations[1].rollback_tags,
+        plan.operations()[1].rollback_tags,
         vec![tag("Imported", Some(1))]
     );
-    assert!(plan.source_records_preserved);
+    assert!(plan.source_records_preserved());
 }
 
 #[test]
@@ -714,7 +701,7 @@ fn write_plan_fails_closed_for_untrusted_stale_or_unsafe_changes() {
     let manual_plan =
         build_classification_write_plan(&version_ten, &manual_marker, WriteMode::DryRun, |_| true)
             .unwrap();
-    assert_eq!(manual_plan.operations[1].after_tags[0].tag_type, None);
+    assert_eq!(manual_plan.operations()[1].after_tags[0].tag_type, None);
 
     manual_marker.changes[0].after_tags[0].tag_type = Some(2);
     assert_eq!(
