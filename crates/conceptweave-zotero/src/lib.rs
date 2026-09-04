@@ -9,16 +9,21 @@ use std::fmt;
 use std::time::Duration;
 
 /// Classification rule revision recorded in every report.
-pub const RULE_REVISION: &str = "ontology-research-v1";
+pub const RULE_REVISION: &str = "ontology-research-v2";
 
+const SUPPORTED_API_VERSION: u64 = 3;
+const SUPPORTED_API_VERSION_HEADER: &str = "3";
 const PAGE_LIMIT: usize = 100;
 const MAX_PAGE_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_SNAPSHOT_ITEMS: usize = 50_000;
 const MAX_SNAPSHOT_BYTES: u64 = 256 * 1024 * 1024;
 const LOCAL_API: &str = "http://127.0.0.1:23119/api/users/0/items";
 
+#[cfg(test)]
+static TEST_LOCAL_API: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
 /// A Zotero item returned by the Local API.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ZoteroItem {
     /// Stable item key.
     pub key: String,
@@ -29,7 +34,7 @@ pub struct ZoteroItem {
 }
 
 /// Metadata used by the classifier.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ItemData {
     /// Zotero item type.
@@ -55,7 +60,7 @@ pub struct ItemData {
 }
 
 /// A Zotero item tag.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ItemTag {
     /// Tag text.
     pub tag: String,
@@ -91,6 +96,8 @@ pub enum AbstentionReason {
     UnsupportedRuleVocabulary,
     /// Metadata is present but no deterministic rule phrase matches it.
     NoDeterministicRuleMatch,
+    /// More than one specific disposition family is supported by the item.
+    ConflictingDispositionEvidence,
 }
 
 /// Evidence for a deterministic proposed disposition.
@@ -98,6 +105,8 @@ pub enum AbstentionReason {
 pub struct ClassificationEvidence {
     /// Metadata fields whose values matched.
     pub fields: Vec<&'static str>,
+    /// Exact snapshot values for matched fields, retained only in the local report.
+    pub field_values: BTreeMap<&'static str, String>,
     /// Rule phrases found in those fields.
     pub matched_phrases: Vec<&'static str>,
 }
@@ -145,6 +154,10 @@ pub struct DuplicateCandidate {
 pub struct ClassificationReport {
     /// Zotero desktop version that served the snapshot.
     pub zotero_version: String,
+    /// Requested and observed Local API version for a live read.
+    pub api_version: Option<u64>,
+    /// Zotero schema revision observed consistently across a live read.
+    pub schema_version: Option<u64>,
     /// Local API server identifier observed on every page when supplied.
     pub server_id: Option<String>,
     /// Library version shared by every fetched page.
@@ -166,6 +179,8 @@ pub enum ReadError {
     Http(String),
     /// Required response header is absent or invalid.
     Header(&'static str),
+    /// Provider contract is present but unsupported.
+    Contract(&'static str),
     /// A later page did not belong to the first page's snapshot.
     SnapshotChanged,
     /// Configured whole-snapshot resource budget was exceeded.
@@ -181,6 +196,7 @@ impl fmt::Display for ReadError {
         match self {
             Self::Http(error) => write!(formatter, "local API request failed: {error}"),
             Self::Header(name) => write!(formatter, "local API response lacks valid {name}"),
+            Self::Contract(name) => write!(formatter, "local API returned unsupported {name}"),
             Self::SnapshotChanged => write!(formatter, "Zotero library changed during the read"),
             Self::Budget(kind) => write!(formatter, "Zotero snapshot exceeds {kind} budget"),
             Self::Json(error) => write!(formatter, "local API returned invalid JSON: {error}"),
@@ -191,8 +207,23 @@ impl fmt::Display for ReadError {
 
 impl std::error::Error for ReadError {}
 
+#[derive(Debug)]
+struct FetchedPage {
+    total: usize,
+    library_version: u64,
+    zotero_version: String,
+    api_version: u64,
+    schema_version: u64,
+    server_id: Option<String>,
+    body_bytes: u64,
+    items: Vec<ZoteroItem>,
+}
+
 /// Reads every Zotero item from one stable Local API library version.
-#[cfg_attr(coverage_nightly, coverage(off))]
+///
+/// Snapshot consistency, resource budgets, API-version validation, pagination,
+/// and duplicate-key checks live in an injectable reader core. Only the narrow
+/// ureq transport shim is excluded from deterministic coverage.
 pub fn read_local_snapshot() -> Result<ClassificationReport, ReadError> {
     let config = ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(60)))
@@ -202,76 +233,139 @@ pub fn read_local_snapshot() -> Result<ClassificationReport, ReadError> {
         .max_redirects(0)
         .build();
     let agent = ureq::Agent::new_with_config(config);
+    read_snapshot_with(|start| fetch_local_page(&agent, start))
+}
+
+fn local_api_base() -> String {
+    #[cfg(test)]
+    {
+        if let Some(value) = TEST_LOCAL_API
+            .lock()
+            .expect("test Local API lock must not be poisoned")
+            .clone()
+        {
+            return value;
+        }
+    }
+    LOCAL_API.to_owned()
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, ReadError> {
+    let url = format!(
+        "{}?format=json&include=data&limit={PAGE_LIMIT}&start={start}",
+        local_api_base()
+    );
+    let mut response = agent
+        .get(&url)
+        .header("Zotero-API-Version", SUPPORTED_API_VERSION_HEADER)
+        .call()
+        .map_err(|error| ReadError::Http(error.to_string()))?;
+    let headers = response.headers();
+    let total = header_u64(headers, "Total-Results")?;
+    let total = usize::try_from(total).map_err(|_| ReadError::Budget("item-count"))?;
+    let library_version = header_u64(headers, "Last-Modified-Version")?;
+    let zotero_version = header_string(headers, "X-Zotero-Version")?;
+    let api_version = header_u64(headers, "Zotero-API-Version")?;
+    let schema_version = header_u64(headers, "Zotero-Schema-Version")?;
+    let server_id = optional_header(headers, "Zotero-Server-ID");
+
+    let body = response
+        .body_mut()
+        .with_config()
+        .limit(MAX_PAGE_BYTES)
+        .read_to_string()
+        .map_err(|error| ReadError::Body(error.to_string()))?;
+    let body_bytes = u64::try_from(body.len()).map_err(|_| ReadError::Budget("byte-count"))?;
+    let items = serde_json::from_str(&body).map_err(ReadError::Json)?;
+
+    Ok(FetchedPage {
+        total,
+        library_version,
+        zotero_version,
+        api_version,
+        schema_version,
+        server_id,
+        body_bytes,
+        items,
+    })
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+fn header_u64(headers: &ureq::http::HeaderMap, name: &'static str) -> Result<u64, ReadError> {
+    header_string(headers, name)?
+        .parse()
+        .map_err(|_| ReadError::Header(name))
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+fn header_string(headers: &ureq::http::HeaderMap, name: &'static str) -> Result<String, ReadError> {
+    optional_header(headers, name).ok_or(ReadError::Header(name))
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+fn optional_header(headers: &ureq::http::HeaderMap, name: &'static str) -> Option<String> {
+    headers.get(name)?.to_str().ok().map(str::to_owned)
+}
+
+fn read_snapshot_with(
+    mut fetch_page: impl FnMut(usize) -> Result<FetchedPage, ReadError>,
+) -> Result<ClassificationReport, ReadError> {
     let mut items = Vec::new();
     let mut snapshot_bytes = 0_u64;
-    let mut expected = None;
+    let mut expected_total = None;
     let mut library_version = None;
     let mut zotero_version = None;
+    let mut schema_version = None;
     let mut server_id = None;
-    let mut metadata_initialized = false;
 
     loop {
-        if expected.is_some_and(|total| items.len() < total)
+        if expected_total.is_some_and(|total| items.len() < total)
             && (items.len() >= MAX_SNAPSHOT_ITEMS || snapshot_bytes >= MAX_SNAPSHOT_BYTES)
         {
             return Err(ReadError::Budget("whole-snapshot"));
         }
-        let url = format!(
-            "{LOCAL_API}?format=json&include=data&limit={PAGE_LIMIT}&start={}",
-            items.len()
-        );
-        let mut response = agent
-            .get(&url)
-            .call()
-            .map_err(|error| ReadError::Http(error.to_string()))?;
-        let headers = response.headers();
-        let page_total = header_u64(headers, "Total-Results")? as usize;
-        if page_total > MAX_SNAPSHOT_ITEMS {
+
+        let page = fetch_page(items.len())?;
+        if page.api_version != SUPPORTED_API_VERSION {
+            return Err(ReadError::Contract("Zotero-API-Version"));
+        }
+        if page.total > MAX_SNAPSHOT_ITEMS {
             return Err(ReadError::Budget("item-count"));
         }
-        let page_version = header_u64(headers, "Last-Modified-Version")?;
-        let page_zotero = header_string(headers, "X-Zotero-Version")?;
-        let page_server = optional_header(headers, "Zotero-Server-ID");
 
-        if metadata_initialized {
-            if expected != Some(page_total)
-                || library_version != Some(page_version)
-                || zotero_version.as_ref() != Some(&page_zotero)
-                || server_id != page_server
+        if let Some(expected) = expected_total {
+            if expected != page.total
+                || library_version != Some(page.library_version)
+                || zotero_version.as_ref() != Some(&page.zotero_version)
+                || schema_version != Some(page.schema_version)
+                || server_id != page.server_id
             {
                 return Err(ReadError::SnapshotChanged);
             }
         } else {
-            expected = Some(page_total);
-            library_version = Some(page_version);
-            zotero_version = Some(page_zotero);
-            server_id = page_server;
-            metadata_initialized = true;
+            expected_total = Some(page.total);
+            library_version = Some(page.library_version);
+            zotero_version = Some(page.zotero_version.clone());
+            schema_version = Some(page.schema_version);
+            server_id = page.server_id.clone();
         }
 
-        let body = response
-            .body_mut()
-            .with_config()
-            .limit(MAX_PAGE_BYTES)
-            .read_to_string()
-            .map_err(|error| ReadError::Body(error.to_string()))?;
-        let body_bytes =
-            u64::try_from(body.len()).map_err(|_| ReadError::Budget("byte-count"))?;
-        let page: Vec<ZoteroItem> = serde_json::from_str(&body).map_err(ReadError::Json)?;
-        if page.is_empty() && items.len() < page_total {
+        if page.items.is_empty() && items.len() < page.total {
             return Err(ReadError::SnapshotChanged);
         }
         let (next_item_count, next_snapshot_bytes) = checked_snapshot_usage(
             items.len(),
-            page.len(),
+            page.items.len(),
             snapshot_bytes,
-            body_bytes,
-            page_total,
+            page.body_bytes,
+            page.total,
         )?;
-        items.extend(page);
+        items.extend(page.items);
         snapshot_bytes = next_snapshot_bytes;
         debug_assert_eq!(items.len(), next_item_count);
-        if items.len() == page_total {
+
+        if items.len() == page.total {
             break;
         }
     }
@@ -286,12 +380,15 @@ pub fn read_local_snapshot() -> Result<ClassificationReport, ReadError> {
         return Err(ReadError::SnapshotChanged);
     }
 
-    Ok(classify_snapshot(
+    let mut report = classify_snapshot(
         zotero_version.ok_or(ReadError::Header("X-Zotero-Version"))?,
         server_id,
         library_version.ok_or(ReadError::Header("Last-Modified-Version"))?,
         items,
-    ))
+    );
+    report.api_version = Some(SUPPORTED_API_VERSION);
+    report.schema_version = schema_version;
+    Ok(report)
 }
 
 fn checked_snapshot_usage(
@@ -322,23 +419,6 @@ fn checked_snapshot_usage(
     Ok((next_items, next_bytes))
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
-fn header_u64(headers: &ureq::http::HeaderMap, name: &'static str) -> Result<u64, ReadError> {
-    header_string(headers, name)?
-        .parse()
-        .map_err(|_| ReadError::Header(name))
-}
-
-#[cfg_attr(coverage_nightly, coverage(off))]
-fn header_string(headers: &ureq::http::HeaderMap, name: &'static str) -> Result<String, ReadError> {
-    optional_header(headers, name).ok_or(ReadError::Header(name))
-}
-
-#[cfg_attr(coverage_nightly, coverage(off))]
-fn optional_header(headers: &ureq::http::HeaderMap, name: &'static str) -> Option<String> {
-    headers.get(name)?.to_str().ok().map(str::to_owned)
-}
-
 /// Classifies an already captured snapshot without network access.
 pub fn classify_snapshot(
     zotero_version: String,
@@ -358,6 +438,8 @@ pub fn classify_snapshot(
 
     ClassificationReport {
         zotero_version,
+        api_version: None,
+        schema_version: None,
         server_id,
         library_version,
         rule_revision: RULE_REVISION,
@@ -390,21 +472,27 @@ fn child_index(items: &[ZoteroItem]) -> BTreeMap<String, Vec<String>> {
 }
 
 fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedItem {
-    let title = item.data.title.to_lowercase();
-    let abstract_note = item.data.abstract_note.to_lowercase();
-    let tags = item
+    let title_normalized = item.data.title.to_lowercase();
+    let abstract_normalized = item.data.abstract_note.to_lowercase();
+    let tags_original = item
         .data
         .tags
         .iter()
-        .map(|tag| tag.tag.to_lowercase())
+        .map(|tag| tag.tag.as_str())
         .collect::<Vec<_>>()
         .join(" ");
+    let tags_normalized = tags_original.to_lowercase();
     let fields = [
-        ("title", title.as_str()),
-        ("abstract_note", abstract_note.as_str()),
-        ("tags", tags.as_str()),
+        ("title", title_normalized.as_str(), item.data.title.as_str()),
+        (
+            "abstract_note",
+            abstract_normalized.as_str(),
+            item.data.abstract_note.as_str(),
+        ),
+        ("tags", tags_normalized.as_str(), tags_original.as_str()),
     ];
-    let rules = [
+
+    let specific_rules = [
         (
             Disposition::AlignmentVersioning,
             &[
@@ -446,37 +534,69 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
                 "shacl",
             ][..],
         ),
-        (
-            Disposition::AdjacentEvidence,
-            &[
-                "ontology",
-                "semantic web",
-                "knowledge graph",
-                "rdf",
-                "owl",
-                "skos",
-            ][..],
-        ),
     ];
-    let mut disposition = Disposition::NeedsStewardReview;
+    let adjacent_phrases = [
+        "ontology",
+        "semantic web",
+        "knowledge graph",
+        "rdf",
+        "owl",
+        "skos",
+    ];
+
+    let mut matched_dispositions = Vec::new();
     let mut matched_fields = BTreeSet::new();
+    let mut field_values = BTreeMap::new();
     let mut matched_phrases = BTreeSet::new();
-    for (candidate, phrases) in rules {
-        for (field, value) in fields {
+
+    for (candidate, phrases) in specific_rules {
+        let mut family_matched = false;
+        for (field, normalized, original) in fields {
             for phrase in phrases {
-                if contains_phrase(value, phrase) {
-                    disposition = candidate;
+                if contains_phrase(normalized, phrase) {
+                    family_matched = true;
                     matched_fields.insert(field);
+                    field_values
+                        .entry(field)
+                        .or_insert_with(|| original.to_owned());
                     matched_phrases.insert(*phrase);
                 }
             }
         }
-        if disposition != Disposition::NeedsStewardReview {
-            break;
+        if family_matched {
+            matched_dispositions.push(candidate);
         }
     }
-    let abstention_reason = (disposition == Disposition::NeedsStewardReview)
-        .then(|| classify_abstention_reason(&fields));
+
+    let (proposed_disposition, abstention_reason) = match matched_dispositions.as_slice() {
+        [] => {
+            for (field, normalized, original) in fields {
+                for phrase in adjacent_phrases {
+                    if contains_phrase(normalized, phrase) {
+                        matched_fields.insert(field);
+                        field_values
+                            .entry(field)
+                            .or_insert_with(|| original.to_owned());
+                        matched_phrases.insert(phrase);
+                    }
+                }
+            }
+            if matched_phrases.is_empty() {
+                (
+                    Disposition::NeedsStewardReview,
+                    Some(classify_abstention_reason(&fields)),
+                )
+            } else {
+                (Disposition::AdjacentEvidence, None)
+            }
+        }
+        [single] => (*single, None),
+        _ => (
+            Disposition::NeedsStewardReview,
+            Some(AbstentionReason::ConflictingDispositionEvidence),
+        ),
+    };
+
     ClassifiedItem {
         item_key: item.key.clone(),
         item_version: item.version,
@@ -484,10 +604,11 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
         title: item.data.title.clone(),
         collection_keys: item.data.collections.clone(),
         tags: item.data.tags.iter().map(|tag| tag.tag.clone()).collect(),
-        proposed_disposition: disposition,
+        proposed_disposition,
         abstention_reason,
         evidence: ClassificationEvidence {
             fields: matched_fields.into_iter().collect(),
+            field_values,
             matched_phrases: matched_phrases.into_iter().collect(),
         },
         child_item_keys,
@@ -495,12 +616,15 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
     }
 }
 
-fn classify_abstention_reason(fields: &[(&'static str, &str)]) -> AbstentionReason {
-    if fields.iter().all(|(_, value)| value.trim().is_empty()) {
+fn classify_abstention_reason(fields: &[(&'static str, &str, &str)]) -> AbstentionReason {
+    if fields
+        .iter()
+        .all(|(_, normalized, _)| normalized.trim().is_empty())
+    {
         return AbstentionReason::MissingClassificationMetadata;
     }
-    if fields.iter().any(|(_, value)| {
-        value
+    if fields.iter().any(|(_, _, original)| {
+        original
             .chars()
             .any(|character| character.is_alphabetic() && !character.is_ascii())
     }) {
@@ -580,6 +704,11 @@ fn normalize_title(value: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::thread;
+
+    static LOCAL_API_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     fn item(key: &str, item_type: &str, title: &str, doi: &str, parent: &str) -> ZoteroItem {
         ZoteroItem {
@@ -597,155 +726,129 @@ mod tests {
         }
     }
 
-    #[test]
-    fn classifies_every_bibliographic_item_and_links_children() {
-        let mut generation = item("B", "journalArticle", "Ontology Learning", "10.1/X", "");
-        generation.data.tags.push(ItemTag {
-            tag: "SHACL".into(),
-        });
-        let report = classify_snapshot(
-            "9.0.6".into(),
-            None,
-            42,
-            vec![
-                item("C", "attachment", "", "", "B"),
-                generation,
-                item("A", "book", "Other", "", ""),
-            ],
-        );
-        assert_eq!(report.observed_item_count, 3);
-        assert_eq!(report.classified_items.len(), 2);
-        assert_eq!(
-            report.classified_items[0].proposed_disposition,
-            Disposition::NeedsStewardReview
-        );
-        assert_eq!(
-            report.classified_items[0].abstention_reason,
-            Some(AbstentionReason::NoDeterministicRuleMatch)
-        );
-        assert_eq!(
-            report.classified_items[1].proposed_disposition,
-            Disposition::Generation
-        );
-        assert_eq!(report.classified_items[1].abstention_reason, None);
-        assert_eq!(report.classified_items[1].child_item_keys, ["C"]);
-        assert_eq!(report.classified_items[1].evidence.fields, ["title"]);
-    }
-
-    #[test]
-    fn priority_and_all_rule_families_are_deterministic() {
-        let cases = [
-            (
-                "ontology matching and ontology learning",
-                Disposition::AlignmentVersioning,
-            ),
-            ("taxonomy induction", Disposition::Generation),
-            (
-                "ontology-based data access",
-                Disposition::SemanticConsumptionBridge,
-            ),
-            ("ontology quality", Disposition::EvaluationGovernance),
-            ("semantic web", Disposition::AdjacentEvidence),
-        ];
-        for (title, expected) in cases {
-            let report = classify_snapshot(
-                "10".into(),
-                Some("s".into()),
-                1,
-                vec![item("A", "book", title, "", "")],
-            );
-            assert_eq!(report.classified_items[0].proposed_disposition, expected);
+    fn fetched_page(total: usize, items: Vec<ZoteroItem>) -> FetchedPage {
+        FetchedPage {
+            total,
+            library_version: 42,
+            zotero_version: "9.0.6".into(),
+            api_version: 3,
+            schema_version: 42,
+            server_id: Some("server".into()),
+            body_bytes: 100,
+            items,
         }
-        assert!(!contains_phrase("knowledge", "owl"));
-        assert!(!contains_phrase("growl", "owl"));
-        assert!(contains_phrase("owl-based", "owl"));
-        assert!(contains_phrase("uses owl", "owl"));
-        assert!(contains_phrase("owl", "owl"));
     }
 
     #[test]
-    fn abstention_reasons_distinguish_missing_unsupported_and_unmatched_metadata() {
-        let missing = classify_snapshot(
-            "10".into(),
-            None,
-            1,
-            vec![item("A", "book", "", "", "")],
-        );
-        assert_eq!(
-            missing.classified_items[0].abstention_reason,
-            Some(AbstentionReason::MissingClassificationMetadata)
-        );
+    fn production_wrapper_requests_api_v3_and_records_contract_versions() {
+        let _guard = LOCAL_API_TEST_LOCK.lock().unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let base = format!("http://{address}/api/users/0/items");
+        *TEST_LOCAL_API.lock().unwrap() = Some(base);
 
-        let unsupported = classify_snapshot(
-            "10".into(),
-            None,
-            1,
-            vec![item("A", "book", "온톨로지 정렬", "", "")],
-        );
-        assert_eq!(
-            unsupported.classified_items[0].abstention_reason,
-            Some(AbstentionReason::UnsupportedRuleVocabulary)
-        );
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = vec![0_u8; 4096];
+            let read = stream.read(&mut request).unwrap();
+            let request = String::from_utf8_lossy(&request[..read]).to_lowercase();
+            assert!(request.contains("zotero-api-version: 3"));
+            let body = r#"[{"key":"A","version":1,"data":{"itemType":"book","title":"ontology evaluation"}}]"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nTotal-Results: 1\r\nLast-Modified-Version: 42\r\nX-Zotero-Version: 9.0.6\r\nZotero-API-Version: 3\r\nZotero-Schema-Version: 42\r\nZotero-Server-ID: server\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            )
+            .unwrap();
+            stream.flush().unwrap();
+        });
 
-        let unmatched = classify_snapshot(
-            "10".into(),
-            None,
-            1,
-            vec![item("A", "book", "Other evidence", "", "")],
-        );
-        assert_eq!(
-            unmatched.classified_items[0].abstention_reason,
-            Some(AbstentionReason::NoDeterministicRuleMatch)
-        );
-    }
+        let report = read_local_snapshot().unwrap();
+        *TEST_LOCAL_API.lock().unwrap() = None;
+        server.join().unwrap();
 
-    #[test]
-    fn duplicate_candidates_are_reversible_and_normalized() {
-        let report = classify_snapshot(
-            "10".into(),
-            None,
-            1,
-            vec![
-                item("A", "book", "OWL: Overview", "doi:10.1/X", ""),
-                item("B", "book", "owl overview", "https://doi.org/10.1/x", ""),
-            ],
-        );
-        assert_eq!(report.duplicate_candidates.len(), 2);
-        assert!(
-            report
-                .duplicate_candidates
-                .iter()
-                .all(|candidate| candidate.item_keys == ["A", "B"])
-        );
-    }
-
-    #[test]
-    fn empty_identities_do_not_form_duplicate_groups() {
-        assert_eq!(normalize_doi("  "), None);
-        assert_eq!(normalize_title("---"), None);
-        assert_eq!(normalize_doi("http://doi.org/A"), Some("a".into()));
-        assert_eq!(normalize_doi("https://doi.org/B"), Some("b".into()));
-        assert_eq!(normalize_doi("http://dx.doi.org/C"), Some("c".into()));
-        assert_eq!(normalize_doi("https://dx.doi.org/D"), Some("d".into()));
-        assert_eq!(normalize_doi("E"), Some("e".into()));
-        assert_eq!(normalize_title(" A---B "), Some("a b".into()));
-        assert_eq!(normalize_title(" A--- "), Some("a".into()));
-        let untitled = item("Z", "book", "", "", "");
-        assert!(duplicate_candidates(&[&untitled]).is_empty());
-
-        let report = classify_snapshot(
-            "10".into(),
-            None,
-            1,
-            vec![
-                item("A", "book", "Only", "", ""),
-                item("B", "note", "Ignored", "", ""),
-                item("C", "annotation", "Ignored", "", ""),
-                item("D", "book", "Child", "", "A"),
-            ],
-        );
-        assert!(report.duplicate_candidates.is_empty());
+        assert_eq!(report.api_version, Some(3));
+        assert_eq!(report.schema_version, Some(42));
+        assert_eq!(report.library_version, 42);
         assert_eq!(report.classified_items.len(), 1);
+        assert_eq!(local_api_base(), LOCAL_API);
+    }
+
+    #[test]
+    fn reader_core_paginates_and_preserves_one_snapshot_contract() {
+        let mut pages = vec![
+            fetched_page(2, vec![item("A", "book", "ontology quality", "", "")]),
+            fetched_page(2, vec![item("B", "book", "semantic web", "", "")]),
+        ]
+        .into_iter();
+        let report = read_snapshot_with(|_| Ok(pages.next().unwrap())).unwrap();
+        assert_eq!(report.observed_item_count, 2);
+        assert_eq!(report.api_version, Some(3));
+        assert_eq!(report.schema_version, Some(42));
+    }
+
+    #[test]
+    fn reader_core_rejects_contract_drift_empty_pages_and_duplicate_keys() {
+        let mut unsupported = fetched_page(1, vec![item("A", "book", "x", "", "")]);
+        unsupported.api_version = 4;
+        assert!(matches!(
+            read_snapshot_with(|_| Ok(unsupported)),
+            Err(ReadError::Contract("Zotero-API-Version"))
+        ));
+
+        let mut pages = vec![
+            fetched_page(2, vec![item("A", "book", "x", "", "")]),
+            {
+                let mut page = fetched_page(2, vec![item("B", "book", "y", "", "")]);
+                page.schema_version = 43;
+                page
+            },
+        ]
+        .into_iter();
+        assert!(matches!(
+            read_snapshot_with(|_| Ok(pages.next().unwrap())),
+            Err(ReadError::SnapshotChanged)
+        ));
+
+        assert!(matches!(
+            read_snapshot_with(|_| Ok(fetched_page(1, vec![]))),
+            Err(ReadError::SnapshotChanged)
+        ));
+
+        assert!(matches!(
+            read_snapshot_with(|_| {
+                Ok(fetched_page(
+                    2,
+                    vec![
+                        item("A", "book", "x", "", ""),
+                        item("A", "book", "y", "", ""),
+                    ],
+                ))
+            }),
+            Err(ReadError::SnapshotChanged)
+        ));
+    }
+
+    #[test]
+    fn reader_core_rejects_total_and_between_request_resource_exhaustion() {
+        let too_many = fetched_page(MAX_SNAPSHOT_ITEMS + 1, vec![]);
+        assert!(matches!(
+            read_snapshot_with(|_| Ok(too_many)),
+            Err(ReadError::Budget("item-count"))
+        ));
+
+        let mut calls = 0;
+        assert!(matches!(
+            read_snapshot_with(|_| {
+                calls += 1;
+                let mut page = fetched_page(2, vec![item("A", "book", "x", "", "")]);
+                page.body_bytes = MAX_SNAPSHOT_BYTES;
+                Ok(page)
+            }),
+            Err(ReadError::Budget("whole-snapshot"))
+        ));
+        assert_eq!(calls, 1);
     }
 
     #[test]
@@ -770,16 +873,164 @@ mod tests {
     }
 
     #[test]
+    fn classifies_every_bibliographic_item_and_links_children() {
+        let mut generation = item("B", "journalArticle", "Ontology Learning", "10.1/X", "");
+        generation.data.tags.push(ItemTag {
+            tag: "SHACL".into(),
+        });
+        let report = classify_snapshot(
+            "9.0.6".into(),
+            None,
+            42,
+            vec![
+                item("C", "attachment", "", "", "B"),
+                generation,
+                item("A", "book", "Other", "", ""),
+            ],
+        );
+        assert_eq!(report.observed_item_count, 3);
+        assert_eq!(report.classified_items.len(), 2);
+        assert_eq!(
+            report.classified_items[0].abstention_reason,
+            Some(AbstentionReason::NoDeterministicRuleMatch)
+        );
+        assert_eq!(
+            report.classified_items[1].proposed_disposition,
+            Disposition::Generation
+        );
+        assert_eq!(report.classified_items[1].abstention_reason, None);
+        assert_eq!(report.classified_items[1].child_item_keys, ["C"]);
+        assert_eq!(report.classified_items[1].evidence.fields, ["title"]);
+    }
+
+    #[test]
+    fn specific_rule_families_and_conflicts_are_deterministic() {
+        let cases = [
+            ("taxonomy induction", Disposition::Generation),
+            (
+                "ontology-based data access",
+                Disposition::SemanticConsumptionBridge,
+            ),
+            ("ontology quality", Disposition::EvaluationGovernance),
+            ("semantic web", Disposition::AdjacentEvidence),
+        ];
+        for (title, expected) in cases {
+            let report = classify_snapshot(
+                "10".into(),
+                Some("s".into()),
+                1,
+                vec![item("A", "book", title, "", "")],
+            );
+            assert_eq!(report.classified_items[0].proposed_disposition, expected);
+        }
+
+        let conflict = classify_snapshot(
+            "10".into(),
+            None,
+            1,
+            vec![item(
+                "A",
+                "book",
+                "ontology matching and ontology learning",
+                "",
+                "",
+            )],
+        );
+        assert_eq!(
+            conflict.classified_items[0].proposed_disposition,
+            Disposition::NeedsStewardReview
+        );
+        assert_eq!(
+            conflict.classified_items[0].abstention_reason,
+            Some(AbstentionReason::ConflictingDispositionEvidence)
+        );
+    }
+
+    #[test]
+    fn matched_values_and_abstention_reasons_are_replayable() {
+        let mut abstract_match = item("A", "book", "Uninformative", "", "");
+        abstract_match.data.abstract_note = "Evidence for ontology alignment".into();
+        let report = classify_snapshot("10".into(), None, 1, vec![abstract_match]);
+        assert_eq!(
+            report.classified_items[0]
+                .evidence
+                .field_values
+                .get("abstract_note")
+                .map(String::as_str),
+            Some("Evidence for ontology alignment")
+        );
+
+        let missing = classify_snapshot(
+            "10".into(),
+            None,
+            1,
+            vec![item("A", "book", "", "", "")],
+        );
+        assert_eq!(
+            missing.classified_items[0].abstention_reason,
+            Some(AbstentionReason::MissingClassificationMetadata)
+        );
+
+        let unsupported = classify_snapshot(
+            "10".into(),
+            None,
+            1,
+            vec![item("A", "book", "온톨로지 정렬", "", "")],
+        );
+        assert_eq!(
+            unsupported.classified_items[0].abstention_reason,
+            Some(AbstentionReason::UnsupportedRuleVocabulary)
+        );
+    }
+
+    #[test]
+    fn phrase_boundaries_and_duplicate_normalization_are_exact() {
+        assert!(!contains_phrase("knowledge", "owl"));
+        assert!(!contains_phrase("growl", "owl"));
+        assert!(contains_phrase("owl-based", "owl"));
+        assert!(contains_phrase("uses owl", "owl"));
+        assert!(contains_phrase("owl", "owl"));
+
+        assert_eq!(normalize_doi("  "), None);
+        assert_eq!(normalize_title("---"), None);
+        assert_eq!(normalize_doi("http://doi.org/A"), Some("a".into()));
+        assert_eq!(normalize_doi("https://doi.org/B"), Some("b".into()));
+        assert_eq!(normalize_doi("http://dx.doi.org/C"), Some("c".into()));
+        assert_eq!(normalize_doi("https://dx.doi.org/D"), Some("d".into()));
+        assert_eq!(normalize_doi("E"), Some("e".into()));
+        assert_eq!(normalize_title(" A---B "), Some("a b".into()));
+        assert_eq!(normalize_title(" A--- "), Some("a".into()));
+
+        let report = classify_snapshot(
+            "10".into(),
+            None,
+            1,
+            vec![
+                item("A", "book", "OWL: Overview", "doi:10.1/X", ""),
+                item(
+                    "B",
+                    "book",
+                    "owl overview",
+                    "https://dx.doi.org/10.1/x",
+                    "",
+                ),
+            ],
+        );
+        assert_eq!(report.duplicate_candidates.len(), 2);
+        assert!(report
+            .duplicate_candidates
+            .iter()
+            .all(|candidate| candidate.item_keys == ["A", "B"]));
+    }
+
+    #[test]
     fn read_errors_are_actionable() {
         assert!(ReadError::Header("x").to_string().contains('x'));
+        assert!(ReadError::Contract("v").to_string().contains("unsupported"));
         assert!(ReadError::SnapshotChanged.to_string().contains("changed"));
         assert!(ReadError::Budget("items").to_string().contains("budget"));
         assert!(ReadError::Http("down".into()).to_string().contains("down"));
-        assert!(
-            ReadError::Body("large".into())
-                .to_string()
-                .contains("large")
-        );
+        assert!(ReadError::Body("large".into()).to_string().contains("large"));
         let json_error = serde_json::from_str::<ZoteroItem>("{}").unwrap_err();
         assert!(ReadError::Json(json_error).to_string().contains("JSON"));
     }
