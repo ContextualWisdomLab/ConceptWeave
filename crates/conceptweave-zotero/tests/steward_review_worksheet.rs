@@ -96,6 +96,55 @@ fn worksheet_rejects_each_inconsistent_report_coordinate() {
     );
 
     let mut invalid = report();
+    invalid.audit_summary.snapshot_item_count += 1;
+    assert_eq!(
+        build_steward_review_worksheet(&invalid),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut invalid = report();
+    invalid.audit_summary.provenance_complete_count -= 1;
+    assert_eq!(
+        build_steward_review_worksheet(&invalid),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut invalid = report();
+    invalid.audit_summary.abstention_count += 1;
+    assert_eq!(
+        build_steward_review_worksheet(&invalid),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut invalid = report();
+    invalid.audit_summary.duplicate_candidate_count += 1;
+    assert_eq!(
+        build_steward_review_worksheet(&invalid),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut invalid = report();
+    invalid.audit_summary.failure_count = 1;
+    assert_eq!(
+        build_steward_review_worksheet(&invalid),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut invalid = report();
+    invalid.audit_summary.disposition_counts.clear();
+    assert_eq!(
+        build_steward_review_worksheet(&invalid),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut invalid = report();
+    invalid.classified_items[0].child_item_keys = vec![String::new()];
+    assert_eq!(
+        build_steward_review_worksheet(&invalid),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut invalid = report();
     invalid.snapshot_items[0].item_key.clear();
     assert_eq!(
         build_steward_review_worksheet(&invalid),
@@ -125,6 +174,21 @@ fn worksheet_rejects_each_inconsistent_report_coordinate() {
 
     let mut invalid = report();
     invalid.classified_items[0].item_version += 1;
+    assert_eq!(
+        build_steward_review_worksheet(&invalid),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut invalid = report();
+    invalid.classified_items[0].abstention_reason = None;
+    assert_eq!(
+        build_steward_review_worksheet(&invalid),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut invalid = report();
+    invalid.classified_items[1].abstention_reason =
+        Some(conceptweave_zotero::AbstentionReason::NoDeterministicRuleMatch);
     assert_eq!(
         build_steward_review_worksheet(&invalid),
         Err(WorksheetError::InvalidReport)
