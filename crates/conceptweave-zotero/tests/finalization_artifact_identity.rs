@@ -104,6 +104,16 @@ fn artifact_commands_reject_distinct_path_spellings_for_one_input_file() {
         ])
         .status()
         .unwrap();
+    let batch_status = Command::new(env!("CARGO_BIN_EXE_conceptweave-zotero"))
+        .args([
+            "--review-batch",
+            &report_path,
+            &worksheet_path,
+            "1",
+            output.to_str().unwrap(),
+        ])
+        .status()
+        .unwrap();
 
     let _ = fs::remove_file(&input);
     let _ = fs::remove_file(&output);
@@ -118,5 +128,9 @@ fn artifact_commands_reject_distinct_path_spellings_for_one_input_file() {
     assert!(
         !patch_status.success(),
         "decision patching must reject path spellings that resolve to one input artifact"
+    );
+    assert!(
+        !batch_status.success(),
+        "review batching must reject path spellings that resolve to one input artifact"
     );
 }
