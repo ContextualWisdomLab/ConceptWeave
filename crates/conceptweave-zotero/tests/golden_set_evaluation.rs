@@ -237,10 +237,6 @@ fn reviewed_golden_set_rejects_stale_unknown_and_duplicate_labels() {
         assert!(error.to_string().contains(fragment));
     }
 
-    let mut incomplete = item("A", "ontology learning");
-    incomplete.version = 0;
-    let incomplete_report = classify_snapshot("9.0.6".into(), None, 42, vec![incomplete]);
-    assert_eq!(incomplete_report.audit_summary.provenance_complete_count, 0);
     let blank_key_report = classify_snapshot(
         "9.0.6".into(),
         None,

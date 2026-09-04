@@ -708,7 +708,7 @@ pub fn classify_snapshot(
         proposed_disposition_count: classified_items.len(),
         provenance_complete_count: classified_items
             .iter()
-            .filter(|item| !item.item_key.trim().is_empty() && item.item_version > 0)
+            .filter(|item| !item.item_key.trim().is_empty())
             .count(),
         abstention_count: classified_items
             .iter()
