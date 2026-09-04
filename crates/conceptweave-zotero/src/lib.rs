@@ -1169,10 +1169,10 @@ pub fn evaluate_complete_reviewed_classification<F>(
 where
     F: FnOnce(&ReviewedGoldenSet) -> bool,
 {
-    let evaluation = evaluate_reviewed_golden_set(report, golden, verify_approval)?;
-    if evaluation.reviewed_count != report.classified_items.len() {
+    if golden.labels.len() != report.classified_items.len() {
         return Err(EvaluationError::IncompleteReview);
     }
+    let evaluation = evaluate_reviewed_golden_set(report, golden, verify_approval)?;
     Ok(evaluation)
 }
 
@@ -1192,9 +1192,6 @@ where
         || golden.approval.snapshot_digest.trim().is_empty()
     {
         return Err(EvaluationError::InvalidReview);
-    }
-    if !verify_approval(golden) {
-        return Err(EvaluationError::UnverifiedApproval);
     }
     let report_snapshot = report
         .snapshot_items
@@ -1262,6 +1259,10 @@ where
         if predicted == Disposition::NeedsStewardReview {
             abstention_count += 1;
         }
+    }
+
+    if !verify_approval(golden) {
+        return Err(EvaluationError::UnverifiedApproval);
     }
 
     Ok(GoldenSetEvaluation {
