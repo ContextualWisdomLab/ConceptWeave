@@ -122,7 +122,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = validate_output_path(&output)?;
     let report = read_local_snapshot()?;
     if report.zotero_version.starts_with("9.") {
-        eprintln!("Zotero 9 Local API is read-only; writing a local proposal report only");
+        eprintln!("Zotero 9 Local API is read-only; writing local proposal output only");
     }
     let file = create_report_file(&output)?;
     let mut writer = BufWriter::new(file);
