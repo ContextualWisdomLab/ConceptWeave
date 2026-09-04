@@ -62,7 +62,8 @@ fn complete_worksheet() -> conceptweave_zotero::StewardReviewWorksheet {
 fn complete_worksheet_becomes_a_snapshot_bound_golden_set() {
     let worksheet = complete_worksheet();
 
-    let golden = reviewed_golden_set_from_worksheet(&report(), &worksheet, approval(&worksheet)).unwrap();
+    let golden =
+        reviewed_golden_set_from_worksheet(&report(), &worksheet, approval(&worksheet)).unwrap();
 
     assert_eq!(golden.labels.len(), 2);
     assert_eq!(golden.labels[0].item_key, "A");

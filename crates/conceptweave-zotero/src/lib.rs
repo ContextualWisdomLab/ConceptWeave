@@ -1219,7 +1219,8 @@ pub fn reviewed_golden_set_from_worksheet(
     worksheet: &StewardReviewWorksheet,
     approval: GoldenSetApproval,
 ) -> Result<ReviewedGoldenSet, EvaluationError> {
-    let expected = build_steward_review_worksheet(report).map_err(|_| EvaluationError::InvalidReview)?;
+    let expected =
+        build_steward_review_worksheet(report).map_err(|_| EvaluationError::InvalidReview)?;
     if worksheet.decisions.len() != expected.decisions.len() {
         return Err(EvaluationError::IncompleteReview);
     }
