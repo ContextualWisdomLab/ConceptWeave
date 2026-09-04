@@ -7,15 +7,16 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
+const USAGE: &str =
+    "usage: conceptweave-zotero /tmp/REPORT.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json";
+
 fn parse_output_request<I, S>(args: I) -> Result<(Option<String>, String), &'static str>
 where
     I: IntoIterator<Item = S>,
     S: Into<String>,
 {
     let mut args = args.into_iter().map(Into::into);
-    let first = args
-        .next()
-        .ok_or("usage: conceptweave-zotero [--worksheet] /tmp/OUTPUT.json")?;
+    let first = args.next().ok_or(USAGE)?;
     let request = if first == "--worksheet" {
         let report = args
             .next()
@@ -189,7 +190,7 @@ mod tests {
             parse_output_request(vec![report]),
             Ok((None, report.to_owned()))
         );
-        assert!(parse_output_request(Vec::<&str>::new()).is_err());
+        assert_eq!(parse_output_request(Vec::<&str>::new()), Err(USAGE));
         assert!(parse_output_request(vec!["--worksheet"]).is_err());
         assert!(parse_output_request(vec!["--worksheet", report]).is_err());
         assert!(parse_output_request(vec![report, "extra"]).is_err());
