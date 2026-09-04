@@ -723,7 +723,6 @@ impl Zotero10LocalAdapter {
         mut response: ureq::http::Response<ureq::Body>,
         requested_key: &str,
     ) -> Result<ZoteroItem, ZoteroTransportError> {
-        self.verify_server(response.headers())?;
         let object_version = version_header(response.headers())?;
         let body = bounded_body(&mut response)?;
         let item: ZoteroItem =
