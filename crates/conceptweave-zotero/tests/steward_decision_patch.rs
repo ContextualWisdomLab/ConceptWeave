@@ -70,6 +70,28 @@ fn decision_patch_rejects_invalid_identity_and_truth() {
     let report = report();
     let worksheet = build_steward_review_worksheet(&report).unwrap();
 
+    let mut invalid_report = report.clone();
+    invalid_report.rule_revision.clear();
+    assert_eq!(
+        apply_steward_decision_patch(
+            &invalid_report,
+            &worksheet,
+            &patch("A", 7, Disposition::AlignmentVersioning)
+        ),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut invalid_worksheet = worksheet.clone();
+    invalid_worksheet.decisions[0].item_version += 1;
+    assert_eq!(
+        apply_steward_decision_patch(
+            &report,
+            &invalid_worksheet,
+            &patch("A", 7, Disposition::AlignmentVersioning)
+        ),
+        Err(WorksheetError::InvalidReport)
+    );
+
     let mut invalid = patch("A", 7, Disposition::AlignmentVersioning);
     invalid.library_version += 1;
     assert_eq!(
@@ -92,6 +114,7 @@ fn decision_patch_rejects_invalid_identity_and_truth() {
     );
 
     for invalid in [
+        patch(" ", 7, Disposition::OutOfScope),
         patch("UNKNOWN", 7, Disposition::OutOfScope),
         patch("A", 8, Disposition::OutOfScope),
         patch("A", 7, Disposition::NeedsStewardReview),
