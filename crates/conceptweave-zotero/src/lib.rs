@@ -207,7 +207,7 @@ impl fmt::Display for ReadError {
 
 impl std::error::Error for ReadError {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FetchedPage {
     total: usize,
     library_version: u64,
@@ -793,7 +793,7 @@ mod tests {
         let mut unsupported = fetched_page(1, vec![item("A", "book", "x", "", "")]);
         unsupported.api_version = 4;
         assert!(matches!(
-            read_snapshot_with(|_| Ok(unsupported)),
+            read_snapshot_with(|_| Ok(unsupported.clone())),
             Err(ReadError::Contract("Zotero-API-Version"))
         ));
 
@@ -834,7 +834,7 @@ mod tests {
     fn reader_core_rejects_total_and_between_request_resource_exhaustion() {
         let too_many = fetched_page(MAX_SNAPSHOT_ITEMS + 1, vec![]);
         assert!(matches!(
-            read_snapshot_with(|_| Ok(too_many)),
+            read_snapshot_with(|_| Ok(too_many.clone())),
             Err(ReadError::Budget("item-count"))
         ));
 
