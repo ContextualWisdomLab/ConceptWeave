@@ -2492,7 +2492,8 @@ mod tests {
                         let mut chunk = [0; 4096];
                         let length = stream.read(&mut chunk).unwrap();
                         bytes.extend_from_slice(&chunk[..length]);
-                        let Some(header_end) = bytes.windows(4).position(|part| part == b"\r\n\r\n")
+                        let Some(header_end) =
+                            bytes.windows(4).position(|part| part == b"\r\n\r\n")
                         else {
                             continue;
                         };
