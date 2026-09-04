@@ -9,7 +9,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::process::Command;
 
 #[test]
-fn finalization_rejects_distinct_path_spellings_for_one_input_file() {
+fn artifact_commands_reject_distinct_path_spellings_for_one_input_file() {
     let item = ZoteroItem {
         key: "ITEM".into(),
         version: 7,
@@ -85,11 +85,24 @@ fn finalization_rejects_distinct_path_spellings_for_one_input_file() {
         ])
         .status()
         .unwrap();
+    let progress_status = Command::new(env!("CARGO_BIN_EXE_conceptweave-zotero"))
+        .args([
+            "--review-progress",
+            &report_path,
+            &worksheet_path,
+            output.to_str().unwrap(),
+        ])
+        .status()
+        .unwrap();
 
     let _ = fs::remove_file(&input);
     let _ = fs::remove_file(&output);
     assert!(
         !status.success(),
         "finalization must reject three path spellings that resolve to one input artifact"
+    );
+    assert!(
+        !progress_status.success(),
+        "progress must reject two path spellings that resolve to one input artifact"
     );
 }
