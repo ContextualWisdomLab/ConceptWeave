@@ -194,14 +194,34 @@ impl GoldenLabel {
 /// Version-bound steward labels that remain outside the repository.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ReviewedGoldenSet {
-    /// Opaque review receipt identifier.
-    pub review_id: String,
+    /// Approval receipt verified by the caller's governance boundary.
+    pub approval: GoldenSetApproval,
+    /// Item-level expected dispositions.
+    pub labels: Vec<GoldenLabel>,
+}
+
+/// One item revision in the exact reviewed classification snapshot.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+pub struct SnapshotItemRevision {
+    /// Stable Zotero item key.
+    pub item_key: String,
+    /// Item revision observed during review.
+    pub item_version: u64,
+}
+
+/// Governance receipt binding a steward approval to one exact classifier input.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct GoldenSetApproval {
+    /// Opaque receipt identifier.
+    pub receipt_id: String,
+    /// Stable reviewer subject understood by the governance verifier.
+    pub reviewer_subject: String,
     /// Zotero library version reviewed by the steward.
     pub library_version: u64,
     /// Classifier rule revision whose proposals were reviewed.
     pub rule_revision: String,
-    /// Item-level expected dispositions.
-    pub labels: Vec<GoldenLabel>,
+    /// Complete sorted item-revision identity of the reviewed report.
+    pub snapshot_items: Vec<SnapshotItemRevision>,
 }
 
 /// Integer evidence from which precision and recall can be calculated exactly.
@@ -237,6 +257,10 @@ pub enum EvaluationError {
     InvalidReview,
     /// The golden set was reviewed against another library or rule revision.
     SnapshotMismatch,
+    /// The caller's governance boundary did not verify the approval receipt.
+    UnverifiedApproval,
+    /// Abstention cannot be used as steward-approved semantic truth.
+    InvalidExpectedDisposition,
     /// A reviewed key is absent from the classification report.
     UnknownItem,
     /// A reviewed key occurs more than once.
@@ -248,6 +272,10 @@ impl fmt::Display for EvaluationError {
         formatter.write_str(match self {
             Self::InvalidReview => "golden-set review metadata or labels are invalid",
             Self::SnapshotMismatch => "golden set does not match the report snapshot",
+            Self::UnverifiedApproval => "golden-set approval receipt is unverified",
+            Self::InvalidExpectedDisposition => {
+                "steward truth cannot use the classifier abstention disposition"
+            }
             Self::UnknownItem => "golden set contains an item absent from the report",
             Self::DuplicateItem => "golden set contains a duplicate item",
         })
@@ -257,18 +285,46 @@ impl fmt::Display for EvaluationError {
 impl std::error::Error for EvaluationError {}
 
 /// Evaluates reviewed labels without copying item identities into the result.
-pub fn evaluate_reviewed_golden_set(
+pub fn evaluate_reviewed_golden_set<F>(
     report: &ClassificationReport,
     golden: &ReviewedGoldenSet,
-) -> Result<GoldenSetEvaluation, EvaluationError> {
-    if golden.review_id.trim().is_empty()
+    verify_approval: F,
+) -> Result<GoldenSetEvaluation, EvaluationError>
+where
+    F: FnOnce(&GoldenSetApproval) -> bool,
+{
+    if golden.approval.receipt_id.trim().is_empty()
+        || golden.approval.reviewer_subject.trim().is_empty()
         || golden.labels.is_empty()
-        || golden.rule_revision.trim().is_empty()
+        || golden.approval.rule_revision.trim().is_empty()
     {
         return Err(EvaluationError::InvalidReview);
     }
-    if golden.library_version != report.library_version
-        || golden.rule_revision != report.rule_revision
+    if !verify_approval(&golden.approval) {
+        return Err(EvaluationError::UnverifiedApproval);
+    }
+    let report_snapshot = report
+        .classified_items
+        .iter()
+        .map(|item| SnapshotItemRevision {
+            item_key: item.item_key.clone(),
+            item_version: item.item_version,
+        })
+        .collect::<BTreeSet<_>>();
+    let approved_snapshot = golden
+        .approval
+        .snapshot_items
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    if report_snapshot.len() != report.classified_items.len()
+        || approved_snapshot.len() != golden.approval.snapshot_items.len()
+    {
+        return Err(EvaluationError::InvalidReview);
+    }
+    if golden.approval.library_version != report.library_version
+        || golden.approval.rule_revision != report.rule_revision
+        || approved_snapshot != report_snapshot
     {
         return Err(EvaluationError::SnapshotMismatch);
     }
@@ -278,9 +334,6 @@ pub fn evaluate_reviewed_golden_set(
         .iter()
         .map(|item| (item.item_key.as_str(), item.proposed_disposition))
         .collect::<BTreeMap<_, _>>();
-    if classified.len() != report.classified_items.len() {
-        return Err(EvaluationError::InvalidReview);
-    }
     let mut seen = BTreeSet::new();
     let mut correct_count = 0;
     let mut abstention_count = 0;
@@ -289,6 +342,9 @@ pub fn evaluate_reviewed_golden_set(
     for label in &golden.labels {
         if label.item_key.trim().is_empty() {
             return Err(EvaluationError::InvalidReview);
+        }
+        if label.expected_disposition == Disposition::NeedsStewardReview {
+            return Err(EvaluationError::InvalidExpectedDisposition);
         }
         if !seen.insert(label.item_key.as_str()) {
             return Err(EvaluationError::DuplicateItem);
@@ -312,7 +368,7 @@ pub fn evaluate_reviewed_golden_set(
     }
 
     Ok(GoldenSetEvaluation {
-        review_id: golden.review_id.clone(),
+        review_id: golden.approval.receipt_id.clone(),
         reviewed_count: golden.labels.len(),
         correct_count,
         abstention_count,
