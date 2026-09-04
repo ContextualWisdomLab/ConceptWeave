@@ -12,7 +12,7 @@ ConceptWeave needs to observe PostgreSQL metadata without turning source connect
 ## Constraints
 
 - Source systems are read-only inputs; ConceptWeave does not own their business truth.
-- Only an opaque source registry key may cross the port: at most 128 bytes, lowercase multiword `snake_case`. Passwords, tokens, DSNs, URLs, shell-style connection parameters, and provider-specific connection objects may not cross this boundary.
+- Only an opaque source registry key may cross the port: at most 128 bytes, lowercase multiword `snake_case`. An authorized registry lookup must issue the capability accepted by immutable snapshots; syntax alone is not provenance authority. Passwords, tokens, DSNs, URLs, shell-style connection parameters, and provider-specific connection objects may not cross this boundary.
 - Every request needs an explicit non-empty exact-schema allowlist and positive statement-timeout, row, byte, and concurrency bounds.
 - Caller cancellation and source disappearance must fail closed rather than return a fabricated or partial success.
 - Exact source identifiers keep original case/text; canonicalization may order an allowlist but must not normalize identifier meaning.
@@ -39,7 +39,7 @@ Selected. `conceptweave-source-port` owns request budgets, exact schema authoriz
 
 ## Decision
 
-Introduce the Rust workspace crate `conceptweave-source-port` as a Supporting-domain port contract. `ObservationLimits` requires positive statement-timeout, row, byte, and concurrency limits. `ObservationRequest` requires an opaque source registry key of at most 128 bytes using lowercase multiword `snake_case`, plus a non-empty exact schema allowlist. It rejects raw DSNs/URLs/key-value connection material, one-word/generic keys, malformed registry identifiers, and blank or duplicate schema identifiers, and sorts the allowlist only for deterministic request identity. `ObservationCancellation` carries caller cancellation. `SourceObservationPort` defines the adapter seam. `SourceObservationFailure` distinguishes cancellation, source disappearance, statement timeout, and row/byte/concurrency-limit exhaustion.
+Introduce the Rust workspace crate `conceptweave-source-port` as a Supporting-domain port contract. `ObservationLimits` requires positive operation/statement-timeout, row, byte, and concurrency limits. `ObservationRequest` requires an opaque source registry key of at most 128 bytes using lowercase multiword `snake_case`, plus a non-empty exact schema allowlist. It rejects raw DSNs/URLs/key-value connection material, one-word/generic keys, malformed registry identifiers, and blank or duplicate schema identifiers, and sorts the allowlist only for deterministic request identity. `SourceConnectionRegistry` resolves the exact key and issues `ResolvedSourceConnection`; `PostgresSchemaSnapshot` accepts only that opaque capability. `ObservationCancellation` carries caller cancellation. `SourceObservationPort` defines the adapter seam. `SourceObservationFailure` distinguishes cancellation, source disappearance, timeout, invalid captured metadata, and row/byte/concurrency-limit exhaustion.
 
 This decision does **not** claim that a production PostgreSQL adapter exists. The next owner-side implementation must select a maintained Rust PostgreSQL driver, resolve the registry key to credentials inside the adapter ACL, establish read-only transaction/session behavior, enforce every port limit in execution rather than configuration only, populate the immutable `conceptweave-observation` contracts, and prove cancellation/source-disappearance behavior against a frozen anonymized reference fixture before live-source readiness is claimed.
 
@@ -50,6 +50,7 @@ This decision does **not** claim that a production PostgreSQL adapter exists. Th
 - Test-first security commit `2f6cd4e6f80b60a0d8118de2162d974bbabde4cc` demonstrates that DSNs, shell-style connection parameters, one-word identifiers, mixed-case identifiers, hyphenated identifiers, and malformed underscore forms must fail before adapter access.
 - Production commit `339222cba31f126a5f5f36fe00f890fc82c4aa79` turns `source_connection_key` into the bounded opaque registry-key contract instead of attempting heuristic secret scanning.
 - Edge-coverage commit `729820490f7d072d28444432a082d9fae263f194` covers the 128-byte registry-key bound.
+- Test-first commits `2194a4ed1b8262d76dca0e7708cfd30114372a2b`, `d073aed`, `a39fa08`, and `38ecdf0` pin targeted foreign-key delete columns and registry-resolved snapshot identity; production commits `eb96251`, `cbfa38a`, and `17c5067` implement those boundaries.
 - `docs/product-technical-gap-baseline.md` records the port as implemented-pending-checks and keeps the concrete PostgreSQL adapter OPEN.
 - Exact-head hosted Product evidence remains required; predecessor or queued runs are not completion evidence.
 
