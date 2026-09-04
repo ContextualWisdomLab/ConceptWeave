@@ -1079,13 +1079,14 @@ impl std::error::Error for WorksheetError {}
 pub fn build_steward_review_worksheet(
     report: &ClassificationReport,
 ) -> Result<StewardReviewWorksheet, WorksheetError> {
-    let disposition_counts = report.classified_items.iter().fold(
-        BTreeMap::new(),
-        |mut counts, item| {
-            *counts.entry(item.proposed_disposition).or_insert(0) += 1;
-            counts
-        },
-    );
+    let disposition_counts =
+        report
+            .classified_items
+            .iter()
+            .fold(BTreeMap::new(), |mut counts, item| {
+                *counts.entry(item.proposed_disposition).or_insert(0) += 1;
+                counts
+            });
     let provenance_complete_count = report
         .classified_items
         .iter()
