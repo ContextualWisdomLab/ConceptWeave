@@ -519,13 +519,13 @@ impl Zotero10LocalAdapter {
             collections: &'a [String],
             tags: &'a [ItemTag],
         }
-        let body = serde_json::to_string(&[Write {
+        let body = serde_json::json!([Write {
             key: &request.item_key,
             version: request.item_version,
             collections: &request.collection_keys,
             tags: &request.tags,
         }])
-        .map_err(|_| ZoteroTransportError::InvalidResponse)?;
+        .to_string();
         let mut response = self
             .agent
             .post(&self.base)
@@ -2115,20 +2115,7 @@ mod tests {
                 .map(|response| {
                     let (mut stream, _) = listener.accept().unwrap();
                     let mut bytes = vec![0; 16 * 1024];
-                    let mut length = 0;
-                    loop {
-                        length += stream.read(&mut bytes[length..]).unwrap();
-                        let request = String::from_utf8_lossy(&bytes[..length]);
-                        let headers_end = request.find("\r\n\r\n").unwrap_or(usize::MAX);
-                        let content_length = request
-                            .lines()
-                            .find_map(|line| line.strip_prefix("content-length: "))
-                            .and_then(|value| value.parse::<usize>().ok())
-                            .unwrap_or(0);
-                        if headers_end != usize::MAX && length >= headers_end + 4 + content_length {
-                            break;
-                        }
-                    }
+                    let length = stream.read(&mut bytes).unwrap();
                     stream.write_all(response.as_bytes()).unwrap();
                     String::from_utf8(bytes[..length].to_vec()).unwrap()
                 })
@@ -2164,8 +2151,44 @@ mod tests {
         )
     }
 
+    fn raw_response(server_id: Option<&str>, version: Option<u64>, body: &str) -> String {
+        let server = server_id
+            .map(|value| format!("Zotero-Server-ID: {value}\r\n"))
+            .unwrap_or_default();
+        let version = version
+            .map(|value| format!("Last-Modified-Version: {value}\r\n"))
+            .unwrap_or_default();
+        format!(
+            "HTTP/1.1 200 OK\r\n{server}{version}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        )
+    }
+
+    fn write_request() -> ClassificationWriteRequest {
+        ClassificationWriteRequest {
+            server_id: "server-10".into(),
+            library_version: 42,
+            item_key: "ABCD2345".into(),
+            item_version: 7,
+            collection_keys: vec!["BCDE3456".into()],
+            tags: vec![ItemTag {
+                tag: "kept".into(),
+                tag_type: Some(1),
+            }],
+        }
+    }
+
     fn transport(base: String) -> Zotero10LocalAdapter {
         Zotero10LocalAdapter::new_with_base("top-secret-key", "server-10", base).unwrap()
+    }
+
+    fn assert_write_invalid(response: String) {
+        let (base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+        assert_eq!(
+            transport(base).write_item(&write_request()).unwrap_err(),
+            ZoteroTransportError::InvalidResponse
+        );
+        server.join().unwrap();
     }
 
     #[test]
@@ -2213,17 +2236,7 @@ mod tests {
     fn zotero10_post_atomically_replaces_complete_arrays() {
         let response = write_response("server-10", 43, 43);
         let (base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
-        let request = ClassificationWriteRequest {
-            server_id: "server-10".into(),
-            library_version: 42,
-            item_key: "ABCD2345".into(),
-            item_version: 7,
-            collection_keys: vec!["BCDE3456".into()],
-            tags: vec![ItemTag {
-                tag: "kept".into(),
-                tag_type: Some(1),
-            }],
-        };
+        let request = write_request();
         let state = transport(base).write_item(&request).unwrap();
         assert_eq!(state.library_version, 43);
         assert_eq!(state.item_version, 43);
@@ -2235,7 +2248,7 @@ mod tests {
         assert!(requests[0].contains("content-type: application/json\r\n"));
         assert!(
             requests[0].ends_with(
-                r#"[{"key":"ABCD2345","version":7,"collections":["BCDE3456"],"tags":[{"tag":"kept","type":1}]}]"#
+                r#"[{"collections":["BCDE3456"],"key":"ABCD2345","tags":[{"tag":"kept","type":1}],"version":7}]"#
             )
         );
     }
@@ -2317,6 +2330,12 @@ mod tests {
                 ZoteroTransportError::InvalidItemKey
             );
         }
+        let mut invalid_write = write_request();
+        invalid_write.item_key = "invalid".into();
+        assert_eq!(
+            adapter.write_item(&invalid_write).unwrap_err(),
+            ZoteroTransportError::InvalidItemKey
+        );
 
         let malformed = "HTTP/1.1 200 OK\r\nZotero-Server-ID: server-10\r\nLast-Modified-Version: 42\r\nContent-Length: 1\r\nConnection: close\r\n\r\n{";
         let before = library_response("server-10", 42);
@@ -2368,6 +2387,115 @@ mod tests {
             ZoteroTransportError::InvalidResponse
         );
         server.join().unwrap();
+    }
+
+    #[test]
+    fn zotero10_transport_covers_read_stage_failures() {
+        let library = library_response("server-10", 42);
+        let (base, server) = serve(vec![
+            Box::leak(library.into_boxed_str()),
+            "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+        ]);
+        assert_eq!(
+            transport(base).get_item("ABCD2345").unwrap_err(),
+            ZoteroTransportError::RequestFailed
+        );
+        server.join().unwrap();
+
+        let before = library_response("server-10", 42);
+        let item = item_response("server-10", 7);
+        let (base, server) = serve(vec![
+            Box::leak(before.into_boxed_str()),
+            Box::leak(item.into_boxed_str()),
+            "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+        ]);
+        assert_eq!(
+            transport(base).get_item("ABCD2345").unwrap_err(),
+            ZoteroTransportError::RequestFailed
+        );
+        server.join().unwrap();
+
+        for response in [
+            raw_response(None, Some(42), "{}"),
+            raw_response(Some("server-10"), None, "{}"),
+        ] {
+            let (base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+            assert_eq!(
+                transport(base).get_item("ABCD2345").unwrap_err(),
+                ZoteroTransportError::InvalidResponse
+            );
+            server.join().unwrap();
+        }
+
+        let item_body = r#"{"key":"ABCD2345","version":8,"data":{"itemType":"book"}}"#;
+        for item in [
+            raw_response(Some("other-server"), Some(8), item_body),
+            raw_response(Some("server-10"), None, item_body),
+            raw_response(Some("server-10"), Some(7), item_body),
+        ] {
+            let before = library_response("server-10", 42);
+            let (base, server) = serve(vec![
+                Box::leak(before.into_boxed_str()),
+                Box::leak(item.into_boxed_str()),
+            ]);
+            let error = transport(base).get_item("ABCD2345").unwrap_err();
+            assert!(matches!(
+                error,
+                ZoteroTransportError::InvalidResponse | ZoteroTransportError::ServerMismatch
+            ));
+            server.join().unwrap();
+        }
+
+        let oversized = "x".repeat((MAX_ITEM_RESPONSE_BYTES + 1) as usize);
+        let before = library_response("server-10", 42);
+        let item = raw_response(Some("server-10"), Some(7), &oversized);
+        let (base, server) = serve(vec![
+            Box::leak(before.into_boxed_str()),
+            Box::leak(item.into_boxed_str()),
+        ]);
+        assert_eq!(
+            transport(base).get_item("ABCD2345").unwrap_err(),
+            ZoteroTransportError::InvalidResponse
+        );
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn zotero10_transport_rejects_every_unproven_write_result() {
+        assert_write_invalid(raw_response(Some("server-10"), None, "{}"));
+        assert_write_invalid(raw_response(Some("server-10"), Some(43), "{"));
+        assert_write_invalid(raw_response(Some("server-10"), Some(43), "{}"));
+        assert_write_invalid(raw_response(
+            Some("server-10"),
+            Some(43),
+            r#"{"successful":{"0":{"key":"ABCD2345","version":43,"data":{"itemType":"book","collections":["BCDE3456"],"tags":[{"tag":"kept","type":1}]}},"1":{"key":"BCDE3456","version":43,"data":{"itemType":"book"}}}}"#,
+        ));
+        for (version, body) in [
+            (
+                43,
+                r#"{"successful":{"0":{"key":"BCDE3456","version":43,"data":{"itemType":"book","collections":["BCDE3456"],"tags":[{"tag":"kept","type":1}]}}}}"#,
+            ),
+            (
+                7,
+                r#"{"successful":{"0":{"key":"ABCD2345","version":7,"data":{"itemType":"book","collections":["BCDE3456"],"tags":[{"tag":"kept","type":1}]}}}}"#,
+            ),
+            (
+                43,
+                r#"{"successful":{"0":{"key":"ABCD2345","version":44,"data":{"itemType":"book","collections":["BCDE3456"],"tags":[{"tag":"kept","type":1}]}}}}"#,
+            ),
+            (
+                43,
+                r#"{"successful":{"0":{"key":"ABCD2345","version":43,"data":{"itemType":"book","collections":[],"tags":[{"tag":"kept","type":1}]}}}}"#,
+            ),
+            (
+                43,
+                r#"{"successful":{"0":{"key":"ABCD2345","version":43,"data":{"itemType":"book","collections":["BCDE3456"],"tags":[]}}}}"#,
+            ),
+        ] {
+            assert_write_invalid(raw_response(Some("server-10"), Some(version), body));
+        }
+        let oversized = "x".repeat((MAX_ITEM_RESPONSE_BYTES + 1) as usize);
+        assert_write_invalid(raw_response(Some("server-10"), Some(43), &oversized));
     }
 
     #[test]
