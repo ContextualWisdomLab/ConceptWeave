@@ -10,7 +10,7 @@ Issue #8 requires classification changes to default to dry-run, preserve complet
 
 ## Decision
 
-ConceptWeave builds a local-only `ClassificationWritePlan` from an externally verified complete review set. Dry-run is the default. The plan must match the exact server identity, library version, classifier revision, raw-snapshot digest, item version, and complete observed collection/tag state. It rejects unknown or duplicate items, blank or duplicate metadata, no-op changes, and `NeedsStewardReview` as a write decision. Operations are deterministic and retain complete before, after, and rollback states. Zotero tag `type` is preserved.
+ConceptWeave builds a local-only `ClassificationWritePlan` from an externally verified complete review set. Dry-run is the default. The review must match the exact Zotero version, server identity, library version, classifier revision, raw-snapshot digest, complete item-key/item-version coordinates, and observed collection/tag state. The plan retains the reviewed Zotero version used for execute eligibility. It rejects unknown or duplicate items, detached item revisions, blank or duplicate metadata, unsupported tag types, no-op changes, and `NeedsStewardReview` as a write decision. Operations are deterministic and retain complete before, after, and rollback states. Manual tag markers `None` and `0` are canonicalized to `None`; automatic tag type `1` is preserved.
 
 Execute planning fails closed for Zotero versions below 10. The plan contains no API key and performs no network call. A later adapter must preflight all operations and return item-level partial-success and rollback receipts; it must not claim cross-item transactionality or delete source records and attachments.
 
