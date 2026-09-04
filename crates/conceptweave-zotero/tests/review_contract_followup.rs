@@ -1,6 +1,4 @@
-use conceptweave_zotero::{
-    classify_snapshot, AbstentionReason, Disposition, ItemData, ZoteroItem,
-};
+use conceptweave_zotero::{AbstentionReason, Disposition, ItemData, ZoteroItem, classify_snapshot};
 
 fn item(key: &str, title: &str, abstract_note: &str) -> ZoteroItem {
     ZoteroItem {
@@ -24,15 +22,14 @@ fn conflicting_specific_rule_families_abstain_for_steward_review() {
         "9.0.6".into(),
         None,
         42,
-        vec![item(
-            "A",
-            "Ontology matching and ontology learning",
-            "",
-        )],
+        vec![item("A", "Ontology matching and ontology learning", "")],
     );
 
     let classified = &report.classified_items[0];
-    assert_eq!(classified.proposed_disposition, Disposition::NeedsStewardReview);
+    assert_eq!(
+        classified.proposed_disposition,
+        Disposition::NeedsStewardReview
+    );
     assert_eq!(
         classified.abstention_reason,
         Some(AbstentionReason::ConflictingDispositionEvidence)
@@ -54,9 +51,16 @@ fn matched_abstract_value_is_preserved_for_replayable_review() {
     );
 
     let classified = &report.classified_items[0];
-    assert_eq!(classified.proposed_disposition, Disposition::AlignmentVersioning);
     assert_eq!(
-        classified.evidence.field_values.get("abstract_note").map(String::as_str),
+        classified.proposed_disposition,
+        Disposition::AlignmentVersioning
+    );
+    assert_eq!(
+        classified
+            .evidence
+            .field_values
+            .get("abstract_note")
+            .map(String::as_str),
         Some(abstract_note)
     );
 }

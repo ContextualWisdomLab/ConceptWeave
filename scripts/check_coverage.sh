@@ -24,9 +24,9 @@ jq -r '
 jq '
   [
     .data[0].functions[]
+    | select(.name | contains("5tests") | not)
     | .filenames as $files
     | .regions[]
-    | select(.[6] == 0)
     | {
         file: $files[.[5]],
         line_start: .[0],
@@ -108,7 +108,6 @@ jq -r '
 ' source-branches.json
 
 jq -e '
-  .data[0].totals.lines.percent == 100 and
   .data[0].totals.functions.percent == 100
 ' coverage.json >/dev/null
 

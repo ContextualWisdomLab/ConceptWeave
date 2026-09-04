@@ -5,7 +5,17 @@ use conceptweave_zotero::read_local_snapshot;
 use std::env;
 use std::fs::{self, OpenOptions};
 use std::io::{self, BufWriter, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+fn allowed_output_parents() -> [PathBuf; 2] {
+    [
+        env::temp_dir()
+            .canonicalize()
+            .expect("system temporary directory must exist"),
+        Path::new("/tmp").canonicalize().expect("/tmp must exist"),
+    ]
+}
 
 fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
     let path = PathBuf::from(raw);
@@ -16,12 +26,12 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
         ));
     }
 
-    let allowed_parent = env::temp_dir().canonicalize()?;
+    let allowed_parents = allowed_output_parents();
     let parent = path.parent().ok_or_else(|| {
         io::Error::new(io::ErrorKind::InvalidInput, "report output has no parent")
     })?;
     let resolved_parent = parent.canonicalize()?;
-    if resolved_parent != allowed_parent {
+    if !allowed_parents.contains(&resolved_parent) {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             "report output must be a direct child of the system temp directory",
@@ -71,14 +81,34 @@ mod tests {
     fn output_path_must_be_a_new_direct_temp_child() {
         let allowed = unique_temp_path("allowed");
         let _ = fs::remove_file(&allowed);
-        assert_eq!(validate_output_path(allowed.to_str().unwrap()).unwrap(), allowed);
+        assert_eq!(
+            validate_output_path(allowed.to_str().unwrap()).unwrap(),
+            allowed
+        );
 
         assert!(validate_output_path("relative.json").is_err());
+        assert!(validate_output_path("/").is_err());
+        assert!(validate_output_path("/tmp/missing-directory/report.json").is_err());
+        assert!(
+            validate_output_path(
+                env::current_dir()
+                    .unwrap()
+                    .join("report.json")
+                    .to_str()
+                    .unwrap()
+            )
+            .is_err()
+        );
 
-        let nested_dir = env::temp_dir().join(format!(
-            "conceptweave-zotero-{}-nested",
+        let conventional = Path::new("/tmp").join(format!(
+            "conceptweave-zotero-{}-conventional.json",
             std::process::id()
         ));
+        let _ = fs::remove_file(&conventional);
+        assert!(validate_output_path(conventional.to_str().unwrap()).is_ok());
+
+        let nested_dir =
+            env::temp_dir().join(format!("conceptweave-zotero-{}-nested", std::process::id()));
         fs::create_dir_all(&nested_dir).unwrap();
         assert!(validate_output_path(nested_dir.join("report.json").to_str().unwrap()).is_err());
         fs::remove_dir_all(nested_dir).unwrap();

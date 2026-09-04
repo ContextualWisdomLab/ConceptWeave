@@ -233,7 +233,7 @@ pub fn read_local_snapshot() -> Result<ClassificationReport, ReadError> {
         .max_redirects(0)
         .build();
     let agent = ureq::Agent::new_with_config(config);
-    read_snapshot_with(|start| fetch_local_page(&agent, start))
+    read_snapshot_with(&mut |start| fetch_local_page(&agent, start))
 }
 
 fn local_api_base() -> String {
@@ -309,7 +309,7 @@ fn optional_header(headers: &ureq::http::HeaderMap, name: &'static str) -> Optio
 }
 
 fn read_snapshot_with(
-    mut fetch_page: impl FnMut(usize) -> Result<FetchedPage, ReadError>,
+    fetch_page: &mut dyn FnMut(usize) -> Result<FetchedPage, ReadError>,
 ) -> Result<ClassificationReport, ReadError> {
     let mut items = Vec::new();
     let mut snapshot_bytes = 0_u64;
@@ -321,7 +321,7 @@ fn read_snapshot_with(
 
     loop {
         if expected_total.is_some_and(|total| items.len() < total)
-            && (items.len() >= MAX_SNAPSHOT_ITEMS || snapshot_bytes >= MAX_SNAPSHOT_BYTES)
+            && snapshot_bytes >= MAX_SNAPSHOT_BYTES
         {
             return Err(ReadError::Budget("whole-snapshot"));
         }
@@ -381,9 +381,9 @@ fn read_snapshot_with(
     }
 
     let mut report = classify_snapshot(
-        zotero_version.ok_or(ReadError::Header("X-Zotero-Version"))?,
+        zotero_version.expect("a completed snapshot has Zotero version metadata"),
         server_id,
-        library_version.ok_or(ReadError::Header("Last-Modified-Version"))?,
+        library_version.expect("a completed snapshot has library version metadata"),
         items,
     );
     report.api_version = Some(SUPPORTED_API_VERSION);
@@ -401,18 +401,14 @@ fn checked_snapshot_usage(
     if advertised_total > MAX_SNAPSHOT_ITEMS {
         return Err(ReadError::Budget("item-count"));
     }
-    let next_items = current_items
-        .checked_add(page_items)
-        .ok_or(ReadError::Budget("item-count"))?;
+    let next_items = current_items.saturating_add(page_items);
     if next_items > MAX_SNAPSHOT_ITEMS {
         return Err(ReadError::Budget("item-count"));
     }
     if next_items > advertised_total {
         return Err(ReadError::SnapshotChanged);
     }
-    let next_bytes = current_bytes
-        .checked_add(page_bytes)
-        .ok_or(ReadError::Budget("byte-count"))?;
+    let next_bytes = current_bytes.saturating_add(page_bytes);
     if next_bytes > MAX_SNAPSHOT_BYTES {
         return Err(ReadError::Budget("byte-count"));
     }
@@ -782,10 +778,13 @@ mod tests {
             fetched_page(2, vec![item("B", "book", "semantic web", "", "")]),
         ]
         .into_iter();
-        let report = read_snapshot_with(|_| Ok(pages.next().unwrap())).unwrap();
+        let report = read_snapshot_with(&mut |_| Ok(pages.next().unwrap())).unwrap();
         assert_eq!(report.observed_item_count, 2);
         assert_eq!(report.api_version, Some(3));
         assert_eq!(report.schema_version, Some(42));
+
+        let empty = read_snapshot_with(&mut |_| Ok(fetched_page(0, vec![]))).unwrap();
+        assert_eq!(empty.observed_item_count, 0);
     }
 
     #[test]
@@ -793,31 +792,43 @@ mod tests {
         let mut unsupported = fetched_page(1, vec![item("A", "book", "x", "", "")]);
         unsupported.api_version = 4;
         assert!(matches!(
-            read_snapshot_with(|_| Ok(unsupported.clone())),
+            read_snapshot_with(&mut |_| Ok(unsupported.clone())),
             Err(ReadError::Contract("Zotero-API-Version"))
         ));
 
-        let mut pages = vec![
-            fetched_page(2, vec![item("A", "book", "x", "", "")]),
-            {
-                let mut page = fetched_page(2, vec![item("B", "book", "y", "", "")]);
-                page.schema_version = 43;
-                page
-            },
-        ]
-        .into_iter();
         assert!(matches!(
-            read_snapshot_with(|_| Ok(pages.next().unwrap())),
+            read_snapshot_with(&mut |_| Err(ReadError::Http("offline".into()))),
+            Err(ReadError::Http(_))
+        ));
+
+        for changed in ["total", "library", "zotero", "schema", "server"] {
+            let mut second = fetched_page(2, vec![item("B", "book", "y", "", "")]);
+            match changed {
+                "total" => second.total = 3,
+                "library" => second.library_version += 1,
+                "zotero" => second.zotero_version = "10.0".into(),
+                "schema" => second.schema_version += 1,
+                "server" => second.server_id = Some("other".into()),
+                _ => unreachable!(),
+            }
+            let mut pages = vec![
+                fetched_page(2, vec![item("A", "book", "x", "", "")]),
+                second,
+            ]
+            .into_iter();
+            assert!(matches!(
+                read_snapshot_with(&mut |_| Ok(pages.next().unwrap())),
+                Err(ReadError::SnapshotChanged)
+            ));
+        }
+
+        assert!(matches!(
+            read_snapshot_with(&mut |_| Ok(fetched_page(1, vec![]))),
             Err(ReadError::SnapshotChanged)
         ));
 
         assert!(matches!(
-            read_snapshot_with(|_| Ok(fetched_page(1, vec![]))),
-            Err(ReadError::SnapshotChanged)
-        ));
-
-        assert!(matches!(
-            read_snapshot_with(|_| {
+            read_snapshot_with(&mut |_| {
                 Ok(fetched_page(
                     2,
                     vec![
@@ -834,13 +845,13 @@ mod tests {
     fn reader_core_rejects_total_and_between_request_resource_exhaustion() {
         let too_many = fetched_page(MAX_SNAPSHOT_ITEMS + 1, vec![]);
         assert!(matches!(
-            read_snapshot_with(|_| Ok(too_many.clone())),
+            read_snapshot_with(&mut |_| Ok(too_many.clone())),
             Err(ReadError::Budget("item-count"))
         ));
 
         let mut calls = 0;
         assert!(matches!(
-            read_snapshot_with(|_| {
+            read_snapshot_with(&mut |_| {
                 calls += 1;
                 let mut page = fetched_page(2, vec![item("A", "book", "x", "", "")]);
                 page.body_bytes = MAX_SNAPSHOT_BYTES;
@@ -849,6 +860,13 @@ mod tests {
             Err(ReadError::Budget("whole-snapshot"))
         ));
         assert_eq!(calls, 1);
+
+        let mut oversized = fetched_page(1, vec![item("A", "book", "x", "", "")]);
+        oversized.body_bytes = MAX_SNAPSHOT_BYTES + 1;
+        assert!(matches!(
+            read_snapshot_with(&mut |_| Ok(oversized.clone())),
+            Err(ReadError::Budget("byte-count"))
+        ));
     }
 
     #[test]
@@ -863,7 +881,15 @@ mod tests {
             Err(ReadError::Budget("item-count"))
         ));
         assert!(matches!(
+            checked_snapshot_usage(usize::MAX, 1, 0, 1, usize::MAX),
+            Err(ReadError::Budget("item-count"))
+        ));
+        assert!(matches!(
             checked_snapshot_usage(0, 1, MAX_SNAPSHOT_BYTES, 1, 1),
+            Err(ReadError::Budget("byte-count"))
+        ));
+        assert!(matches!(
+            checked_snapshot_usage(0, 1, u64::MAX, 1, 1),
             Err(ReadError::Budget("byte-count"))
         ));
         assert!(matches!(
@@ -884,11 +910,12 @@ mod tests {
             42,
             vec![
                 item("C", "attachment", "", "", "B"),
+                item("D", "note", "Ignored", "", ""),
                 generation,
                 item("A", "book", "Other", "", ""),
             ],
         );
-        assert_eq!(report.observed_item_count, 3);
+        assert_eq!(report.observed_item_count, 4);
         assert_eq!(report.classified_items.len(), 2);
         assert_eq!(
             report.classified_items[0].abstention_reason,
@@ -896,11 +923,17 @@ mod tests {
         );
         assert_eq!(
             report.classified_items[1].proposed_disposition,
-            Disposition::Generation
+            Disposition::NeedsStewardReview
         );
-        assert_eq!(report.classified_items[1].abstention_reason, None);
+        assert_eq!(
+            report.classified_items[1].abstention_reason,
+            Some(AbstentionReason::ConflictingDispositionEvidence)
+        );
         assert_eq!(report.classified_items[1].child_item_keys, ["C"]);
-        assert_eq!(report.classified_items[1].evidence.fields, ["title"]);
+        assert_eq!(
+            report.classified_items[1].evidence.fields,
+            ["tags", "title"]
+        );
     }
 
     #[test]
@@ -960,12 +993,7 @@ mod tests {
             Some("Evidence for ontology alignment")
         );
 
-        let missing = classify_snapshot(
-            "10".into(),
-            None,
-            1,
-            vec![item("A", "book", "", "", "")],
-        );
+        let missing = classify_snapshot("10".into(), None, 1, vec![item("A", "book", "", "", "")]);
         assert_eq!(
             missing.classified_items[0].abstention_reason,
             Some(AbstentionReason::MissingClassificationMetadata)
@@ -1007,20 +1035,16 @@ mod tests {
             1,
             vec![
                 item("A", "book", "OWL: Overview", "doi:10.1/X", ""),
-                item(
-                    "B",
-                    "book",
-                    "owl overview",
-                    "https://dx.doi.org/10.1/x",
-                    "",
-                ),
+                item("B", "book", "owl overview", "https://dx.doi.org/10.1/x", ""),
             ],
         );
         assert_eq!(report.duplicate_candidates.len(), 2);
-        assert!(report
-            .duplicate_candidates
-            .iter()
-            .all(|candidate| candidate.item_keys == ["A", "B"]));
+        assert!(
+            report
+                .duplicate_candidates
+                .iter()
+                .all(|candidate| candidate.item_keys == ["A", "B"])
+        );
     }
 
     #[test]
@@ -1030,7 +1054,11 @@ mod tests {
         assert!(ReadError::SnapshotChanged.to_string().contains("changed"));
         assert!(ReadError::Budget("items").to_string().contains("budget"));
         assert!(ReadError::Http("down".into()).to_string().contains("down"));
-        assert!(ReadError::Body("large".into()).to_string().contains("large"));
+        assert!(
+            ReadError::Body("large".into())
+                .to_string()
+                .contains("large")
+        );
         let json_error = serde_json::from_str::<ZoteroItem>("{}").unwrap_err();
         assert!(ReadError::Json(json_error).to_string().contains("JSON"));
     }

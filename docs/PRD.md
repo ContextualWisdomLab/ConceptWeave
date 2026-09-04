@@ -56,7 +56,7 @@ All LLM-backed induction uses `contextual-orchestrator`. Model output is untrust
 
 ### FR-9 Research evidence intake
 
-Read one immutable Zotero Local API library-version snapshot and propose exactly one research disposition for every top-level bibliographic item. Each proposal retains the item key/version, matched metadata fields, rule revision, linked child records, and any model receipt. Weak or ambiguous evidence must abstain into steward review. Duplicate DOI/title identities are review candidates only: intake never merges, deletes, or silently mutates Zotero records.
+Read one immutable Zotero Local API library-version snapshot and propose exactly one research disposition for every top-level bibliographic item. Each proposal retains the item key/version, exact matched metadata values, rule revision, linked child records, and any model receipt. Weak evidence and evidence that matches multiple specific disposition families must abstain into steward review. Duplicate DOI/title identities are review candidates only: intake never merges, deletes, or silently mutates Zotero records.
 
 ## 6. First vertical slice
 
