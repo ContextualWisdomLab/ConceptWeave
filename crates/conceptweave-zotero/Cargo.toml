@@ -8,6 +8,7 @@ license.workspace = true
 description = "Read-only Zotero research classification for ConceptWeave"
 
 [dependencies]
+libc = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
