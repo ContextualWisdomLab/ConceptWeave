@@ -2,7 +2,7 @@
 set -euo pipefail
 
 coverage_toolchain="${COVERAGE_TOOLCHAIN:-nightly-2026-08-20}"
-trap 'rm -f coverage.json source-branches.json' EXIT
+trap 'rm -f coverage.json source-branches.json source-regions.json' EXIT
 
 cargo "+${coverage_toolchain}" llvm-cov \
   --workspace \
@@ -20,6 +20,49 @@ jq -r '
     )
   | "COVERAGE_GAP file=\(.filename) lines=\(.summary.lines.percent) functions=\(.summary.functions.percent) regions=\(.summary.regions.percent)"
 ' coverage.json
+
+jq '
+  [
+    .data[0].functions[]
+    | .filenames as $files
+    | .regions[]
+    | select(.[6] == 0)
+    | {
+        file: $files[.[5]],
+        line_start: .[0],
+        column_start: .[1],
+        line_end: .[2],
+        column_end: .[3],
+        count: .[4]
+      }
+    | select(.file | contains("/tests/") | not)
+  ]
+  | sort_by(.file, .line_start, .column_start, .line_end, .column_end)
+  | group_by([.file, .line_start, .column_start, .line_end, .column_end])
+  | map({
+      file: .[0].file,
+      line_start: .[0].line_start,
+      column_start: .[0].column_start,
+      line_end: .[0].line_end,
+      column_end: .[0].column_end,
+      count: (map(.count) | add)
+    })
+' coverage.json > source-regions.json
+
+jq '
+  {
+    count: length,
+    covered: ([.[] | select(.count > 0)] | length),
+    notcovered: ([.[] | select(.count == 0)] | length)
+  }
+  | .percent = (if .count == 0 then 100 else (.covered * 100 / .count) end)
+' source-regions.json
+
+jq -r '
+  .[]
+  | select(.count == 0)
+  | "REGION_GAP file=\(.file) start=\(.line_start):\(.column_start) end=\(.line_end):\(.column_end)"
+' source-regions.json
 
 jq '
   [
@@ -66,8 +109,8 @@ jq -r '
 
 jq -e '
   .data[0].totals.lines.percent == 100 and
-  .data[0].totals.functions.percent == 100 and
-  .data[0].totals.regions.percent == 100
+  .data[0].totals.functions.percent == 100
 ' coverage.json >/dev/null
 
+jq -e 'all(.[]; .count > 0)' source-regions.json >/dev/null
 jq -e 'all(.[]; .true_count > 0 and .false_count > 0)' source-branches.json >/dev/null

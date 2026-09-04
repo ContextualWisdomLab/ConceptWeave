@@ -14,7 +14,7 @@ fn evidence() -> EvidenceReference {
 }
 
 fn digest(hex: char) -> ReleaseDigest {
-    ReleaseDigest::new(format!("sha256:{}", hex.to_string().repeat(64)))
+    ReleaseDigest::new(&format!("sha256:{}", hex.to_string().repeat(64)))
         .expect("digest fixture is valid")
 }
 

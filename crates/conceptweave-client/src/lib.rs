@@ -23,8 +23,7 @@ pub struct ReleaseDigest(String);
 
 impl ReleaseDigest {
     /// Parses a release digest and rejects unsupported algorithms or malformed hex.
-    pub fn new(value: impl Into<String>) -> Result<Self, ReleaseContractError> {
-        let value = value.into();
+    pub fn new(value: &str) -> Result<Self, ReleaseContractError> {
         let Some(hex) = value.strip_prefix("sha256:") else {
             return Err(ReleaseContractError::InvalidDigest);
         };
@@ -37,7 +36,7 @@ impl ReleaseDigest {
         {
             return Err(ReleaseContractError::InvalidDigest);
         }
-        Ok(Self(value))
+        Ok(Self(value.to_owned()))
     }
 
     /// Returns the canonical digest identity string.
@@ -368,10 +367,8 @@ impl SemanticReleaseClient {
     }
 
     /// Returns explicitly supported legacy contract versions in deterministic order.
-    pub fn supported_legacy_contract_versions(&self) -> impl Iterator<Item = &str> {
-        self.supported_legacy_contract_versions
-            .iter()
-            .map(String::as_str)
+    pub fn supported_legacy_contract_versions(&self) -> &BTreeSet<String> {
+        &self.supported_legacy_contract_versions
     }
 
     /// Classifies a release against the client's explicit compatibility policy.

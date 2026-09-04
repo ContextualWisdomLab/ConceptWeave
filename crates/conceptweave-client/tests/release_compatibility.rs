@@ -42,6 +42,14 @@ fn client_explicitly_distinguishes_current_supported_legacy_and_unknown_versions
     .expect("explicit compatibility policy is valid");
 
     assert_eq!(
+        client
+            .supported_legacy_contract_versions()
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        vec!["1.0.0", "1.1.0"]
+    );
+    assert_eq!(
         client.compatibility(&release("2.0.0")),
         ContractVersionCompatibility::Current
     );

@@ -1,4 +1,4 @@
-# ADR 0004 — Semantic-release client boundary
+# ADR 0005 — Semantic-release client boundary
 
 - **Status:** Proposed
 - **Date:** 2026-09-02
