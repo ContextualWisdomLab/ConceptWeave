@@ -1,7 +1,7 @@
 use conceptweave_zotero::{
     Disposition, ItemData, StewardDecisionPatch, WorksheetError, ZoteroItem,
     apply_steward_decision_patch, build_steward_review_batch, build_steward_review_worksheet,
-    classify_snapshot,
+    classify_snapshot, decision_patch_from_review_batch,
 };
 
 fn item(key: &str, title: &str, abstract_note: &str) -> ZoteroItem {
@@ -137,4 +137,45 @@ fn review_batch_rejects_invalid_or_complete_workloads() {
         build_steward_review_worksheet(&decided_abstract_report),
         Err(WorksheetError::InvalidReport)
     );
+}
+
+#[test]
+fn completed_review_batch_must_preserve_the_context_shown_to_the_steward() {
+    let report = classify_snapshot(
+        "9.0.6".into(),
+        None,
+        42,
+        vec![item("A", "unmatched", "review context")],
+    );
+    let worksheet = build_steward_review_worksheet(&report).unwrap();
+    let mut batch = build_steward_review_batch(&report, &worksheet, 1).unwrap();
+    batch.decisions[0].reviewed_disposition = Some(Disposition::OutOfScope);
+
+    let patch = decision_patch_from_review_batch(&report, &worksheet, &batch).unwrap();
+    assert_eq!(patch.decisions.len(), 1);
+    assert_eq!(patch.decisions[0].item_key, "A");
+    assert_eq!(patch.decisions[0].reviewed_disposition, Disposition::OutOfScope);
+
+    for invalid in [
+        {
+            let mut invalid = batch.clone();
+            invalid.decisions[0].title = "different context".into();
+            invalid
+        },
+        {
+            let mut invalid = batch.clone();
+            invalid.decisions[0].reviewed_disposition = None;
+            invalid
+        },
+        {
+            let mut invalid = batch.clone();
+            invalid.decisions[0].reviewed_disposition = Some(Disposition::NeedsStewardReview);
+            invalid
+        },
+    ] {
+        assert_eq!(
+            decision_patch_from_review_batch(&report, &worksheet, &invalid),
+            Err(WorksheetError::InvalidReport)
+        );
+    }
 }
