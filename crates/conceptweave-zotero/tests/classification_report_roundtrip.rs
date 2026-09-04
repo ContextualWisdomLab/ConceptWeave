@@ -157,10 +157,12 @@ fn restored_report_accepts_snapshot_bound_nested_child_provenance() {
         version: 7,
         data: ItemData {
             item_type: item_type.into(),
-            title: (key == "BOOK")
-                .then_some("ontology alignment")
-                .unwrap_or_default()
-                .into(),
+            title: if key == "BOOK" {
+                "ontology alignment"
+            } else {
+                ""
+            }
+            .into(),
             abstract_note: String::new(),
             doi: String::new(),
             parent_item: parent_item.into(),
