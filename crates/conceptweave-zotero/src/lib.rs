@@ -220,6 +220,8 @@ pub struct GoldenSetApproval {
     pub library_version: u64,
     /// Classifier rule revision whose proposals were reviewed.
     pub rule_revision: String,
+    /// Immutable digest over the approved snapshot, verified by the caller.
+    pub snapshot_digest: String,
     /// Complete sorted item-revision identity of the reviewed report.
     pub snapshot_items: Vec<SnapshotItemRevision>,
 }
@@ -240,6 +242,12 @@ pub struct DispositionEvaluation {
 pub struct GoldenSetEvaluation {
     /// Opaque review receipt identifier.
     pub review_id: String,
+    /// Zotero library revision bound to the verified receipt.
+    pub library_version: u64,
+    /// Classifier revision bound to the verified receipt.
+    pub rule_revision: String,
+    /// Opaque immutable snapshot digest from the verified receipt.
+    pub snapshot_digest: String,
     /// Number of steward-reviewed items.
     pub reviewed_count: usize,
     /// Number of exact disposition matches.
@@ -297,6 +305,7 @@ where
         || golden.approval.reviewer_subject.trim().is_empty()
         || golden.labels.is_empty()
         || golden.approval.rule_revision.trim().is_empty()
+        || golden.approval.snapshot_digest.trim().is_empty()
     {
         return Err(EvaluationError::InvalidReview);
     }
@@ -369,6 +378,9 @@ where
 
     Ok(GoldenSetEvaluation {
         review_id: golden.approval.receipt_id.clone(),
+        library_version: golden.approval.library_version,
+        rule_revision: golden.approval.rule_revision.clone(),
+        snapshot_digest: golden.approval.snapshot_digest.clone(),
         reviewed_count: golden.labels.len(),
         correct_count,
         abstention_count,

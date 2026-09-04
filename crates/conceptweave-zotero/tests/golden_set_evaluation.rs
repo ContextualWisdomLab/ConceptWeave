@@ -39,6 +39,7 @@ fn golden(labels: Vec<GoldenLabel>) -> ReviewedGoldenSet {
             reviewer_subject: "synthetic-steward".into(),
             library_version: 42,
             rule_revision: "ontology-research-v2".into(),
+            snapshot_digest: "sha256:synthetic-snapshot".into(),
             snapshot_items: ["A", "B", "C"]
                 .into_iter()
                 .map(|item_key| SnapshotItemRevision {
@@ -70,6 +71,9 @@ fn reviewed_golden_set_reports_count_based_precision_and_recall_evidence() {
     .unwrap();
 
     assert_eq!(evaluation.review_id, "synthetic-review-1");
+    assert_eq!(evaluation.library_version, 42);
+    assert_eq!(evaluation.rule_revision, "ontology-research-v2");
+    assert_eq!(evaluation.snapshot_digest, "sha256:synthetic-snapshot");
     assert_eq!(evaluation.reviewed_count, 3);
     assert_eq!(evaluation.correct_count, 1);
     assert_eq!(evaluation.abstention_count, 1);
@@ -85,6 +89,7 @@ fn reviewed_golden_set_reports_count_based_precision_and_recall_evidence() {
     let serialized = serde_json::to_value(&evaluation).unwrap();
     assert!(serialized.get("labels").is_none());
     assert!(serialized.get("item_key").is_none());
+    assert!(serialized.get("reviewer_subject").is_none());
 }
 
 #[test]
@@ -113,6 +118,12 @@ fn reviewed_golden_set_rejects_stale_unknown_and_duplicate_labels() {
     );
     let mut missing_revision = golden(vec![GoldenLabel::new("A", Disposition::Generation)]);
     missing_revision.approval.rule_revision.clear();
+    assert_eq!(
+        evaluate_reviewed_golden_set(&report, &missing_revision, verify_synthetic_approval),
+        Err(EvaluationError::InvalidReview)
+    );
+    missing_revision.approval.rule_revision = "ontology-research-v2".into();
+    missing_revision.approval.snapshot_digest.clear();
     assert_eq!(
         evaluate_reviewed_golden_set(&report, &missing_revision, verify_synthetic_approval),
         Err(EvaluationError::InvalidReview)
