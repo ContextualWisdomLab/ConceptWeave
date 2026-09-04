@@ -1,7 +1,7 @@
 #![cfg(unix)]
 
 use conceptweave_zotero::{
-    Disposition, ItemData, StewardReviewBatch, StewardReviewWorksheet, ZoteroItem,
+    Disposition, ItemData, ItemTag, StewardReviewBatch, StewardReviewWorksheet, ZoteroItem,
     build_steward_review_batch, build_steward_review_worksheet, classify_snapshot,
 };
 use std::fs;
@@ -88,7 +88,7 @@ fn completed_review_batch_cli_validates_context_before_updating_worksheet() {
         Some(Disposition::OutOfScope)
     );
 
-    let mut tampered: StewardReviewBatch = batch;
+    let mut tampered: StewardReviewBatch = batch.clone();
     tampered.decisions[0].title = "different context".into();
     let tampered_path = private_input("apply-batch-tampered", &tampered);
     let rejected_path = temp_path("apply-batch-rejected");
@@ -103,6 +103,34 @@ fn completed_review_batch_cli_validates_context_before_updating_worksheet() {
         .success()
     );
     assert!(!rejected_path.exists());
+
+    let original = serde_json::to_value(batch).unwrap();
+    let mut unknown = vec![
+        original.clone(),
+        original.clone(),
+        original.clone(),
+        original,
+    ];
+    unknown[0]["unexpected"] = serde_json::json!("root");
+    unknown[1]["decisions"][0]["unexpected"] = serde_json::json!("decision");
+    unknown[2]["decisions"][0]["evidence"]["unexpected"] = serde_json::json!("evidence");
+    unknown[3]["decisions"][0]["tags"][0]["unexpected"] = serde_json::json!("tag");
+    for (index, invalid) in unknown.into_iter().enumerate() {
+        let invalid_path = private_input(&format!("apply-batch-unknown-{index}"), &invalid);
+        let invalid_output = temp_path(&format!("apply-batch-unknown-output-{index}"));
+        let _ = fs::remove_file(&invalid_output);
+        assert!(
+            !run_apply_batch(
+                &report_path,
+                &worksheet_path,
+                &invalid_path,
+                &invalid_output,
+            )
+            .success()
+        );
+        assert!(!invalid_output.exists());
+        fs::remove_file(invalid_path).unwrap();
+    }
 
     for path in [
         report_path,
@@ -126,7 +154,10 @@ fn item(key: &str, title: &str) -> ZoteroItem {
             doi: String::new(),
             parent_item: String::new(),
             collections: vec![],
-            tags: vec![],
+            tags: vec![ItemTag {
+                tag: "review tag".into(),
+                tag_type: Some(1),
+            }],
         },
     }
 }
