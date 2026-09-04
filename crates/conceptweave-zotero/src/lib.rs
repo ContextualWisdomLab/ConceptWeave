@@ -1261,12 +1261,15 @@ pub fn build_steward_review_worksheet(
                 != item.abstention_reason.is_some()
             || (item.proposed_disposition != Disposition::NeedsStewardReview
                 && item.review_abstract_note.is_some())
-            || item.review_abstract_note.as_ref().is_some_and(|review_abstract| {
-                item.evidence
-                    .field_values
-                    .values()
-                    .any(|value| value == review_abstract)
-            })
+            || item
+                .review_abstract_note
+                .as_ref()
+                .is_some_and(|review_abstract| {
+                    item.evidence
+                        .field_values
+                        .values()
+                        .any(|value| value == review_abstract)
+                })
         {
             return Err(WorksheetError::InvalidReport);
         }
