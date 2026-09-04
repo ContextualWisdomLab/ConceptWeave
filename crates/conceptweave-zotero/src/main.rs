@@ -37,10 +37,13 @@ where
 }
 
 fn write_private_output(path: &Path, content: &[u8]) -> io::Result<()> {
-    write_private_output_with(path, content, |writer, bytes| {
-        writer.write_all(bytes)?;
-        writer.flush()
-    })
+    write_private_output_with(path, content, write_all_and_flush)
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+fn write_all_and_flush(writer: &mut BufWriter<File>, content: &[u8]) -> io::Result<()> {
+    writer.write_all(content)?;
+    writer.flush()
 }
 
 fn write_private_output_with(
@@ -209,6 +212,7 @@ mod tests {
 
         write_private_output(&output, b"complete").unwrap();
         assert_eq!(fs::read(&output).unwrap(), b"complete");
+        assert!(write_private_output(&output, b"replacement").is_err());
         fs::remove_file(output).unwrap();
     }
 
