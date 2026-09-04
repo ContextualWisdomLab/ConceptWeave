@@ -119,4 +119,20 @@ fn restored_report_rejects_classified_or_reused_child_provenance() {
         build_steward_review_worksheet(&reused_child),
         Err(WorksheetError::InvalidReport)
     );
+
+    let mut omitted_child: ClassificationReport = serde_json::from_slice(&serialized).unwrap();
+    omitted_child.classified_items[0].child_item_keys.clear();
+    assert_eq!(
+        build_steward_review_worksheet(&omitted_child),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut duplicate_child: ClassificationReport = serde_json::from_slice(&serialized).unwrap();
+    duplicate_child.classified_items[0]
+        .child_item_keys
+        .push("CHILD".into());
+    assert_eq!(
+        build_steward_review_worksheet(&duplicate_child),
+        Err(WorksheetError::InvalidReport)
+    );
 }
