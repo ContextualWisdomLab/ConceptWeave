@@ -26,7 +26,7 @@ jq '
     .data[0].functions[]
     | .filenames as $files
     | .regions[]
-    | select(.[6] == 0)
+    | select(.[7] == 0 or .[7] == 1)
     | {
         file: $files[.[5]],
         line_start: .[0],
@@ -109,7 +109,8 @@ jq -r '
 
 jq -e '
   .data[0].totals.lines.percent == 100 and
-  .data[0].totals.functions.percent == 100
+  .data[0].totals.functions.percent == 100 and
+  .data[0].totals.regions.percent == 100
 ' coverage.json >/dev/null
 
 jq -e 'all(.[]; .count > 0)' source-regions.json >/dev/null
