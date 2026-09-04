@@ -110,18 +110,18 @@ pub enum AbstentionReason {
 }
 
 /// Evidence for a deterministic proposed disposition.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ClassificationEvidence {
     /// Metadata fields whose values matched.
-    pub fields: Vec<&'static str>,
+    pub fields: Vec<String>,
     /// Exact snapshot values for matched fields, retained only in the local report.
-    pub field_values: BTreeMap<&'static str, String>,
+    pub field_values: BTreeMap<String, String>,
     /// Rule phrases found in those fields.
-    pub matched_phrases: Vec<&'static str>,
+    pub matched_phrases: Vec<String>,
 }
 
 /// A single top-level bibliographic classification proposal.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ClassifiedItem {
     /// Stable Zotero item key.
     pub item_key: String,
@@ -981,7 +981,7 @@ impl fmt::Display for WritePlanError {
 impl std::error::Error for WritePlanError {}
 
 /// Complete local classification report for one immutable library version.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ClassificationReport {
     /// Zotero desktop version that served the snapshot.
     pub zotero_version: String,
@@ -994,7 +994,7 @@ pub struct ClassificationReport {
     /// Library version shared by every fetched page.
     pub library_version: u64,
     /// Rule revision used for all proposals.
-    pub rule_revision: &'static str,
+    pub rule_revision: String,
     /// Number of items read, including child notes and attachments.
     pub observed_item_count: usize,
     /// Complete item-revision identity of every observed record.
@@ -1010,7 +1010,7 @@ pub struct ClassificationReport {
 }
 
 /// Aggregate-only evidence that a successful report covers its input and proposals.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ClassificationAudit {
     /// Records captured from the immutable snapshot.
     pub snapshot_item_count: usize,
@@ -1152,7 +1152,7 @@ pub fn build_steward_review_worksheet(
 
     Ok(StewardReviewWorksheet {
         library_version: report.library_version,
-        rule_revision: report.rule_revision.into(),
+        rule_revision: report.rule_revision.clone(),
         snapshot_digest: report.snapshot_digest.clone(),
         snapshot_items: report.snapshot_items.clone(),
         decisions,
@@ -2510,7 +2510,7 @@ pub fn classify_snapshot(
         schema_version: None,
         server_id,
         library_version,
-        rule_revision: RULE_REVISION,
+        rule_revision: RULE_REVISION.to_owned(),
         observed_item_count: items.len(),
         snapshot_items,
         snapshot_digest,
@@ -2684,9 +2684,12 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
         proposed_disposition,
         abstention_reason,
         evidence: ClassificationEvidence {
-            fields: matched_fields.into_iter().collect(),
-            field_values,
-            matched_phrases: matched_phrases.into_iter().collect(),
+            fields: matched_fields.into_iter().map(str::to_owned).collect(),
+            field_values: field_values
+                .into_iter()
+                .map(|(field, value)| (field.to_owned(), value))
+                .collect(),
+            matched_phrases: matched_phrases.into_iter().map(str::to_owned).collect(),
         },
         child_item_keys,
         model_receipt: None,
