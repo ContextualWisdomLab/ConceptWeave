@@ -61,12 +61,37 @@ fn later_reconciliation_distinguishes_restored_unchanged_and_indeterminate_state
             state(11, vec!["other".into()], operation.tags.clone()),
             ClassificationRollbackState::Indeterminate,
         ),
+        (
+            state(
+                11,
+                operation.expected_collection_keys.clone(),
+                operation.expected_tags.clone(),
+            ),
+            ClassificationRollbackState::Indeterminate,
+        ),
+        (
+            state(
+                10,
+                operation.collection_keys.clone(),
+                operation.tags.clone(),
+            ),
+            ClassificationRollbackState::Indeterminate,
+        ),
+        (
+            state(10, vec![" ".into()], operation.expected_tags.clone()),
+            ClassificationRollbackState::Indeterminate,
+        ),
     ];
 
     for (observed, expected) in cases {
+        let receipt =
+            reconcile_classification_rollback(&operation, |_| Ok::<_, ()>(observed.clone()));
+        assert_eq!(receipt.state, expected);
+        assert_eq!(receipt.operation, operation);
+        assert_eq!(receipt.observed_state, Some(observed));
         assert_eq!(
-            reconcile_classification_rollback(&operation, |_| Ok::<_, ()>(observed.clone())),
-            Ok(expected)
+            receipt.retry_operation,
+            (expected == ClassificationRollbackState::Unchanged).then(|| operation.clone())
         );
     }
 }
@@ -74,12 +99,13 @@ fn later_reconciliation_distinguishes_restored_unchanged_and_indeterminate_state
 #[test]
 fn later_reconciliation_preserves_read_failures_and_rejects_wrong_identity() {
     let operation = operation();
-    assert_eq!(
-        reconcile_classification_rollback(&operation, |_| Err::<ClassificationItemState, _>(
-            "read_failed"
-        )),
-        Err("read_failed")
-    );
+    let unreadable = reconcile_classification_rollback(&operation, |_| {
+        Err::<ClassificationItemState, _>("read_failed")
+    });
+    assert_eq!(unreadable.state, ClassificationRollbackState::Indeterminate);
+    assert_eq!(unreadable.operation, operation);
+    assert!(unreadable.observed_state.is_none());
+    assert!(unreadable.retry_operation.is_none());
 
     let mut wrong_server = state(
         10,
@@ -87,8 +113,39 @@ fn later_reconciliation_preserves_read_failures_and_rejects_wrong_identity() {
         operation.expected_tags.clone(),
     );
     wrong_server.server_id = "server-2".into();
+    let mismatched =
+        reconcile_classification_rollback(&operation, |_| Ok::<_, ()>(wrong_server.clone()));
     assert_eq!(
-        reconcile_classification_rollback(&operation, |_| Ok::<_, ()>(wrong_server.clone())),
-        Ok(ClassificationRollbackState::Indeterminate)
+        mismatched.state,
+        ClassificationRollbackState::Indeterminate
     );
+    assert_eq!(mismatched.observed_state, Some(wrong_server));
+    assert!(mismatched.retry_operation.is_none());
+
+    let mut wrong_item = state(
+        10,
+        operation.expected_collection_keys.clone(),
+        operation.expected_tags.clone(),
+    );
+    wrong_item.item_key = "BCDEFGHJ".into();
+    assert_eq!(
+        reconcile_classification_rollback(&operation, |_| Ok::<_, ()>(wrong_item)).state,
+        ClassificationRollbackState::Indeterminate
+    );
+
+    let mut invalid_operation = operation.clone();
+    invalid_operation.expected_collection_keys.push(" ".into());
+    let invalid = reconcile_classification_rollback(
+        &invalid_operation,
+        |_| -> Result<ClassificationItemState, ()> {
+            panic!("invalid reconciliation evidence must fail before reading")
+        },
+    );
+    assert_eq!(invalid.state, ClassificationRollbackState::Indeterminate);
+    assert!(invalid.observed_state.is_none());
+    assert!(invalid.retry_operation.is_none());
+
+    let serialized = serde_json::to_string(&invalid).unwrap();
+    assert!(!serialized.to_ascii_lowercase().contains("api_key"));
+    assert!(!serialized.contains("read_failed"));
 }
