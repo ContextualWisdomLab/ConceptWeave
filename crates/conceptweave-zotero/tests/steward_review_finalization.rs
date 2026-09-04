@@ -39,9 +39,7 @@ fn report() -> conceptweave_zotero::ClassificationReport {
     )
 }
 
-fn approval(
-    worksheet: &conceptweave_zotero::StewardReviewWorksheet,
-) -> GoldenSetApproval {
+fn approval(worksheet: &conceptweave_zotero::StewardReviewWorksheet) -> GoldenSetApproval {
     GoldenSetApproval {
         receipt_id: "review-receipt".into(),
         reviewer_subject: "steward-subject".into(),
