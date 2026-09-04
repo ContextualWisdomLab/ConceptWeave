@@ -140,7 +140,7 @@ pub struct ClassifiedItem {
 }
 
 /// A duplicate candidate group; no item is merged or deleted.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct DuplicateCandidate {
     /// Identity kind used for the candidate group.
     pub identity_kind: &'static str,
@@ -176,6 +176,8 @@ pub struct ReviewedDuplicateMergeSet {
     pub snapshot_digest: String,
     /// Exact item-key/item-version coordinates reviewed by the steward.
     pub snapshot_items: Vec<SnapshotItemRevision>,
+    /// Exact duplicate membership reviewed by the steward.
+    pub duplicate_candidates: Vec<DuplicateCandidate>,
     /// Exactly one decision for every duplicate candidate.
     pub decisions: Vec<DuplicateMergeDecision>,
 }
@@ -546,6 +548,7 @@ where
         || reviewed.library_version != report.library_version
         || reviewed.rule_revision != report.rule_revision
         || reviewed.snapshot_items != report.snapshot_items
+        || reviewed.duplicate_candidates != report.duplicate_candidates
     {
         return Err(DuplicateReviewError::SnapshotMismatch);
     }
