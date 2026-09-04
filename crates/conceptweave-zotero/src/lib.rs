@@ -131,6 +131,9 @@ pub struct ClassifiedItem {
     pub item_type: String,
     /// Human-readable title retained in the local report only.
     pub title: String,
+    /// Nonempty abstract retained only when a steward must classify the item.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_abstract_note: Option<String>,
     /// Collection keys observed with the item.
     pub collection_keys: Vec<String>,
     /// Tag text observed with the item.
@@ -2459,6 +2462,9 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
         item_version: item.version,
         item_type: item.data.item_type.clone(),
         title: item.data.title.clone(),
+        review_abstract_note: (proposed_disposition == Disposition::NeedsStewardReview
+            && !item.data.abstract_note.trim().is_empty())
+        .then(|| item.data.abstract_note.clone()),
         collection_keys: item.data.collections.clone(),
         tags: item.data.tags.clone(),
         proposed_disposition,
