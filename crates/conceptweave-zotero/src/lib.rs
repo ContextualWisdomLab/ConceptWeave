@@ -1147,11 +1147,8 @@ pub fn build_steward_review_worksheet(
     let mut decision_keys = BTreeSet::new();
     let mut decisions = Vec::with_capacity(report.classified_items.len());
     for item in &report.classified_items {
-        let actual_child_keys: BTreeSet<&str> = item
-            .child_item_keys
-            .iter()
-            .map(String::as_str)
-            .collect();
+        let actual_child_keys: BTreeSet<&str> =
+            item.child_item_keys.iter().map(String::as_str).collect();
         if !decision_keys.insert(item.item_key.as_str())
             || snapshot_coordinates.get(item.item_key.as_str()) != Some(&(item.item_version, None))
             || actual_child_keys.len() != item.child_item_keys.len()
