@@ -1,5 +1,6 @@
 use conceptweave_zotero::{
-    ItemData, WorksheetError, ZoteroItem, build_steward_review_worksheet, classify_snapshot,
+    Disposition, ItemData, WorksheetError, ZoteroItem, build_steward_review_worksheet,
+    classify_snapshot,
 };
 
 fn item(key: &str, title: &str) -> ZoteroItem {
