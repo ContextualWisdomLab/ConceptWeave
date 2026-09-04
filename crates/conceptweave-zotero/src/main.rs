@@ -3,7 +3,8 @@
 
 use conceptweave_zotero::{
     ClassificationReport, GoldenSetApproval, StewardReviewWorksheet,
-    build_steward_review_worksheet, read_local_snapshot, reviewed_golden_set_from_worksheet,
+    assess_steward_review_progress, build_steward_review_worksheet, read_local_snapshot,
+    reviewed_golden_set_from_worksheet,
 };
 use serde::de::DeserializeOwned;
 use std::collections::BTreeSet;
@@ -12,7 +13,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
-const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
+const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --review-progress /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/PROGRESS.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
 const MAX_ARTIFACT_BYTES: u64 = 16 * 1024 * 1024;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -21,6 +22,11 @@ enum OutputRequest {
     Worksheet {
         report: String,
         worksheet: String,
+    },
+    ReviewProgress {
+        report: String,
+        worksheet: String,
+        output: String,
     },
     Finalize {
         report: String,
@@ -48,6 +54,24 @@ where
             return Err("report and worksheet output paths must differ");
         }
         OutputRequest::Worksheet { report, worksheet }
+    } else if first == "--review-progress" {
+        let report = args
+            .next()
+            .ok_or("--review-progress requires three artifact paths")?;
+        let worksheet = args
+            .next()
+            .ok_or("--review-progress requires three artifact paths")?;
+        let output = args
+            .next()
+            .ok_or("--review-progress requires three artifact paths")?;
+        if BTreeSet::from([report.as_str(), worksheet.as_str(), output.as_str()]).len() != 3 {
+            return Err("review progress artifact paths must differ");
+        }
+        OutputRequest::ReviewProgress {
+            report,
+            worksheet,
+            output,
+        }
     } else if first == "--finalize" {
         let report = args
             .next()
@@ -289,6 +313,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err(error.into());
             }
         }
+        OutputRequest::ReviewProgress {
+            report,
+            worksheet,
+            output,
+        } => {
+            let output = validate_output_path(&output)?;
+            let report: ClassificationReport = read_private_json(&report)?;
+            let worksheet: StewardReviewWorksheet = read_private_json(&worksheet)?;
+            let progress = assess_steward_review_progress(&report, &worksheet)?;
+            write_private_output(&output, &serde_json::to_vec_pretty(&progress)?)?;
+        }
         OutputRequest::Finalize {
             report,
             worksheet,
@@ -362,6 +397,37 @@ mod tests {
                 approval,
                 output,
                 "extra",
+            ])
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn review_progress_mode_requires_three_distinct_artifact_paths() {
+        let report = "/tmp/report.json";
+        let worksheet = "/tmp/worksheet.json";
+        let output = "/tmp/progress.json";
+        assert_eq!(
+            parse_output_request(vec!["--review-progress", report, worksheet, output]),
+            Ok(OutputRequest::ReviewProgress {
+                report: report.to_owned(),
+                worksheet: worksheet.to_owned(),
+                output: output.to_owned(),
+            })
+        );
+        assert!(parse_output_request(vec!["--review-progress"]).is_err());
+        assert!(parse_output_request(vec!["--review-progress", report]).is_err());
+        assert!(parse_output_request(vec!["--review-progress", report, worksheet]).is_err());
+        assert!(
+            parse_output_request(vec!["--review-progress", report, worksheet, report]).is_err()
+        );
+        assert!(
+            parse_output_request(vec![
+                "--review-progress",
+                report,
+                worksheet,
+                output,
+                "extra"
             ])
             .is_err()
         );
