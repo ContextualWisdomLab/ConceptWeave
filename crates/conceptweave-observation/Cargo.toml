@@ -9,3 +9,6 @@ description = "Immutable relational-schema observation contracts for ConceptWeav
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+conceptweave-source-port = { path = "../conceptweave-source-port" }
