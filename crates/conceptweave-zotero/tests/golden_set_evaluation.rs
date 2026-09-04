@@ -1,6 +1,6 @@
 use conceptweave_zotero::{
-    Disposition, EvaluationError, GoldenLabel, ItemData, ReviewedGoldenSet, ZoteroItem,
-    classify_snapshot, evaluate_reviewed_golden_set,
+    Disposition, EvaluationError, GoldenLabel, GoldenSetApproval, ItemData, ReviewedGoldenSet,
+    SnapshotItemRevision, ZoteroItem, classify_snapshot, evaluate_reviewed_golden_set,
 };
 
 fn item(key: &str, title: &str) -> ZoteroItem {
@@ -34,11 +34,25 @@ fn report() -> conceptweave_zotero::ClassificationReport {
 
 fn golden(labels: Vec<GoldenLabel>) -> ReviewedGoldenSet {
     ReviewedGoldenSet {
-        review_id: "synthetic-review-1".into(),
-        library_version: 42,
-        rule_revision: "ontology-research-v2".into(),
+        approval: GoldenSetApproval {
+            receipt_id: "synthetic-review-1".into(),
+            reviewer_subject: "synthetic-steward".into(),
+            library_version: 42,
+            rule_revision: "ontology-research-v2".into(),
+            snapshot_items: ["A", "B", "C"]
+                .into_iter()
+                .map(|item_key| SnapshotItemRevision {
+                    item_key: item_key.into(),
+                    item_version: 1,
+                })
+                .collect(),
+        },
         labels,
     }
+}
+
+fn verify_synthetic_approval(approval: &GoldenSetApproval) -> bool {
+    approval.receipt_id == "synthetic-review-1" && approval.reviewer_subject == "synthetic-steward"
 }
 
 #[test]
@@ -65,6 +79,7 @@ fn reviewed_golden_set_reports_count_based_precision_and_recall_evidence() {
             GoldenLabel::new("B", Disposition::AlignmentVersioning),
             GoldenLabel::new("C", Disposition::Generation),
         ]),
+        verify_synthetic_approval,
     )
     .unwrap();
 
@@ -91,44 +106,82 @@ fn reviewed_golden_set_rejects_stale_unknown_and_duplicate_labels() {
     let report = report();
 
     assert_eq!(
-        evaluate_reviewed_golden_set(&report, &golden(vec![])),
+        evaluate_reviewed_golden_set(&report, &golden(vec![]), verify_synthetic_approval),
         Err(EvaluationError::InvalidReview)
     );
     let mut blank = golden(vec![GoldenLabel::new(" ", Disposition::Generation)]);
-    blank.review_id.clear();
+    blank.approval.receipt_id.clear();
     assert_eq!(
-        evaluate_reviewed_golden_set(&report, &blank),
+        evaluate_reviewed_golden_set(&report, &blank, verify_synthetic_approval),
         Err(EvaluationError::InvalidReview)
     );
-    blank.review_id = "synthetic-review-1".into();
+    blank.approval.receipt_id = "synthetic-review-1".into();
     assert_eq!(
-        evaluate_reviewed_golden_set(&report, &blank),
+        evaluate_reviewed_golden_set(&report, &blank, verify_synthetic_approval),
+        Err(EvaluationError::InvalidReview)
+    );
+    blank.approval.reviewer_subject.clear();
+    assert_eq!(
+        evaluate_reviewed_golden_set(&report, &blank, verify_synthetic_approval),
         Err(EvaluationError::InvalidReview)
     );
     let mut missing_revision = golden(vec![GoldenLabel::new("A", Disposition::Generation)]);
-    missing_revision.rule_revision.clear();
+    missing_revision.approval.rule_revision.clear();
     assert_eq!(
-        evaluate_reviewed_golden_set(&report, &missing_revision),
+        evaluate_reviewed_golden_set(&report, &missing_revision, verify_synthetic_approval),
         Err(EvaluationError::InvalidReview)
     );
 
     let mut stale = golden(vec![GoldenLabel::new("A", Disposition::Generation)]);
-    stale.library_version += 1;
+    stale.approval.library_version += 1;
     assert_eq!(
-        evaluate_reviewed_golden_set(&report, &stale),
+        evaluate_reviewed_golden_set(&report, &stale, verify_synthetic_approval),
         Err(EvaluationError::SnapshotMismatch)
     );
-    stale.library_version = report.library_version;
-    stale.rule_revision = "older-rules".into();
+    stale.approval.library_version = report.library_version;
+    stale.approval.rule_revision = "older-rules".into();
     assert_eq!(
-        evaluate_reviewed_golden_set(&report, &stale),
+        evaluate_reviewed_golden_set(&report, &stale, verify_synthetic_approval),
         Err(EvaluationError::SnapshotMismatch)
+    );
+    stale.approval.rule_revision = report.rule_revision.into();
+    stale.approval.snapshot_items[0].item_version += 1;
+    assert_eq!(
+        evaluate_reviewed_golden_set(&report, &stale, verify_synthetic_approval),
+        Err(EvaluationError::SnapshotMismatch)
+    );
+    let mut duplicate_snapshot = golden(vec![GoldenLabel::new("A", Disposition::Generation)]);
+    duplicate_snapshot
+        .approval
+        .snapshot_items
+        .push(duplicate_snapshot.approval.snapshot_items[0].clone());
+    assert_eq!(
+        evaluate_reviewed_golden_set(&report, &duplicate_snapshot, verify_synthetic_approval),
+        Err(EvaluationError::InvalidReview)
     );
 
     assert_eq!(
         evaluate_reviewed_golden_set(
             &report,
-            &golden(vec![GoldenLabel::new("missing", Disposition::Generation)])
+            &golden(vec![GoldenLabel::new("A", Disposition::Generation)]),
+            |_| false
+        ),
+        Err(EvaluationError::UnverifiedApproval)
+    );
+    assert_eq!(
+        evaluate_reviewed_golden_set(
+            &report,
+            &golden(vec![GoldenLabel::new("A", Disposition::NeedsStewardReview)]),
+            verify_synthetic_approval,
+        ),
+        Err(EvaluationError::InvalidExpectedDisposition)
+    );
+
+    assert_eq!(
+        evaluate_reviewed_golden_set(
+            &report,
+            &golden(vec![GoldenLabel::new("missing", Disposition::Generation)]),
+            verify_synthetic_approval,
         ),
         Err(EvaluationError::UnknownItem)
     );
@@ -138,7 +191,8 @@ fn reviewed_golden_set_rejects_stale_unknown_and_duplicate_labels() {
             &golden(vec![
                 GoldenLabel::new("A", Disposition::Generation),
                 GoldenLabel::new("A", Disposition::Generation),
-            ])
+            ]),
+            verify_synthetic_approval,
         ),
         Err(EvaluationError::DuplicateItem)
     );
@@ -155,13 +209,16 @@ fn reviewed_golden_set_rejects_stale_unknown_and_duplicate_labels() {
     assert_eq!(
         evaluate_reviewed_golden_set(
             &duplicate_report,
-            &golden(vec![GoldenLabel::new("A", Disposition::Generation)])
+            &golden(vec![GoldenLabel::new("A", Disposition::Generation)]),
+            verify_synthetic_approval,
         ),
         Err(EvaluationError::InvalidReview)
     );
     for (error, fragment) in [
         (EvaluationError::InvalidReview, "invalid"),
         (EvaluationError::SnapshotMismatch, "snapshot"),
+        (EvaluationError::UnverifiedApproval, "unverified"),
+        (EvaluationError::InvalidExpectedDisposition, "abstention"),
         (EvaluationError::UnknownItem, "absent"),
         (EvaluationError::DuplicateItem, "duplicate"),
     ] {

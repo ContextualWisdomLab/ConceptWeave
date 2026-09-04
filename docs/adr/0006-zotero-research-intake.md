@@ -19,7 +19,7 @@ The adapter links child records, emits exactly one deterministic proposed dispos
 
 Matched metadata values are copied into the local-only evidence receipt for replay. This is necessary for abstract-only matches because a later Zotero revision cannot reconstruct the exact text used for an earlier proposal from item key/version alone. DOI/title matches remain reversible duplicate candidates, including legacy `dx.doi.org` resolver forms.
 
-Classifier quality is measured only against local steward-reviewed labels bound to the same library and rule revisions. Evaluation returns aggregate integer evidence for precision, recall, exact matches, and abstentions; Zotero keys and bibliographic text are deliberately omitted from evaluation output. Missing, stale, unknown, or duplicate review identities fail closed.
+Classifier quality is measured only against local steward-reviewed labels whose governance receipt is verified outside this crate and bound to the exact library version, rule revision, and complete item-key/item-version snapshot. `NeedsStewardReview` is an abstention prediction and cannot be approved truth. Evaluation returns aggregate integer evidence for precision, recall, exact matches, and abstentions; Zotero keys, reviewer identity, and bibliographic text are deliberately omitted from evaluation output. Missing, stale, unverified, unknown, duplicate, or invalid review identities fail closed.
 
 Every successful report includes an aggregate audit summary computed from the same captured snapshot. Partial reads never produce a report, so successful output explicitly records zero failures alongside snapshot, proposal, provenance, abstention, duplicate, and per-disposition totals.
 
