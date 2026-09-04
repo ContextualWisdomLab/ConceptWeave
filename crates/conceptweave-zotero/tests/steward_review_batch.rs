@@ -121,14 +121,8 @@ fn review_batch_rejects_invalid_or_complete_workloads() {
         .evidence
         .field_values
         .insert("abstractNote".into(), "review context".into());
-    let duplicated_abstract_worksheet =
-        build_steward_review_worksheet(&duplicated_abstract_report).unwrap();
     assert_eq!(
-        build_steward_review_batch(
-            &duplicated_abstract_report,
-            &duplicated_abstract_worksheet,
-            1,
-        ),
+        build_steward_review_worksheet(&duplicated_abstract_report),
         Err(WorksheetError::InvalidReport)
     );
 
@@ -139,10 +133,8 @@ fn review_batch_rejects_invalid_or_complete_workloads() {
         vec![item("A", "ontology alignment", "")],
     );
     decided_abstract_report.classified_items[0].review_abstract_note = Some("unexpected".into());
-    let decided_abstract_worksheet =
-        build_steward_review_worksheet(&decided_abstract_report).unwrap();
     assert_eq!(
-        build_steward_review_batch(&decided_abstract_report, &decided_abstract_worksheet, 1),
+        build_steward_review_worksheet(&decided_abstract_report),
         Err(WorksheetError::InvalidReport)
     );
 }
