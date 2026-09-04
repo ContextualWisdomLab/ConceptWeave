@@ -1,15 +1,36 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-use conceptweave_zotero::{build_steward_review_worksheet, read_local_snapshot};
+use conceptweave_zotero::{
+    ClassificationReport, GoldenSetApproval, StewardReviewWorksheet,
+    build_steward_review_worksheet, read_local_snapshot, reviewed_golden_set_from_worksheet,
+};
+use serde::de::DeserializeOwned;
+use std::collections::BTreeSet;
 use std::env;
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, BufWriter, Write};
+use std::io::{self, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
-const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json";
+const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
+const MAX_ARTIFACT_BYTES: u64 = 16 * 1024 * 1024;
 
-fn parse_output_request<I, S>(args: I) -> Result<(Option<String>, String), &'static str>
+#[derive(Debug, PartialEq, Eq)]
+enum OutputRequest {
+    Report(String),
+    Worksheet {
+        report: String,
+        worksheet: String,
+    },
+    Finalize {
+        report: String,
+        worksheet: String,
+        approval: String,
+        output: String,
+    },
+}
+
+fn parse_output_request<I, S>(args: I) -> Result<OutputRequest, &'static str>
 where
     I: IntoIterator<Item = S>,
     S: Into<String>,
@@ -26,14 +47,109 @@ where
         if report == worksheet {
             return Err("report and worksheet output paths must differ");
         }
-        (Some(report), worksheet)
+        OutputRequest::Worksheet { report, worksheet }
+    } else if first == "--finalize" {
+        let report = args
+            .next()
+            .ok_or("--finalize requires four artifact paths")?;
+        let worksheet = args
+            .next()
+            .ok_or("--finalize requires four artifact paths")?;
+        let approval = args
+            .next()
+            .ok_or("--finalize requires four artifact paths")?;
+        let output = args
+            .next()
+            .ok_or("--finalize requires four artifact paths")?;
+        if BTreeSet::from([
+            report.as_str(),
+            worksheet.as_str(),
+            approval.as_str(),
+            output.as_str(),
+        ])
+        .len()
+            != 4
+        {
+            return Err("finalization artifact paths must differ");
+        }
+        OutputRequest::Finalize {
+            report,
+            worksheet,
+            approval,
+            output,
+        }
     } else {
-        (None, first)
+        OutputRequest::Report(first)
     };
     if args.next().is_some() {
         return Err("unexpected extra argument");
     }
     Ok(request)
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<T> {
+    let path = PathBuf::from(raw);
+    if !path.is_absolute() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "review input must be an absolute path in the system temp directory",
+        ));
+    }
+    let parent = path
+        .parent()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "review input has no parent"))?;
+    if !allowed_output_parents().contains(&parent.canonicalize()?) {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "review input must be a direct child of the system temp directory",
+        ));
+    }
+    let path_metadata = fs::symlink_metadata(&path)?;
+    if path_metadata.file_type().is_symlink() || !path_metadata.is_file() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "review input must be a regular file",
+        ));
+    }
+    let file = File::open(&path)?;
+    let opened_metadata = file.metadata()?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        if opened_metadata.dev() != path_metadata.dev()
+            || opened_metadata.ino() != path_metadata.ino()
+            || opened_metadata.nlink() != 1
+            || opened_metadata.permissions().mode() & 0o777 != 0o600
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "review input identity or permissions are unsafe",
+            ));
+        }
+    }
+    #[cfg(not(unix))]
+    return Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "private review input requires a Unix platform",
+    ));
+    if opened_metadata.len() > MAX_ARTIFACT_BYTES {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "review input exceeds the artifact size limit",
+        ));
+    }
+    let mut content = Vec::with_capacity(opened_metadata.len() as usize);
+    file.take(MAX_ARTIFACT_BYTES + 1)
+        .read_to_end(&mut content)?;
+    if content.len() as u64 > MAX_ARTIFACT_BYTES {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "review input grew beyond the artifact size limit",
+        ));
+    }
+    serde_json::from_slice(&content)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
 }
 
 fn write_private_output(path: &Path, content: &[u8]) -> io::Result<()> {
@@ -148,27 +264,44 @@ fn create_report_file_with(
 #[cfg_attr(coverage_nightly, coverage(off))]
 /// Reads one Zotero snapshot and writes its sensitive local proposal report.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let (report_output, output) = parse_output_request(env::args().skip(1))?;
-    let output = validate_output_path(&output)?;
-    let report_output = report_output
-        .as_deref()
-        .map(validate_output_path)
-        .transpose()?;
-    let report = read_local_snapshot()?;
-    if report.zotero_version.starts_with("9.") {
-        eprintln!("Zotero 9 Local API is read-only; writing local proposal output only");
-    }
-    if let Some(report_output) = report_output {
-        let worksheet = build_steward_review_worksheet(&report)?;
-        let report_content = serde_json::to_vec_pretty(&report)?;
-        let worksheet_content = serde_json::to_vec_pretty(&worksheet)?;
-        write_private_output(&report_output, &report_content)?;
-        if let Err(error) = write_private_output(&output, &worksheet_content) {
-            let _ = fs::remove_file(report_output);
-            return Err(error.into());
+    match parse_output_request(env::args().skip(1))? {
+        OutputRequest::Report(output) => {
+            let output = validate_output_path(&output)?;
+            let report = read_local_snapshot()?;
+            if report.zotero_version.starts_with("9.") {
+                eprintln!("Zotero 9 Local API is read-only; writing local proposal output only");
+            }
+            write_private_output(&output, &serde_json::to_vec_pretty(&report)?)?;
         }
-    } else {
-        write_private_output(&output, &serde_json::to_vec_pretty(&report)?)?;
+        OutputRequest::Worksheet { report, worksheet } => {
+            let report_output = validate_output_path(&report)?;
+            let worksheet_output = validate_output_path(&worksheet)?;
+            let report = read_local_snapshot()?;
+            if report.zotero_version.starts_with("9.") {
+                eprintln!("Zotero 9 Local API is read-only; writing local proposal output only");
+            }
+            let worksheet = build_steward_review_worksheet(&report)?;
+            write_private_output(&report_output, &serde_json::to_vec_pretty(&report)?)?;
+            if let Err(error) =
+                write_private_output(&worksheet_output, &serde_json::to_vec_pretty(&worksheet)?)
+            {
+                let _ = fs::remove_file(report_output);
+                return Err(error.into());
+            }
+        }
+        OutputRequest::Finalize {
+            report,
+            worksheet,
+            approval,
+            output,
+        } => {
+            let output = validate_output_path(&output)?;
+            let report: ClassificationReport = read_private_json(&report)?;
+            let worksheet: StewardReviewWorksheet = read_private_json(&worksheet)?;
+            let approval: GoldenSetApproval = read_private_json(&approval)?;
+            let golden = reviewed_golden_set_from_worksheet(&report, &worksheet, approval)?;
+            write_private_output(&output, &serde_json::to_vec_pretty(&golden)?)?;
+        }
     }
     Ok(())
 }
@@ -206,13 +339,7 @@ mod tests {
         let approval = "/tmp/approval.json";
         let output = "/tmp/golden.json";
         assert_eq!(
-            parse_output_request(vec![
-                "--finalize",
-                report,
-                worksheet,
-                approval,
-                output,
-            ]),
+            parse_output_request(vec!["--finalize", report, worksheet, approval, output,]),
             Ok(OutputRequest::Finalize {
                 report: report.to_owned(),
                 worksheet: worksheet.to_owned(),
@@ -220,12 +347,86 @@ mod tests {
                 output: output.to_owned(),
             })
         );
-        assert!(
-            parse_output_request(vec!["--finalize", report, worksheet, approval]).is_err()
-        );
+        assert!(parse_output_request(vec!["--finalize"]).is_err());
+        assert!(parse_output_request(vec!["--finalize", report]).is_err());
+        assert!(parse_output_request(vec!["--finalize", report, worksheet]).is_err());
+        assert!(parse_output_request(vec!["--finalize", report, worksheet, approval]).is_err());
         assert!(
             parse_output_request(vec!["--finalize", report, worksheet, approval, report]).is_err()
         );
+        assert!(
+            parse_output_request(vec![
+                "--finalize",
+                report,
+                worksheet,
+                approval,
+                output,
+                "extra",
+            ])
+            .is_err()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn private_json_input_is_owner_only_regular_bounded_and_valid() {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+
+        let valid = unique_temp_path("valid-input");
+        let _ = fs::remove_file(&valid);
+        fs::write(&valid, br#"{"accepted":true}"#).unwrap();
+        fs::set_permissions(&valid, fs::Permissions::from_mode(0o600)).unwrap();
+        let parsed: serde_json::Value = read_private_json(valid.to_str().unwrap()).unwrap();
+        assert_eq!(parsed["accepted"], true);
+        assert!(read_private_json::<serde_json::Value>("relative.json").is_err());
+        assert!(read_private_json::<serde_json::Value>("/").is_err());
+        assert!(
+            read_private_json::<serde_json::Value>(
+                env::current_dir()
+                    .unwrap()
+                    .join("input.json")
+                    .to_str()
+                    .unwrap()
+            )
+            .is_err()
+        );
+
+        let directory = env::temp_dir().join(format!(
+            "conceptweave-zotero-{}-input-directory",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&directory);
+        fs::create_dir(&directory).unwrap();
+        assert!(read_private_json::<serde_json::Value>(directory.to_str().unwrap()).is_err());
+        fs::remove_dir(directory).unwrap();
+
+        let link = unique_temp_path("input-link");
+        let _ = fs::remove_file(&link);
+        symlink(&valid, &link).unwrap();
+        assert!(read_private_json::<serde_json::Value>(link.to_str().unwrap()).is_err());
+        fs::remove_file(link).unwrap();
+
+        fs::set_permissions(&valid, fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(read_private_json::<serde_json::Value>(valid.to_str().unwrap()).is_err());
+        fs::set_permissions(&valid, fs::Permissions::from_mode(0o600)).unwrap();
+
+        let hardlink = unique_temp_path("input-hardlink");
+        let _ = fs::remove_file(&hardlink);
+        fs::hard_link(&valid, &hardlink).unwrap();
+        assert!(read_private_json::<serde_json::Value>(valid.to_str().unwrap()).is_err());
+        fs::remove_file(hardlink).unwrap();
+
+        fs::write(&valid, b"not-json").unwrap();
+        assert!(read_private_json::<serde_json::Value>(valid.to_str().unwrap()).is_err());
+        fs::remove_file(valid).unwrap();
+
+        let oversized = unique_temp_path("oversized-input");
+        let _ = fs::remove_file(&oversized);
+        let file = File::create(&oversized).unwrap();
+        file.set_len(MAX_ARTIFACT_BYTES + 1).unwrap();
+        fs::set_permissions(&oversized, fs::Permissions::from_mode(0o600)).unwrap();
+        assert!(read_private_json::<serde_json::Value>(oversized.to_str().unwrap()).is_err());
+        fs::remove_file(oversized).unwrap();
     }
 
     #[test]
