@@ -183,17 +183,49 @@ mod tests {
         let worksheet = "/tmp/conceptweave-zotero-worksheet.json";
         assert_eq!(
             parse_output_request(vec!["--worksheet", report, worksheet]),
-            Ok((Some(report.to_owned()), worksheet.to_owned()))
+            Ok(OutputRequest::Worksheet {
+                report: report.to_owned(),
+                worksheet: worksheet.to_owned(),
+            })
         );
         assert_eq!(
             parse_output_request(vec![report]),
-            Ok((None, report.to_owned()))
+            Ok(OutputRequest::Report(report.to_owned()))
         );
         assert_eq!(parse_output_request(Vec::<&str>::new()), Err(USAGE));
         assert!(parse_output_request(vec!["--worksheet"]).is_err());
         assert!(parse_output_request(vec!["--worksheet", report]).is_err());
         assert!(parse_output_request(vec![report, "extra"]).is_err());
         assert!(parse_output_request(vec!["--worksheet", report, report]).is_err());
+    }
+
+    #[test]
+    fn finalization_mode_requires_four_distinct_artifact_paths() {
+        let report = "/tmp/report.json";
+        let worksheet = "/tmp/worksheet.json";
+        let approval = "/tmp/approval.json";
+        let output = "/tmp/golden.json";
+        assert_eq!(
+            parse_output_request(vec![
+                "--finalize",
+                report,
+                worksheet,
+                approval,
+                output,
+            ]),
+            Ok(OutputRequest::Finalize {
+                report: report.to_owned(),
+                worksheet: worksheet.to_owned(),
+                approval: approval.to_owned(),
+                output: output.to_owned(),
+            })
+        );
+        assert!(
+            parse_output_request(vec!["--finalize", report, worksheet, approval]).is_err()
+        );
+        assert!(
+            parse_output_request(vec!["--finalize", report, worksheet, approval, report]).is_err()
+        );
     }
 
     #[test]
