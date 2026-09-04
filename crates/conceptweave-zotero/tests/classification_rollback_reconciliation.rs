@@ -81,6 +81,22 @@ fn later_reconciliation_distinguishes_restored_unchanged_and_indeterminate_state
             state(10, vec![" ".into()], operation.expected_tags.clone()),
             ClassificationRollbackState::Indeterminate,
         ),
+        (
+            state(
+                10,
+                operation.expected_collection_keys.clone(),
+                vec![tag("Other")],
+            ),
+            ClassificationRollbackState::Indeterminate,
+        ),
+        (
+            state(
+                11,
+                operation.collection_keys.clone(),
+                vec![tag("Other")],
+            ),
+            ClassificationRollbackState::Indeterminate,
+        ),
     ];
 
     for (observed, expected) in cases {
@@ -130,19 +146,33 @@ fn later_reconciliation_preserves_read_failures_and_rejects_wrong_identity() {
         ClassificationRollbackState::Indeterminate
     );
 
-    let mut invalid_operation = operation.clone();
-    invalid_operation.expected_collection_keys.push(" ".into());
-    let invalid = reconcile_classification_rollback(
-        &invalid_operation,
-        |_| -> Result<ClassificationItemState, ()> {
-            panic!("invalid reconciliation evidence must fail before reading")
-        },
-    );
-    assert_eq!(invalid.state, ClassificationRollbackState::Indeterminate);
-    assert!(invalid.observed_state.is_none());
-    assert!(invalid.retry_operation.is_none());
+    let mut invalid_operations = Vec::new();
+    let mut blank_server = operation.clone();
+    blank_server.server_id = " ".into();
+    invalid_operations.push(blank_server);
+    let mut blank_item = operation.clone();
+    blank_item.item_key = " ".into();
+    invalid_operations.push(blank_item);
+    let mut invalid_expected = operation.clone();
+    invalid_expected.expected_collection_keys.push(" ".into());
+    invalid_operations.push(invalid_expected);
+    let mut invalid_restoration = operation.clone();
+    invalid_restoration.collection_keys.push(" ".into());
+    invalid_operations.push(invalid_restoration);
 
-    let serialized = serde_json::to_string(&invalid).unwrap();
-    assert!(!serialized.to_ascii_lowercase().contains("api_key"));
-    assert!(!serialized.contains("read_failed"));
+    for invalid_operation in invalid_operations {
+        let invalid = reconcile_classification_rollback(
+            &invalid_operation,
+            |_| -> Result<ClassificationItemState, ()> {
+                panic!("invalid reconciliation evidence must fail before reading")
+            },
+        );
+        assert_eq!(invalid.state, ClassificationRollbackState::Indeterminate);
+        assert!(invalid.observed_state.is_none());
+        assert!(invalid.retry_operation.is_none());
+
+        let serialized = serde_json::to_string(&invalid).unwrap();
+        assert!(!serialized.to_ascii_lowercase().contains("api_key"));
+        assert!(!serialized.contains("read_failed"));
+    }
 }
