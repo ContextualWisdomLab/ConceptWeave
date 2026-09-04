@@ -150,6 +150,104 @@ pub struct DuplicateCandidate {
     pub item_keys: Vec<String>,
 }
 
+/// One steward decision selecting the canonical identity for a duplicate cluster.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct DuplicateMergeDecision {
+    /// Candidate identity kind from the classification report.
+    pub identity_kind: String,
+    /// Candidate normalized identity from the classification report.
+    pub normalized_identity: String,
+    /// Existing Zotero item retained as the canonical reference.
+    pub retained_item_key: String,
+}
+
+/// Snapshot-bound duplicate decisions verified by the caller's governance boundary.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct ReviewedDuplicateMergeSet {
+    /// Opaque steward review receipt.
+    pub review_id: String,
+    /// Opaque governance authority receipt; contains no person identity.
+    pub authority_receipt: String,
+    /// Exact Zotero library revision reviewed by the steward.
+    pub library_version: u64,
+    /// Exact classifier rule revision reviewed by the steward.
+    pub rule_revision: String,
+    /// Exact raw-snapshot digest reviewed by the steward.
+    pub snapshot_digest: String,
+    /// Exactly one decision for every duplicate candidate.
+    pub decisions: Vec<DuplicateMergeDecision>,
+}
+
+/// One reversible canonical-key mapping; Zotero source records remain unchanged.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct DuplicateMergeOperation {
+    /// Candidate identity kind.
+    pub identity_kind: String,
+    /// Candidate normalized identity retained only in the local manifest.
+    pub normalized_identity: String,
+    /// Steward-selected canonical Zotero item key.
+    pub retained_item_key: String,
+    /// Exact source revisions participating in the decision.
+    pub source_items: Vec<SnapshotItemRevision>,
+    /// Mapping before the reviewed canonicalization; every item maps to itself.
+    pub before_canonical_keys: BTreeMap<String, String>,
+    /// Reviewed mapping after canonicalization; every item maps to the retained key.
+    pub after_canonical_keys: BTreeMap<String, String>,
+    /// Exact inverse plan restoring the pre-review mapping.
+    pub rollback_canonical_keys: BTreeMap<String, String>,
+}
+
+/// Aggregate of reviewed, reversible duplicate identity operations.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct DuplicateMergeReviewManifest {
+    /// Opaque steward review receipt.
+    pub review_id: String,
+    /// Opaque governance authority receipt.
+    pub authority_receipt: String,
+    /// Exact Zotero library revision reviewed by the steward.
+    pub library_version: u64,
+    /// Exact classifier rule revision reviewed by the steward.
+    pub rule_revision: String,
+    /// Exact raw-snapshot digest shared with the reviewed decisions.
+    pub snapshot_digest: String,
+    /// Deterministically ordered canonical-key operations.
+    pub operations: Vec<DuplicateMergeOperation>,
+    /// Classification never deletes or mutates Zotero source records.
+    pub source_records_preserved: bool,
+}
+
+/// A fail-closed duplicate review contract violation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DuplicateReviewError {
+    /// Required review metadata or a decision is missing.
+    InvalidReview,
+    /// The review belongs to another raw snapshot.
+    SnapshotMismatch,
+    /// A decision does not identify a report candidate.
+    UnknownCandidate,
+    /// More than one decision targets the same candidate.
+    DuplicateDecision,
+    /// The retained key is not a member of the candidate cluster.
+    InvalidRetainedItem,
+    /// The caller's governance boundary rejected the complete review set.
+    UnverifiedApproval,
+}
+
+impl fmt::Display for DuplicateReviewError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::InvalidReview => "duplicate review metadata or decisions are invalid",
+            Self::SnapshotMismatch => "duplicate review does not match the report snapshot",
+            Self::UnknownCandidate => "duplicate review contains an unknown candidate",
+            Self::DuplicateDecision => "duplicate review repeats a candidate decision",
+            Self::InvalidRetainedItem => "retained item is absent from its duplicate candidate",
+            Self::UnverifiedApproval => "duplicate review approval is unverified",
+        })
+    }
+}
+
+impl std::error::Error for DuplicateReviewError {}
+
 /// Complete local classification report for one immutable library version.
 #[derive(Debug, Serialize)]
 pub struct ClassificationReport {
@@ -422,6 +520,113 @@ where
         correct_count,
         abstention_count,
         by_disposition,
+    })
+}
+
+/// Builds a local-only reversible canonical-key manifest from steward-reviewed decisions.
+pub fn build_duplicate_merge_review_manifest<F>(
+    report: &ClassificationReport,
+    reviewed: &ReviewedDuplicateMergeSet,
+    verify_review: F,
+) -> Result<DuplicateMergeReviewManifest, DuplicateReviewError>
+where
+    F: FnOnce(&ReviewedDuplicateMergeSet) -> bool,
+{
+    if reviewed.review_id.trim().is_empty()
+        || reviewed.authority_receipt.trim().is_empty()
+        || reviewed.snapshot_digest.trim().is_empty()
+        || reviewed.rule_revision.trim().is_empty()
+        || reviewed.decisions.len() != report.duplicate_candidates.len()
+    {
+        return Err(DuplicateReviewError::InvalidReview);
+    }
+    if reviewed.snapshot_digest != report.snapshot_digest
+        || reviewed.library_version != report.library_version
+        || reviewed.rule_revision != report.rule_revision
+    {
+        return Err(DuplicateReviewError::SnapshotMismatch);
+    }
+    if !verify_review(reviewed) {
+        return Err(DuplicateReviewError::UnverifiedApproval);
+    }
+
+    let item_revisions = report
+        .snapshot_items
+        .iter()
+        .map(|item| (item.item_key.as_str(), item.item_version))
+        .collect::<BTreeMap<_, _>>();
+    let candidates = report
+        .duplicate_candidates
+        .iter()
+        .map(|candidate| {
+            (
+                (
+                    candidate.identity_kind,
+                    candidate.normalized_identity.as_str(),
+                ),
+                candidate,
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let mut seen_candidates = BTreeSet::new();
+    let mut operations = Vec::with_capacity(reviewed.decisions.len());
+
+    for decision in &reviewed.decisions {
+        let candidate_key = (
+            decision.identity_kind.as_str(),
+            decision.normalized_identity.as_str(),
+        );
+        if !seen_candidates.insert(candidate_key) {
+            return Err(DuplicateReviewError::DuplicateDecision);
+        }
+        let candidate = candidates
+            .get(&candidate_key)
+            .ok_or(DuplicateReviewError::UnknownCandidate)?;
+        if !candidate.item_keys.contains(&decision.retained_item_key) {
+            return Err(DuplicateReviewError::InvalidRetainedItem);
+        }
+
+        let source_items = candidate
+            .item_keys
+            .iter()
+            .map(|item_key| SnapshotItemRevision {
+                item_key: item_key.clone(),
+                item_version: item_revisions[item_key.as_str()],
+            })
+            .collect::<Vec<_>>();
+        let before_canonical_keys = candidate
+            .item_keys
+            .iter()
+            .map(|item_key| (item_key.clone(), item_key.clone()))
+            .collect::<BTreeMap<_, _>>();
+        let after_canonical_keys = candidate
+            .item_keys
+            .iter()
+            .map(|item_key| (item_key.clone(), decision.retained_item_key.clone()))
+            .collect::<BTreeMap<_, _>>();
+        operations.push(DuplicateMergeOperation {
+            identity_kind: decision.identity_kind.clone(),
+            normalized_identity: decision.normalized_identity.clone(),
+            retained_item_key: decision.retained_item_key.clone(),
+            source_items,
+            rollback_canonical_keys: before_canonical_keys.clone(),
+            before_canonical_keys,
+            after_canonical_keys,
+        });
+    }
+
+    operations.sort_by(|left, right| {
+        (&left.identity_kind, &left.normalized_identity)
+            .cmp(&(&right.identity_kind, &right.normalized_identity))
+    });
+    Ok(DuplicateMergeReviewManifest {
+        review_id: reviewed.review_id.clone(),
+        authority_receipt: reviewed.authority_receipt.clone(),
+        library_version: reviewed.library_version,
+        rule_revision: reviewed.rule_revision.clone(),
+        snapshot_digest: reviewed.snapshot_digest.clone(),
+        operations,
+        source_records_preserved: true,
     })
 }
 
