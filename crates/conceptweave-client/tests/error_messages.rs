@@ -38,6 +38,13 @@ fn contract_errors_explain_the_failed_admission_invariant() {
             "semantic release `semantic_release_2026_09` cannot supersede itself".to_string(),
         ),
         (
+            ReleaseContractError::ConflictingReleaseIdentity(
+                "semantic_release_2026_09".to_string(),
+            ),
+            "semantic release `semantic_release_2026_09` identifies conflicting immutable content"
+                .to_string(),
+        ),
+        (
             ReleaseContractError::SupersededReleaseReferenceMismatch,
             "supersession predecessor reference does not match the exact supplied release"
                 .to_string(),
