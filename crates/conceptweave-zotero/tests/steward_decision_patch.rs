@@ -70,7 +70,7 @@ fn decision_patch_rejects_invalid_identity_and_truth() {
     let report = report();
     let worksheet = build_steward_review_worksheet(&report).unwrap();
 
-    let mut invalid_report = report.clone();
+    let mut invalid_report = crate::report();
     invalid_report.rule_revision.clear();
     assert_eq!(
         apply_steward_decision_patch(
