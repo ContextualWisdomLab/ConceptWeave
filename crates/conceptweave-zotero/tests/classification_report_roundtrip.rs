@@ -1,6 +1,5 @@
 use conceptweave_zotero::{
-    ClassificationReport, ItemData, ZoteroItem, build_steward_review_worksheet,
-    classify_snapshot,
+    ClassificationReport, ItemData, ZoteroItem, build_steward_review_worksheet, classify_snapshot,
 };
 
 #[test]
