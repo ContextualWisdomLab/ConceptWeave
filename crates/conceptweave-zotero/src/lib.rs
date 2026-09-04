@@ -1119,17 +1119,7 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
         let Ok(state) = preflight(&operation.item_key) else {
             return preflight_failure_receipt(plan, Some(&operation.item_key));
         };
-        let Ok((collections, tags)) = normalized_metadata(&state.collection_keys, &state.tags)
-        else {
-            return preflight_failure_receipt(plan, Some(&operation.item_key));
-        };
-        if state.server_id != server_id
-            || state.library_version != plan.library_version
-            || state.item_key != operation.item_key
-            || state.item_version != operation.item_version
-            || collections != operation.before_collection_keys
-            || tags != operation.before_tags
-        {
+        if !matches_before_state(&state, server_id, plan.library_version, operation) {
             return preflight_failure_receipt(plan, Some(&operation.item_key));
         }
     }
@@ -1147,45 +1137,16 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
             tags: operation.after_tags.clone(),
         };
         let response = write_item(&request);
-        let valid_response = response.ok().and_then(|state| {
-            normalized_metadata(&state.collection_keys, &state.tags)
-                .ok()
-                .map(|metadata| (state, metadata))
-        });
-        let verified_state = valid_response.and_then(|(state, (collections, tags))| {
-            (state.server_id == server_id
-                && state.library_version > current_library_version
-                && state.item_key == operation.item_key
-                && state.item_version > operation.item_version
-                && collections == operation.after_collection_keys
-                && tags == operation.after_tags)
-                .then_some(state)
+        let verified_state = response.ok().filter(|state| {
+            matches_after_state(state, server_id, current_library_version, operation)
         });
         let Some(state) = verified_state else {
             let reconciled_state = preflight(&operation.item_key).ok();
             let reconciled_after = reconciled_state.as_ref().is_some_and(|state| {
-                normalized_metadata(&state.collection_keys, &state.tags).is_ok_and(
-                    |(collections, tags)| {
-                        state.server_id == server_id
-                            && state.library_version > current_library_version
-                            && state.item_key == operation.item_key
-                            && state.item_version > operation.item_version
-                            && collections == operation.after_collection_keys
-                            && tags == operation.after_tags
-                    },
-                )
+                matches_after_state(state, server_id, current_library_version, operation)
             });
             let reconciled_before = reconciled_state.as_ref().is_some_and(|state| {
-                normalized_metadata(&state.collection_keys, &state.tags).is_ok_and(
-                    |(collections, tags)| {
-                        state.server_id == server_id
-                            && state.library_version == current_library_version
-                            && state.item_key == operation.item_key
-                            && state.item_version == operation.item_version
-                            && collections == operation.before_collection_keys
-                            && tags == operation.before_tags
-                    },
-                )
+                matches_before_state(state, server_id, current_library_version, operation)
             });
             if let Some(state) = reconciled_state.filter(|_| reconciled_after) {
                 applied_item_keys.push(operation.item_key.clone());
@@ -1223,6 +1184,38 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
         not_attempted_item_keys: Vec::new(),
         rollback_operations,
     }
+}
+
+fn matches_before_state(
+    state: &ClassificationItemState,
+    server_id: &str,
+    library_version: u64,
+    operation: &ClassificationWriteOperation,
+) -> bool {
+    normalized_metadata(&state.collection_keys, &state.tags).is_ok_and(|(collections, tags)| {
+        state.server_id == server_id
+            && state.library_version == library_version
+            && state.item_key == operation.item_key
+            && state.item_version == operation.item_version
+            && collections == operation.before_collection_keys
+            && tags == operation.before_tags
+    })
+}
+
+fn matches_after_state(
+    state: &ClassificationItemState,
+    server_id: &str,
+    library_version: u64,
+    operation: &ClassificationWriteOperation,
+) -> bool {
+    normalized_metadata(&state.collection_keys, &state.tags).is_ok_and(|(collections, tags)| {
+        state.server_id == server_id
+            && state.library_version > library_version
+            && state.item_key == operation.item_key
+            && state.item_version > operation.item_version
+            && collections == operation.after_collection_keys
+            && tags == operation.after_tags
+    })
 }
 
 fn preflight_failure_receipt(
