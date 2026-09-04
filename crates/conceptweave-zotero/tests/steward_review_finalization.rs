@@ -50,12 +50,17 @@ fn approval(worksheet: &conceptweave_zotero::StewardReviewWorksheet) -> GoldenSe
     }
 }
 
-#[test]
-fn complete_worksheet_becomes_a_snapshot_bound_golden_set() {
+fn complete_worksheet() -> conceptweave_zotero::StewardReviewWorksheet {
     let mut worksheet = build_steward_review_worksheet(&report()).unwrap();
     for decision in &mut worksheet.decisions {
         decision.reviewed_disposition = Some(Disposition::Generation);
     }
+    worksheet
+}
+
+#[test]
+fn complete_worksheet_becomes_a_snapshot_bound_golden_set() {
+    let worksheet = complete_worksheet();
 
     let golden = reviewed_golden_set_from_worksheet(&worksheet, approval(&worksheet)).unwrap();
 
@@ -63,6 +68,103 @@ fn complete_worksheet_becomes_a_snapshot_bound_golden_set() {
     assert_eq!(golden.labels[0].item_key, "A");
     assert_eq!(golden.labels[1].item_key, "B");
     assert_eq!(golden.approval.snapshot_items, worksheet.snapshot_items);
+}
+
+#[test]
+fn finalization_rejects_each_invalid_identity_coordinate() {
+    let worksheet = complete_worksheet();
+
+    let mut invalid_approval = approval(&worksheet);
+    invalid_approval.receipt_id.clear();
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(&worksheet, invalid_approval),
+        Err(EvaluationError::InvalidReview)
+    );
+    let mut invalid_approval = approval(&worksheet);
+    invalid_approval.reviewer_subject.clear();
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(&worksheet, invalid_approval),
+        Err(EvaluationError::InvalidReview)
+    );
+
+    let mut invalid = worksheet.clone();
+    invalid.rule_revision.clear();
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(&invalid, approval(&invalid)),
+        Err(EvaluationError::InvalidReview)
+    );
+    let mut invalid = worksheet.clone();
+    invalid.snapshot_digest.clear();
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(&invalid, approval(&invalid)),
+        Err(EvaluationError::InvalidReview)
+    );
+
+    let mut invalid_approval = approval(&worksheet);
+    invalid_approval.library_version += 1;
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(&worksheet, invalid_approval),
+        Err(EvaluationError::SnapshotMismatch)
+    );
+    let mut invalid_approval = approval(&worksheet);
+    invalid_approval.rule_revision.push_str("-changed");
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(&worksheet, invalid_approval),
+        Err(EvaluationError::SnapshotMismatch)
+    );
+    let mut invalid_approval = approval(&worksheet);
+    invalid_approval.snapshot_items.pop();
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(&worksheet, invalid_approval),
+        Err(EvaluationError::SnapshotMismatch)
+    );
+
+    let mut invalid = worksheet.clone();
+    invalid.snapshot_items[0].item_key.clear();
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(&invalid, approval(&invalid)),
+        Err(EvaluationError::InvalidReview)
+    );
+    let mut invalid = worksheet.clone();
+    invalid.snapshot_items[1] = invalid.snapshot_items[0].clone();
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(&invalid, approval(&invalid)),
+        Err(EvaluationError::InvalidReview)
+    );
+
+    let mut invalid = worksheet.clone();
+    invalid.decisions[0].item_key.clear();
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(&invalid, approval(&invalid)),
+        Err(EvaluationError::InvalidReview)
+    );
+    let mut invalid = worksheet.clone();
+    invalid.decisions[0].item_version += 1;
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(&invalid, approval(&invalid)),
+        Err(EvaluationError::InvalidReview)
+    );
+
+    let mut invalid = worksheet.clone();
+    invalid.decisions[0].abstention_reason =
+        Some(conceptweave_zotero::AbstentionReason::NoDeterministicRuleMatch);
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(&invalid, approval(&invalid)),
+        Err(EvaluationError::InvalidReview)
+    );
+    let mut invalid = worksheet.clone();
+    invalid.decisions[1].abstention_reason = None;
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(&invalid, approval(&invalid)),
+        Err(EvaluationError::InvalidReview)
+    );
+
+    let mut invalid = worksheet.clone();
+    invalid.decisions.clear();
+    assert_eq!(
+        reviewed_golden_set_from_worksheet(&invalid, approval(&invalid)),
+        Err(EvaluationError::IncompleteReview)
+    );
 }
 
 #[test]
