@@ -1506,14 +1506,16 @@ where
     {
         return Err(DuplicateReviewError::SnapshotMismatch);
     }
-    if !verify_review(reviewed) {
-        return Err(DuplicateReviewError::UnverifiedApproval);
-    }
-
     if report
         .snapshot_items
         .iter()
-        .any(|item| item.item_key.trim().is_empty())
+        .any(|item| {
+            item.item_key.trim().is_empty()
+                || item
+                    .parent_item_key
+                    .as_ref()
+                    .is_some_and(|parent_key| parent_key.trim().is_empty())
+        })
         || report
             .snapshot_items
             .iter()
@@ -1524,10 +1526,10 @@ where
     {
         return Err(DuplicateReviewError::InvalidReview);
     }
-    let item_revisions = report
+    let item_coordinates = report
         .snapshot_items
         .iter()
-        .map(|item| (item.item_key.as_str(), item.item_version))
+        .map(|item| (item.item_key.as_str(), item))
         .collect::<BTreeMap<_, _>>();
     let candidates = report
         .duplicate_candidates
@@ -1597,13 +1599,10 @@ where
         let source_items = component_keys
             .iter()
             .map(|item_key| {
-                item_revisions
+                item_coordinates
                     .get(item_key.as_str())
-                    .map(|item_version| SnapshotItemRevision {
-                        item_key: (*item_key).clone(),
-                        item_version: *item_version,
-                        parent_item_key: None,
-                    })
+                    .filter(|item| item.parent_item_key.is_none())
+                    .map(|item| (*item).clone())
                     .ok_or(DuplicateReviewError::InvalidReview)
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -1624,6 +1623,10 @@ where
             before_canonical_keys,
             after_canonical_keys,
         });
+    }
+
+    if !verify_review(reviewed) {
+        return Err(DuplicateReviewError::UnverifiedApproval);
     }
 
     operations.sort_by(|left, right| {
