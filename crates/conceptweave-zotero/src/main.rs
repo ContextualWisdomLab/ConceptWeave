@@ -2,9 +2,10 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 use conceptweave_zotero::{
-    ClassificationReport, GoldenSetApproval, StewardDecisionPatch, StewardReviewWorksheet,
-    apply_steward_decision_patch, assess_steward_review_progress, build_steward_review_worksheet,
-    read_local_snapshot, reviewed_golden_set_from_worksheet,
+    ClassificationReport, GoldenSetApproval, MAX_REVIEW_BATCH_ITEMS, StewardDecisionPatch,
+    StewardReviewWorksheet, apply_steward_decision_patch, assess_steward_review_progress,
+    build_steward_review_batch, build_steward_review_worksheet, read_local_snapshot,
+    reviewed_golden_set_from_worksheet,
 };
 use serde::de::DeserializeOwned;
 use std::collections::BTreeSet;
@@ -13,7 +14,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
-const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --review-progress /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/PROGRESS.json | --apply-decision-patch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/PATCH.json /tmp/UPDATED_WORKSHEET.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
+const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --review-progress /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/PROGRESS.json | --review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json LIMIT /tmp/BATCH.json | --apply-decision-patch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/PATCH.json /tmp/UPDATED_WORKSHEET.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
 const MAX_ARTIFACT_BYTES: u64 = 16 * 1024 * 1024;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -26,6 +27,12 @@ enum OutputRequest {
     ReviewProgress {
         report: String,
         worksheet: String,
+        output: String,
+    },
+    ReviewBatch {
+        report: String,
+        worksheet: String,
+        limit: usize,
         output: String,
     },
     ApplyDecisionPatch {
@@ -77,6 +84,37 @@ where
         OutputRequest::ReviewProgress {
             report,
             worksheet,
+            output,
+        }
+    } else if first == "--review-batch" {
+        let report = args
+            .next()
+            .ok_or("--review-batch requires report, worksheet, limit, and output")?;
+        let worksheet = args
+            .next()
+            .ok_or("--review-batch requires report, worksheet, limit, and output")?;
+        let limit = args
+            .next()
+            .ok_or("--review-batch requires report, worksheet, limit, and output")?;
+        let output = args
+            .next()
+            .ok_or("--review-batch requires report, worksheet, limit, and output")?;
+        if BTreeSet::from([report.as_str(), worksheet.as_str(), output.as_str()]).len() != 3 {
+            return Err("review batch artifact paths must differ");
+        }
+        if limit.is_empty() || !limit.bytes().all(|byte| byte.is_ascii_digit()) {
+            return Err("review batch limit must be an unsigned decimal integer");
+        }
+        let limit = limit
+            .parse::<usize>()
+            .map_err(|_| "review batch limit is out of range")?;
+        if !(1..=MAX_REVIEW_BATCH_ITEMS).contains(&limit) {
+            return Err("review batch limit must be between 1 and 100");
+        }
+        OutputRequest::ReviewBatch {
+            report,
+            worksheet,
+            limit,
             output,
         }
     } else if first == "--apply-decision-patch" {
@@ -422,6 +460,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             let progress = assess_steward_review_progress(&report, &worksheet)?;
             write_private_output(&output, &serde_json::to_vec_pretty(&progress)?)?;
+        }
+        OutputRequest::ReviewBatch {
+            report,
+            worksheet,
+            limit,
+            output,
+        } => {
+            let output = validate_output_path(&output)?;
+            let (report, report_identity): (ClassificationReport, _) =
+                read_private_json(&report).map_err(|error| label_input("report", error))?;
+            let (worksheet, worksheet_identity): (StewardReviewWorksheet, _) =
+                read_private_json(&worksheet).map_err(|error| label_input("worksheet", error))?;
+            if report_identity == worksheet_identity {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "review batch inputs must be distinct files",
+                )
+                .into());
+            }
+            let batch = build_steward_review_batch(&report, &worksheet, limit)?;
+            let content = serde_json::to_vec_pretty(&batch)?;
+            write_private_output(&output, &content)?;
         }
         OutputRequest::ApplyDecisionPatch {
             report,
