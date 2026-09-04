@@ -760,6 +760,56 @@ mod tests {
     }
 
     #[test]
+    fn apply_review_batch_mode_requires_four_distinct_artifact_paths() {
+        let report = "/tmp/report.json";
+        let worksheet = "/tmp/worksheet.json";
+        let batch = "/tmp/batch.json";
+        let output = "/tmp/updated-worksheet.json";
+        assert_eq!(
+            parse_output_request(vec![
+                "--apply-review-batch",
+                report,
+                worksheet,
+                batch,
+                output,
+            ]),
+            Ok(OutputRequest::ApplyReviewBatch {
+                report: report.to_owned(),
+                worksheet: worksheet.to_owned(),
+                batch: batch.to_owned(),
+                output: output.to_owned(),
+            })
+        );
+        assert!(parse_output_request(vec!["--apply-review-batch"]).is_err());
+        assert!(parse_output_request(vec!["--apply-review-batch", report]).is_err());
+        assert!(parse_output_request(vec!["--apply-review-batch", report, worksheet]).is_err());
+        assert!(
+            parse_output_request(vec!["--apply-review-batch", report, worksheet, batch]).is_err()
+        );
+        assert!(
+            parse_output_request(vec![
+                "--apply-review-batch",
+                report,
+                worksheet,
+                batch,
+                report,
+            ])
+            .is_err()
+        );
+        assert!(
+            parse_output_request(vec![
+                "--apply-review-batch",
+                report,
+                worksheet,
+                batch,
+                output,
+                "extra",
+            ])
+            .is_err()
+        );
+    }
+
+    #[test]
     fn review_batch_mode_requires_distinct_paths_and_decimal_limit() {
         let report = "/tmp/report.json";
         let worksheet = "/tmp/worksheet.json";

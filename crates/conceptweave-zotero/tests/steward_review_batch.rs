@@ -186,4 +186,19 @@ fn completed_review_batch_must_preserve_the_context_shown_to_the_steward() {
             Err(WorksheetError::InvalidReport)
         );
     }
+
+    let mut empty = batch.clone();
+    empty.decisions.clear();
+    assert_eq!(
+        decision_patch_from_review_batch(&report, &worksheet, &empty),
+        Err(WorksheetError::InvalidReport)
+    );
+    let mut oversized = batch;
+    oversized
+        .decisions
+        .resize(101, oversized.decisions[0].clone());
+    assert_eq!(
+        decision_patch_from_review_batch(&report, &worksheet, &oversized),
+        Err(WorksheetError::InvalidBatchLimit)
+    );
 }
