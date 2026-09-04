@@ -1268,7 +1268,11 @@ pub fn apply_steward_decision_patch(
 ) -> Result<StewardReviewWorksheet, WorksheetError> {
     let expected = build_steward_review_worksheet(report)?;
     validate_steward_review_worksheet_against(&expected, worksheet)?;
-    if patch.library_version != expected.library_version
+    if worksheet
+        .decisions
+        .iter()
+        .any(|decision| decision.reviewed_disposition == Some(Disposition::NeedsStewardReview))
+        || patch.library_version != expected.library_version
         || patch.rule_revision != expected.rule_revision
         || patch.snapshot_digest != expected.snapshot_digest
         || patch.decisions.is_empty()
