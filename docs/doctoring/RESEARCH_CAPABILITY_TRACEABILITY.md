@@ -1,8 +1,8 @@
 # Research-to-capability traceability
 
-Snapshot: 2026-09-01
+Snapshot: 2026-09-04
 
-This register turns the current Consensus search set into product decisions. A paper is not considered "used" merely because it appears in the bibliography: it must be tied to a bounded context, an accepted or rejected design implication, and an executable evaluation family. Publication metadata below follows the current Consensus record; preprints are not silently promoted to peer-reviewed evidence.
+This register turns the accepted research set into product decisions. A paper is not considered "used" merely because it appears in the bibliography: it must be tied to a bounded context, an accepted or rejected design implication, and an executable evaluation family. Publication metadata follows the previously recorded Consensus set plus authoritative publication records re-verified on 2026-09-04; preprints are not silently promoted to peer-reviewed evidence.
 
 ## Classification rules
 
@@ -30,6 +30,8 @@ This register turns the current Consensus search set into product decisions. A p
 | Giglou et al. (2026), *OntoLearner* | generation / cross_cutting | Add cross-domain standardized benchmarking and measure failure against ontology complexity, not just model size. | adopt | Evaluation | multi-domain term/taxonomy/relation benchmark; complexity-stratified error analysis | Tool/library is research infrastructure, not a required runtime dependency. |
 | Hertling & Paulheim (2023), *OLaLa* | client | Ontology matching needs explicit prompt representation, examples, existing correspondences, and candidate-generation choices. | adopt | Model Alignment | OAEI-style matching P/R/F1; zero/few-shot comparison | LLM result is a correspondence candidate, never automatic authoritative alignment. |
 | Giglou, D'Souza, Engel, & Auer (2024), *LLMs4OM* | client | Retrieve first, then match; compare concept-only, parent-context, and child-context representations. | adopt | Model Alignment, Client Consumption | retrieval recall; matching P/R/F1 across representation variants | Consensus currently records arXiv; client must remain functional without LLM matching. |
+| He, Chen, Dong, & Horrocks (2023), *Exploring Large Language Models for Ontology Alignment* | client | Compare concept-label-only matching with bounded structural-context matching instead of treating a richer prompt as automatically better. LLM output remains a correspondence candidate. | adapt | Model Alignment | OAEI Bio-ML hard subsets; concept-only vs structural-context ablation; zero-shot baseline | Peer-reviewed ISWC 2023 Posters/Demos evidence is explicitly preliminary; reported model gains do not establish enterprise-domain generality or publication authority. |
+| Amini, Saki Norouzi, Hitzler, & Amini (2024), *Towards Complex Ontology Alignment Using Large Language Models* | client | Complex correspondence proposals may use bounded ontology modules/rich local context, with module/context size recorded as evidence rather than unconstrained prompt expansion. | adapt | Model Alignment | complex-alignment fixtures; module-size/context ablation; correspondence P/R/F1 | Refereed KGSWC 2024 evidence supports module-aware prompting, but rich context cannot bypass retrieval bounds, source provenance, abstention, or steward governance. |
 | Sousa, Lima, & Trojahn (2025), *Complex Ontology Matching with Large Language Model Embeddings* | client | Support expressive correspondence proposals using local subgraph/neighborhood evidence, not label similarity alone. | adapt | Model Alignment | complex-correspondence F1; subgraph ablations | Embedding-space/model compatibility must be explicit; reported gains do not authorize cross-model vector comparison. |
 | Taboada et al. (2025), MILA | client | Use programmed retrieval/search to prune candidates and reserve LLM calls for uncertain cases. | adopt | Model Alignment, Client Consumption | candidate recall; final P/R/F1; LLM-call reduction vs naive prompting | Consensus currently records arXiv; algorithmic search cannot bypass evidence/truth-state rules. |
 | Barcelos, French, & Wu (2025), *KROMA* | client | Targeted knowledge retrieval, structural context, and refinement should precede context-augmented LLM matching. | adopt | Model Alignment | candidate pruning recall; prompt-enrichment ablation; communication cost | Consensus currently records arXiv; RAG context is not source authority. |
@@ -53,9 +55,9 @@ This register turns the current Consensus search set into product decisions. A p
 
 Acceptance must prove that ConceptWeave never becomes the GRC system of record, that proposed/inferred relations do not mutate authoritative GRC records, that release validation works offline, and that release upgrades identify affected GRC queries explicitly. Public OAEI/RODI/LLMs4OL-style benchmarks remain necessary because one enterprise fixture cannot establish general matching or learning performance.
 
-## Consensus records used in this snapshot
+## Consensus records used in the prior accepted set
 
-The following canonical Consensus records were fetched before recording product implications:
+The following canonical Consensus records were fetched before recording the corresponding product implications:
 
 - https://consensus.app/papers/accelerating-knowledge-graph-and-ontology-engineering-shimizu-hitzler/82d868ee8f7953108246241e28d5e339/?utm_source=chatgpt
 - https://consensus.app/papers/enhancing-knowledge-graph-construction-using-large-trajanoska-stojanov/80ffe83041735fdf94bf4b60dd32ba1a/?utm_source=chatgpt
@@ -84,10 +86,15 @@ The following canonical Consensus records were fetched before recording product 
 - https://consensus.app/papers/large-language-models-for-ontology-engineering-a-li-garijo/3087bb8f7cd0500d917f89d8a92559e5/?utm_source=chatgpt
 - https://consensus.app/papers/a-short-review-for-ontology-learning-stride-to-large-du-an/ad3e2c6bf660569ca1effb7b6d31a6f7/?utm_source=chatgpt
 
+## Additional authoritative publication records verified on 2026-09-04
+
+- He, Y., Chen, J., Dong, H., & Horrocks, I. (2023). *Exploring large language models for ontology alignment*. 22nd International Semantic Web Conference (ISWC 2023), Posters, Demos and Industry Tracks. Oxford University Research Archive peer-reviewed record: https://ora.ox.ac.uk/objects/uuid%3Ab0ecf14b-e9b9-4767-9fae-8a7adddd6fb6
+- Amini, R., Saki Norouzi, S., Hitzler, P., & Amini, R. (2024). *Towards complex ontology alignment using large language models*. In *Knowledge Graphs and Semantic Web: 6th International Conference, KGSWC 2024* (pp. 17–31). Springer. https://doi.org/10.1007/978-3-031-81221-7_2
+
 ## Next executable consequences
 
 1. Issue #2 Generation evaluation must expose task-level metrics rather than one aggregate "ontology quality" score.
-2. Issue #3 Client work must implement retrieval-before-prompt, structural/neighborhood evidence, deterministic lexical evidence, explicit abstention, release diff/version compatibility, and OAEI-LLM hallucination fixtures.
+2. Issue #3 Client work must implement retrieval-before-prompt, structural/neighborhood evidence, deterministic lexical evidence, explicit abstention, release diff/version compatibility, OAEI-LLM hallucination fixtures, concept-only vs structural-context ablations, and bounded-module complex-alignment fixtures.
 3. GRC must remain the first enterprise round-trip fixture, while OAEI/RODI/LLMs4OL-style data guards against overfitting the general contract to GRC.
 4. LLM calls remain behind `contextual-orchestrator`; model/provider/prompt changes require receipts and sensitivity evidence.
 5. Human review remains mandatory before authority promotion; Crowd-OM is evidence for scalable validation mechanics, not permission to replace GRC/domain steward authority.
