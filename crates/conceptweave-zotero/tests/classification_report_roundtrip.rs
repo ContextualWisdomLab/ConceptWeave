@@ -61,6 +61,13 @@ fn restored_report_rejects_child_provenance_outside_the_bound_snapshot() {
         build_steward_review_worksheet(&restored),
         Err(WorksheetError::InvalidReport)
     );
+
+    let mut blank_parent: ClassificationReport = serde_json::from_slice(&serialized).unwrap();
+    blank_parent.snapshot_items[0].parent_item_key = Some(" ".into());
+    assert_eq!(
+        build_steward_review_worksheet(&blank_parent),
+        Err(WorksheetError::InvalidReport)
+    );
 }
 
 #[test]
