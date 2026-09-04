@@ -49,6 +49,10 @@ Giglou, H. B., D'Souza, J., Aioanei, A. C., Mihindukulasooriya, N., & Auer, S. (
 
 ## Client, matching, and versioning research
 
+He, Y., Chen, J., Dong, H., & Horrocks, I. (2023). Exploring large language models for ontology alignment. In I. Fundulaki, K. Kozaki, D. Garijo, & J. M. Gomez-Perez (Eds.), *Proceedings of the ISWC 2023 Posters, Demos and Industry Tracks: From Novel Ideas to Industrial Practice* (CEUR Workshop Proceedings, Vol. 3632). CEUR-WS.org. https://ceur-ws.org/Vol-3632/ISWC2023_paper_427.pdf
+
+Amini, R., Saki Norouzi, S., Hitzler, P., & Amini, R. (2025). Towards complex ontology alignment using large language models. In S. Tiwari, B. Villazón-Terrazas, F. Ortiz-Rodríguez, & S. Sahri (Eds.), *Knowledge graphs and semantic web: 6th International Conference, KGSWC 2024, Paris, France, December 11–13, 2024, proceedings* (Lecture Notes in Computer Science, Vol. 15459, pp. 17–31). Springer Nature Switzerland. https://doi.org/10.1007/978-3-031-81221-7_2
+
 Hertling, S., & Paulheim, H. (2023). OLaLa: Ontology matching with large language models. In *Proceedings of the 12th Knowledge Capture Conference 2023* (pp. 131–139). Association for Computing Machinery. https://doi.org/10.1145/3587259.3627571
 
 Qiang, Z., Wang, W., & Taylor, K. L. (2023). Agent-OM: Leveraging LLM agents for ontology matching. *Proceedings of the VLDB Endowment, 18*, 516–529. Consensus record: https://consensus.app/papers/agentom-leveraging-llm-agents-for-ontology-matching-qiang-wang/1ff1e2abb0f255299ecb808951ceaf6b/?utm_source=chatgpt
