@@ -13,6 +13,8 @@ const MAX_SOURCE_CONNECTION_KEY_BYTES: usize = 128;
 /// Invalid zero-valued resource bounds for one source-observation request.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ObservationLimitError {
+    /// The total observation-operation timeout was zero and therefore unbounded.
+    ZeroOperationTimeout,
     /// The statement timeout was zero and therefore could permit an unbounded wait.
     ZeroStatementTimeout,
     /// The maximum observed-row count was zero.
@@ -26,6 +28,7 @@ pub enum ObservationLimitError {
 /// Explicit positive resource limits that every Source Observation adapter must enforce.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ObservationLimits {
+    operation_timeout_ms: u64,
     statement_timeout_ms: u64,
     max_rows: u64,
     max_bytes: u64,
@@ -33,13 +36,37 @@ pub struct ObservationLimits {
 }
 
 impl ObservationLimits {
-    /// Creates a bounded execution policy, rejecting every zero-valued limit.
+    /// Creates a conservative bounded policy whose total operation deadline equals the statement timeout.
+    ///
+    /// This constructor preserves the original API while making the end-to-end deadline explicit for
+    /// every request. Use [`Self::with_timeouts`] when connection/registry/catalog work needs a larger
+    /// total budget than any individual source statement.
     pub const fn new(
         statement_timeout_ms: u64,
         max_rows: u64,
         max_bytes: u64,
         max_concurrent_queries: u32,
     ) -> Result<Self, ObservationLimitError> {
+        Self::with_timeouts(
+            statement_timeout_ms,
+            statement_timeout_ms,
+            max_rows,
+            max_bytes,
+            max_concurrent_queries,
+        )
+    }
+
+    /// Creates a bounded policy with separate end-to-end and per-statement time budgets.
+    pub const fn with_timeouts(
+        operation_timeout_ms: u64,
+        statement_timeout_ms: u64,
+        max_rows: u64,
+        max_bytes: u64,
+        max_concurrent_queries: u32,
+    ) -> Result<Self, ObservationLimitError> {
+        if operation_timeout_ms == 0 {
+            return Err(ObservationLimitError::ZeroOperationTimeout);
+        }
         if statement_timeout_ms == 0 {
             return Err(ObservationLimitError::ZeroStatementTimeout);
         }
@@ -53,11 +80,18 @@ impl ObservationLimits {
             return Err(ObservationLimitError::ZeroConcurrencyLimit);
         }
         Ok(Self {
+            operation_timeout_ms,
             statement_timeout_ms,
             max_rows,
             max_bytes,
             max_concurrent_queries,
         })
+    }
+
+    /// Returns the maximum elapsed time for registry resolution, connection and all catalog work.
+    #[must_use]
+    pub const fn operation_timeout_ms(&self) -> u64 {
+        self.operation_timeout_ms
     }
 
     /// Returns the maximum time one PostgreSQL statement may execute, in milliseconds.
@@ -206,6 +240,8 @@ pub enum SourceObservationFailure {
     Cancelled,
     /// The referenced source disappeared or could not be reached.
     SourceUnavailable,
+    /// The complete observation exceeded its end-to-end operation deadline.
+    OperationTimeout,
     /// A source metadata statement exceeded the request timeout.
     StatementTimeout,
     /// Observed metadata exceeded the explicit row budget.
@@ -228,10 +264,11 @@ pub enum SourceObservationFailure {
 /// Port implemented by a concrete read-only source adapter.
 ///
 /// Implementations must resolve credentials outside this contract, use only read-only source
-/// access, honor the exact schema allowlist and every [`ObservationLimits`] bound, check caller
-/// cancellation, and return an error rather than a partial or invented snapshot when bounded
-/// observation cannot complete. Implementations own their scheduling model; blocking database work
-/// must not be performed on an asynchronous web executor thread.
+/// access, honor the exact schema allowlist, the total operation deadline, and every per-resource
+/// [`ObservationLimits`] bound, check caller cancellation, and return an error rather than a partial
+/// or invented snapshot when bounded observation cannot complete. Implementations own their
+/// scheduling model; blocking database work must not be performed on an asynchronous web executor
+/// thread.
 pub trait SourceObservationPort {
     /// Immutable snapshot type produced only after a complete bounded observation.
     type Snapshot;
