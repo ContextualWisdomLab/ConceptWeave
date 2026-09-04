@@ -5,7 +5,7 @@ const SNAPSHOT_DIGEST: &str =
 
 fn assert_invalid_timestamp(observed_at_utc: &str) {
     let error = PostgresSchemaSnapshot::new(
-        "warehouse-primary",
+        "warehouse_primary",
         SNAPSHOT_DIGEST,
         "postgres-introspector/1",
         observed_at_utc,
@@ -68,7 +68,7 @@ fn snapshot_accepts_canonical_utc_observation_timestamps() {
         "2024-06-30T23:59:60Z",
     ] {
         let snapshot = PostgresSchemaSnapshot::new(
-            "warehouse-primary",
+            "warehouse_primary",
             SNAPSHOT_DIGEST,
             "postgres-introspector/1",
             observed_at_utc,
