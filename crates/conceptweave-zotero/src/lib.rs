@@ -1164,26 +1164,28 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
         let Some(state) = verified_state else {
             let reconciled_state = preflight(&operation.item_key).ok();
             let reconciled_after = reconciled_state.as_ref().is_some_and(|state| {
-                normalized_metadata(&state.collection_keys, &state.tags)
-                    .is_ok_and(|(collections, tags)| {
+                normalized_metadata(&state.collection_keys, &state.tags).is_ok_and(
+                    |(collections, tags)| {
                         state.server_id == server_id
                             && state.library_version > current_library_version
                             && state.item_key == operation.item_key
                             && state.item_version > operation.item_version
                             && collections == operation.after_collection_keys
                             && tags == operation.after_tags
-                    })
+                    },
+                )
             });
             let reconciled_before = reconciled_state.as_ref().is_some_and(|state| {
-                normalized_metadata(&state.collection_keys, &state.tags)
-                    .is_ok_and(|(collections, tags)| {
+                normalized_metadata(&state.collection_keys, &state.tags).is_ok_and(
+                    |(collections, tags)| {
                         state.server_id == server_id
                             && state.library_version == current_library_version
                             && state.item_key == operation.item_key
                             && state.item_version == operation.item_version
                             && collections == operation.before_collection_keys
                             && tags == operation.before_tags
-                    })
+                    },
+                )
             });
             if let Some(state) = reconciled_state.filter(|_| reconciled_after) {
                 applied_item_keys.push(operation.item_key.clone());
