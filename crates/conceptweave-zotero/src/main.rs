@@ -1,11 +1,35 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-use conceptweave_zotero::read_local_snapshot;
+use conceptweave_zotero::{build_steward_review_worksheet, read_local_snapshot};
 use std::env;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
+
+fn parse_output_request<I, S>(args: I) -> Result<(bool, String), &'static str>
+where
+    I: IntoIterator<Item = S>,
+    S: Into<String>,
+{
+    let mut args = args.into_iter().map(Into::into);
+    let first = args
+        .next()
+        .ok_or("usage: conceptweave-zotero [--worksheet] /tmp/OUTPUT.json")?;
+    let (worksheet, output) = if first == "--worksheet" {
+        (
+            true,
+            args.next()
+                .ok_or("--worksheet requires an output path")?,
+        )
+    } else {
+        (false, first)
+    };
+    if args.next().is_some() {
+        return Err("unexpected extra argument");
+    }
+    Ok((worksheet, output))
+}
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 /// Returns canonical directories in which a sensitive report may be created.
@@ -94,9 +118,7 @@ fn create_report_file_with(
 #[cfg_attr(coverage_nightly, coverage(off))]
 /// Reads one Zotero snapshot and writes its sensitive local proposal report.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let output = env::args()
-        .nth(1)
-        .ok_or("usage: conceptweave-zotero /tmp/OUTPUT.json")?;
+    let (worksheet, output) = parse_output_request(env::args().skip(1))?;
     let output = validate_output_path(&output)?;
     let report = read_local_snapshot()?;
     if report.zotero_version.starts_with("9.") {
@@ -104,7 +126,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let file = create_report_file(&output)?;
     let mut writer = BufWriter::new(file);
-    serde_json::to_writer_pretty(&mut writer, &report)?;
+    if worksheet {
+        serde_json::to_writer_pretty(&mut writer, &build_steward_review_worksheet(&report)?)?;
+    } else {
+        serde_json::to_writer_pretty(&mut writer, &report)?;
+    }
     writer.flush()?;
     Ok(())
 }
