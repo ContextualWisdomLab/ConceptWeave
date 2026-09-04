@@ -2798,15 +2798,12 @@ mod tests {
         let item_body = r#"{"key":"ABCD2345","version":43,"data":{"itemType":"book","collections":["CDEF4567"],"tags":[{"tag":"classified"}]}}"#;
         let responses = vec![
             Box::leak(library_response("server-10", 99).into_boxed_str()),
-            Box::leak(
-                raw_response(Some("server-10"), Some(43), item_body).into_boxed_str(),
-            ),
+            Box::leak(raw_response(Some("server-10"), Some(43), item_body).into_boxed_str()),
             Box::leak(library_response("server-10", 99).into_boxed_str()),
         ];
         let (base, server) = serve(responses);
 
-        let receipt =
-            reconcile_classification_rollback_with_zotero10(&operation, &transport(base));
+        let receipt = reconcile_classification_rollback_with_zotero10(&operation, &transport(base));
 
         assert_eq!(receipt.state, ClassificationRollbackState::Unchanged);
         assert_eq!(receipt.retry_operation, Some(operation));

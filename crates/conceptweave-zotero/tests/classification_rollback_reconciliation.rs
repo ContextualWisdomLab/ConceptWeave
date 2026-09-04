@@ -1,6 +1,6 @@
 use conceptweave_zotero::{
-    ClassificationItemState, ClassificationRollbackOperation, ClassificationRollbackState,
-    ItemTag, reconcile_classification_rollback,
+    ClassificationItemState, ClassificationRollbackOperation, ClassificationRollbackState, ItemTag,
+    reconcile_classification_rollback,
 };
 
 fn tag(value: &str) -> ItemTag {
@@ -115,10 +115,7 @@ fn later_reconciliation_preserves_read_failures_and_rejects_wrong_identity() {
     wrong_server.server_id = "server-2".into();
     let mismatched =
         reconcile_classification_rollback(&operation, |_| Ok::<_, ()>(wrong_server.clone()));
-    assert_eq!(
-        mismatched.state,
-        ClassificationRollbackState::Indeterminate
-    );
+    assert_eq!(mismatched.state, ClassificationRollbackState::Indeterminate);
     assert_eq!(mismatched.observed_state, Some(wrong_server));
     assert!(mismatched.retry_operation.is_none());
 
