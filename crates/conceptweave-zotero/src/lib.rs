@@ -1135,6 +1135,10 @@ pub fn build_steward_review_worksheet(
     for item in &report.classified_items {
         if !decision_keys.insert(item.item_key.as_str())
             || snapshot_versions.get(item.item_key.as_str()) != Some(&item.item_version)
+            || item
+                .child_item_keys
+                .iter()
+                .any(|child_key| !snapshot_versions.contains_key(child_key.as_str()))
             || (item.proposed_disposition == Disposition::NeedsStewardReview)
                 != item.abstention_reason.is_some()
         {

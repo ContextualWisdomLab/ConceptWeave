@@ -1,5 +1,6 @@
 use conceptweave_zotero::{
-    ClassificationReport, ItemData, ZoteroItem, build_steward_review_worksheet, classify_snapshot,
+    ClassificationReport, ItemData, WorksheetError, ZoteroItem, build_steward_review_worksheet,
+    classify_snapshot,
 };
 
 #[test]
@@ -32,5 +33,32 @@ fn owner_only_report_roundtrip_preserves_the_review_workload() {
     assert_eq!(
         build_steward_review_worksheet(&restored).unwrap(),
         build_steward_review_worksheet(&original).unwrap()
+    );
+}
+
+#[test]
+fn restored_report_rejects_child_provenance_outside_the_bound_snapshot() {
+    let item = ZoteroItem {
+        key: "ITEM".into(),
+        version: 7,
+        data: ItemData {
+            item_type: "journalArticle".into(),
+            title: "ontology alignment".into(),
+            abstract_note: "review context".into(),
+            doi: "10.1000/example".into(),
+            parent_item: String::new(),
+            collections: vec!["COLLECTION".into()],
+            tags: vec![],
+        },
+    };
+    let original = classify_snapshot("9.0.6".into(), None, 42, vec![item]);
+    let serialized = serde_json::to_vec(&original).unwrap();
+    let mut restored: ClassificationReport = serde_json::from_slice(&serialized).unwrap();
+
+    restored.classified_items[0].child_item_keys = vec!["UNKNOWN_CHILD".into()];
+
+    assert_eq!(
+        build_steward_review_worksheet(&restored),
+        Err(WorksheetError::InvalidReport)
     );
 }
