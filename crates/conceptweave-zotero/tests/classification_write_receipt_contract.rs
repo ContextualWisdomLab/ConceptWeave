@@ -174,3 +174,42 @@ fn confirmed_unexpected_mutation_retains_known_inverse_rollback() {
     assert!(receipt.rollback_operations[0].collection_keys.is_empty());
     assert!(receipt.rollback_operations[0].tags.is_empty());
 }
+
+#[test]
+fn unexpected_mutation_requires_the_planned_server_and_item_identity() {
+    for (server_id, item_key) in [("other-server", "A"), ("server-1", "other-item")] {
+        let report = classification_report();
+        let plan = build_classification_write_plan(
+            &report,
+            &reviewed(&report),
+            WriteMode::Execute,
+            |_| true,
+        )
+        .unwrap();
+        let initial_preflight_count = plan.operations().len();
+        let mut reads = 0usize;
+
+        let receipt = execute_classification_write_plan(
+            &plan,
+            |requested_item_key| {
+                reads += 1;
+                if reads <= initial_preflight_count {
+                    return Ok::<_, ()>(preflight_state(&plan, requested_item_key));
+                }
+
+                Ok::<_, ()>(ClassificationItemState {
+                    server_id: server_id.into(),
+                    library_version: 43,
+                    item_key: item_key.into(),
+                    item_version: 8,
+                    collection_keys: vec!["unexpected_collection".into()],
+                    tags: vec![],
+                })
+            },
+            |_| Err::<ClassificationItemState, _>(()),
+        );
+
+        assert_eq!(receipt.indeterminate_item_key.as_deref(), Some("A"));
+        assert!(receipt.rollback_operations.is_empty());
+    }
+}
