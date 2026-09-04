@@ -1506,23 +1506,19 @@ where
     {
         return Err(DuplicateReviewError::SnapshotMismatch);
     }
-    if report
+    if report.snapshot_items.iter().any(|item| {
+        item.item_key.trim().is_empty()
+            || item
+                .parent_item_key
+                .as_ref()
+                .is_some_and(|parent_key| parent_key.trim().is_empty())
+    }) || report
         .snapshot_items
         .iter()
-        .any(|item| {
-            item.item_key.trim().is_empty()
-                || item
-                    .parent_item_key
-                    .as_ref()
-                    .is_some_and(|parent_key| parent_key.trim().is_empty())
-        })
-        || report
-            .snapshot_items
-            .iter()
-            .map(|item| item.item_key.as_str())
-            .collect::<BTreeSet<_>>()
-            .len()
-            != report.snapshot_items.len()
+        .map(|item| item.item_key.as_str())
+        .collect::<BTreeSet<_>>()
+        .len()
+        != report.snapshot_items.len()
     {
         return Err(DuplicateReviewError::InvalidReview);
     }

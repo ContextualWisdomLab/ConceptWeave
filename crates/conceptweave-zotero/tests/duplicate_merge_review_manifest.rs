@@ -184,11 +184,13 @@ fn duplicate_review_contract_fails_closed() {
 #[test]
 fn duplicate_review_rejects_child_sources_before_approval_verification() {
     let mut report = report();
-    report.snapshot_items.push(conceptweave_zotero::SnapshotItemRevision {
-        item_key: "CHILD".into(),
-        item_version: 3,
-        parent_item_key: Some("A".into()),
-    });
+    report
+        .snapshot_items
+        .push(conceptweave_zotero::SnapshotItemRevision {
+            item_key: "CHILD".into(),
+            item_version: 3,
+            parent_item_key: Some("A".into()),
+        });
     report.duplicate_candidates[0].item_keys[1] = "CHILD".into();
     let reviewed = reviewed(&report);
     let verifier_calls = Cell::new(0);
