@@ -177,3 +177,106 @@ fn duplicate_review_contract_fails_closed() {
         assert!(error.to_string().contains(fragment));
     }
 }
+
+#[test]
+fn overlapping_duplicate_groups_require_one_consistent_canonical_choice() {
+    let report = classify_snapshot(
+        "9.0.6".into(),
+        None,
+        42,
+        vec![
+            item("A", 7, "Same Identity", "10.1000/overlap"),
+            item("B", 9, "Same Identity", "10.1000/overlap"),
+        ],
+    );
+    assert_eq!(report.duplicate_candidates.len(), 2);
+
+    let reviewed = ReviewedDuplicateMergeSet {
+        review_id: "review-overlap".into(),
+        authority_receipt: "authority-overlap".into(),
+        library_version: report.library_version,
+        rule_revision: report.rule_revision.into(),
+        snapshot_digest: report.snapshot_digest.clone(),
+        decisions: vec![
+            DuplicateMergeDecision {
+                identity_kind: "doi".into(),
+                normalized_identity: "10.1000/overlap".into(),
+                retained_item_key: "A".into(),
+            },
+            DuplicateMergeDecision {
+                identity_kind: "title".into(),
+                normalized_identity: "same identity".into(),
+                retained_item_key: "B".into(),
+            },
+        ],
+    };
+
+    assert_eq!(
+        build_duplicate_merge_review_manifest(&report, &reviewed, |_| true),
+        Err(DuplicateReviewError::InvalidReview),
+        "overlapping duplicate groups cannot emit conflicting A->B and B->A canonical mappings"
+    );
+}
+
+#[test]
+fn duplicate_review_rejects_ambiguous_snapshot_key_revisions() {
+    let report = classify_snapshot(
+        "9.0.6".into(),
+        None,
+        42,
+        vec![
+            item("DUPKEY", 7, "Same Identity", "10.1000/duplicate-key"),
+            item("DUPKEY", 9, "Same Identity", "10.1000/duplicate-key"),
+        ],
+    );
+    assert_eq!(report.snapshot_items.len(), 2);
+    assert!(!report.duplicate_candidates.is_empty());
+
+    let reviewed = ReviewedDuplicateMergeSet {
+        review_id: "review-duplicate-key".into(),
+        authority_receipt: "authority-duplicate-key".into(),
+        library_version: report.library_version,
+        rule_revision: report.rule_revision.into(),
+        snapshot_digest: report.snapshot_digest.clone(),
+        decisions: report
+            .duplicate_candidates
+            .iter()
+            .map(|candidate| DuplicateMergeDecision {
+                identity_kind: candidate.identity_kind.into(),
+                normalized_identity: candidate.normalized_identity.clone(),
+                retained_item_key: "DUPKEY".into(),
+            })
+            .collect(),
+    };
+
+    assert_eq!(
+        build_duplicate_merge_review_manifest(&report, &reviewed, |_| true),
+        Err(DuplicateReviewError::InvalidReview),
+        "duplicate Zotero keys must fail before a BTreeMap can collapse distinct observed revisions"
+    );
+}
+
+#[test]
+fn duplicate_review_domain_language_and_governance_handoff_are_documented() {
+    let ubiquitous_language = include_str!("../../../docs/UBIQUITOUS_LANGUAGE.md");
+    for term in [
+        "Reviewed Duplicate Merge Set",
+        "Authority Receipt",
+        "Canonical-Key Operation",
+    ] {
+        assert!(
+            ubiquitous_language.contains(term),
+            "UBIQUITOUS_LANGUAGE.md must define `{term}`"
+        );
+    }
+
+    let context_map = include_str!("../../../docs/CONTEXT_MAP.md");
+    assert!(
+        context_map.contains("Research Intake -> Governance & Publication"),
+        "CONTEXT_MAP.md must name the Research Intake to Governance & Publication verification handoff"
+    );
+    assert!(
+        context_map.contains("Anti-Corruption Layer"),
+        "the duplicate-review governance handoff must preserve an explicit ACL boundary"
+    );
+}

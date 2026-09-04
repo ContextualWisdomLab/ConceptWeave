@@ -18,3 +18,6 @@
 | Semantic Steward | Authorized reviewer responsible for accepting or rejecting semantic meaning. |
 | Reviewed Classification Change | Authorized complete replacement of one paper's collection and tag state, bound to its observed revision. |
 | Classification Write Plan | Local deterministic dry-run artifact containing exact preconditions and before/after/rollback metadata; not proof of execution. |
+| Reviewed Duplicate Merge Set | Complete steward decisions selecting one consistent canonical item across every overlapping duplicate group in a snapshot. |
+| Authority Receipt | Opaque proof checked by the Governance & Publication boundary; it contains no reviewer identity or credential. |
+| Canonical-Key Operation | Reversible local mapping from each duplicate source key to one retained key, with the exact rollback mapping. |

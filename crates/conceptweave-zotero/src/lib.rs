@@ -692,6 +692,16 @@ where
         return Err(DuplicateReviewError::UnverifiedApproval);
     }
 
+    if report
+        .snapshot_items
+        .iter()
+        .map(|item| item.item_key.as_str())
+        .collect::<BTreeSet<_>>()
+        .len()
+        != report.snapshot_items.len()
+    {
+        return Err(DuplicateReviewError::InvalidReview);
+    }
     let item_revisions = report
         .snapshot_items
         .iter()
@@ -711,6 +721,7 @@ where
         })
         .collect::<BTreeMap<_, _>>();
     let mut seen_candidates = BTreeSet::new();
+    let mut canonical_choices = BTreeMap::<&str, &str>::new();
     let mut operations = Vec::with_capacity(reviewed.decisions.len());
 
     for decision in &reviewed.decisions {
@@ -726,6 +737,14 @@ where
             .ok_or(DuplicateReviewError::UnknownCandidate)?;
         if !candidate.item_keys.contains(&decision.retained_item_key) {
             return Err(DuplicateReviewError::InvalidRetainedItem);
+        }
+        for item_key in &candidate.item_keys {
+            if canonical_choices
+                .insert(item_key, decision.retained_item_key.as_str())
+                .is_some_and(|retained_key| retained_key != decision.retained_item_key)
+            {
+                return Err(DuplicateReviewError::InvalidReview);
+            }
         }
 
         let source_items = candidate
