@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/conceptweave-domain",
+    "crates/conceptweave-client",
     "crates/conceptweave-observation",
     "crates/conceptweave-source-port",
 ]

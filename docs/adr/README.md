@@ -4,3 +4,4 @@
 - [ADR 0002 — Evidence, truth, and publication lifecycle](0002-truth-publication-lifecycle.md)
 - [ADR 0003 — Standards and LLM engineering boundary](0003-standards-llm-boundary.md)
 - [ADR 0004 — Bounded Source Observation port](0004-source-observation-port.md) — Proposed
+- [ADR 0005 — Semantic-release client boundary](0005-semantic-release-client-boundary.md) — Proposed
