@@ -73,6 +73,7 @@ Operators must be able to finalize the saved report, completed worksheet, and ap
 During the human review campaign, operators must be able to validate a partially completed worksheet against its original report and persist aggregate progress without an approval receipt. Progress reports only total, decided, and remaining counts plus a syntactic-completion flag; it never suggests labels or claims correctness, approval, or publication authority. An empty campaign is not complete.
 
 Operators must be able to accumulate small steward-reviewed decision sets into the canonical worksheet without hand-merging the complete JSON document. Each decision patch binds the original library version, classifier revision, snapshot digest, item key, and item revision. Empty, duplicate, unknown, stale, or abstention decisions fail atomically. Reapplying the same decision is idempotent; a different decision cannot overwrite existing review work. Applying a patch does not confer approval or record publication authority.
+The offline CLI must read the saved report, current worksheet, and decision patch as three distinct owner-only file identities and create a separate updated worksheet. It must never overwrite the current worksheet, reread Zotero, or emit output after invalid input.
 
 Every successful classification report includes aggregate evidence for snapshot coverage, proposal coverage, provenance completeness, abstentions, duplicate candidates, disposition totals, and zero unreported failures.
 
