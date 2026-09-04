@@ -577,15 +577,13 @@ impl ForeignKeyObservation {
         if let Some(target_columns) = reference_behavior
             .as_ref()
             .and_then(ForeignKeyReferenceBehavior::delete_target_columns)
-        {
-            if target_columns
+            && target_columns
                 .iter()
                 .any(|column_name| !column_names.contains(column_name))
-            {
-                return Err(ObservationError::InvalidObservationField {
-                    field: "delete_target_column_name",
-                });
-            }
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "delete_target_column_name",
+            });
         }
         Ok(Self {
             constraint_name,
