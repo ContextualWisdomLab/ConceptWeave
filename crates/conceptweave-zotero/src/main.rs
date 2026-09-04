@@ -87,8 +87,13 @@ where
     Ok(request)
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
-fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<T> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+struct ArtifactIdentity {
+    device: u64,
+    inode: u64,
+}
+
+fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<(T, ArtifactIdentity)> {
     let path = PathBuf::from(raw);
     if !path.is_absolute() {
         return Err(io::Error::new(
@@ -114,8 +119,16 @@ fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<T> {
     }
     let file = File::open(&path)?;
     let opened_metadata = file.metadata()?;
-    #[cfg(unix)]
+    #[cfg(not(unix))]
     {
+        let _ = (path_metadata, opened_metadata, file);
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "private review input requires a Unix platform",
+        ));
+    }
+    #[cfg(unix)]
+    let identity = {
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
         if opened_metadata.dev() != path_metadata.dev()
             || opened_metadata.ino() != path_metadata.ino()
@@ -127,29 +140,36 @@ fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<T> {
                 "review input identity or permissions are unsafe",
             ));
         }
+        ArtifactIdentity {
+            device: opened_metadata.dev(),
+            inode: opened_metadata.ino(),
+        }
+    };
+    #[cfg(unix)]
+    {
+        if opened_metadata.len() > MAX_ARTIFACT_BYTES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "review input exceeds the artifact size limit",
+            ));
+        }
+        let mut content = Vec::with_capacity(opened_metadata.len() as usize);
+        file.take(MAX_ARTIFACT_BYTES + 1)
+            .read_to_end(&mut content)?;
+        if content.len() as u64 > MAX_ARTIFACT_BYTES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "review input grew beyond the artifact size limit",
+            ));
+        }
+        let parsed = serde_json::from_slice(&content)
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+        Ok((parsed, identity))
     }
-    #[cfg(not(unix))]
-    return Err(io::Error::new(
-        io::ErrorKind::Unsupported,
-        "private review input requires a Unix platform",
-    ));
-    if opened_metadata.len() > MAX_ARTIFACT_BYTES {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "review input exceeds the artifact size limit",
-        ));
-    }
-    let mut content = Vec::with_capacity(opened_metadata.len() as usize);
-    file.take(MAX_ARTIFACT_BYTES + 1)
-        .read_to_end(&mut content)?;
-    if content.len() as u64 > MAX_ARTIFACT_BYTES {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "review input grew beyond the artifact size limit",
-        ));
-    }
-    serde_json::from_slice(&content)
-        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+}
+
+fn label_input(name: &str, error: io::Error) -> io::Error {
+    io::Error::new(error.kind(), format!("{name}: {error}"))
 }
 
 fn write_private_output(path: &Path, content: &[u8]) -> io::Result<()> {
@@ -296,9 +316,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             output,
         } => {
             let output = validate_output_path(&output)?;
-            let report: ClassificationReport = read_private_json(&report)?;
-            let worksheet: StewardReviewWorksheet = read_private_json(&worksheet)?;
-            let approval: GoldenSetApproval = read_private_json(&approval)?;
+            let (report, report_identity): (ClassificationReport, _) =
+                read_private_json(&report).map_err(|error| label_input("report", error))?;
+            let (worksheet, worksheet_identity): (StewardReviewWorksheet, _) =
+                read_private_json(&worksheet).map_err(|error| label_input("worksheet", error))?;
+            let (approval, approval_identity): (GoldenSetApproval, _) =
+                read_private_json(&approval).map_err(|error| label_input("approval", error))?;
+            if BTreeSet::from([report_identity, worksheet_identity, approval_identity]).len() != 3 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "finalization inputs must be distinct files",
+                )
+                .into());
+            }
             let golden = reviewed_golden_set_from_worksheet(&report, &worksheet, approval)?;
             write_private_output(&output, &serde_json::to_vec_pretty(&golden)?)?;
         }
@@ -376,7 +406,8 @@ mod tests {
         let _ = fs::remove_file(&valid);
         fs::write(&valid, br#"{"accepted":true}"#).unwrap();
         fs::set_permissions(&valid, fs::Permissions::from_mode(0o600)).unwrap();
-        let parsed: serde_json::Value = read_private_json(valid.to_str().unwrap()).unwrap();
+        let (parsed, _): (serde_json::Value, _) =
+            read_private_json(valid.to_str().unwrap()).unwrap();
         assert_eq!(parsed["accepted"], true);
         assert!(read_private_json::<serde_json::Value>("relative.json").is_err());
         assert!(read_private_json::<serde_json::Value>("/").is_err());
