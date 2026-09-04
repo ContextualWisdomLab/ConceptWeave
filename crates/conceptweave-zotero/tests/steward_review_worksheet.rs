@@ -180,15 +180,24 @@ fn worksheet_rejects_each_inconsistent_report_coordinate() {
     );
 
     let mut invalid = report();
-    invalid.classified_items[0].abstention_reason = None;
+    invalid
+        .classified_items
+        .iter_mut()
+        .find(|item| item.proposed_disposition == Disposition::NeedsStewardReview)
+        .unwrap()
+        .abstention_reason = None;
     assert_eq!(
         build_steward_review_worksheet(&invalid),
         Err(WorksheetError::InvalidReport)
     );
 
     let mut invalid = report();
-    invalid.classified_items[1].abstention_reason =
-        Some(conceptweave_zotero::AbstentionReason::NoDeterministicRuleMatch);
+    invalid
+        .classified_items
+        .iter_mut()
+        .find(|item| item.proposed_disposition != Disposition::NeedsStewardReview)
+        .unwrap()
+        .abstention_reason = Some(conceptweave_zotero::AbstentionReason::NoDeterministicRuleMatch);
     assert_eq!(
         build_steward_review_worksheet(&invalid),
         Err(WorksheetError::InvalidReport)
