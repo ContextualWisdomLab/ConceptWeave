@@ -48,6 +48,22 @@ fn complete_review_requires_one_steward_label_per_bibliographic_item() {
         Err(EvaluationError::IncompleteReview)
     );
     assert_eq!(verifier_calls.get(), 0);
+    assert_eq!(
+        evaluate_complete_reviewed_classification(
+            &report,
+            &golden(vec![
+                GoldenLabel::new("A", Disposition::Generation),
+                GoldenLabel::new("A", Disposition::Generation),
+                GoldenLabel::new("B", Disposition::EvaluationGovernance),
+            ]),
+            |_| {
+                verifier_calls.set(verifier_calls.get() + 1);
+                true
+            },
+        ),
+        Err(EvaluationError::DuplicateItem)
+    );
+    assert_eq!(verifier_calls.get(), 0);
 
     let evaluation = evaluate_complete_reviewed_classification(
         &report,
