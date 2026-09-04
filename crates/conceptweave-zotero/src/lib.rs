@@ -1106,6 +1106,7 @@ pub struct StewardDecisionUpdate {
 
 /// A bounded set of local steward decisions for one immutable classification snapshot.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct StewardDecisionPatch {
     /// Zotero library revision shared with the report and worksheet.
     pub library_version: u64,
