@@ -167,6 +167,10 @@ pub struct ClassificationReport {
     pub rule_revision: &'static str,
     /// Number of items read, including child notes and attachments.
     pub observed_item_count: usize,
+    /// Complete item-revision identity of every observed record.
+    pub snapshot_items: Vec<SnapshotItemRevision>,
+    /// Canonical SHA-256 digest of every observed raw Zotero item.
+    pub snapshot_digest: String,
     /// One proposal for every top-level bibliographic item.
     pub classified_items: Vec<ClassifiedItem>,
     /// Reversible DOI/title duplicate candidates.
@@ -229,24 +233,7 @@ pub struct GoldenSetApproval {
 
 /// Computes the canonical content identity verified by a golden-set approval.
 pub fn classification_snapshot_digest(report: &ClassificationReport) -> String {
-    let classified_items = report
-        .classified_items
-        .iter()
-        .map(|item| (item.item_key.as_str(), item))
-        .collect::<BTreeMap<_, _>>();
-    let canonical_snapshot = serde_json::to_vec(&(
-        &report.zotero_version,
-        report.api_version,
-        report.schema_version,
-        &report.server_id,
-        report.library_version,
-        report.rule_revision,
-        report.observed_item_count,
-        classified_items,
-        &report.duplicate_candidates,
-    ))
-    .expect("classification reports contain only JSON-compatible values");
-    format!("sha256:{:x}", Sha256::digest(canonical_snapshot))
+    report.snapshot_digest.clone()
 }
 
 /// Integer evidence from which precision and recall can be calculated exactly.
@@ -322,7 +309,7 @@ pub fn evaluate_reviewed_golden_set<F>(
     verify_approval: F,
 ) -> Result<GoldenSetEvaluation, EvaluationError>
 where
-    F: FnOnce(&GoldenSetApproval) -> bool,
+    F: FnOnce(&ReviewedGoldenSet) -> bool,
 {
     if golden.approval.receipt_id.trim().is_empty()
         || golden.approval.reviewer_subject.trim().is_empty()
@@ -332,16 +319,18 @@ where
     {
         return Err(EvaluationError::InvalidReview);
     }
-    if !verify_approval(&golden.approval) {
+    if !verify_approval(golden) {
         return Err(EvaluationError::UnverifiedApproval);
     }
     let report_snapshot = report
-        .classified_items
+        .snapshot_items
         .iter()
-        .map(|item| SnapshotItemRevision {
-            item_key: item.item_key.clone(),
-            item_version: item.item_version,
-        })
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let report_keys = report
+        .snapshot_items
+        .iter()
+        .map(|item| item.item_key.as_str())
         .collect::<BTreeSet<_>>();
     let approved_snapshot = golden
         .approval
@@ -349,7 +338,8 @@ where
         .iter()
         .cloned()
         .collect::<BTreeSet<_>>();
-    if report_snapshot.len() != report.classified_items.len()
+    if report_snapshot.len() != report.snapshot_items.len()
+        || report_keys.len() != report.snapshot_items.len()
         || approved_snapshot.len() != golden.approval.snapshot_items.len()
     {
         return Err(EvaluationError::InvalidReview);
@@ -663,6 +653,16 @@ pub fn classify_snapshot(
     mut items: Vec<ZoteroItem>,
 ) -> ClassificationReport {
     items.sort_by(|left, right| left.key.cmp(&right.key));
+    let snapshot_items = items
+        .iter()
+        .map(|item| SnapshotItemRevision {
+            item_key: item.key.clone(),
+            item_version: item.version,
+        })
+        .collect();
+    let snapshot_bytes = serde_json::to_vec(&items)
+        .expect("Zotero snapshot items contain only JSON-compatible values");
+    let snapshot_digest = format!("sha256:{:x}", Sha256::digest(snapshot_bytes));
     let children = child_index(&items);
     let bibliographic: Vec<&ZoteroItem> =
         items.iter().filter(|item| is_bibliographic(item)).collect();
@@ -680,6 +680,8 @@ pub fn classify_snapshot(
         library_version,
         rule_revision: RULE_REVISION,
         observed_item_count: items.len(),
+        snapshot_items,
+        snapshot_digest,
         classified_items,
         duplicate_candidates,
     }

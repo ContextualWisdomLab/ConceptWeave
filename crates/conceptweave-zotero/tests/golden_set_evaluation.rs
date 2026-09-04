@@ -53,8 +53,9 @@ fn golden(labels: Vec<GoldenLabel>) -> ReviewedGoldenSet {
     }
 }
 
-fn verify_synthetic_approval(approval: &GoldenSetApproval) -> bool {
-    approval.receipt_id == "synthetic-review-1" && approval.reviewer_subject == "synthetic-steward"
+fn verify_synthetic_approval(golden: &ReviewedGoldenSet) -> bool {
+    golden.approval.receipt_id == "synthetic-review-1"
+        && golden.approval.reviewer_subject == "synthetic-steward"
 }
 
 #[test]
