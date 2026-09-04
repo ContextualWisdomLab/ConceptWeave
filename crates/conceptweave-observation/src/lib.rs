@@ -409,10 +409,11 @@ pub enum ForeignKeyDeferrability {
 }
 
 /// Exact PostgreSQL reference behavior for one observed foreign key.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ForeignKeyReferenceBehavior {
     update_action: ForeignKeyAction,
     delete_action: ForeignKeyAction,
+    delete_target_columns: Option<Vec<String>>,
     match_type: ForeignKeyMatchType,
     deferrability: ForeignKeyDeferrability,
 }
@@ -429,9 +430,38 @@ impl ForeignKeyReferenceBehavior {
         Self {
             update_action,
             delete_action,
+            delete_target_columns: None,
             match_type,
             deferrability,
         }
+    }
+
+    /// Adds the exact local-column subset targeted by `ON DELETE SET NULL` or `SET DEFAULT`.
+    pub fn with_delete_target_columns(
+        mut self,
+        delete_target_columns: Vec<String>,
+    ) -> Result<Self, ObservationError> {
+        if !matches!(
+            self.delete_action,
+            ForeignKeyAction::SetNull | ForeignKeyAction::SetDefault
+        ) || delete_target_columns.is_empty()
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "delete_target_columns",
+            });
+        }
+        let mut seen_columns = BTreeSet::new();
+        for column_name in &delete_target_columns {
+            validate_nonblank(column_name, "delete_target_column_name")?;
+            if !seen_columns.insert(column_name.as_str()) {
+                return Err(ObservationError::DuplicateConstraintColumn {
+                    constraint_name: "delete_target_columns".to_owned(),
+                    column_name: column_name.clone(),
+                });
+            }
+        }
+        self.delete_target_columns = Some(delete_target_columns);
+        Ok(self)
     }
 
     /// Returns the exact `ON UPDATE` action.
@@ -444,6 +474,12 @@ impl ForeignKeyReferenceBehavior {
     #[must_use]
     pub const fn delete_action(&self) -> ForeignKeyAction {
         self.delete_action
+    }
+
+    /// Returns the exact targeted local-column subset, or `None` when the action affects all columns.
+    #[must_use]
+    pub fn delete_target_columns(&self) -> Option<&[String]> {
+        self.delete_target_columns.as_deref()
     }
 
     /// Returns the exact foreign-key match type.
@@ -536,6 +572,19 @@ impl ForeignKeyObservation {
                 local_column_count: column_names.len(),
                 referenced_column_count: referenced_column_names.len(),
             });
+        }
+        if let Some(target_columns) = reference_behavior
+            .as_ref()
+            .and_then(ForeignKeyReferenceBehavior::delete_target_columns)
+        {
+            if target_columns
+                .iter()
+                .any(|column_name| !column_names.contains(column_name))
+            {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "delete_target_column_name",
+                });
+            }
         }
         Ok(Self {
             constraint_name,
