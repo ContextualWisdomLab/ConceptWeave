@@ -95,6 +95,7 @@ fn finalization_rejects_incomplete_invalid_or_mismatched_review() {
     );
 
     complete.decisions[1].item_key = complete.decisions[0].item_key.clone();
+    complete.decisions[1].item_version = complete.decisions[0].item_version;
     assert_eq!(
         reviewed_golden_set_from_worksheet(&complete, approval(&complete)),
         Err(EvaluationError::DuplicateItem)
