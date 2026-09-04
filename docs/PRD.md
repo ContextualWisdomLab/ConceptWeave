@@ -72,6 +72,8 @@ After every decision is filled, worksheet finalization must verify the governanc
 Operators must be able to finalize the saved report, completed worksheet, and approval receipt offline without rereading mutable Zotero state. Every input must be a distinct owner-only file identity, not merely a differently spelled path, and the new golden-set output must use a separate path; invalid, oversized, linked, or shared inputs fail closed.
 During the human review campaign, operators must be able to validate a partially completed worksheet against its original report and persist aggregate progress without an approval receipt. Progress reports only total, decided, and remaining counts plus a syntactic-completion flag; it never suggests labels or claims correctness, approval, or publication authority. An empty campaign is not complete.
 
+Operators must be able to accumulate small steward-reviewed decision sets into the canonical worksheet without hand-merging the complete JSON document. Each decision patch binds the original library version, classifier revision, snapshot digest, item key, and item revision. Empty, duplicate, unknown, stale, or abstention decisions fail atomically. Reapplying the same decision is idempotent; a different decision cannot overwrite existing review work. Applying a patch does not confer approval or record publication authority.
+
 Every successful classification report includes aggregate evidence for snapshot coverage, proposal coverage, provenance completeness, abstentions, duplicate candidates, disposition totals, and zero unreported failures.
 
 ## 6. First vertical slice
