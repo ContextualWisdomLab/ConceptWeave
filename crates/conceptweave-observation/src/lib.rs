@@ -36,7 +36,7 @@ pub enum ObservationError {
         /// Exact source schema identifier.
         schema_name: String,
         /// Exact source table identifier.
-        table_name,
+        table_name: String,
         /// Duplicated one-based source ordinal position.
         ordinal_position: u32,
     },
@@ -891,7 +891,7 @@ impl ObservationLocation {
 
     /// Returns a deterministic collision-safe evidence location string.
     ///
-    /// The vocabulary segments (`schemas`, `tables`, `columns`, `constraints`) are ConceptIdWeave
+    /// The vocabulary segments (`schemas`, `tables`, `columns`, `constraints`) are ConceptWeave
     /// coordinate labels; identifier tokens use RFC 6901 escaping and retain exact case/text.
     #[must_use]
     pub fn canonical_location(&self) -> String {
@@ -1089,7 +1089,7 @@ impl PostgresSchemaSnapshot {
 fn validate_constraint_columns(
     constraint_name: &str,
     column_names: &[String],
-    field: &''static str,
+    field: &'static str,
 ) -> Result<(), ObservationError> {
     if column_names.is_empty() {
         return Err(ObservationError::EmptyConstraintColumns {
@@ -1100,9 +1100,8 @@ fn validate_constraint_columns(
     for column_name in column_names {
         validate_nonblank(column_name, field)?;
         if !seen_columns.insert(column_name.as_str()) {
-            return Err(ObservationError::DuplicateColumnName {
-                schema_name: "".to_owned(),
-                table_name: "".to_owned(),
+            return Err(ObservationError::DuplicateConstraintColumn {
+                constraint_name: constraint_name.to_owned(),
                 column_name: column_name.clone(),
             });
         }
@@ -1137,9 +1136,7 @@ fn validate_observed_at_utc(value: &str) -> Result<(), ObservationError> {
         return Err(invalid());
     };
     let (core, fraction) = match without_z.split_once('.') {
-        Some((core, fraction))
-            if !fraction.is_empty() && fraction.bytes().all(|byte| byte.is_ascii_digit()) =>
-        {
+        Some((core, fraction)) if !fraction.is_empty() && fraction.bytes().all(|byte| byte.is_ascii_digit()) => {
             (core, Some(fraction))
         }
         Some(_) => return Err(invalid()),
