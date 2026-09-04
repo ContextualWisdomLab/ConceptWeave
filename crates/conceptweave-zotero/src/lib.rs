@@ -2796,7 +2796,7 @@ mod tests {
             }],
         };
         let item_body = r#"{"key":"ABCD2345","version":43,"data":{"itemType":"book","collections":["CDEF4567"],"tags":[{"tag":"classified"}]}}"#;
-        let responses = vec![
+        let responses: Vec<&'static str> = vec![
             Box::leak(library_response("server-10", 99).into_boxed_str()),
             Box::leak(raw_response(Some("server-10"), Some(43), item_body).into_boxed_str()),
             Box::leak(library_response("server-10", 99).into_boxed_str()),
