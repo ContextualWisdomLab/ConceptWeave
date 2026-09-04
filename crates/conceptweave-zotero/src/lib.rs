@@ -1213,6 +1213,71 @@ pub struct GoldenSetApproval {
     pub snapshot_items: Vec<SnapshotItemRevision>,
 }
 
+/// Converts a fully decided local worksheet into the input for approval verification.
+pub fn reviewed_golden_set_from_worksheet(
+    worksheet: &StewardReviewWorksheet,
+    approval: GoldenSetApproval,
+) -> Result<ReviewedGoldenSet, EvaluationError> {
+    if approval.receipt_id.trim().is_empty()
+        || approval.reviewer_subject.trim().is_empty()
+        || worksheet.rule_revision.trim().is_empty()
+        || worksheet.snapshot_digest.trim().is_empty()
+    {
+        return Err(EvaluationError::InvalidReview);
+    }
+    if approval.library_version != worksheet.library_version
+        || approval.rule_revision != worksheet.rule_revision
+        || approval.snapshot_digest != worksheet.snapshot_digest
+        || approval.snapshot_items != worksheet.snapshot_items
+    {
+        return Err(EvaluationError::SnapshotMismatch);
+    }
+
+    let mut snapshot_versions = BTreeMap::new();
+    for item in &worksheet.snapshot_items {
+        if item.item_key.trim().is_empty()
+            || snapshot_versions
+                .insert(item.item_key.as_str(), item.item_version)
+                .is_some()
+        {
+            return Err(EvaluationError::InvalidReview);
+        }
+    }
+
+    let mut decision_keys = BTreeSet::new();
+    let mut labels = Vec::with_capacity(worksheet.decisions.len());
+    for decision in &worksheet.decisions {
+        if decision.item_key.trim().is_empty()
+            || snapshot_versions.get(decision.item_key.as_str()) != Some(&decision.item_version)
+        {
+            return Err(EvaluationError::InvalidReview);
+        }
+        if !decision_keys.insert(decision.item_key.as_str()) {
+            return Err(EvaluationError::DuplicateItem);
+        }
+        if (decision.proposed_disposition == Disposition::NeedsStewardReview)
+            != decision.abstention_reason.is_some()
+        {
+            return Err(EvaluationError::InvalidReview);
+        }
+        let expected_disposition = decision
+            .reviewed_disposition
+            .ok_or(EvaluationError::IncompleteReview)?;
+        if expected_disposition == Disposition::NeedsStewardReview {
+            return Err(EvaluationError::InvalidExpectedDisposition);
+        }
+        labels.push(GoldenLabel::new(
+            decision.item_key.clone(),
+            expected_disposition,
+        ));
+    }
+    if labels.is_empty() {
+        return Err(EvaluationError::IncompleteReview);
+    }
+
+    Ok(ReviewedGoldenSet { approval, labels })
+}
+
 /// Computes the canonical content identity verified by a golden-set approval.
 pub fn classification_snapshot_digest(report: &ClassificationReport) -> String {
     report.snapshot_digest.clone()
