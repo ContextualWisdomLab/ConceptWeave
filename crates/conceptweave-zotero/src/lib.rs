@@ -143,10 +143,10 @@ pub struct ClassifiedItem {
 }
 
 /// A duplicate candidate group; no item is merged or deleted.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct DuplicateCandidate {
     /// Identity kind used for the candidate group.
-    pub identity_kind: &'static str,
+    pub identity_kind: String,
     /// Normalized identity value.
     pub normalized_identity: String,
     /// Zotero item keys sharing the identity.
@@ -179,6 +179,8 @@ pub struct ReviewedDuplicateMergeSet {
     pub snapshot_digest: String,
     /// Exact item-key/item-version coordinates reviewed by the steward.
     pub snapshot_items: Vec<SnapshotItemRevision>,
+    /// Exact duplicate membership reviewed by the steward.
+    pub duplicate_candidates: Vec<DuplicateCandidate>,
     /// Exactly one decision for every duplicate candidate.
     pub decisions: Vec<DuplicateMergeDecision>,
 }
@@ -292,12 +294,16 @@ pub struct ReviewedClassificationWriteSet {
     pub authority_receipt: String,
     /// Exact Local API server identity, when supplied by Zotero.
     pub server_id: Option<String>,
+    /// Exact Zotero version reviewed for write capability.
+    pub zotero_version: String,
     /// Exact reviewed library revision.
     pub library_version: u64,
     /// Exact reviewed classifier revision.
     pub rule_revision: String,
     /// Exact reviewed raw-snapshot digest.
     pub snapshot_digest: String,
+    /// Exact item-key/item-version coordinates reviewed by the steward.
+    pub snapshot_items: Vec<SnapshotItemRevision>,
     /// Reviewed item-level changes.
     pub changes: Vec<ReviewedClassificationChange>,
 }
@@ -336,6 +342,8 @@ pub struct ClassificationWritePlan {
     pub authority_receipt: String,
     /// Exact Local API server identity.
     pub server_id: Option<String>,
+    /// Exact Zotero version used to establish execute eligibility.
+    pub zotero_version: String,
     /// Exact library-version precondition.
     pub library_version: u64,
     /// Exact classifier revision.
@@ -418,6 +426,8 @@ pub struct ClassificationWriteReceipt {
     pub applied_item_keys: Vec<String>,
     /// First item whose preflight, write, or response failed.
     pub failed_item_key: Option<String>,
+    /// Item whose state could not be proven after an unverifiable write response.
+    pub indeterminate_item_key: Option<String>,
     /// Items whose write was not attempted.
     pub not_attempted_item_keys: Vec<String>,
     /// Verified inverse operations in safe reverse application order.
@@ -767,6 +777,7 @@ where
         || reviewed.library_version != report.library_version
         || reviewed.rule_revision != report.rule_revision
         || reviewed.snapshot_items != report.snapshot_items
+        || reviewed.duplicate_candidates != report.duplicate_candidates
     {
         return Err(DuplicateReviewError::SnapshotMismatch);
     }
@@ -799,7 +810,7 @@ where
         .map(|candidate| {
             (
                 (
-                    candidate.identity_kind,
+                    candidate.identity_kind.as_str(),
                     candidate.normalized_identity.as_str(),
                 ),
                 candidate,
@@ -910,6 +921,9 @@ fn normalized_metadata(
 ) -> Result<(Vec<String>, Vec<ItemTag>), WritePlanError> {
     if collection_keys.iter().any(|key| key.trim().is_empty())
         || tags.iter().any(|tag| tag.tag.trim().is_empty())
+        || tags
+            .iter()
+            .any(|tag| tag.tag_type.is_some_and(|tag_type| tag_type > 1))
         || collection_keys.iter().collect::<BTreeSet<_>>().len() != collection_keys.len()
         || tags
             .iter()
@@ -922,6 +936,11 @@ fn normalized_metadata(
     }
     let mut collection_keys = collection_keys.to_vec();
     let mut tags = tags.to_vec();
+    for tag in &mut tags {
+        if tag.tag_type == Some(0) {
+            tag.tag_type = None;
+        }
+    }
     collection_keys.sort();
     tags.sort();
     Ok((collection_keys, tags))
@@ -946,9 +965,11 @@ where
         return Err(WritePlanError::InvalidReview);
     }
     if reviewed.server_id != report.server_id
+        || reviewed.zotero_version != report.zotero_version
         || reviewed.library_version != report.library_version
         || reviewed.rule_revision != report.rule_revision
         || reviewed.snapshot_digest != report.snapshot_digest
+        || reviewed.snapshot_items != report.snapshot_items
     {
         return Err(WritePlanError::SnapshotMismatch);
     }
@@ -975,12 +996,23 @@ where
     }
 
     if report
-        .classified_items
+        .snapshot_items
         .iter()
-        .map(|item| item.item_key.as_str())
-        .collect::<BTreeSet<_>>()
-        .len()
-        != report.classified_items.len()
+        .any(|item| item.item_key.trim().is_empty())
+        || report
+            .snapshot_items
+            .iter()
+            .map(|item| item.item_key.as_str())
+            .collect::<BTreeSet<_>>()
+            .len()
+            != report.snapshot_items.len()
+        || report
+            .classified_items
+            .iter()
+            .map(|item| item.item_key.as_str())
+            .collect::<BTreeSet<_>>()
+            .len()
+            != report.classified_items.len()
     {
         return Err(WritePlanError::InvalidReview);
     }
@@ -988,6 +1020,11 @@ where
         .classified_items
         .iter()
         .map(|item| (item.item_key.as_str(), item))
+        .collect::<BTreeMap<_, _>>();
+    let snapshot_revisions = report
+        .snapshot_items
+        .iter()
+        .map(|item| (item.item_key.as_str(), item.item_version))
         .collect::<BTreeMap<_, _>>();
     let mut seen_items = BTreeSet::new();
     let mut operations = Vec::with_capacity(reviewed.changes.len());
@@ -1004,6 +1041,9 @@ where
         let item = classified
             .get(change.item_key.as_str())
             .ok_or(WritePlanError::UnknownItem)?;
+        if snapshot_revisions.get(change.item_key.as_str()) != Some(&item.item_version) {
+            return Err(WritePlanError::StaleItem);
+        }
         let (actual_collections, actual_tags) =
             normalized_metadata(&item.collection_keys, &item.tags)?;
         let (before_collections, before_tags) =
@@ -1037,6 +1077,7 @@ where
         review_id: reviewed.review_id.clone(),
         authority_receipt: reviewed.authority_receipt.clone(),
         server_id: reviewed.server_id.clone(),
+        zotero_version: reviewed.zotero_version.clone(),
         library_version: reviewed.library_version,
         rule_revision: reviewed.rule_revision.clone(),
         snapshot_digest: reviewed.snapshot_digest.clone(),
@@ -1061,6 +1102,7 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
             outcome: ClassificationWriteOutcome::DryRun,
             applied_item_keys: Vec::new(),
             failed_item_key: None,
+            indeterminate_item_key: None,
             not_attempted_item_keys: Vec::new(),
             rollback_operations: Vec::new(),
         };
@@ -1077,17 +1119,7 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
         let Ok(state) = preflight(&operation.item_key) else {
             return preflight_failure_receipt(plan, Some(&operation.item_key));
         };
-        let Ok((collections, tags)) = normalized_metadata(&state.collection_keys, &state.tags)
-        else {
-            return preflight_failure_receipt(plan, Some(&operation.item_key));
-        };
-        if state.server_id != server_id
-            || state.library_version != plan.library_version
-            || state.item_key != operation.item_key
-            || state.item_version != operation.item_version
-            || collections != operation.before_collection_keys
-            || tags != operation.before_tags
-        {
+        if !matches_before_state(&state, server_id, plan.library_version, operation) {
             return preflight_failure_receipt(plan, Some(&operation.item_key));
         }
     }
@@ -1105,35 +1137,35 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
             tags: operation.after_tags.clone(),
         };
         let response = write_item(&request);
-        let valid_response = response.as_ref().ok().and_then(|state| {
-            normalized_metadata(&state.collection_keys, &state.tags)
-                .ok()
-                .map(|metadata| (state, metadata))
+        let verified_state = response.ok().filter(|state| {
+            matches_after_state(state, server_id, current_library_version, operation)
         });
-        let Some((state, (collections, tags))) = valid_response else {
+        let Some(state) = verified_state else {
+            let reconciled_state = preflight(&operation.item_key).ok();
+            let reconciled_after = reconciled_state.as_ref().is_some_and(|state| {
+                matches_after_state(state, server_id, current_library_version, operation)
+            });
+            let reconciled_before = reconciled_state.as_ref().is_some_and(|state| {
+                matches_before_state(state, server_id, current_library_version, operation)
+            });
+            if let Some(state) = reconciled_state.filter(|_| reconciled_after) {
+                applied_item_keys.push(operation.item_key.clone());
+                rollback_operations.push(ClassificationRollbackOperation {
+                    item_key: operation.item_key.clone(),
+                    item_version: state.item_version,
+                    collection_keys: operation.rollback_collection_keys.clone(),
+                    tags: operation.rollback_tags.clone(),
+                });
+            }
             rollback_operations.reverse();
             return partial_failure_receipt(
                 plan,
                 operation_index,
                 applied_item_keys,
                 rollback_operations,
+                (!reconciled_after && !reconciled_before).then_some(operation.item_key.as_str()),
             );
         };
-        if state.server_id != server_id
-            || state.library_version <= current_library_version
-            || state.item_key != operation.item_key
-            || state.item_version <= operation.item_version
-            || collections != operation.after_collection_keys
-            || tags != operation.after_tags
-        {
-            rollback_operations.reverse();
-            return partial_failure_receipt(
-                plan,
-                operation_index,
-                applied_item_keys,
-                rollback_operations,
-            );
-        }
         current_library_version = state.library_version;
         applied_item_keys.push(operation.item_key.clone());
         rollback_operations.push(ClassificationRollbackOperation {
@@ -1148,9 +1180,42 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
         outcome: ClassificationWriteOutcome::Applied,
         applied_item_keys,
         failed_item_key: None,
+        indeterminate_item_key: None,
         not_attempted_item_keys: Vec::new(),
         rollback_operations,
     }
+}
+
+fn matches_before_state(
+    state: &ClassificationItemState,
+    server_id: &str,
+    library_version: u64,
+    operation: &ClassificationWriteOperation,
+) -> bool {
+    normalized_metadata(&state.collection_keys, &state.tags).is_ok_and(|(collections, tags)| {
+        state.server_id == server_id
+            && state.library_version == library_version
+            && state.item_key == operation.item_key
+            && state.item_version == operation.item_version
+            && collections == operation.before_collection_keys
+            && tags == operation.before_tags
+    })
+}
+
+fn matches_after_state(
+    state: &ClassificationItemState,
+    server_id: &str,
+    library_version: u64,
+    operation: &ClassificationWriteOperation,
+) -> bool {
+    normalized_metadata(&state.collection_keys, &state.tags).is_ok_and(|(collections, tags)| {
+        state.server_id == server_id
+            && state.library_version > library_version
+            && state.item_key == operation.item_key
+            && state.item_version > operation.item_version
+            && collections == operation.after_collection_keys
+            && tags == operation.after_tags
+    })
 }
 
 fn preflight_failure_receipt(
@@ -1161,6 +1226,7 @@ fn preflight_failure_receipt(
         outcome: ClassificationWriteOutcome::PreflightFailure,
         applied_item_keys: Vec::new(),
         failed_item_key: failed_item_key.map(str::to_owned),
+        indeterminate_item_key: None,
         not_attempted_item_keys: plan
             .operations
             .iter()
@@ -1175,11 +1241,13 @@ fn partial_failure_receipt(
     failed_index: usize,
     applied_item_keys: Vec<String>,
     rollback_operations: Vec<ClassificationRollbackOperation>,
+    indeterminate_item_key: Option<&str>,
 ) -> ClassificationWriteReceipt {
     ClassificationWriteReceipt {
         outcome: ClassificationWriteOutcome::PartialFailure,
         applied_item_keys,
         failed_item_key: Some(plan.operations[failed_index].item_key.clone()),
+        indeterminate_item_key: indeterminate_item_key.map(str::to_owned),
         not_attempted_item_keys: plan
             .operations
             .iter()
@@ -1719,7 +1787,7 @@ fn duplicate_candidates(items: &[&ZoteroItem]) -> Vec<DuplicateCandidate> {
         .into_iter()
         .filter_map(|((identity_kind, normalized_identity), item_keys)| {
             (item_keys.len() > 1).then_some(DuplicateCandidate {
-                identity_kind,
+                identity_kind: identity_kind.into(),
                 normalized_identity,
                 item_keys,
             })

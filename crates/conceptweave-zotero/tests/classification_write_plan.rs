@@ -31,7 +31,11 @@ fn execution_preflights_every_item_and_returns_reversible_partial_failure() {
                 .unwrap();
             Ok::<_, ()>(ClassificationItemState {
                 server_id: "server-1".into(),
-                library_version: 42,
+                library_version: if preflighted.len() > plan.operations.len() {
+                    43
+                } else {
+                    42
+                },
                 item_key: item_key.into(),
                 item_version: operation.item_version,
                 collection_keys: operation.before_collection_keys.clone(),
@@ -54,10 +58,11 @@ fn execution_preflights_every_item_and_returns_reversible_partial_failure() {
         },
     );
 
-    assert_eq!(preflighted, ["A", "B"]);
+    assert_eq!(preflighted, ["A", "B", "B"]);
     assert_eq!(written, ["A", "B"]);
     assert_eq!(receipt.outcome, ClassificationWriteOutcome::PartialFailure);
     assert_eq!(receipt.failed_item_key.as_deref(), Some("B"));
+    assert_eq!(receipt.indeterminate_item_key, None);
     assert!(receipt.not_attempted_item_keys.is_empty());
     assert_eq!(receipt.applied_item_keys, ["A"]);
     assert_eq!(receipt.rollback_operations.len(), 1);
@@ -84,7 +89,78 @@ fn dry_run_execution_never_calls_the_write_boundary() {
 
     assert_eq!(receipt.outcome, ClassificationWriteOutcome::DryRun);
     assert!(receipt.applied_item_keys.is_empty());
+    assert_eq!(receipt.indeterminate_item_key, None);
     assert!(receipt.rollback_operations.is_empty());
+}
+
+#[test]
+fn execution_reconciles_a_committed_write_after_its_response_is_lost() {
+    let report = classification_report("10.0.0");
+    let plan =
+        build_classification_write_plan(&report, &reviewed(&report), WriteMode::Execute, |_| true)
+            .unwrap();
+    let mut b_reads = 0;
+    let receipt = execute_classification_write_plan(
+        &plan,
+        |item_key| {
+            if item_key == "B" {
+                b_reads += 1;
+                if b_reads == 2 {
+                    let operation = &plan.operations[1];
+                    return Ok::<_, ()>(ClassificationItemState {
+                        server_id: "server-1".into(),
+                        library_version: 44,
+                        item_key: "B".into(),
+                        item_version: 10,
+                        collection_keys: operation.after_collection_keys.clone(),
+                        tags: operation.after_tags.clone(),
+                    });
+                }
+            }
+            Ok::<_, ()>(preflight_state(&plan, item_key))
+        },
+        |request| {
+            if request.item_key == "B" {
+                Err(())
+            } else {
+                Ok(applied_state(request))
+            }
+        },
+    );
+
+    assert_eq!(receipt.outcome, ClassificationWriteOutcome::PartialFailure);
+    assert_eq!(receipt.failed_item_key.as_deref(), Some("B"));
+    assert_eq!(receipt.indeterminate_item_key, None);
+    assert_eq!(receipt.applied_item_keys, ["A", "B"]);
+    assert_eq!(receipt.rollback_operations[0].item_key, "B");
+    assert_eq!(receipt.rollback_operations[0].item_version, 10);
+}
+
+#[test]
+fn execution_names_an_item_when_failed_write_reconciliation_is_unavailable() {
+    let report = classification_report("10.0.0");
+    let plan =
+        build_classification_write_plan(&report, &reviewed(&report), WriteMode::Execute, |_| true)
+            .unwrap();
+    let mut reads = 0;
+    let receipt = execute_classification_write_plan(
+        &plan,
+        |item_key| {
+            reads += 1;
+            if reads > plan.operations.len() {
+                Err(())
+            } else {
+                Ok(preflight_state(&plan, item_key))
+            }
+        },
+        |_| Err::<ClassificationItemState, _>(()),
+    );
+
+    assert_eq!(receipt.outcome, ClassificationWriteOutcome::PartialFailure);
+    assert_eq!(receipt.failed_item_key.as_deref(), Some("A"));
+    assert_eq!(receipt.indeterminate_item_key.as_deref(), Some("A"));
+    assert!(receipt.rollback_operations.is_empty());
+    assert_eq!(receipt.not_attempted_item_keys, ["B"]);
 }
 
 fn preflight_state(
@@ -285,9 +361,11 @@ fn reviewed(report: &conceptweave_zotero::ClassificationReport) -> ReviewedClass
         review_id: "review-1".into(),
         authority_receipt: "authority-1".into(),
         server_id: report.server_id.clone(),
+        zotero_version: report.zotero_version.clone(),
         library_version: report.library_version,
         rule_revision: report.rule_revision.into(),
         snapshot_digest: report.snapshot_digest.clone(),
+        snapshot_items: report.snapshot_items.clone(),
         changes: vec![
             ReviewedClassificationChange {
                 item_key: "B".into(),
@@ -511,9 +589,11 @@ fn write_plan_fails_closed_for_untrusted_stale_or_unsafe_changes() {
         review_id: "review".into(),
         authority_receipt: "authority".into(),
         server_id: None,
+        zotero_version: no_server.zotero_version.clone(),
         library_version: no_server.library_version,
         rule_revision: no_server.rule_revision.into(),
         snapshot_digest: no_server.snapshot_digest.clone(),
+        snapshot_items: no_server.snapshot_items.clone(),
         changes: vec![ReviewedClassificationChange {
             item_key: "A".into(),
             item_version: 7,
@@ -563,6 +643,83 @@ fn write_plan_fails_closed_for_untrusted_stale_or_unsafe_changes() {
             |_| true
         ),
         Err(WritePlanError::UnsupportedExecute)
+    );
+
+    let mut changed_version = classification_report("9.0.6");
+    let changed_version_review = reviewed(&changed_version);
+    changed_version.zotero_version = "10.0.0".into();
+    assert_eq!(
+        build_classification_write_plan(
+            &changed_version,
+            &changed_version_review,
+            WriteMode::Execute,
+            |_| true
+        ),
+        Err(WritePlanError::SnapshotMismatch)
+    );
+
+    let exact_report = classification_report("10.0.0");
+    let mut changed_snapshot_review = reviewed(&exact_report);
+    changed_snapshot_review.snapshot_items[0].item_version += 1;
+    assert_eq!(
+        build_classification_write_plan(
+            &exact_report,
+            &changed_snapshot_review,
+            WriteMode::DryRun,
+            |_| true
+        ),
+        Err(WritePlanError::SnapshotMismatch)
+    );
+
+    let mut blank_snapshot_key = classification_report("10.0.0");
+    blank_snapshot_key.snapshot_items[0].item_key = " ".into();
+    assert_eq!(
+        build_classification_write_plan(
+            &blank_snapshot_key,
+            &reviewed(&blank_snapshot_key),
+            WriteMode::DryRun,
+            |_| true
+        ),
+        Err(WritePlanError::InvalidReview)
+    );
+
+    let mut duplicate_snapshot = classification_report("10.0.0");
+    duplicate_snapshot
+        .snapshot_items
+        .push(duplicate_snapshot.snapshot_items[0].clone());
+    assert_eq!(
+        build_classification_write_plan(
+            &duplicate_snapshot,
+            &reviewed(&duplicate_snapshot),
+            WriteMode::DryRun,
+            |_| true
+        ),
+        Err(WritePlanError::InvalidReview)
+    );
+
+    let mut detached_item = classification_report("10.0.0");
+    detached_item.classified_items[0].item_version += 1;
+    assert_eq!(
+        build_classification_write_plan(
+            &detached_item,
+            &reviewed(&detached_item),
+            WriteMode::DryRun,
+            |_| true
+        ),
+        Err(WritePlanError::StaleItem)
+    );
+
+    let mut manual_marker = reviewed(&version_ten);
+    manual_marker.changes[0].after_tags[0].tag_type = Some(0);
+    let manual_plan =
+        build_classification_write_plan(&version_ten, &manual_marker, WriteMode::DryRun, |_| true)
+            .unwrap();
+    assert_eq!(manual_plan.operations[1].after_tags[0].tag_type, None);
+
+    manual_marker.changes[0].after_tags[0].tag_type = Some(2);
+    assert_eq!(
+        build_classification_write_plan(&version_ten, &manual_marker, WriteMode::DryRun, |_| true),
+        Err(WritePlanError::InvalidMetadata)
     );
 
     for (error, fragment) in [
