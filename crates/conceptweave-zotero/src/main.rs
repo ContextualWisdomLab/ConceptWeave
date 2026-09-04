@@ -8,13 +8,11 @@ use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 #[cfg_attr(coverage_nightly, coverage(off))]
-fn allowed_output_parents() -> [PathBuf; 2] {
-    [
-        env::temp_dir()
-            .canonicalize()
-            .expect("system temporary directory must exist"),
-        Path::new("/tmp").canonicalize().expect("/tmp must exist"),
-    ]
+fn allowed_output_parents() -> io::Result<Vec<PathBuf>> {
+    let mut parents = vec![env::temp_dir().canonicalize()?];
+    #[cfg(unix)]
+    parents.push(Path::new("/tmp").canonicalize()?);
+    Ok(parents)
 }
 
 fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
@@ -26,7 +24,7 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
         ));
     }
 
-    let allowed_parents = allowed_output_parents();
+    let allowed_parents = allowed_output_parents()?;
     let parent = path.parent().ok_or_else(|| {
         io::Error::new(io::ErrorKind::InvalidInput, "report output has no parent")
     })?;
@@ -47,14 +45,26 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
 }
 
 fn create_report_file(path: &Path) -> io::Result<File> {
-    let mut options = OpenOptions::new();
-    options.write(true).create_new(true);
+    #[cfg(not(unix))]
+    return Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "private report creation requires a Unix platform",
+    ));
+
     #[cfg(unix)]
     {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+
+        let mut options = OpenOptions::new();
+        options.write(true).create_new(true);
+        let file = options.mode(0o600).open(path)?;
+        if let Err(error) = file.set_permissions(fs::Permissions::from_mode(0o600)) {
+            drop(file);
+            let _ = fs::remove_file(path);
+            return Err(error);
+        }
+        Ok(file)
     }
-    options.open(path)
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
