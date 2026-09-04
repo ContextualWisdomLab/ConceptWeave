@@ -710,7 +710,16 @@ mod tests {
                 output: output.to_owned(),
             })
         );
-        for limit in ["", "0", "101", " 1", "+1", "-1", "one"] {
+        for limit in [
+            "",
+            "0",
+            "101",
+            " 1",
+            "+1",
+            "-1",
+            "one",
+            "9999999999999999999999999999999999999999",
+        ] {
             assert!(
                 parse_output_request(vec!["--review-batch", report, worksheet, limit, output])
                     .is_err()

@@ -102,4 +102,12 @@ fn review_batch_rejects_invalid_or_complete_workloads() {
         build_steward_review_batch(&report, &worksheet, 1),
         Err(WorksheetError::NoPendingDecisions)
     );
+    assert_eq!(
+        WorksheetError::InvalidBatchLimit.to_string(),
+        "review batch limit must be between 1 and 100"
+    );
+    assert_eq!(
+        WorksheetError::NoPendingDecisions.to_string(),
+        "steward worksheet has no pending decisions"
+    );
 }
