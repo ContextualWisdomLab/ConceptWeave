@@ -1120,6 +1120,7 @@ pub fn build_steward_review_worksheet(
     }
 
     let mut snapshot_coordinates = BTreeMap::new();
+    let mut expected_child_keys: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
     for item in &report.snapshot_items {
         if item.item_key.trim().is_empty()
             || item
@@ -1135,19 +1136,29 @@ pub fn build_steward_review_worksheet(
         {
             return Err(WorksheetError::InvalidReport);
         }
+        if let Some(parent_key) = item.parent_item_key.as_deref() {
+            expected_child_keys
+                .entry(parent_key)
+                .or_default()
+                .insert(item.item_key.as_str());
+        }
     }
 
     let mut decision_keys = BTreeSet::new();
     let mut decisions = Vec::with_capacity(report.classified_items.len());
     for item in &report.classified_items {
+        let actual_child_keys: BTreeSet<&str> = item
+            .child_item_keys
+            .iter()
+            .map(String::as_str)
+            .collect();
         if !decision_keys.insert(item.item_key.as_str())
             || snapshot_coordinates.get(item.item_key.as_str()) != Some(&(item.item_version, None))
-            || item.child_item_keys.iter().any(|child_key| {
-                !matches!(
-                    snapshot_coordinates.get(child_key.as_str()),
-                    Some((_, Some(parent_key))) if *parent_key == item.item_key
-                )
-            })
+            || actual_child_keys.len() != item.child_item_keys.len()
+            || expected_child_keys
+                .remove(item.item_key.as_str())
+                .unwrap_or_default()
+                != actual_child_keys
             || (item.proposed_disposition == Disposition::NeedsStewardReview)
                 != item.abstention_reason.is_some()
         {
@@ -1160,6 +1171,9 @@ pub fn build_steward_review_worksheet(
             abstention_reason: item.abstention_reason,
             reviewed_disposition: None,
         });
+    }
+    if !expected_child_keys.is_empty() {
+        return Err(WorksheetError::InvalidReport);
     }
     decisions.sort_by(|left, right| left.item_key.cmp(&right.item_key));
 
