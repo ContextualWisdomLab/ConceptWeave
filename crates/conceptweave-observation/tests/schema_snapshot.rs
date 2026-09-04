@@ -16,7 +16,7 @@ fn column(name: &str, ordinal_position: u32) -> ColumnObservation {
 #[test]
 fn snapshot_preserves_evidence_and_qualified_identifiers_without_normalization() {
     let snapshot = PostgresSchemaSnapshot::new(
-        "warehouse-primary",
+        "warehouse_primary",
         "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "postgres-introspector/1",
         "2026-09-02T00:00:00Z",
@@ -29,7 +29,7 @@ fn snapshot_preserves_evidence_and_qualified_identifiers_without_normalization()
     )
     .expect("snapshot is valid");
 
-    assert_eq!(snapshot.source_connection_key(), "warehouse-primary");
+    assert_eq!(snapshot.source_connection_key(), "warehouse_primary");
     assert_eq!(
         snapshot.snapshot_digest(),
         "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -57,7 +57,7 @@ fn snapshot_rejects_duplicate_qualified_tables() {
     let duplicate = TableObservation::new("public", "events", vec![column("event_key", 1)])
         .expect("table is valid");
     let error = PostgresSchemaSnapshot::new(
-        "warehouse-primary",
+        "warehouse_primary",
         "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "postgres-introspector/1",
         "2026-09-02T00:00:00Z",
@@ -204,7 +204,7 @@ fn snapshot_digest_requires_canonical_sha256_identity() {
         "sha512:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     ] {
         let error = PostgresSchemaSnapshot::new(
-            "warehouse-primary",
+            "warehouse_primary",
             digest,
             "postgres-introspector/1",
             "2026-09-02T00:00:00Z",
