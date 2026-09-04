@@ -90,11 +90,7 @@ fn later_reconciliation_distinguishes_restored_unchanged_and_indeterminate_state
             ClassificationRollbackState::Indeterminate,
         ),
         (
-            state(
-                11,
-                operation.collection_keys.clone(),
-                vec![tag("Other")],
-            ),
+            state(11, operation.collection_keys.clone(), vec![tag("Other")]),
             ClassificationRollbackState::Indeterminate,
         ),
     ];
