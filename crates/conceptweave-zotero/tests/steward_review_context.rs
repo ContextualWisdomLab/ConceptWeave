@@ -34,15 +34,27 @@ fn abstentions_retain_only_the_abstract_needed_for_local_steward_review() {
         ],
     );
 
-    let review = &report.classified_items[0];
+    let review = report
+        .classified_items
+        .iter()
+        .find(|item| item.item_key == "REVIEW01")
+        .unwrap();
     assert_eq!(review.proposed_disposition, Disposition::NeedsStewardReview);
     assert_eq!(review.review_abstract_note.as_deref(), Some(review_abstract));
 
-    let decided = &report.classified_items[1];
+    let decided = report
+        .classified_items
+        .iter()
+        .find(|item| item.item_key == "DECIDED1")
+        .unwrap();
     assert_eq!(decided.proposed_disposition, Disposition::Generation);
     assert!(decided.review_abstract_note.is_none());
 
-    let empty = &report.classified_items[2];
+    let empty = report
+        .classified_items
+        .iter()
+        .find(|item| item.item_key == "EMPTY001")
+        .unwrap();
     assert_eq!(empty.proposed_disposition, Disposition::NeedsStewardReview);
     assert!(empty.review_abstract_note.is_none());
 }
