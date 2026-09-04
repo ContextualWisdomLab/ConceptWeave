@@ -527,6 +527,7 @@ mod tests {
         assert_eq!(parsed["accepted"], true);
         assert!(read_private_json::<serde_json::Value>("relative.json").is_err());
         assert!(read_private_json::<serde_json::Value>("/").is_err());
+        assert!(read_private_json::<serde_json::Value>("/tmp/..").is_err());
         assert!(
             read_private_json::<serde_json::Value>(
                 unique_temp_path("missing-input").to_str().unwrap()
