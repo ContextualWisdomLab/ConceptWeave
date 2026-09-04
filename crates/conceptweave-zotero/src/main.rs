@@ -18,8 +18,12 @@ where
         .next()
         .ok_or("usage: conceptweave-zotero [--worksheet] /tmp/OUTPUT.json")?;
     let request = if first == "--worksheet" {
-        let report = args.next().ok_or("--worksheet requires report and worksheet output paths")?;
-        let worksheet = args.next().ok_or("--worksheet requires report and worksheet output paths")?;
+        let report = args
+            .next()
+            .ok_or("--worksheet requires report and worksheet output paths")?;
+        let worksheet = args
+            .next()
+            .ok_or("--worksheet requires report and worksheet output paths")?;
         if report == worksheet {
             return Err("report and worksheet output paths must differ");
         }
