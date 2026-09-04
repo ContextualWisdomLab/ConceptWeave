@@ -1683,6 +1683,14 @@ pub fn execute_classification_rollback<PreflightError, WriteError>(
         &ClassificationWriteRequest,
     ) -> Result<ClassificationItemState, WriteError>,
 ) -> ClassificationRollbackReceipt {
+    if let Some(operation) = operations
+        .windows(2)
+        .find(|pair| pair[0].server_id != pair[1].server_id)
+        .map(|pair| &pair[1])
+    {
+        return rollback_preflight_failure(operations, &operation.item_key);
+    }
+
     let mut preflight_states = Vec::with_capacity(operations.len());
     let mut library_version = None;
     for operation in operations {
@@ -1727,7 +1735,7 @@ pub fn execute_classification_rollback<PreflightError, WriteError>(
         if restored {
             restored_item_keys.push(operation.item_key.clone());
         }
-        let remaining_start = index + usize::from(restored);
+        let remaining_start = index + usize::from(restored || !unchanged);
         return ClassificationRollbackReceipt {
             outcome: ClassificationRollbackOutcome::PartialFailure,
             restored_item_keys,
