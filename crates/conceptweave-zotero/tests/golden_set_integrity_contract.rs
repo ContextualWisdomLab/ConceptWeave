@@ -104,8 +104,9 @@ fn verified_snapshot_receipt_cannot_authorize_mutated_steward_labels() {
     };
 
     assert_eq!(
-        evaluate_reviewed_golden_set(&report, &golden, |receipt| {
-            receipt.receipt_id == "approved-review"
+        evaluate_reviewed_golden_set(&report, &golden, |reviewed_set| {
+            reviewed_set.approval.receipt_id == "approved-review"
+                && reviewed_set.labels == vec![GoldenLabel::new("A", Disposition::Generation)]
         }),
         Err(EvaluationError::UnverifiedApproval),
         "approval verification must bind the reviewed labels as well as the snapshot receipt"
