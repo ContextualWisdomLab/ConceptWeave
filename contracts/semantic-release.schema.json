@@ -21,9 +21,7 @@
       "pattern": ".*\\S.*"
     },
     "contract_version": {
-      "type": "string",
-      "minLength": 1,
-      "pattern": ".*\\S.*"
+      "const": "1.0.0"
     },
     "ontology_version": {
       "type": "string",
