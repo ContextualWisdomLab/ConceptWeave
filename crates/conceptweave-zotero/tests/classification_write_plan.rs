@@ -109,13 +109,9 @@ fn preflight_state(
 #[test]
 fn execution_fails_closed_for_each_preflight_mismatch() {
     let report = classification_report("10.0.0");
-    let plan = build_classification_write_plan(
-        &report,
-        &reviewed(&report),
-        WriteMode::Execute,
-        |_| true,
-    )
-    .unwrap();
+    let plan =
+        build_classification_write_plan(&report, &reviewed(&report), WriteMode::Execute, |_| true)
+            .unwrap();
     let mismatches: [fn(&mut ClassificationItemState); 6] = [
         |state| state.server_id = "other-server".into(),
         |state| state.library_version += 1,
@@ -136,7 +132,10 @@ fn execution_fails_closed_for_each_preflight_mismatch() {
             },
             |_| -> Result<ClassificationItemState, ()> { panic!("preflight must finish first") },
         );
-        assert_eq!(receipt.outcome, ClassificationWriteOutcome::PreflightFailure);
+        assert_eq!(
+            receipt.outcome,
+            ClassificationWriteOutcome::PreflightFailure
+        );
         assert_eq!(receipt.failed_item_key.as_deref(), Some("A"));
         assert_eq!(receipt.not_attempted_item_keys, ["A", "B"]);
     }
@@ -150,14 +149,22 @@ fn execution_fails_closed_for_each_preflight_mismatch() {
         },
         |_| -> Result<ClassificationItemState, ()> { panic!("invalid metadata must fail first") },
     );
-    assert_eq!(receipt.outcome, ClassificationWriteOutcome::PreflightFailure);
+    assert_eq!(
+        receipt.outcome,
+        ClassificationWriteOutcome::PreflightFailure
+    );
 
     let receipt = execute_classification_write_plan(
         &plan,
         |_| Err::<ClassificationItemState, _>(()),
-        |_| -> Result<ClassificationItemState, ()> { panic!("failed preflight must prevent writes") },
+        |_| -> Result<ClassificationItemState, ()> {
+            panic!("failed preflight must prevent writes")
+        },
     );
-    assert_eq!(receipt.outcome, ClassificationWriteOutcome::PreflightFailure);
+    assert_eq!(
+        receipt.outcome,
+        ClassificationWriteOutcome::PreflightFailure
+    );
 
     let mut missing_server_plan = plan.clone();
     missing_server_plan.server_id = Some(" ".into());
@@ -166,7 +173,10 @@ fn execution_fails_closed_for_each_preflight_mismatch() {
         |_| -> Result<ClassificationItemState, ()> { panic!("missing server must fail first") },
         |_| -> Result<ClassificationItemState, ()> { panic!("missing server must fail first") },
     );
-    assert_eq!(receipt.outcome, ClassificationWriteOutcome::PreflightFailure);
+    assert_eq!(
+        receipt.outcome,
+        ClassificationWriteOutcome::PreflightFailure
+    );
     assert_eq!(receipt.failed_item_key, None);
 }
 
@@ -186,13 +196,9 @@ fn applied_state(
 #[test]
 fn execution_verifies_each_write_response_and_success_receipt() {
     let report = classification_report("10.0.0");
-    let plan = build_classification_write_plan(
-        &report,
-        &reviewed(&report),
-        WriteMode::Execute,
-        |_| true,
-    )
-    .unwrap();
+    let plan =
+        build_classification_write_plan(&report, &reviewed(&report), WriteMode::Execute, |_| true)
+            .unwrap();
     let mismatches: [fn(&mut ClassificationItemState); 6] = [
         |state| state.server_id = "other-server".into(),
         |state| state.library_version -= 1,
