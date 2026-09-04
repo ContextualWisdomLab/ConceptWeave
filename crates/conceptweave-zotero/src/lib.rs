@@ -2457,14 +2457,17 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
         ),
     };
 
+    let review_abstract_note = (proposed_disposition == Disposition::NeedsStewardReview
+        && !item.data.abstract_note.trim().is_empty()
+        && !field_values.contains_key("abstract_note"))
+    .then(|| item.data.abstract_note.clone());
+
     ClassifiedItem {
         item_key: item.key.clone(),
         item_version: item.version,
         item_type: item.data.item_type.clone(),
         title: item.data.title.clone(),
-        review_abstract_note: (proposed_disposition == Disposition::NeedsStewardReview
-            && !item.data.abstract_note.trim().is_empty())
-        .then(|| item.data.abstract_note.clone()),
+        review_abstract_note,
         collection_keys: item.data.collections.clone(),
         tags: item.data.tags.clone(),
         proposed_disposition,
