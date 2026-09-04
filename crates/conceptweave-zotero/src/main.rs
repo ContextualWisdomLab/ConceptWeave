@@ -171,8 +171,7 @@ fn open_with_metadata(path: &Path) -> io::Result<(File, fs::Metadata)> {
     #[cfg(unix)]
     options.custom_flags(libc::O_NOFOLLOW);
     let file = options.open(path)?;
-    let metadata = file.metadata()?;
-    Ok((file, metadata))
+    file.metadata().map(|metadata| (file, metadata))
 }
 
 #[cfg(unix)]
