@@ -605,6 +605,7 @@ impl Zotero10LocalAdapter {
             .header("Zotero-Server-ID", &self.server_id)
             .call()
             .map_err(|_| ZoteroTransportError::RequestFailed)?;
+        self.verify_server(response.headers())?;
         if response.status() != ureq::http::StatusCode::OK {
             return Err(ZoteroTransportError::RequestFailed);
         }
@@ -708,10 +709,10 @@ impl Zotero10LocalAdapter {
             .header("Zotero-Server-ID", &self.server_id)
             .call()
             .map_err(|_| ZoteroTransportError::RequestFailed)?;
+        self.verify_server(response.headers())?;
         if response.status() != ureq::http::StatusCode::OK {
             return Err(ZoteroTransportError::RequestFailed);
         }
-        self.verify_server(response.headers())?;
         let version = version_header(response.headers())?;
         bounded_body(&mut response)?;
         Ok(version)
@@ -2812,7 +2813,7 @@ mod tests {
         let library = library_response("server-10", 42);
         let (base, server) = serve(vec![
             Box::leak(library.into_boxed_str()),
-            "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            "HTTP/1.1 500 Internal Server Error\r\nZotero-Server-ID: server-10\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
         ]);
         assert_eq!(
             transport(base).get_item("ABCD2345").unwrap_err(),
@@ -2825,11 +2826,27 @@ mod tests {
         let (base, server) = serve(vec![
             Box::leak(before.into_boxed_str()),
             Box::leak(item.into_boxed_str()),
-            "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            "HTTP/1.1 500 Internal Server Error\r\nZotero-Server-ID: server-10\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
         ]);
         assert_eq!(
             transport(base).get_item("ABCD2345").unwrap_err(),
             ZoteroTransportError::RequestFailed
+        );
+        server.join().unwrap();
+
+        let switched = "HTTP/1.1 412 Precondition Failed\r\nZotero-Server-ID: other-server\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        let (base, server) = serve(vec![switched]);
+        assert_eq!(
+            transport(base).get_item("ABCD2345").unwrap_err(),
+            ZoteroTransportError::ServerMismatch
+        );
+        server.join().unwrap();
+
+        let before = library_response("server-10", 42);
+        let (base, server) = serve(vec![Box::leak(before.into_boxed_str()), switched]);
+        assert_eq!(
+            transport(base).get_item("ABCD2345").unwrap_err(),
+            ZoteroTransportError::ServerMismatch
         );
         server.join().unwrap();
 
