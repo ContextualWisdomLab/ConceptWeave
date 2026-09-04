@@ -19,34 +19,43 @@ fn item(key: &str, title: &str, doi: &str) -> ZoteroItem {
 #[test]
 fn steward_abstention_reason_is_explicit_and_deterministic() {
     let blank = item("A", "", "");
-    let multilingual = item("B", "온톨로지 정렬", "");
-    let unmatched = item("C", "Other evidence", "");
-    let matched = item("D", "Ontology alignment", "");
+    let multilingual = [
+        ("B", "온톨로지 정렬"),
+        ("C", "オントロジーアラインメント"),
+        ("D", "本体对齐"),
+        ("E", "căn chỉnh bản thể"),
+        ("F", "alineación de ontologías"),
+        ("G", "Ontologieabgleich"),
+        ("H", "alignement d’ontologies"),
+    ]
+    .map(|(key, title)| item(key, title, ""));
+    let unmatched = item("I", "Other evidence", "");
+    let matched = item("J", "Ontology alignment", "");
 
-    let report = classify_snapshot(
-        "9.0.6".into(),
-        None,
-        42,
-        vec![blank, multilingual, unmatched, matched],
-    );
+    let report = classify_snapshot("9.0.6".into(), None, 42, {
+        let mut items = vec![blank];
+        items.extend(multilingual);
+        items.extend([unmatched, matched]);
+        items
+    });
 
     assert_eq!(
         report.classified_items[0].abstention_reason,
         Some(AbstentionReason::MissingClassificationMetadata)
     );
+    assert!(report.classified_items[1..=7].iter().all(|item| {
+        item.proposed_disposition == Disposition::NeedsStewardReview
+            && item.abstention_reason == Some(AbstentionReason::UnsupportedRuleVocabulary)
+    }));
     assert_eq!(
-        report.classified_items[1].abstention_reason,
-        Some(AbstentionReason::UnsupportedRuleVocabulary)
-    );
-    assert_eq!(
-        report.classified_items[2].abstention_reason,
+        report.classified_items[8].abstention_reason,
         Some(AbstentionReason::NoDeterministicRuleMatch)
     );
     assert_eq!(
-        report.classified_items[3].proposed_disposition,
+        report.classified_items[9].proposed_disposition,
         Disposition::AlignmentVersioning
     );
-    assert_eq!(report.classified_items[3].abstention_reason, None);
+    assert_eq!(report.classified_items[9].abstention_reason, None);
 }
 
 #[test]
