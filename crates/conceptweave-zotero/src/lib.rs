@@ -855,6 +855,31 @@ pub enum ClassificationRollbackOutcome {
     PartialFailure,
 }
 
+/// Current state of one previously indeterminate rollback operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClassificationRollbackState {
+    /// The restoration metadata is present at a newer item revision.
+    Restored,
+    /// The expected post-write metadata and item revision remain unchanged.
+    Unchanged,
+    /// The observed state proves neither safe outcome.
+    Indeterminate,
+}
+
+/// Secret-free evidence from one delayed, read-only rollback reconciliation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ClassificationRollbackReconciliationReceipt {
+    /// State proven by the delayed observation.
+    pub state: ClassificationRollbackState,
+    /// Complete operation under reconciliation.
+    pub operation: ClassificationRollbackOperation,
+    /// Successfully observed state, absent when validation or reading failed.
+    pub observed_state: Option<ClassificationItemState>,
+    /// Operation eligible for the existing complete-preflight retry path.
+    pub retry_operation: Option<ClassificationRollbackOperation>,
+}
+
 /// Secret-free evidence for restored, failed, indeterminate, and pending inverse writes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ClassificationRollbackReceipt {
@@ -1775,6 +1800,43 @@ pub fn execute_classification_rollback_with_zotero10(
     )
 }
 
+/// Re-reads one indeterminate rollback operation without performing a write.
+pub fn reconcile_classification_rollback<ReadError>(
+    operation: &ClassificationRollbackOperation,
+    read_item: impl FnOnce(&str) -> Result<ClassificationItemState, ReadError>,
+) -> ClassificationRollbackReconciliationReceipt {
+    let valid_operation = !operation.server_id.trim().is_empty()
+        && !operation.item_key.trim().is_empty()
+        && normalized_metadata(
+            &operation.expected_collection_keys,
+            &operation.expected_tags,
+        )
+        .is_ok()
+        && normalized_metadata(&operation.collection_keys, &operation.tags).is_ok();
+    let observed_state = valid_operation
+        .then(|| read_item(&operation.item_key).ok())
+        .flatten();
+    let state = observed_state
+        .as_ref()
+        .map(|observed| classify_rollback_state(observed, operation))
+        .unwrap_or(ClassificationRollbackState::Indeterminate);
+    ClassificationRollbackReconciliationReceipt {
+        state,
+        operation: operation.clone(),
+        observed_state,
+        retry_operation: (state == ClassificationRollbackState::Unchanged)
+            .then(|| operation.clone()),
+    }
+}
+
+/// Reconciles one rollback operation through the server-bound Zotero 10 adapter.
+pub fn reconcile_classification_rollback_with_zotero10(
+    operation: &ClassificationRollbackOperation,
+    adapter: &Zotero10LocalAdapter,
+) -> ClassificationRollbackReconciliationReceipt {
+    reconcile_classification_rollback(operation, |item_key| adapter.get_item(item_key))
+}
+
 fn rollback_preflight_failure(
     operations: &[ClassificationRollbackOperation],
     failed_item_key: &str,
@@ -1798,6 +1860,32 @@ fn matches_rollback_current(
     operation: &ClassificationRollbackOperation,
 ) -> bool {
     matches_rollback_current_at(state, state.library_version, operation)
+}
+
+fn classify_rollback_state(
+    state: &ClassificationItemState,
+    operation: &ClassificationRollbackOperation,
+) -> ClassificationRollbackState {
+    let Some((collections, tags)) = normalized_metadata(&state.collection_keys, &state.tags).ok()
+    else {
+        return ClassificationRollbackState::Indeterminate;
+    };
+    if state.server_id != operation.server_id || state.item_key != operation.item_key {
+        return ClassificationRollbackState::Indeterminate;
+    }
+    if state.item_version == operation.item_version
+        && collections == operation.expected_collection_keys
+        && tags == operation.expected_tags
+    {
+        ClassificationRollbackState::Unchanged
+    } else if state.item_version > operation.item_version
+        && collections == operation.collection_keys
+        && tags == operation.tags
+    {
+        ClassificationRollbackState::Restored
+    } else {
+        ClassificationRollbackState::Indeterminate
+    }
 }
 
 fn matches_rollback_current_at(
