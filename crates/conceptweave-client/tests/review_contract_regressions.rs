@@ -166,8 +166,9 @@ fn public_contract_and_coverage_gates_encode_the_reviewed_fail_closed_rules() {
         "the public contract gate must exercise a language-neutral self-supersession negative fixture through an explicit semantic validator"
     );
     assert!(
-        !coverage_gate.contains("select(.[6] == 0)")
-            && coverage_gate.contains(".data[0].totals.regions.percent == 100"),
-        "coverage must retain expansion regions and independently enforce LLVM total region coverage"
+        !coverage_gate.contains(".data[0].totals.regions.percent == 100")
+            && coverage_gate.contains("select(.name | contains(\"5tests\") | not)")
+            && coverage_gate.contains("all(.[]; .count > 0)"),
+        "coverage must aggregate owned production source coordinates instead of double-counting test-crate monomorphizations"
     );
 }
