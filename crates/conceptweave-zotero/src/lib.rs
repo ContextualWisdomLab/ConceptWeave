@@ -897,6 +897,8 @@ pub struct ClassificationWriteReceipt {
     pub authority_receipt: String,
     /// Exact Local API server identity bound to this attempt.
     pub server_id: Option<String>,
+    /// Exact Zotero version bound to this attempt.
+    pub zotero_version: String,
     /// Exact library-version precondition bound to this attempt.
     pub library_version: u64,
     /// Exact classifier revision bound to this attempt.
@@ -1585,6 +1587,7 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
             review_id: plan.review_id.clone(),
             authority_receipt: plan.authority_receipt.clone(),
             server_id: plan.server_id.clone(),
+            zotero_version: plan.zotero_version.clone(),
             library_version: plan.library_version,
             rule_revision: plan.rule_revision.clone(),
             snapshot_digest: plan.snapshot_digest.clone(),
@@ -1692,6 +1695,7 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
         review_id: plan.review_id.clone(),
         authority_receipt: plan.authority_receipt.clone(),
         server_id: plan.server_id.clone(),
+        zotero_version: plan.zotero_version.clone(),
         library_version: plan.library_version,
         rule_revision: plan.rule_revision.clone(),
         snapshot_digest: plan.snapshot_digest.clone(),
@@ -1913,6 +1917,7 @@ fn preflight_failure_receipt(
         review_id: plan.review_id.clone(),
         authority_receipt: plan.authority_receipt.clone(),
         server_id: plan.server_id.clone(),
+        zotero_version: plan.zotero_version.clone(),
         library_version: plan.library_version,
         rule_revision: plan.rule_revision.clone(),
         snapshot_digest: plan.snapshot_digest.clone(),
@@ -1940,6 +1945,7 @@ fn partial_failure_receipt(
         review_id: plan.review_id.clone(),
         authority_receipt: plan.authority_receipt.clone(),
         server_id: plan.server_id.clone(),
+        zotero_version: plan.zotero_version.clone(),
         library_version: plan.library_version,
         rule_revision: plan.rule_revision.clone(),
         snapshot_digest: plan.snapshot_digest.clone(),
