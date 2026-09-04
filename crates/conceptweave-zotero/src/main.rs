@@ -8,11 +8,15 @@ use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 #[cfg_attr(coverage_nightly, coverage(off))]
-fn allowed_output_parents() -> io::Result<Vec<PathBuf>> {
-    let mut parents = vec![env::temp_dir().canonicalize()?];
+fn allowed_output_parents() -> Vec<PathBuf> {
+    let mut parents = vec![
+        env::temp_dir()
+            .canonicalize()
+            .expect("system temporary directory must exist"),
+    ];
     #[cfg(unix)]
-    parents.push(Path::new("/tmp").canonicalize()?);
-    Ok(parents)
+    parents.push(Path::new("/tmp").canonicalize().expect("/tmp must exist"));
+    parents
 }
 
 fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
@@ -24,7 +28,7 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
         ));
     }
 
-    let allowed_parents = allowed_output_parents()?;
+    let allowed_parents = allowed_output_parents();
     let parent = path.parent().ok_or_else(|| {
         io::Error::new(io::ErrorKind::InvalidInput, "report output has no parent")
     })?;
@@ -55,16 +59,28 @@ fn create_report_file(path: &Path) -> io::Result<File> {
     {
         use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 
-        let mut options = OpenOptions::new();
-        options.write(true).create_new(true);
-        let file = options.mode(0o600).open(path)?;
-        if let Err(error) = file.set_permissions(fs::Permissions::from_mode(0o600)) {
-            drop(file);
-            let _ = fs::remove_file(path);
-            return Err(error);
-        }
-        Ok(file)
+        create_report_file_with(path, |file| {
+            file.set_permissions(fs::Permissions::from_mode(0o600))
+        })
     }
+}
+
+#[cfg(unix)]
+fn create_report_file_with(
+    path: &Path,
+    set_permissions: impl FnOnce(&File) -> io::Result<()>,
+) -> io::Result<File> {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    let file = options.mode(0o600).open(path)?;
+    if let Err(error) = set_permissions(&file) {
+        drop(file);
+        let _ = fs::remove_file(path);
+        return Err(error);
+    }
+    Ok(file)
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -165,5 +181,23 @@ mod tests {
         assert_eq!(mode, 0o600);
         drop(file);
         fs::remove_file(output).unwrap();
+
+        let existing = unique_temp_path("private-existing");
+        let _ = fs::remove_file(&existing);
+        fs::write(&existing, b"existing").unwrap();
+        assert!(create_report_file(&existing).is_err());
+        fs::remove_file(existing).unwrap();
+
+        let rejected = unique_temp_path("private-permission-error");
+        let _ = fs::remove_file(&rejected);
+        let error = create_report_file_with(&rejected, |_| {
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "injected permission failure",
+            ))
+        })
+        .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+        assert!(!rejected.exists());
     }
 }
