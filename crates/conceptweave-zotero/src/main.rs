@@ -4,7 +4,7 @@
 use conceptweave_zotero::read_local_snapshot;
 use std::env;
 use std::fs::{self, OpenOptions};
-use std::io::{self, BufWriter};
+use std::io::{self, BufWriter, Write};
 use std::path::PathBuf;
 
 fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
@@ -50,7 +50,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .write(true)
         .create_new(true)
         .open(output)?;
-    serde_json::to_writer_pretty(BufWriter::new(file), &report)?;
+    let mut writer = BufWriter::new(file);
+    serde_json::to_writer_pretty(&mut writer, &report)?;
+    writer.flush()?;
     Ok(())
 }
 
