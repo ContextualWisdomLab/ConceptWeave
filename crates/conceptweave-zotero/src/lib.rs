@@ -698,10 +698,14 @@ where
     if report
         .snapshot_items
         .iter()
-        .map(|item| item.item_key.as_str())
-        .collect::<BTreeSet<_>>()
-        .len()
-        != report.snapshot_items.len()
+        .any(|item| item.item_key.trim().is_empty())
+        || report
+            .snapshot_items
+            .iter()
+            .map(|item| item.item_key.as_str())
+            .collect::<BTreeSet<_>>()
+            .len()
+            != report.snapshot_items.len()
     {
         return Err(DuplicateReviewError::InvalidReview);
     }
@@ -724,7 +728,6 @@ where
         })
         .collect::<BTreeMap<_, _>>();
     let mut seen_candidates = BTreeSet::new();
-    let mut canonical_choices = BTreeMap::<&str, &str>::new();
     let mut operations = Vec::with_capacity(reviewed.decisions.len());
 
     for decision in &reviewed.decisions {
@@ -738,26 +741,57 @@ where
         let candidate = candidates
             .get(&candidate_key)
             .ok_or(DuplicateReviewError::UnknownCandidate)?;
-        if !candidate.item_keys.contains(&decision.retained_item_key) {
+        // ponytail: quadratic component expansion is enough for a steward-sized review;
+        // replace with union-find only if measured duplicate sets become large.
+        let mut component_keys = candidate.item_keys.iter().collect::<BTreeSet<_>>();
+        loop {
+            let previous_len = component_keys.len();
+            for related in &report.duplicate_candidates {
+                if related
+                    .item_keys
+                    .iter()
+                    .any(|item_key| component_keys.contains(item_key))
+                {
+                    component_keys.extend(&related.item_keys);
+                }
+            }
+            if component_keys.len() == previous_len {
+                break;
+            }
+        }
+        if !component_keys.contains(&decision.retained_item_key) {
             return Err(DuplicateReviewError::InvalidRetainedItem);
         }
-        for item_key in &candidate.item_keys {
-            if canonical_choices
-                .insert(item_key, decision.retained_item_key.as_str())
-                .is_some_and(|retained_key| retained_key != decision.retained_item_key)
-            {
-                return Err(DuplicateReviewError::InvalidReview);
-            }
+        if reviewed.decisions.iter().any(|related_decision| {
+            candidates
+                .get(&(
+                    related_decision.identity_kind.as_str(),
+                    related_decision.normalized_identity.as_str(),
+                ))
+                .is_some_and(|related_candidate| {
+                    related_candidate
+                        .item_keys
+                        .iter()
+                        .any(|item_key| component_keys.contains(item_key))
+                        && related_decision.retained_item_key != decision.retained_item_key
+                })
+        }) {
+            return Err(DuplicateReviewError::InvalidReview);
         }
 
         let source_items = candidate
             .item_keys
             .iter()
-            .map(|item_key| SnapshotItemRevision {
-                item_key: item_key.clone(),
-                item_version: item_revisions[item_key.as_str()],
+            .map(|item_key| {
+                item_revisions
+                    .get(item_key.as_str())
+                    .map(|item_version| SnapshotItemRevision {
+                        item_key: item_key.clone(),
+                        item_version: *item_version,
+                    })
+                    .ok_or(DuplicateReviewError::InvalidReview)
             })
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>, _>>()?;
         let before_canonical_keys = candidate
             .item_keys
             .iter()
