@@ -71,7 +71,7 @@ Saved report, worksheet, approval, progress, and golden-set artifacts are sensit
 
 The opened file descriptor must therefore be obtained with a Unix final-component no-follow primitive such as `O_NOFOLLOW` or an equivalent safe abstraction. After open, ConceptWeave still verifies that the opened device/inode matches the checked regular file, link count is one, mode is exactly `0600`, and the bounded-read contract is satisfied. A second pathname check is not an equivalent repair because it leaves another check/open race window.
 
-The exact PR #30 test-only contract records this invariant. Until that contract executes RED and the minimum no-follow open repair reaches one unchanged exact-head GREEN, offline review/finalization artifacts remain acceptance-gated even though existing direct-symlink and inode-alias tests pass.
+PR #30 commit `9733d28` reproduced the inode-preserving final-component symlink swap and left the no-follow contract RED. Commit `7ccbbbe` repairs the shared input-open helper with Unix `O_NOFOLLOW`; focused security and artifact-identity tests then pass. Offline review/finalization remains acceptance-gated until this repair has terminal protected checks and independent approval on one unchanged exact head.
 
 ## Release gate
 
