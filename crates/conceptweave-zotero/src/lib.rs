@@ -2456,11 +2456,11 @@ mod tests {
 
         for (response, expected) in [
             (
-                "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                "HTTP/1.1 500 Internal Server Error\r\nZotero-Server-ID: server-10\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
                 ZoteroTransportError::RequestFailed,
             ),
             (
-                "HTTP/1.1 429 Too Many Requests\r\nRetry-After: tomorrow\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                "HTTP/1.1 429 Too Many Requests\r\nZotero-Server-ID: server-10\r\nRetry-After: tomorrow\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
                 ZoteroTransportError::RateLimited {
                     retry_after_seconds: None,
                 },
