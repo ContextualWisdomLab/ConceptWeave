@@ -388,12 +388,7 @@ impl SemanticReleaseClient {
         }
     }
 
-    /// Fails closed unless a release is explicitly compatible, Published and Authoritative.
-    ///
-    /// This check is deterministic and performs no network or model calls. It is
-    /// suitable as an admission gate before a consuming product performs its own
-    /// tenant/purpose authorization and physical query planning.
-    pub fn validate_for_authoritative_use(
+    fn validate_contract_compatibility(
         &self,
         release: &SemanticRelease,
     ) -> Result<(), ReleaseContractError> {
@@ -403,6 +398,19 @@ impl SemanticReleaseClient {
                 actual: release.contract_version().to_string(),
             });
         }
+        Ok(())
+    }
+
+    /// Fails closed unless a release is explicitly compatible, Published and Authoritative.
+    ///
+    /// This check is deterministic and performs no network or model calls. It is
+    /// suitable as an admission gate before a consuming product performs its own
+    /// tenant/purpose authorization and physical query planning.
+    pub fn validate_for_authoritative_use(
+        &self,
+        release: &SemanticRelease,
+    ) -> Result<(), ReleaseContractError> {
+        self.validate_contract_compatibility(release)?;
         if release.publication_state != PublicationState::Published {
             return Err(ReleaseContractError::ReleaseNotPublished {
                 actual: release.publication_state,
@@ -469,18 +477,26 @@ impl SemanticReleaseClient {
         Ok(())
     }
 
-    /// Validates an explicit immutable supersession declaration between two admitted releases.
+    /// Validates an explicit immutable supersession declaration between two governed releases.
     ///
-    /// Both releases must independently pass the normal authoritative-use gate. The declaration
-    /// must then match each exact release id and artifact digest. No version order, timestamp,
-    /// content diff, or ontology similarity is treated as implicit supersession evidence.
+    /// The successor must pass ordinary authoritative-use admission. The predecessor may either
+    /// still be the admitted Published+Authoritative release while a replacement is reviewed, or
+    /// already carry the governed Superseded+Superseded lifecycle state after publication of the
+    /// replacement. In both cases contract compatibility and exact id-and-digest binding remain
+    /// fail-closed; no version order, timestamp, diff, or ontology similarity is implicit evidence.
     pub fn validate_supersession(
         &self,
         declaration: &ReleaseSupersession,
         superseded: &SemanticRelease,
         successor: &SemanticRelease,
     ) -> Result<(), ReleaseContractError> {
-        self.validate_for_authoritative_use(superseded)?;
+        if superseded.publication_state() == PublicationState::Superseded
+            && superseded.truth_status() == TruthStatus::Superseded
+        {
+            self.validate_contract_compatibility(superseded)?;
+        } else {
+            self.validate_for_authoritative_use(superseded)?;
+        }
         self.validate_for_authoritative_use(successor)?;
 
         if declaration.superseded() != &SemanticReleaseReference::from_release(superseded) {
@@ -495,9 +511,9 @@ impl SemanticReleaseClient {
     /// Compares two admitted releases and reports deterministic concept changes.
     ///
     /// Both releases pass the same authoritative-use admission gate before any
-    /// difference is exposed. This prevents diff inspection from becoming a
-    /// compatibility or publication-state bypass. Concept identifiers are sorted
-    /// deterministically so the result is reproducible offline.
+    /// difference is exposed. Reusing one stable release identity for conflicting
+    /// immutable content fails closed rather than being reported as ordinary
+    /// evolution. Concept identifiers are sorted deterministically for replay.
     pub fn diff(
         &self,
         previous: &SemanticRelease,
@@ -505,6 +521,12 @@ impl SemanticReleaseClient {
     ) -> Result<SemanticReleaseDiff, ReleaseContractError> {
         self.validate_for_authoritative_use(previous)?;
         self.validate_for_authoritative_use(current)?;
+
+        if previous.release_id() == current.release_id() && previous != current {
+            return Err(ReleaseContractError::ConflictingReleaseIdentity(
+                previous.release_id().to_owned(),
+            ));
+        }
 
         let previous_concepts: BTreeSet<&str> =
             previous.concept_ids().iter().map(String::as_str).collect();
@@ -558,6 +580,8 @@ pub enum ReleaseContractError {
     CurrentContractVersionMarkedLegacy(String),
     /// A release attempted to supersede the same stable release identity.
     SelfSupersession(String),
+    /// One stable release identity was reused for conflicting immutable content.
+    ConflictingReleaseIdentity(String),
     /// The declared superseded id-and-digest reference does not match the supplied release.
     SupersededReleaseReferenceMismatch,
     /// The declared successor id-and-digest reference does not match the supplied release.
@@ -607,6 +631,10 @@ impl fmt::Display for ReleaseContractError {
             Self::SelfSupersession(release_id) => write!(
                 formatter,
                 "semantic release `{release_id}` cannot supersede itself"
+            ),
+            Self::ConflictingReleaseIdentity(release_id) => write!(
+                formatter,
+                "semantic release `{release_id}` identifies conflicting immutable content"
             ),
             Self::SupersededReleaseReferenceMismatch => write!(
                 formatter,
