@@ -143,10 +143,10 @@ pub struct ClassifiedItem {
 }
 
 /// A duplicate candidate group; no item is merged or deleted.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct DuplicateCandidate {
     /// Identity kind used for the candidate group.
-    pub identity_kind: &'static str,
+    pub identity_kind: String,
     /// Normalized identity value.
     pub normalized_identity: String,
     /// Zotero item keys sharing the identity.
@@ -179,6 +179,8 @@ pub struct ReviewedDuplicateMergeSet {
     pub snapshot_digest: String,
     /// Exact item-key/item-version coordinates reviewed by the steward.
     pub snapshot_items: Vec<SnapshotItemRevision>,
+    /// Exact duplicate membership reviewed by the steward.
+    pub duplicate_candidates: Vec<DuplicateCandidate>,
     /// Exactly one decision for every duplicate candidate.
     pub decisions: Vec<DuplicateMergeDecision>,
 }
@@ -691,6 +693,7 @@ where
         || reviewed.library_version != report.library_version
         || reviewed.rule_revision != report.rule_revision
         || reviewed.snapshot_items != report.snapshot_items
+        || reviewed.duplicate_candidates != report.duplicate_candidates
     {
         return Err(DuplicateReviewError::SnapshotMismatch);
     }
@@ -723,7 +726,7 @@ where
         .map(|candidate| {
             (
                 (
-                    candidate.identity_kind,
+                    candidate.identity_kind.as_str(),
                     candidate.normalized_identity.as_str(),
                 ),
                 candidate,
@@ -1498,7 +1501,7 @@ fn duplicate_candidates(items: &[&ZoteroItem]) -> Vec<DuplicateCandidate> {
         .into_iter()
         .filter_map(|((identity_kind, normalized_identity), item_keys)| {
             (item_keys.len() > 1).then_some(DuplicateCandidate {
-                identity_kind,
+                identity_kind: identity_kind.into(),
                 normalized_identity,
                 item_keys,
             })
