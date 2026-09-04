@@ -14,8 +14,10 @@ def main() -> int:
 
     required_fragments = (
         "runs-on: ubuntu-24.04",
-        "group: ${{ github.workflow }}-${{ github.repository }}-${{ github.event.pull_request.number || github.run_id }}",
+        "types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]",
+        "group: ${{ github.workflow }}-${{ github.repository }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}",
         "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
+        "if: ${{ github.event_name != 'pull_request' || (github.event.action != 'closed' && github.event.pull_request.draft == false) }}",
         "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
         "COVERAGE_TOOLCHAIN: nightly-2026-08-20",
         'rustup toolchain install "$COVERAGE_TOOLCHAIN" --profile minimal --component llvm-tools-preview',
