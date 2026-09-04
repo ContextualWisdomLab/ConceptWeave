@@ -1139,6 +1139,7 @@ pub fn build_steward_review_worksheet(
     }
 
     let mut snapshot_coordinates = BTreeMap::new();
+    let mut expected_child_keys: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
     for item in &report.snapshot_items {
         if item.item_key.trim().is_empty()
             || item
@@ -1154,19 +1155,31 @@ pub fn build_steward_review_worksheet(
         {
             return Err(WorksheetError::InvalidReport);
         }
+        if let Some(parent_key) = item.parent_item_key.as_deref() {
+            expected_child_keys
+                .entry(parent_key)
+                .or_default()
+                .insert(item.item_key.as_str());
+        }
+    }
+    if snapshot_coordinates.values().any(|(_, parent_key)| {
+        parent_key.is_some_and(|parent_key| !snapshot_coordinates.contains_key(parent_key))
+    }) {
+        return Err(WorksheetError::InvalidReport);
     }
 
     let mut decision_keys = BTreeSet::new();
     let mut decisions = Vec::with_capacity(report.classified_items.len());
     for item in &report.classified_items {
+        let actual_child_keys: BTreeSet<&str> =
+            item.child_item_keys.iter().map(String::as_str).collect();
         if !decision_keys.insert(item.item_key.as_str())
             || snapshot_coordinates.get(item.item_key.as_str()) != Some(&(item.item_version, None))
-            || item.child_item_keys.iter().any(|child_key| {
-                !matches!(
-                    snapshot_coordinates.get(child_key.as_str()),
-                    Some((_, Some(parent_key))) if *parent_key == item.item_key
-                )
-            })
+            || actual_child_keys.len() != item.child_item_keys.len()
+            || expected_child_keys
+                .remove(item.item_key.as_str())
+                .unwrap_or_default()
+                != actual_child_keys
             || (item.proposed_disposition == Disposition::NeedsStewardReview)
                 != item.abstention_reason.is_some()
         {
@@ -1577,28 +1590,26 @@ where
     {
         return Err(DuplicateReviewError::SnapshotMismatch);
     }
-    if !verify_review(reviewed) {
-        return Err(DuplicateReviewError::UnverifiedApproval);
-    }
-
-    if report
+    if report.snapshot_items.iter().any(|item| {
+        item.item_key.trim().is_empty()
+            || item
+                .parent_item_key
+                .as_ref()
+                .is_some_and(|parent_key| parent_key.trim().is_empty())
+    }) || report
         .snapshot_items
         .iter()
-        .any(|item| item.item_key.trim().is_empty())
-        || report
-            .snapshot_items
-            .iter()
-            .map(|item| item.item_key.as_str())
-            .collect::<BTreeSet<_>>()
-            .len()
-            != report.snapshot_items.len()
+        .map(|item| item.item_key.as_str())
+        .collect::<BTreeSet<_>>()
+        .len()
+        != report.snapshot_items.len()
     {
         return Err(DuplicateReviewError::InvalidReview);
     }
-    let item_revisions = report
+    let item_coordinates = report
         .snapshot_items
         .iter()
-        .map(|item| (item.item_key.as_str(), item.item_version))
+        .map(|item| (item.item_key.as_str(), item))
         .collect::<BTreeMap<_, _>>();
     let candidates = report
         .duplicate_candidates
@@ -1668,13 +1679,10 @@ where
         let source_items = component_keys
             .iter()
             .map(|item_key| {
-                item_revisions
+                item_coordinates
                     .get(item_key.as_str())
-                    .map(|item_version| SnapshotItemRevision {
-                        item_key: (*item_key).clone(),
-                        item_version: *item_version,
-                        parent_item_key: None,
-                    })
+                    .filter(|item| item.parent_item_key.is_none())
+                    .map(|item| (*item).clone())
                     .ok_or(DuplicateReviewError::InvalidReview)
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -1695,6 +1703,10 @@ where
             before_canonical_keys,
             after_canonical_keys,
         });
+    }
+
+    if !verify_review(reviewed) {
+        return Err(DuplicateReviewError::UnverifiedApproval);
     }
 
     operations.sort_by(|left, right| {

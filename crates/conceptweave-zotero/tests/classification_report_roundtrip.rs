@@ -119,4 +119,67 @@ fn restored_report_rejects_classified_or_reused_child_provenance() {
         build_steward_review_worksheet(&reused_child),
         Err(WorksheetError::InvalidReport)
     );
+
+    let mut omitted_child: ClassificationReport = serde_json::from_slice(&serialized).unwrap();
+    omitted_child.classified_items[0].child_item_keys.clear();
+    assert_eq!(
+        build_steward_review_worksheet(&omitted_child),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut duplicate_child: ClassificationReport = serde_json::from_slice(&serialized).unwrap();
+    duplicate_child.classified_items[0]
+        .child_item_keys
+        .push("CHILD".into());
+    assert_eq!(
+        build_steward_review_worksheet(&duplicate_child),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let mut orphaned_child: ClassificationReport = serde_json::from_slice(&serialized).unwrap();
+    orphaned_child.classified_items[0].child_item_keys.clear();
+    orphaned_child
+        .snapshot_items
+        .iter_mut()
+        .find(|item| item.item_key == "CHILD")
+        .unwrap()
+        .parent_item_key = Some("UNCLASSIFIED_PARENT".into());
+    assert_eq!(
+        build_steward_review_worksheet(&orphaned_child),
+        Err(WorksheetError::InvalidReport)
+    );
+}
+
+#[test]
+fn restored_report_accepts_snapshot_bound_nested_child_provenance() {
+    let nested_item = |key: &str, item_type: &str, parent_item: &str| ZoteroItem {
+        key: key.into(),
+        version: 7,
+        data: ItemData {
+            item_type: item_type.into(),
+            title: if key == "BOOK" {
+                "ontology alignment"
+            } else {
+                ""
+            }
+            .into(),
+            abstract_note: String::new(),
+            doi: String::new(),
+            parent_item: parent_item.into(),
+            collections: vec![],
+            tags: vec![],
+        },
+    };
+    let report = classify_snapshot(
+        "9.0.6".into(),
+        None,
+        42,
+        vec![
+            nested_item("BOOK", "book", ""),
+            nested_item("ATTACHMENT", "attachment", "BOOK"),
+            nested_item("ANNOTATION", "annotation", "ATTACHMENT"),
+        ],
+    );
+
+    assert!(build_steward_review_worksheet(&report).is_ok());
 }
