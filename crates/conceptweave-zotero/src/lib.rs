@@ -1861,9 +1861,147 @@ mod tests {
     use super::*;
     use std::io::{Read, Write};
     use std::net::TcpListener;
+    use std::io::{Read, Write};
     use std::thread;
 
     static LOCAL_API_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn serve(responses: Vec<&'static str>) -> (String, std::thread::JoinHandle<Vec<String>>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let handle = std::thread::spawn(move || {
+            responses
+                .into_iter()
+                .map(|response| {
+                    let (mut stream, _) = listener.accept().unwrap();
+                    let mut bytes = vec![0; 16 * 1024];
+                    let mut length = 0;
+                    loop {
+                        length += stream.read(&mut bytes[length..]).unwrap();
+                        let request = String::from_utf8_lossy(&bytes[..length]);
+                        let headers_end = request.find("\r\n\r\n").unwrap_or(usize::MAX);
+                        let content_length = request
+                            .lines()
+                            .find_map(|line| line.strip_prefix("content-length: "))
+                            .and_then(|value| value.parse::<usize>().ok())
+                            .unwrap_or(0);
+                        if headers_end != usize::MAX && length >= headers_end + 4 + content_length {
+                            break;
+                        }
+                    }
+                    stream.write_all(response.as_bytes()).unwrap();
+                    String::from_utf8(bytes[..length].to_vec()).unwrap()
+                })
+                .collect()
+        });
+        (format!("http://{address}/api/users/0/items"), handle)
+    }
+
+    fn item_response(server_id: &str, library_version: u64, item_version: u64) -> String {
+        let body = format!(
+            r#"{{"key":"ABCD2345","version":{item_version},"data":{{"itemType":"book","collections":["BCDE3456"],"tags":[{{"tag":"kept","type":1}}]}}}}"#
+        );
+        format!(
+            "HTTP/1.1 200 OK\r\nZotero-Server-ID: {server_id}\r\nLast-Modified-Version: {library_version}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        )
+    }
+
+    fn transport(base: String) -> Zotero10LocalAdapter {
+        Zotero10LocalAdapter::new_with_base("top-secret-key", "server-10", base).unwrap()
+    }
+
+    #[test]
+    fn zotero10_get_uses_exact_item_route_and_server_partition() {
+        let response = item_response("server-10", 42, 7);
+        let (base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+        let state = transport(base).get_item("ABCD2345").unwrap();
+        assert_eq!(state.server_id, "server-10");
+        assert_eq!(state.library_version, 42);
+        assert_eq!(state.item_version, 7);
+        assert_eq!(state.collection_keys, ["BCDE3456"]);
+        assert_eq!(state.tags[0].tag_type, Some(1));
+        let requests = server.join().unwrap();
+        assert!(requests[0].starts_with("GET /api/users/0/items/ABCD2345?format=json&include=data HTTP/1.1\r\n"));
+        assert!(requests[0].contains("zotero-api-version: 3\r\n"));
+        assert!(requests[0].contains("zotero-server-id: server-10\r\n"));
+        assert!(!requests[0].contains("top-secret-key"));
+    }
+
+    #[test]
+    fn zotero10_patch_replaces_complete_arrays_then_reads_verified_state() {
+        let read = item_response("server-10", 43, 8);
+        let (base, server) = serve(vec![
+            "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            Box::leak(read.into_boxed_str()),
+        ]);
+        let request = ClassificationWriteRequest {
+            server_id: "server-10".into(),
+            library_version: 42,
+            item_key: "ABCD2345".into(),
+            item_version: 7,
+            collection_keys: vec!["BCDE3456".into()],
+            tags: vec![ItemTag { tag: "kept".into(), tag_type: Some(1) }],
+        };
+        let state = transport(base).patch_item(&request).unwrap();
+        assert_eq!(state.library_version, 43);
+        let requests = server.join().unwrap();
+        assert!(requests[0].starts_with("PATCH /api/users/0/items/ABCD2345 HTTP/1.1\r\n"));
+        assert!(requests[0].contains("zotero-api-key: top-secret-key\r\n"));
+        assert!(requests[0].contains("zotero-server-id: server-10\r\n"));
+        assert!(requests[0].contains("if-unmodified-since-version: 7\r\n"));
+        assert!(requests[0].contains("content-type: application/json\r\n"));
+        assert!(requests[0].ends_with(r#"{"collections":["BCDE3456"],"tags":[{"tag":"kept","type":1}]}"#));
+        assert!(requests[1].starts_with("GET /api/users/0/items/ABCD2345?format=json&include=data HTTP/1.1\r\n"));
+    }
+
+    #[test]
+    fn zotero10_transport_rejects_stale_non_success_and_server_mismatch() {
+        for response in [
+            "HTTP/1.1 412 Precondition Failed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_owned(),
+            "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_owned(),
+            item_response("other-server", 42, 7),
+        ] {
+            let (base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+            let error = transport(base).get_item("ABCD2345").unwrap_err();
+            assert!(matches!(error, ZoteroTransportError::RequestFailed | ZoteroTransportError::ServerMismatch));
+            server.join().unwrap();
+        }
+    }
+
+    #[test]
+    fn zotero10_transport_rejects_invalid_keys_credentials_and_bounded_bodies() {
+        assert_eq!(
+            Zotero10LocalAdapter::new(" ", "server-10").unwrap_err(),
+            ZoteroTransportError::InvalidCredentials
+        );
+        assert_eq!(
+            Zotero10LocalAdapter::new("secret", " ").unwrap_err(),
+            ZoteroTransportError::InvalidCredentials
+        );
+        let adapter = Zotero10LocalAdapter::new("secret", "server-10").unwrap();
+        for key in ["ABCD234", "ABCD2340", "abcd2345", "ABCD2345/../X"] {
+            assert_eq!(adapter.get_item(key).unwrap_err(), ZoteroTransportError::InvalidItemKey);
+        }
+
+        let malformed = "HTTP/1.1 200 OK\r\nZotero-Server-ID: server-10\r\nLast-Modified-Version: 42\r\nContent-Length: 1\r\nConnection: close\r\n\r\n{";
+        let (base, server) = serve(vec![malformed]);
+        assert_eq!(transport(base).get_item("ABCD2345").unwrap_err(), ZoteroTransportError::InvalidResponse);
+        server.join().unwrap();
+
+        let oversized = "x".repeat((MAX_ITEM_RESPONSE_BYTES + 1) as usize);
+        let response = format!("HTTP/1.1 200 OK\r\nZotero-Server-ID: server-10\r\nLast-Modified-Version: 42\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{oversized}", oversized.len());
+        let (base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+        assert_eq!(transport(base).get_item("ABCD2345").unwrap_err(), ZoteroTransportError::InvalidResponse);
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn zotero10_transport_never_formats_or_serializes_the_key() {
+        let adapter = Zotero10LocalAdapter::new("top-secret-key", "server-10").unwrap();
+        assert!(!std::any::type_name_of_val(&adapter).contains("top-secret-key"));
+        assert_eq!(format!("{:?}", ZoteroTransportError::RequestFailed), "RequestFailed");
+    }
 
     fn item(key: &str, item_type: &str, title: &str, doi: &str, parent: &str) -> ZoteroItem {
         ZoteroItem {
