@@ -162,7 +162,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         write_private_output(&report_output, &report_content)?;
         if let Err(error) = write_private_output(&output, &worksheet_content) {
             let _ = fs::remove_file(report_output);
-            return Err(error);
+            return Err(error.into());
         }
     } else {
         write_private_output(&output, &serde_json::to_vec_pretty(&report)?)?;
