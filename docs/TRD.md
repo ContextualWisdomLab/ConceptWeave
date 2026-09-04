@@ -56,3 +56,7 @@ Source artifacts are untrusted input. Adapters must enforce source size/type bou
 ## 10. Evaluation
 
 Evaluation must separate extraction recall, semantic correctness, structural correctness, ontology consistency, mapping accuracy, measure correctness, and governance outcomes. Model-judge scores may supplement but never replace deterministic golden fixtures and human-reviewed expert cases.
+
+## 11. Zotero research intake
+
+`conceptweave-zotero` reads only the loopback Local API with bounded pages, redirects disabled, and finite connect/response/body timeouts. `Total-Results`, `Last-Modified-Version`, Zotero version, and server identity must remain identical across all pages; drift, malformed JSON, an empty intermediate page, duplicate keys, or an oversized response fails the run. The report is local JSON and contains proposals rather than governance decisions. Zotero 9 writes are unsupported; no mutation path exists in this slice. A future Zotero 10+ writer requires a separate reviewed change with a Local API key, stable server identity, fresh item/library version preconditions, item-by-item before/after receipts, and rollback evidence.

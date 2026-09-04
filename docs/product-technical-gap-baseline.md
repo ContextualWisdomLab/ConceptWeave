@@ -40,6 +40,12 @@ Protected central source is `.github/main@c31d2e5471fc5daf9d72ff67cde6a8874b736d
 
 ## P0 product gaps after the current TDD lanes
 
+### Zotero research classification slice
+
+Local evidence on 2026-09-04 showed Zotero 9.0.6, Local API v3/schema 42, library version 12341, 8,326 total items, and 3,719 top-level items. The first read-only run observed all 8,326 records at that single version and classified all 3,715 top-level bibliographic records; four top-level note/attachment/annotation records were correctly excluded. It proposed 291 adjacent-evidence records, 2 semantic-consumption bridges, and 3,422 steward-review abstentions, linked children for 3,287 records, and surfaced 49 reversible duplicate groups (18 DOI, 31 title). These are local aggregate observations, not reviewed truth or applied Zotero changes. The report stays outside the repository.
+
+The next RED is a steward-reviewed golden set that measures disposition precision/recall and expands multilingual rules without reducing abstention safety. Zotero write-back remains blocked by the installed v9 capability; a Zotero 10+ change must satisfy ADR 0006 preconditions. A dedicated utility repository remains unnecessary until an independently released cross-product contract exists.
+
 1. **Concrete Source Observation adapter** — maintained Rust PostgreSQL driver behind `conceptweave-source-port`; adapter-local credential resolution; explicit read-only mode; statement timeout, cancellation, row/byte/concurrency budgets; complete immutable snapshot or fail closed; deterministic replay against a frozen anonymized GRC-shaped fixture.
 2. **Ontology discovery** — deterministic term/concept/taxonomy/non-taxonomic-relation candidate generation with exact source receipts and abstention for unsupported semantics.
 3. **Semantic-layer discovery** — dimensions, measures, grain, units, relationships and physical mappings with deterministic calculation contracts; do not infer business authority from relational structure alone.
