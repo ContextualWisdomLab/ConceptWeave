@@ -68,3 +68,31 @@ fn targeted_set_default_rejects_unknown_or_non_targetable_columns() {
         "PostgreSQL column lists are valid only for ON DELETE SET NULL/SET DEFAULT"
     );
 }
+
+#[test]
+fn targeted_delete_columns_reject_empty_blank_and_duplicate_coordinates() {
+    for target_columns in [
+        Vec::new(),
+        vec![" ".to_owned()],
+        vec!["author_id".to_owned(), "author_id".to_owned()],
+    ] {
+        assert!(
+            ForeignKeyReferenceBehavior::new(
+                ForeignKeyAction::NoAction,
+                ForeignKeyAction::SetNull,
+                ForeignKeyMatchType::Simple,
+                ForeignKeyDeferrability::NotDeferrable,
+            )
+            .with_delete_target_columns(target_columns)
+            .is_err()
+        );
+    }
+
+    let behavior = ForeignKeyReferenceBehavior::new(
+        ForeignKeyAction::NoAction,
+        ForeignKeyAction::SetNull,
+        ForeignKeyMatchType::Simple,
+        ForeignKeyDeferrability::NotDeferrable,
+    );
+    assert_eq!(behavior.delete_target_columns(), None);
+}
