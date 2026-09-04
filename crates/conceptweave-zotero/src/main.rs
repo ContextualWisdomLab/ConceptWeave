@@ -402,13 +402,17 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
             "report output must be a direct child of the system temp directory",
         ));
     }
-    if fs::symlink_metadata(&path).is_ok() {
+    let file_name = path.file_name().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidInput, "report output has no file name")
+    })?;
+    let validated_path = resolved_parent.join(file_name);
+    if fs::symlink_metadata(&validated_path).is_ok() {
         return Err(io::Error::new(
             io::ErrorKind::AlreadyExists,
             "report output must not already exist or be a symlink",
         ));
     }
-    Ok(path)
+    Ok(validated_path)
 }
 
 /// Creates a new sensitive report file or fails closed on unsupported platforms.
