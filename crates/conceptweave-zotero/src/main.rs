@@ -140,18 +140,21 @@ mod tests {
 
     #[test]
     fn worksheet_mode_is_explicit_and_rejects_ambiguous_arguments() {
-        let output = "/tmp/conceptweave-zotero-worksheet.json";
+        let report = "/tmp/conceptweave-zotero-report.json";
+        let worksheet = "/tmp/conceptweave-zotero-worksheet.json";
         assert_eq!(
-            parse_output_request(vec!["--worksheet", output]),
-            Ok((true, output.to_owned()))
+            parse_output_request(vec!["--worksheet", report, worksheet]),
+            Ok((Some(report.to_owned()), worksheet.to_owned()))
         );
         assert_eq!(
-            parse_output_request(vec![output]),
-            Ok((false, output.to_owned()))
+            parse_output_request(vec![report]),
+            Ok((None, report.to_owned()))
         );
         assert!(parse_output_request(Vec::<&str>::new()).is_err());
         assert!(parse_output_request(vec!["--worksheet"]).is_err());
-        assert!(parse_output_request(vec![output, "extra"]).is_err());
+        assert!(parse_output_request(vec!["--worksheet", report]).is_err());
+        assert!(parse_output_request(vec![report, "extra"]).is_err());
+        assert!(parse_output_request(vec!["--worksheet", report, report]).is_err());
     }
 
     fn unique_temp_path(suffix: &str) -> PathBuf {
