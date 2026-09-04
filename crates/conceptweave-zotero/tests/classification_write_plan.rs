@@ -54,10 +54,11 @@ fn execution_preflights_every_item_and_returns_reversible_partial_failure() {
         },
     );
 
-    assert_eq!(preflighted, ["A", "B"]);
+    assert_eq!(preflighted, ["A", "B", "B"]);
     assert_eq!(written, ["A", "B"]);
     assert_eq!(receipt.outcome, ClassificationWriteOutcome::PartialFailure);
     assert_eq!(receipt.failed_item_key.as_deref(), Some("B"));
+    assert_eq!(receipt.indeterminate_item_key, None);
     assert!(receipt.not_attempted_item_keys.is_empty());
     assert_eq!(receipt.applied_item_keys, ["A"]);
     assert_eq!(receipt.rollback_operations.len(), 1);
@@ -84,7 +85,78 @@ fn dry_run_execution_never_calls_the_write_boundary() {
 
     assert_eq!(receipt.outcome, ClassificationWriteOutcome::DryRun);
     assert!(receipt.applied_item_keys.is_empty());
+    assert_eq!(receipt.indeterminate_item_key, None);
     assert!(receipt.rollback_operations.is_empty());
+}
+
+#[test]
+fn execution_reconciles_a_committed_write_after_its_response_is_lost() {
+    let report = classification_report("10.0.0");
+    let plan =
+        build_classification_write_plan(&report, &reviewed(&report), WriteMode::Execute, |_| true)
+            .unwrap();
+    let mut b_reads = 0;
+    let receipt = execute_classification_write_plan(
+        &plan,
+        |item_key| {
+            if item_key == "B" {
+                b_reads += 1;
+                if b_reads == 2 {
+                    let operation = &plan.operations[1];
+                    return Ok::<_, ()>(ClassificationItemState {
+                        server_id: "server-1".into(),
+                        library_version: 44,
+                        item_key: "B".into(),
+                        item_version: 10,
+                        collection_keys: operation.after_collection_keys.clone(),
+                        tags: operation.after_tags.clone(),
+                    });
+                }
+            }
+            Ok::<_, ()>(preflight_state(&plan, item_key))
+        },
+        |request| {
+            if request.item_key == "B" {
+                Err(())
+            } else {
+                Ok(applied_state(request))
+            }
+        },
+    );
+
+    assert_eq!(receipt.outcome, ClassificationWriteOutcome::PartialFailure);
+    assert_eq!(receipt.failed_item_key.as_deref(), Some("B"));
+    assert_eq!(receipt.indeterminate_item_key, None);
+    assert_eq!(receipt.applied_item_keys, ["A", "B"]);
+    assert_eq!(receipt.rollback_operations[0].item_key, "B");
+    assert_eq!(receipt.rollback_operations[0].item_version, 10);
+}
+
+#[test]
+fn execution_names_an_item_when_failed_write_reconciliation_is_unavailable() {
+    let report = classification_report("10.0.0");
+    let plan =
+        build_classification_write_plan(&report, &reviewed(&report), WriteMode::Execute, |_| true)
+            .unwrap();
+    let mut reads = 0;
+    let receipt = execute_classification_write_plan(
+        &plan,
+        |item_key| {
+            reads += 1;
+            if reads > plan.operations.len() {
+                Err(())
+            } else {
+                Ok(preflight_state(&plan, item_key))
+            }
+        },
+        |_| Err::<ClassificationItemState, _>(()),
+    );
+
+    assert_eq!(receipt.outcome, ClassificationWriteOutcome::PartialFailure);
+    assert_eq!(receipt.failed_item_key.as_deref(), Some("A"));
+    assert_eq!(receipt.indeterminate_item_key.as_deref(), Some("A"));
+    assert!(receipt.rollback_operations.is_empty());
+    assert_eq!(receipt.not_attempted_item_keys, ["B"]);
 }
 
 fn preflight_state(
