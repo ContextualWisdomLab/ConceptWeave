@@ -348,6 +348,31 @@ fn write_plan_fails_closed_for_untrusted_stale_or_unsafe_changes() {
         Err(WritePlanError::SnapshotMismatch)
     );
 
+    let exact_report = classification_report("10.0.0");
+    let mut changed_snapshot_review = reviewed(&exact_report);
+    changed_snapshot_review.snapshot_items[0].item_version += 1;
+    assert_eq!(
+        build_classification_write_plan(
+            &exact_report,
+            &changed_snapshot_review,
+            WriteMode::DryRun,
+            |_| true
+        ),
+        Err(WritePlanError::SnapshotMismatch)
+    );
+
+    let mut blank_snapshot_key = classification_report("10.0.0");
+    blank_snapshot_key.snapshot_items[0].item_key = " ".into();
+    assert_eq!(
+        build_classification_write_plan(
+            &blank_snapshot_key,
+            &reviewed(&blank_snapshot_key),
+            WriteMode::DryRun,
+            |_| true
+        ),
+        Err(WritePlanError::InvalidReview)
+    );
+
     let mut duplicate_snapshot = classification_report("10.0.0");
     duplicate_snapshot
         .snapshot_items
