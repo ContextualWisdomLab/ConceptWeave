@@ -67,6 +67,7 @@ pub struct ItemData {
 
 /// A Zotero item tag.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ItemTag {
     /// Tag text.
     pub tag: String,
@@ -111,6 +112,7 @@ pub enum AbstentionReason {
 
 /// Evidence for a deterministic proposed disposition.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ClassificationEvidence {
     /// Metadata fields whose values matched.
     pub fields: Vec<String>,
@@ -1123,6 +1125,7 @@ pub const MAX_REVIEW_BATCH_ITEMS: usize = 100;
 
 /// One pending decision with the report context required for human review.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct StewardReviewBatchDecision {
     /// Stable Zotero item key used to apply the completed decision.
     pub item_key: String,
@@ -1150,6 +1153,7 @@ pub struct StewardReviewBatchDecision {
 
 /// Deterministic owner-only view of the next pending steward decisions.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct StewardReviewBatch {
     /// Zotero library revision shared with the report and worksheet.
     pub library_version: u64,
