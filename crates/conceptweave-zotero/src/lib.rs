@@ -518,12 +518,7 @@ impl Zotero10LocalAuthorization {
         let body = bounded_body_with_limit(&mut response, MAX_AUTH_RESPONSE_BYTES)?;
         let authorization: AuthorizationResponse =
             serde_json::from_str(&body).map_err(|_| ZoteroTransportError::InvalidResponse)?;
-        if authorization.key.len() != 32
-            || !authorization
-                .key
-                .bytes()
-                .all(|byte| byte.is_ascii_graphic())
-        {
+        if !is_valid_local_api_key(&authorization.key) {
             return Err(ZoteroTransportError::InvalidResponse);
         }
         Ok(Self {
@@ -579,7 +574,7 @@ impl Zotero10LocalAdapter {
         server_id: String,
         base: String,
     ) -> Result<Self, ZoteroTransportError> {
-        if api_key.trim().is_empty() || server_id.trim().is_empty() {
+        if !is_valid_local_api_key(&api_key) || server_id.trim().is_empty() {
             return Err(ZoteroTransportError::InvalidCredentials);
         }
         Ok(Self {
@@ -771,6 +766,10 @@ fn retry_after_seconds(headers: &ureq::http::HeaderMap) -> Option<u64> {
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.parse().ok())
         .filter(|seconds| *seconds <= MAX_RETRY_AFTER_SECONDS)
+}
+
+fn is_valid_local_api_key(api_key: &str) -> bool {
+    api_key.len() == 32 && api_key.bytes().all(|byte| byte.is_ascii_graphic())
 }
 
 fn version_header(headers: &ureq::http::HeaderMap) -> Result<u64, ZoteroTransportError> {
@@ -2351,7 +2350,12 @@ mod tests {
     }
 
     fn transport(base: String) -> Zotero10LocalAdapter {
-        Zotero10LocalAdapter::new_with_base("top-secret-key", "server-10", base).unwrap()
+        Zotero10LocalAdapter::new_with_base(
+            "0123456789abcdef0123456789abcdef",
+            "server-10",
+            base,
+        )
+        .unwrap()
     }
 
     fn authorization_error(
@@ -2639,7 +2643,7 @@ mod tests {
         assert!(
             requests
                 .iter()
-                .all(|request| !request.contains("top-secret-key"))
+                .all(|request| !request.contains("0123456789abcdef0123456789abcdef"))
         );
     }
 
@@ -2653,7 +2657,8 @@ mod tests {
         assert_eq!(state.item_version, 43);
         let requests = server.join().unwrap();
         assert!(requests[0].starts_with("POST /api/users/0/items HTTP/1.1\r\n"));
-        assert!(requests[0].contains("zotero-api-key: top-secret-key\r\n"));
+        assert!(requests[0]
+            .contains("zotero-api-key: 0123456789abcdef0123456789abcdef\r\n"));
         assert!(requests[0].contains("zotero-server-id: server-10\r\n"));
         assert!(requests[0].contains("if-unmodified-since-version: 42\r\n"));
         assert!(requests[0].contains("content-type: application/json\r\n"));
@@ -2693,7 +2698,7 @@ mod tests {
         let mut mismatched_request = request.clone();
         mismatched_request.server_id = "other-server".into();
         assert_eq!(
-            Zotero10LocalAdapter::new("secret", "server-10")
+            Zotero10LocalAdapter::new("0123456789abcdef0123456789abcdef", "server-10")
                 .unwrap()
                 .write_item(&mismatched_request)
                 .unwrap_err(),
@@ -2737,10 +2742,28 @@ mod tests {
             ZoteroTransportError::InvalidCredentials
         );
         assert_eq!(
-            Zotero10LocalAdapter::new("secret", " ").err().unwrap(),
+            Zotero10LocalAdapter::new("0123456789abcdef0123456789abcdef", " ")
+                .err()
+                .unwrap(),
             ZoteroTransportError::InvalidCredentials
         );
-        let adapter = Zotero10LocalAdapter::new("secret", "server-10").unwrap();
+        for api_key in [
+            "too-short",
+            "0123456789abcdef0123456789abcde ",
+            "0123456789abcdef0123456789abcdefx",
+        ] {
+            assert_eq!(
+                Zotero10LocalAdapter::new(api_key, "server-10")
+                    .err()
+                    .unwrap(),
+                ZoteroTransportError::InvalidCredentials
+            );
+        }
+        let adapter = Zotero10LocalAdapter::new(
+            "0123456789abcdef0123456789abcdef",
+            "server-10",
+        )
+        .unwrap();
         for key in ["ABCD234", "ABCD2340", "abcd2345", "ABCD2345/../X"] {
             assert_eq!(
                 adapter.get_item(key).unwrap_err(),
@@ -2933,8 +2956,13 @@ mod tests {
 
     #[test]
     fn zotero10_transport_never_formats_or_serializes_the_key() {
-        let adapter = Zotero10LocalAdapter::new("top-secret-key", "server-10").unwrap();
-        assert!(!std::any::type_name_of_val(&adapter).contains("top-secret-key"));
+        let adapter = Zotero10LocalAdapter::new(
+            "0123456789abcdef0123456789abcdef",
+            "server-10",
+        )
+        .unwrap();
+        assert!(!std::any::type_name_of_val(&adapter)
+            .contains("0123456789abcdef0123456789abcdef"));
         assert_eq!(
             format!("{:?}", ZoteroTransportError::RequestFailed),
             "RequestFailed"
