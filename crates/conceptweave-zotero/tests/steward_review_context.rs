@@ -40,7 +40,10 @@ fn abstentions_retain_only_the_abstract_needed_for_local_steward_review() {
         .find(|item| item.item_key == "REVIEW01")
         .unwrap();
     assert_eq!(review.proposed_disposition, Disposition::NeedsStewardReview);
-    assert_eq!(review.review_abstract_note.as_deref(), Some(review_abstract));
+    assert_eq!(
+        review.review_abstract_note.as_deref(),
+        Some(review_abstract)
+    );
 
     let decided = report
         .classified_items
