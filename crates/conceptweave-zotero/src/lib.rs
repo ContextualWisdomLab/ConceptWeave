@@ -2372,6 +2372,18 @@ mod tests {
         assert!(request.contains("zotero-server-id: server-10\r\n"));
         assert!(request.ends_with(r#"{"appName":"ConceptWeave"}"#));
         assert!(!request.contains("0123456789abcdef0123456789abcdef"));
+
+        let body = r#"{"key":"fedcba9876543210fedcba9876543210","remember":false}"#;
+        let response = authorize_response("200 OK", Some("server-10"), body);
+        let (items_base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+        let authorization = Zotero10LocalAuthorization::request_with_base(
+            "ConceptWeave",
+            "server-10",
+            items_base.replace("/api/users/0/items", ""),
+        )
+        .unwrap();
+        assert!(!authorization.remembered());
+        server.join().unwrap();
     }
 
     #[test]
@@ -2383,6 +2395,10 @@ mod tests {
                 ZoteroTransportError::InvalidCredentials
             );
         }
+        assert_eq!(
+            authorization_error(Zotero10LocalAuthorization::request("ConceptWeave", " ")),
+            ZoteroTransportError::InvalidCredentials
+        );
 
         for response in [
             authorize_response(
@@ -2399,6 +2415,11 @@ mod tests {
                 "200 OK",
                 Some("server-10"),
                 r#"{"key":"too-short","remember":false}"#,
+            ),
+            authorize_response(
+                "200 OK",
+                Some("server-10"),
+                r#"{"key":"0123456789abcdef0123456789abcde ","remember":false}"#,
             ),
             authorize_response("200 OK", Some("server-10"), "{"),
             authorize_response(
@@ -2419,6 +2440,39 @@ mod tests {
             ));
             server.join().unwrap();
         }
+
+        for (response, expected) in [
+            (
+                "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                ZoteroTransportError::RequestFailed,
+            ),
+            (
+                "HTTP/1.1 429 Too Many Requests\r\nRetry-After: tomorrow\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                ZoteroTransportError::RateLimited {
+                    retry_after_seconds: None,
+                },
+            ),
+        ] {
+            let (items_base, server) = serve(vec![response]);
+            assert_eq!(
+                authorization_error(Zotero10LocalAuthorization::request_with_base(
+                    "ConceptWeave",
+                    "server-10",
+                    items_base.replace("/api/users/0/items", ""),
+                )),
+                expected
+            );
+            server.join().unwrap();
+        }
+
+        assert_eq!(
+            authorization_error(Zotero10LocalAuthorization::request_with_base(
+                "ConceptWeave",
+                "server-10",
+                "http://127.0.0.1:0".into(),
+            )),
+            ZoteroTransportError::RequestFailed
+        );
     }
 
     #[test]
@@ -2483,6 +2537,28 @@ mod tests {
             );
             assert_eq!(server.join().unwrap().len(), 1);
         }
+
+        assert_eq!(
+            transport("http://127.0.0.1:0/api/users/0/items".into())
+                .write_item(&write_request())
+                .unwrap_err(),
+            ZoteroTransportError::RequestFailed
+        );
+
+        let response = library_response("server-10", 42);
+        let (base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+        assert_eq!(
+            transport(base).get_item("ABCD2345").unwrap_err(),
+            ZoteroTransportError::RequestFailed
+        );
+        server.join().unwrap();
+
+        assert_eq!(
+            transport("http://127.0.0.1:0/api/users/0/items".into())
+                .get_item("ABCD2345")
+                .unwrap_err(),
+            ZoteroTransportError::RequestFailed
+        );
     }
 
     fn assert_write_invalid(response: String) {
