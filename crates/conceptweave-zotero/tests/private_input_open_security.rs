@@ -62,3 +62,17 @@ fn owner_only_input_open_must_not_follow_final_component_symlinks() {
         "the opened private-artifact handle must be obtained with an explicit no-follow primitive"
     );
 }
+
+#[test]
+fn no_follow_private_input_open_must_remain_inside_security_coverage() {
+    let source = include_str!("../src/main.rs");
+    let open_start = source
+        .find("fn open_with_metadata")
+        .expect("private artifact open helper must remain present");
+    let attribute_window = &source[open_start.saturating_sub(160)..open_start];
+
+    assert!(
+        !attribute_window.contains("coverage(off)"),
+        "the O_NOFOLLOW private-input security boundary must not be removed from owned coverage"
+    );
+}
