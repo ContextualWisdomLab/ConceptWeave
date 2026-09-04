@@ -161,7 +161,6 @@ fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<(T, ArtifactI
     }
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
 /// Opens a review input once and returns metadata from the opened handle.
 fn open_with_metadata(path: &Path) -> io::Result<(File, fs::Metadata)> {
     #[cfg(unix)]
