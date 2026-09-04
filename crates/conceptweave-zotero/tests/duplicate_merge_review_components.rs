@@ -41,11 +41,12 @@ fn transitive_duplicate_component_accepts_one_component_level_canonical_key() {
         rule_revision: report.rule_revision.into(),
         snapshot_digest: report.snapshot_digest.clone(),
         snapshot_items: report.snapshot_items.clone(),
+        duplicate_candidates: report.duplicate_candidates.clone(),
         decisions: report
             .duplicate_candidates
             .iter()
             .map(|candidate| DuplicateMergeDecision {
-                identity_kind: candidate.identity_kind.into(),
+                identity_kind: candidate.identity_kind.clone(),
                 normalized_identity: candidate.normalized_identity.clone(),
                 retained_item_key: "A".into(),
             })
@@ -96,8 +97,9 @@ fn duplicate_review_rejects_blank_snapshot_item_identity() {
         rule_revision: report.rule_revision.into(),
         snapshot_digest: report.snapshot_digest.clone(),
         snapshot_items: report.snapshot_items.clone(),
+        duplicate_candidates: report.duplicate_candidates.clone(),
         decisions: vec![DuplicateMergeDecision {
-            identity_kind: candidate.identity_kind.into(),
+            identity_kind: candidate.identity_kind.clone(),
             normalized_identity: candidate.normalized_identity.clone(),
             retained_item_key: "B".into(),
         }],
@@ -126,6 +128,7 @@ fn duplicate_review_binds_every_item_revision_to_the_reviewed_snapshot() {
         vec![
             item("A", 1, "Same title", "10.1000/same"),
             item("B", 2, "Same title", "10.1000/same"),
+            item("C", 3, "Unrelated title", "10.1000/unrelated"),
         ],
     );
     let mut reviewed = ReviewedDuplicateMergeSet {
@@ -135,11 +138,12 @@ fn duplicate_review_binds_every_item_revision_to_the_reviewed_snapshot() {
         rule_revision: report.rule_revision.into(),
         snapshot_digest: report.snapshot_digest.clone(),
         snapshot_items: report.snapshot_items.clone(),
+        duplicate_candidates: report.duplicate_candidates.clone(),
         decisions: report
             .duplicate_candidates
             .iter()
             .map(|candidate| DuplicateMergeDecision {
-                identity_kind: candidate.identity_kind.into(),
+                identity_kind: candidate.identity_kind.clone(),
                 normalized_identity: candidate.normalized_identity.clone(),
                 retained_item_key: "A".into(),
             })
@@ -157,7 +161,21 @@ fn duplicate_review_binds_every_item_revision_to_the_reviewed_snapshot() {
         decision.retained_item_key = "B".into();
     }
     for candidate in &mut report.duplicate_candidates {
+        candidate.item_keys[0] = "C".into();
+    }
+    assert_eq!(
+        build_duplicate_merge_review_manifest(&report, &reviewed, |_| true),
+        Err(DuplicateReviewError::SnapshotMismatch)
+    );
+
+    reviewed.duplicate_candidates = report.duplicate_candidates.clone();
+    for (candidate, reviewed_candidate) in report
+        .duplicate_candidates
+        .iter_mut()
+        .zip(&mut reviewed.duplicate_candidates)
+    {
         candidate.item_keys[0] = "missing".into();
+        reviewed_candidate.item_keys[0] = "missing".into();
     }
     assert_eq!(
         build_duplicate_merge_review_manifest(&report, &reviewed, |_| true),

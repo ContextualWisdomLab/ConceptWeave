@@ -143,10 +143,10 @@ pub struct ClassifiedItem {
 }
 
 /// A duplicate candidate group; no item is merged or deleted.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct DuplicateCandidate {
     /// Identity kind used for the candidate group.
-    pub identity_kind: &'static str,
+    pub identity_kind: String,
     /// Normalized identity value.
     pub normalized_identity: String,
     /// Zotero item keys sharing the identity.
@@ -179,6 +179,8 @@ pub struct ReviewedDuplicateMergeSet {
     pub snapshot_digest: String,
     /// Exact item-key/item-version coordinates reviewed by the steward.
     pub snapshot_items: Vec<SnapshotItemRevision>,
+    /// Exact duplicate membership reviewed by the steward.
+    pub duplicate_candidates: Vec<DuplicateCandidate>,
     /// Exactly one decision for every duplicate candidate.
     pub decisions: Vec<DuplicateMergeDecision>,
 }
@@ -292,12 +294,16 @@ pub struct ReviewedClassificationWriteSet {
     pub authority_receipt: String,
     /// Exact Local API server identity, when supplied by Zotero.
     pub server_id: Option<String>,
+    /// Exact Zotero version reviewed for write capability.
+    pub zotero_version: String,
     /// Exact reviewed library revision.
     pub library_version: u64,
     /// Exact reviewed classifier revision.
     pub rule_revision: String,
     /// Exact reviewed raw-snapshot digest.
     pub snapshot_digest: String,
+    /// Exact item-key/item-version coordinates reviewed by the steward.
+    pub snapshot_items: Vec<SnapshotItemRevision>,
     /// Reviewed item-level changes.
     pub changes: Vec<ReviewedClassificationChange>,
 }
@@ -336,6 +342,8 @@ pub struct ClassificationWritePlan {
     pub authority_receipt: String,
     /// Exact Local API server identity.
     pub server_id: Option<String>,
+    /// Exact Zotero version used to establish execute eligibility.
+    pub zotero_version: String,
     /// Exact library-version precondition.
     pub library_version: u64,
     /// Exact classifier revision.
@@ -767,6 +775,7 @@ where
         || reviewed.library_version != report.library_version
         || reviewed.rule_revision != report.rule_revision
         || reviewed.snapshot_items != report.snapshot_items
+        || reviewed.duplicate_candidates != report.duplicate_candidates
     {
         return Err(DuplicateReviewError::SnapshotMismatch);
     }
@@ -799,7 +808,7 @@ where
         .map(|candidate| {
             (
                 (
-                    candidate.identity_kind,
+                    candidate.identity_kind.as_str(),
                     candidate.normalized_identity.as_str(),
                 ),
                 candidate,
@@ -910,6 +919,9 @@ fn normalized_metadata(
 ) -> Result<(Vec<String>, Vec<ItemTag>), WritePlanError> {
     if collection_keys.iter().any(|key| key.trim().is_empty())
         || tags.iter().any(|tag| tag.tag.trim().is_empty())
+        || tags
+            .iter()
+            .any(|tag| tag.tag_type.is_some_and(|tag_type| tag_type > 1))
         || collection_keys.iter().collect::<BTreeSet<_>>().len() != collection_keys.len()
         || tags
             .iter()
@@ -922,6 +934,11 @@ fn normalized_metadata(
     }
     let mut collection_keys = collection_keys.to_vec();
     let mut tags = tags.to_vec();
+    for tag in &mut tags {
+        if tag.tag_type == Some(0) {
+            tag.tag_type = None;
+        }
+    }
     collection_keys.sort();
     tags.sort();
     Ok((collection_keys, tags))
@@ -946,9 +963,11 @@ where
         return Err(WritePlanError::InvalidReview);
     }
     if reviewed.server_id != report.server_id
+        || reviewed.zotero_version != report.zotero_version
         || reviewed.library_version != report.library_version
         || reviewed.rule_revision != report.rule_revision
         || reviewed.snapshot_digest != report.snapshot_digest
+        || reviewed.snapshot_items != report.snapshot_items
     {
         return Err(WritePlanError::SnapshotMismatch);
     }
@@ -975,12 +994,23 @@ where
     }
 
     if report
-        .classified_items
+        .snapshot_items
         .iter()
-        .map(|item| item.item_key.as_str())
-        .collect::<BTreeSet<_>>()
-        .len()
-        != report.classified_items.len()
+        .any(|item| item.item_key.trim().is_empty())
+        || report
+            .snapshot_items
+            .iter()
+            .map(|item| item.item_key.as_str())
+            .collect::<BTreeSet<_>>()
+            .len()
+            != report.snapshot_items.len()
+        || report
+            .classified_items
+            .iter()
+            .map(|item| item.item_key.as_str())
+            .collect::<BTreeSet<_>>()
+            .len()
+            != report.classified_items.len()
     {
         return Err(WritePlanError::InvalidReview);
     }
@@ -988,6 +1018,11 @@ where
         .classified_items
         .iter()
         .map(|item| (item.item_key.as_str(), item))
+        .collect::<BTreeMap<_, _>>();
+    let snapshot_revisions = report
+        .snapshot_items
+        .iter()
+        .map(|item| (item.item_key.as_str(), item.item_version))
         .collect::<BTreeMap<_, _>>();
     let mut seen_items = BTreeSet::new();
     let mut operations = Vec::with_capacity(reviewed.changes.len());
@@ -1004,6 +1039,9 @@ where
         let item = classified
             .get(change.item_key.as_str())
             .ok_or(WritePlanError::UnknownItem)?;
+        if snapshot_revisions.get(change.item_key.as_str()) != Some(&item.item_version) {
+            return Err(WritePlanError::StaleItem);
+        }
         let (actual_collections, actual_tags) =
             normalized_metadata(&item.collection_keys, &item.tags)?;
         let (before_collections, before_tags) =
@@ -1037,6 +1075,7 @@ where
         review_id: reviewed.review_id.clone(),
         authority_receipt: reviewed.authority_receipt.clone(),
         server_id: reviewed.server_id.clone(),
+        zotero_version: reviewed.zotero_version.clone(),
         library_version: reviewed.library_version,
         rule_revision: reviewed.rule_revision.clone(),
         snapshot_digest: reviewed.snapshot_digest.clone(),
@@ -1719,7 +1758,7 @@ fn duplicate_candidates(items: &[&ZoteroItem]) -> Vec<DuplicateCandidate> {
         .into_iter()
         .filter_map(|((identity_kind, normalized_identity), item_keys)| {
             (item_keys.len() > 1).then_some(DuplicateCandidate {
-                identity_kind,
+                identity_kind: identity_kind.into(),
                 normalized_identity,
                 item_keys,
             })
