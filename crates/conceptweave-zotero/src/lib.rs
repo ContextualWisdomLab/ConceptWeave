@@ -1215,9 +1215,14 @@ pub struct GoldenSetApproval {
 
 /// Converts a fully decided local worksheet into the input for approval verification.
 pub fn reviewed_golden_set_from_worksheet(
+    report: &ClassificationReport,
     worksheet: &StewardReviewWorksheet,
     approval: GoldenSetApproval,
 ) -> Result<ReviewedGoldenSet, EvaluationError> {
+    let expected = build_steward_review_worksheet(report).map_err(|_| EvaluationError::InvalidReview)?;
+    if worksheet.decisions.len() != expected.decisions.len() {
+        return Err(EvaluationError::IncompleteReview);
+    }
     if approval.receipt_id.trim().is_empty()
         || approval.reviewer_subject.trim().is_empty()
         || worksheet.rule_revision.trim().is_empty()
@@ -1232,31 +1237,20 @@ pub fn reviewed_golden_set_from_worksheet(
     {
         return Err(EvaluationError::SnapshotMismatch);
     }
-
-    let mut snapshot_versions = BTreeMap::new();
-    for item in &worksheet.snapshot_items {
-        if item.item_key.trim().is_empty()
-            || snapshot_versions
-                .insert(item.item_key.as_str(), item.item_version)
-                .is_some()
-        {
-            return Err(EvaluationError::InvalidReview);
-        }
+    if worksheet.library_version != expected.library_version
+        || worksheet.rule_revision != expected.rule_revision
+        || worksheet.snapshot_digest != expected.snapshot_digest
+        || worksheet.snapshot_items != expected.snapshot_items
+    {
+        return Err(EvaluationError::SnapshotMismatch);
     }
 
-    let mut decision_keys = BTreeSet::new();
     let mut labels = Vec::with_capacity(worksheet.decisions.len());
-    for decision in &worksheet.decisions {
-        if decision.item_key.trim().is_empty()
-            || snapshot_versions.get(decision.item_key.as_str()) != Some(&decision.item_version)
-        {
-            return Err(EvaluationError::InvalidReview);
-        }
-        if !decision_keys.insert(decision.item_key.as_str()) {
-            return Err(EvaluationError::DuplicateItem);
-        }
-        if (decision.proposed_disposition == Disposition::NeedsStewardReview)
-            != decision.abstention_reason.is_some()
+    for (decision, expected_decision) in worksheet.decisions.iter().zip(expected.decisions) {
+        if decision.item_key != expected_decision.item_key
+            || decision.item_version != expected_decision.item_version
+            || decision.proposed_disposition != expected_decision.proposed_disposition
+            || decision.abstention_reason != expected_decision.abstention_reason
         {
             return Err(EvaluationError::InvalidReview);
         }

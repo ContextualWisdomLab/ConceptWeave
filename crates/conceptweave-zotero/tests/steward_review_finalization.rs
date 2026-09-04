@@ -62,7 +62,7 @@ fn complete_worksheet() -> conceptweave_zotero::StewardReviewWorksheet {
 fn complete_worksheet_becomes_a_snapshot_bound_golden_set() {
     let worksheet = complete_worksheet();
 
-    let golden = reviewed_golden_set_from_worksheet(&worksheet, approval(&worksheet)).unwrap();
+    let golden = reviewed_golden_set_from_worksheet(&report(), &worksheet, approval(&worksheet)).unwrap();
 
     assert_eq!(golden.labels.len(), 2);
     assert_eq!(golden.labels[0].item_key, "A");
@@ -77,71 +77,71 @@ fn finalization_rejects_each_invalid_identity_coordinate() {
     let mut invalid_approval = approval(&worksheet);
     invalid_approval.receipt_id.clear();
     assert_eq!(
-        reviewed_golden_set_from_worksheet(&worksheet, invalid_approval),
+        reviewed_golden_set_from_worksheet(&report(), &worksheet, invalid_approval),
         Err(EvaluationError::InvalidReview)
     );
     let mut invalid_approval = approval(&worksheet);
     invalid_approval.reviewer_subject.clear();
     assert_eq!(
-        reviewed_golden_set_from_worksheet(&worksheet, invalid_approval),
+        reviewed_golden_set_from_worksheet(&report(), &worksheet, invalid_approval),
         Err(EvaluationError::InvalidReview)
     );
 
     let mut invalid = worksheet.clone();
     invalid.rule_revision.clear();
     assert_eq!(
-        reviewed_golden_set_from_worksheet(&invalid, approval(&invalid)),
+        reviewed_golden_set_from_worksheet(&report(), &invalid, approval(&invalid)),
         Err(EvaluationError::InvalidReview)
     );
     let mut invalid = worksheet.clone();
     invalid.snapshot_digest.clear();
     assert_eq!(
-        reviewed_golden_set_from_worksheet(&invalid, approval(&invalid)),
+        reviewed_golden_set_from_worksheet(&report(), &invalid, approval(&invalid)),
         Err(EvaluationError::InvalidReview)
     );
 
     let mut invalid_approval = approval(&worksheet);
     invalid_approval.library_version += 1;
     assert_eq!(
-        reviewed_golden_set_from_worksheet(&worksheet, invalid_approval),
+        reviewed_golden_set_from_worksheet(&report(), &worksheet, invalid_approval),
         Err(EvaluationError::SnapshotMismatch)
     );
     let mut invalid_approval = approval(&worksheet);
     invalid_approval.rule_revision.push_str("-changed");
     assert_eq!(
-        reviewed_golden_set_from_worksheet(&worksheet, invalid_approval),
+        reviewed_golden_set_from_worksheet(&report(), &worksheet, invalid_approval),
         Err(EvaluationError::SnapshotMismatch)
     );
     let mut invalid_approval = approval(&worksheet);
     invalid_approval.snapshot_items.pop();
     assert_eq!(
-        reviewed_golden_set_from_worksheet(&worksheet, invalid_approval),
+        reviewed_golden_set_from_worksheet(&report(), &worksheet, invalid_approval),
         Err(EvaluationError::SnapshotMismatch)
     );
 
     let mut invalid = worksheet.clone();
     invalid.snapshot_items[0].item_key.clear();
     assert_eq!(
-        reviewed_golden_set_from_worksheet(&invalid, approval(&invalid)),
-        Err(EvaluationError::InvalidReview)
+        reviewed_golden_set_from_worksheet(&report(), &invalid, approval(&invalid)),
+        Err(EvaluationError::SnapshotMismatch)
     );
     let mut invalid = worksheet.clone();
     invalid.snapshot_items[1] = invalid.snapshot_items[0].clone();
     assert_eq!(
-        reviewed_golden_set_from_worksheet(&invalid, approval(&invalid)),
-        Err(EvaluationError::InvalidReview)
+        reviewed_golden_set_from_worksheet(&report(), &invalid, approval(&invalid)),
+        Err(EvaluationError::SnapshotMismatch)
     );
 
     let mut invalid = worksheet.clone();
     invalid.decisions[0].item_key.clear();
     assert_eq!(
-        reviewed_golden_set_from_worksheet(&invalid, approval(&invalid)),
+        reviewed_golden_set_from_worksheet(&report(), &invalid, approval(&invalid)),
         Err(EvaluationError::InvalidReview)
     );
     let mut invalid = worksheet.clone();
     invalid.decisions[0].item_version += 1;
     assert_eq!(
-        reviewed_golden_set_from_worksheet(&invalid, approval(&invalid)),
+        reviewed_golden_set_from_worksheet(&report(), &invalid, approval(&invalid)),
         Err(EvaluationError::InvalidReview)
     );
 
@@ -149,20 +149,20 @@ fn finalization_rejects_each_invalid_identity_coordinate() {
     invalid.decisions[0].abstention_reason =
         Some(conceptweave_zotero::AbstentionReason::NoDeterministicRuleMatch);
     assert_eq!(
-        reviewed_golden_set_from_worksheet(&invalid, approval(&invalid)),
+        reviewed_golden_set_from_worksheet(&report(), &invalid, approval(&invalid)),
         Err(EvaluationError::InvalidReview)
     );
     let mut invalid = worksheet.clone();
     invalid.decisions[1].abstention_reason = None;
     assert_eq!(
-        reviewed_golden_set_from_worksheet(&invalid, approval(&invalid)),
+        reviewed_golden_set_from_worksheet(&report(), &invalid, approval(&invalid)),
         Err(EvaluationError::InvalidReview)
     );
 
     let mut invalid = worksheet.clone();
-    invalid.decisions.clear();
+    invalid.decisions.pop();
     assert_eq!(
-        reviewed_golden_set_from_worksheet(&invalid, approval(&invalid)),
+        reviewed_golden_set_from_worksheet(&report(), &invalid, approval(&invalid)),
         Err(EvaluationError::IncompleteReview)
     );
 }
@@ -171,7 +171,7 @@ fn finalization_rejects_each_invalid_identity_coordinate() {
 fn finalization_rejects_incomplete_invalid_or_mismatched_review() {
     let worksheet = build_steward_review_worksheet(&report()).unwrap();
     assert_eq!(
-        reviewed_golden_set_from_worksheet(&worksheet, approval(&worksheet)),
+        reviewed_golden_set_from_worksheet(&report(), &worksheet, approval(&worksheet)),
         Err(EvaluationError::IncompleteReview)
     );
 
@@ -179,7 +179,7 @@ fn finalization_rejects_incomplete_invalid_or_mismatched_review() {
     invalid.decisions[0].reviewed_disposition = Some(Disposition::NeedsStewardReview);
     invalid.decisions[1].reviewed_disposition = Some(Disposition::Generation);
     assert_eq!(
-        reviewed_golden_set_from_worksheet(&invalid, approval(&invalid)),
+        reviewed_golden_set_from_worksheet(&report(), &invalid, approval(&invalid)),
         Err(EvaluationError::InvalidExpectedDisposition)
     );
 
@@ -190,14 +190,14 @@ fn finalization_rejects_incomplete_invalid_or_mismatched_review() {
     let mut mismatched = approval(&complete);
     mismatched.snapshot_digest.push_str("-changed");
     assert_eq!(
-        reviewed_golden_set_from_worksheet(&complete, mismatched),
+        reviewed_golden_set_from_worksheet(&report(), &complete, mismatched),
         Err(EvaluationError::SnapshotMismatch)
     );
 
     complete.decisions[1].item_key = complete.decisions[0].item_key.clone();
     complete.decisions[1].item_version = complete.decisions[0].item_version;
     assert_eq!(
-        reviewed_golden_set_from_worksheet(&complete, approval(&complete)),
-        Err(EvaluationError::DuplicateItem)
+        reviewed_golden_set_from_worksheet(&report(), &complete, approval(&complete)),
+        Err(EvaluationError::InvalidReview)
     );
 }
