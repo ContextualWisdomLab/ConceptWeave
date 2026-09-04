@@ -400,7 +400,7 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
     for (candidate, phrases) in rules {
         for (field, value) in fields {
             for phrase in phrases {
-                if value.contains(phrase) {
+                if contains_phrase(value, phrase) {
                     disposition = candidate;
                     matched_fields.insert(field);
                     matched_phrases.insert(*phrase);
@@ -426,6 +426,15 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
         child_item_keys,
         model_receipt: None,
     }
+}
+
+fn contains_phrase(value: &str, phrase: &str) -> bool {
+    value.match_indices(phrase).any(|(start, matched)| {
+        let before = value[..start].chars().next_back();
+        let after = value[start + matched.len()..].chars().next();
+        before.is_none_or(|character| !character.is_alphanumeric())
+            && after.is_none_or(|character| !character.is_alphanumeric())
+    })
 }
 
 fn duplicate_candidates(items: &[&ZoteroItem]) -> Vec<DuplicateCandidate> {
@@ -559,6 +568,11 @@ mod tests {
             );
             assert_eq!(report.classified_items[0].proposed_disposition, expected);
         }
+        assert!(!contains_phrase("knowledge", "owl"));
+        assert!(!contains_phrase("growl", "owl"));
+        assert!(contains_phrase("owl-based", "owl"));
+        assert!(contains_phrase("uses owl", "owl"));
+        assert!(contains_phrase("owl", "owl"));
     }
 
     #[test]
