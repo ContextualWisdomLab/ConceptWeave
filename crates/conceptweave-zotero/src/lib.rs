@@ -866,9 +866,11 @@ pub struct ClassificationRollbackReceipt {
     pub failed_item_key: Option<String>,
     /// Item whose state could not be proven after an unverifiable response.
     pub indeterminate_item_key: Option<String>,
+    /// Complete operation retained for manual reconciliation of indeterminate state.
+    pub indeterminate_operation: Option<ClassificationRollbackOperation>,
     /// Items whose inverse write was not attempted.
     pub not_attempted_item_keys: Vec<String>,
-    /// Operations still required for a complete restoration.
+    /// Proven unchanged and untouched operations eligible for automatic retry.
     pub remaining_operations: Vec<ClassificationRollbackOperation>,
 }
 
@@ -1735,12 +1737,14 @@ pub fn execute_classification_rollback<PreflightError, WriteError>(
         if restored {
             restored_item_keys.push(operation.item_key.clone());
         }
+        let indeterminate = !restored && !unchanged;
         let remaining_start = index + usize::from(restored || !unchanged);
         return ClassificationRollbackReceipt {
             outcome: ClassificationRollbackOutcome::PartialFailure,
             restored_item_keys,
             failed_item_key: Some(operation.item_key.clone()),
-            indeterminate_item_key: (!restored && !unchanged).then(|| operation.item_key.clone()),
+            indeterminate_item_key: indeterminate.then(|| operation.item_key.clone()),
+            indeterminate_operation: indeterminate.then(|| operation.clone()),
             not_attempted_item_keys: operations[index + 1..]
                 .iter()
                 .map(|operation| operation.item_key.clone())
@@ -1753,6 +1757,7 @@ pub fn execute_classification_rollback<PreflightError, WriteError>(
         restored_item_keys,
         failed_item_key: None,
         indeterminate_item_key: None,
+        indeterminate_operation: None,
         not_attempted_item_keys: Vec::new(),
         remaining_operations: Vec::new(),
     }
@@ -1779,6 +1784,7 @@ fn rollback_preflight_failure(
         restored_item_keys: Vec::new(),
         failed_item_key: Some(failed_item_key.to_owned()),
         indeterminate_item_key: None,
+        indeterminate_operation: None,
         not_attempted_item_keys: operations
             .iter()
             .map(|item| item.item_key.clone())
