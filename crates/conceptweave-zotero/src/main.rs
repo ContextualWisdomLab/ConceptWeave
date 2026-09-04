@@ -892,6 +892,12 @@ mod tests {
         assert_eq!(fs::read(&output).unwrap(), b"complete");
         assert!(write_private_output(&output, b"replacement").is_err());
         fs::remove_file(output).unwrap();
+
+        let read_only = unique_temp_path("read-only-writer");
+        fs::write(&read_only, b"input").unwrap();
+        let mut writer = BufWriter::with_capacity(1, File::open(&read_only).unwrap());
+        assert!(write_all_and_flush(&mut writer, b"content").is_err());
+        fs::remove_file(read_only).unwrap();
     }
 
     fn unique_temp_path(suffix: &str) -> PathBuf {
