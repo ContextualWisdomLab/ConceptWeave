@@ -346,6 +346,82 @@ pub struct ClassificationWritePlan {
     pub source_records_preserved: bool,
 }
 
+/// Complete item state observed at the Local API write boundary.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ClassificationItemState {
+    /// Local API server identity that produced this state.
+    pub server_id: String,
+    /// Library revision that produced this state.
+    pub library_version: u64,
+    /// Stable Zotero item key.
+    pub item_key: String,
+    /// Current optimistic item revision.
+    pub item_version: u64,
+    /// Complete collection state.
+    pub collection_keys: Vec<String>,
+    /// Complete typed-tag state.
+    pub tags: Vec<ItemTag>,
+}
+
+/// One conditional complete-state replacement passed to an authenticated adapter.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ClassificationWriteRequest {
+    /// Expected Local API server identity.
+    pub server_id: String,
+    /// Current library revision precondition.
+    pub library_version: u64,
+    /// Stable Zotero item key.
+    pub item_key: String,
+    /// Current item revision precondition.
+    pub item_version: u64,
+    /// Complete collection replacement.
+    pub collection_keys: Vec<String>,
+    /// Complete typed-tag replacement.
+    pub tags: Vec<ItemTag>,
+}
+
+/// A conditional inverse write created only after a verified successful write.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ClassificationRollbackOperation {
+    /// Stable Zotero item key.
+    pub item_key: String,
+    /// Post-write item revision required by a rollback adapter.
+    pub item_version: u64,
+    /// Complete collection state to restore.
+    pub collection_keys: Vec<String>,
+    /// Complete typed-tag state to restore.
+    pub tags: Vec<ItemTag>,
+}
+
+/// Observable result of a write-plan execution attempt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClassificationWriteOutcome {
+    /// The plan intentionally made no Local API calls.
+    DryRun,
+    /// Every requested item replacement was verified.
+    Applied,
+    /// No write began because a complete preflight could not be proven.
+    PreflightFailure,
+    /// A write or its response failed after preflight.
+    PartialFailure,
+}
+
+/// Secret-free evidence for applied, failed, pending, and reversible writes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ClassificationWriteReceipt {
+    /// Overall execution outcome.
+    pub outcome: ClassificationWriteOutcome,
+    /// Items whose post-write state was verified, in application order.
+    pub applied_item_keys: Vec<String>,
+    /// First item whose preflight, write, or response failed.
+    pub failed_item_key: Option<String>,
+    /// Items whose write was not attempted.
+    pub not_attempted_item_keys: Vec<String>,
+    /// Verified inverse operations in safe reverse application order.
+    pub rollback_operations: Vec<ClassificationRollbackOperation>,
+}
+
 /// A fail-closed reviewed write-plan contract violation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WritePlanError {
@@ -967,6 +1043,151 @@ where
         operations,
         source_records_preserved: true,
     })
+}
+
+/// Executes a reviewed plan through caller-owned authenticated Local API functions.
+///
+/// Every item is preflighted before the first write. Adapter errors are deliberately
+/// reduced to secret-free receipt states instead of being serialized.
+pub fn execute_classification_write_plan<PreflightError, WriteError>(
+    plan: &ClassificationWritePlan,
+    mut preflight: impl FnMut(&str) -> Result<ClassificationItemState, PreflightError>,
+    mut write_item: impl FnMut(
+        &ClassificationWriteRequest,
+    ) -> Result<ClassificationItemState, WriteError>,
+) -> ClassificationWriteReceipt {
+    if plan.mode == WriteMode::DryRun {
+        return ClassificationWriteReceipt {
+            outcome: ClassificationWriteOutcome::DryRun,
+            applied_item_keys: Vec::new(),
+            failed_item_key: None,
+            not_attempted_item_keys: Vec::new(),
+            rollback_operations: Vec::new(),
+        };
+    }
+    let Some(server_id) = plan
+        .server_id
+        .as_deref()
+        .filter(|server_id| !server_id.trim().is_empty())
+    else {
+        return preflight_failure_receipt(plan, None);
+    };
+
+    for operation in &plan.operations {
+        let Ok(state) = preflight(&operation.item_key) else {
+            return preflight_failure_receipt(plan, Some(&operation.item_key));
+        };
+        let Ok((collections, tags)) = normalized_metadata(&state.collection_keys, &state.tags)
+        else {
+            return preflight_failure_receipt(plan, Some(&operation.item_key));
+        };
+        if state.server_id != server_id
+            || state.library_version != plan.library_version
+            || state.item_key != operation.item_key
+            || state.item_version != operation.item_version
+            || collections != operation.before_collection_keys
+            || tags != operation.before_tags
+        {
+            return preflight_failure_receipt(plan, Some(&operation.item_key));
+        }
+    }
+
+    let mut current_library_version = plan.library_version;
+    let mut applied_item_keys = Vec::new();
+    let mut rollback_operations = Vec::new();
+    for (operation_index, operation) in plan.operations.iter().enumerate() {
+        let request = ClassificationWriteRequest {
+            server_id: server_id.to_owned(),
+            library_version: current_library_version,
+            item_key: operation.item_key.clone(),
+            item_version: operation.item_version,
+            collection_keys: operation.after_collection_keys.clone(),
+            tags: operation.after_tags.clone(),
+        };
+        let response = write_item(&request);
+        let valid_response = response.as_ref().ok().and_then(|state| {
+            normalized_metadata(&state.collection_keys, &state.tags)
+                .ok()
+                .map(|metadata| (state, metadata))
+        });
+        let Some((state, (collections, tags))) = valid_response else {
+            rollback_operations.reverse();
+            return partial_failure_receipt(
+                plan,
+                operation_index,
+                applied_item_keys,
+                rollback_operations,
+            );
+        };
+        if state.server_id != server_id
+            || state.library_version <= current_library_version
+            || state.item_key != operation.item_key
+            || state.item_version <= operation.item_version
+            || collections != operation.after_collection_keys
+            || tags != operation.after_tags
+        {
+            rollback_operations.reverse();
+            return partial_failure_receipt(
+                plan,
+                operation_index,
+                applied_item_keys,
+                rollback_operations,
+            );
+        }
+        current_library_version = state.library_version;
+        applied_item_keys.push(operation.item_key.clone());
+        rollback_operations.push(ClassificationRollbackOperation {
+            item_key: operation.item_key.clone(),
+            item_version: state.item_version,
+            collection_keys: operation.rollback_collection_keys.clone(),
+            tags: operation.rollback_tags.clone(),
+        });
+    }
+    rollback_operations.reverse();
+    ClassificationWriteReceipt {
+        outcome: ClassificationWriteOutcome::Applied,
+        applied_item_keys,
+        failed_item_key: None,
+        not_attempted_item_keys: Vec::new(),
+        rollback_operations,
+    }
+}
+
+fn preflight_failure_receipt(
+    plan: &ClassificationWritePlan,
+    failed_item_key: Option<&str>,
+) -> ClassificationWriteReceipt {
+    ClassificationWriteReceipt {
+        outcome: ClassificationWriteOutcome::PreflightFailure,
+        applied_item_keys: Vec::new(),
+        failed_item_key: failed_item_key.map(str::to_owned),
+        not_attempted_item_keys: plan
+            .operations
+            .iter()
+            .map(|operation| operation.item_key.clone())
+            .collect(),
+        rollback_operations: Vec::new(),
+    }
+}
+
+fn partial_failure_receipt(
+    plan: &ClassificationWritePlan,
+    failed_index: usize,
+    applied_item_keys: Vec<String>,
+    rollback_operations: Vec<ClassificationRollbackOperation>,
+) -> ClassificationWriteReceipt {
+    ClassificationWriteReceipt {
+        outcome: ClassificationWriteOutcome::PartialFailure,
+        applied_item_keys,
+        failed_item_key: Some(plan.operations[failed_index].item_key.clone()),
+        not_attempted_item_keys: plan
+            .operations
+            .iter()
+            .skip(failed_index + 1)
+            .map(|operation| operation.item_key.clone())
+            .collect(),
+        rollback_operations,
+    }
 }
 
 /// Failure raised when a bounded, immutable Local API read cannot be proven.

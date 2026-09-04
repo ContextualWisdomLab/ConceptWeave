@@ -15,13 +15,9 @@ fn tag(name: &str, tag_type: Option<u64>) -> ItemTag {
 #[test]
 fn execution_preflights_every_item_and_returns_reversible_partial_failure() {
     let report = classification_report("10.0.0");
-    let plan = build_classification_write_plan(
-        &report,
-        &reviewed(&report),
-        WriteMode::Execute,
-        |_| true,
-    )
-    .unwrap();
+    let plan =
+        build_classification_write_plan(&report, &reviewed(&report), WriteMode::Execute, |_| true)
+            .unwrap();
     let mut preflighted = Vec::new();
     let mut written = Vec::new();
     let receipt = execute_classification_write_plan(
@@ -67,20 +63,19 @@ fn execution_preflights_every_item_and_returns_reversible_partial_failure() {
     assert_eq!(receipt.rollback_operations.len(), 1);
     assert_eq!(receipt.rollback_operations[0].item_key, "A");
     assert_eq!(receipt.rollback_operations[0].item_version, 8);
-    assert_eq!(receipt.rollback_operations[0].collection_keys, Vec::<String>::new());
+    assert_eq!(
+        receipt.rollback_operations[0].collection_keys,
+        Vec::<String>::new()
+    );
     assert!(receipt.rollback_operations[0].tags.is_empty());
 }
 
 #[test]
 fn dry_run_execution_never_calls_the_write_boundary() {
     let report = classification_report("10.0.0");
-    let plan = build_classification_write_plan(
-        &report,
-        &reviewed(&report),
-        WriteMode::DryRun,
-        |_| true,
-    )
-    .unwrap();
+    let plan =
+        build_classification_write_plan(&report, &reviewed(&report), WriteMode::DryRun, |_| true)
+            .unwrap();
     let receipt = execute_classification_write_plan(
         &plan,
         |_| -> Result<ClassificationItemState, ()> { panic!("dry-run must not preflight") },
