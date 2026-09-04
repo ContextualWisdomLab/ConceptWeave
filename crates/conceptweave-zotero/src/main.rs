@@ -113,6 +113,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn worksheet_mode_is_explicit_and_rejects_ambiguous_arguments() {
+        let output = "/tmp/conceptweave-zotero-worksheet.json";
+        assert_eq!(
+            parse_output_request(vec!["--worksheet", output]),
+            Ok((true, output.to_owned()))
+        );
+        assert_eq!(
+            parse_output_request(vec![output]),
+            Ok((false, output.to_owned()))
+        );
+        assert!(parse_output_request(Vec::<&str>::new()).is_err());
+        assert!(parse_output_request(vec!["--worksheet"]).is_err());
+        assert!(parse_output_request(vec![output, "extra"]).is_err());
+    }
+
     fn unique_temp_path(suffix: &str) -> PathBuf {
         env::temp_dir().join(format!(
             "conceptweave-zotero-{}-{suffix}.json",
