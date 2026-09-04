@@ -51,8 +51,9 @@ fn transitive_duplicate_component_accepts_one_component_level_canonical_key() {
             .collect(),
     };
 
-    let manifest = build_duplicate_merge_review_manifest(&report, &reviewed, |_| true)
-        .expect("one steward-selected canonical key must be valid across a transitive duplicate component");
+    let manifest = build_duplicate_merge_review_manifest(&report, &reviewed, |_| true).expect(
+        "one steward-selected canonical key must be valid across a transitive duplicate component",
+    );
 
     assert_eq!(manifest.operations.len(), 3);
     for operation in manifest.operations {
