@@ -124,6 +124,7 @@ fn golden(labels: Vec<GoldenLabel>) -> ReviewedGoldenSet {
                 .map(|item_key| SnapshotItemRevision {
                     item_key: item_key.into(),
                     item_version: 1,
+                    parent_item_key: None,
                 })
                 .collect(),
         },
