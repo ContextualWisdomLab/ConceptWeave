@@ -506,6 +506,52 @@ mod tests {
         );
     }
 
+    #[test]
+    fn apply_decision_patch_mode_requires_four_distinct_artifact_paths() {
+        let report = "/tmp/report.json";
+        let worksheet = "/tmp/worksheet.json";
+        let patch = "/tmp/patch.json";
+        let output = "/tmp/updated-worksheet.json";
+        assert_eq!(
+            parse_output_request(vec!["--apply-decision-patch", report, worksheet, patch, output]),
+            Ok(OutputRequest::ApplyDecisionPatch {
+                report: report.to_owned(),
+                worksheet: worksheet.to_owned(),
+                patch: patch.to_owned(),
+                output: output.to_owned(),
+            })
+        );
+        assert!(parse_output_request(vec!["--apply-decision-patch"]).is_err());
+        assert!(parse_output_request(vec!["--apply-decision-patch", report]).is_err());
+        assert!(parse_output_request(vec!["--apply-decision-patch", report, worksheet]).is_err());
+        assert!(
+            parse_output_request(vec!["--apply-decision-patch", report, worksheet, patch]).is_err()
+        );
+        assert!(
+            parse_output_request(vec!["--apply-decision-patch", report, worksheet, patch, report])
+                .is_err()
+        );
+        assert!(
+            parse_output_request(vec!["--apply-decision-patch", report, worksheet, worksheet, output])
+                .is_err()
+        );
+        assert!(
+            parse_output_request(vec!["--apply-decision-patch", report, report, patch, output])
+                .is_err()
+        );
+        assert!(
+            parse_output_request(vec![
+                "--apply-decision-patch",
+                report,
+                worksheet,
+                patch,
+                output,
+                "extra",
+            ])
+            .is_err()
+        );
+    }
+
     #[cfg(unix)]
     #[test]
     fn private_json_input_is_owner_only_regular_bounded_and_valid() {
