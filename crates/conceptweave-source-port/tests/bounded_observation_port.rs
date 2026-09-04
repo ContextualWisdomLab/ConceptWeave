@@ -29,6 +29,10 @@ fn explicit_total_operation_deadline_is_distinct_from_statement_timeout() {
         ObservationLimits::with_timeouts(0, 1, 1, 1, 1),
         Err(ObservationLimitError::ZeroOperationTimeout)
     );
+    assert_eq!(
+        ObservationLimits::with_timeouts(1, 0, 1, 1, 1),
+        Err(ObservationLimitError::ZeroStatementTimeout)
+    );
 }
 
 #[test]

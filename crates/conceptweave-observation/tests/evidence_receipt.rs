@@ -108,6 +108,13 @@ fn snapshot_rejects_receipt_for_unobserved_location() {
 }
 
 #[test]
+fn snapshot_rejects_a_location_with_only_the_schema_in_common() {
+    let missing = ObservationLocation::table("Sales/~North", "Other/Line")
+        .expect("location shape is valid before snapshot binding");
+    assert!(snapshot().source_receipt(missing).is_err());
+}
+
+#[test]
 fn snapshot_receipts_existing_constraint_coordinates() {
     let location =
         ObservationLocation::constraint("Sales/~North", "Order/Line", "Order/Account~FK")
