@@ -18,6 +18,7 @@ const PAGE_LIMIT: usize = 100;
 const MAX_PAGE_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_SNAPSHOT_ITEMS: usize = 50_000;
 const MAX_SNAPSHOT_BYTES: u64 = 256 * 1024 * 1024;
+const MAX_ITEM_RESPONSE_BYTES: u64 = 1024 * 1024;
 const LOCAL_API: &str = "http://127.0.0.1:23119/api/users/0/items";
 
 #[cfg(test)]
@@ -403,6 +404,187 @@ pub struct ClassificationItemState {
     pub collection_keys: Vec<String>,
     /// Complete typed-tag state.
     pub tags: Vec<ItemTag>,
+}
+
+/// Secret-free failure returned by the authenticated Zotero 10 Local API adapter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZoteroTransportError {
+    /// The caller did not provide a usable API key and server identity.
+    InvalidCredentials,
+    /// The item key is not an official eight-character Zotero object key.
+    InvalidItemKey,
+    /// The Local API rejected the request or could not be reached.
+    RequestFailed,
+    /// The response came from a different Zotero database.
+    ServerMismatch,
+    /// The response headers or bounded JSON body were invalid.
+    InvalidResponse,
+}
+
+/// Minimal authenticated adapter for Zotero 10+ Local API item metadata writes.
+///
+/// Credentials remain private and this type deliberately implements neither
+/// [`Debug`] nor [`Serialize`].
+pub struct Zotero10LocalAdapter {
+    api_key: String,
+    server_id: String,
+    base: String,
+    agent: ureq::Agent,
+}
+
+impl Zotero10LocalAdapter {
+    /// Creates an adapter pinned to Zotero's loopback production endpoint.
+    pub fn new(
+        api_key: impl Into<String>,
+        server_id: impl Into<String>,
+    ) -> Result<Self, ZoteroTransportError> {
+        Self::build(api_key.into(), server_id.into(), LOCAL_API.to_owned())
+    }
+
+    #[cfg(test)]
+    fn new_with_base(
+        api_key: impl Into<String>,
+        server_id: impl Into<String>,
+        base: String,
+    ) -> Result<Self, ZoteroTransportError> {
+        Self::build(api_key.into(), server_id.into(), base)
+    }
+
+    fn build(
+        api_key: String,
+        server_id: String,
+        base: String,
+    ) -> Result<Self, ZoteroTransportError> {
+        if api_key.trim().is_empty() || server_id.trim().is_empty() {
+            return Err(ZoteroTransportError::InvalidCredentials);
+        }
+        let config = ureq::Agent::config_builder()
+            .timeout_global(Some(Duration::from_secs(30)))
+            .timeout_connect(Some(Duration::from_secs(2)))
+            .timeout_recv_response(Some(Duration::from_secs(10)))
+            .timeout_recv_body(Some(Duration::from_secs(10)))
+            .max_redirects(0)
+            .build();
+        Ok(Self {
+            api_key,
+            server_id,
+            base,
+            agent: ureq::Agent::new_with_config(config),
+        })
+    }
+
+    /// Reads one item's current collection, tag, and version coordinates.
+    pub fn get_item(
+        &self,
+        item_key: &str,
+    ) -> Result<ClassificationItemState, ZoteroTransportError> {
+        validate_item_key(item_key)?;
+        let url = format!("{}/{item_key}?format=json&include=data", self.base);
+        let response = self
+            .agent
+            .get(&url)
+            .header("Zotero-API-Version", SUPPORTED_API_VERSION_HEADER)
+            .header("Zotero-Server-ID", &self.server_id)
+            .call()
+            .map_err(|_| ZoteroTransportError::RequestFailed)?;
+        self.read_state(response, item_key)
+    }
+
+    /// Replaces the complete collection and tag arrays, then reads verified state.
+    pub fn patch_item(
+        &self,
+        request: &ClassificationWriteRequest,
+    ) -> Result<ClassificationItemState, ZoteroTransportError> {
+        validate_item_key(&request.item_key)?;
+        if request.server_id != self.server_id {
+            return Err(ZoteroTransportError::ServerMismatch);
+        }
+        #[derive(Serialize)]
+        struct Patch<'a> {
+            collections: &'a [String],
+            tags: &'a [ItemTag],
+        }
+        let body = serde_json::to_string(&Patch {
+            collections: &request.collection_keys,
+            tags: &request.tags,
+        })
+        .map_err(|_| ZoteroTransportError::InvalidResponse)?;
+        let url = format!("{}/{}", self.base, request.item_key);
+        let response = self
+            .agent
+            .patch(&url)
+            .header("Zotero-API-Version", SUPPORTED_API_VERSION_HEADER)
+            .header("Zotero-API-Key", &self.api_key)
+            .header("Zotero-Server-ID", &self.server_id)
+            .header(
+                "If-Unmodified-Since-Version",
+                &request.item_version.to_string(),
+            )
+            .header("Content-Type", "application/json")
+            .send(body)
+            .map_err(|_| ZoteroTransportError::RequestFailed)?;
+        if response.status() != ureq::http::StatusCode::NO_CONTENT {
+            return Err(ZoteroTransportError::RequestFailed);
+        }
+        let response_server = response
+            .headers()
+            .get("Zotero-Server-ID")
+            .and_then(|value| value.to_str().ok())
+            .ok_or(ZoteroTransportError::InvalidResponse)?;
+        if response_server != self.server_id {
+            return Err(ZoteroTransportError::ServerMismatch);
+        }
+        self.get_item(&request.item_key)
+    }
+
+    fn read_state(
+        &self,
+        mut response: ureq::http::Response<ureq::Body>,
+        requested_key: &str,
+    ) -> Result<ClassificationItemState, ZoteroTransportError> {
+        let response_server = response
+            .headers()
+            .get("Zotero-Server-ID")
+            .and_then(|value| value.to_str().ok())
+            .ok_or(ZoteroTransportError::InvalidResponse)?;
+        if response_server != self.server_id {
+            return Err(ZoteroTransportError::ServerMismatch);
+        }
+        let library_version = response
+            .headers()
+            .get("Last-Modified-Version")
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.parse().ok())
+            .ok_or(ZoteroTransportError::InvalidResponse)?;
+        let body = response
+            .body_mut()
+            .with_config()
+            .limit(MAX_ITEM_RESPONSE_BYTES)
+            .read_to_string()
+            .map_err(|_| ZoteroTransportError::InvalidResponse)?;
+        let item: ZoteroItem =
+            serde_json::from_str(&body).map_err(|_| ZoteroTransportError::InvalidResponse)?;
+        if item.key != requested_key {
+            return Err(ZoteroTransportError::InvalidResponse);
+        }
+        Ok(ClassificationItemState {
+            server_id: self.server_id.clone(),
+            library_version,
+            item_key: item.key,
+            item_version: item.version,
+            collection_keys: item.data.collections,
+            tags: item.data.tags,
+        })
+    }
+}
+
+fn validate_item_key(item_key: &str) -> Result<(), ZoteroTransportError> {
+    const ALPHABET: &[u8] = b"23456789ABCDEFGHIJKLMNPQRSTUVWXYZ";
+    if item_key.len() == 8 && item_key.bytes().all(|byte| ALPHABET.contains(&byte)) {
+        Ok(())
+    } else {
+        Err(ZoteroTransportError::InvalidItemKey)
+    }
 }
 
 /// One conditional complete-state replacement passed to an authenticated adapter.
@@ -1861,7 +2043,6 @@ mod tests {
     use super::*;
     use std::io::{Read, Write};
     use std::net::TcpListener;
-    use std::io::{Read, Write};
     use std::thread;
 
     static LOCAL_API_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -1922,7 +2103,11 @@ mod tests {
         assert_eq!(state.collection_keys, ["BCDE3456"]);
         assert_eq!(state.tags[0].tag_type, Some(1));
         let requests = server.join().unwrap();
-        assert!(requests[0].starts_with("GET /api/users/0/items/ABCD2345?format=json&include=data HTTP/1.1\r\n"));
+        assert!(
+            requests[0].starts_with(
+                "GET /api/users/0/items/ABCD2345?format=json&include=data HTTP/1.1\r\n"
+            )
+        );
         assert!(requests[0].contains("zotero-api-version: 3\r\n"));
         assert!(requests[0].contains("zotero-server-id: server-10\r\n"));
         assert!(!requests[0].contains("top-secret-key"));
@@ -1932,7 +2117,7 @@ mod tests {
     fn zotero10_patch_replaces_complete_arrays_then_reads_verified_state() {
         let read = item_response("server-10", 43, 8);
         let (base, server) = serve(vec![
-            "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            "HTTP/1.1 204 No Content\r\nZotero-Server-ID: server-10\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
             Box::leak(read.into_boxed_str()),
         ]);
         let request = ClassificationWriteRequest {
@@ -1941,7 +2126,10 @@ mod tests {
             item_key: "ABCD2345".into(),
             item_version: 7,
             collection_keys: vec!["BCDE3456".into()],
-            tags: vec![ItemTag { tag: "kept".into(), tag_type: Some(1) }],
+            tags: vec![ItemTag {
+                tag: "kept".into(),
+                tag_type: Some(1),
+            }],
         };
         let state = transport(base).patch_item(&request).unwrap();
         assert_eq!(state.library_version, 43);
@@ -1951,20 +2139,73 @@ mod tests {
         assert!(requests[0].contains("zotero-server-id: server-10\r\n"));
         assert!(requests[0].contains("if-unmodified-since-version: 7\r\n"));
         assert!(requests[0].contains("content-type: application/json\r\n"));
-        assert!(requests[0].ends_with(r#"{"collections":["BCDE3456"],"tags":[{"tag":"kept","type":1}]}"#));
-        assert!(requests[1].starts_with("GET /api/users/0/items/ABCD2345?format=json&include=data HTTP/1.1\r\n"));
+        assert!(
+            requests[0]
+                .ends_with(r#"{"collections":["BCDE3456"],"tags":[{"tag":"kept","type":1}]}"#)
+        );
+        assert!(
+            requests[1].starts_with(
+                "GET /api/users/0/items/ABCD2345?format=json&include=data HTTP/1.1\r\n"
+            )
+        );
     }
 
     #[test]
     fn zotero10_transport_rejects_stale_non_success_and_server_mismatch() {
+        let stale =
+            "HTTP/1.1 412 Precondition Failed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        let (base, server) = serve(vec![stale]);
+        let request = ClassificationWriteRequest {
+            server_id: "server-10".into(),
+            library_version: 42,
+            item_key: "ABCD2345".into(),
+            item_version: 7,
+            collection_keys: vec![],
+            tags: vec![],
+        };
+        assert_eq!(
+            transport(base).patch_item(&request).unwrap_err(),
+            ZoteroTransportError::RequestFailed
+        );
+        assert!(server.join().unwrap()[0].starts_with("PATCH "));
+
+        let mut mismatched_request = request.clone();
+        mismatched_request.server_id = "other-server".into();
+        assert_eq!(
+            Zotero10LocalAdapter::new("secret", "server-10")
+                .unwrap()
+                .patch_item(&mismatched_request)
+                .unwrap_err(),
+            ZoteroTransportError::ServerMismatch
+        );
+
+        let unexpected_success = "HTTP/1.1 200 OK\r\nZotero-Server-ID: server-10\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        let (base, server) = serve(vec![unexpected_success]);
+        assert_eq!(
+            transport(base).patch_item(&request).unwrap_err(),
+            ZoteroTransportError::RequestFailed
+        );
+        server.join().unwrap();
+
+        let wrong_server = "HTTP/1.1 204 No Content\r\nZotero-Server-ID: other-server\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        let (base, server) = serve(vec![wrong_server]);
+        assert_eq!(
+            transport(base).patch_item(&request).unwrap_err(),
+            ZoteroTransportError::ServerMismatch
+        );
+        server.join().unwrap();
+
         for response in [
-            "HTTP/1.1 412 Precondition Failed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_owned(),
-            "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_owned(),
+            "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                .to_owned(),
             item_response("other-server", 42, 7),
         ] {
             let (base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
             let error = transport(base).get_item("ABCD2345").unwrap_err();
-            assert!(matches!(error, ZoteroTransportError::RequestFailed | ZoteroTransportError::ServerMismatch));
+            assert!(matches!(
+                error,
+                ZoteroTransportError::RequestFailed | ZoteroTransportError::ServerMismatch
+            ));
             server.join().unwrap();
         }
     }
@@ -1972,27 +2213,51 @@ mod tests {
     #[test]
     fn zotero10_transport_rejects_invalid_keys_credentials_and_bounded_bodies() {
         assert_eq!(
-            Zotero10LocalAdapter::new(" ", "server-10").unwrap_err(),
+            Zotero10LocalAdapter::new(" ", "server-10").err().unwrap(),
             ZoteroTransportError::InvalidCredentials
         );
         assert_eq!(
-            Zotero10LocalAdapter::new("secret", " ").unwrap_err(),
+            Zotero10LocalAdapter::new("secret", " ").err().unwrap(),
             ZoteroTransportError::InvalidCredentials
         );
         let adapter = Zotero10LocalAdapter::new("secret", "server-10").unwrap();
         for key in ["ABCD234", "ABCD2340", "abcd2345", "ABCD2345/../X"] {
-            assert_eq!(adapter.get_item(key).unwrap_err(), ZoteroTransportError::InvalidItemKey);
+            assert_eq!(
+                adapter.get_item(key).unwrap_err(),
+                ZoteroTransportError::InvalidItemKey
+            );
         }
 
         let malformed = "HTTP/1.1 200 OK\r\nZotero-Server-ID: server-10\r\nLast-Modified-Version: 42\r\nContent-Length: 1\r\nConnection: close\r\n\r\n{";
         let (base, server) = serve(vec![malformed]);
-        assert_eq!(transport(base).get_item("ABCD2345").unwrap_err(), ZoteroTransportError::InvalidResponse);
+        assert_eq!(
+            transport(base).get_item("ABCD2345").unwrap_err(),
+            ZoteroTransportError::InvalidResponse
+        );
+        server.join().unwrap();
+
+        let wrong_key_body = r#"{"key":"BCDE3456","version":7,"data":{"itemType":"book"}}"#;
+        let wrong_key_response = format!(
+            "HTTP/1.1 200 OK\r\nZotero-Server-ID: server-10\r\nLast-Modified-Version: 42\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{wrong_key_body}",
+            wrong_key_body.len()
+        );
+        let (base, server) = serve(vec![Box::leak(wrong_key_response.into_boxed_str())]);
+        assert_eq!(
+            transport(base).get_item("ABCD2345").unwrap_err(),
+            ZoteroTransportError::InvalidResponse
+        );
         server.join().unwrap();
 
         let oversized = "x".repeat((MAX_ITEM_RESPONSE_BYTES + 1) as usize);
-        let response = format!("HTTP/1.1 200 OK\r\nZotero-Server-ID: server-10\r\nLast-Modified-Version: 42\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{oversized}", oversized.len());
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nZotero-Server-ID: server-10\r\nLast-Modified-Version: 42\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{oversized}",
+            oversized.len()
+        );
         let (base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
-        assert_eq!(transport(base).get_item("ABCD2345").unwrap_err(), ZoteroTransportError::InvalidResponse);
+        assert_eq!(
+            transport(base).get_item("ABCD2345").unwrap_err(),
+            ZoteroTransportError::InvalidResponse
+        );
         server.join().unwrap();
     }
 
@@ -2000,7 +2265,10 @@ mod tests {
     fn zotero10_transport_never_formats_or_serializes_the_key() {
         let adapter = Zotero10LocalAdapter::new("top-secret-key", "server-10").unwrap();
         assert!(!std::any::type_name_of_val(&adapter).contains("top-secret-key"));
-        assert_eq!(format!("{:?}", ZoteroTransportError::RequestFailed), "RequestFailed");
+        assert_eq!(
+            format!("{:?}", ZoteroTransportError::RequestFailed),
+            "RequestFailed"
+        );
     }
 
     fn item(key: &str, item_type: &str, title: &str, doi: &str, parent: &str) -> ZoteroItem {
