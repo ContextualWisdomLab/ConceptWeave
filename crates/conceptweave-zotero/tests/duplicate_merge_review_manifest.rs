@@ -45,6 +45,7 @@ fn reviewed(report: &conceptweave_zotero::ClassificationReport) -> ReviewedDupli
         library_version: report.library_version,
         rule_revision: report.rule_revision.into(),
         snapshot_digest: report.snapshot_digest.clone(),
+        snapshot_items: report.snapshot_items.clone(),
         decisions: vec![
             DuplicateMergeDecision {
                 identity_kind: "title".into(),
@@ -197,6 +198,7 @@ fn overlapping_duplicate_groups_require_one_consistent_canonical_choice() {
         library_version: report.library_version,
         rule_revision: report.rule_revision.into(),
         snapshot_digest: report.snapshot_digest.clone(),
+        snapshot_items: report.snapshot_items.clone(),
         decisions: vec![
             DuplicateMergeDecision {
                 identity_kind: "doi".into(),
@@ -238,6 +240,7 @@ fn duplicate_review_rejects_ambiguous_snapshot_key_revisions() {
         library_version: report.library_version,
         rule_revision: report.rule_revision.into(),
         snapshot_digest: report.snapshot_digest.clone(),
+        snapshot_items: report.snapshot_items.clone(),
         decisions: report
             .duplicate_candidates
             .iter()

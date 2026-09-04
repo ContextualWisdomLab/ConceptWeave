@@ -58,7 +58,7 @@ All LLM-backed induction uses `contextual-orchestrator`. Model output is untrust
 
 Read one immutable Zotero Local API library-version snapshot and propose exactly one research disposition for every top-level bibliographic item. Each proposal retains the item key/version, exact matched metadata values, rule revision, linked child records, and any model receipt. Weak evidence and evidence that matches multiple specific disposition families must abstain into steward review. Duplicate DOI/title identities are review candidates only: intake never merges, deletes, or silently mutates Zotero records.
 
-For every detected duplicate cluster, accept exactly one externally verified steward decision selecting an existing canonical item. Produce a local-only manifest that binds the decision to the raw snapshot and records source revisions plus before, after, and rollback canonical-key mappings. Classification preserves every Zotero source record.
+For every connected duplicate component, accept externally verified steward decisions selecting one component-level canonical item. Produce a local-only manifest that binds the decisions to the raw snapshot and its complete item-key/item-version coordinates, and records every component source revision plus before, after, and rollback canonical-key mappings. Classification preserves every Zotero source record.
 
 Reviewed collection and tag changes default to a local dry-run plan. Each operation binds the authority receipt, server/library/item revisions, raw-snapshot digest, and complete before/after/rollback metadata. Zotero 9 execute requests fail closed. No plan contains credentials or permits `NeedsStewardReview`, source-record deletion, or attachment deletion.
 
