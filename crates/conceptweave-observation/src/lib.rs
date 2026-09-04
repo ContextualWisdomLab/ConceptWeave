@@ -1136,7 +1136,9 @@ fn validate_observed_at_utc(value: &str) -> Result<(), ObservationError> {
         return Err(invalid());
     };
     let (core, fraction) = match without_z.split_once('.') {
-        Some((core, fraction)) if !fraction.is_empty() && fraction.bytes().all(|byte| byte.is_ascii_digit()) => {
+        Some((core, fraction))
+            if !fraction.is_empty() && fraction.bytes().all(|byte| byte.is_ascii_digit()) =>
+        {
             (core, Some(fraction))
         }
         Some(_) => return Err(invalid()),
