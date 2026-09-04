@@ -149,3 +149,32 @@ fn restored_report_rejects_classified_or_reused_child_provenance() {
         Err(WorksheetError::InvalidReport)
     );
 }
+
+#[test]
+fn restored_report_accepts_snapshot_bound_nested_child_provenance() {
+    let nested_item = |key: &str, item_type: &str, parent_item: &str| ZoteroItem {
+        key: key.into(),
+        version: 7,
+        data: ItemData {
+            item_type: item_type.into(),
+            title: (key == "BOOK").then_some("ontology alignment").unwrap_or_default().into(),
+            abstract_note: String::new(),
+            doi: String::new(),
+            parent_item: parent_item.into(),
+            collections: vec![],
+            tags: vec![],
+        },
+    };
+    let report = classify_snapshot(
+        "9.0.6".into(),
+        None,
+        42,
+        vec![
+            nested_item("BOOK", "book", ""),
+            nested_item("ATTACHMENT", "attachment", "BOOK"),
+            nested_item("ANNOTATION", "annotation", "ATTACHMENT"),
+        ],
+    );
+
+    assert!(build_steward_review_worksheet(&report).is_ok());
+}
