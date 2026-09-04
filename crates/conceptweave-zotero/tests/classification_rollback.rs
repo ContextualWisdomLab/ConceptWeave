@@ -263,6 +263,13 @@ fn rollback_reconciles_failed_write_without_guessing() {
         assert_eq!(result.restored_item_keys, expected_outcome.0);
         assert_eq!(result.failed_item_key.as_deref(), Some("B"));
         assert_eq!(result.indeterminate_item_key.as_deref(), expected_outcome.1);
+        assert_eq!(
+            result
+                .indeterminate_operation
+                .as_ref()
+                .map(|operation| operation.item_key.as_str()),
+            expected_outcome.1
+        );
         assert_eq!(result.not_attempted_item_keys, ["A"]);
         assert_eq!(
             result.remaining_operations.len(),
