@@ -36,7 +36,7 @@ enum OutputRequest {
     },
 }
 
-/// Parses one mutually exclusive report, worksheet, or finalization request.
+/// Parses one mutually exclusive report, worksheet, review-progress, or finalization request.
 fn parse_output_request<I, S>(args: I) -> Result<OutputRequest, &'static str>
 where
     I: IntoIterator<Item = S>,
