@@ -376,23 +376,14 @@ fn write_plan_fails_closed_for_untrusted_stale_or_unsafe_changes() {
 
     let mut manual_marker = reviewed(&version_ten);
     manual_marker.changes[0].after_tags[0].tag_type = Some(0);
-    let manual_plan = build_classification_write_plan(
-        &version_ten,
-        &manual_marker,
-        WriteMode::DryRun,
-        |_| true,
-    )
-    .unwrap();
+    let manual_plan =
+        build_classification_write_plan(&version_ten, &manual_marker, WriteMode::DryRun, |_| true)
+            .unwrap();
     assert_eq!(manual_plan.operations[1].after_tags[0].tag_type, None);
 
     manual_marker.changes[0].after_tags[0].tag_type = Some(2);
     assert_eq!(
-        build_classification_write_plan(
-            &version_ten,
-            &manual_marker,
-            WriteMode::DryRun,
-            |_| true
-        ),
+        build_classification_write_plan(&version_ten, &manual_marker, WriteMode::DryRun, |_| true),
         Err(WritePlanError::InvalidMetadata)
     );
 

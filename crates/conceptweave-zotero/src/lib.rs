@@ -929,12 +929,12 @@ where
             .len()
             != report.snapshot_items.len()
         || report
-        .classified_items
-        .iter()
-        .map(|item| item.item_key.as_str())
-        .collect::<BTreeSet<_>>()
-        .len()
-        != report.classified_items.len()
+            .classified_items
+            .iter()
+            .map(|item| item.item_key.as_str())
+            .collect::<BTreeSet<_>>()
+            .len()
+            != report.classified_items.len()
     {
         return Err(WritePlanError::InvalidReview);
     }
