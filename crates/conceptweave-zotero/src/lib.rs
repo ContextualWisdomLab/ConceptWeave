@@ -479,6 +479,7 @@ impl Zotero10LocalAdapter {
         item_key: &str,
     ) -> Result<ClassificationItemState, ZoteroTransportError> {
         validate_item_key(item_key)?;
+        let before = self.library_version()?;
         let url = format!("{}/{item_key}?format=json&include=data", self.base);
         let response = self
             .agent
@@ -487,11 +488,23 @@ impl Zotero10LocalAdapter {
             .header("Zotero-Server-ID", &self.server_id)
             .call()
             .map_err(|_| ZoteroTransportError::RequestFailed)?;
-        self.read_state(response, item_key)
+        let item = self.read_item(response, item_key)?;
+        let after = self.library_version()?;
+        if before != after {
+            return Err(ZoteroTransportError::InvalidResponse);
+        }
+        Ok(ClassificationItemState {
+            server_id: self.server_id.clone(),
+            library_version: before,
+            item_key: item.key,
+            item_version: item.version,
+            collection_keys: item.data.collections,
+            tags: item.data.tags,
+        })
     }
 
-    /// Replaces the complete collection and tag arrays, then reads verified state.
-    pub fn patch_item(
+    /// Atomically replaces one item's complete collection and tag arrays.
+    pub fn write_item(
         &self,
         request: &ClassificationWriteRequest,
     ) -> Result<ClassificationItemState, ZoteroTransportError> {
@@ -500,71 +513,55 @@ impl Zotero10LocalAdapter {
             return Err(ZoteroTransportError::ServerMismatch);
         }
         #[derive(Serialize)]
-        struct Patch<'a> {
+        struct Write<'a> {
+            key: &'a str,
+            version: u64,
             collections: &'a [String],
             tags: &'a [ItemTag],
         }
-        let body = serde_json::to_string(&Patch {
+        let body = serde_json::to_string(&[Write {
+            key: &request.item_key,
+            version: request.item_version,
             collections: &request.collection_keys,
             tags: &request.tags,
-        })
+        }])
         .map_err(|_| ZoteroTransportError::InvalidResponse)?;
-        let url = format!("{}/{}", self.base, request.item_key);
-        let response = self
+        let mut response = self
             .agent
-            .patch(&url)
+            .post(&self.base)
             .header("Zotero-API-Version", SUPPORTED_API_VERSION_HEADER)
             .header("Zotero-API-Key", &self.api_key)
             .header("Zotero-Server-ID", &self.server_id)
             .header(
                 "If-Unmodified-Since-Version",
-                &request.item_version.to_string(),
+                &request.library_version.to_string(),
             )
             .header("Content-Type", "application/json")
             .send(body)
             .map_err(|_| ZoteroTransportError::RequestFailed)?;
-        if response.status() != ureq::http::StatusCode::NO_CONTENT {
+        if response.status() != ureq::http::StatusCode::OK {
             return Err(ZoteroTransportError::RequestFailed);
         }
-        let response_server = response
-            .headers()
-            .get("Zotero-Server-ID")
-            .and_then(|value| value.to_str().ok())
-            .ok_or(ZoteroTransportError::InvalidResponse)?;
-        if response_server != self.server_id {
-            return Err(ZoteroTransportError::ServerMismatch);
+        self.verify_server(response.headers())?;
+        let library_version = version_header(response.headers())?;
+        #[derive(Deserialize)]
+        struct WriteResponse {
+            successful: BTreeMap<String, ZoteroItem>,
         }
-        self.get_item(&request.item_key)
-    }
-
-    fn read_state(
-        &self,
-        mut response: ureq::http::Response<ureq::Body>,
-        requested_key: &str,
-    ) -> Result<ClassificationItemState, ZoteroTransportError> {
-        let response_server = response
-            .headers()
-            .get("Zotero-Server-ID")
-            .and_then(|value| value.to_str().ok())
-            .ok_or(ZoteroTransportError::InvalidResponse)?;
-        if response_server != self.server_id {
-            return Err(ZoteroTransportError::ServerMismatch);
-        }
-        let library_version = response
-            .headers()
-            .get("Last-Modified-Version")
-            .and_then(|value| value.to_str().ok())
-            .and_then(|value| value.parse().ok())
-            .ok_or(ZoteroTransportError::InvalidResponse)?;
-        let body = response
-            .body_mut()
-            .with_config()
-            .limit(MAX_ITEM_RESPONSE_BYTES)
-            .read_to_string()
-            .map_err(|_| ZoteroTransportError::InvalidResponse)?;
-        let item: ZoteroItem =
+        let body = bounded_body(&mut response)?;
+        let mut written: WriteResponse =
             serde_json::from_str(&body).map_err(|_| ZoteroTransportError::InvalidResponse)?;
-        if item.key != requested_key {
+        let item = written
+            .successful
+            .remove("0")
+            .filter(|_| written.successful.is_empty())
+            .ok_or(ZoteroTransportError::InvalidResponse)?;
+        if item.key != request.item_key
+            || item.version <= request.item_version
+            || item.version != library_version
+            || item.data.collections != request.collection_keys
+            || item.data.tags != request.tags
+        {
             return Err(ZoteroTransportError::InvalidResponse);
         }
         Ok(ClassificationItemState {
@@ -576,6 +573,68 @@ impl Zotero10LocalAdapter {
             tags: item.data.tags,
         })
     }
+
+    fn library_version(&self) -> Result<u64, ZoteroTransportError> {
+        let url = format!("{}?format=versions&limit=1", self.base);
+        let mut response = self
+            .agent
+            .get(&url)
+            .header("Zotero-API-Version", SUPPORTED_API_VERSION_HEADER)
+            .header("Zotero-Server-ID", &self.server_id)
+            .call()
+            .map_err(|_| ZoteroTransportError::RequestFailed)?;
+        self.verify_server(response.headers())?;
+        let version = version_header(response.headers())?;
+        bounded_body(&mut response)?;
+        Ok(version)
+    }
+
+    fn read_item(
+        &self,
+        mut response: ureq::http::Response<ureq::Body>,
+        requested_key: &str,
+    ) -> Result<ZoteroItem, ZoteroTransportError> {
+        self.verify_server(response.headers())?;
+        let object_version = version_header(response.headers())?;
+        let body = bounded_body(&mut response)?;
+        let item: ZoteroItem =
+            serde_json::from_str(&body).map_err(|_| ZoteroTransportError::InvalidResponse)?;
+        if item.key != requested_key || item.version != object_version {
+            return Err(ZoteroTransportError::InvalidResponse);
+        }
+        Ok(item)
+    }
+
+    fn verify_server(&self, headers: &ureq::http::HeaderMap) -> Result<(), ZoteroTransportError> {
+        let server = headers
+            .get("Zotero-Server-ID")
+            .and_then(|value| value.to_str().ok())
+            .ok_or(ZoteroTransportError::InvalidResponse)?;
+        if server == self.server_id {
+            Ok(())
+        } else {
+            Err(ZoteroTransportError::ServerMismatch)
+        }
+    }
+}
+
+fn version_header(headers: &ureq::http::HeaderMap) -> Result<u64, ZoteroTransportError> {
+    headers
+        .get("Last-Modified-Version")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse().ok())
+        .ok_or(ZoteroTransportError::InvalidResponse)
+}
+
+fn bounded_body(
+    response: &mut ureq::http::Response<ureq::Body>,
+) -> Result<String, ZoteroTransportError> {
+    response
+        .body_mut()
+        .with_config()
+        .limit(MAX_ITEM_RESPONSE_BYTES)
+        .read_to_string()
+        .map_err(|_| ZoteroTransportError::InvalidResponse)
 }
 
 fn validate_item_key(item_key: &str) -> Result<(), ZoteroTransportError> {
@@ -2078,10 +2137,27 @@ mod tests {
         (format!("http://{address}/api/users/0/items"), handle)
     }
 
-    fn item_response(server_id: &str, library_version: u64, item_version: u64) -> String {
+    fn library_response(server_id: &str, library_version: u64) -> String {
+        format!(
+            "HTTP/1.1 200 OK\r\nZotero-Server-ID: {server_id}\r\nLast-Modified-Version: {library_version}\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{{}}"
+        )
+    }
+
+    fn item_response(server_id: &str, item_version: u64) -> String {
         let body = format!(
             r#"{{"key":"ABCD2345","version":{item_version},"data":{{"itemType":"book","collections":["BCDE3456"],"tags":[{{"tag":"kept","type":1}}]}}}}"#
         );
+        format!(
+            "HTTP/1.1 200 OK\r\nZotero-Server-ID: {server_id}\r\nLast-Modified-Version: {item_version}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        )
+    }
+
+    fn write_response(server_id: &str, library_version: u64, item_version: u64) -> String {
+        let item = format!(
+            r#"{{"key":"ABCD2345","version":{item_version},"data":{{"itemType":"book","collections":["BCDE3456"],"tags":[{{"tag":"kept","type":1}}]}}}}"#
+        );
+        let body = format!(r#"{{"successful":{{"0":{item}}}}}"#);
         format!(
             "HTTP/1.1 200 OK\r\nZotero-Server-ID: {server_id}\r\nLast-Modified-Version: {library_version}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
             body.len()
@@ -2094,8 +2170,14 @@ mod tests {
 
     #[test]
     fn zotero10_get_uses_exact_item_route_and_server_partition() {
-        let response = item_response("server-10", 42, 7);
-        let (base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+        let before = library_response("server-10", 42);
+        let item = item_response("server-10", 7);
+        let after = library_response("server-10", 42);
+        let (base, server) = serve(vec![
+            Box::leak(before.into_boxed_str()),
+            Box::leak(item.into_boxed_str()),
+            Box::leak(after.into_boxed_str()),
+        ]);
         let state = transport(base).get_item("ABCD2345").unwrap();
         assert_eq!(state.server_id, "server-10");
         assert_eq!(state.library_version, 42);
@@ -2104,22 +2186,33 @@ mod tests {
         assert_eq!(state.tags[0].tag_type, Some(1));
         let requests = server.join().unwrap();
         assert!(
-            requests[0].starts_with(
+            requests[1].starts_with(
                 "GET /api/users/0/items/ABCD2345?format=json&include=data HTTP/1.1\r\n"
             )
         );
-        assert!(requests[0].contains("zotero-api-version: 3\r\n"));
-        assert!(requests[0].contains("zotero-server-id: server-10\r\n"));
-        assert!(!requests[0].contains("top-secret-key"));
+        assert!(requests[0].starts_with("GET /api/users/0/items?format=versions&limit=1 "));
+        assert!(requests[2].starts_with("GET /api/users/0/items?format=versions&limit=1 "));
+        assert!(
+            requests
+                .iter()
+                .all(|request| request.contains("zotero-api-version: 3\r\n"))
+        );
+        assert!(
+            requests
+                .iter()
+                .all(|request| request.contains("zotero-server-id: server-10\r\n"))
+        );
+        assert!(
+            requests
+                .iter()
+                .all(|request| !request.contains("top-secret-key"))
+        );
     }
 
     #[test]
-    fn zotero10_patch_replaces_complete_arrays_then_reads_verified_state() {
-        let read = item_response("server-10", 43, 8);
-        let (base, server) = serve(vec![
-            "HTTP/1.1 204 No Content\r\nZotero-Server-ID: server-10\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
-            Box::leak(read.into_boxed_str()),
-        ]);
+    fn zotero10_post_atomically_replaces_complete_arrays() {
+        let response = write_response("server-10", 43, 43);
+        let (base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
         let request = ClassificationWriteRequest {
             server_id: "server-10".into(),
             library_version: 42,
@@ -2131,21 +2224,18 @@ mod tests {
                 tag_type: Some(1),
             }],
         };
-        let state = transport(base).patch_item(&request).unwrap();
+        let state = transport(base).write_item(&request).unwrap();
         assert_eq!(state.library_version, 43);
+        assert_eq!(state.item_version, 43);
         let requests = server.join().unwrap();
-        assert!(requests[0].starts_with("PATCH /api/users/0/items/ABCD2345 HTTP/1.1\r\n"));
+        assert!(requests[0].starts_with("POST /api/users/0/items HTTP/1.1\r\n"));
         assert!(requests[0].contains("zotero-api-key: top-secret-key\r\n"));
         assert!(requests[0].contains("zotero-server-id: server-10\r\n"));
-        assert!(requests[0].contains("if-unmodified-since-version: 7\r\n"));
+        assert!(requests[0].contains("if-unmodified-since-version: 42\r\n"));
         assert!(requests[0].contains("content-type: application/json\r\n"));
         assert!(
-            requests[0]
-                .ends_with(r#"{"collections":["BCDE3456"],"tags":[{"tag":"kept","type":1}]}"#)
-        );
-        assert!(
-            requests[1].starts_with(
-                "GET /api/users/0/items/ABCD2345?format=json&include=data HTTP/1.1\r\n"
+            requests[0].ends_with(
+                r#"[{"key":"ABCD2345","version":7,"collections":["BCDE3456"],"tags":[{"tag":"kept","type":1}]}]"#
             )
         );
     }
@@ -2164,33 +2254,33 @@ mod tests {
             tags: vec![],
         };
         assert_eq!(
-            transport(base).patch_item(&request).unwrap_err(),
+            transport(base).write_item(&request).unwrap_err(),
             ZoteroTransportError::RequestFailed
         );
-        assert!(server.join().unwrap()[0].starts_with("PATCH "));
+        assert!(server.join().unwrap()[0].starts_with("POST "));
 
         let mut mismatched_request = request.clone();
         mismatched_request.server_id = "other-server".into();
         assert_eq!(
             Zotero10LocalAdapter::new("secret", "server-10")
                 .unwrap()
-                .patch_item(&mismatched_request)
+                .write_item(&mismatched_request)
                 .unwrap_err(),
             ZoteroTransportError::ServerMismatch
         );
 
-        let unexpected_success = "HTTP/1.1 200 OK\r\nZotero-Server-ID: server-10\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        let unexpected_success = "HTTP/1.1 204 No Content\r\nZotero-Server-ID: server-10\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
         let (base, server) = serve(vec![unexpected_success]);
         assert_eq!(
-            transport(base).patch_item(&request).unwrap_err(),
+            transport(base).write_item(&request).unwrap_err(),
             ZoteroTransportError::RequestFailed
         );
         server.join().unwrap();
 
-        let wrong_server = "HTTP/1.1 204 No Content\r\nZotero-Server-ID: other-server\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
-        let (base, server) = serve(vec![wrong_server]);
+        let wrong_server = write_response("other-server", 43, 43);
+        let (base, server) = serve(vec![Box::leak(wrong_server.into_boxed_str())]);
         assert_eq!(
-            transport(base).patch_item(&request).unwrap_err(),
+            transport(base).write_item(&request).unwrap_err(),
             ZoteroTransportError::ServerMismatch
         );
         server.join().unwrap();
@@ -2198,7 +2288,7 @@ mod tests {
         for response in [
             "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
                 .to_owned(),
-            item_response("other-server", 42, 7),
+            library_response("other-server", 42),
         ] {
             let (base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
             let error = transport(base).get_item("ABCD2345").unwrap_err();
@@ -2229,7 +2319,8 @@ mod tests {
         }
 
         let malformed = "HTTP/1.1 200 OK\r\nZotero-Server-ID: server-10\r\nLast-Modified-Version: 42\r\nContent-Length: 1\r\nConnection: close\r\n\r\n{";
-        let (base, server) = serve(vec![malformed]);
+        let before = library_response("server-10", 42);
+        let (base, server) = serve(vec![Box::leak(before.into_boxed_str()), malformed]);
         assert_eq!(
             transport(base).get_item("ABCD2345").unwrap_err(),
             ZoteroTransportError::InvalidResponse
@@ -2238,10 +2329,28 @@ mod tests {
 
         let wrong_key_body = r#"{"key":"BCDE3456","version":7,"data":{"itemType":"book"}}"#;
         let wrong_key_response = format!(
-            "HTTP/1.1 200 OK\r\nZotero-Server-ID: server-10\r\nLast-Modified-Version: 42\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{wrong_key_body}",
+            "HTTP/1.1 200 OK\r\nZotero-Server-ID: server-10\r\nLast-Modified-Version: 7\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{wrong_key_body}",
             wrong_key_body.len()
         );
-        let (base, server) = serve(vec![Box::leak(wrong_key_response.into_boxed_str())]);
+        let before = library_response("server-10", 42);
+        let (base, server) = serve(vec![
+            Box::leak(before.into_boxed_str()),
+            Box::leak(wrong_key_response.into_boxed_str()),
+        ]);
+        assert_eq!(
+            transport(base).get_item("ABCD2345").unwrap_err(),
+            ZoteroTransportError::InvalidResponse
+        );
+        server.join().unwrap();
+
+        let before = library_response("server-10", 42);
+        let item = item_response("server-10", 7);
+        let after = library_response("server-10", 43);
+        let (base, server) = serve(vec![
+            Box::leak(before.into_boxed_str()),
+            Box::leak(item.into_boxed_str()),
+            Box::leak(after.into_boxed_str()),
+        ]);
         assert_eq!(
             transport(base).get_item("ABCD2345").unwrap_err(),
             ZoteroTransportError::InvalidResponse
