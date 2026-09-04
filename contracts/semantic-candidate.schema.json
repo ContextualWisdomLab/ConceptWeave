@@ -80,6 +80,58 @@
     {
       "if": {
         "properties": {
+          "publication_state": {"const": "draft"}
+        },
+        "required": ["publication_state"]
+      },
+      "then": {
+        "properties": {
+          "truth_status": {"const": "inferred"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "publication_state": {"const": "proposed"}
+        },
+        "required": ["publication_state"]
+      },
+      "then": {
+        "properties": {
+          "truth_status": {"const": "proposed"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "publication_state": {"const": "validated"}
+        },
+        "required": ["publication_state"]
+      },
+      "then": {
+        "properties": {
+          "truth_status": {"const": "inferred"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "publication_state": {"const": "reviewed"}
+        },
+        "required": ["publication_state"]
+      },
+      "then": {
+        "properties": {
+          "truth_status": {"const": "inferred"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
           "publication_state": {"const": "published"}
         },
         "required": ["publication_state"]
@@ -87,6 +139,32 @@
       "then": {
         "properties": {
           "truth_status": {"const": "authoritative"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "publication_state": {"const": "superseded"}
+        },
+        "required": ["publication_state"]
+      },
+      "then": {
+        "properties": {
+          "truth_status": {"const": "superseded"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "publication_state": {"const": "rejected"}
+        },
+        "required": ["publication_state"]
+      },
+      "then": {
+        "properties": {
+          "truth_status": {"const": "rejected"}
         }
       }
     }

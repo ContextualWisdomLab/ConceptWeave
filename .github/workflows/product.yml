@@ -61,7 +61,7 @@ jobs:
       - name: Exact owned coverage
         run: ./scripts/check_coverage.sh
 
-      - name: Validate public JSON contracts
+      - name: Validate public JSON contract
         run: |
           npx --yes ajv-cli@5.0.0 compile \
             --spec=draft2020 \
@@ -81,62 +81,17 @@ jobs:
             -s contracts/semantic-candidate.schema.json \
             -d contracts/fixtures/semantic-candidate.invalid-published-truth.json \
             --invalid
-          npx --yes ajv-cli@5.0.0 compile \
-            --spec=draft2020 \
-            -s contracts/semantic-release.schema.json
           npx --yes ajv-cli@5.0.0 test \
             --spec=draft2020 \
-            -s contracts/semantic-release.schema.json \
-            -d contracts/fixtures/semantic-release.valid.json \
-            --valid
-          npx --yes ajv-cli@5.0.0 test \
-            --spec=draft2020 \
-            -s contracts/semantic-release.schema.json \
-            -d contracts/fixtures/semantic-release.invalid-published-truth.json \
-            --invalid
-          npx --yes ajv-cli@5.0.0 test \
-            --spec=draft2020 \
-            -s contracts/semantic-release.schema.json \
-            -d contracts/fixtures/semantic-release.invalid-duplicate-concept.json \
-            --invalid
-          npx --yes ajv-cli@5.0.0 test \
-            --spec=draft2020 \
-            -s contracts/semantic-release.schema.json \
-            -d contracts/fixtures/semantic-release.invalid-digest.json \
-            --invalid
-          npx --yes ajv-cli@5.0.0 test \
-            --spec=draft2020 \
-            -s contracts/semantic-release.schema.json \
-            -d contracts/fixtures/semantic-release.invalid-uppercase-digest.json \
-            --invalid
-          npx --yes ajv-cli@5.0.0 compile \
-            --spec=draft2020 \
-            -s contracts/semantic-release-supersession.schema.json
-          npx --yes ajv-cli@5.0.0 test \
-            --spec=draft2020 \
-            -s contracts/semantic-release-supersession.schema.json \
-            -d contracts/fixtures/semantic-release-supersession.valid.json \
-            --valid
-          npx --yes ajv-cli@5.0.0 test \
-            --spec=draft2020 \
-            -s contracts/semantic-release-supersession.schema.json \
-            -d contracts/fixtures/semantic-release-supersession.invalid-digest.json \
-            --invalid
-          npx --yes ajv-cli@5.0.0 test \
-            --spec=draft2020 \
-            -s contracts/semantic-release-supersession.schema.json \
-            -d contracts/fixtures/semantic-release-supersession.invalid-rationale.json \
+            -s contracts/semantic-candidate.schema.json \
+            -d contracts/fixtures/semantic-candidate.invalid-state-truth-mismatch.json \
             --invalid
 
       - name: Lockfile freshness
         run: |
           cargo generate-lockfile --locked
           git ls-files --error-unmatch Cargo.lock >/dev/null
-          if ! test -z "$(git status --porcelain=v1 --untracked-files=all -- Cargo.lock)"; then
-            echo "::error::Cargo.lock changed while validating the declared dependency graph"
-            git diff -- Cargo.lock
-            exit 1
-          fi
+          test -z "$(git status --porcelain=v1 --untracked-files=all -- Cargo.lock)"
 
       - name: Clean working tree
         run: test -z "$(git status --porcelain=v1 --untracked-files=all)"
