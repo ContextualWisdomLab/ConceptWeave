@@ -332,28 +332,60 @@ pub struct ClassificationWriteOperation {
 }
 
 /// Local-only, snapshot-bound plan for reviewed Zotero classification writes.
+///
+/// Execution-critical fields are read-only outside this crate, so callers cannot
+/// mutate a verified plan before passing it to the execution boundary.
+///
+/// ```compile_fail
+/// use conceptweave_zotero::{ClassificationWritePlan, WriteMode};
+/// fn forge(plan: &mut ClassificationWritePlan) {
+///     plan.mode = WriteMode::Execute;
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ClassificationWritePlan {
     /// Requested write behavior; dry-run is the default.
-    pub mode: WriteMode,
+    mode: WriteMode,
     /// Opaque review receipt identifier.
-    pub review_id: String,
+    review_id: String,
     /// Opaque governance authority receipt.
-    pub authority_receipt: String,
+    authority_receipt: String,
     /// Exact Local API server identity.
-    pub server_id: Option<String>,
+    server_id: Option<String>,
     /// Exact Zotero version used to establish execute eligibility.
-    pub zotero_version: String,
+    zotero_version: String,
     /// Exact library-version precondition.
-    pub library_version: u64,
+    library_version: u64,
     /// Exact classifier revision.
-    pub rule_revision: String,
+    rule_revision: String,
     /// Exact raw-snapshot digest.
-    pub snapshot_digest: String,
+    snapshot_digest: String,
     /// Deterministically ordered item operations.
-    pub operations: Vec<ClassificationWriteOperation>,
+    operations: Vec<ClassificationWriteOperation>,
     /// Classification writes never delete source records or attachments.
-    pub source_records_preserved: bool,
+    source_records_preserved: bool,
+}
+
+impl ClassificationWritePlan {
+    /// Returns the requested dry-run or execute behavior.
+    pub const fn mode(&self) -> WriteMode {
+        self.mode
+    }
+
+    /// Returns the exact library revision used by every initial preflight.
+    pub const fn library_version(&self) -> u64 {
+        self.library_version
+    }
+
+    /// Returns the deterministic reviewed operations.
+    pub fn operations(&self) -> &[ClassificationWriteOperation] {
+        &self.operations
+    }
+
+    /// Confirms that the plan contains metadata changes only.
+    pub const fn source_records_preserved(&self) -> bool {
+        self.source_records_preserved
+    }
 }
 
 /// Complete item state observed at the Local API write boundary.
@@ -1107,13 +1139,11 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
             rollback_operations: Vec::new(),
         };
     }
-    let Some(server_id) = plan
+    let server_id = plan
         .server_id
         .as_deref()
         .filter(|server_id| !server_id.trim().is_empty())
-    else {
-        return preflight_failure_receipt(plan, None);
-    };
+        .expect("execute plans are built with a nonblank server identity");
 
     for operation in &plan.operations {
         let Ok(state) = preflight(&operation.item_key) else {
