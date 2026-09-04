@@ -4,6 +4,7 @@
 //! Deterministic, read-only classification of a Zotero library snapshot.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::time::Duration;
@@ -226,6 +227,28 @@ pub struct GoldenSetApproval {
     pub snapshot_items: Vec<SnapshotItemRevision>,
 }
 
+/// Computes the canonical content identity verified by a golden-set approval.
+pub fn classification_snapshot_digest(report: &ClassificationReport) -> String {
+    let classified_items = report
+        .classified_items
+        .iter()
+        .map(|item| (item.item_key.as_str(), item))
+        .collect::<BTreeMap<_, _>>();
+    let canonical_snapshot = serde_json::to_vec(&(
+        &report.zotero_version,
+        report.api_version,
+        report.schema_version,
+        &report.server_id,
+        report.library_version,
+        report.rule_revision,
+        report.observed_item_count,
+        classified_items,
+        &report.duplicate_candidates,
+    ))
+    .expect("classification reports contain only JSON-compatible values");
+    format!("sha256:{:x}", Sha256::digest(canonical_snapshot))
+}
+
 /// Integer evidence from which precision and recall can be calculated exactly.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 pub struct DispositionEvaluation {
@@ -333,6 +356,7 @@ where
     }
     if golden.approval.library_version != report.library_version
         || golden.approval.rule_revision != report.rule_revision
+        || golden.approval.snapshot_digest != classification_snapshot_digest(report)
         || approved_snapshot != report_snapshot
     {
         return Err(EvaluationError::SnapshotMismatch);
