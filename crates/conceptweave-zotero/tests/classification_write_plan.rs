@@ -87,6 +87,157 @@ fn dry_run_execution_never_calls_the_write_boundary() {
     assert!(receipt.rollback_operations.is_empty());
 }
 
+fn preflight_state(
+    plan: &conceptweave_zotero::ClassificationWritePlan,
+    item_key: &str,
+) -> ClassificationItemState {
+    let operation = plan
+        .operations
+        .iter()
+        .find(|operation| operation.item_key == item_key)
+        .unwrap();
+    ClassificationItemState {
+        server_id: "server-1".into(),
+        library_version: plan.library_version,
+        item_key: item_key.into(),
+        item_version: operation.item_version,
+        collection_keys: operation.before_collection_keys.clone(),
+        tags: operation.before_tags.clone(),
+    }
+}
+
+#[test]
+fn execution_fails_closed_for_each_preflight_mismatch() {
+    let report = classification_report("10.0.0");
+    let plan = build_classification_write_plan(
+        &report,
+        &reviewed(&report),
+        WriteMode::Execute,
+        |_| true,
+    )
+    .unwrap();
+    let mismatches: [fn(&mut ClassificationItemState); 6] = [
+        |state| state.server_id = "other-server".into(),
+        |state| state.library_version += 1,
+        |state| state.item_key = "other-item".into(),
+        |state| state.item_version += 1,
+        |state| state.collection_keys = vec!["other-collection".into()],
+        |state| state.tags = vec![tag("Other", None)],
+    ];
+    for mismatch in mismatches {
+        let receipt = execute_classification_write_plan(
+            &plan,
+            |item_key| {
+                let mut state = preflight_state(&plan, item_key);
+                if item_key == "A" {
+                    mismatch(&mut state);
+                }
+                Ok::<_, ()>(state)
+            },
+            |_| -> Result<ClassificationItemState, ()> { panic!("preflight must finish first") },
+        );
+        assert_eq!(receipt.outcome, ClassificationWriteOutcome::PreflightFailure);
+        assert_eq!(receipt.failed_item_key.as_deref(), Some("A"));
+        assert_eq!(receipt.not_attempted_item_keys, ["A", "B"]);
+    }
+
+    let receipt = execute_classification_write_plan(
+        &plan,
+        |item_key| {
+            let mut state = preflight_state(&plan, item_key);
+            state.collection_keys.push(" ".into());
+            Ok::<_, ()>(state)
+        },
+        |_| -> Result<ClassificationItemState, ()> { panic!("invalid metadata must fail first") },
+    );
+    assert_eq!(receipt.outcome, ClassificationWriteOutcome::PreflightFailure);
+
+    let receipt = execute_classification_write_plan(
+        &plan,
+        |_| Err::<ClassificationItemState, _>(()),
+        |_| -> Result<ClassificationItemState, ()> { panic!("failed preflight must prevent writes") },
+    );
+    assert_eq!(receipt.outcome, ClassificationWriteOutcome::PreflightFailure);
+
+    let mut missing_server_plan = plan.clone();
+    missing_server_plan.server_id = Some(" ".into());
+    let receipt = execute_classification_write_plan(
+        &missing_server_plan,
+        |_| -> Result<ClassificationItemState, ()> { panic!("missing server must fail first") },
+        |_| -> Result<ClassificationItemState, ()> { panic!("missing server must fail first") },
+    );
+    assert_eq!(receipt.outcome, ClassificationWriteOutcome::PreflightFailure);
+    assert_eq!(receipt.failed_item_key, None);
+}
+
+fn applied_state(
+    request: &conceptweave_zotero::ClassificationWriteRequest,
+) -> ClassificationItemState {
+    ClassificationItemState {
+        server_id: request.server_id.clone(),
+        library_version: request.library_version + 1,
+        item_key: request.item_key.clone(),
+        item_version: request.item_version + 1,
+        collection_keys: request.collection_keys.clone(),
+        tags: request.tags.clone(),
+    }
+}
+
+#[test]
+fn execution_verifies_each_write_response_and_success_receipt() {
+    let report = classification_report("10.0.0");
+    let plan = build_classification_write_plan(
+        &report,
+        &reviewed(&report),
+        WriteMode::Execute,
+        |_| true,
+    )
+    .unwrap();
+    let mismatches: [fn(&mut ClassificationItemState); 6] = [
+        |state| state.server_id = "other-server".into(),
+        |state| state.library_version -= 1,
+        |state| state.item_key = "other-item".into(),
+        |state| state.item_version -= 1,
+        |state| state.collection_keys = vec!["other-collection".into()],
+        |state| state.tags = vec![tag("Other", None)],
+    ];
+    for mismatch in mismatches {
+        let receipt = execute_classification_write_plan(
+            &plan,
+            |item_key| Ok::<_, ()>(preflight_state(&plan, item_key)),
+            |request| {
+                let mut state = applied_state(request);
+                mismatch(&mut state);
+                Ok::<_, ()>(state)
+            },
+        );
+        assert_eq!(receipt.outcome, ClassificationWriteOutcome::PartialFailure);
+        assert_eq!(receipt.failed_item_key.as_deref(), Some("A"));
+        assert_eq!(receipt.not_attempted_item_keys, ["B"]);
+    }
+
+    let receipt = execute_classification_write_plan(
+        &plan,
+        |item_key| Ok::<_, ()>(preflight_state(&plan, item_key)),
+        |request| {
+            let mut state = applied_state(request);
+            state.tags.push(tag(" ", None));
+            Ok::<_, ()>(state)
+        },
+    );
+    assert_eq!(receipt.outcome, ClassificationWriteOutcome::PartialFailure);
+
+    let receipt = execute_classification_write_plan(
+        &plan,
+        |item_key| Ok::<_, ()>(preflight_state(&plan, item_key)),
+        |request| Ok::<_, ()>(applied_state(request)),
+    );
+    assert_eq!(receipt.outcome, ClassificationWriteOutcome::Applied);
+    assert_eq!(receipt.applied_item_keys, ["A", "B"]);
+    assert_eq!(receipt.rollback_operations[0].item_key, "B");
+    assert_eq!(receipt.rollback_operations[1].item_key, "A");
+}
+
 fn classification_report(version: &str) -> conceptweave_zotero::ClassificationReport {
     classify_snapshot(
         version.into(),
