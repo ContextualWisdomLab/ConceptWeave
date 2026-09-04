@@ -62,8 +62,13 @@ fn review_batch_is_deterministic_bounded_and_patch_compatible() {
 
     let mut completed_batch = batch.clone();
     completed_batch.decisions[0].reviewed_disposition = Some(Disposition::OutOfScope);
-    let patch: StewardDecisionPatch =
-        serde_json::from_value(serde_json::to_value(&completed_batch).unwrap()).unwrap();
+    assert!(
+        serde_json::from_value::<StewardDecisionPatch>(
+            serde_json::to_value(&completed_batch).unwrap()
+        )
+        .is_err()
+    );
+    let patch = decision_patch_from_review_batch(&report, &worksheet, &completed_batch).unwrap();
     let updated = apply_steward_decision_patch(&report, &worksheet, &patch).unwrap();
     assert_eq!(
         updated.decisions[1].reviewed_disposition,
@@ -154,7 +159,10 @@ fn completed_review_batch_must_preserve_the_context_shown_to_the_steward() {
     let patch = decision_patch_from_review_batch(&report, &worksheet, &batch).unwrap();
     assert_eq!(patch.decisions.len(), 1);
     assert_eq!(patch.decisions[0].item_key, "A");
-    assert_eq!(patch.decisions[0].reviewed_disposition, Disposition::OutOfScope);
+    assert_eq!(
+        patch.decisions[0].reviewed_disposition,
+        Disposition::OutOfScope
+    );
 
     for invalid in [
         {
