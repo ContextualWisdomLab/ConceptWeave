@@ -1337,10 +1337,8 @@ pub fn build_steward_review_batch(
         .filter(|decision| decision.reviewed_disposition.is_none())
         .take(limit)
         .map(|decision| {
-            let item = classified_by_key
-                .get(decision.item_key.as_str())
-                .ok_or(WorksheetError::InvalidReport)?;
-            Ok(StewardReviewBatchDecision {
+            let item = classified_by_key[decision.item_key.as_str()];
+            StewardReviewBatchDecision {
                 item_key: item.item_key.clone(),
                 item_version: item.item_version,
                 item_type: item.item_type.clone(),
@@ -1352,9 +1350,9 @@ pub fn build_steward_review_batch(
                 abstention_reason: item.abstention_reason,
                 evidence: item.evidence.clone(),
                 reviewed_disposition: None,
-            })
+            }
         })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect();
     Ok(StewardReviewBatch {
         library_version: report.library_version,
         rule_revision: report.rule_revision.clone(),
