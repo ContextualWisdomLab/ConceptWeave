@@ -1189,6 +1189,13 @@ pub fn assess_steward_review_progress(
 ) -> Result<StewardReviewProgress, WorksheetError> {
     let expected = build_steward_review_worksheet(report)?;
     validate_steward_review_worksheet_against(&expected, worksheet)?;
+    if worksheet
+        .decisions
+        .iter()
+        .any(|decision| decision.reviewed_disposition == Some(Disposition::NeedsStewardReview))
+    {
+        return Err(WorksheetError::InvalidReport);
+    }
     let decided_count = worksheet
         .decisions
         .iter()
@@ -1225,7 +1232,6 @@ fn validate_steward_review_worksheet_against(
                     || decision.item_version != expected.item_version
                     || decision.proposed_disposition != expected.proposed_disposition
                     || decision.abstention_reason != expected.abstention_reason
-                    || decision.reviewed_disposition == Some(Disposition::NeedsStewardReview)
             })
     {
         return Err(WorksheetError::InvalidReport);
