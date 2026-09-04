@@ -1079,6 +1079,30 @@ pub struct StewardReviewProgress {
     pub complete: bool,
 }
 
+/// One snapshot-bound steward decision supplied without rewriting a worksheet by hand.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct StewardDecisionUpdate {
+    /// Stable Zotero item key of the reviewed bibliographic item.
+    pub item_key: String,
+    /// Exact item revision reviewed by the steward.
+    pub item_version: u64,
+    /// Human-reviewed truth label; abstention is not valid truth.
+    pub reviewed_disposition: Disposition,
+}
+
+/// A bounded set of local steward decisions for one immutable classification snapshot.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct StewardDecisionPatch {
+    /// Zotero library revision shared with the report and worksheet.
+    pub library_version: u64,
+    /// Classifier revision whose proposals were reviewed.
+    pub rule_revision: String,
+    /// Canonical digest of the complete raw snapshot.
+    pub snapshot_digest: String,
+    /// Unique item-revision decisions to apply atomically.
+    pub decisions: Vec<StewardDecisionUpdate>,
+}
+
 /// A classification report cannot safely produce a review worksheet.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorksheetError {
@@ -1234,6 +1258,58 @@ pub fn assess_steward_review_progress(
         remaining_count,
         complete: total_count > 0 && remaining_count == 0,
     })
+}
+
+/// Applies one snapshot-bound decision patch without overwriting conflicting review work.
+pub fn apply_steward_decision_patch(
+    report: &ClassificationReport,
+    worksheet: &StewardReviewWorksheet,
+    patch: &StewardDecisionPatch,
+) -> Result<StewardReviewWorksheet, WorksheetError> {
+    let expected = build_steward_review_worksheet(report)?;
+    validate_steward_review_worksheet_against(&expected, worksheet)?;
+    if patch.library_version != expected.library_version
+        || patch.rule_revision != expected.rule_revision
+        || patch.snapshot_digest != expected.snapshot_digest
+        || patch.decisions.is_empty()
+    {
+        return Err(WorksheetError::InvalidReport);
+    }
+
+    let mut updates = BTreeMap::new();
+    for decision in &patch.decisions {
+        if decision.item_key.trim().is_empty()
+            || decision.reviewed_disposition == Disposition::NeedsStewardReview
+            || updates
+                .insert(
+                    decision.item_key.as_str(),
+                    (decision.item_version, decision.reviewed_disposition),
+                )
+                .is_some()
+        {
+            return Err(WorksheetError::InvalidReport);
+        }
+    }
+
+    let mut updated = worksheet.clone();
+    for decision in &mut updated.decisions {
+        let Some((item_version, reviewed_disposition)) = updates.remove(decision.item_key.as_str())
+        else {
+            continue;
+        };
+        if item_version != decision.item_version
+            || decision
+                .reviewed_disposition
+                .is_some_and(|existing| existing != reviewed_disposition)
+        {
+            return Err(WorksheetError::InvalidReport);
+        }
+        decision.reviewed_disposition = Some(reviewed_disposition);
+    }
+    if !updates.is_empty() {
+        return Err(WorksheetError::InvalidReport);
+    }
+    Ok(updated)
 }
 
 fn validate_steward_review_worksheet_against(
