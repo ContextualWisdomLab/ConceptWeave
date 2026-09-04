@@ -60,7 +60,12 @@ fn transitive_duplicate_component_accepts_one_component_level_canonical_key() {
     for operation in manifest.operations {
         assert_eq!(operation.retained_item_key, "A");
         assert_eq!(operation.source_items.len(), 4);
-        assert!(operation.source_items.iter().any(|item| item.item_key == "A"));
+        assert!(
+            operation
+                .source_items
+                .iter()
+                .any(|item| item.item_key == "A")
+        );
         assert!(
             operation
                 .after_canonical_keys
@@ -107,8 +112,8 @@ fn duplicate_review_rejects_blank_snapshot_item_identity() {
     report.snapshot_items.remove(0);
     assert_eq!(
         build_duplicate_merge_review_manifest(&report, &reviewed, |_| true),
-        Err(DuplicateReviewError::InvalidReview),
-        "every duplicate candidate must resolve to an immutable snapshot revision"
+        Err(DuplicateReviewError::SnapshotMismatch),
+        "every duplicate candidate must remain bound to its reviewed snapshot revision"
     );
 }
 
