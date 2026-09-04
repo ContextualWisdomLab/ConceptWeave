@@ -2,76 +2,62 @@
 
 **Snapshot:** 2026-09-04
 
-## Shipped on protected `main`
+This branch is the Client Consumption child of Foundation PR #1. Exact PR/run coordinates are evidence snapshots, never mutable production dependencies. Protected/live GitHub state is authoritative when it advances after this snapshot.
 
-Only the repository bootstrap README exists before the foundation PR. No production capability is claimed from protected `main` yet.
+## Stack authority
 
-## Active foundation slice — PR #1
+- Protected/default `main`: `f4f440dd58c77d7cd90dff8a1eb2eeb9a9940425`; no ConceptWeave release exists.
+- Foundation PR #1 advanced by documentation-only live-state repair from `bba351b77bf5f1ab5cfd55979fbb2bd158f78b81` to `447aa0723abd7b582b9acc478ed90238d0d59214`. The delta between those heads is only this gap-baseline file. Current Foundation Product `33835025486`, job `100905656541`, is queued before runner assignment; predecessor Product/SAST success and Security failure remain historical evidence only.
+- Client PR #5 pre-restack head `cd99eb4a42011206f8efa376106aa4b121d2010e` is Draft. Product `33822984126`, job `100869494950`, remains queued before runner assignment and is superseded for acceptance by this Foundation-adoption restack.
+- Source Observation PR #6 pre-restack head is `1fdfb3af14c126c270861eb541e9e57d47418bb8`; Product `33834639272`, job `100904527699`, remains queued before runner assignment. Its production registry-key validation is intentionally unchanged pending the real semantic RED.
 
-| Area | Owner | Status | Evidence / action / next verification |
+## Client Consumption capability status
+
+| Gap | Status | Evidence / invariant | Next verification |
 | --- | --- | --- | --- |
-| Product boundary | ConceptWeave | ACTIVE_PR | PRD/TRD/ADR/context map define Semantic Model Engineering and CWL boundaries. Revalidate against exact PR #1 head `bba351b77bf5f1ab5cfd55979fbb2bd158f78b81` before merge. |
-| Truth/publication lifecycle | Governance & Publication | ACTIVE_PR | Rust domain lifecycle defines Draft -> Proposed -> Validated while public transition APIs fail closed at steward-reviewed/publication boundaries; Draft 2020-12 candidate schema enforces public candidate shape and Published -> Authoritative consistency. |
-| Rust baseline | ConceptWeave | ACTIVE_PR | Rust 1.98.0 workspace, unsafe forbidden, public docs required. |
-| Quality gate | ConceptWeave | ACTIVE_PR | Exact PR #1 head `bba351b77bf5f1ab5cfd55979fbb2bd158f78b81` has Product run `33527150325` and SAST run `33527150417` terminal success. |
-| Security/test/operability | ConceptWeave + central `.github` | CONTROL_PLANE_BLOCKED | Security Scan run `33527150445` reached exact checkout; dependency-review job `100059571813` failed at `Check dependency review support`, so the pinned Dependency Review step was skipped. OSV/Trivy/Scorecard succeeded but are not substitutes. |
-| Merge governance | ContextualWisdomLab/.github | CONTROL_PLANE_BLOCKED | Live organization ruleset `18156473` requires one approving review and thread resolution on `~DEFAULT_BRANCH`; fresh foundation threads are resolved but no qualifying independent human APPROVED review exists. No self-approval or routine admin bypass is accepted. |
+| Offline release admission | IMPLEMENTED_PENDING_CURRENT_HEAD | `SemanticReleaseClient` requires explicit compatibility plus Published + Authoritative and remains provider/network independent. Downstream tenant/purpose authorization and physical execution remain downstream. | Exact-head Rust tests/Clippy/rustdoc/coverage after restack. |
+| Versioned semantic release | IMPLEMENTED_PENDING_CURRENT_HEAD | `contracts/semantic-release.schema.json` plus fixtures and Rust `SemanticRelease` carry release/contract/ontology identity, truth/publication state, digest identity, provenance and unique concept IDs. | Draft-2020-12 schema and Rust parity. |
+| Detached artifact integrity | REPAIRED_PENDING_CURRENT_HEAD | Predecessor `0c32a7b55d3c687ab76cee789962866573496ba1` produced hosted `E0599` because tests required `verify_detached_artifact` while production exposed the retired API. `9c278598001c502a733100d11e901538c3dc2677` made the minimal API/rustdoc repair. | Exact-head Clippy/tests/rustdoc/coverage. |
+| Public documentation parity | REPAIRED_PENDING_CURRENT_HEAD | Product `33741224641`, job `100603361888`, executed exact `1e543bb...`, passed CI/fmt/Clippy and failed the documentation contract because the gap baseline itself reproduced the retired identifier. `fa0e31272097d154427ac53bfb7cc60dc96e72c8` removed that self-reference; `cd99eb4...` then repaired stale sibling Source Observation state. | Current restacked Product gate. |
+| Explicit compatibility | IMPLEMENTED_PENDING_CURRENT_HEAD | Current / SupportedLegacy / Unsupported are explicit; unknown versions fail closed and no ordering inference is used. | Unknown/legacy/current edge cases. |
+| Deterministic diff / resolution | IMPLEMENTED_PENDING_CURRENT_HEAD | Release diff reports deterministic sorted concept changes; exact concept resolution has no fuzzy/model behavior. | Golden diff and unknown/blank resolution cases. |
+| Immutable supersession validation | IMPLEMENTED_PENDING_CURRENT_HEAD | `SemanticReleaseReference`, `ReleaseSupersession` and `validate_supersession` bind exact predecessor/successor IDs and digests, nonblank rationale, no self-supersession and authoritative-use admission. Authority to issue a governed supersession receipt remains Governance & Publication. | Exact-head tests plus public cross-language contract. |
+| Language-neutral supersession/publication contract | INTENTIONAL_RED_PENDING | Test-first lineage beginning `143506eb66b6904b770a628ac793af2253559df2` requires `contracts/semantic-release-supersession.schema.json` and valid/invalid fixtures. Production artifacts remain intentionally absent. | Observe the missing-schema/fixture RED only after the restacked head reaches that public-contract boundary, then make the smallest generic repair. |
+| Match / align / explain | GAP | OLaLA/LLMs4OM/Complex Matching/MILA/KROMA/LLM4VKG research is mapped to retrieve/filter/match and evaluation. LLM output is proposed only and any production call must use released `contextual-orchestrator`. | OAEI-style P/R/F1, retrieval recall, abstention, reproducibility and LLM-call reduction. |
+| Query-plan contract | GAP | ConceptWeave may define semantic plans but cannot own downstream physical authorization/execution. | Versioned DTO + GRC round-trip without cross-service SQL. |
 
-## Active Client Consumption slice — PR #5 / Issue #3
+## Sibling Source Observation state
 
-PR #5 is intentionally stacked on PR #1 because the client reuses only the foundation's public evidence/truth/publication types. It remains Draft. The canonical exact head is the live GitHub PR head; editing this file changes that SHA, so check evidence is valid only for the later unchanged branch head.
+The Source Observation bounded context already contains immutable PostgreSQL table/column/PK/unique/FK/CHECK evidence, exact identifier preservation, canonical lowercase SHA-256 snapshot identity, UTC provenance, typed exact receipts, explicit resource budgets/cancellation/failures and an opaque bounded source registry key at the port boundary.
 
-| Gap | Owner | Status | Evidence | Action | Next verification |
-| --- | --- | --- | --- | --- | --- |
-| Offline release admission | Client Consumption | IMPLEMENTED_PENDING_CHECKS | `SemanticReleaseClient` requires explicit compatibility plus Published + Authoritative and remains provider/network independent. | Preserve downstream tenant/purpose authorization and physical execution boundaries. | Exact-head Rust tests/Clippy/docs/coverage. |
-| Versioned semantic-release shape | Client Consumption / Governance & Publication seam | IMPLEMENTED_PENDING_CHECKS | `contracts/semantic-release.schema.json` + fixtures; Rust `SemanticRelease` carries release/contract/ontology identity, truth/publication state, digest identity, provenance and unique concept IDs. | Keep language-neutral contract stable before generated bindings. | Exact-head AJV + Rust contract parity. |
-| Detached artifact integrity | Client Consumption | IMPLEMENTED_PENDING_CHECKS | `verify_detached_artifact` hashes exact caller-supplied detached immutable semantic-artifact bytes with SHA-256 and compares the canonical declared digest after authoritative-use admission. Predecessor `0c32a7b55d3c687ab76cee789962866573496ba1` produced the expected hosted `E0599` RED when this API was absent; current production head `9c278598001c502a733100d11e901538c3dc2677` contains the minimal repair. | Keep the manifest digest scoped to detached artifact bytes; add signature/provenance-chain verification only when publication defines a stable signing contract. | Fresh exact-head Clippy/tests/rustdoc/coverage on the final documentation successor. |
-| Release diff | Client Consumption | IMPLEMENTED_PENDING_CHECKS | Deterministic `diff` admits both releases through the same governance/compatibility gate and reports sorted added/removed concept IDs. | Extend only when typed relation/mapping/measure diff contracts exist. | Golden added/removed fixtures and exact-head Product run. |
-| Exact concept resolution | Client Consumption | IMPLEMENTED_PENDING_CHECKS | `resolve_concept` performs exact deterministic lookup after authoritative-use admission; no fuzzy/LLM inference. | Add relation and physical-mapping resolution next. | Exact-head edge cases for unknown/blank IDs. |
-| Explicit legacy compatibility | Client Consumption | IMPLEMENTED_PENDING_CHECKS | Test-first `091c36b24330671952de378d3596afcde5f62351`; production `2a4596e88d016e01a3bffded7a8436b14d55ec18` implements Current / SupportedLegacy / Unsupported without version-order inference. | Keep support explicit and bounded; unknown versions remain fail closed. | Hosted exact-head Product/Clippy/tests on final unchanged head. |
-| Explicit immutable supersession | Client Consumption / Governance & Publication seam | IMPLEMENTED_PENDING_CHECKS | Test-first `67132eda0e25d23a4185d4b98f0c6dc3b11e17a4` required exact predecessor/successor id+digest references, nonblank rationale, self-supersession rejection, and ordinary authoritative-use admission. Production `2c4a7954ad3a4fb0dd0a5482a6870fcc0d2996a3` implements `SemanticReleaseReference`, `ReleaseSupersession`, and `validate_supersession`; follow-up tests exercise digest mismatch and both predecessor/successor admission paths. | Add a language-neutral supersession/publication-receipt schema before cross-language completeness; do not infer replacement from version order/time/diff. ADR 0004 stays Proposed while PR #5 is Draft/checks incomplete. | Exact-head fmt/Clippy/tests/rustdoc/100% coverage plus public-contract parity. |
-| Documentation/API parity | Client Consumption | REPAIRED_PENDING_CHECKS | Public Rust API is `verify_detached_artifact`; PRD/TRD/UML/ADR/TEST_STRATEGY/SECURITY and this baseline are aligned to detached-artifact semantics, with a Rust documentation contract preventing the retired serialized-artifact API name from returning. | Preserve manifest-vs-detached-artifact scope across future bindings and schemas. | Exact-head documentation contract + full Product gate. |
-| Match / align / explain | Model Alignment + Client Consumption | GAP | OLaLa/LLMs4OM/MILA/KROMA research traceability defines retrieve/filter/match constraints. | Deterministic candidate retrieval first; optional LLM only through `contextual-orchestrator`; never auto-authorize correspondences. | OAEI-style P/R/F1, retrieval recall, abstention and LLM-call-reduction evidence. |
-| Query-plan contract | Client Consumption | GAP | Issue #3 requires semantic plans without owning physical execution. | Define versioned semantic query-plan DTO and consuming-product ACL seam. | GRC golden round-trip with no cross-service SQL. |
-| Consumer authorization | Downstream product / Keyverse boundary | EXTERNAL_OWNERSHIP | ConceptWeave performs governance/compatibility admission only. | Keep tenant/purpose authorization and physical execution downstream. | Cross-tenant/purpose denial tests in each consumer. |
+The prior UTC RED executed on `2817df62...` and was repaired by `e27ffaf4a40d746781b8012e9fe71467e7e6511f`. A later cross-boundary test on `c9af2255...` requires `PostgresSchemaSnapshot::new` to enforce the same ≤128-byte lowercase multiword `snake_case` registry identity as `ObservationRequest`; its hosted run first failed at formatting before reaching the semantic test. Test formatting was repaired, an accidental whole-file write was neutralized by a non-force forward commit whose tree compared exactly equal to the intended predecessor, and `1fdfb3af...` now contains only the remaining rustfmt wrapping hunk. The semantic production validator still must not land before the real RED.
 
-## Parallel Source Observation slice — PR #6 / Issue #2
-
-PR #6 is a sibling stacked on PR #1 and is not copied into PR #5. Fresh live evidence on 2026-09-04 identifies test-only exact head `c9af2255fb721b8e05e608e6b2525017b1f59151`. Its Product run `33760465773`, rust-quality job `100665220457`, remains queued before runner assignment on explicit `ubuntu-24.04` with `runner_id=0` and `steps=[]`; queued evidence is non-passing. The branch retains immutable PostgreSQL snapshot/source receipts, PK/unique/FK/CHECK evidence, FK reference behavior, PostgreSQL 18 FK validation/enforcement state, and the provider-independent `conceptweave-source-port` with explicit statement-timeout/row/byte/concurrency bounds, exact non-empty schema allowlists, caller cancellation, typed source-disappearance/resource-limit outcomes, and opaque bounded source registry keys.
-
-The prior UTC-provenance RED executed on predecessor `2817df62d0b7b41c0b0dd1bcbd34a444b8a5a092`: Product `33696875090`, job `100467545647`, passed exact checkout/CI/Rust/fmt/Clippy and failed because malformed `observed_at_utc="time"` was accepted. Production `e27ffaf4a40d746781b8012e9fe71467e7e6511f` repaired that boundary with deterministic explicit-UTC validation. The current test-only lane instead covers a separate invariant: public `PostgresSchemaSnapshot::new` must enforce the same opaque ≤128-byte lowercase multiword `snake_case` registry-key boundary as `ObservationRequest`, so DSN/credential-shaped or malformed identities cannot be copied into immutable `source_id` provenance. Production remains intentionally unchanged until exact head `c9af2255...` executes the intended RED. A concrete Rust read-only PostgreSQL adapter remains open after that RED -> minimal fix -> exact-head GREEN sequence.
+After registry RED → minimal fix → exact-head GREEN, the next Source Observation buyer slice is a maintained Rust read-only PostgreSQL adapter behind `conceptweave-source-port`, with adapter-local credential resolution, explicit schema allowlist, statement timeout, cancellation, row/byte/concurrency budgets, complete-or-fail snapshot construction and a frozen anonymized GRC-shaped replay fixture.
 
 ## Central control-plane evidence
 
-- `ContextualWisdomLab/.github#712` remains the owner for hosted-runner acquisition/queue health; current PR #5 and PR #6 Product jobs are still queued before checkout on explicit `ubuntu-24.04`, so no-op source churn is not an acceptable retry mechanism.
-- `ContextualWisdomLab/.github#810` owns authoritative public non-fork Dependency Review availability/configuration. ConceptWeave must not substitute OSV/Trivy/Scorecard or fail open.
-- `ContextualWisdomLab/.github#772` owns the solo-maintainer approval-governance defect. ConceptWeave does not self-approve or count model/bot reviews as an independent human approval.
-- Central required-workflow/runtime repairs are evidence only after protected integration and unchanged ConceptWeave-head revalidation; predecessor runs do not transfer.
+Protected central source is `.github/main@07d9ec23fb265c76539d23249e1dfa124ea7b23b` at this snapshot; this is evidence, not a ConceptWeave dependency.
 
-## Remaining P0 product gaps
+- `.github#810` owns authoritative Dependency Review availability. OSV/Trivy/Scorecard/SAST are not substitutes and 403 cannot be treated as success.
+- `.github#712/#1531` own selective/intermittent runner admission and review/queue amplification.
+- `.github#1796` has test-first Draft #1821 `test/1796-org-sweep-queue-owner@9c79cf775ad6a125a94dedcae9683c20a65a0339`, which separates organization-sweep queue inventory from target-repository exact-head coalescing. Production central source remains unchanged until its RED executes.
+- `.github#1822@7a5cc1b1c43946d210405cd051ae629ff2c44966` is a separate Draft fix for documented `CoalescingRefused` safe-no-op behavior; other exceptions remain fail closed.
+- Fresh central queued inventory reached 1,906 runs. Aggregate backlog movement is diagnostic only; acceptance still requires actual runner assignment, exact checkout and terminal evidence on unchanged current heads.
 
-1. **Source Observation adapter** — after the current registry-identity RED -> minimal production repair -> exact-head GREEN, implement a concrete Rust read-only PostgreSQL adapter behind the existing bounded source port with immutable receipts, domains/enums/indexes/comments, hostile-input/resource bounds, cancellation/source-disappearance behavior, and a frozen anonymized GRC fixture.
-2. **Observation-to-candidate provenance** — exact source receipt plus discovery method/proposal receipt for every generated candidate.
-3. **Ontology induction** — deterministic observations plus `contextual-orchestrator` structured candidate generation for concepts, taxonomy and non-taxonomic relations.
-4. **Semantic-layer induction** — dimensions, measures, grain, units, relationships and physical mappings with deterministic calculation contracts.
-5. **Validation engine** — RDF/OWL/SKOS/SHACL publication validation, consistency checks, duplicate/conflict detection and bounded reasoning.
-6. **Governance persistence** — PostgreSQL 3NF candidates, evidence, validation receipts, review decisions, immutable releases, explicit supersession/publication receipts, transactional outbox and temporal history where warranted.
-7. **Review workflow** — Keyverse tenant/role/purpose context, steward review, maker-checker where required, stale-decision protection and immutable publication receipt.
-8. **Publication adapters** — OWL/RDFS/SKOS/SHACL/JSON-LD and version-bound Apache Ossie export.
-9. **Client completion** — language-neutral supersession/publication receipt, relation/mapping/dimension/measure resolution, signature/provenance contract, research-backed match/align/explain, semantic query-plan API, and GRC reference fixtures.
-10. **CWL integration** — `semantic-data-portal`, `LineageWeave`, `context-graph-contracts`, GRC and EA through published contracts only.
-11. **Evaluation harness** — ontology-learning/matching golden fixtures, structural/semantic metrics, human-reviewed cases, replay reproducibility and multilingual cases.
-12. **Observability/release** — shared OpenTelemetry bootstrap, structured security events, SBOM/provenance/signing, backup/restore and protected release evidence.
+## Remaining P0 gaps
 
-## DDD fitness gaps and invariants
+1. Observe and repair the language-neutral supersession/publication contract RED, then prove exact-head GREEN.
+2. Complete signature/provenance verification after Governance & Publication defines a stable signing contract.
+3. Add relation, physical-mapping, dimension and measure resolution plus a versioned semantic query-plan contract.
+4. Complete deterministic/research-backed match, alignment and explanation with optional bounded contextual-orchestrator assistance only.
+5. Add GRC reference fixtures that exercise only released/versioned `semantic_release` contracts while GRC retains business truth, tenant/purpose authorization and physical execution.
+6. Complete ontology/semantic-layer discovery, validation, governance persistence, steward review, publication adapters, multilingual evaluation, observability/recovery and immutable release evidence in their owning bounded contexts.
 
-- No generic `utils/helpers/services/common` domain buckets are permitted.
-- Adapters remain outside owned domain/client/source-observation contracts.
-- Client Consumption consumes versioned public release contracts only, never generator-private implementation or persistence.
-- Supersession validation is a Client Consumption contract; authority to issue the governed supersession/publication receipt remains Governance & Publication.
-- Published releases are immutable; correction creates a distinct successor and preserves the predecessor.
-- Source Observation preserves source evidence but does not infer semantic authority.
-- Foreign product DTOs require Anti-Corruption Layers.
-- `semantic-data-portal` remains catalog/governance/consumption plane, not ConceptWeave persistence.
-- Consuming-product authorization/query execution stays downstream; ConceptWeave does not own foreign application tables.
-- Future persistence uses descriptive two-or-more-word `snake_case` objects, 3NF by default, explicit item-level UPSERT/idempotency and immutable published releases.
+## DDD and release invariants
+
+- No generic `utils/helpers/services/common` domain buckets.
+- Client Consumption depends only on governed public release contracts, never generator-private classes, prompts, persistence tables or orchestration state.
+- `semantic-data-portal` remains catalog/governance/consumption; `context-graph-contracts` owns interop contracts; `enterprise-architecture-core` owns EA; `contextual-orchestrator` owns provider routing.
+- No source copying, cross-service SQL or mutable foreign-head dependency.
+- Published semantic truth is immutable; correction creates a distinct successor plus supersession evidence.
+- Release requires exact protected head, version/CHANGELOG/tag/package/immutable `semantic_release`, SBOM, provenance, reproducibility and rollback evidence.
