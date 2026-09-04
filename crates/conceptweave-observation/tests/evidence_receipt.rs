@@ -65,6 +65,12 @@ fn snapshot_issues_exact_evidence_receipt_for_observed_column() {
 }
 
 #[test]
+fn snapshot_issues_exact_evidence_receipt_for_observed_table() {
+    let location = ObservationLocation::table("Sales/~North", "Order/Line").unwrap();
+    assert!(snapshot().source_receipt(location).is_ok());
+}
+
+#[test]
 fn canonical_locations_are_typed_and_collision_safe() {
     let table = ObservationLocation::table("public", "event_record").expect("valid table");
     let column =
@@ -159,4 +165,5 @@ fn evidence_location_rejects_blank_exact_identifiers() {
             field: "constraint_name"
         })
     );
+    assert!(ObservationLocation::table("public", " ").is_err());
 }

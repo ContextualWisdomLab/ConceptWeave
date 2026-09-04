@@ -102,6 +102,50 @@ fn supersession_accepts_the_governed_superseded_predecessor_state() {
 }
 
 #[test]
+fn supersession_rejects_a_predecessor_with_only_one_superseded_state() {
+    let client = SemanticReleaseClient::new("1.0.0").expect("client policy must be valid");
+    let previous = release(
+        "semantic_release_previous",
+        'b',
+        TruthStatus::Authoritative,
+        PublicationState::Superseded,
+        &["control.evidence"],
+    );
+    let successor = release(
+        "semantic_release_successor",
+        'c',
+        TruthStatus::Authoritative,
+        PublicationState::Published,
+        &["control.evidence"],
+    );
+    let declaration = ReleaseSupersession::new(
+        SemanticReleaseReference::from_release(&previous),
+        SemanticReleaseReference::from_release(&successor),
+        "steward-approved immutable correction",
+    )
+    .unwrap();
+
+    assert!(
+        client
+            .validate_supersession(&declaration, &previous, &successor)
+            .is_err()
+    );
+}
+
+#[test]
+fn diff_accepts_reusing_the_same_release_object() {
+    let client = SemanticReleaseClient::new("1.0.0").expect("client policy must be valid");
+    let release = release(
+        "semantic_release_same_id",
+        'b',
+        TruthStatus::Authoritative,
+        PublicationState::Published,
+        &["control.evidence"],
+    );
+    assert!(client.diff(&release, &release).is_ok());
+}
+
+#[test]
 fn public_contract_and_coverage_gates_encode_the_reviewed_fail_closed_rules() {
     let root = repository_root();
     let release_schema = fs::read_to_string(root.join("contracts/semantic-release.schema.json"))

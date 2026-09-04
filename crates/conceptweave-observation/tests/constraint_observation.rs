@@ -189,4 +189,43 @@ fn constraint_identifiers_reject_blank_source_metadata() {
             field: "referenced_schema_name"
         }
     );
+
+    for result in [
+        PrimaryKeyObservation::new(" ", vec!["event_key".to_owned()]).map(|_| ()),
+        UniqueConstraintObservation::new("\n", vec!["event_key".to_owned()]).map(|_| ()),
+        ForeignKeyObservation::new(
+            "\t",
+            vec!["event_key".to_owned()],
+            "public",
+            "event_record",
+            vec!["event_key".to_owned()],
+        )
+        .map(|_| ()),
+        ForeignKeyObservation::new(
+            "event_parent_fk",
+            vec!["event_key".to_owned()],
+            "public",
+            " ",
+            vec!["event_key".to_owned()],
+        )
+        .map(|_| ()),
+        ForeignKeyObservation::new(
+            "event_parent_fk",
+            vec![" ".to_owned()],
+            "public",
+            "event_record",
+            vec!["event_key".to_owned()],
+        )
+        .map(|_| ()),
+        ForeignKeyObservation::new(
+            "event_parent_fk",
+            vec!["event_key".to_owned()],
+            "public",
+            "event_record",
+            vec!["event_key".to_owned(), "event_key".to_owned()],
+        )
+        .map(|_| ()),
+    ] {
+        assert!(result.is_err());
+    }
 }

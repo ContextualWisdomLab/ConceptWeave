@@ -41,6 +41,11 @@ fn check_constraint_definition_must_be_observed_not_blank() {
 }
 
 #[test]
+fn check_constraint_name_must_be_observed_not_blank() {
+    assert!(CheckConstraintObservation::new(" ", "CHECK (true)", true, true, false).is_err());
+}
+
+#[test]
 fn table_retains_check_constraint_without_inventing_expression_column_coordinates() {
     let check = CheckConstraintObservation::new(
         "order_quantity_positive",
