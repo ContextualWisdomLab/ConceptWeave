@@ -4,6 +4,8 @@
 
 All source artifacts, generated candidate payloads, external ontology files, model outputs, and future web-retrieved content are untrusted input.
 
+Local Zotero classification reports can contain bibliographic titles, tags, matched values, and abstention abstracts. They are sensitive review material, remain outside the repository, and are not publication artifacts.
+
 ## Required controls
 
 - source size, type, nesting, archive/decompression, and parser-time bounds;
