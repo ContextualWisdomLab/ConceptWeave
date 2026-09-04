@@ -31,7 +31,11 @@ fn execution_preflights_every_item_and_returns_reversible_partial_failure() {
                 .unwrap();
             Ok::<_, ()>(ClassificationItemState {
                 server_id: "server-1".into(),
-                library_version: 42,
+                library_version: if preflighted.len() > plan.operations.len() {
+                    43
+                } else {
+                    42
+                },
                 item_key: item_key.into(),
                 item_version: operation.item_version,
                 collection_keys: operation.before_collection_keys.clone(),
