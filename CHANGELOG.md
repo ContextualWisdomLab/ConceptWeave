@@ -12,7 +12,7 @@ All notable changes to ConceptWeave are documented here.
 - Draft 2020-12 JSON Schema for the semantic-candidate public contract.
 - Standards and research doctoring covering stable W3C ontology standards, 2026 RDF/SHACL work in progress, Apache Ossie, and recent LLM ontology-engineering research.
 - Read-only delayed reconciliation receipts for indeterminate Zotero rollback operations.
-- Minimal local abstract context for Zotero items that require steward classification.
+- Minimal, nonduplicated local abstract context for Zotero items that require steward classification.
 
 ### Security
 
