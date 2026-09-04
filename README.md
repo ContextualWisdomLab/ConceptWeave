@@ -18,6 +18,14 @@ cargo +1.98.0 run --bin conceptweave-zotero -- --apply-decision-patch /tmp/repor
 
 All three inputs must be separate owner-only files from the same immutable snapshot. The output is create-new and owner-only; this offline step neither changes Zotero nor grants governance approval.
 
+Create a small deterministic view of the next pending records for human review:
+
+```sh
+cargo +1.98.0 run --bin conceptweave-zotero -- --review-batch /tmp/report.json /tmp/current-worksheet.json 25 /tmp/review-batch.json
+```
+
+The batch repeats on unchanged input and is not a reservation or assignment. It contains sensitive bibliographic context, must remain owner-only, and becomes a decision patch only after a steward fills every `reviewed_disposition`.
+
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ContextualWisdomLab/ConceptWeave)
 
 **Automatic, evidence-bound ontology and semantic-layer engineering for governed enterprise meaning.**
