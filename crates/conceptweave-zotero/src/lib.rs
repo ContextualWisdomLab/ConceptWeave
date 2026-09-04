@@ -2487,10 +2487,31 @@ mod tests {
                 .into_iter()
                 .map(|response| {
                     let (mut stream, _) = listener.accept().unwrap();
-                    let mut bytes = vec![0; 16 * 1024];
-                    let length = stream.read(&mut bytes).unwrap();
+                    let mut bytes = Vec::new();
+                    loop {
+                        let mut chunk = [0; 4096];
+                        let length = stream.read(&mut chunk).unwrap();
+                        bytes.extend_from_slice(&chunk[..length]);
+                        let Some(header_end) = bytes.windows(4).position(|part| part == b"\r\n\r\n")
+                        else {
+                            continue;
+                        };
+                        let headers = String::from_utf8_lossy(&bytes[..header_end]);
+                        let content_length = headers
+                            .lines()
+                            .find_map(|line| {
+                                let (name, value) = line.split_once(':')?;
+                                name.eq_ignore_ascii_case("content-length")
+                                    .then(|| value.trim().parse::<usize>().ok())
+                                    .flatten()
+                            })
+                            .unwrap_or_default();
+                        if bytes.len() >= header_end + 4 + content_length {
+                            break;
+                        }
+                    }
                     stream.write_all(response.as_bytes()).unwrap();
-                    String::from_utf8(bytes[..length].to_vec()).unwrap()
+                    String::from_utf8(bytes).unwrap()
                 })
                 .collect()
         });
