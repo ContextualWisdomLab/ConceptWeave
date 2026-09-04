@@ -20,4 +20,4 @@
 | Classification Write Plan | Local deterministic dry-run artifact containing exact preconditions and before/after/rollback metadata; not proof of execution. |
 | Reviewed Duplicate Merge Set | Complete steward decisions selecting one consistent canonical item across every overlapping duplicate group in a snapshot. |
 | Authority Receipt | Opaque proof checked by the Governance & Publication boundary; it contains no reviewer identity or credential. |
-| Canonical-Key Operation | Reversible local mapping from each duplicate source key to one retained key, with the exact rollback mapping. |
+| Canonical-Key Operation | Reversible local mapping from every source in a connected duplicate component to one retained key, with complete reviewed revisions and the exact rollback mapping. |

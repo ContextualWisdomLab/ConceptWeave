@@ -177,6 +177,8 @@ pub struct ReviewedDuplicateMergeSet {
     pub rule_revision: String,
     /// Exact raw-snapshot digest reviewed by the steward.
     pub snapshot_digest: String,
+    /// Exact item-key/item-version coordinates reviewed by the steward.
+    pub snapshot_items: Vec<SnapshotItemRevision>,
     /// Exactly one decision for every duplicate candidate.
     pub decisions: Vec<DuplicateMergeDecision>,
 }
@@ -688,6 +690,7 @@ where
     if reviewed.snapshot_digest != report.snapshot_digest
         || reviewed.library_version != report.library_version
         || reviewed.rule_revision != report.rule_revision
+        || reviewed.snapshot_items != report.snapshot_items
     {
         return Err(DuplicateReviewError::SnapshotMismatch);
     }
@@ -779,28 +782,25 @@ where
             return Err(DuplicateReviewError::InvalidReview);
         }
 
-        let source_items = candidate
-            .item_keys
+        let source_items = component_keys
             .iter()
             .map(|item_key| {
                 item_revisions
                     .get(item_key.as_str())
                     .map(|item_version| SnapshotItemRevision {
-                        item_key: item_key.clone(),
+                        item_key: (*item_key).clone(),
                         item_version: *item_version,
                     })
                     .ok_or(DuplicateReviewError::InvalidReview)
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let before_canonical_keys = candidate
-            .item_keys
+        let before_canonical_keys = component_keys
             .iter()
-            .map(|item_key| (item_key.clone(), item_key.clone()))
+            .map(|item_key| ((*item_key).clone(), (*item_key).clone()))
             .collect::<BTreeMap<_, _>>();
-        let after_canonical_keys = candidate
-            .item_keys
+        let after_canonical_keys = component_keys
             .iter()
-            .map(|item_key| (item_key.clone(), decision.retained_item_key.clone()))
+            .map(|item_key| ((*item_key).clone(), decision.retained_item_key.clone()))
             .collect::<BTreeMap<_, _>>();
         operations.push(DuplicateMergeOperation {
             identity_kind: decision.identity_kind.clone(),
