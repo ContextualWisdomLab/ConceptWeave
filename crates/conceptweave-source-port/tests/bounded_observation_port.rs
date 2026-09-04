@@ -12,9 +12,23 @@ fn limits_preserve_timeout_row_byte_and_concurrency_bounds() {
     let limits = limits();
 
     assert_eq!(limits.statement_timeout_ms(), 2_500);
+    assert_eq!(limits.operation_timeout_ms(), 2_500);
     assert_eq!(limits.max_rows(), 5_000);
     assert_eq!(limits.max_bytes(), 1_048_576);
     assert_eq!(limits.max_concurrent_queries(), 2);
+}
+
+#[test]
+fn explicit_total_operation_deadline_is_distinct_from_statement_timeout() {
+    let limits = ObservationLimits::with_timeouts(10_000, 2_500, 5_000, 1_048_576, 2)
+        .expect("bounded limits with an end-to-end deadline");
+
+    assert_eq!(limits.operation_timeout_ms(), 10_000);
+    assert_eq!(limits.statement_timeout_ms(), 2_500);
+    assert_eq!(
+        ObservationLimits::with_timeouts(0, 1, 1, 1, 1),
+        Err(ObservationLimitError::ZeroOperationTimeout)
+    );
 }
 
 #[test]
