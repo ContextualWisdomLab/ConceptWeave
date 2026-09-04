@@ -163,6 +163,7 @@ fn explicit_port_carries_caller_cancellation_without_inventing_success() {
 
     let bounded_failures = [
         SourceObservationFailure::SourceUnavailable,
+        SourceObservationFailure::OperationTimeout,
         SourceObservationFailure::StatementTimeout,
         SourceObservationFailure::RowLimitExceeded { max_rows: 5_000 },
         SourceObservationFailure::ByteLimitExceeded {
@@ -172,5 +173,5 @@ fn explicit_port_carries_caller_cancellation_without_inventing_success() {
             max_concurrent_queries: 2,
         },
     ];
-    assert_eq!(bounded_failures.len(), 5);
+    assert_eq!(bounded_failures.len(), 6);
 }
