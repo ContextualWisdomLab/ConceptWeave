@@ -14,7 +14,8 @@ def main() -> int:
 
     required_fragments = (
         "runs-on: ubuntu-24.04",
-        "cancel-in-progress: true",
+        "group: ${{ github.workflow }}-${{ github.repository }}-${{ github.event.pull_request.number || github.run_id }}",
+        "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
         "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
         "COVERAGE_TOOLCHAIN: nightly-2026-08-20",
         'rustup toolchain install "$COVERAGE_TOOLCHAIN" --profile minimal --component llvm-tools-preview',
@@ -30,6 +31,9 @@ def main() -> int:
             "Product CI must not use ubuntu-latest while current organization "
             "evidence demonstrates selective floating-image starvation"
         )
+
+    if "github.event.pull_request.number || github.ref" in workflow:
+        raise SystemExit("Product CI must isolate non-PR runs by run_id")
 
     return 0
 
