@@ -3,7 +3,7 @@ use conceptweave_zotero::{
     build_steward_review_worksheet, classify_snapshot,
 };
 
-fn report() -> conceptweave_zotero::ClassificationReport {
+fn classification_report() -> conceptweave_zotero::ClassificationReport {
     classify_snapshot(
         "9.0.6".into(),
         None,
@@ -41,7 +41,7 @@ fn report() -> conceptweave_zotero::ClassificationReport {
 
 #[test]
 fn progress_is_exact_aggregate_only_and_fail_closed() {
-    let report = report();
+    let report = classification_report();
     let mut worksheet = build_steward_review_worksheet(&report).unwrap();
 
     let blank = assess_steward_review_progress(&report, &worksheet).unwrap();
@@ -86,6 +86,38 @@ fn progress_is_exact_aggregate_only_and_fail_closed() {
     missing.decisions.pop();
     assert_eq!(
         assess_steward_review_progress(&report, &missing),
+        Err(WorksheetError::InvalidReport)
+    );
+
+    let canonical = build_steward_review_worksheet(&report).unwrap();
+    let mut invalid_report = classification_report();
+    invalid_report.rule_revision.clear();
+    assert_eq!(
+        assess_steward_review_progress(&invalid_report, &canonical),
+        Err(WorksheetError::InvalidReport)
+    );
+    let mut shifted = canonical.clone();
+    shifted.library_version += 1;
+    assert_eq!(
+        assess_steward_review_progress(&report, &shifted),
+        Err(WorksheetError::InvalidReport)
+    );
+    let mut shifted = canonical.clone();
+    shifted.rule_revision.push_str("-changed");
+    assert_eq!(
+        assess_steward_review_progress(&report, &shifted),
+        Err(WorksheetError::InvalidReport)
+    );
+    let mut shifted = canonical.clone();
+    shifted.snapshot_digest.push_str("-changed");
+    assert_eq!(
+        assess_steward_review_progress(&report, &shifted),
+        Err(WorksheetError::InvalidReport)
+    );
+    let mut shifted = canonical;
+    shifted.snapshot_items.pop();
+    assert_eq!(
+        assess_steward_review_progress(&report, &shifted),
         Err(WorksheetError::InvalidReport)
     );
 
