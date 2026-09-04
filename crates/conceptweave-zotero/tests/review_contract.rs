@@ -25,8 +25,8 @@ fn steward_abstention_reason_is_explicit_and_deterministic() {
         ("D", "本体对齐"),
         ("E", "căn chỉnh bản thể"),
         ("F", "alineación de ontologías"),
-        ("G", "Ontologieabgleich"),
-        ("H", "alignement d’ontologies"),
+        ("G", "Ontologie-Ausrichtung für Wissensgraphen"),
+        ("H", "alignement d’ontologies sémantiques"),
     ]
     .map(|(key, title)| item(key, title, ""));
     let unmatched = item("I", "Other evidence", "");
