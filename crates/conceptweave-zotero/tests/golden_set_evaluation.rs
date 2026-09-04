@@ -235,7 +235,7 @@ fn reviewed_golden_set_rejects_stale_unknown_and_duplicate_labels() {
         evaluate_reviewed_golden_set(&report, &stale, verify_synthetic_approval),
         Err(EvaluationError::SnapshotMismatch)
     );
-    stale.approval.rule_revision = report.rule_revision.into();
+    stale.approval.rule_revision = report.rule_revision.clone();
     stale.approval.snapshot_items[0].item_version += 1;
     assert_eq!(
         evaluate_reviewed_golden_set(&report, &stale, verify_synthetic_approval),

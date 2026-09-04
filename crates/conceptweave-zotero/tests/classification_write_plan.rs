@@ -350,7 +350,7 @@ fn reviewed(report: &conceptweave_zotero::ClassificationReport) -> ReviewedClass
         server_id: report.server_id.clone(),
         zotero_version: report.zotero_version.clone(),
         library_version: report.library_version,
-        rule_revision: report.rule_revision.into(),
+        rule_revision: report.rule_revision.clone(),
         snapshot_digest: report.snapshot_digest.clone(),
         snapshot_items: report.snapshot_items.clone(),
         changes: vec![
@@ -578,7 +578,7 @@ fn write_plan_fails_closed_for_untrusted_stale_or_unsafe_changes() {
         server_id: None,
         zotero_version: no_server.zotero_version.clone(),
         library_version: no_server.library_version,
-        rule_revision: no_server.rule_revision.into(),
+        rule_revision: no_server.rule_revision.clone(),
         snapshot_digest: no_server.snapshot_digest.clone(),
         snapshot_items: no_server.snapshot_items.clone(),
         changes: vec![ReviewedClassificationChange {

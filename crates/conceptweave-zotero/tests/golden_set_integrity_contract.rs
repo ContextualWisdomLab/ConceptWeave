@@ -44,7 +44,7 @@ fn approval(
         receipt_id: "approved-review".into(),
         reviewer_subject: "synthetic-steward".into(),
         library_version: report.library_version,
-        rule_revision: report.rule_revision.into(),
+        rule_revision: report.rule_revision.clone(),
         snapshot_digest: classification_snapshot_digest(report),
         snapshot_items,
     }
