@@ -3,11 +3,12 @@
 
 use conceptweave_zotero::{build_steward_review_worksheet, read_local_snapshot};
 use std::env;
+use std::error::Error;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
-fn parse_output_request<I, S>(args: I) -> Result<(bool, String), &'static str>
+fn parse_output_request<I, S>(args: I) -> Result<(Option<String>, String), &'static str>
 where
     I: IntoIterator<Item = S>,
     S: Into<String>,
@@ -16,18 +17,34 @@ where
     let first = args
         .next()
         .ok_or("usage: conceptweave-zotero [--worksheet] /tmp/OUTPUT.json")?;
-    let (worksheet, output) = if first == "--worksheet" {
-        (
-            true,
-            args.next().ok_or("--worksheet requires an output path")?,
-        )
+    let request = if first == "--worksheet" {
+        let report = args.next().ok_or("--worksheet requires report and worksheet output paths")?;
+        let worksheet = args.next().ok_or("--worksheet requires report and worksheet output paths")?;
+        if report == worksheet {
+            return Err("report and worksheet output paths must differ");
+        }
+        (Some(report), worksheet)
     } else {
-        (false, first)
+        (None, first)
     };
     if args.next().is_some() {
         return Err("unexpected extra argument");
     }
-    Ok((worksheet, output))
+    Ok(request)
+}
+
+fn write_private_output(
+    path: &Path,
+    write: impl FnOnce(&mut BufWriter<File>) -> Result<(), Box<dyn Error>>,
+) -> Result<(), Box<dyn Error>> {
+    let file = create_report_file(path)?;
+    let mut writer = BufWriter::new(file);
+    if let Err(error) = write(&mut writer).and_then(|()| writer.flush().map_err(Into::into)) {
+        drop(writer);
+        let _ = fs::remove_file(path);
+        return Err(error);
+    }
+    Ok(())
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -117,20 +134,35 @@ fn create_report_file_with(
 #[cfg_attr(coverage_nightly, coverage(off))]
 /// Reads one Zotero snapshot and writes its sensitive local proposal report.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let (worksheet, output) = parse_output_request(env::args().skip(1))?;
+    let (report_output, output) = parse_output_request(env::args().skip(1))?;
     let output = validate_output_path(&output)?;
+    let report_output = report_output
+        .as_deref()
+        .map(validate_output_path)
+        .transpose()?;
     let report = read_local_snapshot()?;
     if report.zotero_version.starts_with("9.") {
         eprintln!("Zotero 9 Local API is read-only; writing local proposal output only");
     }
-    let file = create_report_file(&output)?;
-    let mut writer = BufWriter::new(file);
-    if worksheet {
-        serde_json::to_writer_pretty(&mut writer, &build_steward_review_worksheet(&report)?)?;
+    if let Some(report_output) = report_output {
+        let worksheet = build_steward_review_worksheet(&report)?;
+        write_private_output(&report_output, |writer| {
+            serde_json::to_writer_pretty(writer, &report)?;
+            Ok(())
+        })?;
+        if let Err(error) = write_private_output(&output, |writer| {
+            serde_json::to_writer_pretty(writer, &worksheet)?;
+            Ok(())
+        }) {
+            let _ = fs::remove_file(report_output);
+            return Err(error);
+        }
     } else {
-        serde_json::to_writer_pretty(&mut writer, &report)?;
+        write_private_output(&output, |writer| {
+            serde_json::to_writer_pretty(writer, &report)?;
+            Ok(())
+        })?;
     }
-    writer.flush()?;
     Ok(())
 }
 
@@ -155,6 +187,21 @@ mod tests {
         assert!(parse_output_request(vec!["--worksheet", report]).is_err());
         assert!(parse_output_request(vec![report, "extra"]).is_err());
         assert!(parse_output_request(vec!["--worksheet", report, report]).is_err());
+    }
+
+    #[test]
+    fn failed_private_output_is_removed_for_retry() {
+        let output = unique_temp_path("failed-output");
+        let _ = fs::remove_file(&output);
+        let error = write_private_output(&output, |_| {
+            Err(io::Error::new(io::ErrorKind::WriteZero, "injected write failure").into())
+        })
+        .unwrap_err();
+        assert_eq!(
+            error.downcast_ref::<io::Error>().unwrap().kind(),
+            io::ErrorKind::WriteZero
+        );
+        assert!(!output.exists());
     }
 
     fn unique_temp_path(suffix: &str) -> PathBuf {
