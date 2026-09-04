@@ -99,6 +99,19 @@ fn preflight_state(
     }
 }
 
+fn assert_receipt_binding(
+    receipt: &conceptweave_zotero::ClassificationWriteReceipt,
+    report: &conceptweave_zotero::ClassificationReport,
+) {
+    assert_eq!(receipt.review_id, "review-1");
+    assert_eq!(receipt.authority_receipt, "authority-1");
+    assert_eq!(receipt.server_id.as_deref(), Some("server-1"));
+    assert_eq!(receipt.zotero_version, report.zotero_version);
+    assert_eq!(receipt.library_version, 42);
+    assert_eq!(receipt.rule_revision, report.rule_revision);
+    assert_eq!(receipt.snapshot_digest, report.snapshot_digest);
+}
+
 #[test]
 fn every_receipt_binds_to_the_reviewed_plan_coordinates() {
     let report = classification_report();
@@ -111,12 +124,42 @@ fn every_receipt_binds_to_the_reviewed_plan_coordinates() {
         |_| -> Result<ClassificationItemState, ()> { panic!("dry-run must not write") },
     );
 
-    assert_eq!(receipt.review_id, "review-1");
-    assert_eq!(receipt.authority_receipt, "authority-1");
-    assert_eq!(receipt.server_id.as_deref(), Some("server-1"));
-    assert_eq!(receipt.library_version, 42);
-    assert_eq!(receipt.rule_revision, report.rule_revision);
-    assert_eq!(receipt.snapshot_digest, report.snapshot_digest);
+    assert_receipt_binding(&receipt, &report);
+}
+
+#[test]
+fn applied_and_preflight_failure_receipts_bind_to_the_reviewed_plan() {
+    let report = classification_report();
+    let plan =
+        build_classification_write_plan(&report, &reviewed(&report), WriteMode::Execute, |_| true)
+            .unwrap();
+    let preflight_failure = execute_classification_write_plan(
+        &plan,
+        |_| Err::<ClassificationItemState, ()>(()),
+        |_| -> Result<ClassificationItemState, ()> { panic!("preflight failure must not write") },
+    );
+    assert_eq!(
+        preflight_failure.outcome,
+        ClassificationWriteOutcome::PreflightFailure
+    );
+    assert_receipt_binding(&preflight_failure, &report);
+
+    let applied = execute_classification_write_plan(
+        &plan,
+        |item_key| Ok::<_, ()>(preflight_state(&plan, item_key)),
+        |request| {
+            Ok::<_, ()>(ClassificationItemState {
+                server_id: request.server_id.clone(),
+                library_version: request.library_version + 1,
+                item_key: request.item_key.clone(),
+                item_version: request.item_version + 1,
+                collection_keys: request.collection_keys.clone(),
+                tags: request.tags.clone(),
+            })
+        },
+    );
+    assert_eq!(applied.outcome, ClassificationWriteOutcome::Applied);
+    assert_receipt_binding(&applied, &report);
 }
 
 #[test]
@@ -166,6 +209,7 @@ fn confirmed_unexpected_mutation_retains_known_inverse_rollback() {
     );
 
     assert_eq!(receipt.outcome, ClassificationWriteOutcome::PartialFailure);
+    assert_receipt_binding(&receipt, &report);
     assert_eq!(receipt.failed_item_key.as_deref(), Some("A"));
     assert_eq!(receipt.indeterminate_item_key.as_deref(), Some("A"));
     assert_eq!(receipt.rollback_operations.len(), 1);
