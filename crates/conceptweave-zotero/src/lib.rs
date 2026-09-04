@@ -1210,7 +1210,7 @@ pub fn assess_steward_review_progress(
         total_count,
         decided_count,
         remaining_count,
-        complete: remaining_count == 0,
+        complete: total_count > 0 && remaining_count == 0,
     })
 }
 

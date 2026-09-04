@@ -88,4 +88,10 @@ fn progress_is_exact_aggregate_only_and_fail_closed() {
         assess_steward_review_progress(&report, &missing),
         Err(WorksheetError::InvalidReport)
     );
+
+    let empty_report = classify_snapshot("9.0.6".into(), None, 42, vec![]);
+    let empty_worksheet = build_steward_review_worksheet(&empty_report).unwrap();
+    let empty = assess_steward_review_progress(&empty_report, &empty_worksheet).unwrap();
+    assert_eq!(empty.total_count, 0);
+    assert!(!empty.complete);
 }
