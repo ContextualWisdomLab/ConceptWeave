@@ -21,7 +21,7 @@ fn item(key: &str, title: &str, abstract_note: &str) -> ZoteroItem {
 }
 
 #[test]
-fn review_batch_is_deterministic_bounded_and_patch_compatible() {
+fn review_batch_is_deterministic_bounded_and_requires_validated_conversion() {
     let report = classify_snapshot(
         "9.0.6".into(),
         None,

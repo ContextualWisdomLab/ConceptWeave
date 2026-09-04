@@ -19,6 +19,7 @@ All notable changes to ConceptWeave are documented here.
 - An explicit `--worksheet` CLI mode that writes the live worksheet with owner-only report protections.
 - Fail-closed conversion from a fully decided worksheet to the existing externally verified golden-set boundary.
 - Lossless owner-only classification-report deserialization for offline review finalization.
+- Context-bound validation and owner-only application of completed steward review batches.
 
 ### Security
 
