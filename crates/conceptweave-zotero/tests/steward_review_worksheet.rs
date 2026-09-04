@@ -60,12 +60,19 @@ fn worksheet_rejects_a_report_with_duplicate_source_identity() {
         "9.0.6".into(),
         None,
         42,
-        vec![item("A", "ontology learning"), item("A", "ontology learning")],
+        vec![
+            item("A", "ontology learning"),
+            item("A", "ontology learning"),
+        ],
     );
 
     assert_eq!(
         build_steward_review_worksheet(&report),
         Err(WorksheetError::InvalidReport)
     );
-    assert!(WorksheetError::InvalidReport.to_string().contains("invalid"));
+    assert!(
+        WorksheetError::InvalidReport
+            .to_string()
+            .contains("invalid")
+    );
 }
