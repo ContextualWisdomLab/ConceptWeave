@@ -1618,6 +1618,22 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
     }
 }
 
+/// Executes a reviewed plan through one server-bound Zotero 10 adapter.
+///
+/// The adapter may be created from a successful local authorization or from an
+/// exact caller-owned local key. The existing execution core retains dry-run,
+/// complete-preflight, reconciliation, and rollback-receipt behavior.
+pub fn execute_classification_write_plan_with_zotero10(
+    plan: &ClassificationWritePlan,
+    adapter: &Zotero10LocalAdapter,
+) -> ClassificationWriteReceipt {
+    execute_classification_write_plan(
+        plan,
+        |item_key| adapter.get_item(item_key),
+        |request| adapter.write_item(request),
+    )
+}
+
 fn matches_before_state(
     state: &ClassificationItemState,
     server_id: &str,
