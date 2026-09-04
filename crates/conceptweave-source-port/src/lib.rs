@@ -244,6 +244,8 @@ pub enum SourceObservationFailure {
     OperationTimeout,
     /// A source metadata statement exceeded the request timeout.
     StatementTimeout,
+    /// Captured source metadata was malformed, contradictory, duplicated, or otherwise inadmissible.
+    InvalidCapturedMetadata,
     /// Observed metadata exceeded the explicit row budget.
     RowLimitExceeded {
         /// Configured maximum row count.
@@ -265,10 +267,10 @@ pub enum SourceObservationFailure {
 ///
 /// Implementations must resolve credentials outside this contract, use only read-only source
 /// access, honor the exact schema allowlist, the total operation deadline, and every per-resource
-/// [`ObservationLimits`] bound, check caller cancellation, and return an error rather than a partial
-/// or invented snapshot when bounded observation cannot complete. Implementations own their
-/// scheduling model; blocking database work must not be performed on an asynchronous web executor
-/// thread.
+/// [`ObservationLimits`] bound, check caller cancellation, and return a typed failure rather than a
+/// partial or invented snapshot when captured metadata cannot construct the immutable snapshot.
+/// Implementations own their scheduling model; blocking database work must not be performed on an
+/// asynchronous web executor thread.
 pub trait SourceObservationPort {
     /// Immutable snapshot type produced only after a complete bounded observation.
     type Snapshot;
