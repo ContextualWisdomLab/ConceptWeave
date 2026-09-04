@@ -485,9 +485,23 @@ impl Zotero10LocalAuthorization {
             .header("Zotero-Server-ID", &server_id)
             .send(serde_json::json!({ "appName": app_name }).to_string())
             .map_err(|_| ZoteroTransportError::RequestFailed)?;
+        verify_server_id(response.headers(), &server_id)?;
         match response.status().as_u16() {
             401 => return Err(ZoteroTransportError::Unauthorized),
-            403 => return Err(ZoteroTransportError::Denied),
+            403 => {
+                #[derive(Deserialize)]
+                struct DenialResponse {
+                    denied: bool,
+                }
+                let body = bounded_body_with_limit(&mut response, MAX_AUTH_RESPONSE_BYTES)?;
+                let denial: DenialResponse = serde_json::from_str(&body)
+                    .map_err(|_| ZoteroTransportError::InvalidResponse)?;
+                return if denial.denied {
+                    Err(ZoteroTransportError::Denied)
+                } else {
+                    Err(ZoteroTransportError::InvalidResponse)
+                };
+            }
             429 => {
                 return Err(ZoteroTransportError::RateLimited {
                     retry_after_seconds: retry_after_seconds(response.headers()),
@@ -496,7 +510,6 @@ impl Zotero10LocalAuthorization {
             200 => {}
             _ => return Err(ZoteroTransportError::RequestFailed),
         }
-        verify_server_id(response.headers(), &server_id)?;
         #[derive(Deserialize)]
         struct AuthorizationResponse {
             key: String,
@@ -646,6 +659,7 @@ impl Zotero10LocalAdapter {
             .header("Content-Type", "application/json")
             .send(body)
             .map_err(|_| ZoteroTransportError::RequestFailed)?;
+        self.verify_server(response.headers())?;
         match response.status().as_u16() {
             401 => return Err(ZoteroTransportError::ReauthorizationRequired),
             412 => return Err(ZoteroTransportError::StalePrecondition),
@@ -654,7 +668,6 @@ impl Zotero10LocalAdapter {
         if response.status() != ureq::http::StatusCode::OK {
             return Err(ZoteroTransportError::RequestFailed);
         }
-        self.verify_server(response.headers())?;
         let library_version = version_header(response.headers())?;
         #[derive(Deserialize)]
         struct WriteResponse {
@@ -2479,25 +2492,21 @@ mod tests {
     fn zotero10_authorization_denial_and_rate_limit_are_single_attempt_errors() {
         for (response, expected) in [
             (
-                "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-                    .to_owned(),
+                authorize_response("403 Forbidden", Some("server-10"), r#"{"denied":true}"#),
                 ZoteroTransportError::Denied,
             ),
             (
-                "HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-                    .to_owned(),
+                authorize_response("401 Unauthorized", Some("server-10"), ""),
                 ZoteroTransportError::Unauthorized,
             ),
             (
-                "HTTP/1.1 429 Too Many Requests\r\nRetry-After: 17\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-                    .to_owned(),
+                "HTTP/1.1 429 Too Many Requests\r\nZotero-Server-ID: server-10\r\nRetry-After: 17\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_owned(),
                 ZoteroTransportError::RateLimited {
                     retry_after_seconds: Some(17),
                 },
             ),
             (
-                "HTTP/1.1 429 Too Many Requests\r\nRetry-After: 999999999999\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-                    .to_owned(),
+                "HTTP/1.1 429 Too Many Requests\r\nZotero-Server-ID: server-10\r\nRetry-After: 999999999999\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_owned(),
                 ZoteroTransportError::RateLimited {
                     retry_after_seconds: None,
                 },
@@ -2514,6 +2523,23 @@ mod tests {
             );
             assert_eq!(server.join().unwrap().len(), 1);
         }
+
+        for response in [
+            authorize_response("403 Forbidden", Some("server-10"), ""),
+            authorize_response("403 Forbidden", Some("server-10"), r#"{"denied":false}"#),
+            authorize_response("403 Forbidden", None, r#"{"denied":true}"#),
+        ] {
+            let (items_base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+            assert!(matches!(
+                authorization_error(Zotero10LocalAuthorization::request_with_base(
+                    "ConceptWeave",
+                    "server-10",
+                    items_base.replace("/api/users/0/items", ""),
+                )),
+                ZoteroTransportError::InvalidResponse
+            ));
+            assert_eq!(server.join().unwrap().len(), 1);
+        }
     }
 
     #[test]
@@ -2528,8 +2554,9 @@ mod tests {
                 ZoteroTransportError::StalePrecondition,
             ),
         ] {
-            let response =
-                format!("HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+            let response = format!(
+                "HTTP/1.1 {status}\r\nZotero-Server-ID: server-10\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            );
             let (base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
             assert_eq!(
                 transport(base).write_item(&write_request()).unwrap_err(),
@@ -2634,8 +2661,7 @@ mod tests {
 
     #[test]
     fn zotero10_transport_rejects_stale_non_success_and_server_mismatch() {
-        let stale =
-            "HTTP/1.1 412 Precondition Failed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        let stale = "HTTP/1.1 412 Precondition Failed\r\nZotero-Server-ID: server-10\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
         let (base, server) = serve(vec![stale]);
         let request = ClassificationWriteRequest {
             server_id: "server-10".into(),
@@ -2650,6 +2676,14 @@ mod tests {
             ZoteroTransportError::StalePrecondition
         );
         assert!(server.join().unwrap()[0].starts_with("POST "));
+
+        let switched = "HTTP/1.1 412 Precondition Failed\r\nZotero-Server-ID: other-server\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        let (base, server) = serve(vec![switched]);
+        assert_eq!(
+            transport(base).write_item(&request).unwrap_err(),
+            ZoteroTransportError::ServerMismatch
+        );
+        server.join().unwrap();
 
         let mut mismatched_request = request.clone();
         mismatched_request.server_id = "other-server".into();
