@@ -1138,11 +1138,18 @@ pub fn build_steward_review_worksheet(
         return Err(WorksheetError::InvalidReport);
     }
 
-    let mut snapshot_versions = BTreeMap::new();
+    let mut snapshot_coordinates = BTreeMap::new();
     for item in &report.snapshot_items {
         if item.item_key.trim().is_empty()
-            || snapshot_versions
-                .insert(item.item_key.as_str(), item.item_version)
+            || item
+                .parent_item_key
+                .as_ref()
+                .is_some_and(|parent_key| parent_key.trim().is_empty())
+            || snapshot_coordinates
+                .insert(
+                    item.item_key.as_str(),
+                    (item.item_version, item.parent_item_key.as_deref()),
+                )
                 .is_some()
         {
             return Err(WorksheetError::InvalidReport);
@@ -1153,11 +1160,13 @@ pub fn build_steward_review_worksheet(
     let mut decisions = Vec::with_capacity(report.classified_items.len());
     for item in &report.classified_items {
         if !decision_keys.insert(item.item_key.as_str())
-            || snapshot_versions.get(item.item_key.as_str()) != Some(&item.item_version)
-            || item
-                .child_item_keys
-                .iter()
-                .any(|child_key| !snapshot_versions.contains_key(child_key.as_str()))
+            || snapshot_coordinates.get(item.item_key.as_str()) != Some(&(item.item_version, None))
+            || item.child_item_keys.iter().any(|child_key| {
+                !matches!(
+                    snapshot_coordinates.get(child_key.as_str()),
+                    Some((_, Some(parent_key))) if *parent_key == item.item_key
+                )
+            })
             || (item.proposed_disposition == Disposition::NeedsStewardReview)
                 != item.abstention_reason.is_some()
         {
@@ -1274,6 +1283,8 @@ pub struct SnapshotItemRevision {
     pub item_key: String,
     /// Item revision observed during review.
     pub item_version: u64,
+    /// Parent item key for child records; absent for top-level records.
+    pub parent_item_key: Option<String>,
 }
 
 /// Governance receipt binding a steward approval to one exact classifier input.
@@ -1662,6 +1673,7 @@ where
                     .map(|item_version| SnapshotItemRevision {
                         item_key: (*item_key).clone(),
                         item_version: *item_version,
+                        parent_item_key: None,
                     })
                     .ok_or(DuplicateReviewError::InvalidReview)
             })
@@ -2535,6 +2547,8 @@ pub fn classify_snapshot(
         .map(|item| SnapshotItemRevision {
             item_key: item.key.clone(),
             item_version: item.version,
+            parent_item_key: (!item.data.parent_item.is_empty())
+                .then(|| item.data.parent_item.clone()),
         })
         .collect();
     let snapshot_bytes = serde_json::to_vec(&items)
