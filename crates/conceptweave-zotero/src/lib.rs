@@ -2528,6 +2528,11 @@ mod tests {
             authorize_response("403 Forbidden", Some("server-10"), ""),
             authorize_response("403 Forbidden", Some("server-10"), r#"{"denied":false}"#),
             authorize_response("403 Forbidden", None, r#"{"denied":true}"#),
+            authorize_response(
+                "403 Forbidden",
+                Some("server-10"),
+                &"x".repeat((MAX_AUTH_RESPONSE_BYTES + 1) as usize),
+            ),
         ] {
             let (items_base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
             assert!(matches!(
