@@ -60,6 +60,8 @@ Read one immutable Zotero Local API library-version snapshot and propose exactly
 
 Evaluate classifier quality only against a version-bound, steward-reviewed local golden set. Evaluation emits aggregate counts for exact matches, abstentions, and per-disposition true-positive/predicted/expected totals; it must not copy Zotero keys or bibliographic text into the result.
 
+Every successful classification report includes aggregate evidence for snapshot coverage, proposal coverage, provenance completeness, abstentions, duplicate candidates, disposition totals, and zero unreported failures.
+
 ## 6. First vertical slice
 
 Relational schema snapshot -> observed tables/columns/foreign keys -> concept/relation/dimension/measure/mapping candidates -> evidence-bound validation report -> reviewable proposal package.

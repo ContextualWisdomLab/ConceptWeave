@@ -21,6 +21,8 @@ Matched metadata values are copied into the local-only evidence receipt for repl
 
 Classifier quality is measured only against local steward-reviewed labels bound to the same library and rule revisions. Evaluation returns aggregate integer evidence for precision, recall, exact matches, and abstentions; Zotero keys and bibliographic text are deliberately omitted from evaluation output. Missing, stale, unknown, or duplicate review identities fail closed.
 
+Every successful report includes an aggregate audit summary computed from the same captured snapshot. Partial reads never produce a report, so successful output explicitly records zero failures alongside snapshot, proposal, provenance, abstention, duplicate, and per-disposition totals.
+
 The reader fails closed above 50,000 items or 256 MiB of cumulative response bodies, while retaining the 8 MiB per-page bound, finite request timeouts, redirect denial, total-count checks, snapshot-version checks, and duplicate-key detection. Pagination, consistency, resource-budget, and provider-contract behavior are separated from the narrow `ureq` transport so deterministic tests exercise the production reader core rather than excluding the entire reader from coverage.
 
 Report output is restricted to a new direct child of the operating system temporary directory. Relative paths, nested paths, existing files, and symlinks are rejected before write; the file is opened with create-new semantics so a path swap cannot cause repository or arbitrary-file overwrite. The buffered writer is explicitly flushed and a final filesystem error fails the command. Reports stay local and are never committed.
