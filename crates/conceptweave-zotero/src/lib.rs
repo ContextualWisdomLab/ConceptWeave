@@ -2718,8 +2718,7 @@ mod tests {
         server.join().unwrap();
 
         for response in [
-            "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-                .to_owned(),
+            "HTTP/1.1 500 Internal Server Error\r\nZotero-Server-ID: server-10\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_owned(),
             library_response("other-server", 42),
         ] {
             let (base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
