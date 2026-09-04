@@ -636,6 +636,49 @@ mod tests {
         );
     }
 
+    #[test]
+    fn review_batch_mode_requires_distinct_paths_and_decimal_limit() {
+        let report = "/tmp/report.json";
+        let worksheet = "/tmp/worksheet.json";
+        let output = "/tmp/batch.json";
+        assert_eq!(
+            parse_output_request(vec!["--review-batch", report, worksheet, "25", output]),
+            Ok(OutputRequest::ReviewBatch {
+                report: report.to_owned(),
+                worksheet: worksheet.to_owned(),
+                limit: 25,
+                output: output.to_owned(),
+            })
+        );
+        for limit in ["", "0", "101", " 1", "+1", "-1", "one"] {
+            assert!(
+                parse_output_request(vec!["--review-batch", report, worksheet, limit, output])
+                    .is_err()
+            );
+        }
+        assert!(parse_output_request(vec!["--review-batch"]).is_err());
+        assert!(parse_output_request(vec!["--review-batch", report]).is_err());
+        assert!(parse_output_request(vec!["--review-batch", report, worksheet]).is_err());
+        assert!(parse_output_request(vec!["--review-batch", report, worksheet, "25"]).is_err());
+        assert!(
+            parse_output_request(vec!["--review-batch", report, report, "25", output]).is_err()
+        );
+        assert!(
+            parse_output_request(vec!["--review-batch", report, worksheet, "25", report]).is_err()
+        );
+        assert!(
+            parse_output_request(vec![
+                "--review-batch",
+                report,
+                worksheet,
+                "25",
+                output,
+                "extra",
+            ])
+            .is_err()
+        );
+    }
+
     #[cfg(unix)]
     #[test]
     fn private_json_input_is_owner_only_regular_bounded_and_valid() {
