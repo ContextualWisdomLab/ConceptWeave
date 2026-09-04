@@ -45,13 +45,7 @@ fn steward_abstention_reason_is_explicit_and_deterministic() {
     );
     assert!(report.classified_items[1..=7].iter().all(|item| {
         item.proposed_disposition == Disposition::NeedsStewardReview
-            && matches!(
-                item.abstention_reason,
-                Some(
-                    AbstentionReason::UnsupportedRuleVocabulary
-                        | AbstentionReason::NoDeterministicRuleMatch
-                )
-            )
+            && item.abstention_reason == Some(AbstentionReason::UnsupportedRuleVocabulary)
     }));
     assert_eq!(
         report.classified_items[8].abstention_reason,
