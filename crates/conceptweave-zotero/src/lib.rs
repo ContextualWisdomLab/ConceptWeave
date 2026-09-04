@@ -1136,6 +1136,8 @@ pub enum EvaluationError {
     UnknownItem,
     /// A reviewed key occurs more than once.
     DuplicateItem,
+    /// The reviewed labels do not cover every bibliographic item.
+    IncompleteReview,
 }
 
 impl fmt::Display for EvaluationError {
@@ -1149,11 +1151,30 @@ impl fmt::Display for EvaluationError {
             }
             Self::UnknownItem => "golden set contains an item absent from the report",
             Self::DuplicateItem => "golden set contains a duplicate item",
+            Self::IncompleteReview => {
+                "complete review must label every bibliographic item exactly once"
+            }
         })
     }
 }
 
 impl std::error::Error for EvaluationError {}
+
+/// Evaluates a steward review only when it covers every bibliographic item.
+pub fn evaluate_complete_reviewed_classification<F>(
+    report: &ClassificationReport,
+    golden: &ReviewedGoldenSet,
+    verify_approval: F,
+) -> Result<GoldenSetEvaluation, EvaluationError>
+where
+    F: FnOnce(&ReviewedGoldenSet) -> bool,
+{
+    let evaluation = evaluate_reviewed_golden_set(report, golden, verify_approval)?;
+    if evaluation.reviewed_count != report.classified_items.len() {
+        return Err(EvaluationError::IncompleteReview);
+    }
+    Ok(evaluation)
+}
 
 /// Evaluates reviewed labels without copying item identities into the result.
 pub fn evaluate_reviewed_golden_set<F>(

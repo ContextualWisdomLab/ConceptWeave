@@ -262,6 +262,7 @@ fn reviewed_golden_set_rejects_stale_unknown_and_duplicate_labels() {
         (EvaluationError::InvalidExpectedDisposition, "abstention"),
         (EvaluationError::UnknownItem, "absent"),
         (EvaluationError::DuplicateItem, "duplicate"),
+        (EvaluationError::IncompleteReview, "every bibliographic"),
     ] {
         assert!(error.to_string().contains(fragment));
     }
