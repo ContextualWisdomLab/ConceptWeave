@@ -10,6 +10,7 @@ description = "Read-only Zotero research classification for ConceptWeave"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 ureq = { version = "3", default-features = false }
 
 [lib]

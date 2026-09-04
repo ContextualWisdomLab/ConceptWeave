@@ -1,6 +1,7 @@
 use conceptweave_zotero::{
     Disposition, EvaluationError, GoldenLabel, GoldenSetApproval, ItemData, ReviewedGoldenSet,
-    SnapshotItemRevision, ZoteroItem, classify_snapshot, evaluate_reviewed_golden_set,
+    SnapshotItemRevision, ZoteroItem, classification_snapshot_digest, classify_snapshot,
+    evaluate_reviewed_golden_set,
 };
 
 fn item(key: &str, title: &str) -> ZoteroItem {
@@ -39,7 +40,7 @@ fn golden(labels: Vec<GoldenLabel>) -> ReviewedGoldenSet {
             reviewer_subject: "synthetic-steward".into(),
             library_version: 42,
             rule_revision: "ontology-research-v2".into(),
-            snapshot_digest: "sha256:synthetic-snapshot".into(),
+            snapshot_digest: classification_snapshot_digest(&report()),
             snapshot_items: ["A", "B", "C"]
                 .into_iter()
                 .map(|item_key| SnapshotItemRevision {
@@ -87,7 +88,7 @@ fn reviewed_golden_set_reports_count_based_precision_and_recall_evidence() {
     assert_eq!(evaluation.review_id, "synthetic-review-1");
     assert_eq!(evaluation.library_version, 42);
     assert_eq!(evaluation.rule_revision, "ontology-research-v2");
-    assert_eq!(evaluation.snapshot_digest, "sha256:synthetic-snapshot");
+    assert!(evaluation.snapshot_digest.starts_with("sha256:"));
     assert_eq!(evaluation.reviewed_count, 3);
     assert_eq!(evaluation.correct_count, 1);
     assert_eq!(evaluation.abstention_count, 1);

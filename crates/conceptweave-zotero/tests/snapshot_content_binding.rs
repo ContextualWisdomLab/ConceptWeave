@@ -21,12 +21,8 @@ fn item(title: &str) -> ZoteroItem {
 
 #[test]
 fn golden_approval_rejects_same_revision_coordinates_with_changed_snapshot_content() {
-    let changed_report = classify_snapshot(
-        "9.0.6".into(),
-        None,
-        42,
-        vec![item("ontology evaluation")],
-    );
+    let changed_report =
+        classify_snapshot("9.0.6".into(), None, 42, vec![item("ontology evaluation")]);
     let golden = ReviewedGoldenSet {
         approval: GoldenSetApproval {
             receipt_id: "review-original-snapshot".into(),
