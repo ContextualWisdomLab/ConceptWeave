@@ -102,13 +102,9 @@ fn preflight_state(
 #[test]
 fn every_receipt_binds_to_the_reviewed_plan_coordinates() {
     let report = classification_report();
-    let plan = build_classification_write_plan(
-        &report,
-        &reviewed(&report),
-        WriteMode::DryRun,
-        |_| true,
-    )
-    .unwrap();
+    let plan =
+        build_classification_write_plan(&report, &reviewed(&report), WriteMode::DryRun, |_| true)
+            .unwrap();
     let receipt = execute_classification_write_plan(
         &plan,
         |_| -> Result<ClassificationItemState, ()> { panic!("dry-run must not preflight") },
@@ -126,13 +122,9 @@ fn every_receipt_binds_to_the_reviewed_plan_coordinates() {
 #[test]
 fn dry_run_receipt_enumerates_every_operation_as_not_attempted() {
     let report = classification_report();
-    let plan = build_classification_write_plan(
-        &report,
-        &reviewed(&report),
-        WriteMode::DryRun,
-        |_| true,
-    )
-    .unwrap();
+    let plan =
+        build_classification_write_plan(&report, &reviewed(&report), WriteMode::DryRun, |_| true)
+            .unwrap();
     let receipt = execute_classification_write_plan(
         &plan,
         |_| -> Result<ClassificationItemState, ()> { panic!("dry-run must not preflight") },
@@ -146,13 +138,9 @@ fn dry_run_receipt_enumerates_every_operation_as_not_attempted() {
 #[test]
 fn confirmed_unexpected_mutation_retains_known_inverse_rollback() {
     let report = classification_report();
-    let plan = build_classification_write_plan(
-        &report,
-        &reviewed(&report),
-        WriteMode::Execute,
-        |_| true,
-    )
-    .unwrap();
+    let plan =
+        build_classification_write_plan(&report, &reviewed(&report), WriteMode::Execute, |_| true)
+            .unwrap();
     let initial_preflight_count = plan.operations().len();
     let mut reads = 0usize;
 
