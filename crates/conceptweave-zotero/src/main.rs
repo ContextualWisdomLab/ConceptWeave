@@ -306,7 +306,6 @@ fn write_private_output(path: &Path, content: &[u8]) -> io::Result<()> {
     write_private_output_with(path, content, write_all_and_flush)
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
 /// Writes and flushes the complete serialized artifact.
 fn write_all_and_flush(writer: &mut BufWriter<File>, content: &[u8]) -> io::Result<()> {
     writer.write_all(content)?;
@@ -329,7 +328,6 @@ fn write_private_output_with(
     Ok(())
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
 /// Returns canonical directories in which a sensitive report may be created.
 fn allowed_output_parents() -> Vec<PathBuf> {
     let mut parents = vec![
