@@ -57,18 +57,21 @@ fn create_report_file(path: &Path) -> io::Result<File> {
 
     #[cfg(unix)]
     {
-        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-
-        create_report_file_with(path, |file| {
-            file.set_permissions(fs::Permissions::from_mode(0o600))
-        })
+        create_report_file_with(path, set_owner_only_permissions)
     }
+}
+
+#[cfg(unix)]
+fn set_owner_only_permissions(file: &File) -> io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    file.set_permissions(fs::Permissions::from_mode(0o600))
 }
 
 #[cfg(unix)]
 fn create_report_file_with(
     path: &Path,
-    set_permissions: impl FnOnce(&File) -> io::Result<()>,
+    set_permissions: fn(&File) -> io::Result<()>,
 ) -> io::Result<File> {
     use std::os::unix::fs::OpenOptionsExt;
 
