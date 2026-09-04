@@ -248,7 +248,7 @@ fn duplicate_review_rejects_ambiguous_snapshot_key_revisions() {
             .duplicate_candidates
             .iter()
             .map(|candidate| DuplicateMergeDecision {
-                identity_kind: candidate.identity_kind.into(),
+                identity_kind: candidate.identity_kind.clone(),
                 normalized_identity: candidate.normalized_identity.clone(),
                 retained_item_key: "DUPKEY".into(),
             })

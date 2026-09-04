@@ -46,7 +46,7 @@ fn transitive_duplicate_component_accepts_one_component_level_canonical_key() {
             .duplicate_candidates
             .iter()
             .map(|candidate| DuplicateMergeDecision {
-                identity_kind: candidate.identity_kind.into(),
+                identity_kind: candidate.identity_kind.clone(),
                 normalized_identity: candidate.normalized_identity.clone(),
                 retained_item_key: "A".into(),
             })
@@ -99,7 +99,7 @@ fn duplicate_review_rejects_blank_snapshot_item_identity() {
         snapshot_items: report.snapshot_items.clone(),
         duplicate_candidates: report.duplicate_candidates.clone(),
         decisions: vec![DuplicateMergeDecision {
-            identity_kind: candidate.identity_kind.into(),
+            identity_kind: candidate.identity_kind.clone(),
             normalized_identity: candidate.normalized_identity.clone(),
             retained_item_key: "B".into(),
         }],
@@ -143,7 +143,7 @@ fn duplicate_review_binds_every_item_revision_to_the_reviewed_snapshot() {
             .duplicate_candidates
             .iter()
             .map(|candidate| DuplicateMergeDecision {
-                identity_kind: candidate.identity_kind.into(),
+                identity_kind: candidate.identity_kind.clone(),
                 normalized_identity: candidate.normalized_identity.clone(),
                 retained_item_key: "A".into(),
             })
