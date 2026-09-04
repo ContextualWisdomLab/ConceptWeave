@@ -135,4 +135,17 @@ fn restored_report_rejects_classified_or_reused_child_provenance() {
         build_steward_review_worksheet(&duplicate_child),
         Err(WorksheetError::InvalidReport)
     );
+
+    let mut orphaned_child: ClassificationReport = serde_json::from_slice(&serialized).unwrap();
+    orphaned_child.classified_items[0].child_item_keys.clear();
+    orphaned_child
+        .snapshot_items
+        .iter_mut()
+        .find(|item| item.item_key == "CHILD")
+        .unwrap()
+        .parent_item_key = Some("UNCLASSIFIED_PARENT".into());
+    assert_eq!(
+        build_steward_review_worksheet(&orphaned_child),
+        Err(WorksheetError::InvalidReport)
+    );
 }
