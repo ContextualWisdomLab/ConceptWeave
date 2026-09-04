@@ -102,13 +102,9 @@ fn preflight_state(
 #[test]
 fn every_receipt_binds_to_the_reviewed_plan_coordinates() {
     let report = classification_report();
-    let plan = build_classification_write_plan(
-        &report,
-        &reviewed(&report),
-        WriteMode::DryRun,
-        |_| true,
-    )
-    .unwrap();
+    let plan =
+        build_classification_write_plan(&report, &reviewed(&report), WriteMode::DryRun, |_| true)
+            .unwrap();
     let receipt = execute_classification_write_plan(
         &plan,
         |_| -> Result<ClassificationItemState, ()> { panic!("dry-run must not preflight") },
@@ -126,13 +122,9 @@ fn every_receipt_binds_to_the_reviewed_plan_coordinates() {
 #[test]
 fn dry_run_receipt_enumerates_every_operation_as_not_attempted() {
     let report = classification_report();
-    let plan = build_classification_write_plan(
-        &report,
-        &reviewed(&report),
-        WriteMode::DryRun,
-        |_| true,
-    )
-    .unwrap();
+    let plan =
+        build_classification_write_plan(&report, &reviewed(&report), WriteMode::DryRun, |_| true)
+            .unwrap();
     let receipt = execute_classification_write_plan(
         &plan,
         |_| -> Result<ClassificationItemState, ()> { panic!("dry-run must not preflight") },
@@ -146,13 +138,9 @@ fn dry_run_receipt_enumerates_every_operation_as_not_attempted() {
 #[test]
 fn confirmed_unexpected_mutation_retains_known_inverse_rollback() {
     let report = classification_report();
-    let plan = build_classification_write_plan(
-        &report,
-        &reviewed(&report),
-        WriteMode::Execute,
-        |_| true,
-    )
-    .unwrap();
+    let plan =
+        build_classification_write_plan(&report, &reviewed(&report), WriteMode::Execute, |_| true)
+            .unwrap();
     let initial_preflight_count = plan.operations().len();
     let mut reads = 0usize;
 
@@ -185,4 +173,43 @@ fn confirmed_unexpected_mutation_retains_known_inverse_rollback() {
     assert_eq!(receipt.rollback_operations[0].item_version, 8);
     assert!(receipt.rollback_operations[0].collection_keys.is_empty());
     assert!(receipt.rollback_operations[0].tags.is_empty());
+}
+
+#[test]
+fn unexpected_mutation_requires_the_planned_server_and_item_identity() {
+    for (server_id, item_key) in [("other-server", "A"), ("server-1", "other-item")] {
+        let report = classification_report();
+        let plan = build_classification_write_plan(
+            &report,
+            &reviewed(&report),
+            WriteMode::Execute,
+            |_| true,
+        )
+        .unwrap();
+        let initial_preflight_count = plan.operations().len();
+        let mut reads = 0usize;
+
+        let receipt = execute_classification_write_plan(
+            &plan,
+            |requested_item_key| {
+                reads += 1;
+                if reads <= initial_preflight_count {
+                    return Ok::<_, ()>(preflight_state(&plan, requested_item_key));
+                }
+
+                Ok::<_, ()>(ClassificationItemState {
+                    server_id: server_id.into(),
+                    library_version: 43,
+                    item_key: item_key.into(),
+                    item_version: 8,
+                    collection_keys: vec!["unexpected_collection".into()],
+                    tags: vec![],
+                })
+            },
+            |_| Err::<ClassificationItemState, _>(()),
+        );
+
+        assert_eq!(receipt.indeterminate_item_key.as_deref(), Some("A"));
+        assert!(receipt.rollback_operations.is_empty());
+    }
 }

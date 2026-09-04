@@ -693,6 +693,18 @@ pub enum ClassificationWriteOutcome {
 /// Secret-free evidence for applied, failed, pending, and reversible writes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ClassificationWriteReceipt {
+    /// Opaque review receipt identifier bound to this attempt.
+    pub review_id: String,
+    /// Opaque governance authority receipt bound to this attempt.
+    pub authority_receipt: String,
+    /// Exact Local API server identity bound to this attempt.
+    pub server_id: Option<String>,
+    /// Exact library-version precondition bound to this attempt.
+    pub library_version: u64,
+    /// Exact classifier revision bound to this attempt.
+    pub rule_revision: String,
+    /// Exact raw-snapshot digest bound to this attempt.
+    pub snapshot_digest: String,
     /// Overall execution outcome.
     pub outcome: ClassificationWriteOutcome,
     /// Items whose post-write state was verified, in application order.
@@ -1372,11 +1384,21 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
 ) -> ClassificationWriteReceipt {
     if plan.mode == WriteMode::DryRun {
         return ClassificationWriteReceipt {
+            review_id: plan.review_id.clone(),
+            authority_receipt: plan.authority_receipt.clone(),
+            server_id: plan.server_id.clone(),
+            library_version: plan.library_version,
+            rule_revision: plan.rule_revision.clone(),
+            snapshot_digest: plan.snapshot_digest.clone(),
             outcome: ClassificationWriteOutcome::DryRun,
             applied_item_keys: Vec::new(),
             failed_item_key: None,
             indeterminate_item_key: None,
-            not_attempted_item_keys: Vec::new(),
+            not_attempted_item_keys: plan
+                .operations
+                .iter()
+                .map(|operation| operation.item_key.clone())
+                .collect(),
             rollback_operations: Vec::new(),
         };
     }
@@ -1419,8 +1441,20 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
             let reconciled_before = reconciled_state.as_ref().is_some_and(|state| {
                 matches_before_state(state, server_id, current_library_version, operation)
             });
-            if let Some(state) = reconciled_state.filter(|_| reconciled_after) {
+            if let Some(state) = reconciled_state.as_ref().filter(|_| reconciled_after) {
                 applied_item_keys.push(operation.item_key.clone());
+                rollback_operations.push(ClassificationRollbackOperation {
+                    item_key: operation.item_key.clone(),
+                    item_version: state.item_version,
+                    collection_keys: operation.rollback_collection_keys.clone(),
+                    tags: operation.rollback_tags.clone(),
+                });
+            } else if let Some(state) = reconciled_state.as_ref().filter(|state| {
+                state.server_id == server_id
+                    && state.library_version > current_library_version
+                    && state.item_key == operation.item_key
+                    && state.item_version > operation.item_version
+            }) {
                 rollback_operations.push(ClassificationRollbackOperation {
                     item_key: operation.item_key.clone(),
                     item_version: state.item_version,
@@ -1448,6 +1482,12 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
     }
     rollback_operations.reverse();
     ClassificationWriteReceipt {
+        review_id: plan.review_id.clone(),
+        authority_receipt: plan.authority_receipt.clone(),
+        server_id: plan.server_id.clone(),
+        library_version: plan.library_version,
+        rule_revision: plan.rule_revision.clone(),
+        snapshot_digest: plan.snapshot_digest.clone(),
         outcome: ClassificationWriteOutcome::Applied,
         applied_item_keys,
         failed_item_key: None,
@@ -1494,6 +1534,12 @@ fn preflight_failure_receipt(
     failed_item_key: Option<&str>,
 ) -> ClassificationWriteReceipt {
     ClassificationWriteReceipt {
+        review_id: plan.review_id.clone(),
+        authority_receipt: plan.authority_receipt.clone(),
+        server_id: plan.server_id.clone(),
+        library_version: plan.library_version,
+        rule_revision: plan.rule_revision.clone(),
+        snapshot_digest: plan.snapshot_digest.clone(),
         outcome: ClassificationWriteOutcome::PreflightFailure,
         applied_item_keys: Vec::new(),
         failed_item_key: failed_item_key.map(str::to_owned),
@@ -1515,6 +1561,12 @@ fn partial_failure_receipt(
     indeterminate_item_key: Option<&str>,
 ) -> ClassificationWriteReceipt {
     ClassificationWriteReceipt {
+        review_id: plan.review_id.clone(),
+        authority_receipt: plan.authority_receipt.clone(),
+        server_id: plan.server_id.clone(),
+        library_version: plan.library_version,
+        rule_revision: plan.rule_revision.clone(),
+        snapshot_digest: plan.snapshot_digest.clone(),
         outcome: ClassificationWriteOutcome::PartialFailure,
         applied_item_keys,
         failed_item_key: Some(plan.operations[failed_index].item_key.clone()),
