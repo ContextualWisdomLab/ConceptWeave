@@ -78,11 +78,7 @@ fn finalization_rejects_each_invalid_identity_coordinate() {
     let mut invalid_report = report();
     invalid_report.rule_revision = "";
     assert_eq!(
-        reviewed_golden_set_from_worksheet(
-            &invalid_report,
-            &worksheet,
-            approval(&worksheet)
-        ),
+        reviewed_golden_set_from_worksheet(&invalid_report, &worksheet, approval(&worksheet)),
         Err(EvaluationError::InvalidReview)
     );
 
