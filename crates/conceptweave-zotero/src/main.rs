@@ -3,9 +3,9 @@
 
 use conceptweave_zotero::{
     ClassificationReport, GoldenSetApproval, MAX_REVIEW_BATCH_ITEMS, StewardDecisionPatch,
-    StewardReviewWorksheet, apply_steward_decision_patch, assess_steward_review_progress,
-    build_steward_review_batch, build_steward_review_worksheet, read_local_snapshot,
-    reviewed_golden_set_from_worksheet,
+    StewardReviewBatch, StewardReviewWorksheet, apply_steward_decision_patch,
+    assess_steward_review_progress, build_steward_review_batch, build_steward_review_worksheet,
+    decision_patch_from_review_batch, read_local_snapshot, reviewed_golden_set_from_worksheet,
 };
 use serde::de::DeserializeOwned;
 use std::collections::BTreeSet;
@@ -14,7 +14,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
-const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --review-progress /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/PROGRESS.json | --review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json LIMIT /tmp/BATCH.json | --apply-decision-patch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/PATCH.json /tmp/UPDATED_WORKSHEET.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
+const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --review-progress /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/PROGRESS.json | --review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json LIMIT /tmp/BATCH.json | --apply-review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/COMPLETED_BATCH.json /tmp/UPDATED_WORKSHEET.json | --apply-decision-patch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/PATCH.json /tmp/UPDATED_WORKSHEET.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
 const MAX_ARTIFACT_BYTES: u64 = 16 * 1024 * 1024;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -39,6 +39,12 @@ enum OutputRequest {
         report: String,
         worksheet: String,
         patch: String,
+        output: String,
+    },
+    ApplyReviewBatch {
+        report: String,
+        worksheet: String,
+        batch: String,
         output: String,
     },
     Finalize {
@@ -115,6 +121,36 @@ where
             report,
             worksheet,
             limit,
+            output,
+        }
+    } else if first == "--apply-review-batch" {
+        let report = args
+            .next()
+            .ok_or("--apply-review-batch requires four artifact paths")?;
+        let worksheet = args
+            .next()
+            .ok_or("--apply-review-batch requires four artifact paths")?;
+        let batch = args
+            .next()
+            .ok_or("--apply-review-batch requires four artifact paths")?;
+        let output = args
+            .next()
+            .ok_or("--apply-review-batch requires four artifact paths")?;
+        if BTreeSet::from([
+            report.as_str(),
+            worksheet.as_str(),
+            batch.as_str(),
+            output.as_str(),
+        ])
+        .len()
+            != 4
+        {
+            return Err("review batch application artifact paths must differ");
+        }
+        OutputRequest::ApplyReviewBatch {
+            report,
+            worksheet,
+            batch,
             output,
         }
     } else if first == "--apply-decision-patch" {
@@ -485,6 +521,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let batch = build_steward_review_batch(&report, &worksheet, limit)?;
             let content = serde_json::to_vec_pretty(&batch)?;
             write_private_output(&output, &content)?;
+        }
+        OutputRequest::ApplyReviewBatch {
+            report,
+            worksheet,
+            batch,
+            output,
+        } => {
+            let output = validate_output_path(&output)?;
+            let (report, report_identity): (ClassificationReport, _) =
+                read_private_json(&report).map_err(|error| label_input("report", error))?;
+            let (worksheet, worksheet_identity): (StewardReviewWorksheet, _) =
+                read_private_json(&worksheet).map_err(|error| label_input("worksheet", error))?;
+            let (batch, batch_identity): (StewardReviewBatch, _) =
+                read_private_json(&batch).map_err(|error| label_input("review batch", error))?;
+            if BTreeSet::from([report_identity, worksheet_identity, batch_identity]).len() != 3 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "review batch application inputs must be distinct files",
+                )
+                .into());
+            }
+            let patch = decision_patch_from_review_batch(&report, &worksheet, &batch)?;
+            let updated = apply_steward_decision_patch(&report, &worksheet, &patch)?;
+            write_private_output(&output, &serde_json::to_vec_pretty(&updated)?)?;
         }
         OutputRequest::ApplyDecisionPatch {
             report,
