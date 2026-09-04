@@ -1605,6 +1605,7 @@ where
                     .map(|item_version| SnapshotItemRevision {
                         item_key: (*item_key).clone(),
                         item_version: *item_version,
+                        parent_item_key: None,
                     })
                     .ok_or(DuplicateReviewError::InvalidReview)
             })
