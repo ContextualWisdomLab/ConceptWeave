@@ -1,7 +1,7 @@
 use conceptweave_zotero::{
     Disposition, EvaluationError, GoldenLabel, GoldenSetApproval, ItemData, ReviewedGoldenSet,
     SnapshotItemRevision, ZoteroItem, classification_snapshot_digest, classify_snapshot,
-    evaluate_reviewed_golden_set,
+    evaluate_complete_reviewed_classification, evaluate_reviewed_golden_set,
 };
 
 fn item(key: &str, title: &str) -> ZoteroItem {
@@ -18,6 +18,34 @@ fn item(key: &str, title: &str) -> ZoteroItem {
             tags: vec![],
         },
     }
+}
+
+#[test]
+fn complete_review_requires_one_steward_label_per_bibliographic_item() {
+    let report = report();
+    assert_eq!(
+        evaluate_complete_reviewed_classification(
+            &report,
+            &golden(vec![
+                GoldenLabel::new("A", Disposition::Generation),
+                GoldenLabel::new("B", Disposition::EvaluationGovernance),
+            ]),
+            verify_synthetic_approval,
+        ),
+        Err(EvaluationError::IncompleteReview)
+    );
+
+    let evaluation = evaluate_complete_reviewed_classification(
+        &report,
+        &golden(vec![
+            GoldenLabel::new("A", Disposition::Generation),
+            GoldenLabel::new("B", Disposition::EvaluationGovernance),
+            GoldenLabel::new("C", Disposition::OutOfScope),
+        ]),
+        verify_synthetic_approval,
+    )
+    .unwrap();
+    assert_eq!(evaluation.reviewed_count, 3);
 }
 
 fn report() -> conceptweave_zotero::ClassificationReport {
