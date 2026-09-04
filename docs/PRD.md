@@ -60,6 +60,8 @@ Read one immutable Zotero Local API library-version snapshot and propose exactly
 
 For every detected duplicate cluster, accept exactly one externally verified steward decision selecting an existing canonical item. Produce a local-only manifest that binds the decision to the raw snapshot and records source revisions plus before, after, and rollback canonical-key mappings. Classification preserves every Zotero source record.
 
+Reviewed collection and tag changes default to a local dry-run plan. Each operation binds the authority receipt, server/library/item revisions, raw-snapshot digest, and complete before/after/rollback metadata. Zotero 9 execute requests fail closed. No plan contains credentials or permits `NeedsStewardReview`, source-record deletion, or attachment deletion.
+
 Evaluate classifier quality only against a steward-reviewed local golden set whose governance receipt is externally verified and bound to the canonical SHA-256 digest of the complete Zotero classification report plus its item-key/item-version coordinates. Abstention is a prediction outcome, never an approved truth label. Evaluation emits the verified library revision, rule revision, opaque snapshot digest, and aggregate counts for exact matches, abstentions, and per-disposition true-positive/predicted/expected totals; it must not copy Zotero keys, reviewer identity, or bibliographic text into the result.
 Every successful classification report includes aggregate evidence for snapshot coverage, proposal coverage, provenance completeness, abstentions, duplicate candidates, disposition totals, and zero unreported failures.
 
