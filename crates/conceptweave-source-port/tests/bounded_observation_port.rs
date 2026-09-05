@@ -1,3 +1,9 @@
+use std::{
+    future::Future,
+    sync::Arc,
+    task::{Context, Poll, Wake, Waker},
+};
+
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, ObservationLimitError,
     ObservationLimits, ObservationRequest, ObservationRequestBudget, ObservationRequestBudgetError,
@@ -253,18 +259,37 @@ struct EchoPort;
 impl SourceObservationPort for EchoPort {
     type Snapshot = String;
 
-    fn observe(
-        &self,
-        request: &AuthorizedObservationRequest,
-        cancellation: &dyn ObservationCancellation,
-    ) -> Result<Self::Snapshot, SourceObservationFailure> {
-        if cancellation.is_cancelled() {
-            return Err(SourceObservationFailure::Cancelled);
+    fn observe<'a>(
+        &'a self,
+        request: &'a AuthorizedObservationRequest,
+        cancellation: &'a dyn ObservationCancellation,
+    ) -> impl Future<Output = Result<Self::Snapshot, SourceObservationFailure>> + Send + 'a {
+        async move {
+            if cancellation.is_cancelled() {
+                return Err(SourceObservationFailure::Cancelled);
+            }
+            Ok(request
+                .source_connection()
+                .source_connection_key()
+                .to_owned())
         }
-        Ok(request
-            .source_connection()
-            .source_connection_key()
-            .to_owned())
+    }
+}
+
+struct NoopWake;
+
+impl Wake for NoopWake {
+    fn wake(self: Arc<Self>) {}
+}
+
+fn poll_ready<F: Future>(future: F) -> F::Output {
+    let waker = Waker::from(Arc::new(NoopWake));
+    let mut context = Context::from_waker(&waker);
+    let mut future = std::pin::pin!(future);
+
+    match future.as_mut().poll(&mut context) {
+        Poll::Ready(output) => output,
+        Poll::Pending => panic!("synthetic adapter unexpectedly required an external wakeup"),
     }
 }
 
@@ -281,11 +306,11 @@ fn explicit_port_carries_authorization_and_cancellation_without_inventing_succes
     .expect("authorized request");
 
     assert_eq!(
-        EchoPort.observe(&request, &Cancellation(true)),
+        poll_ready(EchoPort.observe(&request, &Cancellation(true))),
         Err(SourceObservationFailure::Cancelled)
     );
     assert_eq!(
-        EchoPort.observe(&request, &Cancellation(false)),
+        poll_ready(EchoPort.observe(&request, &Cancellation(false))),
         Ok("grc_readonly_connection".to_owned())
     );
 
