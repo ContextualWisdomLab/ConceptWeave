@@ -185,11 +185,13 @@ fn full_text_review_cli_capture_file_budget_is_separate_from_metadata_budget() {
     assert!(inputs.run("1", &output_path).status.success());
     fs::remove_file(&output_path).unwrap();
     for metadata_path in [&inputs.report_path, &inputs.worksheet_path] {
+        let original = fs::read(metadata_path).unwrap();
         let file = OpenOptions::new().write(true).open(metadata_path).unwrap();
         file.set_len(16 * 1024 * 1024 + 1).unwrap();
         drop(file);
         assert!(!inputs.run("1", &output_path).status.success());
         assert!(!output_path.exists());
+        fs::write(metadata_path, original).unwrap();
     }
 }
 
