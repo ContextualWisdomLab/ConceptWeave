@@ -2269,10 +2269,31 @@ mod tests {
                 .into_iter()
                 .map(|response| {
                     let (mut stream, _) = listener.accept().unwrap();
-                    let mut bytes = vec![0; 16 * 1024];
-                    let length = stream.read(&mut bytes).unwrap();
+                    let mut bytes = Vec::new();
+                    loop {
+                        let mut buffer = [0; 4096];
+                        let length = stream.read(&mut buffer).unwrap();
+                        assert_ne!(length, 0);
+                        bytes.extend_from_slice(&buffer[..length]);
+                        if let Some(header_end) =
+                            bytes.windows(4).position(|part| part == b"\r\n\r\n")
+                        {
+                            let headers = std::str::from_utf8(&bytes[..header_end]).unwrap();
+                            let body_length = headers
+                                .lines()
+                                .find_map(|line| {
+                                    line.to_ascii_lowercase()
+                                        .strip_prefix("content-length: ")
+                                        .map(|value| value.parse::<usize>().unwrap())
+                                })
+                                .unwrap_or(0);
+                            if bytes.len() >= header_end + 4 + body_length {
+                                break;
+                            }
+                        }
+                    }
                     stream.write_all(response.as_bytes()).unwrap();
-                    String::from_utf8(bytes[..length].to_vec()).unwrap()
+                    String::from_utf8(bytes).unwrap()
                 })
                 .collect()
         });
