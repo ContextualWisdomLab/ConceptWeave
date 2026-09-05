@@ -1,7 +1,8 @@
 use conceptweave_source_port::{
-    ObservationCancellation, ObservationLimitError, ObservationLimits, ObservationRequest,
-    ObservationRequestBudget, ObservationRequestBudgetError, ObservationRequestError,
-    SourceObservationFailure, SourceObservationPort,
+    AuthorizedObservationRequest, ObservationCancellation, ObservationLimitError,
+    ObservationLimits, ObservationRequest, ObservationRequestBudget, ObservationRequestBudgetError,
+    ObservationRequestError, SourceConnectionRegistry, SourceObservationFailure,
+    SourceObservationPort,
 };
 
 fn limits() -> ObservationLimits {
@@ -195,6 +196,50 @@ fn request_rejects_blank_source_empty_or_blank_schema_and_exact_duplicates() {
     );
 }
 
+struct ExactRegistry;
+
+impl SourceConnectionRegistry for ExactRegistry {
+    fn contains_source_connection(&self, source_connection_key: &str) -> bool {
+        source_connection_key == "grc_readonly_connection"
+    }
+}
+
+struct DenyRegistry;
+
+impl SourceConnectionRegistry for DenyRegistry {
+    fn contains_source_connection(&self, _source_connection_key: &str) -> bool {
+        false
+    }
+}
+
+#[test]
+fn adapter_execution_requires_a_registry_authorized_request() {
+    let request = ObservationRequest::new(
+        "grc_readonly_connection",
+        vec!["governance_core".to_owned()],
+        request_budget(),
+        limits(),
+    )
+    .expect("valid request metadata");
+
+    assert_eq!(
+        request.clone().authorize(&DenyRegistry),
+        Err(ObservationRequestError::UnknownSourceConnectionKey)
+    );
+
+    let authorized = request
+        .authorize(&ExactRegistry)
+        .expect("registry authorization must issue the execution capability");
+    assert_eq!(
+        authorized.request().source_connection_key(),
+        "grc_readonly_connection"
+    );
+    assert_eq!(
+        authorized.source_connection().source_connection_key(),
+        "grc_readonly_connection"
+    );
+}
+
 struct Cancellation(bool);
 
 impl ObservationCancellation for Cancellation {
@@ -210,25 +255,30 @@ impl SourceObservationPort for EchoPort {
 
     fn observe(
         &self,
-        request: &ObservationRequest,
+        request: &AuthorizedObservationRequest,
         cancellation: &dyn ObservationCancellation,
     ) -> Result<Self::Snapshot, SourceObservationFailure> {
         if cancellation.is_cancelled() {
             return Err(SourceObservationFailure::Cancelled);
         }
-        Ok(request.source_connection_key().to_owned())
+        Ok(request
+            .source_connection()
+            .source_connection_key()
+            .to_owned())
     }
 }
 
 #[test]
-fn explicit_port_carries_caller_cancellation_without_inventing_success() {
+fn explicit_port_carries_authorization_and_cancellation_without_inventing_success() {
     let request = ObservationRequest::new(
         "grc_readonly_connection",
         vec!["governance_core".to_owned()],
         request_budget(),
         limits(),
     )
-    .expect("valid request");
+    .expect("valid request")
+    .authorize(&ExactRegistry)
+    .expect("authorized request");
 
     assert_eq!(
         EchoPort.observe(&request, &Cancellation(true)),
