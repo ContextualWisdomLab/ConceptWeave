@@ -353,7 +353,8 @@ fn byte_and_clock_limits_include_exact_boundary_and_overflow_failures() {
         version: None,
         body: "x".repeat(MAX_PAGE_BYTES as usize + 1),
     };
-    assert!(account_body(&mut MAX_SNAPSHOT_BYTES.clone(), &oversized).is_err());
+    let mut remaining = MAX_SNAPSHOT_BYTES;
+    assert!(account_body(&mut remaining, &oversized).is_err());
     assert!(check_admission(0, Duration::ZERO).is_err());
     assert!(check_admission(1, CAPTURE_DEADLINE).is_err());
     check_admission(1, CAPTURE_DEADLINE - Duration::from_nanos(1)).unwrap();

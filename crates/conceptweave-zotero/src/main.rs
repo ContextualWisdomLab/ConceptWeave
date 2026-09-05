@@ -15,7 +15,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
-const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --review-progress /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/PROGRESS.json | --review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json LIMIT /tmp/BATCH.json | --apply-review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/COMPLETED_BATCH.json /tmp/UPDATED_WORKSHEET.json | --apply-decision-patch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/PATCH.json /tmp/UPDATED_WORKSHEET.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
+const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --capture-full-text /tmp/REPORT.json /tmp/CAPTURE.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --review-progress /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/PROGRESS.json | --review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json LIMIT /tmp/BATCH.json | --apply-review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/COMPLETED_BATCH.json /tmp/UPDATED_WORKSHEET.json | --apply-decision-patch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/PATCH.json /tmp/UPDATED_WORKSHEET.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
 const MAX_ARTIFACT_BYTES: u64 = 16 * 1024 * 1024;
 
 #[derive(Debug, PartialEq, Eq)]
