@@ -3,20 +3,24 @@
 
 use conceptweave_zotero::read_local_snapshot;
 use std::env;
-use std::fs::{self, OpenOptions};
+use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 #[cfg_attr(coverage_nightly, coverage(off))]
-fn allowed_output_parents() -> [PathBuf; 2] {
-    [
+/// Returns canonical directories in which a sensitive report may be created.
+fn allowed_output_parents() -> Vec<PathBuf> {
+    let mut parents = vec![
         env::temp_dir()
             .canonicalize()
             .expect("system temporary directory must exist"),
-        Path::new("/tmp").canonicalize().expect("/tmp must exist"),
-    ]
+    ];
+    #[cfg(unix)]
+    parents.push(Path::new("/tmp").canonicalize().expect("/tmp must exist"));
+    parents
 }
 
+/// Validates that a report path is a new direct child of an allowed temp directory.
 fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
     let path = PathBuf::from(raw);
     if !path.is_absolute() {
@@ -46,7 +50,49 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
     Ok(path)
 }
 
+/// Creates a new sensitive report file or fails closed on unsupported platforms.
+fn create_report_file(path: &Path) -> io::Result<File> {
+    #[cfg(not(unix))]
+    return Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "private report creation requires a Unix platform",
+    ));
+
+    #[cfg(unix)]
+    {
+        create_report_file_with(path, set_owner_only_permissions)
+    }
+}
+
+#[cfg(unix)]
+/// Restores exact owner-only permissions after process umask application.
+fn set_owner_only_permissions(file: &File) -> io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    file.set_permissions(fs::Permissions::from_mode(0o600))
+}
+
+#[cfg(unix)]
+/// Creates a private file and removes it if final permission enforcement fails.
+fn create_report_file_with(
+    path: &Path,
+    set_permissions: fn(&File) -> io::Result<()>,
+) -> io::Result<File> {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    let file = options.mode(0o600).open(path)?;
+    if let Err(error) = set_permissions(&file) {
+        drop(file);
+        let _ = fs::remove_file(path);
+        return Err(error);
+    }
+    Ok(file)
+}
+
 #[cfg_attr(coverage_nightly, coverage(off))]
+/// Reads one Zotero snapshot and writes its sensitive local proposal report.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
         .nth(1)
@@ -56,10 +102,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if report.zotero_version.starts_with("9.") {
         eprintln!("Zotero 9 Local API is read-only; writing a local proposal report only");
     }
-    let file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(output)?;
+    let file = create_report_file(&output)?;
     let mut writer = BufWriter::new(file);
     serde_json::to_writer_pretty(&mut writer, &report)?;
     writer.flush()?;
@@ -100,12 +143,18 @@ mod tests {
             .is_err()
         );
 
-        let conventional = Path::new("/tmp").join(format!(
-            "conceptweave-zotero-{}-conventional.json",
-            std::process::id()
-        ));
-        let _ = fs::remove_file(&conventional);
-        assert!(validate_output_path(conventional.to_str().unwrap()).is_ok());
+        #[cfg(unix)]
+        {
+            let conventional = Path::new("/tmp").join(format!(
+                "conceptweave-zotero-{}-conventional.json",
+                std::process::id()
+            ));
+            let _ = fs::remove_file(&conventional);
+            assert!(validate_output_path(conventional.to_str().unwrap()).is_ok());
+        }
+
+        #[cfg(not(unix))]
+        assert!(validate_output_path("/tmp/conceptweave-zotero.json").is_err());
 
         let nested_dir =
             env::temp_dir().join(format!("conceptweave-zotero-{}-nested", std::process::id()));
@@ -133,5 +182,37 @@ mod tests {
         assert!(validate_output_path(link.to_str().unwrap()).is_err());
         fs::remove_file(link).unwrap();
         fs::remove_file(target).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn report_output_is_owner_readable_and_writable_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let output = unique_temp_path("private");
+        let _ = fs::remove_file(&output);
+        let file = create_report_file(&output).unwrap();
+        let mode = file.metadata().unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        drop(file);
+        fs::remove_file(output).unwrap();
+
+        let existing = unique_temp_path("private-existing");
+        let _ = fs::remove_file(&existing);
+        fs::write(&existing, b"existing").unwrap();
+        assert!(create_report_file(&existing).is_err());
+        fs::remove_file(existing).unwrap();
+
+        let rejected = unique_temp_path("private-permission-error");
+        let _ = fs::remove_file(&rejected);
+        let error = create_report_file_with(&rejected, |_| {
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "injected permission failure",
+            ))
+        })
+        .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+        assert!(!rejected.exists());
     }
 }
