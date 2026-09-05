@@ -1,6 +1,7 @@
 use conceptweave_source_port::{
     ObservationCancellation, ObservationLimitError, ObservationLimits, ObservationRequest,
-    ObservationRequestError, SourceObservationFailure, SourceObservationPort,
+    ObservationRequestBudget, ObservationRequestBudgetError, ObservationRequestError,
+    SourceObservationFailure, SourceObservationPort,
 };
 
 fn limits() -> ObservationLimits {
@@ -52,6 +53,51 @@ fn every_zero_resource_bound_fails_closed() {
     assert_eq!(
         ObservationLimits::new(1, 1, 1, 0),
         Err(ObservationLimitError::ZeroConcurrencyLimit)
+    );
+}
+
+#[test]
+fn request_metadata_budget_requires_explicit_positive_count_and_byte_bounds() {
+    assert_eq!(
+        ObservationRequestBudget::new(0, 1),
+        Err(ObservationRequestBudgetError::ZeroSchemaCountLimit)
+    );
+    assert_eq!(
+        ObservationRequestBudget::new(1, 0),
+        Err(ObservationRequestBudgetError::ZeroSchemaByteLimit)
+    );
+
+    let budget = ObservationRequestBudget::new(2, 32).expect("positive request budget");
+    assert_eq!(budget.max_schema_count(), 2);
+    assert_eq!(budget.max_schema_bytes(), 32);
+}
+
+#[test]
+fn request_rejects_allowlist_count_and_bytes_before_registry_or_adapter_access() {
+    let count_budget = ObservationRequestBudget::new(1, 64).expect("positive count budget");
+    assert_eq!(
+        ObservationRequest::new(
+            "grc_readonly_connection",
+            vec!["audit".to_owned(), "public".to_owned()],
+            count_budget,
+            limits(),
+        ),
+        Err(ObservationRequestError::SchemaCountLimitExceeded {
+            max_schema_count: 1,
+        })
+    );
+
+    let byte_budget = ObservationRequestBudget::new(2, 10).expect("positive byte budget");
+    assert_eq!(
+        ObservationRequest::new(
+            "grc_readonly_connection",
+            vec!["Audit/Event".to_owned()],
+            byte_budget,
+            limits(),
+        ),
+        Err(ObservationRequestError::SchemaByteLimitExceeded {
+            max_schema_bytes: 10,
+        })
     );
 }
 
