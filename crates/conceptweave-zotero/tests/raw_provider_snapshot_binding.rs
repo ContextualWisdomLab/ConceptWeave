@@ -68,3 +68,32 @@ fn snapshot_digest_preserves_omitted_versus_explicit_default_metadata() {
         assert_ne!(snapshot_digest(explicit), omitted_digest, "{field_name}");
     }
 }
+
+#[test]
+fn snapshot_digest_binds_actual_classifier_inputs_after_provider_decode() {
+    let original: ZoteroItem = serde_json::from_value(json!({
+        "key": "SYNTH001", "version": 7,
+        "data": {"itemType": "book", "title": "Ontology learning"}
+    }))
+    .unwrap();
+    let original_digest =
+        classify_snapshot("9.0.6".into(), None, 42, vec![original.clone()]).snapshot_digest;
+    let mut changed = original;
+    changed.data.title = "Ontology alignment".into();
+    assert_ne!(
+        classify_snapshot("9.0.6".into(), None, 42, vec![changed]).snapshot_digest,
+        original_digest,
+        "changed classifier input cannot retain the original source receipt"
+    );
+}
+
+#[test]
+fn source_capture_preserves_provider_shape_validation() {
+    for invalid in [
+        json!(null),
+        json!({"key": 7, "version": 7, "data": {"itemType": "book"}}),
+        json!({"key": "SYNTH001", "version": 7, "data": {}}),
+    ] {
+        assert!(serde_json::from_value::<ZoteroItem>(invalid).is_err());
+    }
+}
