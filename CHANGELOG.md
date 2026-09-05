@@ -14,6 +14,7 @@ All notable changes to ConceptWeave are documented here.
 - Exact optional PostgreSQL foreign-key validation/enforcement evidence, preserving observed `convalidated` and `conenforced` booleans (including explicit `false`) while retaining `None` when the adapter did not observe those catalog fields.
 - PostgreSQL 18 `CHECK` constraint observations preserving the reconstructed source definition plus validation, enforcement, and `NO INHERIT` status without guessing expression-to-column dependencies.
 - Rust-first `conceptweave-source-port` contract with positive statement-timeout/row/byte/concurrency limits, exact non-empty schema allowlists, bounded opaque source registry keys, caller cancellation, and typed fail-closed source-disappearance/resource-limit outcomes; a live PostgreSQL adapter remains open work.
+- Explicit `ObservationRequestBudget` policy with positive maximum schema count and total retained UTF-8 schema bytes, enforced before registry/database access without treating PostgreSQL's identifier-length default as a ConceptWeave security constant.
 - Source registry keys now require at most 128 bytes of lowercase multiword `snake_case`, rejecting raw DSNs, URLs, shell-style connection parameters, generic one-word identifiers, and malformed registry identifiers before adapter credential resolution.
 - Registry resolution now issues an opaque source capability, and immutable snapshots accept that capability instead of caller-supplied connection text.
 - Composite foreign keys preserve the exact local-column subset used by PostgreSQL `ON DELETE SET NULL (...)` and `SET DEFAULT (...)`, rejecting invalid action/column combinations.
@@ -32,6 +33,7 @@ All notable changes to ConceptWeave are documented here.
 ### Security
 
 - Model-generated semantics remain non-authoritative until deterministic validation and authorized review.
+- Source Observation rejects over-budget exact-schema authorization metadata before registry/database access and requires callers to choose explicit positive count/byte bounds rather than inheriting provider defaults.
 - Client authoritative-use admission rejects incompatible, unpublished, or non-authoritative releases without requiring a network/model call.
 - Legacy compatibility is explicit opt-in policy; unknown versions remain fail-closed and the current version cannot also be configured as legacy.
 - Release diff validates both compared releases through the same fail-closed authoritative-use gate so comparison cannot bypass contract-version, publication-state, or truth-status policy.
