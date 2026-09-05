@@ -7,6 +7,7 @@ fn zotero_nine_zero_item_version_is_still_a_valid_provenance_coordinate() {
         None,
         42,
         vec![ZoteroItem {
+            source_record: None,
             key: "UNSYNCED1".into(),
             version: 0,
             data: ItemData {
@@ -35,6 +36,7 @@ fn provenance_completeness_requires_stable_linked_child_identity() {
         42,
         vec![
             ZoteroItem {
+                source_record: None,
                 key: "PARENT01".into(),
                 version: 4,
                 data: ItemData {
@@ -48,6 +50,7 @@ fn provenance_completeness_requires_stable_linked_child_identity() {
                 },
             },
             ZoteroItem {
+                source_record: None,
                 key: String::new(),
                 version: 0,
                 data: ItemData {
