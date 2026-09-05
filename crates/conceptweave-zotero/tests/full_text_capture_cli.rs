@@ -35,7 +35,9 @@ fn full_text_capture_rejects_an_unbound_report_before_creating_output() {
     assert!(!command.status.success());
     assert!(!output_path.exists());
     assert!(command.stdout.is_empty());
-    assert!(String::from_utf8(command.stderr)
-        .unwrap()
-        .contains("full-text capture requires a bound Zotero 10+ report"));
+    assert!(
+        String::from_utf8(command.stderr)
+            .unwrap()
+            .contains("full-text capture requires a bound Zotero 10+ report")
+    );
 }

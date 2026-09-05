@@ -5,7 +5,8 @@ use conceptweave_zotero::{
     ClassificationReport, GoldenSetApproval, MAX_REVIEW_BATCH_ITEMS, StewardDecisionPatch,
     StewardReviewBatch, StewardReviewWorksheet, apply_steward_decision_patch,
     assess_steward_review_progress, build_steward_review_batch, build_steward_review_worksheet,
-    decision_patch_from_review_batch, read_local_snapshot, reviewed_golden_set_from_worksheet,
+    decision_patch_from_review_batch, read_local_full_text, read_local_snapshot,
+    reviewed_golden_set_from_worksheet,
 };
 use serde::de::DeserializeOwned;
 use std::collections::BTreeSet;
@@ -20,6 +21,10 @@ const MAX_ARTIFACT_BYTES: u64 = 16 * 1024 * 1024;
 #[derive(Debug, PartialEq, Eq)]
 enum OutputRequest {
     Report(String),
+    FullTextCapture {
+        report: String,
+        output: String,
+    },
     Worksheet {
         report: String,
         worksheet: String,
@@ -63,7 +68,18 @@ where
 {
     let mut args = args.into_iter().map(Into::into);
     let first = args.next().ok_or(USAGE)?;
-    let request = if first == "--worksheet" {
+    let request = if first == "--capture-full-text" {
+        let report = args
+            .next()
+            .ok_or("--capture-full-text requires report and output paths")?;
+        let output = args
+            .next()
+            .ok_or("--capture-full-text requires report and output paths")?;
+        if report == output {
+            return Err("full-text report and output paths must differ");
+        }
+        OutputRequest::FullTextCapture { report, output }
+    } else if first == "--worksheet" {
         let report = args
             .next()
             .ok_or("--worksheet requires report and worksheet output paths")?;
@@ -357,7 +373,7 @@ fn write_all_and_flush(writer: &mut BufWriter<File>, content: &[u8]) -> io::Resu
 fn write_private_output_with(
     path: &Path,
     content: &[u8],
-    write: fn(&mut BufWriter<File>, &[u8]) -> io::Result<()>,
+    write: impl FnOnce(&mut BufWriter<File>, &[u8]) -> io::Result<()>,
 ) -> io::Result<()> {
     let file = create_report_file(path)?;
     let mut writer = BufWriter::new(file);
@@ -463,6 +479,16 @@ fn create_report_file_with(
 /// Reads one Zotero snapshot and writes its sensitive local proposal report.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     match parse_output_request(env::args().skip(1))? {
+        OutputRequest::FullTextCapture { report, output } => {
+            let output = validate_output_path(&output)?;
+            let (report, _): (ClassificationReport, _) =
+                read_private_json(&report).map_err(|error| label_input("report", error))?;
+            let capture = read_local_full_text(&report)?;
+            write_private_output_with(&output, &[], |writer, _| {
+                serde_json::to_writer(&mut *writer, &capture).map_err(io::Error::other)?;
+                writer.flush()
+            })?;
+        }
         OutputRequest::Report(output) => {
             let output = validate_output_path(&output)?;
             let report = read_local_snapshot()?;
