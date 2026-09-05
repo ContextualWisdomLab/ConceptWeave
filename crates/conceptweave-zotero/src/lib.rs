@@ -13,6 +13,7 @@ use std::time::Duration;
 pub const RULE_REVISION: &str = "ontology-research-v2";
 
 const SUPPORTED_API_VERSION: u64 = 3;
+const SNAPSHOT_DIGEST_DOMAIN: &str = "conceptweave-zotero-snapshot-v2";
 const SUPPORTED_API_VERSION_HEADER: &str = "3";
 const PAGE_LIMIT: usize = 100;
 const MAX_PAGE_BYTES: u64 = 8 * 1024 * 1024;
@@ -29,7 +30,7 @@ const LOCAL_API_ROOT: &str = "http://127.0.0.1:23119";
 static TEST_LOCAL_API: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 
 /// A Zotero item returned by the Local API.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ZoteroItem {
     /// Stable item key.
     pub key: String,
@@ -37,6 +38,38 @@ pub struct ZoteroItem {
     pub version: u64,
     /// Item metadata.
     pub data: ItemData,
+    /// Complete original JSON object, captured automatically during deserialization.
+    ///
+    /// Offline callers constructing synthetic typed items use `None`. The digest
+    /// binds this source value together with the actual typed classifier input,
+    /// so later projection changes also invalidate the receipt. It retains omitted fields,
+    /// unknown metadata, nested objects, and array order exactly as observed.
+    #[serde(skip)]
+    pub source_record: Option<serde_json::Value>,
+}
+
+impl<'de> Deserialize<'de> for ZoteroItem {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct ItemProjection {
+            key: String,
+            version: u64,
+            data: ItemData,
+        }
+
+        let source_record = serde_json::Value::deserialize(deserializer)?;
+        let projection =
+            ItemProjection::deserialize(&source_record).map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            key: projection.key,
+            version: projection.version,
+            data: projection.data,
+            source_record: Some(source_record),
+        })
+    }
 }
 
 /// Metadata used by the classifier.
@@ -1394,7 +1427,7 @@ pub struct SnapshotItemRevision {
     pub parent_item_key: Option<String>,
 }
 
-/// Governance receipt binding a steward approval to one exact classifier input.
+/// Governance receipt binding a steward approval to exact input and proposals.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct GoldenSetApproval {
     /// Opaque receipt identifier.
@@ -1407,11 +1440,16 @@ pub struct GoldenSetApproval {
     pub rule_revision: String,
     /// Immutable digest over the approved snapshot, verified by the caller.
     pub snapshot_digest: String,
+    /// Digest of the actual proposal records reviewed and verified by the caller.
+    pub proposal_digest: String,
     /// Complete sorted item-revision identity of the reviewed report.
     pub snapshot_items: Vec<SnapshotItemRevision>,
 }
 
 /// Converts a fully decided local worksheet into the input for approval verification.
+///
+/// The supplied approval must already bind the current complete proposal records.
+/// This function validates that binding without creating or renewing authority.
 pub fn reviewed_golden_set_from_worksheet(
     report: &ClassificationReport,
     worksheet: &StewardReviewWorksheet,
@@ -1424,6 +1462,7 @@ pub fn reviewed_golden_set_from_worksheet(
     }
     if approval.receipt_id.trim().is_empty()
         || approval.reviewer_subject.trim().is_empty()
+        || approval.proposal_digest.trim().is_empty()
         || worksheet.rule_revision.trim().is_empty()
         || worksheet.snapshot_digest.trim().is_empty()
     {
@@ -1432,6 +1471,7 @@ pub fn reviewed_golden_set_from_worksheet(
     if approval.library_version != worksheet.library_version
         || approval.rule_revision != worksheet.rule_revision
         || approval.snapshot_digest != worksheet.snapshot_digest
+        || approval.proposal_digest != classification_proposal_digest(report)
         || approval.snapshot_items != worksheet.snapshot_items
     {
         return Err(EvaluationError::SnapshotMismatch);
@@ -1471,6 +1511,22 @@ pub fn classification_snapshot_digest(report: &ClassificationReport) -> String {
     report.snapshot_digest.clone()
 }
 
+/// Computes the versioned SHA-256 identity of the report's current proposals.
+///
+/// Every proposal field is covered, including its prediction, evidence, and item
+/// revision. Records are sorted by item key and revision so page ordering does
+/// not change their identity. No second source snapshot is stored. Governance
+/// must bind this value when issuing an approval; recomputing it alone grants no
+/// authority. Evaluation recomputes it rather than trusting report metadata.
+pub fn classification_proposal_digest(report: &ClassificationReport) -> String {
+    let mut proposals = report.classified_items.iter().collect::<Vec<_>>();
+    proposals.sort_by_key(|item| (&item.item_key, item.item_version));
+    let proposal_bytes =
+        serde_json::to_vec(&("conceptweave-classification-proposals-v1", proposals))
+            .expect("classification proposal records contain only JSON-serializable values");
+    format!("sha256:{:x}", Sha256::digest(proposal_bytes))
+}
+
 /// Integer evidence from which precision and recall can be calculated exactly.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 pub struct DispositionEvaluation {
@@ -1493,6 +1549,8 @@ pub struct GoldenSetEvaluation {
     pub rule_revision: String,
     /// Opaque immutable snapshot digest from the verified receipt.
     pub snapshot_digest: String,
+    /// Opaque digest binding the exact proposal records used for these counts.
+    pub proposal_digest: String,
     /// Number of steward-reviewed items.
     pub reviewed_count: usize,
     /// Number of exact disposition matches.
@@ -1559,6 +1617,11 @@ where
 }
 
 /// Evaluates reviewed labels without copying item identities into the result.
+///
+/// Structural, source, proposal, and label validation run before governance is
+/// contacted. The verifier must authenticate the complete reviewed set against
+/// an independently issued receipt, including both digests and every label;
+/// accepting a self-declared receipt identifier or digest is not verification.
 pub fn evaluate_reviewed_golden_set<F>(
     report: &ClassificationReport,
     golden: &ReviewedGoldenSet,
@@ -1572,6 +1635,7 @@ where
         || golden.labels.is_empty()
         || golden.approval.rule_revision.trim().is_empty()
         || golden.approval.snapshot_digest.trim().is_empty()
+        || golden.approval.proposal_digest.trim().is_empty()
     {
         return Err(EvaluationError::InvalidReview);
     }
@@ -1610,6 +1674,21 @@ where
         .iter()
         .map(|item| (item.item_key.as_str(), item.proposed_disposition))
         .collect::<BTreeMap<_, _>>();
+    if classified.len() != report.classified_items.len()
+        || report.classified_items.iter().any(|item| {
+            item.item_key.trim().is_empty()
+                || !report_snapshot.contains(&SnapshotItemRevision {
+                    item_key: item.item_key.clone(),
+                    item_version: item.item_version,
+                    parent_item_key: None,
+                })
+        })
+    {
+        return Err(EvaluationError::InvalidReview);
+    }
+    if golden.approval.proposal_digest != classification_proposal_digest(report) {
+        return Err(EvaluationError::SnapshotMismatch);
+    }
     let mut seen = BTreeSet::new();
     let mut correct_count = 0;
     let mut abstention_count = 0;
@@ -1652,6 +1731,7 @@ where
         library_version: golden.approval.library_version,
         rule_revision: golden.approval.rule_revision.clone(),
         snapshot_digest: golden.approval.snapshot_digest.clone(),
+        proposal_digest: golden.approval.proposal_digest.clone(),
         reviewed_count: golden.labels.len(),
         correct_count,
         abstention_count,
@@ -2704,7 +2784,11 @@ pub fn classify_snapshot(
                 .then(|| item.data.parent_item.clone()),
         })
         .collect();
-    let snapshot_bytes = serde_json::to_vec(&items)
+    let snapshot_records: Vec<_> = items
+        .iter()
+        .map(|item| (&item.source_record, item))
+        .collect();
+    let snapshot_bytes = serde_json::to_vec(&(SNAPSHOT_DIGEST_DOMAIN, snapshot_records))
         .expect("Zotero snapshot items contain only JSON-compatible values");
     let snapshot_digest = format!("sha256:{:x}", Sha256::digest(snapshot_bytes));
     let children = child_index(&items);
@@ -3882,6 +3966,7 @@ mod tests {
                 collections: vec![],
                 tags: vec![],
             },
+            source_record: None,
         }
     }
 
