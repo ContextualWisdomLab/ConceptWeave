@@ -58,6 +58,24 @@ fn snapshot_preserves_evidence_and_qualified_identifiers_without_normalization()
 }
 
 #[test]
+fn snapshot_rejects_table_outside_the_authorized_schema_allowlist() {
+    let unauthorized = TableObservation::new("audit", "events", vec![column("event_key", 1)])
+        .expect("table fixture is structurally valid");
+
+    let result = PostgresSchemaSnapshot::new(
+        &support::resolved_source("warehouse_primary"),
+        "postgres-introspector/1",
+        "2026-09-02T00:00:00Z",
+        vec![unauthorized],
+    );
+
+    assert!(
+        result.is_err(),
+        "canonical snapshot construction must not admit a table outside the request's exact schema allowlist"
+    );
+}
+
+#[test]
 fn snapshot_rejects_duplicate_qualified_tables() {
     let duplicate = TableObservation::new("public", "events", vec![column("event_key", 1)])
         .expect("table is valid");
