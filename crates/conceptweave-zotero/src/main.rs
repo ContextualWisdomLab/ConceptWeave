@@ -403,7 +403,10 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
         ));
     }
     let file_name = path.file_name().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidInput, "report output has no file name")
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "report output has no file name",
+        )
     })?;
     let validated_path = resolved_parent.join(file_name);
     if fs::symlink_metadata(&validated_path).is_ok() {
@@ -1033,7 +1036,10 @@ mod tests {
         let _ = fs::remove_file(&allowed);
         assert_eq!(
             validate_output_path(allowed.to_str().unwrap()).unwrap(),
-            allowed
+            env::temp_dir()
+                .canonicalize()
+                .unwrap()
+                .join(allowed.file_name().unwrap())
         );
 
         assert!(validate_output_path("relative.json").is_err());
