@@ -102,3 +102,11 @@ Li, J., Garijo, D., & Poveda-Villalón, M. (2026). Large language models for ont
 - OAEI-LLM/OAEI-LLM-T add LLM-specific hallucination categories to matching evaluation. GRC remains the enterprise round-trip fixture rather than the sole benchmark.
 - Modular ontology engineering and explicit source provenance are preferred over one opaque prompt that attempts to generate an entire enterprise semantic layer in a single step.
 - Human review remains mandatory before authority promotion. Scalable validation research may inform review mechanics but cannot replace domain-owner/steward authority.
+
+## Provider snapshot content binding
+
+Serde. (n.d.). *Container attributes*. Retrieved September 5, 2026, from https://serde.rs/container-attrs.html
+
+Serde. (n.d.). *Struct flattening*. Retrieved September 5, 2026, from https://serde.rs/attr-flatten.html
+
+The derived JSON reader ignores unknown fields by default. Flattened maps retain those fields but still normalize omitted modeled fields through defaults. Therefore `ZoteroItem::deserialize` captures the original JSON object, and `classify_snapshot` hashes it together with the actual classifier projection. The regression suite `raw_provider_snapshot_binding.rs` verifies unknown top-level/data/tag fields, omitted default fields, object-order stability, post-decode input mutation, and invalid provider shapes. This repairs the raw-content finding on PR #10 without treating it as external review approval or protected release evidence.
