@@ -46,7 +46,7 @@ fn approval(
         receipt_id: "approved-review".into(),
         reviewer_subject: "synthetic-steward".into(),
         library_version: report.library_version,
-        rule_revision: report.rule_revision.into(),
+        rule_revision: report.rule_revision.clone(),
         snapshot_digest: classification_snapshot_digest(report),
         proposal_digest: classification_proposal_digest(report),
         snapshot_items,
@@ -71,10 +71,12 @@ fn reviewed_snapshot_binding_includes_linked_child_revisions() {
                 SnapshotItemRevision {
                     item_key: "PARENT".into(),
                     item_version: 7,
+                    parent_item_key: None,
                 },
                 SnapshotItemRevision {
                     item_key: "NOTE1".into(),
                     item_version: 3,
+                    parent_item_key: Some("PARENT".into()),
                 },
             ],
         ),
@@ -101,6 +103,7 @@ fn verified_snapshot_receipt_cannot_authorize_mutated_steward_labels() {
             vec![SnapshotItemRevision {
                 item_key: "A".into(),
                 item_version: 1,
+                parent_item_key: None,
             }],
         ),
         labels: vec![GoldenLabel::new("A", Disposition::AlignmentVersioning)],
@@ -134,10 +137,12 @@ fn duplicate_zotero_keys_fail_closed_even_when_item_revisions_differ() {
                 SnapshotItemRevision {
                     item_key: "A".into(),
                     item_version: 1,
+                    parent_item_key: None,
                 },
                 SnapshotItemRevision {
                     item_key: "A".into(),
                     item_version: 2,
+                    parent_item_key: None,
                 },
             ],
         ),

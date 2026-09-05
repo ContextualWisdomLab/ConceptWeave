@@ -2,6 +2,7 @@ use conceptweave_zotero::{
     Disposition, DuplicateMergeDecision, DuplicateReviewError, ItemData, ReviewedDuplicateMergeSet,
     ZoteroItem, build_duplicate_merge_review_manifest, classify_snapshot,
 };
+use std::cell::Cell;
 
 fn item(key: &str, version: u64, title: &str, doi: &str) -> ZoteroItem {
     ZoteroItem {
@@ -44,7 +45,7 @@ fn reviewed(report: &conceptweave_zotero::ClassificationReport) -> ReviewedDupli
         review_id: "review-duplicate-1".into(),
         authority_receipt: "authority-receipt-1".into(),
         library_version: report.library_version,
-        rule_revision: report.rule_revision.into(),
+        rule_revision: report.rule_revision.clone(),
         snapshot_digest: report.snapshot_digest.clone(),
         snapshot_items: report.snapshot_items.clone(),
         duplicate_candidates: report.duplicate_candidates.clone(),
@@ -182,6 +183,30 @@ fn duplicate_review_contract_fails_closed() {
 }
 
 #[test]
+fn duplicate_review_rejects_child_sources_before_approval_verification() {
+    let mut report = report();
+    report
+        .snapshot_items
+        .push(conceptweave_zotero::SnapshotItemRevision {
+            item_key: "CHILD".into(),
+            item_version: 3,
+            parent_item_key: Some("A".into()),
+        });
+    report.duplicate_candidates[0].item_keys[1] = "CHILD".into();
+    let reviewed = reviewed(&report);
+    let verifier_calls = Cell::new(0);
+
+    assert_eq!(
+        build_duplicate_merge_review_manifest(&report, &reviewed, |_| {
+            verifier_calls.set(verifier_calls.get() + 1);
+            true
+        }),
+        Err(DuplicateReviewError::InvalidReview)
+    );
+    assert_eq!(verifier_calls.get(), 0);
+}
+
+#[test]
 fn overlapping_duplicate_groups_require_one_consistent_canonical_choice() {
     let report = classify_snapshot(
         "9.0.6".into(),
@@ -198,7 +223,7 @@ fn overlapping_duplicate_groups_require_one_consistent_canonical_choice() {
         review_id: "review-overlap".into(),
         authority_receipt: "authority-overlap".into(),
         library_version: report.library_version,
-        rule_revision: report.rule_revision.into(),
+        rule_revision: report.rule_revision.clone(),
         snapshot_digest: report.snapshot_digest.clone(),
         snapshot_items: report.snapshot_items.clone(),
         duplicate_candidates: report.duplicate_candidates.clone(),
@@ -241,7 +266,7 @@ fn duplicate_review_rejects_ambiguous_snapshot_key_revisions() {
         review_id: "review-duplicate-key".into(),
         authority_receipt: "authority-duplicate-key".into(),
         library_version: report.library_version,
-        rule_revision: report.rule_revision.into(),
+        rule_revision: report.rule_revision.clone(),
         snapshot_digest: report.snapshot_digest.clone(),
         snapshot_items: report.snapshot_items.clone(),
         duplicate_candidates: report.duplicate_candidates.clone(),

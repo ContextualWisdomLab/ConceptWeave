@@ -84,7 +84,7 @@ fn finalization_rejects_each_invalid_identity_coordinate() {
     let worksheet = complete_worksheet();
 
     let mut invalid_report = report();
-    invalid_report.rule_revision = "";
+    invalid_report.rule_revision.clear();
     assert_eq!(
         reviewed_golden_set_from_worksheet(
             &invalid_report,
