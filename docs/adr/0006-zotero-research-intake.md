@@ -47,6 +47,18 @@ No dedicated utility repository or Zotero mutation path is created. A future Zot
 
 ## Consequences
 
+### 2026-09-05 earliest-owner private artifact repair amendment (Proposed)
+
+In the context of independently reviewed stacked pull requests, facing a shared private JSON defect fixed only in a later child, we decided for a minimal repair at the original reader boundary and ordinary parent-to-child merges and against accepting vulnerable predecessors, reverse-merging later full-text features or discarding predecessor deltas, to make each proposed slice independently verifiable, accepting repeated checks at every changed head.
+
+The private reader and verbatim Serde error entered at `ffa115018f957842a7b9f102e5d975ded806b930` in PR #29; `5299219c1049701b80d9e9f743499b6d7adaeae3` extracted an existing helper rather than introducing the defect. At that earlier contract, test-only strict input reproduces rejected field disclosure and the actual finalization command reproduces invalid disposition and scalar disclosure. RED `4c0c8f0` retains those failures alongside a compatible successful finalization. GREEN `25d4a78` replaces only the shared parse error with static text; artifact-role, size/growth and I/O diagnostics remain distinct. Adding later strict DTO rules to that predecessor was rejected because it would change its accepted contract rather than repair disclosure.
+
+The metadata writer predates that reader, but PR #29 establishes the 16 MiB saved-artifact round trip. Separate RED `cdf8e12` proves exact-limit success and one-byte overflow creating an unreadable output. GREEN `0837c6f` rejects overflow before creating any file. The later capture-specific streaming writer remains outside this metadata guard. No dependency, approval issuer, capture feature or new output ceiling is backported.
+
+Verification also reproduced an inherited strict-Clippy failure on PR #28's unchanged head `d6e7b3570ae91832a8da658c31cd71d45361840a`. Merge `1623aad` had reintroduced an unnecessary fixture conversion already removed by `1ca8a79`. Repair `5c95bb7` restores that one line on PR #28 before forward integration; test fixtures are not a reason to suppress warnings. PR #29's first coverage run then exposed a test-cleanup branch reachable only during the preserved RED failure. Test-only `fec97ac` makes cleanup unconditional while retaining the file-created assertion and existing-file protection. The unchanged coverage gate passes after that repair; raw LLVM coverage remains below 100% and is recorded separately in the Gap baseline.
+
+Positive consequences are source-free diagnostics and save/read compatibility on the original owner slice, with both old heads retained as ancestors through normal merges. Costs are additional regression history and repeated validation across the stack. Local GREEN and an independent source review do not constitute protected approval, release, completed paper review or authority to modify Zotero. The next governance and write-admission gaps remain open; ADR status remains Proposed.
+
 ### 2026-09-05 private review command amendment (Proposed)
 
 In the context of an operator reviewing retained paper text without accessing mutable Zotero state, facing tested library operations that were not callable as one private review workflow, we decided for three thin commands reusing the existing view/application/finalization APIs and against another review engine, service, repository or local approval issuer, to preserve source bindings and prior work at each saved-file transition, accepting repeated capture verification and separately supplied decisions and approval evidence.
