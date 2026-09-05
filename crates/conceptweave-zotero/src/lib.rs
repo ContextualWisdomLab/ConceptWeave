@@ -699,6 +699,8 @@ fn normalize_title(value: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    mod metadata_transport;
+
     use super::*;
     use std::io::{Read, Write};
     use std::net::TcpListener;
