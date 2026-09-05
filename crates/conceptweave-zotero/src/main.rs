@@ -2,11 +2,13 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 use conceptweave_zotero::{
-    ClassificationReport, FullTextCapture, GoldenSetApproval, MAX_REVIEW_BATCH_ITEMS,
-    StewardDecisionPatch, StewardReviewBatch, StewardReviewWorksheet, apply_steward_decision_patch,
-    assess_steward_review_progress, build_full_text_review_json, build_full_text_review_worksheet,
-    build_steward_review_batch, build_steward_review_worksheet, decision_patch_from_review_batch,
-    read_local_full_text, read_local_snapshot, reviewed_golden_set_from_worksheet,
+    ClassificationReport, FullTextCapture, FullTextReviewApproval, FullTextReviewWorksheet,
+    GoldenSetApproval, MAX_REVIEW_BATCH_ITEMS, StewardDecisionPatch, StewardReviewBatch,
+    StewardReviewWorksheet, apply_full_text_review_view, apply_steward_decision_patch,
+    assess_steward_review_progress, build_bound_full_text_review_json, build_full_text_review_json,
+    build_full_text_review_worksheet, build_steward_review_batch, build_steward_review_worksheet,
+    decision_patch_from_review_batch, finalize_full_text_review, read_local_full_text,
+    read_local_snapshot, reviewed_golden_set_from_worksheet,
 };
 use serde::de::DeserializeOwned;
 use std::collections::BTreeSet;
@@ -15,7 +17,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
-const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --capture-full-text /tmp/REPORT.json /tmp/CAPTURE.json | --full-text-worksheet /tmp/REPORT.json /tmp/CAPTURE.json /tmp/WORKSHEET.json | --full-text-review /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/CAPTURE.json LIMIT /tmp/VIEW.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --review-progress /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/PROGRESS.json | --review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json LIMIT /tmp/BATCH.json | --apply-review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/COMPLETED_BATCH.json /tmp/UPDATED_WORKSHEET.json | --apply-decision-patch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/PATCH.json /tmp/UPDATED_WORKSHEET.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
+const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --capture-full-text /tmp/REPORT.json /tmp/CAPTURE.json | --full-text-worksheet /tmp/REPORT.json /tmp/CAPTURE.json /tmp/WORKSHEET.json | --bound-full-text-review /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/CAPTURE.json LIMIT /tmp/VIEW.json | --apply-full-text-review /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/CAPTURE.json /tmp/COMPLETED_VIEW.json /tmp/UPDATED.json | --finalize-full-text-review /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/CAPTURE.json /tmp/APPROVAL.json /tmp/GOLDEN.json | --full-text-review /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/CAPTURE.json LIMIT /tmp/VIEW.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --review-progress /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/PROGRESS.json | --review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json LIMIT /tmp/BATCH.json | --apply-review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/COMPLETED_BATCH.json /tmp/UPDATED_WORKSHEET.json | --apply-decision-patch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/PATCH.json /tmp/UPDATED_WORKSHEET.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
 const MAX_ARTIFACT_BYTES: u64 = 16 * 1024 * 1024;
 // JSON escaping and envelope bytes are separate from the capture's raw-body budget.
 const MAX_CAPTURE_FILE_BYTES: u64 = 512 * 1024 * 1024;
@@ -37,6 +39,27 @@ enum OutputRequest {
         worksheet: String,
         capture: String,
         limit: usize,
+        output: String,
+    },
+    BoundFullTextReview {
+        report: String,
+        worksheet: String,
+        capture: String,
+        limit: usize,
+        output: String,
+    },
+    ApplyFullTextReview {
+        report: String,
+        worksheet: String,
+        capture: String,
+        completed_view: String,
+        output: String,
+    },
+    FinalizeFullTextReview {
+        report: String,
+        worksheet: String,
+        capture: String,
+        approval: String,
         output: String,
     },
     Worksheet {
@@ -111,7 +134,43 @@ where
             capture,
             output,
         }
-    } else if first == "--full-text-review" {
+    } else if first == "--apply-full-text-review" || first == "--finalize-full-text-review" {
+        let report = args
+            .next()
+            .ok_or("full-text review application and finalization require five paths")?;
+        let worksheet = args
+            .next()
+            .ok_or("full-text review application and finalization require five paths")?;
+        let capture = args
+            .next()
+            .ok_or("full-text review application and finalization require five paths")?;
+        let input = args
+            .next()
+            .ok_or("full-text review application and finalization require five paths")?;
+        let output = args
+            .next()
+            .ok_or("full-text review application and finalization require five paths")?;
+        if BTreeSet::from([&report, &worksheet, &capture, &input, &output]).len() != 5 {
+            return Err("full-text review paths must be distinct");
+        }
+        if first == "--apply-full-text-review" {
+            OutputRequest::ApplyFullTextReview {
+                report,
+                worksheet,
+                capture,
+                completed_view: input,
+                output,
+            }
+        } else {
+            OutputRequest::FinalizeFullTextReview {
+                report,
+                worksheet,
+                capture,
+                approval: input,
+                output,
+            }
+        }
+    } else if first == "--full-text-review" || first == "--bound-full-text-review" {
         let report = args
             .next()
             .ok_or("full-text review mode requires a report path")?;
@@ -139,12 +198,22 @@ where
         if BTreeSet::from([&report, &worksheet, &capture, &output]).len() != 4 {
             return Err("full-text review paths must be distinct");
         }
-        OutputRequest::FullTextReview {
-            report,
-            worksheet,
-            capture,
-            limit,
-            output,
+        if first == "--bound-full-text-review" {
+            OutputRequest::BoundFullTextReview {
+                report,
+                worksheet,
+                capture,
+                limit,
+                output,
+            }
+        } else {
+            OutputRequest::FullTextReview {
+                report,
+                worksheet,
+                capture,
+                limit,
+                output,
+            }
         }
     } else if first == "--worksheet" {
         let report = args
@@ -316,6 +385,11 @@ fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<(T, ArtifactI
     read_private_input(raw, |file, length| read_bounded_json(file, length))
 }
 
+/// Retains exact completed-view bytes for the duplicate-key-aware review parser.
+fn read_private_bytes(raw: &str) -> io::Result<(Vec<u8>, ArtifactIdentity)> {
+    read_private_input(raw, |file, length| read_bounded_bytes(file, length))
+}
+
 /// Restores a private capture without allocating a second full-file byte buffer.
 fn read_private_capture(raw: &str) -> io::Result<(FullTextCapture, ArtifactIdentity)> {
     read_private_input(raw, |file, length| {
@@ -415,6 +489,12 @@ fn read_bounded_json<T: DeserializeOwned>(
     reader: &mut dyn Read,
     advertised_len: u64,
 ) -> io::Result<T> {
+    serde_json::from_slice(&read_bounded_bytes(reader, advertised_len)?)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+}
+
+/// Shares the metadata byte ceiling without normalizing completed review JSON.
+fn read_bounded_bytes(reader: &mut dyn Read, advertised_len: u64) -> io::Result<Vec<u8>> {
     if advertised_len > MAX_ARTIFACT_BYTES {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
@@ -431,8 +511,7 @@ fn read_bounded_json<T: DeserializeOwned>(
             "review input grew beyond the artifact size limit",
         ));
     }
-    serde_json::from_slice(&content)
-        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+    Ok(content)
 }
 
 /// Parses capture JSON through a fixed buffer and rejects size drift or trailing data.
@@ -606,6 +685,87 @@ fn create_report_file_with(
 /// Reads one Zotero snapshot and writes its sensitive local proposal report.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     match parse_output_request(env::args().skip(1))? {
+        OutputRequest::BoundFullTextReview {
+            report,
+            worksheet,
+            capture,
+            limit,
+            output,
+        } => {
+            let output_path = validate_output_path(&output)?;
+            let (report, report_identity): (ClassificationReport, _) =
+                read_private_json(&report).map_err(|error| label_input("report", error))?;
+            let (worksheet, worksheet_identity): (FullTextReviewWorksheet, _) =
+                read_private_json(&worksheet).map_err(|error| label_input("worksheet", error))?;
+            let (capture, capture_identity) =
+                read_private_capture(&capture).map_err(|error| label_input("capture", error))?;
+            if BTreeSet::from([report_identity, worksheet_identity, capture_identity]).len() != 3 {
+                return Err("full-text review inputs must be distinct files".into());
+            }
+            let content = build_bound_full_text_review_json(&report, &worksheet, &capture, limit)?;
+            write_private_output(&output_path, &content)?;
+        }
+        OutputRequest::ApplyFullTextReview {
+            report,
+            worksheet,
+            capture,
+            completed_view,
+            output,
+        } => {
+            let output_path = validate_output_path(&output)?;
+            let (report, report_identity): (ClassificationReport, _) =
+                read_private_json(&report).map_err(|error| label_input("report", error))?;
+            let (worksheet, worksheet_identity): (FullTextReviewWorksheet, _) =
+                read_private_json(&worksheet).map_err(|error| label_input("worksheet", error))?;
+            let (capture, capture_identity) =
+                read_private_capture(&capture).map_err(|error| label_input("capture", error))?;
+            let (completed_view, view_identity) = read_private_bytes(&completed_view)
+                .map_err(|error| label_input("completed view", error))?;
+            if BTreeSet::from([
+                report_identity,
+                worksheet_identity,
+                capture_identity,
+                view_identity,
+            ])
+            .len()
+                != 4
+            {
+                return Err("full-text review inputs must be distinct files".into());
+            }
+            let updated =
+                apply_full_text_review_view(&report, &worksheet, &capture, &completed_view)?;
+            write_private_output(&output_path, &serde_json::to_vec_pretty(&updated)?)?;
+        }
+        OutputRequest::FinalizeFullTextReview {
+            report,
+            worksheet,
+            capture,
+            approval,
+            output,
+        } => {
+            let output_path = validate_output_path(&output)?;
+            let (report, report_identity): (ClassificationReport, _) =
+                read_private_json(&report).map_err(|error| label_input("report", error))?;
+            let (worksheet, worksheet_identity): (FullTextReviewWorksheet, _) =
+                read_private_json(&worksheet).map_err(|error| label_input("worksheet", error))?;
+            let (capture, capture_identity) =
+                read_private_capture(&capture).map_err(|error| label_input("capture", error))?;
+            let (approval, approval_identity): (FullTextReviewApproval, _) =
+                read_private_json(&approval).map_err(|error| label_input("approval", error))?;
+            if BTreeSet::from([
+                report_identity,
+                worksheet_identity,
+                capture_identity,
+                approval_identity,
+            ])
+            .len()
+                != 4
+            {
+                return Err("full-text review inputs must be distinct files".into());
+            }
+            let golden = finalize_full_text_review(&report, &worksheet, &capture, approval)?;
+            write_private_output(&output_path, &serde_json::to_vec_pretty(&golden)?)?;
+        }
         OutputRequest::FullTextWorksheet {
             report,
             capture,
@@ -799,6 +959,44 @@ mod full_text_review_cli_reader_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bound_full_text_modes_require_complete_distinct_paths_and_limits() {
+        for mode in [
+            "--bound-full-text-review",
+            "--apply-full-text-review",
+            "--finalize-full-text-review",
+        ] {
+            let fourth = if mode == "--bound-full-text-review" {
+                "1"
+            } else {
+                "input"
+            };
+            let args = [mode, "report", "worksheet", "capture", fourth, "output"];
+            assert!(parse_output_request(args).is_ok());
+            for count in 1..6 {
+                assert!(parse_output_request(args[..count].iter().copied()).is_err());
+            }
+            assert!(parse_output_request([mode, "r", "r", "c", fourth, "o"]).is_err());
+            assert!(parse_output_request([mode, "r", "w", "c", fourth, "c"]).is_err());
+            assert!(parse_output_request([mode, "r", "w", "c", fourth, "o", "extra"]).is_err());
+        }
+        for limit in [
+            "",
+            "0",
+            "101",
+            "-1",
+            "+1",
+            " 1",
+            "one",
+            "999999999999999999999999",
+        ] {
+            assert!(
+                parse_output_request(["--bound-full-text-review", "r", "w", "c", limit, "o"])
+                    .is_err()
+            );
+        }
+    }
 
     #[test]
     fn full_text_worksheet_mode_requires_three_distinct_paths() {
@@ -1164,7 +1362,7 @@ mod tests {
 
         let valid = unique_temp_path("valid-input");
         let _ = fs::remove_file(&valid);
-        fs::write(&valid, br#"{\"accepted\":true}"#).unwrap();
+        fs::write(&valid, br#"{"accepted":true}"#).unwrap();
         fs::set_permissions(&valid, fs::Permissions::from_mode(0o600)).unwrap();
 
         fs::set_permissions(&valid, fs::Permissions::from_mode(0o000)).unwrap();
