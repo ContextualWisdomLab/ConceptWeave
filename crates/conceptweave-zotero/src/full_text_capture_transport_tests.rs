@@ -223,6 +223,61 @@ mod tests {
     }
 
     #[test]
+    fn authorization_response_at_its_byte_limit_is_not_rejected() {
+        let mut body = br#"{"key":"0123456789abcdef0123456789abcdef","remember":true}"#.to_vec();
+        body.resize(crate::MAX_AUTH_RESPONSE_BYTES as usize, b' ');
+        let (api_root, server) = serve_responses(vec![wire_response(200, None, &body)]);
+        let result = crate::Zotero10LocalAuthorization::request_with_base(
+            "Synthetic exact limit test",
+            "fixture-server",
+            api_root,
+        );
+        server.join().unwrap();
+        assert!(
+            result.is_ok(),
+            "exact-limit authorization JSON must be accepted"
+        );
+    }
+
+    #[test]
+    fn snapshot_response_at_its_byte_limit_is_not_rejected() {
+        const CHILD_CASE: &str = "CONCEPTWEAVE_EXACT_SNAPSHOT_LIMIT_CASE";
+        if std::env::var_os(CHILD_CASE).is_none() {
+            let status = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "full_text_capture::transport_tests::tests::snapshot_response_at_its_byte_limit_is_not_rejected",
+                ])
+                .env_clear()
+                .env(CHILD_CASE, "synthetic")
+                .status()
+                .unwrap();
+            assert!(
+                status.success(),
+                "isolated snapshot byte-limit regression failed"
+            );
+            return;
+        }
+        let mut body = b"[]".to_vec();
+        body.resize(MAX_PAGE_BYTES as usize, b' ');
+        let mut response = wire_response(200, Some("2"), &body);
+        let header_end = response
+            .windows(4)
+            .position(|part| part == b"\r\n\r\n")
+            .unwrap();
+        response.splice(
+            header_end..header_end,
+            b"\r\nTotal-Results: 0".iter().copied(),
+        );
+        let (api_root, server) = serve_responses(vec![response]);
+        *crate::TEST_LOCAL_API.lock().unwrap() = Some(format!("{api_root}/api/users/0/items"));
+        let result = crate::read_local_snapshot();
+        *crate::TEST_LOCAL_API.lock().unwrap() = None;
+        server.join().unwrap();
+        assert!(result.is_ok(), "exact-limit snapshot JSON must be accepted");
+    }
+
+    #[test]
     fn synthetic_http_sweep_uses_the_same_agent_and_capture_path_as_the_public_wrapper() {
         let manifest = br#"{"BCDE3456":7}"#;
         let metadata = br#"{"key":"BCDE3456","version":1,"data":{"itemType":"attachment","parentItem":"ABCD2345"}}"#;
