@@ -69,3 +69,21 @@ fn private_capture_reader_reuses_regular_owner_only_file_boundary() {
     assert_eq!(error.to_string(), "full-text capture input is invalid");
     fs::remove_file(file_path).unwrap();
 }
+
+#[test]
+fn metadata_writer_rejects_oversized_output_before_creating_file() {
+    let output = tests::unique_temp_path("oversized-private-output");
+    let _ = fs::remove_file(&output);
+    let content = vec![b'x'; MAX_ARTIFACT_BYTES as usize + 1];
+
+    let result = write_private_output(&output, &content);
+    let output_was_created = output.exists();
+    if output_was_created {
+        fs::remove_file(&output).unwrap();
+    }
+
+    let error = result.expect_err("oversized metadata output must fail closed");
+    assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    assert_eq!(error.to_string(), "metadata output exceeds the artifact size limit");
+    assert!(!output_was_created);
+}
