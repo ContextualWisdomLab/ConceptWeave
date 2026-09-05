@@ -484,13 +484,13 @@ fn validate_opened_identity(
     })
 }
 
-/// Reads JSON without allowing the input to exceed or grow past the artifact limit.
+/// Reads bounded JSON without exposing rejected field names or values in diagnostics.
 fn read_bounded_json<T: DeserializeOwned>(
     reader: &mut dyn Read,
     advertised_len: u64,
 ) -> io::Result<T> {
     serde_json::from_slice(&read_bounded_bytes(reader, advertised_len)?)
-        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "review input is invalid"))
 }
 
 /// Shares the metadata byte ceiling without normalizing completed review JSON.
@@ -1464,6 +1464,10 @@ mod tests {
             read_bounded_json::<serde_json::Value>(&mut io::empty(), MAX_ARTIFACT_BYTES + 1)
                 .unwrap_err();
         assert_eq!(oversized.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(
+            oversized.to_string(),
+            "review input exceeds the artifact size limit"
+        );
 
         let grown = read_bounded_json::<serde_json::Value>(
             &mut io::repeat(b' ').take(MAX_ARTIFACT_BYTES + 1),
@@ -1471,10 +1475,15 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(grown.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(
+            grown.to_string(),
+            "review input grew beyond the artifact size limit"
+        );
 
         let read_failure =
             read_bounded_json::<serde_json::Value>(&mut FailingReader, 0).unwrap_err();
         assert_eq!(read_failure.kind(), io::ErrorKind::Other);
+        assert_eq!(read_failure.to_string(), "injected read failure");
 
         let labeled = label_input(
             "worksheet",
