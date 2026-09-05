@@ -90,6 +90,7 @@ fn snapshot_digest_binds_actual_classifier_inputs_after_provider_decode() {
 
 #[test]
 fn source_capture_preserves_provider_shape_validation() {
+    assert!(serde_json::from_str::<ZoteroItem>("{").is_err());
     for invalid in [
         json!(null),
         json!({"key": 7, "version": 7, "data": {"itemType": "book"}}),
