@@ -1,4 +1,11 @@
-use std::cell::Cell;
+use std::{
+    future::Future,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    task::{Context, Poll, Wake, Waker},
+};
 
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, ObservationLimits, ObservationRequest,
@@ -40,34 +47,51 @@ impl ObservationCancellation for Cancellation {
 
 #[derive(Default)]
 struct CountedObservationPort {
-    adapter_invocations: Cell<usize>,
-    source_accesses: Cell<usize>,
-    snapshot_constructions: Cell<usize>,
+    adapter_invocations: AtomicUsize,
+    source_accesses: AtomicUsize,
+    snapshot_constructions: AtomicUsize,
 }
 
 impl SourceObservationPort for CountedObservationPort {
     type Snapshot = String;
 
-    fn observe(
-        &self,
-        request: &AuthorizedObservationRequest,
-        cancellation: &dyn ObservationCancellation,
-    ) -> Result<Self::Snapshot, SourceObservationFailure> {
-        self.adapter_invocations
-            .set(self.adapter_invocations.get() + 1);
+    fn observe<'a>(
+        &'a self,
+        request: &'a AuthorizedObservationRequest,
+        cancellation: &'a dyn ObservationCancellation,
+    ) -> impl Future<Output = Result<Self::Snapshot, SourceObservationFailure>> + Send + 'a {
+        async move {
+            self.adapter_invocations.fetch_add(1, Ordering::Relaxed);
 
-        if cancellation.is_cancelled() {
-            return Err(SourceObservationFailure::Cancelled);
+            if cancellation.is_cancelled() {
+                return Err(SourceObservationFailure::Cancelled);
+            }
+
+            self.source_accesses.fetch_add(1, Ordering::Relaxed);
+            let snapshot = request
+                .source_connection()
+                .source_connection_key()
+                .to_owned();
+            self.snapshot_constructions.fetch_add(1, Ordering::Relaxed);
+            Ok(snapshot)
         }
+    }
+}
 
-        self.source_accesses.set(self.source_accesses.get() + 1);
-        let snapshot = request
-            .source_connection()
-            .source_connection_key()
-            .to_owned();
-        self.snapshot_constructions
-            .set(self.snapshot_constructions.get() + 1);
-        Ok(snapshot)
+struct NoopWake;
+
+impl Wake for NoopWake {
+    fn wake(self: Arc<Self>) {}
+}
+
+fn poll_ready<F: Future>(future: F) -> F::Output {
+    let waker = Waker::from(Arc::new(NoopWake));
+    let mut context = Context::from_waker(&waker);
+    let mut future = std::pin::pin!(future);
+
+    match future.as_mut().poll(&mut context) {
+        Poll::Ready(output) => output,
+        Poll::Pending => panic!("synthetic adapter unexpectedly required an external wakeup"),
     }
 }
 
@@ -93,18 +117,18 @@ fn denied_authorization_has_no_execution_side_effects_and_authorized_control_exe
         Err(ObservationRequestError::UnknownSourceConnectionKey)
     );
     assert!(denied_execution.is_none());
-    assert_eq!(port.adapter_invocations.get(), 0);
-    assert_eq!(port.source_accesses.get(), 0);
-    assert_eq!(port.snapshot_constructions.get(), 0);
+    assert_eq!(port.adapter_invocations.load(Ordering::Relaxed), 0);
+    assert_eq!(port.source_accesses.load(Ordering::Relaxed), 0);
+    assert_eq!(port.snapshot_constructions.load(Ordering::Relaxed), 0);
 
     let authorized = request
         .authorize(&ExactRegistry)
         .expect("known registry key must issue the execution capability");
     assert_eq!(
-        port.observe(&authorized, &Cancellation(false)),
+        poll_ready(port.observe(&authorized, &Cancellation(false))),
         Ok("grc_readonly_connection".to_owned())
     );
-    assert_eq!(port.adapter_invocations.get(), 1);
-    assert_eq!(port.source_accesses.get(), 1);
-    assert_eq!(port.snapshot_constructions.get(), 1);
+    assert_eq!(port.adapter_invocations.load(Ordering::Relaxed), 1);
+    assert_eq!(port.source_accesses.load(Ordering::Relaxed), 1);
+    assert_eq!(port.snapshot_constructions.load(Ordering::Relaxed), 1);
 }
