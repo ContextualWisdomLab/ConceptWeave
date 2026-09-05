@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.contextualwisdomlab.org/conceptweave/semantic-release-supersession/1.0.0",
+  "title": "ConceptWeave Semantic Release Supersession",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["superseded", "successor", "rationale"],
+  "properties": {
+    "superseded": {"$ref": "#/$defs/release_reference"},
+    "successor": {"$ref": "#/$defs/release_reference"},
+    "rationale": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    }
+  },
+  "$defs": {
+    "release_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_id", "artifact_digest"],
+      "properties": {
+        "release_id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": ".*\\S.*"
+        },
+        "artifact_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}
