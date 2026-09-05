@@ -1,0 +1,10 @@
+[workspace]
+members = ["crates/conceptweave-domain"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+repository = "https://github.com/ContextualWisdomLab/ConceptWeave"
+license = "Apache-2.0"
