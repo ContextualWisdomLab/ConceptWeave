@@ -81,7 +81,7 @@ impl ObservationLimits {
             return Err(ObservationLimitError::ZeroRowLimit);
         }
         if max_bytes == 0 {
-            return Err(ObservationLimitError::ZeroByteLimitExceeded);
+            return Err(ObservationLimitError::ZeroByteLimit);
         }
         if max_concurrent_queries == 0 {
             return Err(ObservationLimitError::ZeroConcurrencyLimit);
