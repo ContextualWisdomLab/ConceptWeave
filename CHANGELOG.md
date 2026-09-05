@@ -14,6 +14,7 @@ All notable changes to ConceptWeave are documented here.
 - Read-only delayed reconciliation receipts for indeterminate Zotero rollback operations.
 - Minimal, nonduplicated local abstract context for Zotero items that require steward classification.
 - Owner-only file permissions for sensitive local Zotero classification reports.
+- A complete-review evaluator that rejects partial steward labels as full reclassification evidence.
 
 ### Security
 

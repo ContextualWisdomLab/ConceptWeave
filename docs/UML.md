@@ -55,6 +55,8 @@ sequenceDiagram
     Intake->>Intake: classify or abstain; link children; find duplicate candidates
     Intake->>Report: write proposals and evidence
     Report->>Steward: review dispositions and merge candidates
+    Steward->>Intake: verified labels for every bibliographic item
+    Intake-->>Steward: aggregate completion evidence or incomplete-review failure
     Steward->>Intake: verified canonical-item decisions
     Intake->>Report: before/after/rollback identity manifest
     Report-->>Steward: reversible local mapping; source records preserved
