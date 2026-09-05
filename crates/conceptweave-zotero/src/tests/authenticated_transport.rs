@@ -154,7 +154,19 @@ fn authenticated_write_accepts_exactly_the_byte_limit() {
         MAX_ITEM_RESPONSE_BYTES as usize,
     )]);
     let result = transport(base).write_item(&write_request());
-    server.join().unwrap();
+    let requests = server.join().unwrap();
+    let (headers, request_body) = requests[0].split_once("\r\n\r\n").unwrap();
+    let declared_bytes: usize = headers
+        .lines()
+        .find_map(|line| line.strip_prefix("content-length: "))
+        .unwrap()
+        .parse()
+        .unwrap();
+    assert_eq!(
+        request_body.len(),
+        declared_bytes,
+        "the synthetic server must consume the complete POST before closing"
+    );
     let state = result.expect("inclusive byte limit must accept the write response");
     assert_eq!(state.library_version, 43);
     assert_eq!(state.item_version, 43);
