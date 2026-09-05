@@ -6,6 +6,8 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
+- Private inspection of pending papers alongside their saved text, preserving missing material and leaving previous reports and decisions unchanged.
+
 - Private, replayable paper-text capture for later research review, preserving unavailable material and leaving earlier reports and approvals unchanged.
 
 - Full-library research-source audit separating available text, incomplete indexing and missing material from reviewed classification; no paper is excluded because its abstract or text is unavailable.

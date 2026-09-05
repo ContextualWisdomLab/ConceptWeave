@@ -24,6 +24,8 @@ flowchart LR
 
 Research Intake's Zotero adapter retains optional full-text observations in a separate private artifact bound to the original metadata report. It remains inside ConceptWeave: acquisition is supporting evidence work, not a publication authority or another research system of record. Provider version counters remain opaque at this Anti-Corruption Layer; downstream classification and review must explicitly adopt new content under fresh evidence bindings. See [ADR 0006](docs/adr/0006-zotero-research-intake.md).
 
+Its Full-Text Review View reuses capture verification and canonical pending selection to make exact text inspectable without changing earlier proposals. This bounded read projection is not an aggregate or a decision-application API; the metadata-only approval chain does not acquire full-text provenance from it.
+
 | Context | Type | Owns | Does not own |
 | --- | --- | --- | --- |
 | Source Observation | Supporting | immutable observations, parser receipts, evidence locations | source-system business truth |

@@ -12,7 +12,8 @@ use std::time::Duration;
 
 mod full_text_capture;
 pub use full_text_capture::{
-    FullTextCapture, FullTextError, read_local_full_text, verify_full_text_capture,
+    FullTextCapture, FullTextError, build_full_text_review_json, read_local_full_text,
+    verify_full_text_capture,
 };
 
 /// Classification rule revision recorded in every report.
