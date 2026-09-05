@@ -13,8 +13,8 @@ The active roots observed immediately before this baseline refresh are:
 1. Foundation PR #1 — exact head `b538470c963e6524ddc0c3f652a46a4fc8265150`, Draft/open. The current Foundation makes Product CI draft-aware while keeping Ready/non-Draft quality requirements intact. Product CI still cannot materialize from protected `main` because that branch does not yet contain `.github/workflows/product.yml`.
 2. Product-CI bootstrap PR #35 — exact head `a31ae0c2df920f2794f7ddb456795b04797ab472`, open/non-Draft. It adds the pull-request form of Product CI and removes no-op closed/converted-to-Draft triggers. Scope detection and review admission have executed successfully, while CodeQL, Semgrep, Noema, Strix, Trivy and Scorecard remain queued. The workflow-only diff skips Dependency Review and OSV; these skips do not prove Foundation's dependency-changing checks. No independent approval exists for this head.
 3. Client Consumption PR #5 — exact head `fcf36c8a99f015b963c9f812787df127ac2e2f9e`, Draft/open. The current source retains language-neutral semantic-release admission, integrity, compatibility, diff/resolution and supersession validation. Previously valid review findings are source-repaired, but current protected evidence remains independently required.
-4. Source Observation PR #6 — exact head `51a7344c6b159df8daaf2fca6540f7b712f5f8c6`, Draft/open. PostgreSQL targeted `ON DELETE SET NULL (...)` / `SET DEFAULT (...)` column provenance and registry/ACL-resolved source identity are source-repaired. The next P0 slice is the concrete bounded read-only PostgreSQL adapter.
-5. Zotero Research Classification root PR #9 — exact head `256076d12dec80997960b1db89bec0809f129c90`, Draft/open. Its dependent stack ends at review-batch PR #34, measured at `062a0d9bca086d5a2aaa5d4122f58364115d4f91` before this documentation repair. The stack remains proposal/review oriented and does not elevate local classifier output to semantic authority.
+4. Source Observation PR #6 — exact head `8ed91afcf520efdd53c9103b332d3e277db29a03`, Draft/open. Its independent owner added explicit schema-allowlist count/UTF-8 byte admission and checked overflow rejection after `51a7344c6b159df8daaf2fca6540f7b712f5f8c6`; exact compare and current PR notes were inspected. This does not transfer Zotero tests to that branch. The concrete bounded read-only PostgreSQL adapter remains absent.
+5. Zotero Research Classification root PR #9 — exact head `256076d12dec80997960b1db89bec0809f129c90`, Draft/open. Integrity root #10 is `e7d4e59f1b55b5954c5f8436527bc96e7ef2fb13`; all 23 descendants inherited it through ordinary merges ending at review-batch PR #34 `a359c5b9d1013e84f5832506f5a57aec364e6493`. The local coverage follow-up is `6f27da9` before this documentation commit. The stack remains proposal/review oriented and does not elevate local classifier output to semantic authority.
 
 Predecessor reviews/checks never transfer to successor heads. No force-push, destructive rebase, self-approval, fail-open scanner substitution or routine administrator bypass is acceptance evidence.
 
@@ -51,7 +51,32 @@ Protected central source is `.github/main@6d7fbebec8aec31d88a30a36e71ca5b3925d24
 
 ## Zotero research campaign evidence
 
-### Current runtime transition and integrity gates
+### Repaired current snapshot and source verification
+
+PR #10 `e7d4e59f1b55b5954c5f8436527bc96e7ef2fb13` binds the complete captured provider JSON value plus the typed inputs actually consumed by the classifier, including omitted/default distinctions and post-decode changes. A separately recomputed complete proposal digest binds the actual records evaluated under a governance receipt. Root tests reproduce lost provider fields and prediction replacement under an unchanged receipt before fixing them. PR #27 records finalization RED `4718073` → GREEN `61fee4c`; PR #28 `25a787a` proves that a valid saved report preserves the proposal digest while changed title/evidence is rejected before external verification. Old approval JSON without that binding fails closed; never synthesize or backfill genuine approval receipts.
+
+All 23 descendants (#11–#34, excluding absent #14) received the root changes by non-force merge/push, with their original deltas and Draft states preserved. Independent local testing at #34 `a359c5b9d1013e84f5832506f5a57aec364e6493` passed 143 tests across 36 suites, strict workspace Clippy, rustdoc with warnings denied, formatting and the CI contract. The first final-tip coverage run correctly failed: five owned regions in the missing-output-filename rejection were not exercised. Test-only `6f27da9` adds that boundary case without weakening file protection or excluding code; the focused test and full coverage run passed. Existing source-normalized coverage reports 3,197/3,197 regions and 596/596 branch outcomes; functions are 314/314. LLVM's raw instantiated totals remain 3,822/3,908 lines, 5,603/5,734 regions and 528/596 branch outcomes. Do not describe those raw totals as 100% or transfer local evidence to hosted checks.
+
+The repaired executable at `a359c5b9d1013e84f5832506f5a57aec364e6493` completed a new read-only Zotero 10.0.1/API 3/schema-44/library-2 capture. It observed 8,326 records, 3,715 bibliographic items, complete proposal/provenance counts of 3,715 each, 56 adjacent-evidence proposals, one semantic-consumption bridge, 3,658 abstentions, 49 duplicate candidates and zero reported read failures. The versioned source digest is `sha256:0666dbebfb0c5aa99deb5a6dda1fc02d84bc46d08aaaddf25f5526a18eceef6d`. A distinct first pending batch was generated at test-only follow-up `6f27da9`; generation does not supply decisions.
+
+All four new artifacts remain private mode `0600`, outside the repository:
+
+| Artifact | Bytes | File SHA-256 |
+| --- | ---: | --- |
+| Repaired report | 6,890,050 | `bf45248413f433a537fe8fc62c02b93eef3c7e47ff6245f31610e9ba72031d8d` |
+| Repaired worksheet | 1,640,941 | `2093aeffd3907e71d310715889b87e3fbc189cfba620338bf9a81b53ced26f87` |
+| Aggregate progress | 258 | `1b0a01798e03d8dff0677ef3b13605979b667cb9a74e690327d87ae7c2d0bd25` |
+| First pending review batch | 32,848 | `c8c3143bb23e4ebcb15d4ca789727c96a495d5ca50739e69e9eae2d22426286b` |
+
+The repaired worksheet has 0/3,715 decisions and the first batch has 0/25; externally approved full-review coverage remains 0/3,715. No authorization prompt, approval, Zotero write, record merge/deletion or rollback was performed. The three historical Zotero 9 artifact hashes below were rechecked unchanged. The pre-repair schema-44 artifacts are also preserved. Stronger source binding is not classification correctness, business approval or loopback peer authentication.
+
+The [CWL ontology capability inventory](doctoring/cwl_ontology_capability_inventory.md) now separates a 76-repository metadata census from a 12-candidate exact-default-head capability audit. Three selected candidates have GitHub releases with resolved source commits: RankWeave, mhtml-etl-gateway and fast-mlsirm. Veilpick's protected default tree contains only a license despite its ontology-related description; graphify is an upstream fork without a returned CWL GitHub release. These are maturity observations, not adoption receipts. Source-level discovery remains incomplete for 64 repositories, and actual ConceptWeave adoption remains unproved. No additional utility owner is justified yet.
+
+Next: apply only authentic snapshot-bound steward decisions to the repaired batch, cover all 3,715 items and independently verify full-review approval; continue owner contract discovery and protected Foundation work while external checks/reviews are pending. The current body notes for PRs #11–#33 distinguish inherited source repair from historical head/check claims. No PR was closed, approved, merged or retargeted by this repair.
+
+### Historical pre-repair Zotero 10 transition
+
+The following schema-44 observations were captured before integrity repair and are retained for provenance, not reused as current approval inputs.
 
 A fresh read at `22030ae6c8510d9eb8f7b07d98959bb69d2bd286` observed Zotero 10.0.1, API 3/schema 44, library version 2 and a present server identity. It produced a distinct report/worksheet pair without overwriting the historical artifacts below. The full read still counted 8,326 records and 3,715 bibliographic proposals, with 56 adjacent-evidence proposals, one semantic-consumption bridge, 3,658 abstentions and 49 duplicate candidates. The new worksheet's aggregate checkpoint remains 0/3,715, incomplete. Equal totals do not prove unchanged content across the Zotero 9-to-10 version-space transition.
 
@@ -59,7 +84,7 @@ Both new files have mode `0600`. The report is 6,890,050 bytes with file SHA-256
 
 PR #10's existing findings remain source-confirmed at this capture head: provider fields omitted by the typed input are lost before raw-snapshot hashing, and mutable report predictions can be evaluated under an unchanged approval receipt. These invalidate stronger integrity claims, not the observed aggregate counts. Repair the canonical owner, propagate through the stack and regenerate before approval/promotion. Zotero 10 availability alone does not resolve the loopback confidentiality finding or grant write authority.
 
-The [CWL ontology capability inventory](doctoring/cwl_ontology_capability_inventory.md) records eight bounded owner candidates with exact default heads. Seven returned no GitHub release; RankWeave v0.18.0 resolves to an exact commit but does not prove Rust runtime availability or ConceptWeave adoption. `context-graph-contracts` and `enterprise-architecture-core` use protected `develop`, not `main`, as their default adoption baseline. This is owner-selection evidence, not an organization-wide census or permission to bypass missing releases.
+At that earlier checkpoint, the inventory covered eight bounded owner candidates: seven returned no GitHub release, while RankWeave v0.18.0 resolved to an exact commit. The expanded inventory above supersedes that audit denominator without rewriting its historical observation. `context-graph-contracts` and `enterprise-architecture-core` use protected `develop`, not `main`, as their default adoption baseline. Neither checkpoint permits bypassing missing owner releases.
 
 ### Historical Zotero 9 snapshot
 
