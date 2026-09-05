@@ -156,15 +156,26 @@ fn capture_with(
     max_bytes: u64,
     fetch: &mut dyn FnMut(&str, u64) -> Result<CapturedResponse, FullTextError>,
 ) -> Result<FullTextCapture, FullTextError> {
-    let snapshot = validate_report(report)?;
-    let started_unix_ms = unix_millis(SystemTime::now())?;
     let started = Instant::now();
+    capture_with_clock(report, max_bytes, fetch, &mut || {
+        (SystemTime::now(), started.elapsed())
+    })
+}
+
+fn capture_with_clock(
+    report: &ClassificationReport,
+    max_bytes: u64,
+    fetch: &mut dyn FnMut(&str, u64) -> Result<CapturedResponse, FullTextError>,
+    observe_time: &mut dyn FnMut() -> (SystemTime, Duration),
+) -> Result<FullTextCapture, FullTextError> {
+    let snapshot = validate_report(report)?;
+    let started_unix_ms = unix_millis(observe_time().0)?;
     let mut remaining = max_bytes.min(MAX_SNAPSHOT_BYTES);
     let mut read = |request_path: &str| {
-        check_admission(remaining, started.elapsed())?;
+        check_admission(remaining, observe_time().1)?;
         let response = fetch(request_path, remaining.min(MAX_PAGE_BYTES))?;
         account_body(&mut remaining, &response)?;
-        check_deadline(started.elapsed())?;
+        check_deadline(observe_time().1)?;
         Ok::<_, FullTextError>(response)
     };
     let library_before = read("items?limit=1")?;
@@ -191,7 +202,7 @@ fn capture_with(
         metadata_snapshot_digest: report.snapshot_digest.clone(),
         bibliographic_item_count: report.classified_items.len(),
         started_unix_ms,
-        finished_unix_ms: unix_millis(SystemTime::now())?,
+        finished_unix_ms: unix_millis(observe_time().0)?,
         library_before,
         manifest_before,
         records,
@@ -203,7 +214,7 @@ fn capture_with(
         capture_evidence,
     };
     verify_full_text_capture(&capture, report)?;
-    check_deadline(started.elapsed())?;
+    check_deadline(observe_time().1)?;
     Ok(capture)
 }
 
@@ -236,15 +247,6 @@ fn validate_report(
         snapshot.insert(item.item_key.as_str(), item);
     }
     Ok(snapshot)
-}
-
-fn capture_with_clock(
-    report: &ClassificationReport,
-    max_bytes: u64,
-    fetch: &mut dyn FnMut(&str, u64) -> Result<CapturedResponse, FullTextError>,
-    _observe_time: &mut dyn FnMut() -> (SystemTime, Duration),
-) -> Result<FullTextCapture, FullTextError> {
-    capture_with(report, max_bytes, fetch)
 }
 
 fn validate_library(
@@ -377,21 +379,15 @@ fn fetch_response(
     request_path: &str,
     limit: u64,
 ) -> Result<CapturedResponse, FullTextError> {
+    let expected_server = report.server_id.as_deref().ok_or(INVALID_EVIDENCE)?;
     let mut response = agent
         .get(&format!("{api_root}/api/users/0/{request_path}"))
         .header("Zotero-API-Version", "3")
-        .header(
-            "Zotero-Server-ID",
-            report.server_id.as_deref().ok_or(INVALID_EVIDENCE)?,
-        )
+        .header("Zotero-Server-ID", expected_server)
         .call()
         .map_err(|_| FullTextError("full-text local request failed"))?;
     let headers = response.headers();
-    verify_server_id(
-        headers,
-        report.server_id.as_deref().ok_or(INVALID_EVIDENCE)?,
-    )
-    .map_err(|_| INVALID_EVIDENCE)?;
+    verify_server_id(headers, expected_server).map_err(|_| INVALID_EVIDENCE)?;
     for (header, expected) in [
         ("Zotero-API-Version", "3".to_owned()),
         (

@@ -433,3 +433,36 @@ fn capture_rejects_clock_failure_and_late_results_without_real_waiting() {
         assert!(result.is_err(), "clock poll {failed_poll}");
     }
 }
+
+#[test]
+fn every_failed_request_and_invalid_replay_input_fails_closed() {
+    let report = report_fixture();
+    for failed_request in 0..8 {
+        let mut requests = 0;
+        let result = capture_with(&report, 4096, &mut |request_path, _| {
+            requests += 1;
+            if requests == failed_request + 1 {
+                Err(INVALID_EVIDENCE)
+            } else {
+                Ok(response_fixture(request_path))
+            }
+        });
+        assert!(result.is_err());
+        assert_eq!(requests, failed_request + 1);
+    }
+    assert!(
+        capture_with(&report, 1, &mut |request_path, _| Ok(response_fixture(
+            request_path
+        )))
+        .is_err()
+    );
+    let mut capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let mut invalid_report = report_fixture();
+    invalid_report.api_version = None;
+    assert!(verify_full_text_capture(&capture, &invalid_report).is_err());
+    capture.capture_evidence.manifest_before.body = "null".into();
+    assert!(verify_full_text_capture(&capture, &report).is_err());
+}
