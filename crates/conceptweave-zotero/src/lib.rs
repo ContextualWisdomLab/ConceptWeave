@@ -32,6 +32,9 @@ pub struct ZoteroItem {
     pub version: u64,
     /// Item metadata.
     pub data: ItemData,
+    /// Unmodeled provider fields retained in the canonical snapshot digest.
+    #[serde(flatten)]
+    pub additional_fields: BTreeMap<String, serde_json::Value>,
 }
 
 /// Metadata used by the classifier.
@@ -58,6 +61,9 @@ pub struct ItemData {
     /// Tags applied to the item.
     #[serde(default)]
     pub tags: Vec<ItemTag>,
+    /// Complete provider metadata not needed by the classifier, retained for content binding.
+    #[serde(flatten)]
+    pub additional_fields: BTreeMap<String, serde_json::Value>,
 }
 
 /// A Zotero item tag.
@@ -65,6 +71,9 @@ pub struct ItemData {
 pub struct ItemTag {
     /// Tag text.
     pub tag: String,
+    /// Provider tag metadata retained even when classification uses only the text.
+    #[serde(flatten)]
+    pub additional_fields: BTreeMap<String, serde_json::Value>,
 }
 
 /// One mutually exclusive proposed disposition.
@@ -960,7 +969,9 @@ mod tests {
                 parent_item: parent.into(),
                 collections: vec![],
                 tags: vec![],
+                additional_fields: BTreeMap::new(),
             },
+            additional_fields: BTreeMap::new(),
         }
     }
 
@@ -1145,6 +1156,7 @@ mod tests {
         let mut generation = item("B", "journalArticle", "Ontology Learning", "10.1/X", "");
         generation.data.tags.push(ItemTag {
             tag: "SHACL".into(),
+            additional_fields: BTreeMap::new(),
         });
         let report = classify_snapshot(
             "9.0.6".into(),

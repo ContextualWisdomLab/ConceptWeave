@@ -12,7 +12,9 @@ fn item(key: &str, title: &str, doi: &str) -> ZoteroItem {
             parent_item: String::new(),
             collections: vec![],
             tags: vec![],
+            additional_fields: Default::default(),
         },
+        additional_fields: Default::default(),
     }
 }
 
