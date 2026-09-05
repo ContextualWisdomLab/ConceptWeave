@@ -638,6 +638,59 @@ mod tests {
     use super::*;
 
     #[test]
+    fn full_text_review_mode_requires_five_distinct_bounded_arguments() {
+        assert!(
+            parse_output_request([
+                "--full-text-review",
+                "/tmp/report.json",
+                "/tmp/worksheet.json",
+                "/tmp/capture.json",
+                "2",
+                "/tmp/view.json",
+            ])
+            .is_ok()
+        );
+        for length in 1..6 {
+            let arguments = ["--full-text-review", "r", "w", "c", "1", "o"];
+            assert!(parse_output_request(arguments[..length].iter().copied()).is_err());
+        }
+        for limit in [
+            "",
+            "0",
+            "101",
+            " 1",
+            "+1",
+            "-1",
+            "one",
+            "999999999999999999999999999",
+        ] {
+            assert!(
+                parse_output_request(["--full-text-review", "r", "w", "c", limit, "o"]).is_err()
+            );
+        }
+        for paths in [
+            ["r", "r", "c", "o"],
+            ["r", "w", "r", "o"],
+            ["r", "w", "c", "r"],
+        ] {
+            assert!(
+                parse_output_request([
+                    "--full-text-review",
+                    paths[0],
+                    paths[1],
+                    paths[2],
+                    "1",
+                    paths[3]
+                ])
+                .is_err()
+            );
+        }
+        assert!(
+            parse_output_request(["--full-text-review", "r", "w", "c", "1", "o", "extra"]).is_err()
+        );
+    }
+
+    #[test]
     fn full_text_mode_requires_two_distinct_artifact_paths() {
         let report = "/tmp/report.json";
         let output = "/tmp/full-text.json";
