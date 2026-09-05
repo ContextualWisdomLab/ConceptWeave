@@ -35,15 +35,14 @@ fn capture_reader_rejects_advertised_oversize_growth_and_shrink() {
 
 #[test]
 fn capture_reader_sanitizes_json_and_io_failures() {
-    for bytes in [
+    for mut bytes in [
         b"{\"private-sentinel\":".as_slice(),
         b"{} private-sentinel",
         b"\xff",
         b"",
     ] {
-        let error =
-            read_bounded_capture::<serde_json::Value>(&mut bytes.as_ref(), bytes.len() as u64, 64)
-                .unwrap_err();
+        let length = bytes.len() as u64;
+        let error = read_bounded_capture::<serde_json::Value>(&mut bytes, length, 64).unwrap_err();
         assert_eq!(error.to_string(), "full-text capture input is invalid");
     }
     struct FailedReader;

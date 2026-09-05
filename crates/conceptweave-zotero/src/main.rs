@@ -293,12 +293,14 @@ fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<(T, ArtifactI
     read_private_input(raw, |file, length| read_bounded_json(file, length))
 }
 
+/// Restores a private capture without allocating a second full-file byte buffer.
 fn read_private_capture(raw: &str) -> io::Result<(FullTextCapture, ArtifactIdentity)> {
     read_private_input(raw, |file, length| {
         read_bounded_capture(file, length, MAX_CAPTURE_FILE_BYTES)
     })
 }
 
+/// Shares the validated, single-open file boundary across bounded artifact parsers.
 fn read_private_input<T>(
     raw: &str,
     parse: impl FnOnce(&mut File, u64) -> io::Result<T>,
