@@ -214,7 +214,7 @@ pub struct SnapshotItemRevision {
     pub item_version: u64,
 }
 
-/// Governance receipt binding a steward approval to one exact classifier input.
+/// Governance receipt binding a steward approval to exact input and proposals.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct GoldenSetApproval {
     /// Opaque receipt identifier.
@@ -227,6 +227,8 @@ pub struct GoldenSetApproval {
     pub rule_revision: String,
     /// Immutable digest over the approved snapshot, verified by the caller.
     pub snapshot_digest: String,
+    /// Digest of the actual proposal records reviewed and verified by the caller.
+    pub proposal_digest: String,
     /// Complete sorted item-revision identity of the reviewed report.
     pub snapshot_items: Vec<SnapshotItemRevision>,
 }
@@ -234,6 +236,22 @@ pub struct GoldenSetApproval {
 /// Computes the canonical content identity verified by a golden-set approval.
 pub fn classification_snapshot_digest(report: &ClassificationReport) -> String {
     report.snapshot_digest.clone()
+}
+
+/// Computes the versioned SHA-256 identity of the report's current proposals.
+///
+/// Every proposal field is covered, including its prediction, evidence, and item
+/// revision. Records are sorted by item key and revision so page ordering does
+/// not change their identity. No second source snapshot is stored. Governance
+/// must bind this value when issuing an approval; recomputing it alone grants no
+/// authority. Evaluation recomputes it rather than trusting report metadata.
+pub fn classification_proposal_digest(report: &ClassificationReport) -> String {
+    let mut proposals = report.classified_items.iter().collect::<Vec<_>>();
+    proposals.sort_by_key(|item| (&item.item_key, item.item_version));
+    let proposal_bytes =
+        serde_json::to_vec(&("conceptweave-classification-proposals-v1", proposals))
+            .expect("classification proposal records contain only JSON-serializable values");
+    format!("sha256:{:x}", Sha256::digest(proposal_bytes))
 }
 
 /// Integer evidence from which precision and recall can be calculated exactly.
@@ -258,6 +276,8 @@ pub struct GoldenSetEvaluation {
     pub rule_revision: String,
     /// Opaque immutable snapshot digest from the verified receipt.
     pub snapshot_digest: String,
+    /// Opaque digest binding the exact proposal records used for these counts.
+    pub proposal_digest: String,
     /// Number of steward-reviewed items.
     pub reviewed_count: usize,
     /// Number of exact disposition matches.
@@ -303,6 +323,11 @@ impl fmt::Display for EvaluationError {
 impl std::error::Error for EvaluationError {}
 
 /// Evaluates reviewed labels without copying item identities into the result.
+///
+/// Structural, source, proposal, and label validation run before governance is
+/// contacted. The verifier must authenticate the complete reviewed set against
+/// an independently issued receipt, including both digests and every label;
+/// accepting a self-declared receipt identifier or digest is not verification.
 pub fn evaluate_reviewed_golden_set<F>(
     report: &ClassificationReport,
     golden: &ReviewedGoldenSet,
@@ -316,11 +341,9 @@ where
         || golden.labels.is_empty()
         || golden.approval.rule_revision.trim().is_empty()
         || golden.approval.snapshot_digest.trim().is_empty()
+        || golden.approval.proposal_digest.trim().is_empty()
     {
         return Err(EvaluationError::InvalidReview);
-    }
-    if !verify_approval(golden) {
-        return Err(EvaluationError::UnverifiedApproval);
     }
     let report_snapshot = report
         .snapshot_items
@@ -357,6 +380,20 @@ where
         .iter()
         .map(|item| (item.item_key.as_str(), item.proposed_disposition))
         .collect::<BTreeMap<_, _>>();
+    if classified.len() != report.classified_items.len()
+        || report.classified_items.iter().any(|item| {
+            item.item_key.trim().is_empty()
+                || !report_snapshot.contains(&SnapshotItemRevision {
+                    item_key: item.item_key.clone(),
+                    item_version: item.item_version,
+                })
+        })
+    {
+        return Err(EvaluationError::InvalidReview);
+    }
+    if golden.approval.proposal_digest != classification_proposal_digest(report) {
+        return Err(EvaluationError::SnapshotMismatch);
+    }
     let mut seen = BTreeSet::new();
     let mut correct_count = 0;
     let mut abstention_count = 0;
@@ -390,11 +427,16 @@ where
         }
     }
 
+    if !verify_approval(golden) {
+        return Err(EvaluationError::UnverifiedApproval);
+    }
+
     Ok(GoldenSetEvaluation {
         review_id: golden.approval.receipt_id.clone(),
         library_version: golden.approval.library_version,
         rule_revision: golden.approval.rule_revision.clone(),
         snapshot_digest: golden.approval.snapshot_digest.clone(),
+        proposal_digest: golden.approval.proposal_digest.clone(),
         reviewed_count: golden.labels.len(),
         correct_count,
         abstention_count,

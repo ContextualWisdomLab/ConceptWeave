@@ -1,7 +1,7 @@
 use conceptweave_zotero::{
     Disposition, EvaluationError, GoldenLabel, GoldenSetApproval, ItemData, ReviewedGoldenSet,
-    SnapshotItemRevision, ZoteroItem, classification_snapshot_digest, classify_snapshot,
-    evaluate_reviewed_golden_set,
+    SnapshotItemRevision, ZoteroItem, classification_proposal_digest,
+    classification_snapshot_digest, classify_snapshot, evaluate_reviewed_golden_set,
 };
 
 fn item(key: &str, title: &str) -> ZoteroItem {
@@ -41,6 +41,7 @@ fn golden(labels: Vec<GoldenLabel>) -> ReviewedGoldenSet {
             library_version: 42,
             rule_revision: "ontology-research-v2".into(),
             snapshot_digest: classification_snapshot_digest(&report()),
+            proposal_digest: classification_proposal_digest(&report()),
             snapshot_items: ["A", "B", "C"]
                 .into_iter()
                 .map(|item_key| SnapshotItemRevision {

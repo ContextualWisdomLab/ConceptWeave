@@ -1,7 +1,7 @@
 use conceptweave_zotero::{
     Disposition, EvaluationError, GoldenLabel, GoldenSetApproval, ItemData, ReviewedGoldenSet,
-    SnapshotItemRevision, ZoteroItem, classification_snapshot_digest, classify_snapshot,
-    evaluate_reviewed_golden_set,
+    SnapshotItemRevision, ZoteroItem, classification_proposal_digest,
+    classification_snapshot_digest, classify_snapshot, evaluate_reviewed_golden_set,
 };
 
 fn bibliographic(key: &str, version: u64, title: &str) -> ZoteroItem {
@@ -46,6 +46,7 @@ fn approval(
         library_version: report.library_version,
         rule_revision: report.rule_revision.into(),
         snapshot_digest: classification_snapshot_digest(report),
+        proposal_digest: classification_proposal_digest(report),
         snapshot_items,
     }
 }

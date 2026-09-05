@@ -1,6 +1,7 @@
 use conceptweave_zotero::{
     Disposition, EvaluationError, GoldenLabel, GoldenSetApproval, ItemData, ReviewedGoldenSet,
-    SnapshotItemRevision, ZoteroItem, classify_snapshot, evaluate_reviewed_golden_set,
+    SnapshotItemRevision, ZoteroItem, classification_proposal_digest, classify_snapshot,
+    evaluate_reviewed_golden_set,
 };
 
 fn item(title: &str) -> ZoteroItem {
@@ -30,6 +31,7 @@ fn golden_approval_rejects_same_revision_coordinates_with_changed_snapshot_conte
             library_version: 42,
             rule_revision: "ontology-research-v2".into(),
             snapshot_digest: "sha256:approved-original-content".into(),
+            proposal_digest: classification_proposal_digest(&changed_report),
             snapshot_items: vec![SnapshotItemRevision {
                 item_key: "A".into(),
                 item_version: 1,
