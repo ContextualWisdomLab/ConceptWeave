@@ -17,6 +17,7 @@ All notable changes to ConceptWeave are documented here.
 - Explicit `ObservationRequestBudget` policy with positive maximum schema count and total retained UTF-8 schema bytes, enforced before registry/database access without treating PostgreSQL's identifier-length default as a ConceptWeave security constant.
 - Source registry keys now require at most 128 bytes of lowercase multiword `snake_case`, rejecting raw DSNs, URLs, shell-style connection parameters, generic one-word identifiers, and malformed registry identifiers before adapter credential resolution.
 - Registry resolution now issues an opaque source capability, and immutable snapshots accept that capability instead of caller-supplied connection text.
+- `AuthorizedObservationRequest` now binds validated request policy to registry-issued `ResolvedSourceConnection` capability evidence, and `SourceObservationPort::observe` accepts only that authorized envelope rather than a raw syntactically valid request.
 - Composite foreign keys preserve the exact local-column subset used by PostgreSQL `ON DELETE SET NULL (...)` and `SET DEFAULT (...)`, rejecting invalid action/column combinations.
 - Source Observation timestamps now fail closed unless they use an explicit canonical UTC `Z` form with a valid Gregorian calendar date and clock value; optional fractional seconds are preserved, and numeric/local offsets are not silently normalized into provenance.
 - Fail-closed Draft -> Proposed -> Validated -> Reviewed -> Published lifecycle with explicit rejection and supersession.
@@ -34,6 +35,7 @@ All notable changes to ConceptWeave are documented here.
 
 - Model-generated semantics remain non-authoritative until deterministic validation and authorized review.
 - Source Observation rejects over-budget exact-schema authorization metadata before registry/database access and requires callers to choose explicit positive count/byte bounds rather than inheriting provider defaults.
+- Source Observation adapter execution now requires a registry-authorized request envelope; a well-formed opaque key alone cannot cross the canonical execution seam, and credential material remains adapter-local.
 - Client authoritative-use admission rejects incompatible, unpublished, or non-authoritative releases without requiring a network/model call.
 - Legacy compatibility is explicit opt-in policy; unknown versions remain fail-closed and the current version cannot also be configured as legacy.
 - Release diff validates both compared releases through the same fail-closed authoritative-use gate so comparison cannot bypass contract-version, publication-state, or truth-status policy.
