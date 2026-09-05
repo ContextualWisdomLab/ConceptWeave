@@ -708,6 +708,15 @@ fn review_view_rejects_json_expansion_without_truncating_valid_captured_text() {
     let error = build_full_text_review_json(&report, &worksheet, &capture, 1).unwrap_err();
     assert!(error.to_string().contains("16 MiB output limit"));
     assert_eq!(worksheet.decisions.len(), 2);
+    let bound = build_full_text_review_worksheet(&report, &capture).unwrap();
+    assert!(build_bound_full_text_review_json(&report, &bound, &capture, 1).is_err());
+    let mut batch = crate::build_steward_review_batch(&report, &worksheet, 1).unwrap();
+    batch.decisions[0].reviewed_disposition = Some(crate::Disposition::OutOfScope);
+    let input = serde_json::to_vec(&serde_json::json!({"review_batch":batch})).unwrap();
+    let error = apply_full_text_review_view(&report, &bound, &capture, &input)
+        .err()
+        .unwrap();
+    assert!(error.to_string().contains("16 MiB output limit"));
 }
 
 fn report_fixture() -> ClassificationReport {
