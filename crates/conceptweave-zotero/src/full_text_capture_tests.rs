@@ -1,0 +1,114 @@
+use super::*;
+use crate::{ZoteroItem, classify_snapshot};
+
+fn report_fixture() -> ClassificationReport {
+    let items: Vec<ZoteroItem> = serde_json::from_value(serde_json::json!([
+        {"key":"ABCD2345","version":2,"data":{"itemType":"journalArticle","title":"fixture paper"}},
+        {"key":"BCDE3456","version":1,"data":{"itemType":"attachment","parentItem":"ABCD2345"}},
+        {"key":"CDEF4567","version":0,"data":{"itemType":"attachment","parentItem":"ABCD2345"}},
+        {"key":"DEFG5678","version":2,"data":{"itemType":"book","title":"no attachment fixture"}}
+    ])).unwrap();
+    let mut report = classify_snapshot("10.0.1".into(), Some("fixture-server".into()), 2, items);
+    report.api_version = Some(3);
+    report.schema_version = Some(44);
+    report
+}
+
+fn response_fixture(request_path: &str) -> CapturedResponse {
+    let (status, version, body) = match request_path {
+        "items?limit=1" => (200, Some(2), "[]"),
+        "fulltext?since=0" => (200, None, r#"{"BCDE3456":12403,"CDEF4567":0}"#),
+        "items/BCDE3456" => (200, Some(1), r#"{"key":"BCDE3456","version":1,"data":{"itemType":"attachment","parentItem":"ABCD2345"}}"#),
+        "items/CDEF4567" => (200, Some(0), r#"{"key":"CDEF4567","version":0,"data":{"itemType":"attachment","parentItem":"ABCD2345"}}"#),
+        "items/BCDE3456/fulltext" => (200, Some(12403), r#"{"content":"fixture text 한글","indexedPages":2,"totalPages":2,"providerExtra":{"retained":true}}"#),
+        "items/CDEF4567/fulltext" => (404, None, "missing"),
+        _ => panic!("unexpected fixture request"),
+    };
+    CapturedResponse { status, version, body: body.into() }
+}
+
+#[test]
+fn capture_retains_exact_text_missing_results_and_full_parent_denominator() {
+    let report = report_fixture();
+    let old_digest = report.snapshot_digest.clone();
+    let mut requests = Vec::new();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        requests.push(request_path.to_owned());
+        Ok(response_fixture(request_path))
+    }).unwrap();
+    assert_eq!(requests.len(), 8);
+    assert_eq!(requests.first().unwrap(), "items?limit=1");
+    assert_eq!(requests.last().unwrap(), "items?limit=1");
+    let saved = serde_json::to_value(&capture).unwrap();
+    assert_eq!(saved["capture_evidence"]["capture_kind"], "non_atomic_fulltext_sweep_v1");
+    assert_eq!(saved["capture_evidence"]["bibliographic_item_count"], 2);
+    assert_eq!(saved["capture_evidence"]["records"].as_array().unwrap().len(), 2);
+    assert_eq!(saved["capture_evidence"]["records"][0]["content_response"]["body"], response_fixture("items/BCDE3456/fulltext").body);
+    assert_eq!(saved["capture_evidence"]["records"][0]["content_response"]["version"], 12403);
+    assert_eq!(saved["capture_evidence"]["records"][1]["content_response"]["status"], 404);
+    assert_eq!(report.snapshot_digest, old_digest);
+    let restored: FullTextCapture = serde_json::from_value(saved.clone()).unwrap();
+    verify_full_text_capture(&restored, &report).unwrap();
+    let mut changed = saved;
+    changed["capture_evidence"]["records"][0]["content_response"]["body"] = "changed text".into();
+    let changed: FullTextCapture = serde_json::from_value(changed).unwrap();
+    assert!(verify_full_text_capture(&changed, &report).is_err());
+}
+
+#[test]
+fn capture_rejects_unbound_reports_before_any_request() {
+    let mut report = report_fixture();
+    report.server_id = None;
+    let mut calls = 0;
+    assert!(capture_with(&report, 4096, &mut |_, _| { calls += 1; unreachable!() }).is_err());
+    assert_eq!(calls, 0);
+}
+
+#[test]
+fn capture_rejects_foreign_manifest_items_and_duplicate_manifest_keys() {
+    for body in [r#"{"EFGH6789":0}"#, r#"{"BCDE3456":1,"BCDE3456":2}"#] {
+        let mut calls = 0;
+        assert!(capture_with(&report_fixture(), 4096, &mut |request_path, _| {
+            calls += 1;
+            let mut response = response_fixture(request_path);
+            if request_path == "fulltext?since=0" { response.body = body.into(); }
+            Ok(response)
+        }).is_err());
+        assert_eq!(calls, 2);
+    }
+}
+
+#[test]
+fn capture_rejects_parent_version_status_and_bookend_drift() {
+    for scenario in 0..5 {
+        let mut manifest_reads = 0;
+        let result = capture_with(&report_fixture(), 4096, &mut |request_path, _| {
+            let mut response = response_fixture(request_path);
+            if request_path == "items/BCDE3456" {
+                if scenario == 0 { response.body = response.body.replace("ABCD2345", "DEFG5678"); }
+                if scenario == 1 { response.version = Some(3); }
+            }
+            if request_path == "items/BCDE3456/fulltext" {
+                if scenario == 2 { response.status = 500; }
+                if scenario == 3 { response.version = Some(12404); }
+            }
+            if request_path == "fulltext?since=0" {
+                manifest_reads += 1;
+                if scenario == 4 && manifest_reads == 2 { response.body = "{}".into(); }
+            }
+            Ok(response)
+        });
+        assert!(result.is_err(), "drift scenario {scenario}");
+    }
+}
+
+#[test]
+fn capture_checks_total_budget_before_another_request() {
+    let mut calls = 0;
+    assert!(capture_with(&report_fixture(), 2, &mut |request_path, limit| {
+        calls += 1;
+        assert_eq!(limit, 2);
+        Ok(response_fixture(request_path))
+    }).is_err());
+    assert_eq!(calls, 1);
+}
