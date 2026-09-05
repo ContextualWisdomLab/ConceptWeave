@@ -10,6 +10,14 @@ cargo +1.98.0 run --bin conceptweave-zotero -- /tmp/conceptweave-zotero-classifi
 
 The command reads one stable library-version snapshot and creates a local, reviewable JSON report. On Unix, output is restricted to a new owner-only (`0600`) direct child of canonical `/tmp` or the system temporary directory; the CLI fails closed on other platforms. The command never changes Zotero records.
 
+Apply a small steward-reviewed decision patch to a new worksheet without overwriting the current one:
+
+```sh
+cargo +1.98.0 run --bin conceptweave-zotero -- --apply-decision-patch /tmp/report.json /tmp/current-worksheet.json /tmp/patch.json /tmp/updated-worksheet.json
+```
+
+All three inputs must be separate owner-only files from the same immutable snapshot. The output is create-new and owner-only; this offline step neither changes Zotero nor grants governance approval.
+
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ContextualWisdomLab/ConceptWeave)
 
 **Automatic, evidence-bound ontology and semantic-layer engineering for governed enterprise meaning.**

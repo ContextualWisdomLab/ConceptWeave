@@ -2,9 +2,9 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 use conceptweave_zotero::{
-    ClassificationReport, GoldenSetApproval, StewardReviewWorksheet,
-    assess_steward_review_progress, build_steward_review_worksheet, read_local_snapshot,
-    reviewed_golden_set_from_worksheet,
+    ClassificationReport, GoldenSetApproval, StewardDecisionPatch, StewardReviewWorksheet,
+    apply_steward_decision_patch, assess_steward_review_progress, build_steward_review_worksheet,
+    read_local_snapshot, reviewed_golden_set_from_worksheet,
 };
 use serde::de::DeserializeOwned;
 use std::collections::BTreeSet;
@@ -13,7 +13,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
-const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --review-progress /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/PROGRESS.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
+const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --review-progress /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/PROGRESS.json | --apply-decision-patch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/PATCH.json /tmp/UPDATED_WORKSHEET.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
 const MAX_ARTIFACT_BYTES: u64 = 16 * 1024 * 1024;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -26,6 +26,12 @@ enum OutputRequest {
     ReviewProgress {
         report: String,
         worksheet: String,
+        output: String,
+    },
+    ApplyDecisionPatch {
+        report: String,
+        worksheet: String,
+        patch: String,
         output: String,
     },
     Finalize {
@@ -71,6 +77,36 @@ where
         OutputRequest::ReviewProgress {
             report,
             worksheet,
+            output,
+        }
+    } else if first == "--apply-decision-patch" {
+        let report = args
+            .next()
+            .ok_or("--apply-decision-patch requires four artifact paths")?;
+        let worksheet = args
+            .next()
+            .ok_or("--apply-decision-patch requires four artifact paths")?;
+        let patch = args
+            .next()
+            .ok_or("--apply-decision-patch requires four artifact paths")?;
+        let output = args
+            .next()
+            .ok_or("--apply-decision-patch requires four artifact paths")?;
+        if BTreeSet::from([
+            report.as_str(),
+            worksheet.as_str(),
+            patch.as_str(),
+            output.as_str(),
+        ])
+        .len()
+            != 4
+        {
+            return Err("decision patch artifact paths must differ");
+        }
+        OutputRequest::ApplyDecisionPatch {
+            report,
+            worksheet,
+            patch,
             output,
         }
     } else if first == "--finalize" {
@@ -396,6 +432,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let progress = assess_steward_review_progress(&report, &worksheet)?;
             write_private_output(&output, &serde_json::to_vec_pretty(&progress)?)?;
         }
+        OutputRequest::ApplyDecisionPatch {
+            report,
+            worksheet,
+            patch,
+            output,
+        } => {
+            let output = validate_output_path(&output)?;
+            let (report, report_identity): (ClassificationReport, _) =
+                read_private_json(&report).map_err(|error| label_input("report", error))?;
+            let (worksheet, worksheet_identity): (StewardReviewWorksheet, _) =
+                read_private_json(&worksheet).map_err(|error| label_input("worksheet", error))?;
+            let (patch, patch_identity): (StewardDecisionPatch, _) =
+                read_private_json(&patch).map_err(|error| label_input("decision patch", error))?;
+            if BTreeSet::from([report_identity, worksheet_identity, patch_identity]).len() != 3 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "decision patch inputs must be distinct files",
+                )
+                .into());
+            }
+            let updated = apply_steward_decision_patch(&report, &worksheet, &patch)?;
+            let content = serde_json::to_vec_pretty(&updated)?;
+            write_private_output(&output, &content)?;
+        }
         OutputRequest::Finalize {
             report,
             worksheet,
@@ -510,6 +570,76 @@ mod tests {
                 worksheet,
                 output,
                 "extra"
+            ])
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn apply_decision_patch_mode_requires_four_distinct_artifact_paths() {
+        let report = "/tmp/report.json";
+        let worksheet = "/tmp/worksheet.json";
+        let patch = "/tmp/patch.json";
+        let output = "/tmp/updated-worksheet.json";
+        assert_eq!(
+            parse_output_request(vec![
+                "--apply-decision-patch",
+                report,
+                worksheet,
+                patch,
+                output
+            ]),
+            Ok(OutputRequest::ApplyDecisionPatch {
+                report: report.to_owned(),
+                worksheet: worksheet.to_owned(),
+                patch: patch.to_owned(),
+                output: output.to_owned(),
+            })
+        );
+        assert!(parse_output_request(vec!["--apply-decision-patch"]).is_err());
+        assert!(parse_output_request(vec!["--apply-decision-patch", report]).is_err());
+        assert!(parse_output_request(vec!["--apply-decision-patch", report, worksheet]).is_err());
+        assert!(
+            parse_output_request(vec!["--apply-decision-patch", report, worksheet, patch]).is_err()
+        );
+        assert!(
+            parse_output_request(vec![
+                "--apply-decision-patch",
+                report,
+                worksheet,
+                patch,
+                report
+            ])
+            .is_err()
+        );
+        assert!(
+            parse_output_request(vec![
+                "--apply-decision-patch",
+                report,
+                worksheet,
+                worksheet,
+                output
+            ])
+            .is_err()
+        );
+        assert!(
+            parse_output_request(vec![
+                "--apply-decision-patch",
+                report,
+                report,
+                patch,
+                output
+            ])
+            .is_err()
+        );
+        assert!(
+            parse_output_request(vec![
+                "--apply-decision-patch",
+                report,
+                worksheet,
+                patch,
+                output,
+                "extra",
             ])
             .is_err()
         );
