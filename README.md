@@ -24,7 +24,11 @@ Create a small deterministic view of the next pending records for human review:
 cargo +1.98.0 run --bin conceptweave-zotero -- --review-batch /tmp/report.json /tmp/current-worksheet.json 25 /tmp/review-batch.json
 ```
 
-The batch repeats on unchanged input and is not a reservation or assignment. It contains sensitive bibliographic context, must remain owner-only, and becomes a decision patch only after a steward fills every `reviewed_disposition`.
+The batch repeats on unchanged input and is not a reservation or assignment. It contains sensitive bibliographic context and must remain owner-only. After a steward fills every `reviewed_disposition`, validate the complete displayed context and create a new worksheet:
+
+```sh
+cargo +1.98.0 run --bin conceptweave-zotero -- --apply-review-batch /tmp/report.json /tmp/current-worksheet.json /tmp/review-batch.json /tmp/updated-worksheet.json
+```
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ContextualWisdomLab/ConceptWeave)
 

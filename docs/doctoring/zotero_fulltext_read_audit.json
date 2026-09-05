@@ -1,0 +1,61 @@
+{
+  "audit_status": "completed_read_sweep_not_atomic_snapshot",
+  "observed_at": "2026-09-05T07:36:42.665Z",
+  "conceptweave_head": "2a75051f0082103511222e278de24b2690fe6bfe",
+  "zotero_source_commit": "36749bd0bd4fdac9ee46c16f7aa7bed094a0851f",
+  "zotero_version": "10.0.1",
+  "api_version": 3,
+  "schema_version": 44,
+  "metadata_snapshot_digest": "sha256:0666dbebfb0c5aa99deb5a6dda1fc02d84bc46d08aaaddf25f5526a18eceef6d",
+  "metadata_report_file_sha256": "bf45248413f433a537fe8fc62c02b93eef3c7e47ff6245f31610e9ba72031d8d",
+  "library_version_before": 2,
+  "library_version_after": 2,
+  "server_api_schema_continuity_checked": true,
+  "manifest_last_modified_version": null,
+  "manifest_unchanged": true,
+  "manifest_sha256": "3d07472323b1a2e41947068e3b0e24a57c5569e08fd2ef0d35e626f290b9b351",
+  "ordered_response_sha256": "43b2239528182e3d28d91ba59ea3d713a1fc9652c37bb662c54564bfa34e84c3",
+  "elapsed_ms": 10737,
+  "total_response_bytes": 224842838,
+  "bounds": {
+    "max_bytes": 536870912,
+    "max_response_bytes": 8388608,
+    "max_elapsed_ms": 300000,
+    "request_timeout_ms": 20000,
+    "concurrent_requests": 1,
+    "redirects_allowed": false
+  },
+  "counts": {
+    "manifest_entries": 3473,
+    "manifest_versions_greater_than_library": 3432,
+    "manifest_versions_zero": 41,
+    "manifest_entries_in_metadata_snapshot": 3473,
+    "manifest_candidate_parents": 3241,
+    "attempted": 3473,
+    "http_200": 3432,
+    "http_404": 41,
+    "other_status": 0,
+    "empty_content": 5,
+    "full_index_metadata": 2755,
+    "partial_index_metadata": 67,
+    "unproven_index_completeness": 610,
+    "content_version_mismatch": 0,
+    "bibliographic_denominator": 3715,
+    "parents_with_nonempty_fulltext": 3203,
+    "parents_with_full_index_metadata": 2561,
+    "approved_labels": 0,
+    "bound_fulltext_proposals": 0
+  },
+  "abstract_matrix": {
+    "abstract_not_retained": {
+      "total": 1000,
+      "nonempty_fulltext": 800,
+      "nonempty_fulltext_with_full_index_metadata": 598
+    },
+    "abstract_present": {
+      "total": 2715,
+      "nonempty_fulltext": 2403,
+      "nonempty_fulltext_with_full_index_metadata": 1963
+    }
+  }
+}

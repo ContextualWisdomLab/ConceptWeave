@@ -1,8 +1,8 @@
 #![cfg(unix)]
 
 use conceptweave_zotero::{
-    Disposition, GoldenSetApproval, ItemData, ZoteroItem, build_steward_review_worksheet,
-    classify_snapshot,
+    Disposition, GoldenSetApproval, ItemData, StewardDecisionPatch, StewardDecisionUpdate,
+    ZoteroItem, build_steward_review_worksheet, classify_snapshot,
 };
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
@@ -39,8 +39,8 @@ fn artifact_commands_reject_distinct_path_spellings_for_one_input_file() {
         snapshot_items: worksheet.snapshot_items.clone(),
     };
 
-    // These structs intentionally accept additional owner-only fields. Without checking file
-    // identity, one JSON object can therefore be accepted as all three finalization inputs.
+    // The finalization inputs accept overlapping owner-only fields. Without checking file
+    // identity, one JSON object can therefore be accepted as all three inputs.
     let mut combined = serde_json::to_value(&report).unwrap();
     let object = combined.as_object_mut().unwrap();
     object.insert(
@@ -70,10 +70,27 @@ fn artifact_commands_reject_distinct_path_spellings_for_one_input_file() {
         "conceptweave-zotero-finalize-alias-{}-output.json",
         std::process::id()
     ));
+    let patch_path = temp.join(format!(
+        "conceptweave-zotero-finalize-alias-{}-patch.json",
+        std::process::id()
+    ));
     let _ = fs::remove_file(&input);
     let _ = fs::remove_file(&output);
+    let _ = fs::remove_file(&patch_path);
     fs::write(&input, serde_json::to_vec(&combined).unwrap()).unwrap();
     fs::set_permissions(&input, fs::Permissions::from_mode(0o600)).unwrap();
+    let patch = StewardDecisionPatch {
+        library_version: worksheet.library_version,
+        rule_revision: worksheet.rule_revision.clone(),
+        snapshot_digest: worksheet.snapshot_digest.clone(),
+        decisions: vec![StewardDecisionUpdate {
+            item_key: "ITEM".into(),
+            item_version: 7,
+            reviewed_disposition: Disposition::OutOfScope,
+        }],
+    };
+    fs::write(&patch_path, serde_json::to_vec(&patch).unwrap()).unwrap();
+    fs::set_permissions(&patch_path, fs::Permissions::from_mode(0o600)).unwrap();
 
     let report_path = input.to_str().unwrap().to_owned();
     let worksheet_path = format!("{}/./{}", temp.display(), filename);
@@ -105,7 +122,7 @@ fn artifact_commands_reject_distinct_path_spellings_for_one_input_file() {
             "--apply-decision-patch",
             &report_path,
             &worksheet_path,
-            &approval_path,
+            patch_path.to_str().unwrap(),
             output.to_str().unwrap(),
         ])
         .status()
@@ -123,6 +140,7 @@ fn artifact_commands_reject_distinct_path_spellings_for_one_input_file() {
 
     let _ = fs::remove_file(&input);
     let _ = fs::remove_file(&output);
+    let _ = fs::remove_file(&patch_path);
     assert!(
         !status.success(),
         "finalization must reject three path spellings that resolve to one input artifact"

@@ -3,9 +3,9 @@
 
 use conceptweave_zotero::{
     ClassificationReport, GoldenSetApproval, MAX_REVIEW_BATCH_ITEMS, StewardDecisionPatch,
-    StewardReviewWorksheet, apply_steward_decision_patch, assess_steward_review_progress,
-    build_steward_review_batch, build_steward_review_worksheet, read_local_snapshot,
-    reviewed_golden_set_from_worksheet,
+    StewardReviewBatch, StewardReviewWorksheet, apply_steward_decision_patch,
+    assess_steward_review_progress, build_steward_review_batch, build_steward_review_worksheet,
+    decision_patch_from_review_batch, read_local_snapshot, reviewed_golden_set_from_worksheet,
 };
 use serde::de::DeserializeOwned;
 use std::collections::BTreeSet;
@@ -14,7 +14,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
-const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --review-progress /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/PROGRESS.json | --review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json LIMIT /tmp/BATCH.json | --apply-decision-patch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/PATCH.json /tmp/UPDATED_WORKSHEET.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
+const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --review-progress /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/PROGRESS.json | --review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json LIMIT /tmp/BATCH.json | --apply-review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/COMPLETED_BATCH.json /tmp/UPDATED_WORKSHEET.json | --apply-decision-patch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/PATCH.json /tmp/UPDATED_WORKSHEET.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
 const MAX_ARTIFACT_BYTES: u64 = 16 * 1024 * 1024;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -39,6 +39,12 @@ enum OutputRequest {
         report: String,
         worksheet: String,
         patch: String,
+        output: String,
+    },
+    ApplyReviewBatch {
+        report: String,
+        worksheet: String,
+        batch: String,
         output: String,
     },
     Finalize {
@@ -115,6 +121,36 @@ where
             report,
             worksheet,
             limit,
+            output,
+        }
+    } else if first == "--apply-review-batch" {
+        let report = args
+            .next()
+            .ok_or("--apply-review-batch requires four artifact paths")?;
+        let worksheet = args
+            .next()
+            .ok_or("--apply-review-batch requires four artifact paths")?;
+        let batch = args
+            .next()
+            .ok_or("--apply-review-batch requires four artifact paths")?;
+        let output = args
+            .next()
+            .ok_or("--apply-review-batch requires four artifact paths")?;
+        if BTreeSet::from([
+            report.as_str(),
+            worksheet.as_str(),
+            batch.as_str(),
+            output.as_str(),
+        ])
+        .len()
+            != 4
+        {
+            return Err("review batch application artifact paths must differ");
+        }
+        OutputRequest::ApplyReviewBatch {
+            report,
+            worksheet,
+            batch,
             output,
         }
     } else if first == "--apply-decision-patch" {
@@ -372,13 +408,20 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
             "report output must be a direct child of the system temp directory",
         ));
     }
-    if fs::symlink_metadata(&path).is_ok() {
+    let file_name = path.file_name().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "report output has no file name",
+        )
+    })?;
+    let validated_path = resolved_parent.join(file_name);
+    if fs::symlink_metadata(&validated_path).is_ok() {
         return Err(io::Error::new(
             io::ErrorKind::AlreadyExists,
             "report output must not already exist or be a symlink",
         ));
     }
-    Ok(path)
+    Ok(validated_path)
 }
 
 /// Creates a new sensitive report file or fails closed on unsupported platforms.
@@ -491,6 +534,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let batch = build_steward_review_batch(&report, &worksheet, limit)?;
             let content = serde_json::to_vec_pretty(&batch)?;
             write_private_output(&output, &content)?;
+        }
+        OutputRequest::ApplyReviewBatch {
+            report,
+            worksheet,
+            batch,
+            output,
+        } => {
+            let output = validate_output_path(&output)?;
+            let (report, report_identity): (ClassificationReport, _) =
+                read_private_json(&report).map_err(|error| label_input("report", error))?;
+            let (worksheet, worksheet_identity): (StewardReviewWorksheet, _) =
+                read_private_json(&worksheet).map_err(|error| label_input("worksheet", error))?;
+            let (batch, batch_identity): (StewardReviewBatch, _) =
+                read_private_json(&batch).map_err(|error| label_input("review batch", error))?;
+            if BTreeSet::from([report_identity, worksheet_identity, batch_identity]).len() != 3 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "review batch application inputs must be distinct files",
+                )
+                .into());
+            }
+            let patch = decision_patch_from_review_batch(&report, &worksheet, &batch)?;
+            let updated = apply_steward_decision_patch(&report, &worksheet, &patch)?;
+            write_private_output(&output, &serde_json::to_vec_pretty(&updated)?)?;
         }
         OutputRequest::ApplyDecisionPatch {
             report,
@@ -698,6 +765,56 @@ mod tests {
                 report,
                 worksheet,
                 patch,
+                output,
+                "extra",
+            ])
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn apply_review_batch_mode_requires_four_distinct_artifact_paths() {
+        let report = "/tmp/report.json";
+        let worksheet = "/tmp/worksheet.json";
+        let batch = "/tmp/batch.json";
+        let output = "/tmp/updated-worksheet.json";
+        assert_eq!(
+            parse_output_request(vec![
+                "--apply-review-batch",
+                report,
+                worksheet,
+                batch,
+                output,
+            ]),
+            Ok(OutputRequest::ApplyReviewBatch {
+                report: report.to_owned(),
+                worksheet: worksheet.to_owned(),
+                batch: batch.to_owned(),
+                output: output.to_owned(),
+            })
+        );
+        assert!(parse_output_request(vec!["--apply-review-batch"]).is_err());
+        assert!(parse_output_request(vec!["--apply-review-batch", report]).is_err());
+        assert!(parse_output_request(vec!["--apply-review-batch", report, worksheet]).is_err());
+        assert!(
+            parse_output_request(vec!["--apply-review-batch", report, worksheet, batch]).is_err()
+        );
+        assert!(
+            parse_output_request(vec![
+                "--apply-review-batch",
+                report,
+                worksheet,
+                batch,
+                report,
+            ])
+            .is_err()
+        );
+        assert!(
+            parse_output_request(vec![
+                "--apply-review-batch",
+                report,
+                worksheet,
+                batch,
                 output,
                 "extra",
             ])
@@ -1014,11 +1131,18 @@ mod tests {
         let _ = fs::remove_file(&allowed);
         assert_eq!(
             validate_output_path(allowed.to_str().unwrap()).unwrap(),
-            allowed
+            env::temp_dir()
+                .canonicalize()
+                .unwrap()
+                .join(allowed.file_name().unwrap())
         );
 
         assert!(validate_output_path("relative.json").is_err());
         assert!(validate_output_path("/").is_err());
+        let missing_name = validate_output_path(env::temp_dir().join("..").to_str().unwrap())
+            .expect_err("an allowed parent still requires a file name");
+        assert_eq!(missing_name.kind(), io::ErrorKind::InvalidInput);
+        assert_eq!(missing_name.to_string(), "report output has no file name");
         assert!(validate_output_path("/tmp/missing-directory/report.json").is_err());
         assert!(
             validate_output_path(
