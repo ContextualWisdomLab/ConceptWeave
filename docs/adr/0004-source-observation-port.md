@@ -7,110 +7,124 @@
 
 ## Problem
 
-ConceptWeave needs to observe PostgreSQL metadata without turning source connectivity into hidden coupling or allowing an adapter to run indefinitely, inspect unauthorized schemas, invent a partial snapshot after source disappearance, or leak credentials into domain contracts. The existing `conceptweave-observation` crate already owns immutable observed facts and provenance receipts, but it intentionally does not own source execution policy.
+ConceptWeave needs to observe PostgreSQL metadata without turning connectivity into hidden coupling or allowing an adapter to inspect unauthorized schemas, run without bounds, fabricate partial snapshots after source disappearance, leak credentials into domain contracts, or let callers assert immutable snapshot identity.
 
-A snapshot digest is an integrity identity, not an adapter assertion. Accepting an arbitrary syntactically valid digest from the caller allows distinct observed metadata to reuse one immutable identity and lets receipts repeat that unverified assertion. Source Observation therefore also needs one owner-defined deterministic content framing before a snapshot can issue provenance.
-
-A request allowlist is authorization metadata and consumes resources before source access. Bounding only captured catalog rows/bytes leaves a gap in which an untrusted or tenant-facing caller can ask ConceptWeave to retain an arbitrarily large exact-schema allowlist before registry or database access. The port therefore needs an explicit provider-independent request-metadata budget without pretending PostgreSQL's build-time identifier-length default is a ConceptWeave security constant.
+Three independent admission/integrity gaps are material to this boundary. First, a syntactically valid caller-supplied digest is not proof that the digest was computed from the observed metadata. Second, captured catalog row/byte limits do not bound the caller-owned exact-schema allowlist retained before source access. Third, a registry capability is not an authorization boundary if the primary adapter method can still accept a raw request and succeed without registry resolution.
 
 ## Constraints
 
 - Source systems are read-only inputs; ConceptWeave does not own their business truth.
-- Only an opaque source registry key may cross the port: at most 128 bytes, lowercase multiword `snake_case`. An authorized registry lookup must issue the capability accepted by immutable snapshots; syntax alone is not provenance authority. Passwords, tokens, DSNs, URLs, shell-style connection parameters, and provider-specific connection objects may not cross this boundary.
-- Every request needs an explicit non-empty exact-schema allowlist, a positive caller-selected allowlist count/total-UTF-8-byte budget, and positive operation/statement-timeout, row, byte, and concurrency bounds.
-- Request authorization metadata must be rejected before registry or database access when it exceeds its explicit budget.
-- Caller cancellation and source disappearance must fail closed rather than return a fabricated or partial success.
-- Exact source identifiers keep original case/text; canonicalization may order an allowlist but must not normalize identifier meaning.
-- Snapshot content identity must be derived from the complete observed metadata owned by this bounded context. Caller-supplied digest syntax is not proof of content identity.
-- Source registry identity, extractor revision, and observation time are explicit provenance coordinates. They are not source-content bytes and must not change the content digest for an otherwise identical observation.
-- Digest framing must be versioned and domain-separated so later metadata-model changes cannot silently reinterpret an existing digest.
-- The port must remain provider-independent and free of PostgreSQL driver, credential, semantic-inference, publication, or LLM responsibilities.
-- The concrete PostgreSQL adapter must remain outside `conceptweave-domain`, `conceptweave-observation`, and the port contract.
+- Only a bounded opaque registry key may appear in request/domain objects: at most 128 bytes, lowercase multiword `snake_case`. Passwords, tokens, DSNs, URLs, shell-style connection parameters and provider connection objects do not cross this boundary.
+- Key syntax is admission hygiene, not authorization. An authorized `SourceConnectionRegistry` must issue the opaque capability before a request can reach `SourceObservationPort` execution.
+- Every request has a non-empty exact-schema allowlist, positive caller-selected schema-count/total-UTF-8-byte admission budget, and positive operation/statement-timeout, row, byte and concurrency bounds.
+- Request authorization metadata is rejected before registry or database access when it exceeds policy.
+- Exact source identifiers preserve original source text. Ordering may be canonicalized; identifier meaning is never normalized or truncated.
+- Caller cancellation, source disappearance, malformed captures and resource exhaustion fail closed and do not produce a partial snapshot.
+- Snapshot content identity is computed by Source Observation from complete owned observed metadata. Caller digest syntax is not content authority.
+- Source registry identity, extractor revision and observation time remain provenance coordinates, not source-content bytes.
+- Digest framing is versioned and domain-separated.
+- The port remains provider-independent and free of PostgreSQL drivers, credentials, semantic inference, publication and LLM responsibilities.
+- The concrete PostgreSQL adapter remains outside `conceptweave-domain`, `conceptweave-observation` and the port contract. Credential resolution stays inside its Anti-Corruption Layer.
 
 ## Options considered
 
-### Put limits and source execution into `conceptweave-observation`
+### Put execution policy into `conceptweave-observation`
 
-Rejected. That crate owns immutable observation facts. Mixing driver execution policy into the fact model would collapse the Source Observation aggregate boundary and make deterministic replay depend on live-source concerns.
+Rejected. That crate owns immutable observation facts. Driver execution policy would collapse fact identity and live-source concerns into one aggregate boundary.
 
-### Let each PostgreSQL adapter define its own timeout/allowlist/error vocabulary
+### Let every adapter define its own authorization, timeout and failure vocabulary
 
-Rejected. This would make resource safety and cancellation non-portable, weaken conformance tests, and allow downstream adapters to silently diverge on what counts as bounded observation.
+Rejected. Resource safety and authorization would become adapter convention rather than a reusable product contract, weakening conformance and allowing silent divergence.
 
-### Hard-code PostgreSQL's current identifier-length default as the allowlist resource bound
+### Treat a well-formed registry key as sufficient source authority
 
-Rejected. Exact identifiers are source evidence, PostgreSQL builds can change the identifier-length constant, and a provider implementation detail is not the same concern as ConceptWeave request-memory admission. The caller must choose a positive provider-independent schema-count and total UTF-8 byte budget appropriate to its product/tenant policy.
+Rejected. Syntax cannot establish whether the caller is allowed to observe the named source. The earlier `SourceObservationPort::observe(&ObservationRequest, ...)` shape demonstrated the problem: an implementation could succeed without ever consulting `SourceConnectionRegistry` while satisfying the trait.
 
-### Pass a raw connection string plus arbitrary SQL callback through a generic utility layer
+### Hard-code PostgreSQL's identifier-length default as request-memory policy
 
-Rejected. Raw credentials would cross the boundary, arbitrary SQL would make read-only enforcement unauditable, and a generic utility bucket would erase the Source Observation ubiquitous language.
+Rejected. PostgreSQL build defaults are provider implementation details, not ConceptWeave authorization-memory policy. Exact identifiers are source evidence and may not be truncated to fit a convenience constant.
+
+### Pass a raw connection string or arbitrary SQL callback
+
+Rejected. It would cross credential boundaries, make read-only enforcement unauditable and erase Source Observation ubiquitous language.
 
 ### Trust an adapter-supplied SHA-256 string as snapshot identity
 
-Rejected. Canonical `sha256:<64 lowercase hex>` syntax proves only representation shape. It does not prove that the digest was computed from the observed tables, columns, constraints, or their exact source metadata.
+Rejected. Canonical `sha256:<64 lowercase hex>` syntax proves representation shape only, not binding to tables, columns or constraints.
 
-### Canonicalize the internal observation model through a general JSON or CBOR wire format
+### Canonicalize through a general JSON or CBOR wire format now
 
-Deferred. RFC 8949 deterministic CBOR is a sound standard when a protocol needs deterministic encoded bytes, and a future cross-language Source Observation artifact may adopt it. The current digest is an internal aggregate identity, however, and making a general serialization format canonical now would introduce a wire-format commitment that the current Rust-only fact model does not otherwise require. JSON canonicalization has the same premature wire-contract problem for this boundary.
+Deferred. RFC 8949 deterministic CBOR is a suitable benchmark for a future cross-language artifact, but the current digest is an internal Rust aggregate identity. Introducing a general wire format now would create a serialization commitment the current boundary does not need.
 
-### Define a small provider-independent Source Observation port and an owner-computed content digest
+### Provider-independent request + authorized execution envelope + owner-computed digest
 
-Selected. `conceptweave-source-port` owns request budgets, exact schema authorization, bounded opaque source registry keys, caller cancellation, and typed fail-closed outcomes. `conceptweave-observation` owns deterministic observed facts and derives their content identity itself.
+Selected. `conceptweave-source-port` owns request admission, authorization capability binding, cancellation and fail-closed execution outcomes. `conceptweave-observation` owns immutable facts and source-content identity.
 
 ## Decision
 
-Introduce the Rust workspace crate `conceptweave-source-port` as a Supporting-domain port contract. `ObservationLimits` requires positive operation/statement-timeout, row, byte, and concurrency limits. `ObservationRequestBudget` separately requires a positive maximum schema count and positive maximum total UTF-8 bytes retained across exact schema identifiers. No provider-derived default is embedded in the port; the caller/application policy chooses these values explicitly. `ObservationRequest` requires that budget, an opaque source registry key of at most 128 bytes using lowercase multiword `snake_case`, plus a non-empty exact schema allowlist. It rejects raw DSNs/URLs/key-value connection material, one-word/generic keys, malformed registry identifiers, over-budget allowlists, and blank or duplicate schema identifiers, and sorts the allowlist only for deterministic request identity. Count and byte admission happen before the registry can be resolved or an adapter can receive the request. `SourceConnectionRegistry` resolves the exact key and issues `ResolvedSourceConnection`; `PostgresSchemaSnapshot` accepts only that opaque capability. `ObservationCancellation` carries caller cancellation. `SourceObservationPort` defines the adapter seam. `SourceObservationFailure` distinguishes cancellation, source disappearance, timeout, invalid captured metadata, and row/byte/concurrency-limit exhaustion.
+`ObservationLimits` requires positive operation/statement-timeout, row, byte and concurrency limits. `ObservationRequestBudget` separately requires positive maximum schema count and total retained UTF-8 schema bytes. Caller/application policy selects these values explicitly; no provider-derived default is embedded.
 
-`PostgresSchemaSnapshot` computes its own `sha256:` identity after exact table ordering is canonicalized. The digest input uses a versioned domain separator (`conceptweave.postgres_schema_snapshot.v1`) and an explicit length-prefixed binary framing. Strings are hashed as their exact UTF-8 bytes without Unicode, case, or PostgreSQL-quoting normalization. Collection lengths and string lengths are unsigned 64-bit big-endian values; column ordinals are unsigned 32-bit big-endian values; booleans, options, constraint variants, referential actions, match types, and deferrability states use explicit stable tags. Table order, column order, and constraint order are deterministic; ordered composite-key and foreign-key coordinates remain order-significant because PostgreSQL reports those positions as source evidence.
+`ObservationRequest` accepts a bounded opaque source registry key plus a non-empty exact schema allowlist. It rejects raw connection material, malformed/generic keys, blank or duplicate schema identifiers and over-budget authorization metadata before registry or database access. It sorts only the allowlist order for deterministic request identity.
 
-The v1 content envelope includes exact table identifiers, column names/ordinals/types/nullability/comments, and every owned PK/unique/FK/CHECK field, including optional FK reference behavior, targeted delete columns, validation/enforcement state, CHECK definition, and `NO INHERIT`. It excludes `source_connection_key`, `extractor_revision`, and `observed_at_utc`; those remain separate receipt provenance. Changing any observed source-content field changes the digest, while changing only input collection order or those provenance coordinates does not. Receipts expose only the snapshot's owner-computed digest.
+`SourceConnectionRegistry` is the authorization boundary for the opaque key. `ObservationRequest::authorize` consumes a validated request, resolves its exact key through that registry and returns `AuthorizedObservationRequest`, which privately binds the request to the resulting `ResolvedSourceConnection`. `SourceObservationPort::observe` accepts only `AuthorizedObservationRequest`; a raw request or unknown key therefore cannot reach the adapter execution seam through the canonical port API. The authorization envelope contains no credential material. The concrete adapter resolves its already-authorized opaque capability to least-privilege credentials inside its own ACL.
 
-SHA-256 is the current digest primitive under NIST FIPS 180-4. The framing is intentionally ConceptWeave-owned rather than an implicit Rust memory/serde representation, so compiler layout, map iteration, or serializer defaults cannot alter identity. A future framing revision must use a new domain/version and document migration rather than silently changing v1 semantics.
+Registry authorization remains part of the same end-to-end operation policy as connection and catalog work. The concrete application/adapter integration must demonstrate that the configured operation deadline covers authorization, connection and all catalog work rather than treating authorization as an unbounded pre-step. ADR 0004 remains Proposed until that runtime conformance is implemented and verified.
 
-This decision does **not** claim that a production PostgreSQL adapter exists. The next owner-side implementation must select a maintained Rust PostgreSQL driver, resolve the registry key to credentials inside the adapter ACL, establish read-only transaction/session behavior, enforce every port limit in execution rather than configuration only, populate the immutable `conceptweave-observation` contracts, and prove cancellation/source-disappearance behavior against a frozen anonymized reference fixture before live-source readiness is claimed.
+`PostgresSchemaSnapshot` computes its own `sha256:` identity after exact table ordering is canonicalized. Digest input uses domain separator `conceptweave.postgres_schema_snapshot.v1` and explicit length-prefixed binary framing. Strings use exact UTF-8 bytes without Unicode/case/quoting normalization. Lengths are unsigned 64-bit big-endian, column ordinals unsigned 32-bit big-endian, and booleans/options/constraint variants/FK actions/match types/deferrability use explicit stable tags. Ordered composite-key and FK coordinates remain order-significant source evidence.
+
+The v1 envelope includes exact table identifiers; column name/ordinal/type/nullability/comment; PK/unique/FK/CHECK fields; optional FK reference behavior and targeted delete columns; validation/enforcement state; CHECK definition; and `NO INHERIT`. It excludes `source_connection_key`, extractor revision and observation time. Receipts expose only the owner-computed digest plus separate provenance coordinates.
+
+SHA-256 follows NIST FIPS 180-4. A future framing revision must use a new domain/version and migration contract rather than silently reinterpret v1. A future published cross-language observation artifact may adopt deterministic CBOR under RFC 8949; v1 does not claim CBOR compatibility.
+
+This decision does **not** claim a production PostgreSQL adapter exists. The next implementation must select a maintained Rust driver, resolve credentials only from the authorized opaque capability, establish explicit read-only session/transaction behavior, enforce all budgets and cancellation in execution, produce complete-or-fail immutable observations, and prove source-disappearance behavior against a frozen anonymized reference fixture.
 
 ## Evidence
 
-- Test-first commit `7cafba262aca070fa6bdccc95284641436a81224` specifies positive resource budgets, exact allowlist behavior, cancellation, and bounded failure outcomes.
-- Production commit `016b0aff5a6866d6071e02dd1afa6e116a8ce92b` implements the provider-independent contract.
-- Test-first security commit `2f6cd4e6f80b60a0d8118de2162d974bbabde4cc` demonstrates that DSNs, shell-style connection parameters, one-word identifiers, mixed-case identifiers, hyphenated identifiers, and malformed underscore forms must fail before adapter access.
-- Production commit `339222cba31f126a5f5f36fe00f890fc82c4aa79` turns `source_connection_key` into the bounded opaque registry-key contract instead of attempting heuristic secret scanning.
-- Edge-coverage commit `729820490f7d072d28444432a082d9fae263f194` covers the 128-byte registry-key bound.
-- Test-first commits `2194a4ed1b8262d76dca0e7708cfd30114372a2b`, `d073aed`, `a39fa08`, and `38ecdf0` pin targeted foreign-key delete columns and registry-resolved snapshot identity; production commits `eb96251`, `cbfa38a`, and `17c5067` implement those boundaries.
-- Test-first digest-integrity commit `5ee0e1edf8a2da527aefd4fe7ad2003d79b87ac6` proves that reusing one caller assertion across changed observed metadata is not an acceptable immutable identity and locks provenance/order invariants for the owner-computed replacement.
-- Test-first request-budget commit `b7e54ae2b4fe9bea20d42b2d95e8c25c118a1f5f` specifies caller-selected positive schema-count/byte policy and fail-closed over-budget admission. Production commit `94927ec3c7763c4b53cbcefd01b510030122d1db` adds `ObservationRequestBudget`; follow-up fixture commits apply the explicit policy to all current Source Observation request construction sites.
-- NIST FIPS 180-4 defines the Secure Hash Standard used for SHA-256. RFC 8949 deterministic encoding requirements are retained as the benchmark for any future CBOR-based cross-language observation artifact; v1 does not claim CBOR compatibility.
-- `docs/product-technical-gap-baseline.md` records the port as implemented-pending-checks and keeps the concrete PostgreSQL adapter OPEN.
-- Exact-head hosted Product evidence remains required; predecessor, local-only, queued, or superseded runs are not completion evidence.
+- `7cafba262aca070fa6bdccc95284641436a81224` — test-first bounded resource/allowlist/cancellation contract.
+- `016b0aff5a6866d6071e02dd1afa6e116a8ce92b` — provider-independent port implementation.
+- `2f6cd4e6f80b60a0d8118de2162d974bbabde4cc` / `339222cba31f126a5f5f36fe00f890fc82c4aa79` — credential-shaped key rejection and bounded opaque registry-key production contract.
+- `729820490f7d072d28444432a082d9fae263f194` — 128-byte registry-key edge coverage.
+- `2194a4ed1b8262d76dca0e7708cfd30114372a2b`, `d073aed`, `a39fa08`, `38ecdf0` plus production successors — targeted FK delete coordinates and registry-resolved snapshot identity.
+- `5ee0e1edf8a2da527aefd4fe7ad2003d79b87ac6` — test-first digest-integrity predicate.
+- `301452ae2744080406f4075fe197c16d7c35cd2d` — owner-computed deterministic snapshot digest.
+- `b7e54ae2b4fe9bea20d42b2d95e8c25c118a1f5f` / `94927ec3c7763c4b53cbcefd01b510030122d1db` — request authorization-metadata budget RED/production repair.
+- `8ed91afcf520efdd53c9103b332d3e277db29a03` — checked fail-closed schema-byte accumulation.
+- Review `5120378921` — raw request could reach the source execution seam without registry capability evidence.
+- `a372d6729364347315db1ad9a75efc49c779fbb9` — test-first contract requiring an authorized execution request.
+- `5caf10b144b8254946e5d80840b0f200c0d36651` — `AuthorizedObservationRequest` and authorized-only `SourceObservationPort::observe` production repair.
+- NIST FIPS 180-4 — SHA-256 primitive. RFC 8949 — deterministic encoding benchmark for a future cross-language artifact.
+- Exact-head hosted Product evidence remains required; predecessor, local-only, queued or superseded evidence is not completion evidence.
 
 ## Risks and mitigations
 
-- **Configuration without enforcement:** a concrete adapter could accept limits but ignore them. Mitigation: adapter conformance tests must force timeout, row, byte, concurrency, cancellation, and disappearance failures and verify no snapshot is returned.
-- **Unbounded request authorization metadata:** a caller could otherwise retain an arbitrarily large exact-schema allowlist before the adapter's captured-source byte budget applies. Mitigation: `ObservationRequestBudget` requires explicit positive count and total UTF-8 byte ceilings and rejects over-budget requests before registry/database access; no PostgreSQL identifier-size default is used as a security shortcut.
-- **Credential-shaped caller input:** a caller could otherwise place a DSN or connection parameter string in `source_connection_key` even though the field was documented as non-credential. Mitigation: the port accepts only bounded multiword `snake_case` registry keys; credential lookup remains exclusively inside the adapter ACL.
-- **Blocking execution:** a blocking driver could stall an asynchronous product executor. Mitigation: adapter design must isolate blocking work or use an async Rust driver; no blocking database call may run on an async web executor thread.
-- **Authorization drift:** a broad or normalized schema selector could observe unintended metadata. Mitigation: exact non-empty allowlists plus caller-selected count/byte budgets are part of the port and must be applied before catalog results become observations.
-- **Partial evidence:** a source can disappear mid-capture. Mitigation: incomplete captures fail with `SourceUnavailable`; immutable snapshot identity is issued only after a complete bounded capture.
-- **Digest framing drift:** adding a new observed field without defining its identity semantics could make two implementations disagree. Mitigation: v1 is domain-separated and explicit; future framing changes require a new version/domain plus regression fixtures rather than an in-place reinterpretation.
-- **Unicode or identifier normalization drift:** visually similar identifiers can have different source bytes. Mitigation: v1 hashes exact UTF-8 source text and performs no normalization.
-- **Cross-language replay:** an ad hoc serializer would be difficult to reproduce safely. Mitigation: v1 specifies primitive tags, byte order, and length framing explicitly; if a published cross-language artifact is required, standard deterministic CBOR is reconsidered at that contract boundary.
+- **Configuration without enforcement:** a concrete adapter can accept budgets but ignore them. Conformance must force timeout, row, byte, concurrency, cancellation and source-disappearance failures and prove no snapshot is returned.
+- **Authorization bypass:** an implementation could otherwise use a syntactically valid raw key directly. Canonical adapter execution now requires `AuthorizedObservationRequest`; unknown keys fail before that value exists.
+- **Credential-shaped caller input:** request keys are bounded multiword `snake_case`; actual credential lookup remains adapter-local.
+- **Authorization deadline gap:** moving authorization ahead of adapter execution can accidentally exclude it from the total deadline. Runtime integration must prove one end-to-end operation budget across authorization, connection and catalog work before ADR acceptance.
+- **Unbounded authorization metadata:** explicit schema count/byte ceilings apply before registry/database access.
+- **Blocking execution:** blocking DB work may not run on an async web executor thread; select an async Rust driver or isolate blocking work.
+- **Authorization drift:** exact schema allowlists remain exact, non-empty and unnormalized.
+- **Partial evidence:** incomplete capture fails; immutable snapshot identity is issued only after complete construction.
+- **Digest framing drift:** new observed identity fields require a new framing version/domain and regression fixtures.
+- **Unicode/identifier normalization drift:** v1 hashes exact UTF-8 source bytes.
+- **Cross-language replay:** if published replay becomes a requirement, adopt a standard deterministic representation rather than implicit Rust/serde layout.
 
 ## Effects
 
-The Source Observation Context Map now has three explicit layers: caller/application -> `conceptweave-source-port` -> concrete source adapter -> `conceptweave-observation` immutable facts. Semantic Discovery consumes completed observation facts and receipts only; it never receives a live connection handle. Governance & Publication remains downstream and does not gain source execution authority. The caller can reference an approved source connection only through a registry key; adapter-local credential resolution remains an Anti-Corruption Layer concern.
+The Context Map is now caller/application → request admission + registry authorization (`conceptweave-source-port`) → authorized execution envelope → concrete source adapter → immutable `conceptweave-observation` facts. Semantic Discovery consumes completed observations/receipts only and never sees a live connection handle. Governance & Publication gains no source-execution authority.
 
-The port no longer relies on an implicit or provider-derived request-size convention. The caller chooses the authorization-metadata budget as policy, while the port validates that policy is positive and enforces it before source resolution. Exact schema bytes remain source identifiers rather than normalized labels.
+The request-memory budget and source authorization are separate invariants. A key can be syntactically valid yet unauthorized; an allowlist can be authorized in principle yet rejected because its retained metadata exceeds policy. Neither condition is silently converted into source access.
 
-The immutable observation aggregate no longer treats a caller-provided digest as evidence. Content identity is computed inside its canonical owner after deterministic ordering; provenance remains separately inspectable through source registry, extractor, timestamp, and evidence-location coordinates.
+Snapshot identity is owner-computed. Provenance remains separately inspectable through source registry, extractor, timestamp and evidence-location coordinates.
 
 ## Concrete scenes
 
-- **Data architect:** selects an approved source registry key, exact schemas, and an explicit schema-count/total-byte request budget. A raw PostgreSQL URL, generic one-word key, blank/duplicate schema name, or over-budget allowlist is rejected before source access.
-- **Operator:** sets finite operation/statement timeouts plus row/byte/concurrency budgets. A source that exceeds any execution budget fails explicitly instead of producing a misleading partial model.
-- **User cancellation:** cancellation is propagated across the port; the adapter must stop/abort as supported and return `Cancelled`, not a success receipt.
-- **Source restart/disappearance:** a connection loss during metadata capture returns `SourceUnavailable`; no immutable snapshot is published from the incomplete capture.
-- **Security review:** credentials remain adapter-owned and absent from request/domain objects; the port admits only a bounded opaque registry key while exact-schema authorization, request-memory bounds, and execution resource limits remain visible, typed, and testable.
-- **Evidence replay:** two snapshots with the same observed source metadata produce the same v1 source-content digest regardless of input table order, source registry key, extractor revision, or observation timestamp; changing one observed metadata field changes that digest.
+- **Data architect:** selects an approved opaque source key, exact schemas and explicit request-metadata budgets. Raw URLs, malformed keys, unknown keys, blank/duplicate schemas or over-budget allowlists fail before adapter execution.
+- **Operator:** sets finite operation/statement timeouts plus row/byte/concurrency budgets. Runtime conformance must include the authorization step in the end-to-end deadline.
+- **User cancellation:** the adapter propagates cancellation and returns `Cancelled`, not a success receipt.
+- **Source restart/disappearance:** incomplete capture returns `SourceUnavailable`; no immutable snapshot is published.
+- **Security review:** source execution requires registry-issued opaque capability evidence while credentials remain exclusively adapter-owned.
+- **Evidence replay:** same observed source content yields the same v1 digest independent of table input order or provenance-only source/extractor/time values; a material metadata change changes the digest.
 
 ## References
 
@@ -120,9 +134,10 @@ National Institute of Standards and Technology. (2015). *Secure Hash Standard (S
 
 ## Follow-up
 
-1. Obtain exact-head Product/coverage/rustdoc evidence for the owner-computed snapshot digest and request-metadata budget; keep both findings acceptance-gated until that current head is verified.
-2. Implement the concrete read-only PostgreSQL adapter behind this port with Rust and an explicit dependency/release decision.
-3. Add conformance tests for registry-key credential resolution, request-metadata admission, timeout, cancellation, row/byte/concurrency exhaustion, source disappearance, quoted identifiers, cross-schema collisions, composite keys, nullable FKs, CHECK/FK validation-enforcement state, domains, enums, indexes, and comments.
-4. Bind successful adapter output to immutable extractor receipts and the owner-computed deterministic snapshot identity.
-5. Freeze an anonymized GRC-shaped reference fixture without copying foreign product source/DB internals.
-6. Revisit this ADR for Accepted status only after the adapter and exact-head conformance evidence are integrated; until then it remains Proposed.
+1. Obtain exact-head Product/coverage/rustdoc evidence for digest, request-metadata admission and registry-authorized execution; keep the findings acceptance-gated until current-head verification exists.
+2. Implement the concrete read-only PostgreSQL adapter in Rust with explicit dependency/release decision and least-privilege credential resolution from `AuthorizedObservationRequest`.
+3. Prove one end-to-end operation deadline across authorization, connection and catalog work; do not leave registry resolution as an unbounded pre-step.
+4. Add conformance tests for unknown registry keys before adapter invocation, request admission, timeout, cancellation, row/byte/concurrency exhaustion, source disappearance, quoted identifiers, cross-schema collisions, composite keys, nullable FKs, CHECK/FK state, domains, enums, indexes and comments.
+5. Bind successful adapter output to immutable extractor receipts and owner-computed snapshot identity.
+6. Freeze an anonymized GRC-shaped reference fixture without copying foreign product source/DB internals.
+7. Revisit this ADR for Accepted status only after adapter implementation and exact-head conformance evidence; until then it remains Proposed.
