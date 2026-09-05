@@ -1044,6 +1044,10 @@ mod tests {
 
         assert!(validate_output_path("relative.json").is_err());
         assert!(validate_output_path("/").is_err());
+        let missing_name = validate_output_path(env::temp_dir().join("..").to_str().unwrap())
+            .expect_err("an allowed parent still requires a file name");
+        assert_eq!(missing_name.kind(), io::ErrorKind::InvalidInput);
+        assert_eq!(missing_name.to_string(), "report output has no file name");
         assert!(validate_output_path("/tmp/missing-directory/report.json").is_err());
         assert!(
             validate_output_path(
