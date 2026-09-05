@@ -14,5 +14,6 @@ All notable changes to ConceptWeave are documented here.
 
 ### Security
 
+- Golden-set evaluation rejects changed predictions or evidence under an earlier approval. Proposal-bound approvals must be reissued; aggregate receipts identify the actual evaluated proposal run.
 - Model-generated semantics remain non-authoritative until deterministic validation and authorized review.
 - Unsafe Rust is forbidden in the core domain crate.
