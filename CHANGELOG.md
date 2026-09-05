@@ -6,6 +6,8 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
+- Private, replayable paper-text capture for later research review, preserving unavailable material and leaving earlier reports and approvals unchanged.
+
 - Full-library research-source audit separating available text, incomplete indexing and missing material from reviewed classification; no paper is excluded because its abstract or text is unavailable.
 - Initial ConceptWeave product, DDD, security, test, and operability baselines.
 - Rust 1.98.0 `conceptweave-domain` foundation with evidence-bound semantic candidate contracts.
@@ -24,7 +26,13 @@ All notable changes to ConceptWeave are documented here.
 
 ### Security
 
+- Local research requests bypass environment-configured proxies. This prevents unintended proxy forwarding; local peer authentication remains an explicit release limitation.
+
 - Source receipts bind complete captured metadata and actual classifier inputs; earlier report and review artifacts require regeneration under the versioned digest representation.
 - Golden-set evaluation rejects changed predictions or evidence under an earlier approval. Proposal-bound approvals must be reissued; aggregate receipts identify the actual evaluated proposal run.
 - Model-generated semantics remain non-authoritative until deterministic validation and authorized review.
 - Unsafe Rust is forbidden in the core domain crate.
+
+### Fixed
+
+- Research reads accept valid responses exactly at their documented size limit while still rejecting oversized, incomplete or invalidly encoded responses.

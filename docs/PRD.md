@@ -52,13 +52,13 @@ Support stable adapters for `semantic-data-portal`, `LineageWeave`, `context-gra
 
 ### FR-8 LLM assistance
 
-All LLM-backed induction uses `contextual-orchestrator`. Model output is untrusted proposal data and may not skip deterministic validation or review.
+All LLM-backed induction uses released `contextual-orchestrator` contracts. Model output is untrusted proposal data and may not skip deterministic validation or review. A documented API, Draft release proposal or successful maintenance job does not prove the deployed service is ready; missing release and runtime evidence keeps model assistance unavailable without excluding papers from review.
 
 ### FR-9 Research evidence intake
 
 Read one immutable Zotero Local API library-version snapshot and propose exactly one research disposition for every top-level bibliographic item. Each proposal retains the item key/version, exact matched metadata values, rule revision, linked child records, and any model receipt. Weak evidence and evidence that matches multiple specific disposition families must abstain into steward review. A local abstention retains its nonempty abstract exactly once, as matched evidence when applicable or otherwise as review context; decided items omit the review-only copy. Duplicate DOI/title identities are review candidates only: intake never merges, deletes, or silently mutates Zotero records.
 
-Full-text enrichment must distinguish listed attachments, returned nonempty text, complete or partial indexing, and reviewed meaning. Missing abstracts or unavailable text never remove papers from the campaign denominator or prove irrelevance. Newly retrieved text requires its own immutable evidence capture and renewed review of any changed proposal; it cannot silently replace evidence beneath an earlier approval. The [full-text audit](doctoring/zotero_fulltext_contract_audit.md) establishes availability only, not an implemented enrichment or completed classification.
+Full-text enrichment must distinguish listed attachments, returned nonempty text, complete or partial indexing, and reviewed meaning. Missing abstracts or unavailable text never remove papers from the campaign denominator or prove irrelevance. Newly retrieved text requires its own immutable evidence capture and renewed review of any changed proposal; it cannot silently replace evidence beneath an earlier approval. The [full-text audit](doctoring/zotero_fulltext_contract_audit.md) establishes availability only. A separate proposed local capture now preserves the observed text for later review, with missing material still visible. Retained text is neither completed classification nor approved meaning.
 
 For every connected duplicate component, accept externally verified steward decisions selecting one component-level canonical item. Produce a local-only manifest that binds the decisions to the raw snapshot, its complete item-key/item-version coordinates, and exact duplicate-candidate membership, and records every component source revision plus before, after, and rollback canonical-key mappings. Classification preserves every Zotero source record.
 

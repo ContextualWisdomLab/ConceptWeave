@@ -8,6 +8,8 @@
 - Governance & Publication -> Interoperability: **Published Language**; adapters consume immutable release contracts.
 - Research Intake -> Governance & Publication: **Anti-Corruption Layer**; Governance verifies complete duplicate and classification-write review sets and returns only opaque authority receipts before Intake emits canonical-key operations or write plans.
 
+Research Intake also owns the optional private Full-Text Capture bound to a metadata report. It preserves provider observations while rejecting mixed-origin counters as a reliable incremental cursor. This is an adapter responsibility, not a new bounded context, shared catalog or approval owner; downstream proposal adoption remains a separate evidence/review transition.
+
 ## External relationships
 
 - Zotero Local API -> research evidence intake: **Anti-Corruption Layer into Semantic Discovery**. Zotero remains the bibliographic system of record; ConceptWeave consumes a version-pinned snapshot and emits proposal evidence. Execute-mode metadata changes cross only a caller-owned authenticated adapter after complete preflight; ConceptWeave retains no API key and records verified item-level outcomes and rollback coordinates. Item metadata, attachments, collection/tag truth, and write authority remain in Zotero. No Zotero record becomes semantic authority without ConceptWeave validation/review/publication.

@@ -9,6 +9,10 @@
 - lockfile freshness and clean-tree verification;
 - public Rust documentation with `missing_docs` denied.
 
+## Local research capture regressions
+
+The full-text suite covers report admission, exact response retention, parent/item revision binding, independent content versions, missing/empty/partial text, duplicate/foreign manifest rejection, bookend drift, byte/deadline boundaries and replay under changed or recomputed digests. Synthetic HTTP tests cover headers, network/redirect failures, strict encoding and response limits without touching the running Zotero library. Proxy isolation uses fresh subprocess environments for all six supported proxy variable spellings across the three existing local transport paths. Synthetic text is only a unit/integration fixture; live aggregate evidence is separately recorded in doctoring and never reported as approved labels.
+
 ## Future product test families
 
 ### Source observation

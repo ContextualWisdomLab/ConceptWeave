@@ -10,6 +10,11 @@ use std::fmt;
 use std::io::Read;
 use std::time::Duration;
 
+mod full_text_capture;
+pub use full_text_capture::{
+    FullTextCapture, FullTextError, read_local_full_text, verify_full_text_capture,
+};
+
 /// Classification rule revision recorded in every report.
 pub const RULE_REVISION: &str = "ontology-research-v2";
 
@@ -3283,6 +3288,7 @@ fn normalize_title(value: &str) -> Option<String> {
 mod tests {
     mod authenticated_transport;
     mod metadata_transport;
+    mod proxy_isolation;
 
     use super::*;
     use std::io::{Read, Write};
