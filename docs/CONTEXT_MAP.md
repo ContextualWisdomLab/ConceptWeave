@@ -6,6 +6,7 @@
 - Semantic Discovery -> Model Validation: **Conformist to published candidate contract**; validation must not rewrite discovery evidence.
 - Model Validation -> Governance & Publication: **Customer/Supplier**; governance consumes deterministic validation receipts.
 - Governance & Publication -> Interoperability: **Published Language**; adapters consume immutable release contracts.
+- Research Intake -> Governance & Publication: **Anti-Corruption Layer**; Governance verifies the complete reviewed duplicate set and returns only an opaque authority receipt before Intake emits canonical-key operations.
 
 ## External relationships
 
