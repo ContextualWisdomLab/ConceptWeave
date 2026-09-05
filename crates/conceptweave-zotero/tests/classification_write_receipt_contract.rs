@@ -56,7 +56,7 @@ fn reviewed(report: &conceptweave_zotero::ClassificationReport) -> ReviewedClass
         server_id: report.server_id.clone(),
         zotero_version: report.zotero_version.clone(),
         library_version: report.library_version,
-        rule_revision: report.rule_revision.clone().into(),
+        rule_revision: report.rule_revision.clone(),
         snapshot_digest: report.snapshot_digest.clone(),
         snapshot_items: report.snapshot_items.clone(),
         changes: vec![
