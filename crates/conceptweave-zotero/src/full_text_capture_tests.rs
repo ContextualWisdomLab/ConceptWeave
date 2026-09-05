@@ -409,3 +409,27 @@ fn streaming_digest_preserves_the_existing_exact_json_representation() {
         format!("sha256:{:x}", Sha256::digest(bytes))
     );
 }
+
+#[test]
+fn capture_rejects_clock_failure_and_late_results_without_real_waiting() {
+    for failed_poll in [0, 1, 2, 17, 18] {
+        let mut clock_polls = 0;
+        let result = capture_with_clock(
+            &report_fixture(),
+            4096,
+            &mut |request_path, _| Ok(response_fixture(request_path)),
+            &mut || {
+                let poll = clock_polls;
+                clock_polls += 1;
+                if poll == failed_poll && [0, 17].contains(&poll) {
+                    (UNIX_EPOCH - Duration::from_secs(1), Duration::ZERO)
+                } else if poll == failed_poll {
+                    (UNIX_EPOCH + Duration::from_secs(100), CAPTURE_DEADLINE)
+                } else {
+                    (UNIX_EPOCH + Duration::from_secs(100), Duration::ZERO)
+                }
+            },
+        );
+        assert!(result.is_err(), "clock poll {failed_poll}");
+    }
+}

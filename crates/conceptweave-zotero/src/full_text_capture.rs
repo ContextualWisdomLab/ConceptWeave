@@ -238,6 +238,15 @@ fn validate_report(
     Ok(snapshot)
 }
 
+fn capture_with_clock(
+    report: &ClassificationReport,
+    max_bytes: u64,
+    fetch: &mut dyn FnMut(&str, u64) -> Result<CapturedResponse, FullTextError>,
+    _observe_time: &mut dyn FnMut() -> (SystemTime, Duration),
+) -> Result<FullTextCapture, FullTextError> {
+    capture_with(report, max_bytes, fetch)
+}
+
 fn validate_library(
     response: &CapturedResponse,
     report: &ClassificationReport,
