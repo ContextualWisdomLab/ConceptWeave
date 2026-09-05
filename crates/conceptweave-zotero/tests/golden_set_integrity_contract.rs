@@ -17,6 +17,7 @@ fn bibliographic(key: &str, version: u64, title: &str) -> ZoteroItem {
             collections: vec![],
             tags: vec![],
         },
+        source_record: None,
     }
 }
 
@@ -33,6 +34,7 @@ fn child_note(key: &str, version: u64, parent_item: &str) -> ZoteroItem {
             collections: vec![],
             tags: vec![],
         },
+        source_record: None,
     }
 }
 

@@ -13,6 +13,7 @@ use std::time::Duration;
 pub const RULE_REVISION: &str = "ontology-research-v2";
 
 const SUPPORTED_API_VERSION: u64 = 3;
+const SNAPSHOT_DIGEST_DOMAIN: &str = "conceptweave-zotero-snapshot-v2";
 const SUPPORTED_API_VERSION_HEADER: &str = "3";
 const PAGE_LIMIT: usize = 100;
 const MAX_PAGE_BYTES: u64 = 8 * 1024 * 1024;
@@ -24,7 +25,7 @@ const LOCAL_API: &str = "http://127.0.0.1:23119/api/users/0/items";
 static TEST_LOCAL_API: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 
 /// A Zotero item returned by the Local API.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ZoteroItem {
     /// Stable item key.
     pub key: String,
@@ -32,6 +33,38 @@ pub struct ZoteroItem {
     pub version: u64,
     /// Item metadata.
     pub data: ItemData,
+    /// Complete original JSON object, captured automatically during deserialization.
+    ///
+    /// Offline callers constructing synthetic typed items use `None`. The digest
+    /// binds this source value together with the actual typed classifier input,
+    /// so later projection changes also invalidate the receipt. It retains omitted fields,
+    /// unknown metadata, nested objects, and array order exactly as observed.
+    #[serde(skip)]
+    pub source_record: Option<serde_json::Value>,
+}
+
+impl<'de> Deserialize<'de> for ZoteroItem {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct ItemProjection {
+            key: String,
+            version: u64,
+            data: ItemData,
+        }
+
+        let source_record = serde_json::Value::deserialize(deserializer)?;
+        let projection =
+            ItemProjection::deserialize(&source_record).map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            key: projection.key,
+            version: projection.version,
+            data: projection.data,
+            source_record: Some(source_record),
+        })
+    }
 }
 
 /// Metadata used by the classifier.
@@ -702,7 +735,11 @@ pub fn classify_snapshot(
             item_version: item.version,
         })
         .collect();
-    let snapshot_bytes = serde_json::to_vec(&items)
+    let snapshot_records: Vec<_> = items
+        .iter()
+        .map(|item| (&item.source_record, item))
+        .collect();
+    let snapshot_bytes = serde_json::to_vec(&(SNAPSHOT_DIGEST_DOMAIN, snapshot_records))
         .expect("Zotero snapshot items contain only JSON-compatible values");
     let snapshot_digest = format!("sha256:{:x}", Sha256::digest(snapshot_bytes));
     let children = child_index(&items);
@@ -1003,6 +1040,7 @@ mod tests {
                 collections: vec![],
                 tags: vec![],
             },
+            source_record: None,
         }
     }
 

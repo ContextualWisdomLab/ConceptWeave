@@ -17,6 +17,7 @@ fn item(title: &str) -> ZoteroItem {
             collections: vec![],
             tags: vec![],
         },
+        source_record: None,
     }
 }
 
