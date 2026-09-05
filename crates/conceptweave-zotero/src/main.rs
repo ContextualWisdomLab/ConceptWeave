@@ -198,8 +198,14 @@ fn label_input(name: &str, error: io::Error) -> io::Error {
     io::Error::new(error.kind(), format!("{name}: {error}"))
 }
 
-/// Writes one create-new owner-only artifact and removes a failed partial write.
+/// Writes one bounded create-new owner-only artifact and removes a failed partial write.
 fn write_private_output(path: &Path, content: &[u8]) -> io::Result<()> {
+    if content.len() as u64 > MAX_ARTIFACT_BYTES {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "metadata output exceeds the artifact size limit",
+        ));
+    }
     write_private_output_with(path, content, write_all_and_flush)
 }
 
