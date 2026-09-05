@@ -1,0 +1,97 @@
+name: Product
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.repository }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  rust-quality:
+    if: ${{ github.event.pull_request.draft == false }}
+    runs-on: ubuntu-24.04
+    env:
+      COVERAGE_TOOLCHAIN: nightly-2026-08-20
+    steps:
+      - name: Checkout exact source revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Validate Product CI contract
+        run: python3 scripts/check_ci_contract.py
+
+      - name: Show pinned Rust toolchain
+        run: rustc --version && cargo --version
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Public documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --no-deps
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@1ed6d7be6168f6c9046541087ff549b6bc581fdf # v2.87.2
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Install pinned branch-coverage toolchain
+        run: rustup toolchain install "$COVERAGE_TOOLCHAIN" --profile minimal --component llvm-tools-preview
+
+      - name: Exact owned coverage
+        run: ./scripts/check_coverage.sh
+
+      - name: Validate public JSON contract
+        run: |
+          npx --yes ajv-cli@5.0.0 compile \
+            --spec=draft2020 \
+            -s contracts/semantic-candidate.schema.json
+          npx --yes ajv-cli@5.0.0 test \
+            --spec=draft2020 \
+            -s contracts/semantic-candidate.schema.json \
+            -d contracts/fixtures/semantic-candidate.valid.json \
+            --valid
+          npx --yes ajv-cli@5.0.0 test \
+            --spec=draft2020 \
+            -s contracts/semantic-candidate.schema.json \
+            -d contracts/fixtures/semantic-candidate.invalid-whitespace.json \
+            --invalid
+          npx --yes ajv-cli@5.0.0 test \
+            --spec=draft2020 \
+            -s contracts/semantic-candidate.schema.json \
+            -d contracts/fixtures/semantic-candidate.invalid-published-truth.json \
+            --invalid
+          npx --yes ajv-cli@5.0.0 test \
+            --spec=draft2020 \
+            -s contracts/semantic-candidate.schema.json \
+            -d contracts/fixtures/semantic-candidate.invalid-state-truth-mismatch.json \
+            --invalid
+
+      - name: Lockfile freshness
+        run: |
+          cargo generate-lockfile --locked
+          git ls-files --error-unmatch Cargo.lock >/dev/null
+          test -z "$(git status --porcelain=v1 --untracked-files=all -- Cargo.lock)"
+
+      - name: Clean working tree
+        run: test -z "$(git status --porcelain=v1 --untracked-files=all)"
