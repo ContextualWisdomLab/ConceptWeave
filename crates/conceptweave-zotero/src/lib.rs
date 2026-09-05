@@ -769,6 +769,7 @@ impl Zotero10LocalAdapter {
 
 fn local_agent() -> ureq::Agent {
     let config = ureq::Agent::config_builder()
+        .proxy(None)
         .timeout_global(Some(Duration::from_secs(30)))
         .timeout_connect(Some(Duration::from_secs(2)))
         .timeout_recv_response(Some(Duration::from_secs(10)))
@@ -824,12 +825,7 @@ fn bounded_body_with_limit(
     response: &mut ureq::http::Response<ureq::Body>,
     limit: u64,
 ) -> Result<String, ZoteroTransportError> {
-    response
-        .body_mut()
-        .with_config()
-        .limit(limit)
-        .read_to_string()
-        .map_err(|_| ZoteroTransportError::InvalidResponse)
+    read_bounded_response_text(response, limit).map_err(|_| ZoteroTransportError::InvalidResponse)
 }
 
 fn validate_item_key(item_key: &str) -> Result<(), ZoteroTransportError> {
