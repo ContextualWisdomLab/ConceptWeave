@@ -12,3 +12,4 @@ path = "src/lib.rs"
 
 [dependencies]
 conceptweave-source-port = { path = "../conceptweave-source-port" }
+sha2 = "0.10.9"

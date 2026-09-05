@@ -19,7 +19,6 @@ fn column(name: &str, ordinal_position: u32) -> ColumnObservation {
 fn snapshot_preserves_evidence_and_qualified_identifiers_without_normalization() {
     let snapshot = PostgresSchemaSnapshot::new(
         &support::resolved_source("warehouse_primary"),
-        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "postgres-introspector/1",
         "2026-09-02T00:00:00Z",
         vec![
@@ -32,9 +31,13 @@ fn snapshot_preserves_evidence_and_qualified_identifiers_without_normalization()
     .expect("snapshot is valid");
 
     assert_eq!(snapshot.source_connection_key(), "warehouse_primary");
-    assert_eq!(
-        snapshot.snapshot_digest(),
-        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    let digest = snapshot.snapshot_digest();
+    assert_eq!(digest.len(), "sha256:".len() + 64);
+    assert!(digest.starts_with("sha256:"));
+    assert!(
+        digest["sha256:".len()..]
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
     );
     assert_eq!(snapshot.extractor_revision(), "postgres-introspector/1");
     assert_eq!(snapshot.observed_at_utc(), "2026-09-02T00:00:00Z");
@@ -60,7 +63,6 @@ fn snapshot_rejects_duplicate_qualified_tables() {
         .expect("table is valid");
     let error = PostgresSchemaSnapshot::new(
         &support::resolved_source("warehouse_primary"),
-        "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "postgres-introspector/1",
         "2026-09-02T00:00:00Z",
         vec![duplicate.clone(), duplicate],
@@ -161,56 +163,39 @@ fn source_identifiers_and_evidence_reject_unicode_whitespace_only_values() {
         }
     );
 
-    for (snapshot_digest, extractor_revision, observed_at_utc, field) in [
-        ("\u{2003}", "extractor", "time", "snapshot_digest"),
-        (
-            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "\n",
-            "time",
-            "extractor_revision",
-        ),
-        (
-            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "extractor",
-            " ",
-            "observed_at_utc",
-        ),
+    for (extractor_revision, observed_at_utc, field) in [
+        ("\n", "time", "extractor_revision"),
+        ("extractor", " ", "observed_at_utc"),
     ] {
         let error = PostgresSchemaSnapshot::new(
             &support::resolved_source("warehouse_primary"),
-            snapshot_digest,
             extractor_revision,
             observed_at_utc,
             Vec::new(),
         )
-        .expect_err("blank snapshot evidence must fail closed");
+        .expect_err("blank snapshot provenance must fail closed");
         assert_eq!(error, ObservationError::InvalidObservationField { field });
     }
 }
 
 #[test]
-fn snapshot_digest_requires_canonical_sha256_identity() {
-    for digest in [
-        "digest",
-        "sha256:abc",
-        "sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        "sha512:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    ] {
-        let error = PostgresSchemaSnapshot::new(
-            &support::resolved_source("warehouse_primary"),
-            digest,
-            "postgres-introspector/1",
-            "2026-09-02T00:00:00Z",
-            Vec::new(),
-        )
-        .expect_err("snapshot digests must be canonical lowercase SHA-256 identities");
-        assert_eq!(
-            error,
-            ObservationError::InvalidObservationField {
-                field: "snapshot_digest"
-            }
-        );
-    }
+fn snapshot_digest_is_owner_computed_canonical_sha256_identity() {
+    let snapshot = PostgresSchemaSnapshot::new(
+        &support::resolved_source("warehouse_primary"),
+        "postgres-introspector/1",
+        "2026-09-02T00:00:00Z",
+        Vec::new(),
+    )
+    .expect("empty bounded metadata still has deterministic content identity");
+
+    let digest = snapshot.snapshot_digest();
+    assert_eq!(digest.len(), "sha256:".len() + 64);
+    assert!(digest.starts_with("sha256:"));
+    assert!(
+        digest["sha256:".len()..]
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    );
 }
 
 #[test]

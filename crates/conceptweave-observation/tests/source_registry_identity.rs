@@ -2,13 +2,9 @@ use conceptweave_observation::{ObservationError, PostgresSchemaSnapshot};
 
 mod support;
 
-const SNAPSHOT_DIGEST: &str =
-    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-
 fn snapshot_with_source() -> Result<PostgresSchemaSnapshot, ObservationError> {
     PostgresSchemaSnapshot::new(
         &support::resolved_source("grc_readonly_connection"),
-        SNAPSHOT_DIGEST,
         "postgres_introspector_v1",
         "2026-09-03T13:00:00Z",
         Vec::new(),

@@ -2,13 +2,9 @@ use conceptweave_observation::{ObservationError, PostgresSchemaSnapshot};
 
 mod support;
 
-const SNAPSHOT_DIGEST: &str =
-    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-
 fn assert_invalid_timestamp(observed_at_utc: &str) {
     let error = PostgresSchemaSnapshot::new(
         &support::resolved_source("warehouse_primary"),
-        SNAPSHOT_DIGEST,
         "postgres-introspector/1",
         observed_at_utc,
         Vec::new(),
@@ -71,7 +67,6 @@ fn snapshot_accepts_canonical_utc_observation_timestamps() {
     ] {
         let snapshot = PostgresSchemaSnapshot::new(
             &support::resolved_source("warehouse_primary"),
-            SNAPSHOT_DIGEST,
             "postgres-introspector/1",
             observed_at_utc,
             Vec::new(),

@@ -5,9 +5,6 @@ use conceptweave_observation::{
 
 mod support;
 
-const SNAPSHOT_DIGEST: &str =
-    "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-
 fn snapshot() -> PostgresSchemaSnapshot {
     let foreign_key = ForeignKeyObservation::new(
         "Order/Account~FK",
@@ -32,7 +29,6 @@ fn snapshot() -> PostgresSchemaSnapshot {
 
     PostgresSchemaSnapshot::new(
         &support::resolved_source("warehouse_source"),
-        SNAPSHOT_DIGEST,
         "catalog-v1",
         "2026-09-02T06:00:00Z",
         vec![table],
@@ -45,12 +41,13 @@ fn snapshot_issues_exact_evidence_receipt_for_observed_column() {
     let location = ObservationLocation::column("Sales/~North", "Order/Line", "Account/Key")
         .expect("location fixture is valid");
 
-    let receipt = snapshot()
+    let snapshot = snapshot();
+    let receipt = snapshot
         .source_receipt(location)
         .expect("observed location can be receipted");
 
     assert_eq!(receipt.source_id(), "warehouse_source");
-    assert_eq!(receipt.source_digest(), SNAPSHOT_DIGEST);
+    assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
     assert_eq!(receipt.extractor_revision(), "catalog-v1");
     assert_eq!(receipt.observed_at_utc(), "2026-09-02T06:00:00Z");
     assert_eq!(receipt.location().kind(), ObservationLocationKind::Column);
