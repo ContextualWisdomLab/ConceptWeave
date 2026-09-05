@@ -52,7 +52,7 @@ Support stable adapters for `semantic-data-portal`, `LineageWeave`, `context-gra
 
 ### FR-8 LLM assistance
 
-All LLM-backed induction uses `contextual-orchestrator`. Model output is untrusted proposal data and may not skip deterministic validation or review.
+All LLM-backed induction uses released `contextual-orchestrator` contracts. Model output is untrusted proposal data and may not skip deterministic validation or review. A documented API, Draft release proposal or successful maintenance job does not prove the deployed service is ready; missing release and runtime evidence keeps model assistance unavailable without excluding papers from review.
 
 ### FR-9 Research evidence intake
 

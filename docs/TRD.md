@@ -41,6 +41,8 @@ The initial Rust and JSON contracts cover candidate kind, truth status, publicat
 
 LLM calls go through `contextual-orchestrator`. The application sends bounded evidence/context and receives structured proposals. LLM output is never a database command, publication decision, validation result, or source-system mutation. Deterministic checks must be able to reject the output without another model call.
 
+Before enabling that adapter, verify an immutable owner artifact and schema digest, protected-source provenance, an identified gateway's deployed version and exact-consumer contract evidence. A provider-catalog maintenance deployment is not serving-gateway evidence. The [current owner audit](doctoring/zotero_fulltext_contract_audit.md#released-orchestration-evidence) connects the unfulfilled release gate to existing owner work; copied source, mutable branches and direct-provider calls are not fallback integrations.
+
 ## 7. Standards strategy
 
 Stable publication targets use stable recommendations first: RDF 1.1, OWL 2, SKOS, SHACL 1.0, JSON-LD 1.1, and PROV-O as applicable. RDF 1.2 and SHACL 1.2 are tracked as 2026 drafts/candidate work and are not silently treated as final standards. Apache Ossie (incubating; formerly OSI) is tracked as an emerging semantic-model exchange format for metrics, dimensions, relationships, and datasets.
