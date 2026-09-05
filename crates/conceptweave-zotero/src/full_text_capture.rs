@@ -77,12 +77,69 @@ impl std::error::Error for FullTextError {}
 /// The returned JSON is not a decision patch or an approval. It must not replace
 /// the original report or worksheet, and it is rejected by legacy apply commands.
 pub fn build_full_text_review_json(
-    _report: &ClassificationReport,
-    _worksheet: &crate::StewardReviewWorksheet,
-    _capture: &FullTextCapture,
-    _limit: usize,
+    report: &ClassificationReport,
+    worksheet: &crate::StewardReviewWorksheet,
+    capture: &FullTextCapture,
+    limit: usize,
 ) -> Result<Vec<u8>, FullTextError> {
-    Err(INVALID_EVIDENCE)
+    #[derive(Serialize)]
+    struct AttachmentEvidence<'a> {
+        item_key: &'a str,
+        metadata_version: Option<u64>,
+        content_response: &'a CapturedResponse,
+    }
+    #[derive(Serialize)]
+    struct ReviewView<'a> {
+        view_kind: &'static str,
+        capture_digest: &'a str,
+        metadata_report_digest: &'a str,
+        proposal_digest: String,
+        bibliographic_item_count: usize,
+        review_batch: crate::StewardReviewBatch,
+        attachment_evidence: BTreeMap<String, Vec<AttachmentEvidence<'a>>>,
+    }
+
+    let review_batch = crate::build_steward_review_batch(report, worksheet, limit)
+        .map_err(|_| FullTextError("full-text review requires a valid pending batch"))?;
+    verify_full_text_capture(capture, report)?;
+    let parent_by_key: BTreeMap<_, _> = report
+        .snapshot_items
+        .iter()
+        .map(|item| (item.item_key.as_str(), item.parent_item_key.as_deref()))
+        .collect();
+    let mut attachment_evidence: BTreeMap<_, Vec<_>> = review_batch
+        .decisions
+        .iter()
+        .map(|decision| (decision.item_key.clone(), Vec::new()))
+        .collect();
+    for record in &capture.capture_evidence.records {
+        if let Some(rows) = parent_by_key[record.item_key.as_str()]
+            .and_then(|parent| attachment_evidence.get_mut(parent))
+        {
+            rows.push(AttachmentEvidence {
+                item_key: &record.item_key,
+                metadata_version: record.metadata_response.version,
+                content_response: &record.content_response,
+            });
+        }
+    }
+    let view = ReviewView {
+        view_kind: "full_text_review_view_v1",
+        capture_digest: &capture.capture_digest,
+        metadata_report_digest: &capture.capture_evidence.metadata_report_digest,
+        proposal_digest: crate::classification_proposal_digest(report),
+        bibliographic_item_count: report.classified_items.len(),
+        review_batch,
+        attachment_evidence,
+    };
+    // A fixed slice bounds serialization itself, including JSON escaping.
+    let mut bytes = vec![0; 16 * 1024 * 1024];
+    let mut writer = std::io::Cursor::new(bytes.as_mut_slice());
+    serde_json::to_writer(&mut writer, &view)
+        .map_err(|_| FullTextError("full-text review exceeds the 16 MiB output limit"))?;
+    let length = writer.position() as usize;
+    bytes.truncate(length);
+    Ok(bytes)
 }
 
 /// Reads every full-text manifest entry through the fixed loopback API.
