@@ -1,6 +1,70 @@
 use super::*;
 use crate::{ZoteroItem, classify_snapshot};
 
+#[test]
+fn review_view_binds_exact_capture_and_keeps_missing_parents_without_decisions() {
+    let report = report_fixture();
+    let worksheet = build_steward_review_worksheet(&report).unwrap();
+    let before_report = serde_json::to_vec(&report).unwrap();
+    let before_worksheet = worksheet.clone();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let bytes = build_full_text_review_json(&report, &worksheet, &capture, 2).unwrap();
+    let view: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(view["view_kind"], "full_text_review_view_v1");
+    assert_eq!(view["capture_digest"], capture.capture_digest);
+    assert_eq!(
+        view["metadata_report_digest"],
+        capture.capture_evidence.metadata_report_digest
+    );
+    assert_eq!(view["bibliographic_item_count"], 2);
+    assert_eq!(view["review_batch"]["remaining_count"], 2);
+    assert_eq!(
+        view["review_batch"]["decisions"].as_array().unwrap().len(),
+        2
+    );
+    assert_eq!(
+        view["attachment_evidence"]["ABCD2345"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        view["attachment_evidence"]["DEFG5678"],
+        serde_json::json!([])
+    );
+    assert_eq!(
+        view["attachment_evidence"]["ABCD2345"][0]["item_key"],
+        "BCDE3456"
+    );
+    assert_eq!(
+        view["attachment_evidence"]["ABCD2345"][0]["content_response"]["body"],
+        r#"{"content":"fixture text 한글","indexedPages":2,"totalPages":2,"providerExtra":{"retained":true}}"#
+    );
+    assert_eq!(
+        view["attachment_evidence"]["ABCD2345"][1]["content_response"]["status"],
+        404
+    );
+    assert!(
+        view["review_batch"]["decisions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|row| row["reviewed_disposition"].is_null())
+    );
+    assert!(serde_json::from_slice::<crate::StewardReviewBatch>(&bytes).is_err());
+    assert!(serde_json::from_slice::<crate::StewardDecisionPatch>(&bytes).is_err());
+    assert_eq!(serde_json::to_vec(&report).unwrap(), before_report);
+    assert_eq!(worksheet, before_worksheet);
+    assert_eq!(
+        build_full_text_review_json(&report, &worksheet, &capture, 2).unwrap(),
+        bytes
+    );
+}
+
 fn report_fixture() -> ClassificationReport {
     let items: Vec<ZoteroItem> = serde_json::from_value(serde_json::json!([
         {"key":"ABCD2345","version":2,"data":{"itemType":"journalArticle","title":"fixture paper"}},

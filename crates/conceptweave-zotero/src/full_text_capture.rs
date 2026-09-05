@@ -72,6 +72,19 @@ impl fmt::Display for FullTextError {
 
 impl std::error::Error for FullTextError {}
 
+/// Builds a bounded private evidence view for the next pending review rows.
+///
+/// The returned JSON is not a decision patch or an approval. It must not replace
+/// the original report or worksheet, and it is rejected by legacy apply commands.
+pub fn build_full_text_review_json(
+    _report: &ClassificationReport,
+    _worksheet: &crate::StewardReviewWorksheet,
+    _capture: &FullTextCapture,
+    _limit: usize,
+) -> Result<Vec<u8>, FullTextError> {
+    Err(INVALID_EVIDENCE)
+}
+
 /// Reads every full-text manifest entry through the fixed loopback API.
 ///
 /// The report remains unchanged. Missing content is retained explicitly, while
