@@ -5,7 +5,7 @@
 
 ## Context
 
-CWL needs a reproducible inventory of ontology research without turning keyword matches into authoritative library organization. The current desktop is Zotero 9.0.6, whose Local API supports reads but not writes. Zotero documents Local API writes only for Zotero 10+, where they require user-granted authorization and `Zotero-Server-ID`; this slice therefore has no mutation capability. The library is mutable while pagination is in progress, duplicate metadata does not prove that two records should be merged, and the local report contains titles and item keys that must not be written into the repository.
+CWL needs a reproducible inventory of ontology research without turning keyword matches into authoritative library organization. At the original 2026-09-04 decision snapshot the desktop was Zotero 9.0.6, whose Local API supports reads but not writes. Zotero documents Local API writes only for Zotero 10+, where they require user-granted authorization and `Zotero-Server-ID`; the initial intake slice therefore had no mutation capability. The 2026-09-05 campaign now observes Zotero 10.0.1; write planning remains governed separately by ADR 0007 and does not follow from that upgrade. The library is mutable while pagination is in progress, duplicate metadata does not prove that two records should be merged, and the local report contains titles and item keys that must not be written into the repository.
 
 Zotero's Local API documentation states that production clients should request `Zotero-API-Version: 3`; the response exposes `Zotero-API-Version` and `Zotero-Schema-Version`. The API version is the compatibility contract. The schema version is therefore recorded and required to remain stable across the snapshot, but it is not hard-coded to the developer workstation's current schema 42 because Zotero can legitimately revise the local data schema while retaining API v3 compatibility.
 
@@ -46,6 +46,12 @@ Report output is restricted to a new direct child of the operating system tempor
 No dedicated utility repository or Zotero mutation path is created. A future Zotero 10+ write adapter is a separate decision and must use authenticated loopback access, server identity, optimistic version preconditions, reviewed item-level changes, before/after receipts, and rollback evidence.
 
 ## Consequences
+
+### 2026-09-05 full-text evidence amendment (Proposed)
+
+In the context of reviewing papers with missing abstracts, facing a full-text API whose observed versions mix sync and local writes and whose list lacks the documented version header, we decided for separately captured, content-bound full-text observations and against treating attachment listings or unchanged version counters as complete snapshot evidence, to preserve review provenance and the full campaign denominator, accepting another capture/verification step and no current claim of atomic full-text enrichment.
+
+The [source-grounded audit](../doctoring/zotero_fulltext_contract_audit.md) retrieved all 3,473 listed entries and demonstrated nonempty text for 3,203/3,715 bibliographic items, including 800/1,000 without retained abstracts. It did not persist raw text or classify those papers. Positive consequence: available source material can guide genuine review without inventing relevance or approval. Negative consequence: content remains unbound to the metadata report until a separate immutable capture contract is implemented and reviewed. Neither a guessed incremental cursor nor adding only the provider's missing header repairs the mixed-version semantics. Direct database edits, cloud credential expansion and a new utility owner are rejected; the provider semantics require an upstream fix, while Research Intake retains the consumer admission boundary. Status remains Proposed.
 
 ### 2026-09-05 integrity amendment (Proposed)
 
