@@ -6,6 +6,7 @@ use conceptweave_zotero::{
 
 fn item(key: &str, title: &str, abstract_note: &str) -> ZoteroItem {
     ZoteroItem {
+        source_record: None,
         key: key.into(),
         version: 7,
         data: ItemData {

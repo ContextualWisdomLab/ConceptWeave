@@ -145,6 +145,7 @@ fn completed_review_batch_cli_validates_context_before_updating_worksheet() {
 
 fn item(key: &str, title: &str) -> ZoteroItem {
     ZoteroItem {
+        source_record: None,
         key: key.into(),
         version: 7,
         data: ItemData {
