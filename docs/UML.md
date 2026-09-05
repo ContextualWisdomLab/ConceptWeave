@@ -38,3 +38,22 @@ sequenceDiagram
     Publisher-->>Source: no source mutation
     Publisher-->>Steward: immutable release receipt
 ```
+
+## Research intake sequence
+
+```mermaid
+sequenceDiagram
+    participant Zotero as Zotero Local API
+    participant Intake as Research intake
+    participant Report as Local proposal report
+    participant Steward
+
+    loop bounded pages
+        Intake->>Zotero: read items at one library version
+        Zotero-->>Intake: items + immutable version headers
+    end
+    Intake->>Intake: classify or abstain; link children; find duplicate candidates
+    Intake->>Report: write proposals and evidence
+    Report->>Steward: review dispositions and merge candidates
+    Intake-->>Zotero: no mutation
+```
