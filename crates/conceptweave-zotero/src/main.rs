@@ -238,7 +238,7 @@ fn validate_opened_identity(
     })
 }
 
-/// Reads JSON without allowing the input to exceed or grow past the artifact limit.
+/// Reads bounded JSON without exposing rejected field names or values in diagnostics.
 fn read_bounded_json<T: DeserializeOwned>(
     reader: &mut dyn Read,
     advertised_len: u64,
@@ -260,7 +260,7 @@ fn read_bounded_json<T: DeserializeOwned>(
         ));
     }
     serde_json::from_slice(&content)
-        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "review input is invalid"))
 }
 
 /// Preserves an input error kind while naming the rejected artifact.
@@ -268,8 +268,14 @@ fn label_input(name: &str, error: io::Error) -> io::Error {
     io::Error::new(error.kind(), format!("{name}: {error}"))
 }
 
-/// Writes one create-new owner-only artifact and removes a failed partial write.
+/// Writes one bounded create-new owner-only artifact and removes a failed partial write.
 fn write_private_output(path: &Path, content: &[u8]) -> io::Result<()> {
+    if content.len() as u64 > MAX_ARTIFACT_BYTES {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "metadata output exceeds the artifact size limit",
+        ));
+    }
     write_private_output_with(path, content, write_all_and_flush)
 }
 
@@ -748,6 +754,10 @@ mod tests {
             read_bounded_json::<serde_json::Value>(&mut io::empty(), MAX_ARTIFACT_BYTES + 1)
                 .unwrap_err();
         assert_eq!(oversized.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(
+            oversized.to_string(),
+            "review input exceeds the artifact size limit"
+        );
 
         let grown = read_bounded_json::<serde_json::Value>(
             &mut io::repeat(b' ').take(MAX_ARTIFACT_BYTES + 1),
@@ -755,10 +765,15 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(grown.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(
+            grown.to_string(),
+            "review input grew beyond the artifact size limit"
+        );
 
         let read_failure =
             read_bounded_json::<serde_json::Value>(&mut FailingReader, 0).unwrap_err();
         assert_eq!(read_failure.kind(), io::ErrorKind::Other);
+        assert_eq!(read_failure.to_string(), "injected read failure");
 
         let labeled = label_input(
             "worksheet",
@@ -766,6 +781,86 @@ mod tests {
         );
         assert_eq!(labeled.kind(), io::ErrorKind::PermissionDenied);
         assert_eq!(labeled.to_string(), "worksheet: unsafe");
+    }
+
+    #[test]
+    fn private_json_diagnostic_hides_unknown_field_names() {
+        #[derive(Debug, serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct StrictReviewInput {}
+
+        // Original metadata types permit additional fields. This strict test-only type
+        // exercises the shared reader's confidentiality contract for future callers.
+        let error = read_bounded_json::<StrictReviewInput>(
+            &mut br#"{"synthetic-private-field-sentinel":true}"#.as_slice(),
+            0,
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(error.to_string(), "review input is invalid");
+        assert_eq!(
+            label_input("worksheet", error).to_string(),
+            "worksheet: review input is invalid"
+        );
+    }
+
+    #[test]
+    fn private_json_diagnostic_hides_rejected_enum_values() {
+        let error = read_bounded_json::<conceptweave_zotero::Disposition>(
+            &mut br#""synthetic-private-enum-sentinel""#.as_slice(),
+            0,
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(error.to_string(), "review input is invalid");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn private_output_limit_accepts_exactly_the_readable_artifact_boundary() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let output = unique_temp_path("exact-output-limit");
+        assert!(!output.exists());
+        let mut content = vec![b' '; MAX_ARTIFACT_BYTES as usize];
+        content[..2].copy_from_slice(b"{}");
+        write_private_output(&output, &content).unwrap();
+        let metadata = fs::metadata(&output).unwrap();
+        let restored = read_private_json::<serde_json::Value>(output.to_str().unwrap());
+        fs::remove_file(output).unwrap();
+        assert_eq!(metadata.len(), MAX_ARTIFACT_BYTES);
+        assert_eq!(metadata.permissions().mode() & 0o777, 0o600);
+        assert_eq!(restored.unwrap().0, serde_json::json!({}));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn private_output_limit_rejects_oversize_before_creating_or_touching_a_file() {
+        let output = unique_temp_path("oversized-output-limit");
+        let existing = unique_temp_path("existing-output-limit");
+        assert!(!output.exists());
+        assert!(!existing.exists());
+        write_private_output(&existing, b"original").unwrap();
+        let content = vec![b' '; MAX_ARTIFACT_BYTES as usize + 1];
+        let rejected = write_private_output(&output, &content);
+        let touched = write_private_output(&existing, &content);
+        let created = output.exists();
+        let preserved = fs::read(&existing).unwrap();
+        // Clean synthetic artifacts even when the RED implementation creates the file.
+        let _ = fs::remove_file(output);
+        fs::remove_file(existing).unwrap();
+        assert!(
+            !created,
+            "oversized metadata must be rejected before creation"
+        );
+        assert_eq!(preserved, b"original");
+        for error in [rejected.unwrap_err(), touched.unwrap_err()] {
+            assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+            assert_eq!(
+                error.to_string(),
+                "metadata output exceeds the artifact size limit"
+            );
+        }
     }
 
     #[test]
