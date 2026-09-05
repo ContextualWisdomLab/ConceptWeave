@@ -25,7 +25,7 @@ pub enum ObservationLimitError {
     ZeroConcurrencyLimit,
 }
 
-/// Explicit positive resource limits that every Source Observation adapter must enforce.
+/// Explicit positive resource limits that the Source Observation runtime must enforce.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ObservationLimits {
     operation_timeout_ms: u64,
@@ -39,8 +39,8 @@ impl ObservationLimits {
     /// Creates a conservative bounded policy whose total operation deadline equals the statement timeout.
     ///
     /// This constructor preserves the original API while making the end-to-end deadline explicit for
-    /// every request. Use [`Self::with_timeouts`] when connection/registry/catalog work needs a larger
-    /// total budget than any individual source statement.
+    /// every request. Use [`Self::with_timeouts`] when authorization/connection/catalog work needs a
+    /// larger total budget than any individual source statement.
     pub const fn new(
         statement_timeout_ms: u64,
         max_rows: u64,
@@ -91,7 +91,11 @@ impl ObservationLimits {
         })
     }
 
-    /// Returns the maximum elapsed time for registry resolution, connection and all catalog work.
+    /// Returns the policy ceiling for authorization, connection and all catalog work.
+    ///
+    /// Registry authorization occurs before [`SourceObservationPort::observe`], so the concrete
+    /// application/adapter integration must account for that elapsed time when enforcing this
+    /// end-to-end limit rather than restarting the budget at adapter entry.
     #[must_use]
     pub const fn operation_timeout_ms(&self) -> u64 {
         self.operation_timeout_ms
@@ -223,13 +227,13 @@ impl ResolvedSourceConnection {
 
 /// One fail-closed request to observe explicitly authorized source schemas.
 ///
-/// `source_connection_key` is an opaque registry identifier resolved by the adapter's credential
-/// boundary. It is deliberately restricted to a bounded, lowercase, multiword `snake_case` key so
-/// DSNs, URLs, shell-style connection parameters, or other credential-bearing connection material
-/// cannot accidentally cross this port as a connection reference. Schema identifiers retain exact
-/// source spelling and are sorted only to make request identity deterministic. Callers must also
-/// provide an explicit provider-independent authorization-metadata budget before the request can be
-/// constructed.
+/// `source_connection_key` is a bounded opaque identifier, not source authority by itself. Before
+/// adapter execution, [`Self::authorize`] must resolve it through the caller's authorized
+/// [`SourceConnectionRegistry`] and bind the resulting capability into an
+/// [`AuthorizedObservationRequest`]. The adapter later maps that authorized opaque capability to
+/// credentials inside its own ACL. Schema identifiers retain exact source spelling and are sorted
+/// only to make request identity deterministic. Callers must also provide an explicit
+/// provider-independent authorization-metadata budget before the request can be constructed.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ObservationRequest {
     source_connection_key: String,
@@ -342,7 +346,7 @@ impl ObservationRequest {
         self.request_budget
     }
 
-    /// Returns the execution limits the adapter must enforce for this request.
+    /// Returns the resource limits the operation runtime and source adapter must jointly enforce.
     #[must_use]
     pub const fn limits(&self) -> ObservationLimits {
         self.limits
@@ -438,11 +442,12 @@ pub enum SourceObservationFailure {
 ///
 /// Implementations receive only a registry-authorized request, resolve credentials from its opaque
 /// source capability inside the adapter ACL, use only read-only source access, honor the exact
-/// schema allowlist, the total operation deadline, and every per-resource [`ObservationLimits`]
-/// bound, check caller cancellation, and return a typed failure rather than a partial or invented
-/// snapshot when captured metadata cannot construct the immutable snapshot. Implementations own
-/// their scheduling model; blocking database work must not be performed on an asynchronous web
-/// executor thread.
+/// schema allowlist, the remaining end-to-end operation budget plus every adapter-side
+/// [`ObservationLimits`] bound, check caller cancellation, and return a typed failure rather than a
+/// partial or invented snapshot when captured metadata cannot construct the immutable snapshot.
+/// The surrounding operation runtime is responsible for including pre-adapter registry authorization
+/// in the same total deadline. Implementations own their scheduling model; blocking database work
+/// must not be performed on an asynchronous web executor thread.
 pub trait SourceObservationPort {
     /// Immutable snapshot type produced only after a complete bounded observation.
     type Snapshot;
