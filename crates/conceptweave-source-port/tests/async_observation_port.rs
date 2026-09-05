@@ -88,14 +88,16 @@ fn authorized_request() -> AuthorizedObservationRequest {
 #[test]
 fn source_port_accepts_a_send_awaitable_adapter_without_a_runtime_dependency() {
     let request = authorized_request();
+    let cancelled_signal = Cancellation(true);
+    let active_signal = Cancellation(false);
 
-    let cancelled = assert_send(AsyncEchoPort.observe(&request, &Cancellation(true)));
+    let cancelled = assert_send(AsyncEchoPort.observe(&request, &cancelled_signal));
     assert_eq!(
         poll_ready(cancelled),
         Err(SourceObservationFailure::Cancelled)
     );
 
-    let completed = assert_send(AsyncEchoPort.observe(&request, &Cancellation(false)));
+    let completed = assert_send(AsyncEchoPort.observe(&request, &active_signal));
     assert_eq!(
         poll_ready(completed),
         Ok("grc_readonly_connection".to_owned())
