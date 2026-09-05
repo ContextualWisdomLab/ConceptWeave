@@ -95,8 +95,26 @@ pub fn verify_full_text_capture(
 ) -> Result<(), FullTextError> {
     let snapshot = validate_report(report)?;
     let evidence = &capture.capture_evidence;
-    if capture.capture_digest != json_digest(evidence)
-        || evidence.capture_kind != CAPTURE_KIND
+    if evidence.records.len() > snapshot.len() {
+        return Err(INVALID_EVIDENCE);
+    }
+    let mut remaining = MAX_SNAPSHOT_BYTES;
+    for response in [
+        &evidence.library_before,
+        &evidence.manifest_before,
+        &evidence.manifest_after,
+        &evidence.library_after,
+    ]
+    .into_iter()
+    .chain(
+        evidence
+            .records
+            .iter()
+            .flat_map(|record| [&record.metadata_response, &record.content_response]),
+    ) {
+        account_body(&mut remaining, response)?;
+    }
+    if evidence.capture_kind != CAPTURE_KIND
         || evidence.metadata_report_digest != json_digest(report)
         || evidence.metadata_snapshot_digest != report.snapshot_digest
         || evidence.bibliographic_item_count != report.classified_items.len()
@@ -113,23 +131,15 @@ pub fn verify_full_text_capture(
     {
         return Err(INVALID_EVIDENCE);
     }
-    let mut remaining = MAX_SNAPSHOT_BYTES;
-    for response in [
-        &evidence.library_before,
-        &evidence.manifest_before,
-        &evidence.manifest_after,
-        &evidence.library_after,
-    ] {
-        account_body(&mut remaining, response)?;
-    }
     for (record, (item_key, version)) in evidence.records.iter().zip(&manifest) {
         if &record.item_key != item_key {
             return Err(INVALID_EVIDENCE);
         }
         validate_metadata(&record.metadata_response, snapshot[item_key.as_str()])?;
         validate_content(&record.content_response, *version)?;
-        account_body(&mut remaining, &record.metadata_response)?;
-        account_body(&mut remaining, &record.content_response)?;
+    }
+    if capture.capture_digest != json_digest(evidence) {
+        return Err(INVALID_EVIDENCE);
     }
     Ok(())
 }
@@ -339,8 +349,9 @@ fn unix_millis(time: SystemTime) -> Result<u64, FullTextError> {
 }
 
 fn json_digest(value: &impl Serialize) -> String {
-    let bytes = serde_json::to_vec(value).expect("capture values are JSON-compatible");
-    format!("sha256:{:x}", Sha256::digest(bytes))
+    let mut digest = Sha256::new();
+    serde_json::to_writer(&mut digest, value).expect("capture values are JSON-compatible");
+    format!("sha256:{:x}", digest.finalize())
 }
 
 fn fetch_response(
