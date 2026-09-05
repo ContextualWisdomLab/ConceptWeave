@@ -2254,6 +2254,7 @@ fn normalize_title(value: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    mod authenticated_transport;
     mod metadata_transport;
 
     use super::*;
