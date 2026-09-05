@@ -15,7 +15,7 @@ pub use model::{
     TableConstraintObservation, TableObservation, UniqueConstraintObservation,
 };
 
-use conceptweave_source_port::ResolvedSourceConnection;
+use conceptweave_source_port::AuthorizedObservationRequest;
 use sha2::{Digest, Sha256};
 
 const SNAPSHOT_DIGEST_DOMAIN_V1: &[u8] = b"conceptweave.postgres_schema_snapshot.v1";
@@ -30,25 +30,40 @@ const SNAPSHOT_DIGEST_DOMAIN_V1: &[u8] = b"conceptweave.postgres_schema_snapshot
 pub struct PostgresSchemaSnapshot(model::PostgresSchemaSnapshot);
 
 impl PostgresSchemaSnapshot {
-    /// Creates a deterministic snapshot contract from already-bounded source metadata.
+    /// Creates a deterministic snapshot contract from already-bounded, authorized source metadata.
     ///
     /// Collection order is canonicalized by exact qualified table identifier before the digest is
     /// computed. Exact UTF-8 source text is preserved without Unicode, case, or quoting
-    /// normalization. The source connection reference must be a registry-resolved capability
-    /// issued by the Source Observation port. The observation time remains explicit provenance and
-    /// must use the canonical UTC form enforced by the underlying observation contract.
+    /// normalization. The complete registry-authorized request is required so every observed local
+    /// table schema can be checked against the exact request allowlist before immutable evidence or
+    /// receipts are created. Referenced foreign-key schemas are relationship evidence and are not
+    /// treated as locally observed table schemas. The observation time remains explicit provenance
+    /// and must use the canonical UTC form enforced by the underlying observation contract.
     pub fn new(
-        source_connection: &ResolvedSourceConnection,
+        authorized_request: &AuthorizedObservationRequest,
         extractor_revision: impl Into<String>,
         observed_at_utc: impl Into<String>,
         mut tables: Vec<TableObservation>,
     ) -> Result<Self, ObservationError> {
+        for table in &tables {
+            if !authorized_request
+                .request()
+                .allowed_schema_names()
+                .iter()
+                .any(|schema_name| schema_name == table.schema_name())
+            {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "unauthorized_schema_name",
+                });
+            }
+        }
+
         tables.sort_by(|left, right| {
             (left.schema_name(), left.table_name()).cmp(&(right.schema_name(), right.table_name()))
         });
         let snapshot_digest = compute_snapshot_digest(&tables);
         model::PostgresSchemaSnapshot::new(
-            source_connection,
+            authorized_request.source_connection(),
             snapshot_digest,
             extractor_revision,
             observed_at_utc,
