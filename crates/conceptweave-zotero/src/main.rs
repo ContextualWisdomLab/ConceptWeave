@@ -756,6 +756,33 @@ mod tests {
     use super::*;
 
     #[test]
+    fn full_text_worksheet_mode_requires_three_distinct_paths() {
+        assert!(
+            parse_output_request([
+                "--full-text-worksheet",
+                "/tmp/report.json",
+                "/tmp/capture.json",
+                "/tmp/worksheet.json",
+            ])
+            .is_ok()
+        );
+        for length in 1..4 {
+            let arguments = ["--full-text-worksheet", "r", "c", "o"];
+            assert!(parse_output_request(arguments[..length].iter().copied()).is_err());
+        }
+        for paths in [["r", "r", "o"], ["r", "c", "r"], ["r", "c", "c"]] {
+            assert!(
+                parse_output_request(["--full-text-worksheet", paths[0], paths[1], paths[2]])
+                    .is_err()
+            );
+        }
+        assert!(
+            parse_output_request(["--full-text-worksheet", "r", "c", "o", "metadata-worksheet"])
+                .is_err()
+        );
+    }
+
+    #[test]
     fn full_text_review_mode_requires_five_distinct_bounded_arguments() {
         assert!(
             parse_output_request([
