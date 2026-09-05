@@ -16,6 +16,10 @@ fn review_view_binds_exact_capture_and_keeps_missing_parents_without_decisions()
     assert_eq!(view["view_kind"], "full_text_review_view_v1");
     assert_eq!(view["capture_digest"], capture.capture_digest);
     assert_eq!(
+        view["proposal_digest"],
+        crate::classification_proposal_digest(&report)
+    );
+    assert_eq!(
         view["metadata_report_digest"],
         capture.capture_evidence.metadata_report_digest
     );
@@ -40,6 +44,19 @@ fn review_view_binds_exact_capture_and_keeps_missing_parents_without_decisions()
         view["attachment_evidence"]["ABCD2345"][0]["item_key"],
         "BCDE3456"
     );
+    assert_eq!(
+        view["attachment_evidence"]["ABCD2345"][0]["metadata_version"],
+        1
+    );
+    assert_eq!(
+        view["attachment_evidence"]["ABCD2345"][0]["content_response"]["version"],
+        12403
+    );
+    assert_eq!(
+        view["attachment_evidence"]["ABCD2345"][1]["metadata_version"],
+        0
+    );
+    assert!(view["attachment_evidence"]["ABCD2345"][1]["content_response"]["version"].is_null());
     assert_eq!(
         view["attachment_evidence"]["ABCD2345"][0]["content_response"]["body"],
         r#"{"content":"fixture text 한글","indexedPages":2,"totalPages":2,"providerExtra":{"retained":true}}"#
@@ -92,6 +109,77 @@ fn review_view_selects_only_pending_parents_and_never_copies_unrelated_text() {
         serde_json::json!({"DEFG5678":[]})
     );
     assert!(!String::from_utf8(next).unwrap().contains("fixture text"));
+}
+
+#[test]
+fn review_view_separates_two_text_parents_and_excludes_standalone_attachments() {
+    let source: Vec<ZoteroItem> = serde_json::from_value(serde_json::json!([
+        {"key":"ABCD2345","version":2,"data":{"itemType":"book","title":"first paper"}},
+        {"key":"BCDE3456","version":1,"data":{"itemType":"attachment","parentItem":"ABCD2345"}},
+        {"key":"DEFG5678","version":2,"data":{"itemType":"book","title":"second paper"}},
+        {"key":"EFGH6789","version":1,"data":{"itemType":"attachment","parentItem":"DEFG5678"}},
+        {"key":"FGHI789A","version":1,"data":{"itemType":"attachment"}}
+    ]))
+    .unwrap();
+    let mut report = classify_snapshot("10.0.1".into(), Some("fixture-server".into()), 2, source);
+    report.api_version = Some(3);
+    report.schema_version = Some(44);
+    let mut worksheet = build_steward_review_worksheet(&report).unwrap();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(match request_path {
+            "fulltext?since=0" => CapturedResponse {status:200,version:None,
+                body:r#"{"BCDE3456":12403,"EFGH6789":9,"FGHI789A":0}"#.into()},
+            "items/EFGH6789" => CapturedResponse {status:200,version:Some(1),
+                body:r#"{"key":"EFGH6789","version":1,"data":{"itemType":"attachment","parentItem":"DEFG5678"}}"#.into()},
+            "items/EFGH6789/fulltext" => CapturedResponse {status:200,version:Some(9),
+                body:r#"{"content":"second parent evidence"}"#.into()},
+            "items/FGHI789A" => CapturedResponse {status:200,version:Some(1),
+                body:r#"{"key":"FGHI789A","version":1,"data":{"itemType":"attachment"}}"#.into()},
+            "items/FGHI789A/fulltext" => CapturedResponse {status:200,version:Some(0),
+                body:r#"{"content":"standalone evidence"}"#.into()},
+            _ => response_fixture(request_path),
+        })
+    }).unwrap();
+    let both: serde_json::Value = serde_json::from_slice(
+        &build_full_text_review_json(&report, &worksheet, &capture, 2).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(both["bibliographic_item_count"], 2);
+    assert_eq!(
+        both["attachment_evidence"]["ABCD2345"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        both["attachment_evidence"]["DEFG5678"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        both["attachment_evidence"]["DEFG5678"][0]["item_key"],
+        "EFGH6789"
+    );
+    assert_eq!(
+        both["attachment_evidence"]["DEFG5678"][0]["content_response"]["version"],
+        9
+    );
+    let first =
+        String::from_utf8(build_full_text_review_json(&report, &worksheet, &capture, 1).unwrap())
+            .unwrap();
+    assert!(first.contains("fixture text"));
+    assert!(!first.contains("second parent evidence"));
+    assert!(!first.contains("standalone evidence"));
+    worksheet.decisions[0].reviewed_disposition = Some(crate::Disposition::OutOfScope);
+    let second =
+        String::from_utf8(build_full_text_review_json(&report, &worksheet, &capture, 1).unwrap())
+            .unwrap();
+    assert!(second.contains("second parent evidence"));
+    assert!(!second.contains("fixture text"));
+    assert!(!second.contains("standalone evidence"));
 }
 
 #[test]
