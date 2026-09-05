@@ -16,29 +16,20 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 #[test]
-fn cli_private_json_errors_never_echo_source_keys_or_dispositions() {
+fn cli_private_json_errors_never_echo_source_keys_or_approval_fields() {
     let case = Case::new("diagnostic-privacy");
     let [report, worksheet, capture] = case.inputs();
     let original = fs::read(&worksheet).unwrap();
-    let original_value: Value = serde_json::from_slice(&original).unwrap();
-    let mut unknown_field = original_value.clone();
+    let mut unknown_field: Value = serde_json::from_slice(&original).unwrap();
     unknown_field["synthetic-private-field-sentinel"] = true.into();
-    let mut invalid_value = original_value.clone();
-    invalid_value["full_text_worksheet_v1"]["decisions"][0]["reviewed_disposition"] =
-        "synthetic-private-enum-sentinel".into();
-    for (index, invalid) in [unknown_field, invalid_value.clone()]
-        .into_iter()
-        .enumerate()
-    {
-        let invalid = case.json(&format!("invalid-worksheet-{index}"), &invalid);
-        let output = case.path(&format!("rejected-{index}"));
-        let command = run(
-            "--bound-full-text-review",
-            &[&report, &invalid, &capture, Path::new("1"), &output],
-        );
-        assert_private_parse_failure(command, "worksheet");
-        assert!(!output.exists());
-    }
+    let invalid = case.json("invalid-worksheet", &unknown_field);
+    let output = case.path("rejected");
+    let command = run(
+        "--bound-full-text-review",
+        &[&report, &invalid, &capture, Path::new("1"), &output],
+    );
+    assert_private_parse_failure(command, "worksheet");
+    assert!(!output.exists());
     let mut approval = serde_json::to_value(case.approval()).unwrap();
     approval["synthetic-private-approval-sentinel"] = true.into();
     let approval = case.json("invalid-approval", &approval);
@@ -51,6 +42,27 @@ fn cli_private_json_errors_never_echo_source_keys_or_dispositions() {
         "approval",
     );
     assert!(!golden.exists());
+    assert_eq!(fs::read(&worksheet).unwrap(), original);
+}
+
+#[test]
+fn cli_private_json_errors_never_echo_disposition_values() {
+    let case = Case::new("enum-diagnostic-privacy");
+    let [report, worksheet, capture] = case.inputs();
+    let original = fs::read(&worksheet).unwrap();
+    let mut invalid_value: Value = serde_json::from_slice(&original).unwrap();
+    invalid_value["full_text_worksheet_v1"]["decisions"][0]["reviewed_disposition"] =
+        "synthetic-private-enum-sentinel".into();
+    let invalid = case.json("invalid-worksheet", &invalid_value);
+    let output = case.path("rejected");
+    assert_private_parse_failure(
+        run(
+            "--bound-full-text-review",
+            &[&report, &invalid, &capture, Path::new("1"), &output],
+        ),
+        "worksheet",
+    );
+    assert!(!output.exists());
     // Metadata-only siblings share the same parser and must not retain the leak.
     let legacy = case.json(
         "invalid-legacy-worksheet",
