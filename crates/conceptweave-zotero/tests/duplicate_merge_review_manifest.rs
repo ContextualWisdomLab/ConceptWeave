@@ -6,6 +6,7 @@ use std::cell::Cell;
 
 fn item(key: &str, version: u64, title: &str, doi: &str) -> ZoteroItem {
     ZoteroItem {
+        source_record: None,
         key: key.into(),
         version,
         data: ItemData {

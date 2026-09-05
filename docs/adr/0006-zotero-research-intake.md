@@ -40,6 +40,18 @@ No dedicated utility repository or Zotero mutation path is created. A future Zot
 
 ## Consequences
 
+### 2026-09-05 integrity amendment (Proposed)
+
+In the context of replaying a Zotero research classification against a steward's approved labels, facing source fields lost during projection and predictions mutable after review, we decided for separate source-and-input and proposal-content digests verified with the complete reviewed set, and against typed-only source hashing or a report's self-declared cached proposal identity, to preserve the exact evidence used for evaluation, accepting a receipt-format break, report regeneration and fresh governance approval.
+
+The source identity uses `conceptweave-zotero-snapshot-v2` over item-key-ordered pairs of complete captured provider JSON and actual typed classifier input. Capturing only unknown flattened fields was rejected after the omitted-title versus explicit-empty-title regression showed another collision. Hashing only captured JSON was also rejected: mutating a decoded public title would otherwise change classification without changing source identity. The pair binds both representations without another cloned source snapshot; JSON object order is canonicalized while field presence, nested metadata and array order remain meaningful.
+
+The approval additionally requires `proposal_digest`, computed from all current proposal records under `conceptweave-classification-proposals-v1`, sorted by item key and revision. Every proposal field is bound, including evidence and records outside a reviewed sample. Evaluation recomputes this value before invoking the external verifier. Changing both the prediction and the submitted digest cannot renew an independently issued approval; the governance verifier must authenticate the complete reviewed set, not merely accept a receipt identifier. Local checks remain before this authority boundary.
+
+Positive consequence: same-version metadata edits, changed classifier inputs and altered evaluated predictions invalidate the relevant binding. Negative consequence: prior source digests and approval formats are incompatible; no automatic backfill or transfer of approval is allowed. Captured source and typed input also consume memory until classification finishes. Private Rust fields alone were not selected as the approval solution because they cannot authenticate a deserialized report; storing another full source snapshot was unnecessary for proposal binding. No new authority service, external dependency, or repository is introduced.
+
+The regressions in `raw_provider_snapshot_binding.rs`, `golden_set_integrity_contract.rs` and `snapshot_content_binding.rs` exercise the two existing PR #10 findings, including failed intermediate designs. Source repair is distinct from hosted exact-head checks, independent review, protected integration and externally approved live classification. The dependent review/finalization stack must adopt the required digest and reject old approval JSON before promotion. ADR status remains Proposed.
+
 - A complete snapshot can be audited and replayed without changing the research library.
 - Rule evidence and explicit abstention reasons are visible; automated classification is not governance approval.
 - Cross-cutting papers cannot be silently forced into whichever rule family happens to be evaluated first.
