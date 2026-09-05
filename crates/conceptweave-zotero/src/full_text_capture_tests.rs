@@ -172,3 +172,201 @@ fn capture_checks_total_budget_before_another_request() {
     );
     assert_eq!(calls, 1);
 }
+
+#[test]
+fn capture_validates_each_report_admission_condition() {
+    for scenario in 0..10 {
+        let mut report = report_fixture();
+        match scenario {
+            0 => report.api_version = None,
+            1 => report.schema_version = None,
+            2 => report.server_id = Some("  ".into()),
+            3 => report.zotero_version = "9.0.6".into(),
+            4 => report.zotero_version = "invalid".into(),
+            5 => report.classified_items.clear(),
+            6 => report.observed_item_count = MAX_SNAPSHOT_ITEMS + 1,
+            7 => report.snapshot_digest.clear(),
+            8 => report.snapshot_items[0].item_version += 1,
+            _ => {
+                let items = serde_json::from_value(serde_json::json!([
+                    {"key":"INVALID0","version":2,"data":{"itemType":"book","title":"fixture"}}
+                ]))
+                .unwrap();
+                report =
+                    classify_snapshot("10.0.1".into(), Some("fixture-server".into()), 2, items);
+                report.api_version = Some(3);
+                report.schema_version = Some(44);
+            }
+        }
+        let result = capture_with(&report, 4096, &mut |_, _| {
+            panic!("admission must precede requests")
+        });
+        assert!(result.is_err(), "admission scenario {scenario}");
+    }
+}
+
+#[test]
+fn replay_checks_bindings_and_structure_even_when_digest_is_recomputed() {
+    let report = report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let saved = serde_json::to_value(capture).unwrap();
+    for scenario in 0..15 {
+        let mut restored: FullTextCapture = serde_json::from_value(saved.clone()).unwrap();
+        let evidence = &mut restored.capture_evidence;
+        match scenario {
+            0 => evidence.capture_kind = "snapshot".into(),
+            1 => evidence.metadata_report_digest.clear(),
+            2 => evidence.metadata_snapshot_digest.clear(),
+            3 => evidence.bibliographic_item_count = 1,
+            4 => evidence.finished_unix_ms = 0,
+            5 => evidence.library_before.status = 500,
+            6 => evidence.library_after.version = Some(3),
+            7 => evidence.library_after.body = "null".into(),
+            8 => evidence.manifest_after.status = 500,
+            9 => evidence.manifest_after.body = "{}".into(),
+            10 => {
+                evidence.records.pop();
+            }
+            11 => evidence.records.swap(0, 1),
+            12 => evidence.records[0].metadata_response.body = "{}".into(),
+            13 => evidence.records[0].content_response.body = r#"{"content":null}"#.into(),
+            _ => evidence.records[0].content_response.version = None,
+        }
+        restored.capture_digest = json_digest(evidence);
+        assert!(
+            verify_full_text_capture(&restored, &report).is_err(),
+            "replay scenario {scenario}"
+        );
+    }
+    let mut another_report = report_fixture();
+    another_report.schema_version = Some(45);
+    let restored: FullTextCapture = serde_json::from_value(saved).unwrap();
+    assert!(verify_full_text_capture(&restored, &another_report).is_err());
+}
+
+#[test]
+fn malformed_and_oversized_manifests_never_become_partial_captures() {
+    let report = report_fixture();
+    let snapshot = validate_report(&report).unwrap();
+    for body in [
+        "[]",
+        "not json",
+        r#"{"BCDE3456":-1}"#,
+        r#"{"BCDE3456":1.5}"#,
+        r#"{"BCDE3456":0} {}"#,
+    ] {
+        let response = CapturedResponse {
+            status: 200,
+            version: None,
+            body: body.into(),
+        };
+        assert!(parse_manifest(&response, &snapshot).is_err());
+    }
+    let response = CapturedResponse {
+        status: 503,
+        version: None,
+        body: "{}".into(),
+    };
+    assert!(parse_manifest(&response, &snapshot).is_err());
+    let entries: BTreeMap<_, _> = (0..=MAX_SNAPSHOT_ITEMS)
+        .map(|index| (format!("{index:08}"), 0))
+        .collect();
+    let response = CapturedResponse {
+        status: 200,
+        version: None,
+        body: serde_json::to_string(&entries).unwrap(),
+    };
+    assert!(parse_manifest(&response, &snapshot).is_err());
+    assert!(
+        capture_with(&report, 4096, &mut |_, _| Err(FullTextError(
+            "fixture request failed"
+        )))
+        .is_err()
+    );
+}
+
+#[test]
+fn metadata_requires_attachment_identity_revision_and_parent() {
+    let report = report_fixture();
+    let snapshot = validate_report(&report).unwrap();
+    let expected = snapshot["BCDE3456"];
+    for scenario in 0..5 {
+        let mut response = response_fixture("items/BCDE3456");
+        let mut body: serde_json::Value = serde_json::from_str(&response.body).unwrap();
+        match scenario {
+            0 => response.status = 404,
+            1 => body["key"] = "CDEF4567".into(),
+            2 => body["version"] = 2.into(),
+            3 => body["data"]["itemType"] = "note".into(),
+            _ => body["data"]["parentItem"] = "DEFG5678".into(),
+        }
+        response.body = serde_json::to_string(&body).unwrap();
+        assert!(validate_metadata(&response, expected).is_err());
+    }
+    let response = CapturedResponse {
+        status: 200,
+        version: Some(1),
+        body: r#"{"key":"BCDE3456","version":1,"data":{"itemType":"attachment"}}"#.into(),
+    };
+    let expected = SnapshotItemRevision {
+        item_key: "BCDE3456".into(),
+        item_version: 1,
+        parent_item_key: None,
+    };
+    validate_metadata(&response, &expected).unwrap();
+}
+
+#[test]
+fn empty_partial_and_unknown_content_counters_are_retained_without_approval() {
+    for body in [
+        r#"{"content":""}"#,
+        r#"{"content":"text","indexedPages":1,"totalPages":2}"#,
+        r#"{"content":"text","indexedChars":null,"totalChars":null}"#,
+    ] {
+        let capture = capture_with(&report_fixture(), 4096, &mut |request_path, _| {
+            let mut response = response_fixture(request_path);
+            if request_path == "items/BCDE3456/fulltext" {
+                response.body = body.into();
+            }
+            Ok(response)
+        })
+        .unwrap();
+        assert_eq!(
+            capture.capture_evidence.records[0].content_response.body,
+            body
+        );
+    }
+}
+
+#[test]
+fn byte_and_clock_limits_include_exact_boundary_and_overflow_failures() {
+    let small = response_fixture("items?limit=1");
+    assert!(account_body(&mut 1, &small).is_err());
+    let mut exact_remaining = 2;
+    account_body(&mut exact_remaining, &small).unwrap();
+    assert_eq!(exact_remaining, 0);
+    let oversized = CapturedResponse {
+        status: 404,
+        version: None,
+        body: "x".repeat(MAX_PAGE_BYTES as usize + 1),
+    };
+    assert!(account_body(&mut MAX_SNAPSHOT_BYTES.clone(), &oversized).is_err());
+    assert!(check_admission(0, Duration::ZERO).is_err());
+    assert!(check_admission(1, CAPTURE_DEADLINE).is_err());
+    check_admission(1, CAPTURE_DEADLINE - Duration::from_nanos(1)).unwrap();
+    assert!(unix_millis(UNIX_EPOCH - Duration::from_secs(1)).is_err());
+    assert_eq!(unix_millis(UNIX_EPOCH).unwrap(), 0);
+    let max_time = UNIX_EPOCH
+        .checked_add(Duration::from_secs(u64::MAX / 1000 + 1))
+        .unwrap();
+    assert!(unix_millis(max_time).is_err());
+    let message = FullTextError("fixture static error");
+    assert_eq!(message.to_string(), "fixture static error");
+    assert_eq!(
+        format!("{message:?}"),
+        "FullTextError(\"fixture static error\")"
+    );
+}

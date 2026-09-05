@@ -635,6 +635,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn full_text_mode_requires_two_distinct_artifact_paths() {
+        let report = "/tmp/report.json";
+        let output = "/tmp/full-text.json";
+        assert_eq!(
+            parse_output_request(["--capture-full-text", report, output]),
+            Ok(OutputRequest::FullTextCapture {
+                report: report.into(),
+                output: output.into(),
+            })
+        );
+        assert!(parse_output_request(["--capture-full-text"]).is_err());
+        assert!(parse_output_request(["--capture-full-text", report]).is_err());
+        assert!(parse_output_request(["--capture-full-text", report, report]).is_err());
+        assert!(parse_output_request(["--capture-full-text", report, output, "extra"]).is_err());
+    }
+
+    #[test]
     fn worksheet_mode_is_explicit_and_rejects_ambiguous_arguments() {
         let report = "/tmp/conceptweave-zotero-report.json";
         let worksheet = "/tmp/conceptweave-zotero-worksheet.json";
