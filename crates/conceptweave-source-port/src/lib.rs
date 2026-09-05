@@ -314,6 +314,22 @@ impl ObservationRequest {
         })
     }
 
+    /// Consumes this request after registry authorization and binds the resulting capability to it.
+    ///
+    /// The returned execution envelope is the only request type accepted by [`SourceObservationPort`].
+    /// Unknown registry keys therefore fail before an adapter can receive the request, while
+    /// credential material remains outside this contract.
+    pub fn authorize(
+        self,
+        registry: &dyn SourceConnectionRegistry,
+    ) -> Result<AuthorizedObservationRequest, ObservationRequestError> {
+        let source_connection = self.resolve_source_connection(registry)?;
+        Ok(AuthorizedObservationRequest {
+            request: self,
+            source_connection,
+        })
+    }
+
     /// Returns exact authorized schema identifiers in deterministic lexical order.
     #[must_use]
     pub fn allowed_schema_names(&self) -> &[String] {
@@ -330,6 +346,31 @@ impl ObservationRequest {
     #[must_use]
     pub const fn limits(&self) -> ObservationLimits {
         self.limits
+    }
+}
+
+/// Registry-authorized request envelope accepted by a concrete source adapter.
+///
+/// This value can only be created by [`ObservationRequest::authorize`], which binds the exact
+/// request to the opaque [`ResolvedSourceConnection`] issued by the authorized registry. It carries
+/// no connection string, credential, token, or provider-specific connection object.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AuthorizedObservationRequest {
+    request: ObservationRequest,
+    source_connection: ResolvedSourceConnection,
+}
+
+impl AuthorizedObservationRequest {
+    /// Returns the validated request metadata and execution budgets bound to this authorization.
+    #[must_use]
+    pub const fn request(&self) -> &ObservationRequest {
+        &self.request
+    }
+
+    /// Returns the opaque authorized source capability used by the adapter ACL.
+    #[must_use]
+    pub const fn source_connection(&self) -> &ResolvedSourceConnection {
+        &self.source_connection
     }
 }
 
@@ -395,20 +436,21 @@ pub enum SourceObservationFailure {
 
 /// Port implemented by a concrete read-only source adapter.
 ///
-/// Implementations must resolve credentials outside this contract, use only read-only source
-/// access, honor the exact schema allowlist, the total operation deadline, and every per-resource
-/// [`ObservationLimits`] bound, check caller cancellation, and return a typed failure rather than a
-/// partial or invented snapshot when captured metadata cannot construct the immutable snapshot.
-/// Implementations own their scheduling model; blocking database work must not be performed on an
-/// asynchronous web executor thread.
+/// Implementations receive only a registry-authorized request, resolve credentials from its opaque
+/// source capability inside the adapter ACL, use only read-only source access, honor the exact
+/// schema allowlist, the total operation deadline, and every per-resource [`ObservationLimits`]
+/// bound, check caller cancellation, and return a typed failure rather than a partial or invented
+/// snapshot when captured metadata cannot construct the immutable snapshot. Implementations own
+/// their scheduling model; blocking database work must not be performed on an asynchronous web
+/// executor thread.
 pub trait SourceObservationPort {
     /// Immutable snapshot type produced only after a complete bounded observation.
     type Snapshot;
 
-    /// Executes one bounded observation against an implementation-owned source adapter.
+    /// Executes one bounded observation after registry authorization has issued the source capability.
     fn observe(
         &self,
-        request: &ObservationRequest,
+        request: &AuthorizedObservationRequest,
         cancellation: &dyn ObservationCancellation,
     ) -> Result<Self::Snapshot, SourceObservationFailure>;
 }
