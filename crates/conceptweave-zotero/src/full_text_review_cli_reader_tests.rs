@@ -31,6 +31,9 @@ fn capture_reader_rejects_advertised_oversize_growth_and_shrink() {
         assert_eq!(error.kind(), io::ErrorKind::InvalidData);
         assert_eq!(error.to_string(), expected);
     }
+    let mut stream = io::Cursor::new(b"{}                ");
+    assert!(read_bounded_capture::<serde_json::Value>(&mut stream, 4, 4).is_err());
+    assert_eq!(stream.position(), 5);
 }
 
 #[test]
@@ -60,10 +63,9 @@ fn private_capture_reader_reuses_regular_owner_only_file_boundary() {
     let file_path = tests::unique_temp_path("streaming-capture-reader");
     let file = create_report_file(&file_path).unwrap();
     drop(file);
-    let error = match read_private_capture(file_path.to_str().unwrap()) {
-        Ok(_) => panic!("empty capture must be rejected"),
-        Err(error) => error,
-    };
+    let error = read_private_capture(file_path.to_str().unwrap())
+        .err()
+        .unwrap();
     assert_eq!(error.to_string(), "full-text capture input is invalid");
     fs::remove_file(file_path).unwrap();
 }
