@@ -633,9 +633,7 @@ mod tests {
         let created = output.exists();
         let preserved = fs::read(&existing).unwrap();
         // Clean synthetic artifacts even when the RED implementation creates the file.
-        if created {
-            fs::remove_file(output).unwrap();
-        }
+        let _ = fs::remove_file(output);
         fs::remove_file(existing).unwrap();
         assert!(
             !created,
