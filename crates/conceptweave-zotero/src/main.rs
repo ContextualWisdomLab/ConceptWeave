@@ -1164,7 +1164,7 @@ mod tests {
 
         let valid = unique_temp_path("valid-input");
         let _ = fs::remove_file(&valid);
-        fs::write(&valid, br#"{\"accepted\":true}"#).unwrap();
+        fs::write(&valid, br#"{"accepted":true}"#).unwrap();
         fs::set_permissions(&valid, fs::Permissions::from_mode(0o600)).unwrap();
 
         fs::set_permissions(&valid, fs::Permissions::from_mode(0o000)).unwrap();
