@@ -773,6 +773,7 @@ impl Zotero10LocalAdapter {
 
 fn local_agent() -> ureq::Agent {
     let config = ureq::Agent::config_builder()
+        .proxy(None)
         .timeout_global(Some(Duration::from_secs(30)))
         .timeout_connect(Some(Duration::from_secs(2)))
         .timeout_recv_response(Some(Duration::from_secs(10)))
@@ -2732,6 +2733,7 @@ struct FetchedPage {
 /// ureq transport shim is excluded from deterministic coverage.
 pub fn read_local_snapshot() -> Result<ClassificationReport, ReadError> {
     let config = ureq::Agent::config_builder()
+        .proxy(None)
         .timeout_global(Some(Duration::from_secs(60)))
         .timeout_connect(Some(Duration::from_secs(2)))
         .timeout_recv_response(Some(Duration::from_secs(10)))
@@ -3263,6 +3265,8 @@ fn normalize_title(value: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    mod proxy_isolation;
+
     use super::*;
     use std::io::{Read, Write};
     use std::net::TcpListener;
