@@ -17,6 +17,7 @@ fn classification_report(version: &str) -> conceptweave_zotero::ClassificationRe
         42,
         vec![
             ZoteroItem {
+                source_record: None,
                 key: "B".into(),
                 version: 9,
                 data: ItemData {
@@ -30,6 +31,7 @@ fn classification_report(version: &str) -> conceptweave_zotero::ClassificationRe
                 },
             },
             ZoteroItem {
+                source_record: None,
                 key: "A".into(),
                 version: 7,
                 data: ItemData {
@@ -262,6 +264,7 @@ fn write_plan_fails_closed_for_untrusted_stale_or_unsafe_changes() {
         None,
         42,
         vec![ZoteroItem {
+            source_record: None,
             key: "A".into(),
             version: 7,
             data: ItemData {
