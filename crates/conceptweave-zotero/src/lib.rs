@@ -34,8 +34,9 @@ pub struct ZoteroItem {
     pub data: ItemData,
     /// Complete original JSON object, captured automatically during deserialization.
     ///
-    /// Offline callers constructing synthetic typed items use `None`; their typed
-    /// representation is hashed instead. Provider records retain omitted fields,
+    /// Offline callers constructing synthetic typed items use `None`. The digest
+    /// binds this source value together with the actual typed classifier input,
+    /// so later projection changes also invalidate the receipt. It retains omitted fields,
     /// unknown metadata, nested objects, and array order exactly as observed.
     #[serde(skip)]
     pub source_record: Option<serde_json::Value>,
@@ -693,12 +694,7 @@ pub fn classify_snapshot(
         .collect();
     let snapshot_records: Vec<_> = items
         .iter()
-        .map(|item| {
-            item.source_record.clone().unwrap_or_else(|| {
-                serde_json::to_value(item)
-                    .expect("synthetic Zotero items contain only JSON-compatible values")
-            })
-        })
+        .map(|item| (&item.source_record, item))
         .collect();
     let snapshot_bytes = serde_json::to_vec(&snapshot_records)
         .expect("Zotero snapshot items contain only JSON-compatible values");
