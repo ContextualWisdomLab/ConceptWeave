@@ -7,20 +7,20 @@
 
 ## Problem
 
-ConceptWeave must observe relational metadata without turning connectivity into hidden coupling. The canonical boundary has to prevent unauthorized source access, out-of-scope schema evidence, unbounded request metadata, caller-controlled snapshot identity, partial-success evidence, hidden blocking bridges, and a timeout policy that restarts after authorization.
+ConceptWeave must observe relational metadata without turning connectivity into hidden coupling. The canonical boundary has to prevent unauthorized source access, caller-self-authorized schema scope, out-of-scope schema evidence, unbounded request metadata, caller-controlled snapshot identity, partial-success evidence, hidden blocking bridges, and a timeout policy that restarts after authorization.
 
-The concrete PostgreSQL adapter is asynchronous. The port therefore needs an awaitable execution seam, but request admission and source authorization must remain provider-independent. The operation timeout is also end-to-end: registry authorization, connection, transaction, catalog queries, cancellation cleanup, and immutable snapshot construction may not each start a fresh copy of the same duration.
+The concrete PostgreSQL adapter is asynchronous. The port therefore needs an awaitable execution seam, but request admission and source authorization must remain provider-independent. The operation timeout is also end-to-end: source-key authorization, exact-schema-scope authorization, connection, transaction, catalog queries, cancellation cleanup, and immutable snapshot construction may not each start a fresh copy of the same duration.
 
 ## Constraints
 
 - Source systems are read-only inputs; ConceptWeave does not own their business truth.
 - Raw DSNs, URLs, credentials, tokens, provider connection objects, and arbitrary SQL callbacks do not cross the port/domain boundary.
 - A source key is a bounded opaque multiword `snake_case` registry identifier; syntax is not authority.
-- `SourceConnectionRegistry` is an application-owned local authorization boundary. Remote credential/network work belongs in the adapter ACL after authorization.
+- `SourceConnectionRegistry` is an application-owned local authorization boundary. It must explicitly authorize both the exact source key and the exact requested schema scope; source recognition alone defaults to deny for schema scope. Remote credential/network work belongs in the adapter ACL after authorization.
 - Every request carries a non-empty exact-schema allowlist, an explicit schema-count/UTF-8-byte admission budget, and positive operation/statement/row/byte/concurrency bounds.
 - Request metadata is rejected before registry/database access when it exceeds policy.
 - The canonical immutable snapshot constructor retains the complete authorization envelope and rejects any locally observed table schema absent from the request's exact allowlist before digest or receipt issuance.
-- Exact source identifiers retain source spelling. Ordering may be canonicalized; names are never normalized or truncated for convenience.
+- Exact source identifiers retain source spelling. Ordering may be canonicalized; names are never normalized or truncated for convenience or authorization broadening.
 - Caller cancellation, source disappearance, malformed captures, timeout, and resource exhaustion fail closed and never create a partial immutable snapshot.
 - Snapshot content identity is computed by Source Observation from complete owned observed metadata; caller digest syntax is not content authority.
 - Registry identity, extractor revision, observation time, and evidence location are provenance coordinates, not source-content bytes.
@@ -36,6 +36,10 @@ Rejected. It hides scheduling policy in the adapter, risks nested-runtime behavi
 
 Rejected. A syntactically valid registry key is not proof that the caller is authorized to observe that source.
 
+### Source-only registry authorization plus caller-selected schema allowlist
+
+Rejected. Recognizing an opaque source key does not prove that the caller may widen its own schema scope. Snapshot-side containment only proves that returned tables are within the caller-selected list; without a policy decision over that list, a broadly credentialed source key can turn selection metadata into an application ACL grant.
+
 ### Snapshot constructor accepts only `ResolvedSourceConnection`
 
 Rejected. Source resolution proves the opaque source key but does not carry the request's exact schema scope. That shape allowed canonical snapshots and receipts to be created for locally observed schemas outside the authorization request.
@@ -48,25 +52,27 @@ Rejected. An adapter entering after slow authorization cannot distinguish a near
 
 Rejected. Wall-clock provenance is unnecessary for resource enforcement, adds serialization/clock-domain ambiguity, and leaks execution mechanics into the domain seam.
 
-### Provider-independent authorized envelope with a private monotonic start coordinate
+### Provider-independent authorized envelope with local source+schema policy and a private monotonic start coordinate
 
-Selected. Authorization begins one monotonic operation budget before the registry lookup. The authorized envelope privately retains that coordinate and exposes only the remaining `Duration` to adapter code.
+Selected. Authorization begins one monotonic operation budget before local registry policy work. The registry first resolves the exact source key and separately authorizes the exact requested schema scope. The schema-scope method defaults to deny, so key-only registries cannot silently grant arbitrary schemas. The authorized envelope privately retains the operation start coordinate and exposes only the remaining `Duration` to adapter code.
 
 ## Decision
 
-`ObservationRequest` validates a bounded opaque source key, exact schema allowlist, `ObservationRequestBudget`, and `ObservationLimits`. `ObservationRequest::authorize` starts the operation's monotonic budget before the local `SourceConnectionRegistry` lookup. The lookup result is captured first; if elapsed time has exhausted `operation_timeout_ms`, authorization returns `ObservationRequestError::OperationTimeout` before propagating the registry result or admitting an adapter. This gives timeout precedence to an exhausted authorization step and preserves zero adapter/source/snapshot side effects.
+`ObservationRequest` validates a bounded opaque source key, exact schema allowlist, `ObservationRequestBudget`, and `ObservationLimits`. `ObservationRequest::authorize` starts the operation's monotonic budget before local registry policy. It first resolves the exact key through `SourceConnectionRegistry::contains_source_connection`. If the source exists, the same registry receives the exact sorted `allowed_schema_names` through `authorizes_schema_scope`. The default schema-scope implementation is fail-closed. A source that exists but whose requested scope is not explicitly authorized returns `ObservationRequestError::UnauthorizedSchemaScope`; the denial does not echo the schema. No case or Unicode normalization may broaden the grant.
 
-A successful authorization returns `AuthorizedObservationRequest`, which binds the validated request to `ResolvedSourceConnection` and privately carries the monotonic start coordinate. `remaining_operation_budget() -> Option<Duration>` is the only timing capability exposed to a concrete adapter. `None` means the end-to-end operation budget has expired. The start coordinate itself is not a public field, serialized timestamp, provider object, or credential.
+Both local registry decisions are part of the same operation budget. Their results are captured before the elapsed-time check; if policy work exhausts `operation_timeout_ms`, authorization returns `ObservationRequestError::OperationTimeout` before propagating either policy result or admitting an adapter. This preserves timeout precedence and zero adapter/source/snapshot side effects for over-budget authorization.
+
+A successful authorization returns `AuthorizedObservationRequest`, which binds the validated request to `ResolvedSourceConnection`, preserves the explicitly authorized schema scope in the request, and privately carries the monotonic start coordinate. `remaining_operation_budget() -> Option<Duration>` is the only timing capability exposed to a concrete adapter. `None` means the end-to-end operation budget has expired. The start coordinate itself is not a public field, serialized timestamp, provider object, or credential.
 
 `SourceObservationPort::observe` accepts only `AuthorizedObservationRequest` and returns a provider-independent `Send` future. Request construction remains deterministic. Authorization is synchronous and local but deadline-aware; it is not described as time-independent. A registry implementation that performs remote I/O would violate this boundary: remote credential/network work belongs inside the concrete adapter and must be capped by the remaining budget.
 
-The public `PostgresSchemaSnapshot::new` also accepts the complete `AuthorizedObservationRequest`, rather than the narrower `ResolvedSourceConnection`. Before owner-computed digest construction it compares every locally observed table's exact `schema_name` with `request().allowed_schema_names()` and fails closed when a table lies outside that scope. Matching is exact and case-sensitive; no Unicode/case normalization broadens authorization. A foreign key may retain a referenced schema outside the local read allowlist because that name is relationship metadata observed from an authorized local table, not evidence that ConceptWeave read the referenced table. The private storage model may retain only the resolved source coordinate after this canonical admission check.
+The public `PostgresSchemaSnapshot::new` also accepts the complete `AuthorizedObservationRequest`, rather than the narrower `ResolvedSourceConnection`. Before owner-computed digest construction it compares every locally observed table's exact `schema_name` with `request().allowed_schema_names()` and fails closed when a table lies outside that scope. This is defense in depth after the registry has authorized the scope. Matching is exact and case-sensitive; no Unicode/case normalization broadens authorization. A foreign key may retain a referenced schema outside the local read allowlist because that name is relationship metadata observed from an authorized local table, not evidence that ConceptWeave read the referenced table. The private storage model may retain only the resolved source coordinate after this canonical admission check.
 
 The concrete adapter must read the remaining budget before potentially blocking connection/transaction/statement/cancellation work and cap each stage accordingly. It must not restart `operation_timeout_ms` at `observe`. A caller-side outer timeout may still bound waiting, but it is not a substitute for passing the remaining budget into driver/server limits.
 
 `PostgresSchemaSnapshot` continues to compute its own domain-separated SHA-256 identity from complete exact observed metadata. Provenance coordinates stay separate from source-content identity.
 
-This ADR remains **Proposed**. The port can now represent and preserve the non-resetting budget and canonical schema-scope binding, but no production PostgreSQL adapter or exact-head runtime conformance has yet proved the full decision.
+This ADR remains **Proposed**. The port can now represent source-key authorization, exact schema-scope authorization, non-resetting budget, and canonical snapshot scope binding, but no production PostgreSQL adapter or exact-head runtime conformance has yet proved the full decision.
 
 ## Test and evidence contract
 
@@ -76,28 +82,28 @@ The current Source Observation lineage includes:
 - `b7e54ae2b4fe9bea20d42b2d95e8c25c118a1f5f` → `94927ec3c7763c4b53cbcefd01b510030122d1db`, plus `8ed91afcf520efdd53c9103b332d3e277db29a03`: bounded request metadata and checked byte accumulation;
 - `a372d6729364347315db1ad9a75efc49c779fbb9` → `5caf10b144b8254946e5d80840b0f200c0d36651`: registry-authorized adapter admission;
 - `b2b83c0fdc78af11e3e0df8cf6993216dd9c6004` → `638be096f444fd22755160972285dbb9f0eb0364`: runtime-neutral awaitable source-port seam;
-- `1f8f6a5875072f15325c063aa857c6da8e0accc1`: executable specification for partial and exhausted registry-budget consumption;
-- `2a77a9012ef2b8323fe61ed3ba9986ee8ecae6b0`: private monotonic coordinate and remaining-budget API;
-- `82222c194e974df8f24527ab3e9b0eb579823d2d`: timeout-precedence specification for a slow denied registry lookup;
-- `235a892e8a6bd77ac5f33136980eb1fd14f30eaa`: timeout-precedence production repair;
-- `1204b35376d739c123668c9eb92868eef1992bb7`: immediate static correction of an accidental enum-variant spelling regression in the preceding commit;
-- `1f4fd1a8b969584584d77eb7c440a9b7958aeeac`: executable regression specifying that a `public`-only authorization cannot produce an `audit` snapshot;
-- `aa087e3154f01a9c914c9533e1ffe703a79e428b`: canonical snapshot constructor repair binding immutable evidence to `AuthorizedObservationRequest` and exact local schema scope;
-- `e49973f538d9d2afacac2db77029b528ee39e221` → `3b7e4553564627de527d2460e3e23d3beab58230`: test-fixture propagation preserving explicit authorization envelopes and the negative scope regression.
+- `1f8f6a5875072f15325c063aa857c6da8e0accc1` → `2a77a9012ef2b8323fe61ed3ba9986ee8ecae6b0` → `82222c194e974df8f24527ab3e9b0eb579823d2d` → `235a892e8a6bd77ac5f33136980eb1fd14f30eaa` → `1204b35376d739c123668c9eb92868eef1992bb7`: remaining-operation-budget preservation and timeout precedence;
+- `1f4fd1a8b969584584d77eb7c440a9b7958aeeac` → `aa087e3154f01a9c914c9533e1ffe703a79e428b`, with fixture propagation through `3b7e4553564627de527d2460e3e23d3beab58230`: canonical snapshot exact-schema containment;
+- review `5122942377`: source-only registry authorization was shown to leave the schema list caller-self-authorized;
+- `fd00dab3335156ebc849697013de693aab7592d9`: executable regression specifying that a source-only registry must not authorize arbitrary `restricted_finance` scope;
+- `320ab7c8a80faa23515a158598296c898f1f5822`: fail-closed registry schema-scope policy, explicit positive fixture grants, and source/scope authorization binding.
 
-The remaining-budget and schema-scope tests are committed executable specifications, not claimed observed RED→GREEN. The current execution environment has no Rust toolchain, and exact-head GitHub Product/Rust/coverage/rustdoc evidence is still required.
+The schema-scope regression and repair are committed executable specifications, not claimed observed RED→GREEN. The current execution environment has no Rust toolchain, and exact-head GitHub Product/Rust/coverage/rustdoc evidence is still required.
 
 Required runtime acceptance before ADR status can become Accepted:
 
-1. A registry lookup that consumes part of the operation budget leaves the adapter only the remainder.
-2. A registry lookup that exhausts the budget returns `OperationTimeout` before adapter/source/snapshot side effects, including the denied-key case.
-3. A request authorized only for one exact local schema cannot construct an immutable snapshot or receipt containing a different local schema; explicitly authorized multi-schema capture remains valid without case/Unicode normalization.
-4. Connection, `REPEATABLE READ READ ONLY` transaction, every catalog statement, cancellation cleanup, and immutable snapshot construction are capped by the same non-resetting remaining budget.
-5. Unknown keys, cancellation, source disappearance, malformed/partial metadata, and row/byte/concurrency exhaustion remain typed fail-closed outcomes.
-6. Exact-head tests, strict Clippy/fmt/rustdoc, release build, owned coverage, security/dependency gates, and independent review are terminally valid.
+1. A registry that recognizes an exact source key but does not explicitly authorize the requested schema scope returns `UnauthorizedSchemaScope` before adapter/source/snapshot side effects; a valid exact source+schema control reaches the adapter once.
+2. Exact schema authorization is case-sensitive and normalization-free; a differently cased or Unicode-normalized identifier is not implicitly granted.
+3. A registry lookup that consumes part of the operation budget leaves the adapter only the remainder.
+4. Registry policy that exhausts the budget returns `OperationTimeout` before adapter/source/snapshot side effects, including denied-source or denied-scope cases.
+5. A request authorized only for one exact local schema cannot construct an immutable snapshot or receipt containing a different local schema; explicitly authorized multi-schema capture remains valid without case/Unicode normalization.
+6. Connection, `REPEATABLE READ READ ONLY` transaction, every catalog statement, cancellation cleanup, and immutable snapshot construction are capped by the same non-resetting remaining budget.
+7. Unknown keys, cancellation, source disappearance, malformed/partial metadata, and row/byte/concurrency exhaustion remain typed fail-closed outcomes.
+8. Exact-head tests, strict Clippy/fmt/rustdoc, release build, owned coverage, security/dependency gates, and independent review are terminally valid.
 
 ## Risks and mitigations
 
+- **Source-only authorization accidentally broadens schema scope:** schema-scope authorization defaults to deny and must be explicitly implemented by the registry. Snapshot construction independently rejects local table schemas outside the authorized request as defense in depth.
 - **Synchronous registry hangs:** the registry boundary is deliberately local and bounded; remote work is prohibited there. Runtime integration must keep that implementation property explicit and test it rather than silently using a network registry.
 - **Deadline reset in adapter:** adapter conformance must use `remaining_operation_budget()` at each blocking stage; the original configured duration is a ceiling, not a fresh per-stage allowance.
 - **Timing-coordinate leakage:** only remaining `Duration` is part of the adapter-facing API; no wall-clock timestamp or credential is carried.
@@ -108,7 +114,7 @@ Required runtime acceptance before ADR status can become Accepted:
 
 ## Effects
 
-The Context Map is caller/application → bounded request admission → local registry authorization + shared monotonic budget → authorized awaitable execution envelope → concrete read-only source adapter → authorization-bound immutable Source Observation facts/receipts. Semantic Discovery consumes completed observations only. Governance & Publication gains no source-execution authority.
+The Context Map is caller/application → bounded request admission → local registry source+exact-schema authorization + shared monotonic budget → authorized awaitable execution envelope → concrete read-only source adapter → authorization-bound immutable Source Observation facts/receipts. Semantic Discovery consumes completed observations only. Governance & Publication gains no source-execution authority.
 
 ## References
 
