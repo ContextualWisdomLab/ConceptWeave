@@ -444,6 +444,71 @@ fn full_text_worksheet_starts_blank_without_a_metadata_downcast() {
 }
 
 #[test]
+fn bound_review_view_reserves_space_for_every_valid_decision() {
+    let report = report_fixture();
+    let metadata = build_steward_review_worksheet(&report).unwrap();
+    let make_capture = |text: String| {
+        capture_with(&report, MAX_SNAPSHOT_BYTES, &mut |request_path, _| {
+            let mut response = response_fixture(request_path);
+            if request_path == "items/BCDE3456/fulltext" {
+                response.body = serde_json::json!({"content":text}).to_string();
+            }
+            Ok(response)
+        })
+        .unwrap()
+    };
+    let empty = make_capture(String::new());
+    let base_bytes = build_full_text_review_json(&report, &metadata, &empty, 1)
+        .unwrap()
+        .len();
+    let max_bytes = 16 * 1024 * 1024;
+    let full_size = max_bytes - base_bytes;
+    let full_capture = make_capture(format!(
+        "{}{}",
+        "\"".repeat(full_size / 4),
+        "a".repeat(full_size % 4)
+    ));
+    assert_eq!(
+        build_full_text_review_json(&report, &metadata, &full_capture, 1)
+            .unwrap()
+            .len(),
+        max_bytes
+    );
+    let worksheet = build_full_text_review_worksheet(&report, &full_capture).unwrap();
+    assert!(build_bound_full_text_review_json(&report, &worksheet, &full_capture, 1).is_err());
+
+    let growth = serde_json::to_vec(&crate::Disposition::SemanticConsumptionBridge)
+        .unwrap()
+        .len()
+        - 4;
+    let admitted_size = full_size - growth;
+    let capture = make_capture(format!(
+        "{}{}",
+        "\"".repeat(admitted_size / 4),
+        "a".repeat(admitted_size % 4)
+    ));
+    let worksheet = build_full_text_review_worksheet(&report, &capture).unwrap();
+    let bytes = build_bound_full_text_review_json(&report, &worksheet, &capture, 1).unwrap();
+    assert_eq!(bytes.len() + growth, max_bytes);
+    for disposition in [
+        crate::Disposition::Generation,
+        crate::Disposition::AlignmentVersioning,
+        crate::Disposition::SemanticConsumptionBridge,
+        crate::Disposition::EvaluationGovernance,
+        crate::Disposition::AdjacentEvidence,
+        crate::Disposition::OutOfScope,
+    ] {
+        assert!(serde_json::to_vec(&disposition).unwrap().len() - 4 <= growth);
+    }
+    let mut view: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    view["review_batch"]["decisions"][0]["reviewed_disposition"] =
+        serde_json::json!(crate::Disposition::SemanticConsumptionBridge);
+    let completed = serde_json::to_vec(&view).unwrap();
+    assert_eq!(completed.len(), max_bytes);
+    assert!(apply_full_text_review_view(&report, &worksheet, &capture, &completed).is_ok());
+}
+
+#[test]
 fn review_view_binds_exact_capture_and_keeps_missing_parents_without_decisions() {
     let report = report_fixture();
     let worksheet = build_steward_review_worksheet(&report).unwrap();
