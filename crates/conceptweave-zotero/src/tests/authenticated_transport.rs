@@ -6,6 +6,30 @@ const PROXY_CHILD_CASE: &str = "CONCEPTWEAVE_AUTHENTICATED_PROXY_CASE";
 const SYNTHETIC_API_KEY: &str = "0123456789abcdef0123456789abcdef";
 
 #[test]
+fn synthetic_server_retains_headers_and_body_larger_than_its_read_buffer() {
+    let response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+    let (base, server) = serve(vec![response]);
+    let address = base
+        .strip_prefix("http://")
+        .unwrap()
+        .split_once('/')
+        .unwrap()
+        .0;
+    let mut connection = std::net::TcpStream::connect(address).unwrap();
+    // Both sections exceed the 4 KiB read buffer regardless of TCP packet timing.
+    let request = format!(
+        "POST /api/users/0/items HTTP/1.1\r\nHost: localhost\r\nX-Synthetic-Padding: {}\r\nContent-Length: 8192\r\n\r\n{}",
+        "h".repeat(8192),
+        "b".repeat(8192)
+    );
+    connection.write_all(request.as_bytes()).unwrap();
+    let mut received_response = String::new();
+    connection.read_to_string(&mut received_response).unwrap();
+    assert_eq!(received_response, response);
+    assert_eq!(server.join().unwrap(), [request]);
+}
+
+#[test]
 fn authenticated_calls_never_use_environment_proxies() {
     let mut failures = Vec::new();
     for request_kind in ["read", "write"] {
