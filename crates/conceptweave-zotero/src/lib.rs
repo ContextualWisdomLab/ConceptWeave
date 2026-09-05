@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
+use std::io::Read;
 use std::time::Duration;
 
 mod full_text_capture;
@@ -834,12 +835,27 @@ fn bounded_body_with_limit(
     response: &mut ureq::http::Response<ureq::Body>,
     limit: u64,
 ) -> Result<String, ZoteroTransportError> {
+    read_bounded_response_text(response, limit).map_err(|_| ZoteroTransportError::InvalidResponse)
+}
+
+/// Reads strict UTF-8 with an inclusive byte limit and one byte of overrun evidence.
+fn read_bounded_response_text(
+    response: &mut ureq::http::Response<ureq::Body>,
+    limit: u64,
+) -> std::io::Result<String> {
+    let mut body = String::new();
     response
         .body_mut()
-        .with_config()
-        .limit(limit)
-        .read_to_string()
-        .map_err(|_| ZoteroTransportError::InvalidResponse)
+        .as_reader()
+        .take(limit.saturating_add(1))
+        .read_to_string(&mut body)?;
+    if body.len() as u64 > limit {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "response body exceeds byte limit",
+        ));
+    }
+    Ok(body)
 }
 
 fn validate_item_key(item_key: &str) -> Result<(), ZoteroTransportError> {
@@ -2783,11 +2799,7 @@ fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, Re
     let schema_version = header_u64(headers, "Zotero-Schema-Version")?;
     let server_id = optional_header(headers, "Zotero-Server-ID");
 
-    let body = response
-        .body_mut()
-        .with_config()
-        .limit(MAX_PAGE_BYTES)
-        .read_to_string()
+    let body = read_bounded_response_text(&mut response, MAX_PAGE_BYTES)
         .map_err(|error| ReadError::Body(error.to_string()))?;
     let body_bytes = u64::try_from(body.len()).map_err(|_| ReadError::Budget("byte-count"))?;
     let items = serde_json::from_str(&body).map_err(ReadError::Json)?;
