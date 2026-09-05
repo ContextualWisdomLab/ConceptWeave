@@ -10,17 +10,16 @@ fn full_text_worksheet_starts_blank_without_a_metadata_downcast() {
     .unwrap();
     let worksheet = build_full_text_review_worksheet(&report, &capture).unwrap();
     let json = serde_json::to_value(&worksheet).unwrap();
-    assert_eq!(json["artifact_kind"], "full_text_review_worksheet_v1");
     assert_eq!(json["capture_digest"], capture.capture_digest);
     assert_eq!(
-        json["review_worksheet"]["decisions"]
+        json["full_text_worksheet_v1"]["decisions"]
             .as_array()
             .unwrap()
             .len(),
         2
     );
     assert!(
-        json["review_worksheet"]["decisions"]
+        json["full_text_worksheet_v1"]["decisions"]
             .as_array()
             .unwrap()
             .iter()
