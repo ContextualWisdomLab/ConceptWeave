@@ -4,7 +4,7 @@ use serde::de::{DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use serde_json::{Map, Value};
 use std::fmt;
 
-const MAX_REVIEW_JSON_BYTES: usize = 16 * 1024 * 1024;
+pub(super) const MAX_REVIEW_JSON_BYTES: usize = 16 * 1024 * 1024;
 const INVALID_REVIEW_JSON: &str = "review JSON is invalid";
 
 /// Parses one complete review value without accepting ambiguous object keys.

@@ -56,6 +56,8 @@ pub fn build_full_text_review_worksheet(
 }
 
 /// Shows the next pending rows only after revalidating the worksheet's capture.
+/// Reserves room for the longest v1 decision so compact completed JSON still fits
+/// the 16 MiB input limit. Extra formatting whitespace is not reserved.
 pub fn build_bound_full_text_review_json(
     report: &ClassificationReport,
     worksheet: &FullTextReviewWorksheet,
@@ -63,7 +65,26 @@ pub fn build_bound_full_text_review_json(
     limit: usize,
 ) -> Result<Vec<u8>, FullTextError> {
     validate_review_capture(report, capture, &worksheet.capture_digest)?;
-    build_full_text_review_json(report, &worksheet.review_worksheet, capture, limit)
+    let bytes = build_full_text_review_json(report, &worksheet.review_worksheet, capture, limit)?;
+    let editable_count = worksheet
+        .review_worksheet
+        .decisions
+        .iter()
+        .filter(|decision| decision.reviewed_disposition.is_none())
+        .take(limit)
+        .count();
+    // The v1 disposition contract's longest label; all valid labels are checked
+    // by the generation -> edit -> admission boundary regression.
+    let maximum_growth = serde_json::to_vec(&crate::Disposition::SemanticConsumptionBridge)
+        .expect("review dispositions are JSON-compatible")
+        .len()
+        - b"null".len();
+    if bytes.len() + editable_count * maximum_growth > unique_review_json::MAX_REVIEW_JSON_BYTES {
+        return Err(FullTextError(
+            "full-text review exceeds the 16 MiB limit including decisions",
+        ));
+    }
+    Ok(bytes)
 }
 
 /// Applies only completed decision slots in an otherwise unchanged evidence view.
