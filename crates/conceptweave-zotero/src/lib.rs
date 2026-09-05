@@ -1259,6 +1259,71 @@ pub struct GoldenSetApproval {
     pub snapshot_items: Vec<SnapshotItemRevision>,
 }
 
+/// Converts a fully decided local worksheet into the input for approval verification.
+///
+/// The supplied approval must already bind the current complete proposal records.
+/// This function validates that binding without creating or renewing authority.
+pub fn reviewed_golden_set_from_worksheet(
+    report: &ClassificationReport,
+    worksheet: &StewardReviewWorksheet,
+    approval: GoldenSetApproval,
+) -> Result<ReviewedGoldenSet, EvaluationError> {
+    let expected =
+        build_steward_review_worksheet(report).map_err(|_| EvaluationError::InvalidReview)?;
+    if worksheet.decisions.len() != expected.decisions.len() {
+        return Err(EvaluationError::IncompleteReview);
+    }
+    if approval.receipt_id.trim().is_empty()
+        || approval.reviewer_subject.trim().is_empty()
+        || approval.proposal_digest.trim().is_empty()
+        || worksheet.rule_revision.trim().is_empty()
+        || worksheet.snapshot_digest.trim().is_empty()
+    {
+        return Err(EvaluationError::InvalidReview);
+    }
+    if approval.library_version != worksheet.library_version
+        || approval.rule_revision != worksheet.rule_revision
+        || approval.snapshot_digest != worksheet.snapshot_digest
+        || approval.proposal_digest != classification_proposal_digest(report)
+        || approval.snapshot_items != worksheet.snapshot_items
+    {
+        return Err(EvaluationError::SnapshotMismatch);
+    }
+    if worksheet.library_version != expected.library_version
+        || worksheet.rule_revision != expected.rule_revision
+        || worksheet.snapshot_digest != expected.snapshot_digest
+        || worksheet.snapshot_items != expected.snapshot_items
+    {
+        return Err(EvaluationError::SnapshotMismatch);
+    }
+
+    let mut labels = Vec::with_capacity(worksheet.decisions.len());
+    for (decision, expected_decision) in worksheet.decisions.iter().zip(expected.decisions) {
+        if decision.item_key != expected_decision.item_key
+            || decision.item_version != expected_decision.item_version
+            || decision.proposed_disposition != expected_decision.proposed_disposition
+            || decision.abstention_reason != expected_decision.abstention_reason
+        {
+            return Err(EvaluationError::InvalidReview);
+        }
+        let expected_disposition = decision
+            .reviewed_disposition
+            .ok_or(EvaluationError::IncompleteReview)?;
+        if expected_disposition == Disposition::NeedsStewardReview {
+            return Err(EvaluationError::InvalidExpectedDisposition);
+        }
+        labels.push(GoldenLabel::new(
+            decision.item_key.clone(),
+            expected_disposition,
+        ));
+    }
+    if labels.is_empty() {
+        return Err(EvaluationError::IncompleteReview);
+    }
+
+    Ok(ReviewedGoldenSet { approval, labels })
+}
+
 /// Computes the canonical content identity verified by a golden-set approval.
 pub fn classification_snapshot_digest(report: &ClassificationReport) -> String {
     report.snapshot_digest.clone()
