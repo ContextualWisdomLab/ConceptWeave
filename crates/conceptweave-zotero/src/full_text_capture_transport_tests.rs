@@ -220,6 +220,15 @@ mod tests {
         .unwrap();
         assert_eq!(error.to_string(), "full-text local request failed");
         assert!(!format!("{error:?}").contains("BCDE3456"));
+
+        let (api_root, server) = serve_responses(vec![wire_response(200, Some("2"), b"[]")]);
+        let mut report = report_fixture();
+        report.schema_version = None;
+        assert_eq!(
+            fetch_response(&local_agent(), &report, &api_root, "items?limit=1", 128).err(),
+            Some(INVALID_EVIDENCE)
+        );
+        assert_eq!(server.join().unwrap().len(), 1);
     }
 
     #[test]
