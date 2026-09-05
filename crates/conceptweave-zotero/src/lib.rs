@@ -13,6 +13,7 @@ use std::time::Duration;
 pub const RULE_REVISION: &str = "ontology-research-v2";
 
 const SUPPORTED_API_VERSION: u64 = 3;
+const SNAPSHOT_DIGEST_DOMAIN: &str = "conceptweave-zotero-snapshot-v2";
 const SUPPORTED_API_VERSION_HEADER: &str = "3";
 const PAGE_LIMIT: usize = 100;
 const MAX_PAGE_BYTES: u64 = 8 * 1024 * 1024;
@@ -696,7 +697,7 @@ pub fn classify_snapshot(
         .iter()
         .map(|item| (&item.source_record, item))
         .collect();
-    let snapshot_bytes = serde_json::to_vec(&snapshot_records)
+    let snapshot_bytes = serde_json::to_vec(&(SNAPSHOT_DIGEST_DOMAIN, snapshot_records))
         .expect("Zotero snapshot items contain only JSON-compatible values");
     let snapshot_digest = format!("sha256:{:x}", Sha256::digest(snapshot_bytes));
     let children = child_index(&items);
