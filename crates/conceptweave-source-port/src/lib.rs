@@ -6,7 +6,7 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, future::Future};
 
 const MAX_SOURCE_CONNECTION_KEY_BYTES: usize = 128;
 
@@ -403,7 +403,10 @@ fn is_valid_source_connection_key(value: &str) -> bool {
 }
 
 /// Caller-owned cooperative cancellation signal passed across the Source Observation port.
-pub trait ObservationCancellation {
+///
+/// The signal is shareable across an await point so a concrete asynchronous adapter can expose a
+/// `Send` observation future without weakening cancellation semantics.
+pub trait ObservationCancellation: Sync {
     /// Returns `true` once the caller has cancelled the observation.
     fn is_cancelled(&self) -> bool;
 }
@@ -446,16 +449,16 @@ pub enum SourceObservationFailure {
 /// [`ObservationLimits`] bound, check caller cancellation, and return a typed failure rather than a
 /// partial or invented snapshot when captured metadata cannot construct the immutable snapshot.
 /// The surrounding operation runtime is responsible for including pre-adapter registry authorization
-/// in the same total deadline. Implementations own their scheduling model; blocking database work
-/// must not be performed on an asynchronous web executor thread.
-pub trait SourceObservationPort {
+/// in the same total deadline. Observation execution is awaitable so asynchronous database clients
+/// do not need to hide a nested executor or block an asynchronous web executor thread.
+pub trait SourceObservationPort: Sync {
     /// Immutable snapshot type produced only after a complete bounded observation.
     type Snapshot;
 
-    /// Executes one bounded observation after registry authorization has issued the source capability.
-    fn observe(
-        &self,
-        request: &AuthorizedObservationRequest,
-        cancellation: &dyn ObservationCancellation,
-    ) -> Result<Self::Snapshot, SourceObservationFailure>;
+    /// Executes one bounded asynchronous observation after registry authorization has issued the source capability.
+    fn observe<'a>(
+        &'a self,
+        request: &'a AuthorizedObservationRequest,
+        cancellation: &'a dyn ObservationCancellation,
+    ) -> impl Future<Output = Result<Self::Snapshot, SourceObservationFailure>> + Send + 'a;
 }
