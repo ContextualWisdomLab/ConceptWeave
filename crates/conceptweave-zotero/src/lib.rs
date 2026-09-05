@@ -24,7 +24,7 @@ const LOCAL_API: &str = "http://127.0.0.1:23119/api/users/0/items";
 static TEST_LOCAL_API: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 
 /// A Zotero item returned by the Local API.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ZoteroItem {
     /// Stable item key.
     pub key: String,
@@ -32,9 +32,37 @@ pub struct ZoteroItem {
     pub version: u64,
     /// Item metadata.
     pub data: ItemData,
-    /// Unmodeled provider fields retained in the canonical snapshot digest.
-    #[serde(flatten)]
-    pub additional_fields: BTreeMap<String, serde_json::Value>,
+    /// Complete original JSON object, captured automatically during deserialization.
+    ///
+    /// Offline callers constructing synthetic typed items use `None`; their typed
+    /// representation is hashed instead. Provider records retain omitted fields,
+    /// unknown metadata, nested objects, and array order exactly as observed.
+    #[serde(skip)]
+    pub source_record: Option<serde_json::Value>,
+}
+
+impl<'de> Deserialize<'de> for ZoteroItem {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct ItemProjection {
+            key: String,
+            version: u64,
+            data: ItemData,
+        }
+
+        let source_record = serde_json::Value::deserialize(deserializer)?;
+        let projection =
+            ItemProjection::deserialize(&source_record).map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            key: projection.key,
+            version: projection.version,
+            data: projection.data,
+            source_record: Some(source_record),
+        })
+    }
 }
 
 /// Metadata used by the classifier.
@@ -61,9 +89,6 @@ pub struct ItemData {
     /// Tags applied to the item.
     #[serde(default)]
     pub tags: Vec<ItemTag>,
-    /// Complete provider metadata not needed by the classifier, retained for content binding.
-    #[serde(flatten)]
-    pub additional_fields: BTreeMap<String, serde_json::Value>,
 }
 
 /// A Zotero item tag.
@@ -71,9 +96,6 @@ pub struct ItemData {
 pub struct ItemTag {
     /// Tag text.
     pub tag: String,
-    /// Provider tag metadata retained even when classification uses only the text.
-    #[serde(flatten)]
-    pub additional_fields: BTreeMap<String, serde_json::Value>,
 }
 
 /// One mutually exclusive proposed disposition.
@@ -669,7 +691,16 @@ pub fn classify_snapshot(
             item_version: item.version,
         })
         .collect();
-    let snapshot_bytes = serde_json::to_vec(&items)
+    let snapshot_records: Vec<_> = items
+        .iter()
+        .map(|item| {
+            item.source_record.clone().unwrap_or_else(|| {
+                serde_json::to_value(item)
+                    .expect("synthetic Zotero items contain only JSON-compatible values")
+            })
+        })
+        .collect();
+    let snapshot_bytes = serde_json::to_vec(&snapshot_records)
         .expect("Zotero snapshot items contain only JSON-compatible values");
     let snapshot_digest = format!("sha256:{:x}", Sha256::digest(snapshot_bytes));
     let children = child_index(&items);
@@ -969,9 +1000,8 @@ mod tests {
                 parent_item: parent.into(),
                 collections: vec![],
                 tags: vec![],
-                additional_fields: BTreeMap::new(),
             },
-            additional_fields: BTreeMap::new(),
+            source_record: None,
         }
     }
 
@@ -1156,7 +1186,6 @@ mod tests {
         let mut generation = item("B", "journalArticle", "Ontology Learning", "10.1/X", "");
         generation.data.tags.push(ItemTag {
             tag: "SHACL".into(),
-            additional_fields: BTreeMap::new(),
         });
         let report = classify_snapshot(
             "9.0.6".into(),

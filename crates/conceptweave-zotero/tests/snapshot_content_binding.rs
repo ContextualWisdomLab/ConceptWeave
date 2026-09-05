@@ -15,9 +15,8 @@ fn item(title: &str) -> ZoteroItem {
             parent_item: String::new(),
             collections: vec![],
             tags: vec![],
-            additional_fields: Default::default(),
         },
-        additional_fields: Default::default(),
+        source_record: None,
     }
 }
 
