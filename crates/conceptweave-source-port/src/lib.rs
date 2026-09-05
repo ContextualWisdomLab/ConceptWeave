@@ -261,7 +261,12 @@ impl ObservationRequest {
 
         let mut schema_bytes = 0_usize;
         for schema_name in &allowed_schema_names {
-            schema_bytes = schema_bytes.saturating_add(schema_name.len());
+            let Some(next_schema_bytes) = schema_bytes.checked_add(schema_name.len()) else {
+                return Err(ObservationRequestError::SchemaByteLimitExceeded {
+                    max_schema_bytes: request_budget.max_schema_bytes,
+                });
+            };
+            schema_bytes = next_schema_bytes;
             if schema_bytes > request_budget.max_schema_bytes {
                 return Err(ObservationRequestError::SchemaByteLimitExceeded {
                     max_schema_bytes: request_budget.max_schema_bytes,
