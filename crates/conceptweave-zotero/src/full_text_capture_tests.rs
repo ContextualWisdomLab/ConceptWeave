@@ -371,3 +371,32 @@ fn byte_and_clock_limits_include_exact_boundary_and_overflow_failures() {
         "FullTextError(\"fixture static error\")"
     );
 }
+
+#[test]
+fn replay_applies_byte_admission_before_digest_or_json_work() {
+    let report = report_fixture();
+    let mut capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    capture.capture_evidence.records[1].content_response.body =
+        "x".repeat(MAX_PAGE_BYTES as usize + 1);
+    assert_eq!(
+        verify_full_text_capture(&capture, &report),
+        Err(BUDGET_EXCEEDED)
+    );
+}
+
+#[test]
+fn streaming_digest_preserves_the_existing_exact_json_representation() {
+    let report = report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let bytes = serde_json::to_vec(&capture.capture_evidence).unwrap();
+    assert_eq!(
+        capture.capture_digest,
+        format!("sha256:{:x}", Sha256::digest(bytes))
+    );
+}
