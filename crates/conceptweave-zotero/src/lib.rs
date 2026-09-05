@@ -1263,6 +1263,9 @@ pub struct GoldenSetApproval {
 }
 
 /// Converts a fully decided local worksheet into the input for approval verification.
+///
+/// The supplied approval must already bind the current complete proposal records.
+/// This function validates that binding without creating or renewing authority.
 pub fn reviewed_golden_set_from_worksheet(
     report: &ClassificationReport,
     worksheet: &StewardReviewWorksheet,
@@ -1275,6 +1278,7 @@ pub fn reviewed_golden_set_from_worksheet(
     }
     if approval.receipt_id.trim().is_empty()
         || approval.reviewer_subject.trim().is_empty()
+        || approval.proposal_digest.trim().is_empty()
         || worksheet.rule_revision.trim().is_empty()
         || worksheet.snapshot_digest.trim().is_empty()
     {
@@ -1283,6 +1287,7 @@ pub fn reviewed_golden_set_from_worksheet(
     if approval.library_version != worksheet.library_version
         || approval.rule_revision != worksheet.rule_revision
         || approval.snapshot_digest != worksheet.snapshot_digest
+        || approval.proposal_digest != classification_proposal_digest(report)
         || approval.snapshot_items != worksheet.snapshot_items
     {
         return Err(EvaluationError::SnapshotMismatch);
