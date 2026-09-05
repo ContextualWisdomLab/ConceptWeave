@@ -122,6 +122,57 @@ impl ObservationLimits {
     }
 }
 
+/// Invalid zero-valued authorization-metadata bounds for one observation request.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ObservationRequestBudgetError {
+    /// The maximum number of authorized schema identifiers was zero.
+    ZeroSchemaCountLimit,
+    /// The maximum retained UTF-8 bytes across authorized schema identifiers was zero.
+    ZeroSchemaByteLimit,
+}
+
+/// Caller-selected positive bounds for authorization metadata retained by an observation request.
+///
+/// These bounds are intentionally provider-independent. They limit how much exact schema-selection
+/// metadata ConceptWeave accepts before registry or database access without assuming PostgreSQL's
+/// build-time identifier length or normalizing source spelling.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ObservationRequestBudget {
+    max_schema_count: usize,
+    max_schema_bytes: usize,
+}
+
+impl ObservationRequestBudget {
+    /// Creates explicit positive count and total UTF-8 byte bounds for the exact schema allowlist.
+    pub const fn new(
+        max_schema_count: usize,
+        max_schema_bytes: usize,
+    ) -> Result<Self, ObservationRequestBudgetError> {
+        if max_schema_count == 0 {
+            return Err(ObservationRequestBudgetError::ZeroSchemaCountLimit);
+        }
+        if max_schema_bytes == 0 {
+            return Err(ObservationRequestBudgetError::ZeroSchemaByteLimit);
+        }
+        Ok(Self {
+            max_schema_count,
+            max_schema_bytes,
+        })
+    }
+
+    /// Returns the maximum number of exact schema identifiers the request may retain.
+    #[must_use]
+    pub const fn max_schema_count(&self) -> usize {
+        self.max_schema_count
+    }
+
+    /// Returns the maximum total UTF-8 bytes retained across exact schema identifiers.
+    #[must_use]
+    pub const fn max_schema_bytes(&self) -> usize {
+        self.max_schema_bytes
+    }
+}
+
 /// Invalid source-observation request metadata.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ObservationRequestError {
@@ -131,6 +182,16 @@ pub enum ObservationRequestError {
     UnknownSourceConnectionKey,
     /// No source schema was explicitly authorized for observation.
     EmptySchemaAllowlist,
+    /// The requested schema count exceeded the caller-selected authorization-metadata budget.
+    SchemaCountLimitExceeded {
+        /// Maximum allowed schema count.
+        max_schema_count: usize,
+    },
+    /// The requested schema identifiers exceeded the caller-selected total UTF-8 byte budget.
+    SchemaByteLimitExceeded {
+        /// Maximum allowed total UTF-8 bytes across schema identifiers.
+        max_schema_bytes: usize,
+    },
     /// One authorized source schema identifier was blank.
     InvalidSchemaName,
     /// The exact same source schema identifier was authorized twice.
@@ -166,11 +227,14 @@ impl ResolvedSourceConnection {
 /// boundary. It is deliberately restricted to a bounded, lowercase, multiword `snake_case` key so
 /// DSNs, URLs, shell-style connection parameters, or other credential-bearing connection material
 /// cannot accidentally cross this port as a connection reference. Schema identifiers retain exact
-/// source spelling and are sorted only to make request identity deterministic.
+/// source spelling and are sorted only to make request identity deterministic. Callers must also
+/// provide an explicit provider-independent authorization-metadata budget before the request can be
+/// constructed.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ObservationRequest {
     source_connection_key: String,
     allowed_schema_names: Vec<String>,
+    request_budget: ObservationRequestBudget,
     limits: ObservationLimits,
 }
 
@@ -179,6 +243,7 @@ impl ObservationRequest {
     pub fn new(
         source_connection_key: impl Into<String>,
         mut allowed_schema_names: Vec<String>,
+        request_budget: ObservationRequestBudget,
         limits: ObservationLimits,
     ) -> Result<Self, ObservationRequestError> {
         let source_connection_key = source_connection_key.into();
@@ -187,6 +252,21 @@ impl ObservationRequest {
         }
         if allowed_schema_names.is_empty() {
             return Err(ObservationRequestError::EmptySchemaAllowlist);
+        }
+        if allowed_schema_names.len() > request_budget.max_schema_count {
+            return Err(ObservationRequestError::SchemaCountLimitExceeded {
+                max_schema_count: request_budget.max_schema_count,
+            });
+        }
+
+        let mut schema_bytes = 0_usize;
+        for schema_name in &allowed_schema_names {
+            schema_bytes = schema_bytes.saturating_add(schema_name.len());
+            if schema_bytes > request_budget.max_schema_bytes {
+                return Err(ObservationRequestError::SchemaByteLimitExceeded {
+                    max_schema_bytes: request_budget.max_schema_bytes,
+                });
+            }
         }
 
         let mut seen_schema_names = BTreeSet::new();
@@ -205,6 +285,7 @@ impl ObservationRequest {
         Ok(Self {
             source_connection_key,
             allowed_schema_names,
+            request_budget,
             limits,
         })
     }
@@ -232,6 +313,12 @@ impl ObservationRequest {
     #[must_use]
     pub fn allowed_schema_names(&self) -> &[String] {
         &self.allowed_schema_names
+    }
+
+    /// Returns the authorization-metadata budget applied before registry or database access.
+    #[must_use]
+    pub const fn request_budget(&self) -> ObservationRequestBudget {
+        self.request_budget
     }
 
     /// Returns the execution limits the adapter must enforce for this request.
