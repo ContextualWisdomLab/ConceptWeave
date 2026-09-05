@@ -493,6 +493,7 @@ impl Zotero10LocalAdapter {
             return Err(ZoteroTransportError::InvalidCredentials);
         }
         let config = ureq::Agent::config_builder()
+            .proxy(None)
             .timeout_global(Some(Duration::from_secs(30)))
             .timeout_connect(Some(Duration::from_secs(2)))
             .timeout_recv_response(Some(Duration::from_secs(10)))
@@ -663,11 +664,7 @@ fn version_header(headers: &ureq::http::HeaderMap) -> Result<u64, ZoteroTranspor
 fn bounded_body(
     response: &mut ureq::http::Response<ureq::Body>,
 ) -> Result<String, ZoteroTransportError> {
-    response
-        .body_mut()
-        .with_config()
-        .limit(MAX_ITEM_RESPONSE_BYTES)
-        .read_to_string()
+    read_bounded_response_text(response, MAX_ITEM_RESPONSE_BYTES)
         .map_err(|_| ZoteroTransportError::InvalidResponse)
 }
 
