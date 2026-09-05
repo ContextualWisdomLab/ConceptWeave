@@ -19,6 +19,7 @@ fn plan() -> conceptweave_zotero::ClassificationWritePlan {
         42,
         vec![
             ZoteroItem {
+                source_record: None,
                 key: "A".into(),
                 version: 7,
                 data: ItemData {
@@ -32,6 +33,7 @@ fn plan() -> conceptweave_zotero::ClassificationWritePlan {
                 },
             },
             ZoteroItem {
+                source_record: None,
                 key: "B".into(),
                 version: 9,
                 data: ItemData {
