@@ -265,7 +265,8 @@ fn encode_bool(hasher: &mut Sha256, value: bool) {
 mod internal_model_tests {
     use super::model;
     use conceptweave_source_port::{
-        ObservationLimits, ObservationRequest, ResolvedSourceConnection, SourceConnectionRegistry,
+        ObservationLimits, ObservationRequest, ObservationRequestBudget, ResolvedSourceConnection,
+        SourceConnectionRegistry,
     };
 
     struct ExactRegistry;
@@ -280,6 +281,7 @@ mod internal_model_tests {
         ObservationRequest::new(
             "warehouse_primary",
             vec!["public".to_owned()],
+            ObservationRequestBudget::new(4, 256).unwrap(),
             ObservationLimits::new(1_000, 10, 1_024, 1).unwrap(),
         )
         .unwrap()
