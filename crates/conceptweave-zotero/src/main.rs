@@ -168,7 +168,7 @@ fn validate_opened_identity(
     })
 }
 
-/// Reads JSON without allowing the input to exceed or grow past the artifact limit.
+/// Reads bounded JSON without exposing rejected field names or values in diagnostics.
 fn read_bounded_json<T: DeserializeOwned>(
     reader: &mut dyn Read,
     advertised_len: u64,
@@ -190,7 +190,7 @@ fn read_bounded_json<T: DeserializeOwned>(
         ));
     }
     serde_json::from_slice(&content)
-        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "review input is invalid"))
 }
 
 /// Preserves an input error kind while naming the rejected artifact.
