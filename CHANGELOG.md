@@ -30,6 +30,8 @@ All notable changes to ConceptWeave are documented here.
 
 ### Security
 
+- Invalid private review files no longer expose rejected field names or values in error messages. File-role, size and access errors remain distinguishable.
+
 - Completed text-review files reject changed evidence, stale decisions and duplicate fields before updating local work. Earlier approvals cannot silently acquire later text evidence.
 
 - Local research requests bypass environment-configured proxies. This prevents unintended proxy forwarding; local peer authentication remains an explicit release limitation.
