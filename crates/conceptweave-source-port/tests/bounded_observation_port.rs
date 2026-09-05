@@ -8,6 +8,10 @@ fn limits() -> ObservationLimits {
     ObservationLimits::new(2_500, 5_000, 1_048_576, 2).expect("bounded limits")
 }
 
+fn request_budget() -> ObservationRequestBudget {
+    ObservationRequestBudget::new(8, 512).expect("bounded request metadata")
+}
+
 #[test]
 fn limits_preserve_timeout_row_byte_and_concurrency_bounds() {
     let limits = limits();
@@ -106,12 +110,14 @@ fn request_preserves_exact_source_reference_and_canonicalizes_allowlist_only_by_
     let request = ObservationRequest::new(
         "grc_readonly_connection",
         vec!["Risk-Core".to_owned(), "Audit/Event".to_owned()],
+        request_budget(),
         limits(),
     )
     .expect("valid request");
 
     assert_eq!(request.source_connection_key(), "grc_readonly_connection");
     assert_eq!(request.allowed_schema_names(), ["Audit/Event", "Risk-Core"]);
+    assert_eq!(request.request_budget(), request_budget());
     assert_eq!(request.limits(), limits());
 }
 
@@ -128,7 +134,12 @@ fn request_rejects_non_registry_source_connection_keys_before_adapter_access() {
         "warehouse_primary_",
     ] {
         assert_eq!(
-            ObservationRequest::new(source_connection_key, vec!["public".to_owned()], limits(),),
+            ObservationRequest::new(
+                source_connection_key,
+                vec!["public".to_owned()],
+                request_budget(),
+                limits(),
+            ),
             Err(ObservationRequestError::InvalidSourceConnectionKey),
             "source connection keys must be opaque multiword snake_case registry identifiers: {source_connection_key}"
         );
@@ -137,7 +148,12 @@ fn request_rejects_non_registry_source_connection_keys_before_adapter_access() {
     let oversized_key = format!("source_{}", "a".repeat(122));
     assert_eq!(oversized_key.len(), 129);
     assert_eq!(
-        ObservationRequest::new(oversized_key, vec!["public".to_owned()], limits()),
+        ObservationRequest::new(
+            oversized_key,
+            vec!["public".to_owned()],
+            request_budget(),
+            limits(),
+        ),
         Err(ObservationRequestError::InvalidSourceConnectionKey)
     );
 }
@@ -145,21 +161,32 @@ fn request_rejects_non_registry_source_connection_keys_before_adapter_access() {
 #[test]
 fn request_rejects_blank_source_empty_or_blank_schema_and_exact_duplicates() {
     assert_eq!(
-        ObservationRequest::new("  ", vec!["public".to_owned()], limits()),
+        ObservationRequest::new(
+            "  ",
+            vec!["public".to_owned()],
+            request_budget(),
+            limits(),
+        ),
         Err(ObservationRequestError::InvalidSourceConnectionKey)
     );
     assert_eq!(
-        ObservationRequest::new("source_ref", Vec::new(), limits()),
+        ObservationRequest::new("source_ref", Vec::new(), request_budget(), limits()),
         Err(ObservationRequestError::EmptySchemaAllowlist)
     );
     assert_eq!(
-        ObservationRequest::new("source_ref", vec!["\t".to_owned()], limits()),
+        ObservationRequest::new(
+            "source_ref",
+            vec!["\t".to_owned()],
+            request_budget(),
+            limits(),
+        ),
         Err(ObservationRequestError::InvalidSchemaName)
     );
     assert_eq!(
         ObservationRequest::new(
             "source_ref",
             vec!["public".to_owned(), "public".to_owned()],
+            request_budget(),
             limits(),
         ),
         Err(ObservationRequestError::DuplicateSchemaName {
@@ -198,6 +225,7 @@ fn explicit_port_carries_caller_cancellation_without_inventing_success() {
     let request = ObservationRequest::new(
         "grc_readonly_connection",
         vec!["governance_core".to_owned()],
+        request_budget(),
         limits(),
     )
     .expect("valid request");
