@@ -21,7 +21,11 @@ const MAX_PAGE_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_SNAPSHOT_ITEMS: usize = 50_000;
 const MAX_SNAPSHOT_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_ITEM_RESPONSE_BYTES: u64 = 1024 * 1024;
+const MAX_AUTH_RESPONSE_BYTES: u64 = 512;
+const MAX_AUTH_APP_NAME_BYTES: usize = 128;
+const MAX_RETRY_AFTER_SECONDS: u64 = 86_400;
 const LOCAL_API: &str = "http://127.0.0.1:23119/api/users/0/items";
+const LOCAL_API_ROOT: &str = "http://127.0.0.1:23119";
 
 #[cfg(test)]
 static TEST_LOCAL_API: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
@@ -445,6 +449,19 @@ pub struct ClassificationItemState {
 pub enum ZoteroTransportError {
     /// The caller did not provide a usable API key and server identity.
     InvalidCredentials,
+    /// Zotero did not recognize the caller's authorization request.
+    Unauthorized,
+    /// The user denied the one-time authorization request.
+    Denied,
+    /// Zotero rate-limited authorization; a safe delta may be exposed.
+    RateLimited {
+        /// Retry delay in seconds when it was a bounded integer delta.
+        retry_after_seconds: Option<u64>,
+    },
+    /// A write key is no longer authorized and must be replaced by the caller.
+    ReauthorizationRequired,
+    /// A write precondition no longer matches the Zotero library.
+    StalePrecondition,
     /// The item key is not an official eight-character Zotero object key.
     InvalidItemKey,
     /// The Local API rejected the request or could not be reached.
@@ -453,6 +470,108 @@ pub enum ZoteroTransportError {
     ServerMismatch,
     /// The response headers or bounded JSON body were invalid.
     InvalidResponse,
+}
+
+/// One user-approved Zotero 10 Local API authorization.
+///
+/// The key remains private and this type deliberately implements neither
+/// [`Debug`] nor [`Serialize`]. Authorization performs exactly one request;
+/// callers decide whether and when another user prompt is appropriate.
+pub struct Zotero10LocalAuthorization {
+    api_key: String,
+    server_id: String,
+    remembered: bool,
+}
+
+impl Zotero10LocalAuthorization {
+    /// Requests authorization from Zotero's fixed loopback endpoint once.
+    pub fn request(
+        app_name: &str,
+        server_id: impl Into<String>,
+    ) -> Result<Self, ZoteroTransportError> {
+        Self::request_from(app_name, server_id.into(), LOCAL_API_ROOT)
+    }
+
+    #[cfg(test)]
+    fn request_with_base(
+        app_name: &str,
+        server_id: impl Into<String>,
+        base: String,
+    ) -> Result<Self, ZoteroTransportError> {
+        Self::request_from(app_name, server_id.into(), &base)
+    }
+
+    fn request_from(
+        app_name: &str,
+        server_id: String,
+        base: &str,
+    ) -> Result<Self, ZoteroTransportError> {
+        if app_name.trim().is_empty()
+            || app_name.len() > MAX_AUTH_APP_NAME_BYTES
+            || server_id.trim().is_empty()
+        {
+            return Err(ZoteroTransportError::InvalidCredentials);
+        }
+        let url = format!("{base}/api/local/authorize");
+        let mut response = local_agent()
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .header("Zotero-Server-ID", &server_id)
+            .send(serde_json::json!({ "appName": app_name }).to_string())
+            .map_err(|_| ZoteroTransportError::RequestFailed)?;
+        verify_server_id(response.headers(), &server_id)?;
+        match response.status().as_u16() {
+            401 => return Err(ZoteroTransportError::Unauthorized),
+            403 => {
+                #[derive(Deserialize)]
+                struct DenialResponse {
+                    denied: bool,
+                }
+                let body = bounded_body_with_limit(&mut response, MAX_AUTH_RESPONSE_BYTES)?;
+                let denial: DenialResponse = serde_json::from_str(&body)
+                    .map_err(|_| ZoteroTransportError::InvalidResponse)?;
+                return if denial.denied {
+                    Err(ZoteroTransportError::Denied)
+                } else {
+                    Err(ZoteroTransportError::InvalidResponse)
+                };
+            }
+            429 => {
+                return Err(ZoteroTransportError::RateLimited {
+                    retry_after_seconds: retry_after_seconds(response.headers()),
+                });
+            }
+            200 => {}
+            _ => return Err(ZoteroTransportError::RequestFailed),
+        }
+        #[derive(Deserialize)]
+        struct AuthorizationResponse {
+            key: String,
+            remember: bool,
+        }
+        let body = bounded_body_with_limit(&mut response, MAX_AUTH_RESPONSE_BYTES)?;
+        let authorization: AuthorizationResponse =
+            serde_json::from_str(&body).map_err(|_| ZoteroTransportError::InvalidResponse)?;
+        if !is_valid_local_api_key(&authorization.key) {
+            return Err(ZoteroTransportError::InvalidResponse);
+        }
+        Ok(Self {
+            api_key: authorization.key,
+            server_id,
+            remembered: authorization.remember,
+        })
+    }
+
+    /// Reports whether Zotero agreed to remember this authorization.
+    pub const fn remembered(&self) -> bool {
+        self.remembered
+    }
+
+    /// Consumes the authorization and creates the existing write adapter.
+    pub fn into_adapter(self) -> Zotero10LocalAdapter {
+        Zotero10LocalAdapter::build(self.api_key, self.server_id, LOCAL_API.to_owned())
+            .expect("validated authorization always builds an adapter")
+    }
 }
 
 /// Minimal authenticated adapter for Zotero 10+ Local API item metadata writes.
@@ -489,22 +608,14 @@ impl Zotero10LocalAdapter {
         server_id: String,
         base: String,
     ) -> Result<Self, ZoteroTransportError> {
-        if api_key.trim().is_empty() || server_id.trim().is_empty() {
+        if !is_valid_local_api_key(&api_key) || server_id.trim().is_empty() {
             return Err(ZoteroTransportError::InvalidCredentials);
         }
-        let config = ureq::Agent::config_builder()
-            .proxy(None)
-            .timeout_global(Some(Duration::from_secs(30)))
-            .timeout_connect(Some(Duration::from_secs(2)))
-            .timeout_recv_response(Some(Duration::from_secs(10)))
-            .timeout_recv_body(Some(Duration::from_secs(10)))
-            .max_redirects(0)
-            .build();
         Ok(Self {
             api_key,
             server_id,
             base,
-            agent: ureq::Agent::new_with_config(config),
+            agent: local_agent(),
         })
     }
 
@@ -523,6 +634,10 @@ impl Zotero10LocalAdapter {
             .header("Zotero-Server-ID", &self.server_id)
             .call()
             .map_err(|_| ZoteroTransportError::RequestFailed)?;
+        self.verify_server(response.headers())?;
+        if response.status() != ureq::http::StatusCode::OK {
+            return Err(ZoteroTransportError::RequestFailed);
+        }
         let item = self.read_item(response, item_key)?;
         let after = self.library_version()?;
         if before != after {
@@ -574,10 +689,15 @@ impl Zotero10LocalAdapter {
             .header("Content-Type", "application/json")
             .send(body)
             .map_err(|_| ZoteroTransportError::RequestFailed)?;
+        self.verify_server(response.headers())?;
+        match response.status().as_u16() {
+            401 => return Err(ZoteroTransportError::ReauthorizationRequired),
+            412 => return Err(ZoteroTransportError::StalePrecondition),
+            _ => {}
+        }
         if response.status() != ureq::http::StatusCode::OK {
             return Err(ZoteroTransportError::RequestFailed);
         }
-        self.verify_server(response.headers())?;
         let library_version = version_header(response.headers())?;
         #[derive(Deserialize)]
         struct WriteResponse {
@@ -619,6 +739,9 @@ impl Zotero10LocalAdapter {
             .call()
             .map_err(|_| ZoteroTransportError::RequestFailed)?;
         self.verify_server(response.headers())?;
+        if response.status() != ureq::http::StatusCode::OK {
+            return Err(ZoteroTransportError::RequestFailed);
+        }
         let version = version_header(response.headers())?;
         bounded_body(&mut response)?;
         Ok(version)
@@ -629,7 +752,6 @@ impl Zotero10LocalAdapter {
         mut response: ureq::http::Response<ureq::Body>,
         requested_key: &str,
     ) -> Result<ZoteroItem, ZoteroTransportError> {
-        self.verify_server(response.headers())?;
         let object_version = version_header(response.headers())?;
         let body = bounded_body(&mut response)?;
         let item: ZoteroItem =
@@ -641,16 +763,48 @@ impl Zotero10LocalAdapter {
     }
 
     fn verify_server(&self, headers: &ureq::http::HeaderMap) -> Result<(), ZoteroTransportError> {
-        let server = headers
-            .get("Zotero-Server-ID")
-            .and_then(|value| value.to_str().ok())
-            .ok_or(ZoteroTransportError::InvalidResponse)?;
-        if server == self.server_id {
-            Ok(())
-        } else {
-            Err(ZoteroTransportError::ServerMismatch)
-        }
+        verify_server_id(headers, &self.server_id)
     }
+}
+
+fn local_agent() -> ureq::Agent {
+    let config = ureq::Agent::config_builder()
+        .proxy(None)
+        .timeout_global(Some(Duration::from_secs(30)))
+        .timeout_connect(Some(Duration::from_secs(2)))
+        .timeout_recv_response(Some(Duration::from_secs(10)))
+        .timeout_recv_body(Some(Duration::from_secs(10)))
+        .http_status_as_error(false)
+        .max_redirects(0)
+        .build();
+    ureq::Agent::new_with_config(config)
+}
+
+fn verify_server_id(
+    headers: &ureq::http::HeaderMap,
+    expected: &str,
+) -> Result<(), ZoteroTransportError> {
+    let server = headers
+        .get("Zotero-Server-ID")
+        .and_then(|value| value.to_str().ok())
+        .ok_or(ZoteroTransportError::InvalidResponse)?;
+    if server == expected {
+        Ok(())
+    } else {
+        Err(ZoteroTransportError::ServerMismatch)
+    }
+}
+
+fn retry_after_seconds(headers: &ureq::http::HeaderMap) -> Option<u64> {
+    headers
+        .get("Retry-After")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse().ok())
+        .filter(|seconds| *seconds <= MAX_RETRY_AFTER_SECONDS)
+}
+
+fn is_valid_local_api_key(api_key: &str) -> bool {
+    api_key.len() == 32 && api_key.bytes().all(|byte| byte.is_ascii_graphic())
 }
 
 fn version_header(headers: &ureq::http::HeaderMap) -> Result<u64, ZoteroTransportError> {
@@ -664,8 +818,14 @@ fn version_header(headers: &ureq::http::HeaderMap) -> Result<u64, ZoteroTranspor
 fn bounded_body(
     response: &mut ureq::http::Response<ureq::Body>,
 ) -> Result<String, ZoteroTransportError> {
-    read_bounded_response_text(response, MAX_ITEM_RESPONSE_BYTES)
-        .map_err(|_| ZoteroTransportError::InvalidResponse)
+    bounded_body_with_limit(response, MAX_ITEM_RESPONSE_BYTES)
+}
+
+fn bounded_body_with_limit(
+    response: &mut ureq::http::Response<ureq::Body>,
+    limit: u64,
+) -> Result<String, ZoteroTransportError> {
+    read_bounded_response_text(response, limit).map_err(|_| ZoteroTransportError::InvalidResponse)
 }
 
 fn validate_item_key(item_key: &str) -> Result<(), ZoteroTransportError> {
@@ -2344,6 +2504,16 @@ mod tests {
         )
     }
 
+    fn authorize_response(status: &str, server_id: Option<&str>, body: &str) -> String {
+        let server = server_id
+            .map(|value| format!("Zotero-Server-ID: {value}\r\n"))
+            .unwrap_or_default();
+        format!(
+            "HTTP/1.1 {status}\r\n{server}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        )
+    }
+
     fn write_request() -> ClassificationWriteRequest {
         ClassificationWriteRequest {
             server_id: "server-10".into(),
@@ -2359,7 +2529,247 @@ mod tests {
     }
 
     fn transport(base: String) -> Zotero10LocalAdapter {
-        Zotero10LocalAdapter::new_with_base("top-secret-key", "server-10", base).unwrap()
+        Zotero10LocalAdapter::new_with_base("0123456789abcdef0123456789abcdef", "server-10", base)
+            .unwrap()
+    }
+
+    fn authorization_error(
+        result: Result<Zotero10LocalAuthorization, ZoteroTransportError>,
+    ) -> ZoteroTransportError {
+        match result {
+            Ok(_) => panic!("authorization unexpectedly succeeded"),
+            Err(error) => error,
+        }
+    }
+
+    #[test]
+    fn zotero10_authorization_uses_exact_wire_contract_and_builds_adapter() {
+        let body = r#"{"key":"0123456789abcdef0123456789abcdef","remember":true}"#;
+        let response = authorize_response("200 OK", Some("server-10"), body);
+        let (items_base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+        let authorize_base = items_base.replace("/api/users/0/items", "");
+
+        let authorization = Zotero10LocalAuthorization::request_with_base(
+            "ConceptWeave",
+            "server-10",
+            authorize_base,
+        )
+        .unwrap();
+        assert!(authorization.remembered());
+        let _adapter = authorization.into_adapter();
+
+        let request = &server.join().unwrap()[0];
+        assert!(request.starts_with("POST /api/local/authorize HTTP/1.1\r\n"));
+        assert!(request.contains("content-type: application/json\r\n"));
+        assert!(request.contains("zotero-server-id: server-10\r\n"));
+        assert!(request.ends_with(r#"{"appName":"ConceptWeave"}"#));
+        assert!(!request.contains("0123456789abcdef0123456789abcdef"));
+
+        let body = r#"{"key":"fedcba9876543210fedcba9876543210","remember":false}"#;
+        let response = authorize_response("200 OK", Some("server-10"), body);
+        let (items_base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+        let authorization = Zotero10LocalAuthorization::request_with_base(
+            "ConceptWeave",
+            "server-10",
+            items_base.replace("/api/users/0/items", ""),
+        )
+        .unwrap();
+        assert!(!authorization.remembered());
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn zotero10_authorization_rejects_invalid_input_and_unproven_success() {
+        let oversized_name = "x".repeat(MAX_AUTH_APP_NAME_BYTES + 1);
+        for app_name in ["", " ", oversized_name.as_str()] {
+            assert_eq!(
+                authorization_error(Zotero10LocalAuthorization::request(app_name, "server-10")),
+                ZoteroTransportError::InvalidCredentials
+            );
+        }
+        assert_eq!(
+            authorization_error(Zotero10LocalAuthorization::request("ConceptWeave", " ")),
+            ZoteroTransportError::InvalidCredentials
+        );
+
+        for response in [
+            authorize_response(
+                "200 OK",
+                None,
+                r#"{"key":"0123456789abcdef0123456789abcdef","remember":false}"#,
+            ),
+            authorize_response(
+                "200 OK",
+                Some("other-server"),
+                r#"{"key":"0123456789abcdef0123456789abcdef","remember":false}"#,
+            ),
+            authorize_response(
+                "200 OK",
+                Some("server-10"),
+                r#"{"key":"too-short","remember":false}"#,
+            ),
+            authorize_response(
+                "200 OK",
+                Some("server-10"),
+                r#"{"key":"0123456789abcdef0123456789abcde ","remember":false}"#,
+            ),
+            authorize_response("200 OK", Some("server-10"), "{"),
+            authorize_response(
+                "200 OK",
+                Some("server-10"),
+                &format!(r#"{{"key":"{}","remember":false}}"#, "x".repeat(1024)),
+            ),
+        ] {
+            let (items_base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+            let error = authorization_error(Zotero10LocalAuthorization::request_with_base(
+                "ConceptWeave",
+                "server-10",
+                items_base.replace("/api/users/0/items", ""),
+            ));
+            assert!(matches!(
+                error,
+                ZoteroTransportError::InvalidResponse | ZoteroTransportError::ServerMismatch
+            ));
+            server.join().unwrap();
+        }
+
+        for (response, expected) in [
+            (
+                "HTTP/1.1 500 Internal Server Error\r\nZotero-Server-ID: server-10\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                ZoteroTransportError::RequestFailed,
+            ),
+            (
+                "HTTP/1.1 429 Too Many Requests\r\nZotero-Server-ID: server-10\r\nRetry-After: tomorrow\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                ZoteroTransportError::RateLimited {
+                    retry_after_seconds: None,
+                },
+            ),
+        ] {
+            let (items_base, server) = serve(vec![response]);
+            assert_eq!(
+                authorization_error(Zotero10LocalAuthorization::request_with_base(
+                    "ConceptWeave",
+                    "server-10",
+                    items_base.replace("/api/users/0/items", ""),
+                )),
+                expected
+            );
+            server.join().unwrap();
+        }
+
+        assert_eq!(
+            authorization_error(Zotero10LocalAuthorization::request_with_base(
+                "ConceptWeave",
+                "server-10",
+                "http://127.0.0.1:0".into(),
+            )),
+            ZoteroTransportError::RequestFailed
+        );
+    }
+
+    #[test]
+    fn zotero10_authorization_denial_and_rate_limit_are_single_attempt_errors() {
+        for (response, expected) in [
+            (
+                authorize_response("403 Forbidden", Some("server-10"), r#"{"denied":true}"#),
+                ZoteroTransportError::Denied,
+            ),
+            (
+                authorize_response("401 Unauthorized", Some("server-10"), ""),
+                ZoteroTransportError::Unauthorized,
+            ),
+            (
+                "HTTP/1.1 429 Too Many Requests\r\nZotero-Server-ID: server-10\r\nRetry-After: 17\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_owned(),
+                ZoteroTransportError::RateLimited {
+                    retry_after_seconds: Some(17),
+                },
+            ),
+            (
+                "HTTP/1.1 429 Too Many Requests\r\nZotero-Server-ID: server-10\r\nRetry-After: 999999999999\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_owned(),
+                ZoteroTransportError::RateLimited {
+                    retry_after_seconds: None,
+                },
+            ),
+        ] {
+            let (items_base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+            assert_eq!(
+                authorization_error(Zotero10LocalAuthorization::request_with_base(
+                    "ConceptWeave",
+                    "server-10",
+                    items_base.replace("/api/users/0/items", ""),
+                )),
+                expected
+            );
+            assert_eq!(server.join().unwrap().len(), 1);
+        }
+
+        for response in [
+            authorize_response("403 Forbidden", Some("server-10"), ""),
+            authorize_response("403 Forbidden", Some("server-10"), r#"{"denied":false}"#),
+            authorize_response("403 Forbidden", None, r#"{"denied":true}"#),
+            authorize_response(
+                "403 Forbidden",
+                Some("server-10"),
+                &"x".repeat((MAX_AUTH_RESPONSE_BYTES + 1) as usize),
+            ),
+        ] {
+            let (items_base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+            assert!(matches!(
+                authorization_error(Zotero10LocalAuthorization::request_with_base(
+                    "ConceptWeave",
+                    "server-10",
+                    items_base.replace("/api/users/0/items", ""),
+                )),
+                ZoteroTransportError::InvalidResponse
+            ));
+            assert_eq!(server.join().unwrap().len(), 1);
+        }
+    }
+
+    #[test]
+    fn zotero10_write_names_reauthorization_and_stale_precondition() {
+        for (status, expected) in [
+            (
+                "401 Unauthorized",
+                ZoteroTransportError::ReauthorizationRequired,
+            ),
+            (
+                "412 Precondition Failed",
+                ZoteroTransportError::StalePrecondition,
+            ),
+        ] {
+            let response = format!(
+                "HTTP/1.1 {status}\r\nZotero-Server-ID: server-10\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            );
+            let (base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+            assert_eq!(
+                transport(base).write_item(&write_request()).unwrap_err(),
+                expected
+            );
+            assert_eq!(server.join().unwrap().len(), 1);
+        }
+
+        assert_eq!(
+            transport("http://127.0.0.1:0/api/users/0/items".into())
+                .write_item(&write_request())
+                .unwrap_err(),
+            ZoteroTransportError::RequestFailed
+        );
+
+        let response = library_response("server-10", 42);
+        let (base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+        assert_eq!(
+            transport(base).get_item("ABCD2345").unwrap_err(),
+            ZoteroTransportError::RequestFailed
+        );
+        server.join().unwrap();
+
+        assert_eq!(
+            transport("http://127.0.0.1:0/api/users/0/items".into())
+                .get_item("ABCD2345")
+                .unwrap_err(),
+            ZoteroTransportError::RequestFailed
+        );
     }
 
     fn assert_write_invalid(response: String) {
@@ -2408,7 +2818,7 @@ mod tests {
         assert!(
             requests
                 .iter()
-                .all(|request| !request.contains("top-secret-key"))
+                .all(|request| !request.contains("0123456789abcdef0123456789abcdef"))
         );
     }
 
@@ -2422,7 +2832,7 @@ mod tests {
         assert_eq!(state.item_version, 43);
         let requests = server.join().unwrap();
         assert!(requests[0].starts_with("POST /api/users/0/items HTTP/1.1\r\n"));
-        assert!(requests[0].contains("zotero-api-key: top-secret-key\r\n"));
+        assert!(requests[0].contains("zotero-api-key: 0123456789abcdef0123456789abcdef\r\n"));
         assert!(requests[0].contains("zotero-server-id: server-10\r\n"));
         assert!(requests[0].contains("if-unmodified-since-version: 42\r\n"));
         assert!(requests[0].contains("content-type: application/json\r\n"));
@@ -2435,8 +2845,7 @@ mod tests {
 
     #[test]
     fn zotero10_transport_rejects_stale_non_success_and_server_mismatch() {
-        let stale =
-            "HTTP/1.1 412 Precondition Failed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        let stale = "HTTP/1.1 412 Precondition Failed\r\nZotero-Server-ID: server-10\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
         let (base, server) = serve(vec![stale]);
         let request = ClassificationWriteRequest {
             server_id: "server-10".into(),
@@ -2448,14 +2857,22 @@ mod tests {
         };
         assert_eq!(
             transport(base).write_item(&request).unwrap_err(),
-            ZoteroTransportError::RequestFailed
+            ZoteroTransportError::StalePrecondition
         );
         assert!(server.join().unwrap()[0].starts_with("POST "));
+
+        let switched = "HTTP/1.1 412 Precondition Failed\r\nZotero-Server-ID: other-server\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        let (base, server) = serve(vec![switched]);
+        assert_eq!(
+            transport(base).write_item(&request).unwrap_err(),
+            ZoteroTransportError::ServerMismatch
+        );
+        server.join().unwrap();
 
         let mut mismatched_request = request.clone();
         mismatched_request.server_id = "other-server".into();
         assert_eq!(
-            Zotero10LocalAdapter::new("secret", "server-10")
+            Zotero10LocalAdapter::new("0123456789abcdef0123456789abcdef", "server-10")
                 .unwrap()
                 .write_item(&mismatched_request)
                 .unwrap_err(),
@@ -2479,8 +2896,7 @@ mod tests {
         server.join().unwrap();
 
         for response in [
-            "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-                .to_owned(),
+            "HTTP/1.1 500 Internal Server Error\r\nZotero-Server-ID: server-10\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_owned(),
             library_response("other-server", 42),
         ] {
             let (base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
@@ -2500,10 +2916,25 @@ mod tests {
             ZoteroTransportError::InvalidCredentials
         );
         assert_eq!(
-            Zotero10LocalAdapter::new("secret", " ").err().unwrap(),
+            Zotero10LocalAdapter::new("0123456789abcdef0123456789abcdef", " ")
+                .err()
+                .unwrap(),
             ZoteroTransportError::InvalidCredentials
         );
-        let adapter = Zotero10LocalAdapter::new("secret", "server-10").unwrap();
+        for api_key in [
+            "too-short",
+            "0123456789abcdef0123456789abcde ",
+            "0123456789abcdef0123456789abcdefx",
+        ] {
+            assert_eq!(
+                Zotero10LocalAdapter::new(api_key, "server-10")
+                    .err()
+                    .unwrap(),
+                ZoteroTransportError::InvalidCredentials
+            );
+        }
+        let adapter =
+            Zotero10LocalAdapter::new("0123456789abcdef0123456789abcdef", "server-10").unwrap();
         for key in ["ABCD234", "ABCD2340", "abcd2345", "ABCD2345/../X"] {
             assert_eq!(
                 adapter.get_item(key).unwrap_err(),
@@ -2574,7 +3005,7 @@ mod tests {
         let library = library_response("server-10", 42);
         let (base, server) = serve(vec![
             Box::leak(library.into_boxed_str()),
-            "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            "HTTP/1.1 500 Internal Server Error\r\nZotero-Server-ID: server-10\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
         ]);
         assert_eq!(
             transport(base).get_item("ABCD2345").unwrap_err(),
@@ -2587,11 +3018,27 @@ mod tests {
         let (base, server) = serve(vec![
             Box::leak(before.into_boxed_str()),
             Box::leak(item.into_boxed_str()),
-            "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            "HTTP/1.1 500 Internal Server Error\r\nZotero-Server-ID: server-10\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
         ]);
         assert_eq!(
             transport(base).get_item("ABCD2345").unwrap_err(),
             ZoteroTransportError::RequestFailed
+        );
+        server.join().unwrap();
+
+        let switched = "HTTP/1.1 412 Precondition Failed\r\nZotero-Server-ID: other-server\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        let (base, server) = serve(vec![switched]);
+        assert_eq!(
+            transport(base).get_item("ABCD2345").unwrap_err(),
+            ZoteroTransportError::ServerMismatch
+        );
+        server.join().unwrap();
+
+        let before = library_response("server-10", 42);
+        let (base, server) = serve(vec![Box::leak(before.into_boxed_str()), switched]);
+        assert_eq!(
+            transport(base).get_item("ABCD2345").unwrap_err(),
+            ZoteroTransportError::ServerMismatch
         );
         server.join().unwrap();
 
@@ -2680,8 +3127,9 @@ mod tests {
 
     #[test]
     fn zotero10_transport_never_formats_or_serializes_the_key() {
-        let adapter = Zotero10LocalAdapter::new("top-secret-key", "server-10").unwrap();
-        assert!(!std::any::type_name_of_val(&adapter).contains("top-secret-key"));
+        let adapter =
+            Zotero10LocalAdapter::new("0123456789abcdef0123456789abcdef", "server-10").unwrap();
+        assert!(!std::any::type_name_of_val(&adapter).contains("0123456789abcdef0123456789abcdef"));
         assert_eq!(
             format!("{:?}", ZoteroTransportError::RequestFailed),
             "RequestFailed"

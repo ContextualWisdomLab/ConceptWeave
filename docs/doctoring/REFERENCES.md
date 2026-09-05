@@ -6,6 +6,8 @@ This file records the evidence basis for ConceptWeave architecture decisions. St
 
 Corporation for Digital Scholarship. (2026). *Zotero Local API*. Zotero Documentation. https://www.zotero.org/support/dev/web_api/v3/local_api
 
+Corporation for Digital Scholarship. (2026). *Zotero Local API authentication*. Zotero Documentation. https://www.zotero.org/support/dev/web_api/v3/local_api#authorizing_writes
+
 Corporation for Digital Scholarship. (2026). *Zotero Web API write requests*. Zotero Documentation. https://www.zotero.org/support/dev/web_api/v3/write_requests
 
 Miles, A., & Bechhofer, S. (Eds.). (2009). *SKOS Simple Knowledge Organization System Reference*. World Wide Web Consortium. https://www.w3.org/TR/skos-reference/
