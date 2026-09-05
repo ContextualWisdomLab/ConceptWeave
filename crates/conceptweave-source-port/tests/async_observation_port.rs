@@ -16,6 +16,16 @@ impl SourceConnectionRegistry for ExactRegistry {
     fn contains_source_connection(&self, source_connection_key: &str) -> bool {
         source_connection_key == "grc_readonly_connection"
     }
+
+    fn authorizes_schema_scope(
+        &self,
+        source_connection_key: &str,
+        allowed_schema_names: &[String],
+    ) -> bool {
+        source_connection_key == "grc_readonly_connection"
+            && allowed_schema_names.len() == 1
+            && allowed_schema_names[0] == "governance_core"
+    }
 }
 
 struct Cancellation(bool);

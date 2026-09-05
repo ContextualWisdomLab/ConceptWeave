@@ -184,6 +184,8 @@ pub enum ObservationRequestError {
     InvalidSourceConnectionKey,
     /// The syntactically valid key was absent from the caller's authorized source registry.
     UnknownSourceConnectionKey,
+    /// The source existed, but the registry did not authorize the exact requested schema scope.
+    UnauthorizedSchemaScope,
     /// Registry authorization exhausted the request's end-to-end operation budget.
     OperationTimeout,
     /// No source schema was explicitly authorized for observation.
@@ -207,10 +209,25 @@ pub enum ObservationRequestError {
     },
 }
 
-/// Read-only registry boundary used to authorize an opaque source connection key.
+/// Read-only registry boundary used to authorize an opaque source connection and exact schema scope.
 pub trait SourceConnectionRegistry {
     /// Returns whether the exact key names a source the caller may observe.
     fn contains_source_connection(&self, source_connection_key: &str) -> bool;
+
+    /// Returns whether the exact requested schema scope is authorized for the exact source key.
+    ///
+    /// The default is fail-closed so a registry that only recognizes a source key cannot silently
+    /// turn caller-selected schema names into application authorization. Implementations that grant
+    /// schema access must do so explicitly and must preserve exact identifier spelling rather than
+    /// broadening access through case or Unicode normalization.
+    fn authorizes_schema_scope(
+        &self,
+        source_connection_key: &str,
+        allowed_schema_names: &[String],
+    ) -> bool {
+        let _ = (source_connection_key, allowed_schema_names);
+        false
+    }
 }
 
 /// Opaque proof that a source key was resolved by an authorized registry boundary.
@@ -231,11 +248,12 @@ impl ResolvedSourceConnection {
 ///
 /// `source_connection_key` is a bounded opaque identifier, not source authority by itself. Before
 /// adapter execution, [`Self::authorize`] must resolve it through the caller's authorized
-/// [`SourceConnectionRegistry`] and bind the resulting capability into an
-/// [`AuthorizedObservationRequest`]. The adapter later maps that authorized opaque capability to
-/// credentials inside its own ACL. Schema identifiers retain exact source spelling and are sorted
-/// only to make request identity deterministic. Callers must also provide an explicit
-/// provider-independent authorization-metadata budget before the request can be constructed.
+/// [`SourceConnectionRegistry`], verify the exact requested schema scope through the same policy
+/// boundary, and bind the resulting capability into an [`AuthorizedObservationRequest`]. The
+/// adapter later maps that authorized opaque capability to credentials inside its own ACL. Schema
+/// identifiers retain exact source spelling and are sorted only to make request identity
+/// deterministic. Callers must also provide an explicit provider-independent authorization-metadata
+/// budget before the request can be constructed.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ObservationRequest {
     source_connection_key: String,
@@ -322,23 +340,32 @@ impl ObservationRequest {
 
     /// Consumes this request after registry authorization and binds the resulting capability to it.
     ///
-    /// The operation budget starts before the registry lookup. The returned execution envelope is
-    /// the only request type accepted by [`SourceObservationPort`] and privately retains the
-    /// monotonic start coordinate so adapter code can query the remaining budget without receiving
-    /// wall-clock provenance. If registry work consumes the budget, timeout takes precedence over
-    /// the registry result so over-budget authorization never leaks into adapter admission.
+    /// The operation budget starts before source-key and exact-schema-scope authorization. The
+    /// returned execution envelope is the only request type accepted by [`SourceObservationPort`]
+    /// and privately retains the monotonic start coordinate so adapter code can query the remaining
+    /// budget without receiving wall-clock provenance. If registry work consumes the budget,
+    /// timeout takes precedence over either authorization result so over-budget policy work never
+    /// leaks into adapter admission.
     pub fn authorize(
         self,
         registry: &dyn SourceConnectionRegistry,
     ) -> Result<AuthorizedObservationRequest, ObservationRequestError> {
         let operation_started_at = Instant::now();
         let source_connection = self.resolve_source_connection(registry);
+        let schema_scope_authorized = source_connection.is_ok()
+            && registry.authorizes_schema_scope(
+                &self.source_connection_key,
+                &self.allowed_schema_names,
+            );
         let elapsed = Instant::now().saturating_duration_since(operation_started_at);
         let operation_timeout = Duration::from_millis(self.limits.operation_timeout_ms);
         if elapsed >= operation_timeout {
             return Err(ObservationRequestError::OperationTimeout);
         }
         let source_connection = source_connection?;
+        if !schema_scope_authorized {
+            return Err(ObservationRequestError::UnauthorizedSchemaScope);
+        }
         Ok(AuthorizedObservationRequest {
             request: self,
             source_connection,
@@ -368,10 +395,11 @@ impl ObservationRequest {
 /// Registry-authorized request envelope accepted by a concrete source adapter.
 ///
 /// This value can only be created by [`ObservationRequest::authorize`], which binds the exact
-/// request to the opaque [`ResolvedSourceConnection`] issued by the authorized registry. It also
-/// retains a private monotonic operation-start coordinate so the adapter can cap connection,
-/// transaction, statement and cancellation work by the true remaining budget. It carries no
-/// connection string, credential, token, provider-specific connection object, or wall-clock time.
+/// request to the opaque [`ResolvedSourceConnection`] issued by the authorized registry after the
+/// same policy boundary has explicitly accepted the request's exact schema scope. It also retains a
+/// private monotonic operation-start coordinate so the adapter can cap connection, transaction,
+/// statement and cancellation work by the true remaining budget. It carries no connection string,
+/// credential, token, provider-specific connection object, or wall-clock time.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AuthorizedObservationRequest {
     request: ObservationRequest,
@@ -473,14 +501,14 @@ pub enum SourceObservationFailure {
 
 /// Port implemented by a concrete read-only source adapter.
 ///
-/// Implementations receive only a registry-authorized request, resolve credentials from its opaque
-/// source capability inside the adapter ACL, use only read-only source access, honor the exact
-/// schema allowlist, query [`AuthorizedObservationRequest::remaining_operation_budget`] before
-/// adapter-side blocking work, enforce every adapter-side [`ObservationLimits`] bound, check caller
-/// cancellation, and return a typed failure rather than a partial or invented snapshot when captured
-/// metadata cannot construct the immutable snapshot. Observation execution is awaitable so
-/// asynchronous database clients do not need to hide a nested executor or block an asynchronous web
-/// executor thread.
+/// Implementations receive only a registry-authorized request whose exact schema scope was accepted
+/// by the same local policy boundary, resolve credentials from its opaque source capability inside
+/// the adapter ACL, use only read-only source access, honor the exact schema allowlist, query
+/// [`AuthorizedObservationRequest::remaining_operation_budget`] before adapter-side blocking work,
+/// enforce every adapter-side [`ObservationLimits`] bound, check caller cancellation, and return a
+/// typed failure rather than a partial or invented snapshot when captured metadata cannot construct
+/// the immutable snapshot. Observation execution is awaitable so asynchronous database clients do
+/// not need to hide a nested executor or block an asynchronous web executor thread.
 pub trait SourceObservationPort: Sync {
     /// Immutable snapshot type produced only after a complete bounded observation.
     type Snapshot;

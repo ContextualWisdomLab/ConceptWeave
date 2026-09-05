@@ -27,6 +27,16 @@ impl SourceConnectionRegistry for ExactRegistry {
     fn contains_source_connection(&self, source_connection_key: &str) -> bool {
         source_connection_key == "grc_readonly_connection"
     }
+
+    fn authorizes_schema_scope(
+        &self,
+        source_connection_key: &str,
+        allowed_schema_names: &[String],
+    ) -> bool {
+        source_connection_key == "grc_readonly_connection"
+            && allowed_schema_names.len() == 1
+            && allowed_schema_names[0] == "governance_core"
+    }
 }
 
 struct DenyRegistry;
@@ -123,7 +133,7 @@ fn denied_authorization_has_no_execution_side_effects_and_authorized_control_exe
 
     let authorized = request
         .authorize(&ExactRegistry)
-        .expect("known registry key must issue the execution capability");
+        .expect("known registry key and schema scope must issue the execution capability");
     assert_eq!(
         poll_ready(port.observe(&authorized, &Cancellation(false))),
         Ok("grc_readonly_connection".to_owned())
