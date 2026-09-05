@@ -69,6 +69,7 @@ fn review_batch_cli_emits_nothing_for_complete_or_existing_output() {
 
 fn item(key: &str, title: &str) -> ZoteroItem {
     ZoteroItem {
+        source_record: None,
         key: key.into(),
         version: 7,
         data: ItemData {
