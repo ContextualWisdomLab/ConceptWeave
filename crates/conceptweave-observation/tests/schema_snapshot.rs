@@ -63,7 +63,7 @@ fn snapshot_rejects_table_outside_the_authorized_schema_allowlist() {
         .expect("table fixture is structurally valid");
 
     let result = PostgresSchemaSnapshot::new(
-        &support::resolved_source("warehouse_primary"),
+        &support::authorized_source("warehouse_primary", &["public"]),
         "postgres-introspector/1",
         "2026-09-02T00:00:00Z",
         vec![unauthorized],
