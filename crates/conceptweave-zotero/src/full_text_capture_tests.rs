@@ -79,6 +79,343 @@ fn full_text_review_preserves_context_through_decisions_and_full_approval() {
 }
 
 #[test]
+fn full_text_review_rejects_modified_display_and_never_overwrites_work() {
+    let report = report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let worksheet = build_full_text_review_worksheet(&report, &capture).unwrap();
+    let completed = completed_full_text_view(&report, &worksheet, &capture, 1);
+    let original: serde_json::Value = serde_json::from_slice(&completed).unwrap();
+    let before = serde_json::to_vec(&worksheet).unwrap();
+    for (pointer, value) in [
+        ("/capture_digest", serde_json::json!("changed")),
+        ("/metadata_report_digest", serde_json::json!("changed")),
+        ("/proposal_digest", serde_json::json!("changed")),
+        ("/view_kind", serde_json::json!("changed")),
+        ("/bibliographic_item_count", serde_json::json!(1)),
+        ("/review_batch/remaining_count", serde_json::json!(1)),
+        (
+            "/review_batch/decisions/0/title",
+            serde_json::json!("changed"),
+        ),
+        (
+            "/review_batch/decisions/0/reviewed_disposition",
+            serde_json::Value::Null,
+        ),
+        (
+            "/review_batch/decisions/0/reviewed_disposition",
+            serde_json::json!(crate::Disposition::NeedsStewardReview),
+        ),
+        (
+            "/attachment_evidence/ABCD2345/0/content_response/body",
+            serde_json::json!("changed"),
+        ),
+        (
+            "/attachment_evidence/ABCD2345/0/content_response/status",
+            serde_json::json!(404),
+        ),
+        (
+            "/attachment_evidence/ABCD2345/0/content_response/version",
+            serde_json::json!(42),
+        ),
+        (
+            "/attachment_evidence/ABCD2345/0/metadata_version",
+            serde_json::json!(42),
+        ),
+        ("/attachment_evidence/ABCD2345", serde_json::json!([])),
+        ("/review_batch/decisions", serde_json::json!([])),
+    ] {
+        let mut invalid = original.clone();
+        *invalid.pointer_mut(pointer).unwrap() = value;
+        assert!(
+            apply_full_text_review_view(
+                &report,
+                &worksheet,
+                &capture,
+                &serde_json::to_vec(&invalid).unwrap()
+            )
+            .is_err(),
+            "{pointer}"
+        );
+    }
+    for pointer in [
+        "",
+        "/review_batch",
+        "/review_batch/decisions/0",
+        "/review_batch/decisions/0/evidence",
+        "/attachment_evidence/ABCD2345/0",
+        "/attachment_evidence/ABCD2345/0/content_response",
+    ] {
+        let mut invalid = original.clone();
+        invalid
+            .pointer_mut(pointer)
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .insert("unexpected_field".into(), serde_json::json!(true));
+        assert!(
+            apply_full_text_review_view(
+                &report,
+                &worksheet,
+                &capture,
+                &serde_json::to_vec(&invalid).unwrap()
+            )
+            .is_err()
+        );
+    }
+    for bytes in [b"null".as_slice(), b"{}", b"{", b"{\"review_batch\":true}"] {
+        assert!(apply_full_text_review_view(&report, &worksheet, &capture, bytes).is_err());
+    }
+    let advanced = apply_full_text_review_view(&report, &worksheet, &capture, &completed).unwrap();
+    assert!(apply_full_text_review_view(&report, &advanced, &capture, &completed).is_err());
+    assert!(
+        finalize_full_text_review(
+            &report,
+            &advanced,
+            &capture,
+            full_text_approval_fixture(&report, &capture)
+        )
+        .is_err()
+    );
+    let next: serde_json::Value = serde_json::from_slice(
+        &build_bound_full_text_review_json(&report, &advanced, &capture, 1).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(next["review_batch"]["remaining_count"], 1);
+    assert_eq!(
+        next["attachment_evidence"],
+        serde_json::json!({"DEFG5678":[]})
+    );
+    let completed_next = completed_full_text_view(&report, &advanced, &capture, 1);
+    let complete =
+        apply_full_text_review_view(&report, &advanced, &capture, &completed_next).unwrap();
+    assert!(
+        finalize_full_text_review(
+            &report,
+            &complete,
+            &capture,
+            full_text_approval_fixture(&report, &capture)
+        )
+        .is_ok()
+    );
+    assert_eq!(serde_json::to_vec(&worksheet).unwrap(), before);
+}
+
+#[test]
+fn full_text_review_rejects_duplicate_keys_before_comparing_presented_context() {
+    let report = report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let worksheet = build_full_text_review_worksheet(&report, &capture).unwrap();
+    let completed =
+        String::from_utf8(completed_full_text_view(&report, &worksheet, &capture, 2)).unwrap();
+    for (original, duplicated) in [
+        (
+            "\"capture_digest\":",
+            "\"capture_digest\":\"changed\",\"capture_digest\":",
+        ),
+        ("\"item_key\":", "\"item_key\":\"changed\",\"item_key\":"),
+        ("\"ABCD2345\":", "\"ABCD2345\":[],\"ABCD2345\":"),
+        ("\"body\":", "\"body\":\"changed\",\"body\":"),
+    ] {
+        assert!(completed.contains(original));
+        let invalid = completed.replacen(original, duplicated, 1);
+        assert!(
+            apply_full_text_review_view(&report, &worksheet, &capture, invalid.as_bytes()).is_err()
+        );
+    }
+}
+
+#[test]
+fn full_text_review_revalidates_restored_bindings_before_governance() {
+    let report = report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let worksheet = build_full_text_review_worksheet(&report, &capture).unwrap();
+    let completed = completed_full_text_view(&report, &worksheet, &capture, 2);
+    let decided = apply_full_text_review_view(&report, &worksheet, &capture, &completed).unwrap();
+    let golden = finalize_full_text_review(
+        &report,
+        &decided,
+        &capture,
+        full_text_approval_fixture(&report, &capture),
+    )
+    .unwrap();
+    let expected = serde_json::to_value(&golden).unwrap();
+    let mut changed_report = report_fixture();
+    changed_report.classified_items[0]
+        .title
+        .push_str(" changed");
+    assert!(
+        finalize_full_text_review(
+            &changed_report,
+            &decided,
+            &capture,
+            full_text_approval_fixture(&changed_report, &capture)
+        )
+        .is_err()
+    );
+    let mut calls = 0;
+    assert!(
+        evaluate_full_text_review(&changed_report, &capture, &golden, |_| {
+            calls += 1;
+            true
+        })
+        .is_err()
+    );
+    assert_eq!(calls, 0);
+    for (pointer, replacement) in [
+        ("/capture_digest", serde_json::json!("changed")),
+        ("/full_text_golden_set_v1/labels", serde_json::json!([])),
+        (
+            "/full_text_golden_set_v1/approval/proposal_digest",
+            serde_json::json!("changed"),
+        ),
+    ] {
+        let mut invalid = expected.clone();
+        *invalid.pointer_mut(pointer).unwrap() = replacement;
+        let invalid: FullTextReviewedGoldenSet = serde_json::from_value(invalid).unwrap();
+        assert!(
+            evaluate_full_text_review(&report, &capture, &invalid, |_| {
+                calls += 1;
+                true
+            })
+            .is_err()
+        );
+    }
+    assert_eq!(calls, 0);
+    let mut relabeled = expected.clone();
+    relabeled["full_text_golden_set_v1"]["labels"][0]["expected_disposition"] =
+        serde_json::json!(crate::Disposition::Generation);
+    let relabeled = serde_json::from_value(relabeled).unwrap();
+    assert!(
+        evaluate_full_text_review(
+            &report,
+            &capture,
+            &relabeled,
+            |received| serde_json::to_value(received).unwrap() == expected
+        )
+        .is_err()
+    );
+    let mut wrong_approval =
+        serde_json::to_value(full_text_approval_fixture(&report, &capture)).unwrap();
+    wrong_approval["capture_digest"] = serde_json::json!("changed");
+    assert!(
+        finalize_full_text_review(
+            &report,
+            &decided,
+            &capture,
+            serde_json::from_value(wrong_approval).unwrap()
+        )
+        .is_err()
+    );
+    let mut invalid_worksheet = serde_json::to_value(&worksheet).unwrap();
+    invalid_worksheet["capture_digest"] = serde_json::json!("changed");
+    let invalid_worksheet = serde_json::from_value(invalid_worksheet).unwrap();
+    assert!(build_bound_full_text_review_json(&report, &invalid_worksheet, &capture, 1).is_err());
+    assert!(
+        apply_full_text_review_view(&report, &invalid_worksheet, &capture, &completed).is_err()
+    );
+    assert!(
+        finalize_full_text_review(
+            &report,
+            &invalid_worksheet,
+            &capture,
+            full_text_approval_fixture(&report, &capture)
+        )
+        .is_err()
+    );
+    let mut invalid_report = report_fixture();
+    invalid_report.audit_summary.failure_count = 1;
+    assert!(build_full_text_review_worksheet(&invalid_report, &capture).is_err());
+    assert!(build_full_text_review_worksheet(&changed_report, &capture).is_err());
+}
+
+#[test]
+fn full_text_owned_artifacts_reject_unknown_fields_without_changing_legacy_validity() {
+    let report = report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let worksheet = build_full_text_review_worksheet(&report, &capture).unwrap();
+    let worksheet_json = serde_json::to_value(&worksheet).unwrap();
+    for pointer in [
+        "",
+        "/full_text_worksheet_v1",
+        "/full_text_worksheet_v1/decisions/0",
+        "/full_text_worksheet_v1/snapshot_items/0",
+    ] {
+        let mut invalid = worksheet_json.clone();
+        invalid
+            .pointer_mut(pointer)
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .insert("unexpected_field".into(), serde_json::json!(true));
+        assert!(serde_json::from_value::<FullTextReviewWorksheet>(invalid).is_err());
+    }
+    let approval_json =
+        serde_json::to_value(full_text_approval_fixture(&report, &capture)).unwrap();
+    assert!(serde_json::from_value::<crate::GoldenSetApproval>(approval_json.clone()).is_err());
+    assert!(
+        serde_json::from_value::<FullTextReviewApproval>(
+            approval_json["full_text_approval_v1"].clone()
+        )
+        .is_err()
+    );
+    assert!(
+        serde_json::from_value::<crate::GoldenSetApproval>(
+            approval_json["full_text_approval_v1"].clone()
+        )
+        .is_ok()
+    );
+    for pointer in [
+        "",
+        "/full_text_approval_v1",
+        "/full_text_approval_v1/snapshot_items/0",
+    ] {
+        let mut invalid = approval_json.clone();
+        invalid
+            .pointer_mut(pointer)
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .insert("unexpected_field".into(), serde_json::json!(true));
+        assert!(serde_json::from_value::<FullTextReviewApproval>(invalid).is_err());
+    }
+    let completed = completed_full_text_view(&report, &worksheet, &capture, 2);
+    let decided = apply_full_text_review_view(&report, &worksheet, &capture, &completed).unwrap();
+    let golden = finalize_full_text_review(
+        &report,
+        &decided,
+        &capture,
+        full_text_approval_fixture(&report, &capture),
+    )
+    .unwrap();
+    for pointer in [
+        "",
+        "/full_text_golden_set_v1",
+        "/full_text_golden_set_v1/labels/0",
+    ] {
+        let mut invalid = serde_json::to_value(&golden).unwrap();
+        invalid
+            .pointer_mut(pointer)
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .insert("unexpected_field".into(), serde_json::json!(true));
+        assert!(serde_json::from_value::<FullTextReviewedGoldenSet>(invalid).is_err());
+    }
+}
+
+#[test]
 fn full_text_worksheet_starts_blank_without_a_metadata_downcast() {
     let report = report_fixture();
     let capture = capture_with(&report, 4096, &mut |request_path, _| {

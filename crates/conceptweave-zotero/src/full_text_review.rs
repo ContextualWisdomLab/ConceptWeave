@@ -47,10 +47,11 @@ pub fn build_full_text_review_worksheet(
     report: &ClassificationReport,
     capture: &FullTextCapture,
 ) -> Result<FullTextReviewWorksheet, FullTextError> {
+    let review_worksheet = build_steward_review_worksheet(report).map_err(|_| INVALID_EVIDENCE)?;
     verify_full_text_capture(capture, report)?;
     Ok(FullTextReviewWorksheet {
         capture_digest: capture.capture_digest.clone(),
-        review_worksheet: build_steward_review_worksheet(report).map_err(|_| INVALID_EVIDENCE)?,
+        review_worksheet,
     })
 }
 
@@ -74,24 +75,35 @@ pub fn apply_full_text_review_view(
     completed_view: &[u8],
 ) -> Result<FullTextReviewWorksheet, FullTextError> {
     validate_review_capture(report, capture, &worksheet.capture_digest)?;
-    let mut completed = unique_review_json::parse_review_json(completed_view)
-        .map_err(|_| INVALID_EVIDENCE)?;
+    let mut completed =
+        unique_review_json::parse_review_json(completed_view).map_err(|_| INVALID_EVIDENCE)?;
     let batch: crate::StewardReviewBatch = serde_json::from_value(
-        completed.get("review_batch").ok_or(INVALID_EVIDENCE)?.clone(),
-    ).map_err(|_| INVALID_EVIDENCE)?;
-    let patch = crate::decision_patch_from_review_batch(report, &worksheet.review_worksheet, &batch)
-        .map_err(|_| INVALID_EVIDENCE)?;
+        completed
+            .get("review_batch")
+            .ok_or(INVALID_EVIDENCE)?
+            .clone(),
+    )
+    .map_err(|_| INVALID_EVIDENCE)?;
+    let patch =
+        crate::decision_patch_from_review_batch(report, &worksheet.review_worksheet, &batch)
+            .map_err(|_| INVALID_EVIDENCE)?;
     let expected: serde_json::Value = serde_json::from_slice(&build_full_text_review_json(
-        report, &worksheet.review_worksheet, capture, batch.decisions.len(),
-    )?).map_err(|_| INVALID_EVIDENCE)?;
+        report,
+        &worksheet.review_worksheet,
+        capture,
+        batch.decisions.len(),
+    )?)
+    .expect("generated full-text view contains valid JSON");
     // The metadata boundary above already checked every displayed batch field.
     // Replace only that verified batch before comparing the retained text envelope.
     completed["review_batch"] = expected["review_batch"].clone();
     if completed != expected {
         return Err(INVALID_EVIDENCE);
     }
-    let review_worksheet = crate::apply_steward_decision_patch(report, &worksheet.review_worksheet, &patch)
-        .map_err(|_| INVALID_EVIDENCE)?;
+    let review_worksheet =
+        crate::apply_steward_decision_patch(report, &worksheet.review_worksheet, &patch).expect(
+            "a validated pending review patch cannot conflict with its unchanged worksheet",
+        );
     Ok(FullTextReviewWorksheet {
         capture_digest: worksheet.capture_digest.clone(),
         review_worksheet,
@@ -111,8 +123,11 @@ pub fn finalize_full_text_review(
         return Err(INVALID_EVIDENCE);
     }
     let reviewed_golden_set = crate::reviewed_golden_set_from_worksheet(
-        report, &worksheet.review_worksheet, approval.review_approval,
-    ).map_err(|_| INVALID_EVIDENCE)?;
+        report,
+        &worksheet.review_worksheet,
+        approval.review_approval,
+    )
+    .map_err(|_| INVALID_EVIDENCE)?;
     Ok(FullTextReviewedGoldenSet {
         capture_digest: worksheet.capture_digest.clone(),
         reviewed_golden_set,
@@ -134,8 +149,11 @@ where
 {
     validate_review_capture(report, capture, &reviewed.capture_digest)?;
     let review_evaluation = crate::evaluate_complete_reviewed_classification(
-        report, &reviewed.reviewed_golden_set, |_| verify_approval(reviewed),
-    ).map_err(|_| FullTextError("full-text review is invalid or unverified"))?;
+        report,
+        &reviewed.reviewed_golden_set,
+        |_| verify_approval(reviewed),
+    )
+    .map_err(|_| FullTextError("full-text review is invalid or unverified"))?;
     Ok(FullTextReviewEvaluation {
         capture_digest: reviewed.capture_digest.clone(),
         review_evaluation,

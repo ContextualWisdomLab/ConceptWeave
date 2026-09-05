@@ -1,6 +1,8 @@
 //! Bounded JSON admission before a review object can discard duplicate keys.
 
-use serde_json::Value;
+use serde::de::{DeserializeSeed, MapAccess, SeqAccess, Visitor};
+use serde_json::{Map, Value};
+use std::fmt;
 
 const MAX_REVIEW_JSON_BYTES: usize = 16 * 1024 * 1024;
 const INVALID_REVIEW_JSON: &str = "review JSON is invalid";
@@ -13,7 +15,74 @@ pub(crate) fn parse_review_json(bytes: &[u8]) -> Result<Value, &'static str> {
     if bytes.len() > MAX_REVIEW_JSON_BYTES {
         return Err(INVALID_REVIEW_JSON);
     }
-    serde_json::from_slice(bytes).map_err(|_| INVALID_REVIEW_JSON)
+    let mut deserializer = serde_json::Deserializer::from_slice(bytes);
+    let value = UniqueReviewValue
+        .deserialize(&mut deserializer)
+        .map_err(|_| INVALID_REVIEW_JSON)?;
+    deserializer.end().map_err(|_| INVALID_REVIEW_JSON)?;
+    Ok(value)
+}
+
+/// Builds values recursively while retaining each object's decoded key boundary.
+struct UniqueReviewValue;
+
+impl<'de> DeserializeSeed<'de> for UniqueReviewValue {
+    type Value = Value;
+
+    fn deserialize<D: serde::Deserializer<'de>>(self, deserializer: D) -> Result<Value, D::Error> {
+        deserializer.deserialize_any(self)
+    }
+}
+
+impl<'de> Visitor<'de> for UniqueReviewValue {
+    type Value = Value;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("a JSON value with unique object keys")
+    }
+
+    fn visit_unit<E>(self) -> Result<Value, E> {
+        Ok(Value::Null)
+    }
+
+    fn visit_bool<E>(self, value: bool) -> Result<Value, E> {
+        Ok(Value::Bool(value))
+    }
+
+    fn visit_i64<E>(self, value: i64) -> Result<Value, E> {
+        Ok(Value::from(value))
+    }
+
+    fn visit_u64<E>(self, value: u64) -> Result<Value, E> {
+        Ok(Value::from(value))
+    }
+
+    fn visit_f64<E>(self, value: f64) -> Result<Value, E> {
+        Ok(Value::from(value))
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Value, E> {
+        Ok(Value::String(value.to_owned()))
+    }
+
+    fn visit_seq<A: SeqAccess<'de>>(self, mut sequence: A) -> Result<Value, A::Error> {
+        let mut values = Vec::new();
+        while let Some(value) = sequence.next_element_seed(UniqueReviewValue)? {
+            values.push(value);
+        }
+        Ok(Value::Array(values))
+    }
+
+    fn visit_map<A: MapAccess<'de>>(self, mut object: A) -> Result<Value, A::Error> {
+        let mut values = Map::new();
+        while let Some(key) = object.next_key::<String>()? {
+            if values.contains_key(&key) {
+                return Err(serde::de::Error::custom("duplicate review key"));
+            }
+            values.insert(key, object.next_value_seed(UniqueReviewValue)?);
+        }
+        Ok(Value::Object(values))
+    }
 }
 
 #[cfg(test)]
@@ -61,6 +130,15 @@ mod tests {
 
     #[test]
     fn review_json_rejects_malformed_trailing_and_excessively_deep_inputs() {
+        let expectation = <serde_json::Error as serde::de::Error>::invalid_type(
+            serde::de::Unexpected::Bytes(b""),
+            &UniqueReviewValue,
+        );
+        assert!(
+            expectation
+                .to_string()
+                .contains("a JSON value with unique object keys")
+        );
         for bytes in [
             b"".as_slice(),
             b" ",
