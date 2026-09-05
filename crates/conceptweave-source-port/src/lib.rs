@@ -81,7 +81,7 @@ impl ObservationLimits {
             return Err(ObservationLimitError::ZeroRowLimit);
         }
         if max_bytes == 0 {
-            return Err(ObservationLimitError::ZeroByteLimit);
+            return Err(ObservationLimitError::ZeroByteLimitExceeded);
         }
         if max_concurrent_queries == 0 {
             return Err(ObservationLimitError::ZeroConcurrencyLimit);
@@ -325,24 +325,25 @@ impl ObservationRequest {
     /// The operation budget starts before the registry lookup. The returned execution envelope is
     /// the only request type accepted by [`SourceObservationPort`] and privately retains the
     /// monotonic start coordinate so adapter code can query the remaining budget without receiving
-    /// wall-clock provenance. Unknown registry keys or an exhausted authorization budget fail
-    /// before an adapter can receive the request, while credential material remains outside this
-    /// contract.
+    /// wall-clock provenance. If registry work consumes the budget, timeout takes precedence over
+    /// the registry result so over-budget authorization never leaks into adapter admission.
     pub fn authorize(
         self,
         registry: &dyn SourceConnectionRegistry,
     ) -> Result<AuthorizedObservationRequest, ObservationRequestError> {
         let operation_started_at = Instant::now();
-        let source_connection = self.resolve_source_connection(registry)?;
-        let authorized = AuthorizedObservationRequest {
+        let source_connection = self.resolve_source_connection(registry);
+        let elapsed = Instant::now().saturating_duration_since(operation_started_at);
+        let operation_timeout = Duration::from_millis(self.limits.operation_timeout_ms);
+        if elapsed >= operation_timeout {
+            return Err(ObservationRequestError::OperationTimeout);
+        }
+        let source_connection = source_connection?;
+        Ok(AuthorizedObservationRequest {
             request: self,
             source_connection,
             operation_started_at,
-        };
-        if authorized.remaining_operation_budget().is_none() {
-            return Err(ObservationRequestError::OperationTimeout);
-        }
-        Ok(authorized)
+        })
     }
 
     /// Returns exact authorized schema identifiers in deterministic lexical order.
