@@ -595,6 +595,56 @@ mod tests {
         assert_eq!(error.to_string(), "review input is invalid");
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn private_output_limit_accepts_exactly_the_readable_artifact_boundary() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let output = unique_temp_path("exact-output-limit");
+        assert!(!output.exists());
+        let mut content = vec![b' '; MAX_ARTIFACT_BYTES as usize];
+        content[..2].copy_from_slice(b"{}");
+        write_private_output(&output, &content).unwrap();
+        let metadata = fs::metadata(&output).unwrap();
+        let restored = read_private_json::<serde_json::Value>(output.to_str().unwrap());
+        fs::remove_file(output).unwrap();
+        assert_eq!(metadata.len(), MAX_ARTIFACT_BYTES);
+        assert_eq!(metadata.permissions().mode() & 0o777, 0o600);
+        assert_eq!(restored.unwrap().0, serde_json::json!({}));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn private_output_limit_rejects_oversize_before_creating_or_touching_a_file() {
+        let output = unique_temp_path("oversized-output-limit");
+        let existing = unique_temp_path("existing-output-limit");
+        assert!(!output.exists());
+        assert!(!existing.exists());
+        write_private_output(&existing, b"original").unwrap();
+        let content = vec![b' '; MAX_ARTIFACT_BYTES as usize + 1];
+        let rejected = write_private_output(&output, &content);
+        let touched = write_private_output(&existing, &content);
+        let created = output.exists();
+        let preserved = fs::read(&existing).unwrap();
+        // Clean synthetic artifacts even when the RED implementation creates the file.
+        if created {
+            fs::remove_file(output).unwrap();
+        }
+        fs::remove_file(existing).unwrap();
+        assert!(
+            !created,
+            "oversized metadata must be rejected before creation"
+        );
+        assert_eq!(preserved, b"original");
+        for error in [rejected.unwrap_err(), touched.unwrap_err()] {
+            assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+            assert_eq!(
+                error.to_string(),
+                "metadata output exceeds the artifact size limit"
+            );
+        }
+    }
+
     #[test]
     fn failed_private_output_is_removed_for_retry() {
         let output = unique_temp_path("failed-output");
