@@ -370,10 +370,13 @@ fn write_all_and_flush(writer: &mut BufWriter<File>, content: &[u8]) -> io::Resu
 }
 
 /// Runs the private-output boundary with an injectable writer for failure testing.
+type PrivateOutputWriter<'writer> =
+    dyn FnMut(&mut BufWriter<File>, &[u8]) -> io::Result<()> + 'writer;
+
 fn write_private_output_with(
     path: &Path,
     content: &[u8],
-    write: &mut dyn FnMut(&mut BufWriter<File>, &[u8]) -> io::Result<()>,
+    write: &mut PrivateOutputWriter<'_>,
 ) -> io::Result<()> {
     let file = create_report_file(path)?;
     let mut writer = BufWriter::new(file);
