@@ -10,6 +10,8 @@
 
 Research Intake also owns the optional private Full-Text Capture bound to a metadata report. It preserves provider observations while rejecting mixed-origin counters as a reliable incremental cursor. This is an adapter responsibility, not a new bounded context, shared catalog or approval owner; downstream proposal adoption remains a separate evidence/review transition.
 
+The Full-Text Review View is an in-context read projection over that verified capture and the current pending worksheet. It introduces no new aggregate or authority owner. Governance cannot accept it through the existing metadata-only patch path; full-text decision provenance needs a subsequent explicit contract.
+
 ## External relationships
 
 - Zotero Local API -> research evidence intake: **Anti-Corruption Layer into Semantic Discovery**. Zotero remains the bibliographic system of record; ConceptWeave consumes a version-pinned snapshot and emits proposal evidence. Execute-mode metadata changes cross only a caller-owned authenticated adapter after complete preflight; ConceptWeave retains no API key and records verified item-level outcomes and rollback coordinates. Item metadata, attachments, collection/tag truth, and write authority remain in Zotero. No Zotero record becomes semantic authority without ConceptWeave validation/review/publication.

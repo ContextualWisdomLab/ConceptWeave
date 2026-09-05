@@ -68,6 +68,13 @@ sequenceDiagram
         Note over Report,Capture: non-atomic observation; no changed proposal or approval
     end
     Intake->>Report: derive snapshot-bound decision worksheet without bibliographic text
+    opt inspect retained text for pending rows
+        Report->>Intake: original report and current worksheet
+        Capture->>Intake: separately bounded private capture
+        Intake->>Intake: verify capture binding and select canonical pending rows
+        Intake-->>Steward: create-new bounded evidence view with missing text visible
+        Note over Intake,Steward: read-only view; legacy apply commands reject it
+    end
     Report->>Steward: review dispositions and merge candidates
     Steward->>Intake: save partially completed worksheet
     Intake->>Report: validate original binding; emit aggregate progress only

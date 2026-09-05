@@ -47,6 +47,16 @@ No dedicated utility repository or Zotero mutation path is created. A future Zot
 
 ## Consequences
 
+### 2026-09-05 private full-text review view amendment (Proposed)
+
+In the context of stewards inspecting retained text for pending papers, facing a metadata-only decision and approval chain that cannot retain a later capture's identity, we decided for a separate verified, bounded evidence view and against enriching the earlier report or silently converting the view into a legacy decision patch, to preserve source and review boundaries while making the saved text inspectable, accepting that full-text decision application and approval binding still require a subsequent contract change.
+
+The view combines the original report, current pending worksheet and exact capture through existing validation, without new proposals or authority. It keeps capture/report/proposal digests distinct, includes only selected parents' exact attachment content/status/version observations, and keeps all bibliographic items in the campaign denominator. A missing attachment list, 404 response, empty content or incomplete counter is evidence for review, never a reason to invent a label or exclude a paper. Standalone or unrelated attachment text is not duplicated into another paper's view.
+
+We choose a non-flattened, Serialize-only envelope so the existing strict batch and patch parsers reject it. Copying its nested metadata batch manually cannot substantiate full-text-reviewed decisions; the next decision-application contract must retain review-context identity through worksheet/finalization and require fresh external approval. Regenerating all proposals was rejected because this step changes access to evidence, not predictions. New domain aggregates, a database, an assignment service and a Utility Repository were rejected because there is still one local Research Intake consumer.
+
+The larger capture reader preserves the existing private-file identity checks and adds a separate 512 MiB file ceiling without raising the 16 MiB report/worksheet limit. A fixed-slice standard-library writer bounds the complete output to 16 MiB, including escaping, without a custom writer abstraction. Positive consequences are repeatable evidence inspection and no full-capture-sized serialization buffer. Negative consequences are another sensitive retained file, a bounded output buffer, and possible rejection of an otherwise valid large capture or review view. Overflow must be reported without truncation; the original capture remains available and papers remain pending. No UI, model call, publication, approved write or protected release is implied. Status remains Proposed.
+
 ### 2026-09-05 full-text evidence amendment (Proposed)
 
 In the context of reviewing papers with missing abstracts, facing a full-text API whose observed versions mix sync and local writes and whose list lacks the documented version header, we decided for separately captured, content-bound full-text observations and against treating attachment listings or unchanged version counters as complete snapshot evidence, to preserve review provenance and the full campaign denominator, accepting another capture/verification step and no current claim of atomic full-text enrichment.

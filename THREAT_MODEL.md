@@ -75,4 +75,6 @@ PR #30 commit `9733d28` reproduced the inode-preserving final-component symlink 
 
 ## Release gate
 
+The optional full-text review view must not be confused with the metadata-only decision or approval artifacts. A required versioned outer envelope and strict legacy parsers prevent silent direct application; an intentional caller can still strip fields, so no full-text-reviewed approval is claimed. The complete capture is reverified before selecting text, unrelated parent text is excluded, and output serialization itself is bounded. The larger serialized-capture input ceiling is separate from the unchanged report/worksheet limit. Source text is untrusted data, never instructions, and source content must not be included in input-error diagnostics.
+
 A capability is not release-ready while a valid security finding lacks a deterministic test or equivalent machine-verifiable contract, while required exact-head checks are non-terminal, or while the implemented transport cannot satisfy the advertised security claim. Documentation must describe residual risk without upgrading provider guarantees by inference.

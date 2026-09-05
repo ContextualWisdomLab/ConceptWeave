@@ -74,6 +74,14 @@ impl std::error::Error for FullTextError {}
 
 /// Builds a bounded private evidence view for the next pending review rows.
 ///
+/// This verifies the complete capture against the unchanged report, then selects
+/// the same 1–100 pending rows as the metadata review command. Each selected paper
+/// keeps an attachment list, even when no text was captured. Exact response bodies
+/// preserve missing, empty and partially indexed content without interpreting it.
+/// The serialized output is limited to 16 MiB, including JSON escaping; an
+/// oversized view fails without truncation. Callers must separately bound private
+/// capture-file deserialization before passing the restored capture here.
+///
 /// The returned JSON is not a decision patch or an approval. It must not replace
 /// the original report or worksheet, and it is rejected by legacy apply commands.
 pub fn build_full_text_review_json(
