@@ -51,6 +51,20 @@ Protected central source is `.github/main@6d7fbebec8aec31d88a30a36e71ca5b3925d24
 
 ## Zotero research campaign evidence
 
+### Current runtime transition and integrity gates
+
+A fresh read at `22030ae6c8510d9eb8f7b07d98959bb69d2bd286` observed Zotero 10.0.1, API 3/schema 44, library version 2 and a present server identity. It produced a distinct report/worksheet pair without overwriting the historical artifacts below. The full read still counted 8,326 records and 3,715 bibliographic proposals, with 56 adjacent-evidence proposals, one semantic-consumption bridge, 3,658 abstentions and 49 duplicate candidates. The new worksheet's aggregate checkpoint remains 0/3,715, incomplete. Equal totals do not prove unchanged content across the Zotero 9-to-10 version-space transition.
+
+Both new files have mode `0600`. The report is 6,890,050 bytes with file SHA-256 `d56c8ac70da7f094355748f6611ba47f9d2256bb87f0e24ab84683536e56fb9e`; the worksheet is 1,640,941 bytes with file SHA-256 `919ad3b875846c018eb92df2b2caf5d9a8ed491ede0b4718c07e56dc69bca0d9`. Their implementation-reported snapshot digest is `sha256:bcc50fdf4e16789e7d2651b431817dfc178fdcaad7e0c73360fda2d83351d7b5`, which is not yet proof of complete raw-field binding.
+
+PR #10's existing findings remain source-confirmed at this capture head: provider fields omitted by the typed input are lost before raw-snapshot hashing, and mutable report predictions can be evaluated under an unchanged approval receipt. These invalidate stronger integrity claims, not the observed aggregate counts. Repair the canonical owner, propagate through the stack and regenerate before approval/promotion. Zotero 10 availability alone does not resolve the loopback confidentiality finding or grant write authority.
+
+The [CWL ontology capability inventory](doctoring/cwl_ontology_capability_inventory.md) records eight bounded owner candidates with exact default heads. Seven returned no GitHub release; RankWeave v0.18.0 resolves to an exact commit but does not prove Rust runtime availability or ConceptWeave adoption. `context-graph-contracts` and `enterprise-architecture-core` use protected `develop`, not `main`, as their default adoption baseline. This is owner-selection evidence, not an organization-wide census or permission to bypass missing releases.
+
+### Historical Zotero 9 snapshot
+
+The following record preserves earlier measurements and execution guidance. It does not authorize applying the old worksheet or batch to the current Zotero 10 snapshot.
+
 The parent integration ending at `062a0d9bca086d5a2aaa5d4122f58364115d4f91` replaced the baseline with Foundation's document and removed the research section present at `a84e6d49aba2a4fd0b0ef303a342922c4ce909bb`. This section restores FR-9 traceability using the saved private artifacts and the current executable. It preserves Foundation's updated status. These records must survive later parent integrations alongside the Foundation, Client and Source Observation evidence.
 
 On 2026-09-05, the existing `--review-progress` command at `062a0d9...` revalidated the original report and worksheet offline. The report still binds Zotero 9.0.6, API v3/schema 42, library version 12341, rule `ontology-research-v2`, and snapshot `sha256:c49b08066c4526e520a5f85416543ea20a620a06170e1e15f563088f6bc9e162`. This replay does not claim the mutable Zotero library is still at that version. All three original artifacts retained their hashes and remained outside the repository.
