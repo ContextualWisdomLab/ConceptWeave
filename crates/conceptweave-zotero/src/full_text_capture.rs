@@ -6,6 +6,9 @@ use crate::{
     local_agent, validate_item_key, verify_server_id,
 };
 use serde::{Deserialize, Serialize};
+#[path = "full_text_review.rs"]
+mod full_text_review;
+pub use full_text_review::*;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fmt;

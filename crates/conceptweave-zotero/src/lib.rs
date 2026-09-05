@@ -15,6 +15,7 @@ pub use full_text_capture::{
     FullTextCapture, FullTextError, build_full_text_review_json, read_local_full_text,
     verify_full_text_capture,
 };
+pub use full_text_capture::{FullTextReviewWorksheet, build_full_text_review_worksheet};
 
 /// Classification rule revision recorded in every report.
 pub const RULE_REVISION: &str = "ontology-research-v2";

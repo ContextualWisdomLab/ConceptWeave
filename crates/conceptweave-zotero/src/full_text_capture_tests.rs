@@ -2,6 +2,35 @@ use super::*;
 use crate::{ZoteroItem, classify_snapshot};
 
 #[test]
+fn full_text_worksheet_starts_blank_without_a_metadata_downcast() {
+    let report = report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let worksheet = build_full_text_review_worksheet(&report, &capture).unwrap();
+    let json = serde_json::to_value(&worksheet).unwrap();
+    assert_eq!(json["artifact_kind"], "full_text_review_worksheet_v1");
+    assert_eq!(json["capture_digest"], capture.capture_digest);
+    assert_eq!(
+        json["review_worksheet"]["decisions"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(
+        json["review_worksheet"]["decisions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|decision| decision["reviewed_disposition"].is_null())
+    );
+    assert!(serde_json::from_value::<StewardReviewWorksheet>(json.clone()).is_err());
+    assert!(serde_json::from_value::<FullTextReviewWorksheet>(json).is_ok());
+}
+
+#[test]
 fn review_view_binds_exact_capture_and_keeps_missing_parents_without_decisions() {
     let report = report_fixture();
     let worksheet = build_steward_review_worksheet(&report).unwrap();
