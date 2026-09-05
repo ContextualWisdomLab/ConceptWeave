@@ -3263,6 +3263,8 @@ fn normalize_title(value: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    mod proxy_isolation;
+
     use super::*;
     use std::io::{Read, Write};
     use std::net::TcpListener;
