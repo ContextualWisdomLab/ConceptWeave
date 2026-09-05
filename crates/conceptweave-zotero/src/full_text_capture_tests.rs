@@ -65,6 +65,121 @@ fn review_view_binds_exact_capture_and_keeps_missing_parents_without_decisions()
     );
 }
 
+#[test]
+fn review_view_selects_only_pending_parents_and_never_copies_unrelated_text() {
+    let report = report_fixture();
+    let mut worksheet = build_steward_review_worksheet(&report).unwrap();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let first: serde_json::Value = serde_json::from_slice(
+        &build_full_text_review_json(&report, &worksheet, &capture, 1).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        first["review_batch"]["decisions"].as_array().unwrap().len(),
+        1
+    );
+    assert!(first["attachment_evidence"].get("DEFG5678").is_none());
+    worksheet.decisions[0].reviewed_disposition = Some(crate::Disposition::OutOfScope);
+    let next = build_full_text_review_json(&report, &worksheet, &capture, 2).unwrap();
+    let view: serde_json::Value = serde_json::from_slice(&next).unwrap();
+    assert_eq!(view["review_batch"]["remaining_count"], 1);
+    assert_eq!(view["bibliographic_item_count"], 2);
+    assert_eq!(
+        view["attachment_evidence"],
+        serde_json::json!({"DEFG5678":[]})
+    );
+    assert!(!String::from_utf8(next).unwrap().contains("fixture text"));
+}
+
+#[test]
+fn review_view_rejects_changed_capture_report_and_invalid_pending_work() {
+    let report = report_fixture();
+    let worksheet = build_steward_review_worksheet(&report).unwrap();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    for field in ["body", "status", "version"] {
+        let mut saved = serde_json::to_value(&capture).unwrap();
+        saved["capture_evidence"]["records"][0]["content_response"][field] = if field == "body" {
+            serde_json::json!("private changed text")
+        } else {
+            serde_json::json!(999)
+        };
+        let changed: FullTextCapture = serde_json::from_value(saved).unwrap();
+        assert!(build_full_text_review_json(&report, &worksheet, &changed, 2).is_err());
+    }
+    let mut changed_report = report_fixture();
+    changed_report.classified_items[0].title = "different report evidence".into();
+    assert!(build_full_text_review_json(&changed_report, &worksheet, &capture, 2).is_err());
+    for limit in [0, 101] {
+        assert!(build_full_text_review_json(&report, &worksheet, &capture, limit).is_err());
+    }
+    let mut invalid = worksheet.clone();
+    invalid.decisions[0].reviewed_disposition = Some(crate::Disposition::NeedsStewardReview);
+    assert!(build_full_text_review_json(&report, &invalid, &capture, 2).is_err());
+    for decision in &mut invalid.decisions {
+        decision.reviewed_disposition = Some(crate::Disposition::OutOfScope);
+    }
+    assert!(build_full_text_review_json(&report, &invalid, &capture, 2).is_err());
+}
+
+#[test]
+fn review_view_retains_empty_partial_and_unknown_provider_evidence() {
+    for body in [
+        r#"{"content":""}"#,
+        r#"{"content":"partial text","indexedPages":1,"totalPages":2}"#,
+        r#"{"content":"unknown completeness","providerExtra":{"original":true}}"#,
+    ] {
+        let report = report_fixture();
+        let worksheet = build_steward_review_worksheet(&report).unwrap();
+        let capture = capture_with(&report, 4096, &mut |request_path, _| {
+            let mut response = response_fixture(request_path);
+            if request_path == "items/BCDE3456/fulltext" {
+                response.body = body.into();
+            }
+            Ok(response)
+        })
+        .unwrap();
+        let view: serde_json::Value = serde_json::from_slice(
+            &build_full_text_review_json(&report, &worksheet, &capture, 2).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            view["attachment_evidence"]["ABCD2345"][0]["content_response"]["body"],
+            body
+        );
+        assert_eq!(view["bibliographic_item_count"], 2);
+    }
+}
+
+#[test]
+fn review_view_rejects_json_expansion_without_truncating_valid_captured_text() {
+    let report = report_fixture();
+    let worksheet = build_steward_review_worksheet(&report).unwrap();
+    let capture = capture_with(&report, MAX_SNAPSHOT_BYTES, &mut |request_path, _| {
+        let mut response = response_fixture(request_path);
+        if request_path.ends_with("/fulltext") {
+            response.status = 200;
+            response.version = Some(if request_path.contains("BCDE3456") {
+                12403
+            } else {
+                0
+            });
+            response.body = serde_json::json!({"content":"\"".repeat(3 * 1024 * 1024)}).to_string();
+        }
+        Ok(response)
+    })
+    .unwrap();
+    verify_full_text_capture(&capture, &report).unwrap();
+    let error = build_full_text_review_json(&report, &worksheet, &capture, 1).unwrap_err();
+    assert!(error.to_string().contains("16 MiB output limit"));
+    assert_eq!(worksheet.decisions.len(), 2);
+}
+
 fn report_fixture() -> ClassificationReport {
     let items: Vec<ZoteroItem> = serde_json::from_value(serde_json::json!([
         {"key":"ABCD2345","version":2,"data":{"itemType":"journalArticle","title":"fixture paper"}},
