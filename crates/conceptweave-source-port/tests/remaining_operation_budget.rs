@@ -15,15 +15,19 @@ use conceptweave_source_port::{
     SourceObservationFailure, SourceObservationPort,
 };
 
-fn request(operation_timeout_ms: u64) -> ObservationRequest {
+fn request_with_key(source_connection_key: &str, operation_timeout_ms: u64) -> ObservationRequest {
     ObservationRequest::new(
-        "grc_readonly_connection",
+        source_connection_key,
         vec!["governance_core".to_owned()],
         ObservationRequestBudget::new(8, 512).expect("bounded request metadata"),
         ObservationLimits::with_timeouts(operation_timeout_ms, 5, 5_000, 1_048_576, 2)
             .expect("bounded observation limits"),
     )
     .expect("valid observation request")
+}
+
+fn request(operation_timeout_ms: u64) -> ObservationRequest {
+    request_with_key("grc_readonly_connection", operation_timeout_ms)
 }
 
 struct DelayedRegistry {
@@ -119,4 +123,15 @@ fn exhausted_authorization_fails_before_adapter_source_or_snapshot_side_effects(
     assert_eq!(port.adapter_invocations.load(Ordering::Relaxed), 0);
     assert_eq!(port.source_accesses.load(Ordering::Relaxed), 0);
     assert_eq!(port.snapshot_constructions.load(Ordering::Relaxed), 0);
+}
+
+#[test]
+fn elapsed_budget_takes_precedence_after_a_slow_unknown_registry_lookup() {
+    let authorization = request_with_key("unknown_readonly_connection", 5).authorize(
+        &DelayedRegistry {
+            delay: Duration::from_millis(20),
+        },
+    );
+
+    assert_eq!(authorization, Err(ObservationRequestError::OperationTimeout));
 }
