@@ -1,11 +1,14 @@
 use conceptweave_zotero::{
-    ClassificationReport, ItemData, WorksheetError, ZoteroItem, build_steward_review_worksheet,
-    classify_snapshot,
+    ClassificationReport, Disposition, EvaluationError, GoldenSetApproval, ItemData,
+    ReviewedGoldenSet, WorksheetError, ZoteroItem, build_steward_review_worksheet,
+    classification_proposal_digest, classify_snapshot, evaluate_complete_reviewed_classification,
+    reviewed_golden_set_from_worksheet,
 };
 
 #[test]
 fn owner_only_report_roundtrip_preserves_the_review_workload() {
     let mut item = ZoteroItem {
+        source_record: None,
         key: "ITEM".into(),
         version: 7,
         data: ItemData {
@@ -34,11 +37,75 @@ fn owner_only_report_roundtrip_preserves_the_review_workload() {
         build_steward_review_worksheet(&restored).unwrap(),
         build_steward_review_worksheet(&original).unwrap()
     );
+    assert_eq!(
+        classification_proposal_digest(&restored),
+        classification_proposal_digest(&original)
+    );
+
+    let mut worksheet = build_steward_review_worksheet(&original).unwrap();
+    worksheet.decisions[0].reviewed_disposition = Some(Disposition::AlignmentVersioning);
+    let approval = GoldenSetApproval {
+        receipt_id: "synthetic-roundtrip-receipt".into(),
+        reviewer_subject: "synthetic-steward".into(),
+        library_version: original.library_version,
+        rule_revision: original.rule_revision.clone(),
+        snapshot_digest: original.snapshot_digest.clone(),
+        proposal_digest: classification_proposal_digest(&original),
+        snapshot_items: original.snapshot_items.clone(),
+    };
+    let golden = reviewed_golden_set_from_worksheet(&original, &worksheet, approval).unwrap();
+    let restored_golden: ReviewedGoldenSet =
+        serde_json::from_slice(&serde_json::to_vec(&golden).unwrap()).unwrap();
+    assert_eq!(
+        evaluate_complete_reviewed_classification(&restored, &restored_golden, |candidate| {
+            candidate == &golden
+        })
+        .unwrap()
+        .correct_count,
+        1
+    );
+
+    for alter_title in [false, true] {
+        let mut changed_json = serde_json::to_value(&original).unwrap();
+        if alter_title {
+            changed_json["classified_items"][0]["title"] = "changed after review".into();
+        } else {
+            changed_json["classified_items"][0]["evidence"]["field_values"] = serde_json::json!({});
+        }
+        let changed_report: ClassificationReport = serde_json::from_value(changed_json).unwrap();
+        assert_eq!(changed_report.snapshot_digest, original.snapshot_digest);
+        assert_eq!(
+            build_steward_review_worksheet(&changed_report).unwrap(),
+            build_steward_review_worksheet(&original).unwrap()
+        );
+        assert_eq!(
+            reviewed_golden_set_from_worksheet(
+                &changed_report,
+                &worksheet,
+                restored_golden.approval.clone()
+            ),
+            Err(EvaluationError::SnapshotMismatch)
+        );
+        let verifier_calls = std::cell::Cell::new(0);
+        assert_eq!(
+            evaluate_complete_reviewed_classification(
+                &changed_report,
+                &restored_golden,
+                |candidate| {
+                    verifier_calls.set(verifier_calls.get() + 1);
+                    candidate == &golden
+                }
+            ),
+            Err(EvaluationError::SnapshotMismatch)
+        );
+        assert_eq!(verifier_calls.get(), 0);
+    }
 }
 
 #[test]
 fn restored_report_rejects_child_provenance_outside_the_bound_snapshot() {
     let item = ZoteroItem {
+        source_record: None,
         key: "ITEM".into(),
         version: 7,
         data: ItemData {
@@ -73,6 +140,7 @@ fn restored_report_rejects_child_provenance_outside_the_bound_snapshot() {
 #[test]
 fn restored_report_rejects_classified_or_reused_child_provenance() {
     let bibliographic = |key: &str| ZoteroItem {
+        source_record: None,
         key: key.into(),
         version: 7,
         data: ItemData {
@@ -86,6 +154,7 @@ fn restored_report_rejects_classified_or_reused_child_provenance() {
         },
     };
     let child = ZoteroItem {
+        source_record: None,
         key: "CHILD".into(),
         version: 3,
         data: ItemData {
@@ -153,6 +222,7 @@ fn restored_report_rejects_classified_or_reused_child_provenance() {
 #[test]
 fn restored_report_accepts_snapshot_bound_nested_child_provenance() {
     let nested_item = |key: &str, item_type: &str, parent_item: &str| ZoteroItem {
+        source_record: None,
         key: key.into(),
         version: 7,
         data: ItemData {
