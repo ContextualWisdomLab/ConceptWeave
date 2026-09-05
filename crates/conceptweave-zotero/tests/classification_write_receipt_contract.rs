@@ -18,6 +18,7 @@ fn classification_report() -> conceptweave_zotero::ClassificationReport {
         42,
         vec![
             ZoteroItem {
+                source_record: None,
                 key: "B".into(),
                 version: 9,
                 data: ItemData {
@@ -31,6 +32,7 @@ fn classification_report() -> conceptweave_zotero::ClassificationReport {
                 },
             },
             ZoteroItem {
+                source_record: None,
                 key: "A".into(),
                 version: 7,
                 data: ItemData {
