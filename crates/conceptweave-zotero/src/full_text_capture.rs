@@ -79,9 +79,16 @@ impl std::error::Error for FullTextError {}
 pub fn read_local_full_text(
     report: &ClassificationReport,
 ) -> Result<FullTextCapture, FullTextError> {
+    read_full_text_from_api(report, crate::LOCAL_API_ROOT)
+}
+
+fn read_full_text_from_api(
+    report: &ClassificationReport,
+    api_root: &str,
+) -> Result<FullTextCapture, FullTextError> {
     let agent = local_agent();
     capture_with(report, MAX_SNAPSHOT_BYTES, &mut |request_path, limit| {
-        fetch_response(&agent, report, crate::LOCAL_API_ROOT, request_path, limit)
+        fetch_response(&agent, report, api_root, request_path, limit)
     })
 }
 
@@ -397,3 +404,7 @@ fn fetch_response(
 #[cfg(test)]
 #[path = "full_text_capture_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "full_text_capture_transport_tests.rs"]
+mod transport_tests;
