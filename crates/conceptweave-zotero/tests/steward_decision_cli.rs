@@ -15,6 +15,7 @@ fn decision_patch_cli_writes_one_owner_only_updated_worksheet() {
         None,
         42,
         vec![ZoteroItem {
+            source_record: None,
             key: "ITEM".into(),
             version: 7,
             data: ItemData {
@@ -105,6 +106,7 @@ fn decision_patch_cli_never_overwrites_or_emits_invalid_work() {
         None,
         42,
         vec![ZoteroItem {
+            source_record: None,
             key: "ITEM".into(),
             version: 7,
             data: ItemData {
