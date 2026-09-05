@@ -1,5 +1,6 @@
 use conceptweave_source_port::{
-    ObservationLimits, ObservationRequest, ObservationRequestError, SourceConnectionRegistry,
+    ObservationLimits, ObservationRequest, ObservationRequestBudget, ObservationRequestError,
+    SourceConnectionRegistry,
 };
 
 struct TestRegistry;
@@ -14,6 +15,7 @@ fn request(source_connection_key: &str) -> ObservationRequest {
     ObservationRequest::new(
         source_connection_key,
         vec!["public".to_owned()],
+        ObservationRequestBudget::new(4, 256).unwrap(),
         ObservationLimits::new(1_000, 10, 1_024, 1).unwrap(),
     )
     .unwrap()
