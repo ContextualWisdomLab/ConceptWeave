@@ -3,7 +3,8 @@
 
 use conceptweave_zotero::{
     ClassificationReport, GoldenSetApproval, StewardReviewWorksheet,
-    build_steward_review_worksheet, read_local_snapshot, reviewed_golden_set_from_worksheet,
+    assess_steward_review_progress, build_steward_review_worksheet, read_local_snapshot,
+    reviewed_golden_set_from_worksheet,
 };
 use serde::de::DeserializeOwned;
 use std::collections::BTreeSet;
@@ -12,7 +13,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
-const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
+const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --review-progress /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/PROGRESS.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
 const MAX_ARTIFACT_BYTES: u64 = 16 * 1024 * 1024;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -22,6 +23,11 @@ enum OutputRequest {
         report: String,
         worksheet: String,
     },
+    ReviewProgress {
+        report: String,
+        worksheet: String,
+        output: String,
+    },
     Finalize {
         report: String,
         worksheet: String,
@@ -30,7 +36,7 @@ enum OutputRequest {
     },
 }
 
-/// Parses one mutually exclusive report, worksheet, or finalization request.
+/// Parses one mutually exclusive report, worksheet, review-progress, or finalization request.
 fn parse_output_request<I, S>(args: I) -> Result<OutputRequest, &'static str>
 where
     I: IntoIterator<Item = S>,
@@ -49,6 +55,24 @@ where
             return Err("report and worksheet output paths must differ");
         }
         OutputRequest::Worksheet { report, worksheet }
+    } else if first == "--review-progress" {
+        let report = args
+            .next()
+            .ok_or("--review-progress requires three artifact paths")?;
+        let worksheet = args
+            .next()
+            .ok_or("--review-progress requires three artifact paths")?;
+        let output = args
+            .next()
+            .ok_or("--review-progress requires three artifact paths")?;
+        if BTreeSet::from([report.as_str(), worksheet.as_str(), output.as_str()]).len() != 3 {
+            return Err("review progress artifact paths must differ");
+        }
+        OutputRequest::ReviewProgress {
+            report,
+            worksheet,
+            output,
+        }
     } else if first == "--finalize" {
         let report = args
             .next()
@@ -106,20 +130,25 @@ fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<(T, ArtifactI
     let parent = path
         .parent()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "review input has no parent"))?;
-    if !allowed_output_parents().contains(&parent.canonicalize()?) {
+    let resolved_parent = parent.canonicalize()?;
+    if !allowed_output_parents().contains(&resolved_parent) {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             "review input must be a direct child of the system temp directory",
         ));
     }
-    let path_metadata = fs::symlink_metadata(&path)?;
+    let file_name = path.file_name().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidInput, "review input has no file name")
+    })?;
+    let validated_path = resolved_parent.join(file_name);
+    let path_metadata = fs::symlink_metadata(&validated_path)?;
     if path_metadata.file_type().is_symlink() || !path_metadata.is_file() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "review input must be a regular file",
         ));
     }
-    let (file, opened_metadata) = open_with_metadata(&path)?;
+    let (file, opened_metadata) = open_with_metadata(&validated_path)?;
     #[cfg(not(unix))]
     {
         let _ = (path_metadata, opened_metadata, file);
@@ -137,12 +166,17 @@ fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<(T, ArtifactI
     }
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
 /// Opens a review input once and returns metadata from the opened handle.
 fn open_with_metadata(path: &Path) -> io::Result<(File, fs::Metadata)> {
-    let file = File::open(path)?;
-    let metadata = file.metadata()?;
-    Ok((file, metadata))
+    #[cfg(unix)]
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    options.custom_flags(libc::O_NOFOLLOW);
+    let file = options.open(path)?;
+    file.metadata().map(|metadata| (file, metadata))
 }
 
 #[cfg(unix)]
@@ -209,7 +243,6 @@ fn write_private_output(path: &Path, content: &[u8]) -> io::Result<()> {
     write_private_output_with(path, content, write_all_and_flush)
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
 /// Writes and flushes the complete serialized artifact.
 fn write_all_and_flush(writer: &mut BufWriter<File>, content: &[u8]) -> io::Result<()> {
     writer.write_all(content)?;
@@ -232,7 +265,6 @@ fn write_private_output_with(
     Ok(())
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
 /// Returns canonical directories in which a sensitive report may be created.
 fn allowed_output_parents() -> Vec<PathBuf> {
     let mut parents = vec![
@@ -344,6 +376,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err(error.into());
             }
         }
+        OutputRequest::ReviewProgress {
+            report,
+            worksheet,
+            output,
+        } => {
+            let output = validate_output_path(&output)?;
+            let (report, report_identity): (ClassificationReport, _) =
+                read_private_json(&report).map_err(|error| label_input("report", error))?;
+            let (worksheet, worksheet_identity): (StewardReviewWorksheet, _) =
+                read_private_json(&worksheet).map_err(|error| label_input("worksheet", error))?;
+            if report_identity == worksheet_identity {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "review progress inputs must be distinct files",
+                )
+                .into());
+            }
+            let progress = assess_steward_review_progress(&report, &worksheet)?;
+            write_private_output(&output, &serde_json::to_vec_pretty(&progress)?)?;
+        }
         OutputRequest::Finalize {
             report,
             worksheet,
@@ -432,6 +484,37 @@ mod tests {
         );
     }
 
+    #[test]
+    fn review_progress_mode_requires_three_distinct_artifact_paths() {
+        let report = "/tmp/report.json";
+        let worksheet = "/tmp/worksheet.json";
+        let output = "/tmp/progress.json";
+        assert_eq!(
+            parse_output_request(vec!["--review-progress", report, worksheet, output]),
+            Ok(OutputRequest::ReviewProgress {
+                report: report.to_owned(),
+                worksheet: worksheet.to_owned(),
+                output: output.to_owned(),
+            })
+        );
+        assert!(parse_output_request(vec!["--review-progress"]).is_err());
+        assert!(parse_output_request(vec!["--review-progress", report]).is_err());
+        assert!(parse_output_request(vec!["--review-progress", report, worksheet]).is_err());
+        assert!(
+            parse_output_request(vec!["--review-progress", report, worksheet, report]).is_err()
+        );
+        assert!(
+            parse_output_request(vec![
+                "--review-progress",
+                report,
+                worksheet,
+                output,
+                "extra"
+            ])
+            .is_err()
+        );
+    }
+
     #[cfg(unix)]
     #[test]
     fn private_json_input_is_owner_only_regular_bounded_and_valid() {
@@ -450,6 +533,7 @@ mod tests {
         assert_eq!(parsed["accepted"], true);
         assert!(read_private_json::<serde_json::Value>("relative.json").is_err());
         assert!(read_private_json::<serde_json::Value>("/").is_err());
+        assert!(read_private_json::<serde_json::Value>("/tmp/..").is_err());
         assert!(
             read_private_json::<serde_json::Value>(
                 unique_temp_path("missing-input").to_str().unwrap()
@@ -667,6 +751,12 @@ mod tests {
         assert_eq!(fs::read(&output).unwrap(), b"complete");
         assert!(write_private_output(&output, b"replacement").is_err());
         fs::remove_file(output).unwrap();
+
+        let read_only = unique_temp_path("read-only-writer");
+        fs::write(&read_only, b"input").unwrap();
+        let mut writer = BufWriter::with_capacity(1, File::open(&read_only).unwrap());
+        assert!(write_all_and_flush(&mut writer, b"content").is_err());
+        fs::remove_file(read_only).unwrap();
     }
 
     fn unique_temp_path(suffix: &str) -> PathBuf {

@@ -1104,6 +1104,25 @@ pub struct StewardReviewWorksheet {
     pub decisions: Vec<StewardReviewDecision>,
 }
 
+/// Aggregate-only checkpoint for a human steward review campaign.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct StewardReviewProgress {
+    /// Zotero library revision bound to the original report.
+    pub library_version: u64,
+    /// Classifier revision whose proposals are being reviewed.
+    pub rule_revision: String,
+    /// Opaque immutable snapshot identity.
+    pub snapshot_digest: String,
+    /// Number of bibliographic decisions required for completion.
+    pub total_count: usize,
+    /// Number of non-abstention decisions supplied by a steward.
+    pub decided_count: usize,
+    /// Number of decisions still blank.
+    pub remaining_count: usize,
+    /// Whether every decision slot is filled; this does not confer approval.
+    pub complete: bool,
+}
+
 /// A classification report cannot safely produce a review worksheet.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorksheetError {
@@ -1229,6 +1248,63 @@ pub fn build_steward_review_worksheet(
     })
 }
 
+/// Validates an in-progress worksheet and returns privacy-safe aggregate progress.
+pub fn assess_steward_review_progress(
+    report: &ClassificationReport,
+    worksheet: &StewardReviewWorksheet,
+) -> Result<StewardReviewProgress, WorksheetError> {
+    let expected = build_steward_review_worksheet(report)?;
+    validate_steward_review_worksheet_against(&expected, worksheet)?;
+    if worksheet
+        .decisions
+        .iter()
+        .any(|decision| decision.reviewed_disposition == Some(Disposition::NeedsStewardReview))
+    {
+        return Err(WorksheetError::InvalidReport);
+    }
+    let decided_count = worksheet
+        .decisions
+        .iter()
+        .filter(|decision| decision.reviewed_disposition.is_some())
+        .count();
+    let total_count = worksheet.decisions.len();
+    let remaining_count = total_count - decided_count;
+    Ok(StewardReviewProgress {
+        library_version: worksheet.library_version,
+        rule_revision: worksheet.rule_revision.clone(),
+        snapshot_digest: worksheet.snapshot_digest.clone(),
+        total_count,
+        decided_count,
+        remaining_count,
+        complete: total_count > 0 && remaining_count == 0,
+    })
+}
+
+fn validate_steward_review_worksheet_against(
+    expected: &StewardReviewWorksheet,
+    worksheet: &StewardReviewWorksheet,
+) -> Result<(), WorksheetError> {
+    if worksheet.library_version != expected.library_version
+        || worksheet.rule_revision != expected.rule_revision
+        || worksheet.snapshot_digest != expected.snapshot_digest
+        || worksheet.snapshot_items != expected.snapshot_items
+        || worksheet.decisions.len() != expected.decisions.len()
+        || worksheet
+            .decisions
+            .iter()
+            .zip(&expected.decisions)
+            .any(|(decision, expected)| {
+                decision.item_key != expected.item_key
+                    || decision.item_version != expected.item_version
+                    || decision.proposed_disposition != expected.proposed_disposition
+                    || decision.abstention_reason != expected.abstention_reason
+            })
+    {
+        return Err(WorksheetError::InvalidReport);
+    }
+    Ok(())
+}
+
 /// One steward-reviewed expected disposition in a local golden set.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct GoldenLabel {
@@ -1324,16 +1400,11 @@ pub fn reviewed_golden_set_from_worksheet(
     {
         return Err(EvaluationError::SnapshotMismatch);
     }
-
+    if validate_steward_review_worksheet_against(&expected, worksheet).is_err() {
+        return Err(EvaluationError::InvalidReview);
+    }
     let mut labels = Vec::with_capacity(worksheet.decisions.len());
-    for (decision, expected_decision) in worksheet.decisions.iter().zip(expected.decisions) {
-        if decision.item_key != expected_decision.item_key
-            || decision.item_version != expected_decision.item_version
-            || decision.proposed_disposition != expected_decision.proposed_disposition
-            || decision.abstention_reason != expected_decision.abstention_reason
-        {
-            return Err(EvaluationError::InvalidReview);
-        }
+    for decision in &worksheet.decisions {
         let expected_disposition = decision
             .reviewed_disposition
             .ok_or(EvaluationError::IncompleteReview)?;
