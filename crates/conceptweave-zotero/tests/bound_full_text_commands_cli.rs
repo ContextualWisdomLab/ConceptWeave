@@ -16,6 +16,67 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 #[test]
+fn cli_private_json_errors_never_echo_source_keys_or_dispositions() {
+    let case = Case::new("diagnostic-privacy");
+    let [report, worksheet, capture] = case.inputs();
+    let original = fs::read(&worksheet).unwrap();
+    let original_value: Value = serde_json::from_slice(&original).unwrap();
+    let mut unknown_field = original_value.clone();
+    unknown_field["synthetic-private-field-sentinel"] = true.into();
+    let mut invalid_value = original_value.clone();
+    invalid_value["full_text_worksheet_v1"]["decisions"][0]["reviewed_disposition"] =
+        "synthetic-private-enum-sentinel".into();
+    for (index, invalid) in [unknown_field, invalid_value.clone()]
+        .into_iter()
+        .enumerate()
+    {
+        let invalid = case.json(&format!("invalid-worksheet-{index}"), &invalid);
+        let output = case.path(&format!("rejected-{index}"));
+        let command = run(
+            "--bound-full-text-review",
+            &[&report, &invalid, &capture, Path::new("1"), &output],
+        );
+        assert_private_parse_failure(command, "worksheet");
+        assert!(!output.exists());
+    }
+    let mut approval = serde_json::to_value(case.approval()).unwrap();
+    approval["synthetic-private-approval-sentinel"] = true.into();
+    let approval = case.json("invalid-approval", &approval);
+    let golden = case.path("rejected-golden");
+    assert_private_parse_failure(
+        run(
+            "--finalize-full-text-review",
+            &[&report, &worksheet, &capture, &approval, &golden],
+        ),
+        "approval",
+    );
+    assert!(!golden.exists());
+    // Metadata-only siblings share the same parser and must not retain the leak.
+    let legacy = case.json(
+        "invalid-legacy-worksheet",
+        &invalid_value["full_text_worksheet_v1"],
+    );
+    let progress = case.path("rejected-progress");
+    assert_private_parse_failure(
+        run("--review-progress", &[&report, &legacy, &progress]),
+        "worksheet",
+    );
+    assert!(!progress.exists());
+    assert_eq!(fs::read(&worksheet).unwrap(), original);
+}
+
+fn assert_private_parse_failure(output: Output, role: &str) {
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(!stderr.contains("synthetic-private-"), "{stderr}");
+    assert!(
+        stderr.contains(&format!("{role}: review input is invalid")),
+        "{stderr}"
+    );
+}
+
+#[test]
 fn library_two_batch_flow_keeps_the_full_review_and_approval_envelopes() {
     let case = Case::new("library");
     let original = build_full_text_review_worksheet(&case.report, &case.capture).unwrap();

@@ -1,6 +1,31 @@
 use super::*;
 
 #[test]
+fn private_json_reader_does_not_echo_unknown_keys_or_invalid_values() {
+    let unknown_field = br#"{"synthetic-private-field-sentinel":true}"#;
+    let invalid_disposition = br#""synthetic-private-enum-sentinel""#;
+    let unknown_error = read_bounded_json::<FullTextReviewWorksheet>(
+        &mut unknown_field.as_slice(),
+        unknown_field.len() as u64,
+    )
+    .err()
+    .unwrap();
+    let value_error = read_bounded_json::<conceptweave_zotero::Disposition>(
+        &mut invalid_disposition.as_slice(),
+        invalid_disposition.len() as u64,
+    )
+    .unwrap_err();
+    for error in [unknown_error, value_error] {
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(error.to_string(), "review input is invalid");
+        assert_eq!(
+            label_input("worksheet", error).to_string(),
+            "worksheet: review input is invalid"
+        );
+    }
+}
+
+#[test]
 fn capture_reader_accepts_exact_budget_without_truncating_trailing_bytes() {
     let bytes = b"{\"synthetic\":true}  ";
     let length = bytes.len() as u64;
