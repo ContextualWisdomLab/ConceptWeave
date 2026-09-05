@@ -147,3 +147,36 @@ fn duplicate_zotero_keys_fail_closed_even_when_item_revisions_differ() {
         "Zotero item keys are identities; duplicate keys cannot become distinct records merely because their revision counters differ"
     );
 }
+
+#[test]
+fn approved_snapshot_cannot_authorize_a_prediction_changed_to_match_the_label() {
+    let mut report = classify_snapshot(
+        "9.0.6".into(),
+        None,
+        42,
+        vec![bibliographic("A", 1, "ontology learning")],
+    );
+    let golden = ReviewedGoldenSet {
+        approval: approval(&report, report.snapshot_items.clone()),
+        labels: vec![GoldenLabel::new("A", Disposition::AlignmentVersioning)],
+    };
+    let approved_golden = golden.clone();
+    assert_eq!(
+        evaluate_reviewed_golden_set(&report, &golden, |candidate| candidate == &approved_golden)
+            .unwrap()
+            .correct_count,
+        0
+    );
+
+    report.classified_items[0].proposed_disposition = Disposition::AlignmentVersioning;
+    let verifier_called = std::cell::Cell::new(false);
+    assert_eq!(
+        evaluate_reviewed_golden_set(&report, &golden, |candidate| {
+            verifier_called.set(true);
+            candidate == &approved_golden
+        }),
+        Err(EvaluationError::SnapshotMismatch),
+        "a source receipt cannot authorize changed predictions under unchanged source coordinates"
+    );
+    assert!(!verifier_called.get());
+}
