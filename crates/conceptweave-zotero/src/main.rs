@@ -360,7 +360,7 @@ fn label_input(name: &str, error: io::Error) -> io::Error {
 
 /// Writes one create-new owner-only artifact and removes a failed partial write.
 fn write_private_output(path: &Path, content: &[u8]) -> io::Result<()> {
-    write_private_output_with(path, content, write_all_and_flush)
+    write_private_output_with(path, content, &mut write_all_and_flush)
 }
 
 /// Writes and flushes the complete serialized artifact.
@@ -373,7 +373,7 @@ fn write_all_and_flush(writer: &mut BufWriter<File>, content: &[u8]) -> io::Resu
 fn write_private_output_with(
     path: &Path,
     content: &[u8],
-    write: impl FnOnce(&mut BufWriter<File>, &[u8]) -> io::Result<()>,
+    write: &mut dyn FnMut(&mut BufWriter<File>, &[u8]) -> io::Result<()>,
 ) -> io::Result<()> {
     let file = create_report_file(path)?;
     let mut writer = BufWriter::new(file);
@@ -484,7 +484,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let (report, _): (ClassificationReport, _) =
                 read_private_json(&report).map_err(|error| label_input("report", error))?;
             let capture = read_local_full_text(&report)?;
-            write_private_output_with(&output, &[], |writer, _| {
+            write_private_output_with(&output, &[], &mut |writer, _| {
                 serde_json::to_writer(&mut *writer, &capture).map_err(io::Error::other)?;
                 writer.flush()
             })?;
@@ -1044,7 +1044,7 @@ mod tests {
     fn failed_private_output_is_removed_for_retry() {
         let output = unique_temp_path("failed-output");
         let _ = fs::remove_file(&output);
-        let error = write_private_output_with(&output, b"content", |_, _| {
+        let error = write_private_output_with(&output, b"content", &mut |_, _| {
             Err(io::Error::new(
                 io::ErrorKind::WriteZero,
                 "injected write failure",
