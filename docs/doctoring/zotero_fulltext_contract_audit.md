@@ -122,7 +122,17 @@ The later #19 coverage failure, 333/334 normalized branch outcomes, exposed nond
 
 The final non-force cascade reaches #34 `b0119a57047e7b1fe5ddfbbf4b973de0f15de172`, with 156 workspace tests and its existing coverage gate passing. Root full-text integration `75da75cf01704d9aae47f1e5573e3bbe3fb42bb0` passes 186 workspace tests across 37 unfiltered suites, strict Clippy, formatting, rustdoc, CI contract and the existing coverage gate. It preserves one unchanged shared reader, inherited regression modules and all earlier full-text safeguards. Source-normalized coverage is 3,710/3,710 regions and 674/674 branches; functions are 347/347. Raw LLVM totals remain 4,159/4,255 lines, 6,129/6,274 regions and 603/674 branches. Independent source review found no actionable merge finding, not approval. No predecessor delta was discarded; every head still requires its own protected acceptance evidence.
 
+### Review binding follow-up, 2026-09-05
+
+The [blank initialization evidence](zotero_fulltext_review_binding_evidence.json) and [current baseline](../product-technical-gap-baseline.md#capture-bound-review-application-and-blank-initialization) record the separate capture-bound review contract at `da406cf6110888808fa530592bbce2b774b73f33`. The original source files remain unchanged, 3,715 new review slots are blank, and no approval, model call or Zotero write occurred. Its CLI only initializes work; completed-view application and whole-envelope governance verification are library APIs. This does not resolve the provider version-space defect or supply released orchestration.
+
+For restored owned review artifacts, unknown fields must fail instead of disappearing during deserialization. Serde documents that distinction and disallows combining its strict container attribute with flattening (Serde contributors, n.d.). JSON object-name duplication has inconsistent receiver behavior under RFC 8259; ConceptWeave rejects duplicate decoded keys recursively before comparing completed evidence views, rather than accepting last-key-wins projection (Bray, 2017, Section 4). These primary references support the input-contract choice, not semantic-label correctness. Context7's monthly quota was exhausted and DeepWiki did not index this repository during this follow-up; direct official documentation and current source/tests supplied the evidence.
+
 ## References
+
+Bray, T. (Ed.). (2017). *The JavaScript Object Notation (JSON) data interchange format* (RFC 8259, Section 4). Internet Engineering Task Force. https://www.rfc-editor.org/rfc/rfc8259#section-4
+
+Serde contributors. (n.d.). *Container attributes*. Serde. Retrieved September 5, 2026, from https://serde.rs/container-attrs.html
 
 Zotero. (2026a, July 29). *Zotero local API*. https://www.zotero.org/support/dev/web_api/v3/local_api
 

@@ -10,7 +10,7 @@
 
 Research Intake also owns the optional private Full-Text Capture bound to a metadata report. It preserves provider observations while rejecting mixed-origin counters as a reliable incremental cursor. This is an adapter responsibility, not a new bounded context, shared catalog or approval owner; downstream proposal adoption remains a separate evidence/review transition.
 
-The Full-Text Review View is an in-context read projection over that verified capture and the current pending worksheet. It introduces no new aggregate or authority owner. Governance cannot accept it through the existing metadata-only patch path; full-text decision provenance needs a subsequent explicit contract.
+The Full-Text Review View is an in-context read projection over that verified capture and the current pending worksheet. It introduces no new aggregate or authority owner. The separate Full-Text Review Worksheet carries one verified capture through atomic completed-view application and finalization. Governance receives the complete capture-bound reviewed set for independent verification; no metadata-only downcast or approval renewal is provided. The classification-write review remains a separate authority contract, with no full-text evaluation-to-write conversion.
 
 ## External relationships
 

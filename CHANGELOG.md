@@ -6,6 +6,8 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
+- A separate private review worksheet and library review path that keeps saved-text evidence attached to decisions and approval verification. Command-line support currently initializes blank review work; it does not complete or approve a review.
+
 - Private inspection of pending papers alongside their saved text, preserving missing material and leaving previous reports and decisions unchanged.
 
 - Private, replayable paper-text capture for later research review, preserving unavailable material and leaving earlier reports and approvals unchanged.
@@ -27,6 +29,8 @@ All notable changes to ConceptWeave are documented here.
 - Context-bound validation and owner-only application of completed steward review batches.
 
 ### Security
+
+- Completed text-review files reject changed evidence, stale decisions and duplicate fields before updating local work. Earlier approvals cannot silently acquire later text evidence.
 
 - Local research requests bypass environment-configured proxies. This prevents unintended proxy forwarding; local peer authentication remains an explicit release limitation.
 

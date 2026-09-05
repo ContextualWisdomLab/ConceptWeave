@@ -18,6 +18,7 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - Preserve source evidence, truth status, and publication state separately.
 - Keep Zotero full-text captures separate from metadata reports and approval receipts; restored captures require bounded verification, and local HTTP continuity is not peer authentication.
 - Full-text review views are read-only evidence; never strip their outer binding into a metadata-only patch and claim full-text decision or approval provenance.
+- Full-text decisions use the separate blank-start worksheet and atomic exact-view application; reverify the capture/report relation through finalization and whole-envelope governance. No reviewed-set downcast grants Zotero write authority.
 - Published semantic truth is immutable; correction uses supersession/new release.
 - Public Rust APIs require beginner-readable documentation.
 - Owned production coverage target is 100% line/function/region/branch where tooling exposes it.

@@ -9,3 +9,5 @@ Keep domain logic in bounded domain modules, LLM/provider logic behind ports/ada
 Zotero source capture must not alter the metadata report or renew its approval. Preserve private-file protections and the full bibliographic denominator, including missing and partial text.
 
 The separate full-text review view does not authorize decisions or writes. Keep its evidence binding intact; existing metadata-only apply/finalization cannot establish full-text-reviewed approval.
+
+Use the capture-bound blank-start worksheet for full-text decision work. Only the dedicated atomic view path may apply completed slots; finalization/evaluation reverify capture/report bindings and require whole-envelope external approval. CLI initialization alone is not an end-to-end review interface or Zotero write admission.

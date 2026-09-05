@@ -5,6 +5,8 @@
 | Source Snapshot | Immutable revision of source evidence observed by ConceptWeave. |
 | Full-Text Capture | Separate private record of exact text/metadata responses, missing results and read interval, bound to an earlier metadata report; not an atomic Source Snapshot or an Authority Receipt. |
 | Full-Text Review View | Bounded private projection of verified captured text beside current pending metadata decisions; keeps missing evidence visible and is neither an applicable decision patch nor an Authority Receipt. |
+| Full-Text Review Worksheet | Separate private work that starts with blank decisions for every bibliographic item and retains one verified capture identity through decision application; not authenticated history or approval. |
+| Capture-Bound Reviewed Set | Complete non-abstention labels and a capture-bound approval input, all presented together for independent governance verification; never a classification-write authorization. |
 | Observation | Deterministically extracted fact from a Source Snapshot. |
 | Evidence Reference | Stable source identity, digest, and location supporting a candidate. |
 | Semantic Candidate | Evidence-bound proposal for a concept, relation, constraint, dimension, measure, or physical mapping. |
