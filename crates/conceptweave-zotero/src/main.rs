@@ -801,6 +801,44 @@ mod tests {
     use super::*;
 
     #[test]
+    fn bound_full_text_modes_require_complete_distinct_paths_and_limits() {
+        for mode in [
+            "--bound-full-text-review",
+            "--apply-full-text-review",
+            "--finalize-full-text-review",
+        ] {
+            let fourth = if mode == "--bound-full-text-review" {
+                "1"
+            } else {
+                "input"
+            };
+            let args = [mode, "report", "worksheet", "capture", fourth, "output"];
+            assert!(parse_output_request(args).is_ok());
+            for count in 1..6 {
+                assert!(parse_output_request(args[..count].iter().copied()).is_err());
+            }
+            assert!(parse_output_request([mode, "r", "r", "c", fourth, "o"]).is_err());
+            assert!(parse_output_request([mode, "r", "w", "c", fourth, "c"]).is_err());
+            assert!(parse_output_request([mode, "r", "w", "c", fourth, "o", "extra"]).is_err());
+        }
+        for limit in [
+            "",
+            "0",
+            "101",
+            "-1",
+            "+1",
+            " 1",
+            "one",
+            "999999999999999999999999",
+        ] {
+            assert!(
+                parse_output_request(["--bound-full-text-review", "r", "w", "c", limit, "o"])
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
     fn full_text_worksheet_mode_requires_three_distinct_paths() {
         assert!(
             parse_output_request([
