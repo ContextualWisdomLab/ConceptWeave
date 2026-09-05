@@ -65,6 +65,12 @@ The official `10.0.1` tag resolves to `36749bd0bd4fdac9ee46c16f7aa7bed094a0851f`
 
 This is a provider contract mismatch, not evidence of a corrupt user library. The manifest bytes and metadata library version were unchanged at the bookends, but those observations do not establish atomicity or rule out a same-version full-text edit. The mixed-origin field must not become a reliable incremental cursor, an item revision or a write precondition. Adding the missing header alone would not fix the version semantics.
 
+### Current upstream recheck
+
+At 2026-09-05 09:16 UTC, official maintenance `10.0@a5b4b4d20d12cf07af43d928bd66090faed1a655` and development `main@fc17dcd24ad34686cb24e6b3ffb06a6a7a5e0e5d` retained the same Local API, full-text storage and sync-engine blobs as 10.0.1. Their respective blob identities are `6cfbaf8247a5e914c92e8711be46d4431e79923e`, `ca981b95fdbd41fa00927dd606ac5a8fde0e1cb6` and `225b0449b362201ad5d8717510af3478ef15d2b9`. The [current list endpoint](https://github.com/zotero/zotero/blob/fc17dcd24ad34686cb24e6b3ffb06a6a7a5e0e5d/chrome/content/zotero/xpcom/server/server_localAPI.js#L1459-L1487) still returns the stored version without the promised library-version header. No provider repair was verified.
+
+Bounded official issue/PR searches returned 34 fulltext matches but no dedicated matching defect report. Historical [issue #5002](https://github.com/zotero/zotero/issues/5002) and merged [PR #5004](https://github.com/zotero/zotero/pull/5004) introduce the endpoint; [Full-text v2 draft #5673](https://github.com/zotero/zotero/issues/5673) concerns a richer format, and [semantic-search Draft PR #6012](https://github.com/zotero/zotero/pull/6012) retains the same endpoint blob at its inspected head `19e79625b1c6fbbdd75367aa85b62d5a7080d7f6`. None establishes this cursor repair. Search results are not global absence proof. No upstream issue, patch, installation change or private-library read was made during this recheck.
+
 ## Proposed admission and owner follow-up
 
 Research Intake remains in ConceptWeave. Full text needs a separate immutable capture receipt binding server/API/schema observations, attachment and bibliographic-parent identities, content and index-statistics digests, read interval, returned status and partial/unknown coverage. Reusing an old metadata digest or governance receipt for later text is forbidden. An availability sweep may guide retrieval and steward work but cannot make unsupported content authoritative or renew prior approval.
