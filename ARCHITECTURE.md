@@ -26,7 +26,7 @@ Research Intake's Zotero adapter retains optional full-text observations in a se
 
 Its Full-Text Review View reuses capture verification and canonical pending selection to make exact text inspectable without changing earlier proposals. This bounded read projection is not an aggregate or a decision-application API; the metadata-only approval chain does not acquire full-text provenance from it.
 
-The separate Full-Text Review Worksheet starts blank and retains one capture identity through atomic completed-view application, finalization and whole-envelope governance verification. Every boundary rechecks the capture against the complete report. It reuses existing review cores rather than introducing another service or source of semantic truth. The CLI only initializes this work; the remaining operations are library APIs. Verified review still does not admit Zotero writes, whose exact change set requires independent authorization.
+The separate Full-Text Review Worksheet starts blank and retains one capture identity through atomic completed-view application, finalization and whole-envelope governance verification. Every boundary rechecks the capture against the complete report. The offline CLI exposes initialization, evidence-view creation, atomic application and finalization using those existing review cores and private-file helpers. Completed JSON bytes enter the owner parser unchanged, preserving duplicate-key detection. External approval verification remains a caller-owned library boundary; no CLI verifier, service or new source of semantic truth is introduced. Verified review still does not admit Zotero writes, whose exact change set requires independent authorization.
 
 | Context | Type | Owns | Does not own |
 | --- | --- | --- | --- |

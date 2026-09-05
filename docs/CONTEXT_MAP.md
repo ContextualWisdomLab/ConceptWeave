@@ -20,3 +20,5 @@ The Full-Text Review View is an in-context read projection over that verified ca
 - context-graph-contracts <-> Interoperability: **Shared Kernel only for versioned public contracts**, kept minimal.
 - semantic-data-portal <- Interoperability: **Published Language**. SDP consumes releases; ConceptWeave does not read SDP application tables.
 - Keyverse -> future delivery layer: **Anti-Corruption Layer** for verified identity/tenant context.
+- governance-risk-compliance -> Source Observation / Client Consumption: **Proposed Anti-Corruption Layer**, pending a released contract and exact-consumer proof. External requirements, internal controls, evidence links and effectiveness remain distinct GRC-owned meanings; ConceptWeave cannot infer assurance from evidence presence.
+- Orgmetra -> Source Observation: **Proposed Anti-Corruption Layer**, pending a released evidence contract. Job/Task/KSAO relationships remain product-owned; tenant, source version and review status must survive observation without moving employment authority or ordinal scoring into ConceptWeave.

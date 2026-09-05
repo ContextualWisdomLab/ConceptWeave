@@ -6,7 +6,7 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
-- A separate private review worksheet and library review path that keeps saved-text evidence attached to decisions and approval verification. Command-line support currently initializes blank review work; it does not complete or approve a review.
+- Private review commands now show saved text, accept completed decisions without replacing earlier work, and prepare a complete review for independent approval verification. They do not supply decisions or approve a review.
 
 - Private inspection of pending papers alongside their saved text, preserving missing material and leaving previous reports and decisions unchanged.
 
@@ -40,5 +40,7 @@ All notable changes to ConceptWeave are documented here.
 - Unsafe Rust is forbidden in the core domain crate.
 
 ### Fixed
+
+- Oversized private review outputs fail before creating a file, so a successful save stays within the corresponding reader's size limit. Large saved-text captures retain their separate limit.
 
 - Research reads accept valid responses exactly at their documented size limit while still rejecting oversized, incomplete or invalidly encoded responses.

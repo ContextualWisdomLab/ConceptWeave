@@ -49,6 +49,10 @@ This register turns the accepted research set into product decisions. A paper is
 
 ## GRC reference flow
 
+The [2026-09-05 exact-default-source audit](cwl_ontology_capability_inventory.md#further-domain-contract-audits-2026-09-05) found GRC evidence-to-requirement binding and a Proposed internal-control mapping design, not a released semantic round trip. NIST IR 8477 and the OSCAL mapping documentation distinguish relationship semantics and source/target context; use these to test subset direction, explicit no-relationship versus missing mapping, and source-edition drift. Evidence presence must never satisfy an effectiveness assertion. These are future evaluation requirements, not executed conformance or steward-approved labels.
+
+Orgmetra's inspected Task–KSAO contract is a second domain-specific observation candidate. A future consumer test must preserve Job versus Position/Assignment, tenant and source-version boundaries, reject LLM-origin material presented as validated, and avoid treating an ordinal relationship rating as calibrated ontology confidence. No Orgmetra package or application table is imported. Its absence of a release keeps this a cultivation hypothesis.
+
 `ContextualWisdomLab/governance-risk-compliance` is the first enterprise golden/reference scenario, not a special-case algorithm. The same immutable GRC fixture must exercise both tracks:
 
 `GRC source contract -> observed facts -> generation candidates -> validation/steward review -> semantic_release -> client validation/resolution/diff/query-plan -> GRC deterministic calculation`.

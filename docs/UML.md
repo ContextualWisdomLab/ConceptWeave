@@ -77,6 +77,7 @@ sequenceDiagram
         Note over Intake,Steward: read-only view; legacy apply commands reject it
     end
     opt separate capture-bound review campaign
+        Note over Intake,Steward: offline CLI through finalization; external verification is a separate library boundary
         Report->>Intake: original report, without importing metadata decisions
         Capture->>Intake: exact retained capture
         Intake->>Intake: create blank capture-bound worksheet
