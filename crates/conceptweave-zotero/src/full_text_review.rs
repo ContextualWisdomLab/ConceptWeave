@@ -1,4 +1,5 @@
 use super::*;
+use crate::StewardReviewWorksheet;
 
 /// Private single-capture review work, distinct from a metadata-only worksheet.
 ///
@@ -21,5 +22,5 @@ pub fn build_full_text_review_worksheet(
     _report: &ClassificationReport,
     _capture: &FullTextCapture,
 ) -> Result<FullTextReviewWorksheet, FullTextError> {
-    Err(FullTextError(INVALID_EVIDENCE))
+    Err(INVALID_EVIDENCE)
 }

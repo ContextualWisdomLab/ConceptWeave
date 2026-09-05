@@ -1,5 +1,5 @@
 use super::*;
-use crate::{ZoteroItem, classify_snapshot};
+use crate::{StewardReviewWorksheet, ZoteroItem, classify_snapshot};
 
 #[test]
 fn full_text_worksheet_starts_blank_without_a_metadata_downcast() {
