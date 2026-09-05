@@ -1,6 +1,83 @@
 use super::*;
 use crate::{StewardReviewWorksheet, ZoteroItem, classify_snapshot};
 
+fn completed_full_text_view(
+    report: &ClassificationReport,
+    worksheet: &FullTextReviewWorksheet,
+    capture: &FullTextCapture,
+    limit: usize,
+) -> Vec<u8> {
+    let mut json: serde_json::Value = serde_json::from_slice(
+        &build_bound_full_text_review_json(report, worksheet, capture, limit).unwrap(),
+    )
+    .unwrap();
+    for decision in json["review_batch"]["decisions"].as_array_mut().unwrap() {
+        decision["reviewed_disposition"] = serde_json::json!(crate::Disposition::OutOfScope);
+    }
+    serde_json::to_vec(&json).unwrap()
+}
+
+fn full_text_approval_fixture(
+    report: &ClassificationReport,
+    capture: &FullTextCapture,
+) -> FullTextReviewApproval {
+    serde_json::from_value(serde_json::json!({
+        "capture_digest":capture.capture_digest,
+        "full_text_approval_v1":{
+            "receipt_id":"synthetic-review-receipt",
+            "reviewer_subject":"synthetic-steward",
+            "library_version":report.library_version,
+            "rule_revision":report.rule_revision,
+            "snapshot_digest":report.snapshot_digest,
+            "proposal_digest":crate::classification_proposal_digest(report),
+            "snapshot_items":report.snapshot_items,
+        }
+    }))
+    .unwrap()
+}
+
+#[test]
+fn full_text_review_preserves_context_through_decisions_and_full_approval() {
+    let report = report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let worksheet = build_full_text_review_worksheet(&report, &capture).unwrap();
+    let unchanged = serde_json::to_vec(&worksheet).unwrap();
+    let view = completed_full_text_view(&report, &worksheet, &capture, 2);
+    let decided = apply_full_text_review_view(&report, &worksheet, &capture, &view).unwrap();
+    assert_eq!(serde_json::to_vec(&worksheet).unwrap(), unchanged);
+    let golden = finalize_full_text_review(
+        &report,
+        &decided,
+        &capture,
+        full_text_approval_fixture(&report, &capture),
+    )
+    .unwrap();
+    let expected = serde_json::to_value(&golden).unwrap();
+    assert_eq!(expected["capture_digest"], capture.capture_digest);
+    assert!(
+        expected["full_text_golden_set_v1"]["labels"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|label| label["expected_disposition"]
+                == serde_json::json!(crate::Disposition::OutOfScope))
+    );
+    let evaluation = evaluate_full_text_review(&report, &capture, &golden, |received| {
+        serde_json::to_value(received).unwrap() == expected
+    })
+    .unwrap();
+    let result = serde_json::to_value(evaluation).unwrap();
+    assert_eq!(result["capture_digest"], capture.capture_digest);
+    assert_eq!(result["full_text_evaluation_v1"]["reviewed_count"], 2);
+    assert!(evaluate_full_text_review(&report, &capture, &golden, |_| false).is_err());
+    assert!(apply_full_text_review_view(&report, &decided, &capture, &view).is_err());
+    assert!(serde_json::from_value::<crate::ReviewedGoldenSet>(expected.clone()).is_err());
+    assert!(serde_json::from_value::<crate::ReviewedClassificationWriteSet>(expected).is_err());
+}
+
 #[test]
 fn full_text_worksheet_starts_blank_without_a_metadata_downcast() {
     let report = report_fixture();
