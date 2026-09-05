@@ -9,6 +9,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::time::Duration;
 
+mod full_text_capture;
+pub use full_text_capture::{
+    FullTextCapture, FullTextError, read_local_full_text, verify_full_text_capture,
+};
+
 /// Classification rule revision recorded in every report.
 pub const RULE_REVISION: &str = "ontology-research-v2";
 
