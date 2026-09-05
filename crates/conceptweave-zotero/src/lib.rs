@@ -885,6 +885,31 @@ pub enum ClassificationRollbackOutcome {
     PartialFailure,
 }
 
+/// Current state of one previously indeterminate rollback operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClassificationRollbackState {
+    /// The restoration metadata is present at a newer item revision.
+    Restored,
+    /// The expected post-write metadata and item revision remain unchanged.
+    Unchanged,
+    /// The observed state proves neither safe outcome.
+    Indeterminate,
+}
+
+/// Secret-free evidence from one delayed, read-only rollback reconciliation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ClassificationRollbackReconciliationReceipt {
+    /// State proven by the delayed observation.
+    pub state: ClassificationRollbackState,
+    /// Complete operation under reconciliation.
+    pub operation: ClassificationRollbackOperation,
+    /// Successfully observed state, absent when validation or reading failed.
+    pub observed_state: Option<ClassificationItemState>,
+    /// Operation eligible for the existing complete-preflight retry path.
+    pub retry_operation: Option<ClassificationRollbackOperation>,
+}
+
 /// Secret-free evidence for restored, failed, indeterminate, and pending inverse writes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ClassificationRollbackReceipt {
@@ -1898,6 +1923,43 @@ pub fn execute_classification_rollback_with_zotero10(
     )
 }
 
+/// Re-reads one indeterminate rollback operation without performing a write.
+pub fn reconcile_classification_rollback<ReadError>(
+    operation: &ClassificationRollbackOperation,
+    read_item: impl FnOnce(&str) -> Result<ClassificationItemState, ReadError>,
+) -> ClassificationRollbackReconciliationReceipt {
+    let valid_operation = !operation.server_id.trim().is_empty()
+        && !operation.item_key.trim().is_empty()
+        && normalized_metadata(
+            &operation.expected_collection_keys,
+            &operation.expected_tags,
+        )
+        .is_ok()
+        && normalized_metadata(&operation.collection_keys, &operation.tags).is_ok();
+    let observed_state = valid_operation
+        .then(|| read_item(&operation.item_key).ok())
+        .flatten();
+    let state = observed_state
+        .as_ref()
+        .map(|observed| classify_rollback_state(observed, operation))
+        .unwrap_or(ClassificationRollbackState::Indeterminate);
+    ClassificationRollbackReconciliationReceipt {
+        state,
+        operation: operation.clone(),
+        observed_state,
+        retry_operation: (state == ClassificationRollbackState::Unchanged)
+            .then(|| operation.clone()),
+    }
+}
+
+/// Reconciles one rollback operation through the server-bound Zotero 10 adapter.
+pub fn reconcile_classification_rollback_with_zotero10(
+    operation: &ClassificationRollbackOperation,
+    adapter: &Zotero10LocalAdapter,
+) -> ClassificationRollbackReconciliationReceipt {
+    reconcile_classification_rollback(operation, |item_key| adapter.get_item(item_key))
+}
+
 fn rollback_preflight_failure(
     operations: &[ClassificationRollbackOperation],
     failed_item_key: &str,
@@ -1921,6 +1983,32 @@ fn matches_rollback_current(
     operation: &ClassificationRollbackOperation,
 ) -> bool {
     matches_rollback_current_at(state, state.library_version, operation)
+}
+
+fn classify_rollback_state(
+    state: &ClassificationItemState,
+    operation: &ClassificationRollbackOperation,
+) -> ClassificationRollbackState {
+    let Some((collections, tags)) = normalized_metadata(&state.collection_keys, &state.tags).ok()
+    else {
+        return ClassificationRollbackState::Indeterminate;
+    };
+    if state.server_id != operation.server_id || state.item_key != operation.item_key {
+        return ClassificationRollbackState::Indeterminate;
+    }
+    if state.item_version == operation.item_version
+        && collections == operation.expected_collection_keys
+        && tags == operation.expected_tags
+    {
+        ClassificationRollbackState::Unchanged
+    } else if state.item_version > operation.item_version
+        && collections == operation.collection_keys
+        && tags == operation.tags
+    {
+        ClassificationRollbackState::Restored
+    } else {
+        ClassificationRollbackState::Indeterminate
+    }
 }
 
 fn matches_rollback_current_at(
@@ -2850,6 +2938,38 @@ mod tests {
         assert_eq!(receipt.outcome, ClassificationRollbackOutcome::Restored);
         assert_eq!(receipt.restored_item_keys, ["ABCD2345"]);
         assert_eq!(server.join().unwrap().len(), 4);
+    }
+
+    #[test]
+    fn zotero10_adapter_reconciles_an_indeterminate_rollback_without_writing() {
+        let operation = ClassificationRollbackOperation {
+            server_id: "server-10".into(),
+            item_key: "ABCD2345".into(),
+            item_version: 43,
+            expected_collection_keys: vec!["CDEF4567".into()],
+            expected_tags: vec![ItemTag {
+                tag: "classified".into(),
+                tag_type: None,
+            }],
+            collection_keys: vec!["BCDE3456".into()],
+            tags: vec![ItemTag {
+                tag: "kept".into(),
+                tag_type: Some(1),
+            }],
+        };
+        let item_body = r#"{"key":"ABCD2345","version":43,"data":{"itemType":"book","collections":["CDEF4567"],"tags":[{"tag":"classified"}]}}"#;
+        let responses: Vec<&'static str> = vec![
+            Box::leak(library_response("server-10", 99).into_boxed_str()),
+            Box::leak(raw_response(Some("server-10"), Some(43), item_body).into_boxed_str()),
+            Box::leak(library_response("server-10", 99).into_boxed_str()),
+        ];
+        let (base, server) = serve(responses);
+
+        let receipt = reconcile_classification_rollback_with_zotero10(&operation, &transport(base));
+
+        assert_eq!(receipt.state, ClassificationRollbackState::Unchanged);
+        assert_eq!(receipt.retry_operation, Some(operation));
+        assert_eq!(server.join().unwrap().len(), 3);
     }
 
     #[test]
