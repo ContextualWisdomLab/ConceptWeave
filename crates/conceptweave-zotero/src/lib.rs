@@ -838,26 +838,6 @@ fn bounded_body_with_limit(
     read_bounded_response_text(response, limit).map_err(|_| ZoteroTransportError::InvalidResponse)
 }
 
-/// Reads strict UTF-8 with an inclusive byte limit and one byte of overrun evidence.
-fn read_bounded_response_text(
-    response: &mut ureq::http::Response<ureq::Body>,
-    limit: u64,
-) -> std::io::Result<String> {
-    let mut body = String::new();
-    response
-        .body_mut()
-        .as_reader()
-        .take(limit.saturating_add(1))
-        .read_to_string(&mut body)?;
-    if body.len() as u64 > limit {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "response body exceeds byte limit",
-        ));
-    }
-    Ok(body)
-}
-
 fn validate_item_key(item_key: &str) -> Result<(), ZoteroTransportError> {
     const ALPHABET: &[u8] = b"23456789ABCDEFGHIJKLMNPQRSTUVWXYZ";
     if item_key.len() == 8 && item_key.bytes().all(|byte| ALPHABET.contains(&byte)) {
@@ -2816,6 +2796,26 @@ fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, Re
     })
 }
 
+/// Reads strict UTF-8 with an inclusive byte limit and one byte of overrun evidence.
+fn read_bounded_response_text(
+    response: &mut ureq::http::Response<ureq::Body>,
+    limit: u64,
+) -> std::io::Result<String> {
+    let mut body = String::new();
+    response
+        .body_mut()
+        .as_reader()
+        .take(limit.saturating_add(1))
+        .read_to_string(&mut body)?;
+    if body.len() as u64 > limit {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "response body exceeds byte limit",
+        ));
+    }
+    Ok(body)
+}
+
 #[cfg_attr(coverage_nightly, coverage(off))]
 fn header_u64(headers: &ureq::http::HeaderMap, name: &'static str) -> Result<u64, ReadError> {
     header_string(headers, name)?
@@ -3282,6 +3282,8 @@ fn normalize_title(value: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    mod authenticated_transport;
+    mod metadata_transport;
     mod proxy_isolation;
 
     use super::*;
@@ -3304,6 +3306,7 @@ mod tests {
                     loop {
                         let mut chunk = [0; 4096];
                         let length = stream.read(&mut chunk).unwrap();
+                        assert_ne!(length, 0);
                         bytes.extend_from_slice(&chunk[..length]);
                         let Some(header_end) =
                             bytes.windows(4).position(|part| part == b"\r\n\r\n")
