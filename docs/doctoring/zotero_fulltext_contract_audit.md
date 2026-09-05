@@ -30,15 +30,17 @@ The execution was sequential with a 20-second request timeout, an 8 MiB response
 
 Raw text was held for one response at a time and discarded. The ordered-response SHA-256 streams compact JSON arrays of attachment key, HTTP status, observed content-version header and body SHA-256, in lexicographic key order. The public record retains only the final aggregate digest, not those arrays. Body hashes are over received bytes, not canonical JSON. They identify this sweep's responses but cannot replay discarded source content or serve as an approval receipt.
 
-These standalone probes expose only aggregate counts and public protocol values, not response bodies or identities:
+These standalone probes disable curl's configuration-file loading, bypass proxies, restrict the protocol to HTTP and allow no redirects. They expose only aggregate counts and public protocol values, not response bodies or identities:
 
 ```sh
-curl --silent --show-error --fail --max-time 20 \
+curl --disable --noproxy '*' --proto '=http' --max-redirs 0 \
+  --silent --show-error --fail --max-time 20 --max-filesize 8388608 \
   -H 'Zotero-API-Version: 3' \
   'http://127.0.0.1:23119/api/users/0/fulltext?since=0' \
   | jq '{manifest_entries: length, version_types: ([.[] | type] | unique), minimum_version: ([.[]] | min), maximum_version: ([.[]] | max)}'
 
-curl --silent --show-error --fail --max-time 20 --output /dev/null \
+curl --disable --noproxy '*' --proto '=http' --max-redirs 0 \
+  --silent --show-error --fail --max-time 20 --max-filesize 8388608 --output /dev/null \
   --write-out 'HTTP %{http_code}; version=%header{last-modified-version}; API=%header{zotero-api-version}; schema=%header{zotero-schema-version}\n' \
   -H 'Zotero-API-Version: 3' \
   'http://127.0.0.1:23119/api/users/0/fulltext?since=0'
