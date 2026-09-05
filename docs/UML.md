@@ -56,7 +56,9 @@ sequenceDiagram
     Intake->>Report: write proposals and evidence
     Intake->>Report: derive snapshot-bound decision worksheet without bibliographic text
     Report->>Steward: review dispositions and merge candidates
-    Steward->>Intake: verified labels for every bibliographic item
+    Steward->>Intake: completed worksheet + approval receipt
+    Intake->>Report: offline finalization against the original saved report
+    Report-->>Steward: reviewed golden set or fail-closed validation error
     Intake-->>Steward: aggregate completion evidence or incomplete-review failure
     Steward->>Intake: verified canonical-item decisions
     Intake->>Report: before/after/rollback identity manifest
