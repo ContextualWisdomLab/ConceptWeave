@@ -1,5 +1,6 @@
 use conceptweave_zotero::{ZoteroItem, classify_snapshot};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 
 fn snapshot_digest(raw_item: Value) -> String {
     let item: ZoteroItem = serde_json::from_value(raw_item).unwrap();
@@ -96,4 +97,25 @@ fn source_capture_preserves_provider_shape_validation() {
     ] {
         assert!(serde_json::from_value::<ZoteroItem>(invalid).is_err());
     }
+    assert!(
+        serde_json::from_str::<ZoteroItem>(
+            r#"{"key":"SYNTH001","version":7,"data":{"itemType":false}}"#
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn snapshot_digest_has_versioned_domain_separation() {
+    let item: ZoteroItem = serde_json::from_value(json!({
+        "key": "SYNTH001", "version": 7, "data": {"itemType": "book"}
+    }))
+    .unwrap();
+    let unmarked_content = serde_json::to_vec(&[(&item.source_record, &item)]).unwrap();
+    let unmarked_digest = format!("sha256:{:x}", Sha256::digest(unmarked_content));
+    assert_ne!(
+        classify_snapshot("9.0.6".into(), None, 42, vec![item]).snapshot_digest,
+        unmarked_digest,
+        "snapshot receipts must be separated from unversioned content hashes"
+    );
 }
