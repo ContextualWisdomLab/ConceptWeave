@@ -86,7 +86,8 @@ fn capture_retains_exact_text_missing_results_and_full_parent_denominator() {
     let restored: FullTextCapture = serde_json::from_value(saved.clone()).unwrap();
     verify_full_text_capture(&restored, &report).unwrap();
     let mut changed = saved;
-    changed["capture_evidence"]["records"][0]["content_response"]["body"] = "changed text".into();
+    changed["capture_evidence"]["records"][0]["content_response"]["body"] =
+        r#"{"content":"changed text"}"#.into();
     let changed: FullTextCapture = serde_json::from_value(changed).unwrap();
     assert!(verify_full_text_capture(&changed, &report).is_err());
 }
@@ -213,7 +214,7 @@ fn replay_checks_bindings_and_structure_even_when_digest_is_recomputed() {
     })
     .unwrap();
     let saved = serde_json::to_value(capture).unwrap();
-    for scenario in 0..15 {
+    for scenario in 0..16 {
         let mut restored: FullTextCapture = serde_json::from_value(saved.clone()).unwrap();
         let evidence = &mut restored.capture_evidence;
         match scenario {
@@ -233,7 +234,15 @@ fn replay_checks_bindings_and_structure_even_when_digest_is_recomputed() {
             11 => evidence.records.swap(0, 1),
             12 => evidence.records[0].metadata_response.body = "{}".into(),
             13 => evidence.records[0].content_response.body = r#"{"content":null}"#.into(),
-            _ => evidence.records[0].content_response.version = None,
+            14 => evidence.records[0].content_response.version = None,
+            _ => {
+                let serialized = serde_json::to_string(&evidence.records[0]).unwrap();
+                for _ in 0..3 {
+                    evidence
+                        .records
+                        .push(serde_json::from_str(&serialized).unwrap());
+                }
+            }
         }
         restored.capture_digest = json_digest(evidence);
         assert!(
