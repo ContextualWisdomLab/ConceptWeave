@@ -1467,6 +1467,10 @@ fn normalized_metadata(
 }
 
 /// Builds a deterministic reviewed write plan without contacting or mutating Zotero.
+///
+/// Local identity, execution-mode, and metadata checks finish before the caller's
+/// governance verifier runs. Invalid input never consumes a one-use approval;
+/// a locally valid complete review is verified exactly once before returning a plan.
 pub fn build_classification_write_plan<F>(
     report: &ClassificationReport,
     reviewed: &ReviewedClassificationWriteSet,
@@ -1492,9 +1496,6 @@ where
         || reviewed.snapshot_items != report.snapshot_items
     {
         return Err(WritePlanError::SnapshotMismatch);
-    }
-    if !verify_review(reviewed) {
-        return Err(WritePlanError::UnverifiedApproval);
     }
     if mode == WriteMode::Execute
         && report
@@ -1592,6 +1593,9 @@ where
         });
     }
     operations.sort_by(|left, right| left.item_key.cmp(&right.item_key));
+    if !verify_review(reviewed) {
+        return Err(WritePlanError::UnverifiedApproval);
+    }
     Ok(ClassificationWritePlan {
         mode,
         review_id: reviewed.review_id.clone(),
