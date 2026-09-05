@@ -4,6 +4,10 @@ This file records the evidence basis for ConceptWeave architecture decisions. St
 
 ## Stable standards / recommendations
 
+Corporation for Digital Scholarship. (2026). *Zotero Local API*. Zotero Documentation. https://www.zotero.org/support/dev/web_api/v3/local_api
+
+Corporation for Digital Scholarship. (2026). *Zotero Web API write requests*. Zotero Documentation. https://www.zotero.org/support/dev/web_api/v3/write_requests
+
 Miles, A., & Bechhofer, S. (Eds.). (2009). *SKOS Simple Knowledge Organization System Reference*. World Wide Web Consortium. https://www.w3.org/TR/skos-reference/
 
 W3C OWL Working Group. (2012). *OWL 2 Web Ontology Language document overview (Second Edition)*. World Wide Web Consortium. https://www.w3.org/TR/owl2-overview/
