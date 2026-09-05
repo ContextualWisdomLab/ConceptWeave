@@ -50,3 +50,21 @@ fn snapshot_digest_is_independent_of_provider_object_field_order() {
     .unwrap();
     assert_eq!(snapshot_digest(ordered), snapshot_digest(reordered));
 }
+
+#[test]
+fn snapshot_digest_preserves_omitted_versus_explicit_default_metadata() {
+    let omitted = json!({"key": "SYNTH001", "version": 7, "data": {"itemType": "book"}});
+    let omitted_digest = snapshot_digest(omitted.clone());
+    for (field_name, explicit_default) in [
+        ("title", json!("")),
+        ("abstractNote", json!("")),
+        ("DOI", json!("")),
+        ("parentItem", json!("")),
+        ("collections", json!([])),
+        ("tags", json!([])),
+    ] {
+        let mut explicit = omitted.clone();
+        explicit["data"][field_name] = explicit_default;
+        assert_ne!(snapshot_digest(explicit), omitted_digest, "{field_name}");
+    }
+}
