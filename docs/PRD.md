@@ -26,13 +26,17 @@ Given an enterprise source estate, produce a **reviewable semantic model proposa
 
 Accept immutable snapshots or versioned contracts for relational schema, OpenAPI, AsyncAPI/event models, documents/glossaries, source-code structure, existing ontology/vocabulary, and lineage/provenance. Raw source authority remains with its owning system.
 
+The first active relational slice defines an immutable PostgreSQL schema-snapshot contract before a live adapter exists. It preserves exact schema/table/column identifiers, source column ordinals, source type/nullability/comment metadata, registry-authorized opaque source capability evidence, owner-computed snapshot digest, extractor revision, observation-time evidence, PK/unique/FK coordinates, and CHECK-constraint evidence. The raw registry key is bounded to at most 128 bytes of lowercase multiword `snake_case`; raw DSNs, URLs, shell-style connection parameters, generic one-word references, and malformed identifiers fail request admission. Syntax alone is not source authority: a validated `ObservationRequest` must resolve through the caller's authorized `SourceConnectionRegistry` into `AuthorizedObservationRequest`, and the canonical `SourceObservationPort` execution seam accepts only that authorized envelope. A syntactically valid but unregistered key therefore fails before adapter execution. The envelope carries no credentials; a concrete adapter resolves its opaque authorized capability to least-privilege credentials only inside its ACL.
+
+Each request also carries explicit positive schema-count/total-UTF-8-byte authorization-metadata policy plus positive operation/statement-timeout, row, byte and concurrency bounds. The end-to-end operation deadline includes registry authorization, connection and catalog work; implementation must not silently restart that deadline after authorization. Exact source identifiers are not normalized or truncated. For foreign keys, observed `ON UPDATE`/`ON DELETE` actions, any local-column subset targeted by `ON DELETE SET NULL (...)` or `SET DEFAULT (...)`, match type, deferrability/initial timing, and PostgreSQL validation/enforcement state are retained as typed source evidence; each metadata family remains explicitly absent if the adapter did not observe it rather than inventing defaults. For CHECK constraints, preserve the PostgreSQL-reconstructed definition together with validation, enforcement, and `NO INHERIT` status; do not infer ordered expression-column coordinates from SQL text.
+
 ### FR-2 Candidate discovery
 
 Produce candidates for concepts, taxonomies, non-taxonomic relations, semantic constraints, dimensions, measures, and physical-to-semantic mappings. Each candidate starts as inferred rather than authoritative.
 
 ### FR-3 Evidence and provenance
 
-The current v0.1 candidate contract requires every candidate to retain exact source identity, source digest, and source location through `EvidenceReference`. Issue #2 must add immutable Source Observation and proposal-receipt contracts that also retain observation time, parser/extractor revision, and discovery method before the first Generation release. Until those receipt contracts exist on an integrated Generation head, the Rust `SemanticCandidate` and `contracts/semantic-candidate.schema.json` must not be described as already carrying those deferred coordinates. Unsupported candidates fail closed.
+The current v0.1 candidate contract requires every candidate to retain exact source identity, source digest, and source location through `EvidenceReference`. The active Source Observation slice additionally retains snapshot digest, observation time, extractor revision, typed table/column/constraint locations, foreign-key relationship behavior and validation/enforcement state when observed, and CHECK definition/status evidence. Issue #2 must still add proposal-receipt/discovery-method provenance and bind generated candidates to verified source receipts before the first Generation release. Unsupported candidates fail closed.
 
 ### FR-4 Deterministic validation
 
@@ -66,7 +70,7 @@ A client can also validate an explicit immutable supersession declaration. `Sema
 
 ## 6. First Generation ↔ Client vertical
 
-`relational schema snapshot -> observed tables/columns/foreign keys -> concept/relation/dimension/measure/mapping candidates -> evidence-bound validation -> steward review -> immutable semantic_release -> offline client admission/diff/integrity/supersession validation -> consuming-product ACL/query boundary`.
+`relational schema request -> bounded request admission -> registry authorization -> authorized read-only source observation -> immutable observed tables/columns/constraints -> concept/relation/dimension/measure/mapping candidates -> evidence-bound validation -> steward review -> immutable semantic_release -> offline client admission/diff/integrity/supersession validation -> consuming-product ACL/query boundary`.
 
 `ContextualWisdomLab/governance-risk-compliance` is the first reference source/client scenario, not a special-case algorithm. A shared golden fixture must exercise both Generation and Client without copying GRC truth into ConceptWeave or giving ConceptWeave direct GRC application-table access.
 
@@ -80,6 +84,7 @@ A client can also validate an explicit immutable supersession declaration. `Sema
 - copying every external ontology into one CWL namespace;
 - building a generic LLM gateway or browser crawler;
 - treating digest syntax validation alone as cryptographic integrity evidence;
+- treating a syntactically valid source key as authorization;
 - inferring backward compatibility merely because one version number is older;
 - inferring supersession from version order, timestamps, semantic similarity, or diff size;
 - overwriting a published semantic release in place;
@@ -92,6 +97,9 @@ A client can also validate an explicit immutable supersession declaration. `Sema
 - zero publication paths that bypass reviewed state;
 - zero silent inferred-to-authoritative promotion;
 - deterministic replay of the same immutable source snapshot and extraction configuration;
+- raw source requests cannot reach the canonical adapter execution seam without registry-issued capability evidence;
+- unknown registry keys fail before adapter invocation and credential material never crosses the Source Observation contract;
+- end-to-end source-operation deadline includes authorization, connection and catalog work;
 - cross-tenant access denial when tenancy is introduced;
 - malformed/hostile source contracts rejected with bounded resource use;
 - semantic-model release can be reproduced from source receipts and approved proposal receipts;

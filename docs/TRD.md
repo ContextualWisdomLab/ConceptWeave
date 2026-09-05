@@ -6,7 +6,7 @@ ConceptWeave starts as a Rust-first modular monolith with explicit bounded conte
 
 ## 2. Bounded contexts
 
-1. **Source Observation** — immutable source snapshots and parser receipts.
+1. **Source Observation** — immutable source snapshots and parser/extractor receipts.
 2. **Semantic Discovery** — evidence-bound candidate generation.
 3. **Model Validation** — deterministic structural, ontology, constraint, and semantic-model validation.
 4. **Governance & Publication** — review decisions, immutable releases, supersession.
@@ -19,7 +19,7 @@ The Core Domain is **Semantic Model Engineering**, represented by the discovery-
 
 `domain <- application <- ports/contracts <- adapters <- delivery`
 
-Client Consumption depends only on versioned public release/domain contracts. Domain and client code must not import web frameworks, databases, provider SDKs, LLM SDKs, generator-private adapters, or another CWL product's internals.
+Client Consumption depends only on versioned public release/domain contracts. Domain and client code must not import web frameworks, databases, provider SDKs, LLM SDKs, generator-private adapters, or another CWL product's internals. `conceptweave-observation` is a provider-independent Source Observation contract crate; live PostgreSQL connectivity belongs in an adapter crate behind an explicit application port.
 
 ## 4. Source observation contract
 
@@ -34,9 +34,15 @@ Every observed source will eventually carry at least:
 - tenant/workspace scope when tenancy exists;
 - bounded source locations for extracted evidence.
 
+The active PostgreSQL slice already preserves exact schema/table/column identifiers, deterministic column ordinals, source type/nullability/comments, composite PK/unique/FK coordinates, exact optional FK update/delete behavior including targeted `SET NULL`/`SET DEFAULT` local-column subsets, match/deferrability behavior, CHECK reconstructed definitions, CHECK validation/enforcement/`NO INHERIT` state, canonical lowercase `sha256:<64 hex>` snapshot identity, extractor revision, observation time, and verified table/column/constraint receipts. CHECK SQL is evidence, not a license to infer ordered expression-column dependencies.
+
+A live PostgreSQL adapter must operate read-only behind the Source Observation port. The raw `ObservationRequest` accepts only an opaque source registry key of at most 128 bytes in lowercase multiword `snake_case`; syntax alone is not source authority. `ObservationRequest::authorize` must resolve that exact key through the caller's authorized `SourceConnectionRegistry` and bind the validated request to the resulting opaque `ResolvedSourceConnection` inside an `AuthorizedObservationRequest`. `SourceObservationPort::observe` accepts only that authorized envelope, so an unknown or merely well-formed key cannot reach the adapter execution seam. Request construction and registry authorization remain deterministic pre-adapter operations; `observe` is an awaitable, `Send` execution seam so an asynchronous source driver can be awaited without a hidden blocking bridge or a runtime dependency in the port crate. The concrete adapter then resolves the already-authorized opaque capability to least-privilege credentials inside its Anti-Corruption Layer. Raw DSNs, URLs, shell-style connection parameters, unregistered keys, credentials, and provider connection objects cannot cross the port/domain boundary.
+
+Each request also carries a caller-selected positive provider-independent authorization-metadata budget: maximum exact-schema count plus maximum total UTF-8 bytes retained across schema identifiers. That admission is enforced before registry/database access and does not assume PostgreSQL's build-time identifier-length default. The adapter must then use bounded catalog queries, explicit statement/operation timeout, caller cancellation, row/byte/concurrency limits, exact identifier handling, and immutable extractor receipts. Registry authorization remains part of the same end-to-end operation policy even though credential material stays adapter-local; the concrete application/adapter integration must prove the total deadline across authorization, connection, and catalog work rather than treating authorization as an unbounded pre-step or resetting the deadline when asynchronous adapter execution begins. It must fail closed on partial or ambiguous catalog evidence and must not read another product's application tables through hidden coupling. PostgreSQL catalog reconstruction functions are treated as source rendering, not original DDL text.
+
 ## 5. Candidate contract
 
-The initial Rust and JSON contracts cover candidate kind, truth status, publication state, and source evidence. Later revisions add ontology IRIs, language-tagged labels, relation endpoints, cardinality, units, measure expressions, physical mappings, confidence/evaluation receipts, and temporal validity without breaking v0.1 consumers.
+The initial Rust and JSON contracts cover candidate kind, truth status, publication state, and source evidence. Later revisions add ontology IRIs, language-tagged labels, relation endpoints, cardinality, units, measure expressions, physical mappings, confidence/evaluation receipts, and temporal validity without breaking v0.1 consumers. Generated candidates must bind to verified Source Observation receipts plus a discovery/proposal receipt before the first Generation release.
 
 ## 6. Semantic-release client contract
 
@@ -66,14 +72,16 @@ LLM calls go through `contextual-orchestrator`. The application sends bounded ev
 
 Stable publication targets use stable recommendations first: RDF 1.1, OWL 2, SKOS, SHACL 1.0, JSON-LD 1.1, and PROV-O as applicable. RDF 1.2 and SHACL 1.2 are tracked as 2026 drafts/candidate work and are not silently treated as final standards. Apache Ossie (incubating; formerly OSI) is tracked as an emerging semantic-model exchange format for metrics, dimensions, relationships, and datasets.
 
+For the PostgreSQL observation adapter, PostgreSQL 18 `pg_constraint` and `pg_get_constraintdef()` are the current authoritative catalog/rendering contracts. `conenforced`, `convalidated`, `connoinherit`, FK action/match metadata, and reconstructed CHECK definitions are preserved as source evidence rather than normalized into heuristic semantics.
+
 ## 9. Persistence
 
 No durable product database is claimed by the current slices. When persistence is introduced it must be PostgreSQL, 3NF by default, use descriptive two-or-more-word `snake_case` objects, preserve business/effective time separately from system-recorded time when facts vary over time, enforce tenant-scoped references, and use explicit migration ownership rather than runtime DDL races. Published releases are immutable; correction creates a superseding release. Item-level UPSERT behavior must be explicit and idempotency-tested before any mutable pre-publication persistence is introduced.
 
 ## 10. Security
 
-Source artifacts and release payloads are untrusted input. Adapters must enforce source size/type bounds, parser timeouts, archive/decompression limits, SSRF-safe outbound access where external retrieval exists, and prompt-injection isolation for LLM-assisted extraction. Credentials and raw secrets never become semantic evidence. Client admission validates governance/compatibility but does not replace consuming-product tenant/purpose authorization. Exact detached artifact integrity must be verified against the declared digest before bytes are trusted as the referenced semantic artifact.
+Source artifacts and release payloads are untrusted input. Adapters must enforce source size/type bounds, parser timeouts, archive/decompression limits, SSRF-safe outbound access where external retrieval exists, and prompt-injection isolation for LLM-assisted extraction. Credentials and raw secrets never become semantic evidence. Database adapters must use least-privilege read-only credentials, accept source execution only through a registry-authorized `AuthorizedObservationRequest`, resolve credentials only from that approved opaque capability, reject over-budget schema authorization metadata before registry/database access, avoid interpolating source identifiers into SQL, and expose cancellation/resource-limit failure as typed non-success outcomes rather than truncated success. Client admission validates governance/compatibility but does not replace consuming-product tenant/purpose authorization. Exact detached artifact integrity must be verified against the declared digest before bytes are trusted as the referenced semantic artifact.
 
 ## 11. Evaluation
 
-Evaluation must separate extraction recall, semantic correctness, structural correctness, ontology consistency, mapping accuracy, measure correctness, release compatibility/admission correctness, and governance outcomes. Model-judge scores may supplement but never replace deterministic golden fixtures and human-reviewed expert cases. Client matching later uses OAEI-style precision/recall/F1 and candidate-retrieval recall; release admission and integrity use deterministic malformed/version/state/provenance/digest/tamper fixtures.
+Evaluation must separate extraction recall, semantic correctness, structural correctness, ontology consistency, mapping accuracy, measure correctness, release compatibility/admission correctness, and governance outcomes. Model-judge scores may supplement but never replace deterministic golden fixtures and human-reviewed expert cases. PostgreSQL extraction tests must include a frozen anonymized fixture covering schema collisions, composite keys, cross-schema FKs, FK behavior, enforced/not-enforced CHECKs, quoted identifiers, nullability/comments, request-metadata admission, registry authorization before adapter invocation, awaitable cancellation/execution, and source disappearance/retry boundaries. Client matching later uses OAEI-style precision/recall/F1 and candidate-retrieval recall; release admission and integrity use deterministic malformed/version/state/provenance/digest/tamper fixtures.

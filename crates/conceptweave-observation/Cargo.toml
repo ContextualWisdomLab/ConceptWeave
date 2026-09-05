@@ -1,0 +1,15 @@
+[package]
+name = "conceptweave-observation"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "Immutable relational-schema observation contracts for ConceptWeave"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+conceptweave-source-port = { path = "../conceptweave-source-port" }
+sha2 = "0.10.9"
