@@ -1,5 +1,5 @@
 use conceptweave_source_port::{
-    ObservationLimits, ObservationRequest, ObservationRequestBudget, ResolvedSourceConnection,
+    AuthorizedObservationRequest, ObservationLimits, ObservationRequest, ObservationRequestBudget,
     SourceConnectionRegistry,
 };
 
@@ -11,14 +11,24 @@ impl SourceConnectionRegistry for ExactRegistry<'_> {
     }
 }
 
-pub fn resolved_source(source_connection_key: &str) -> ResolvedSourceConnection {
+pub fn authorized_source(
+    source_connection_key: &str,
+    allowed_schema_names: &[&str],
+) -> AuthorizedObservationRequest {
     ObservationRequest::new(
         source_connection_key,
-        vec!["public".to_owned()],
-        ObservationRequestBudget::new(4, 256).unwrap(),
+        allowed_schema_names
+            .iter()
+            .map(|schema_name| (*schema_name).to_owned())
+            .collect(),
+        ObservationRequestBudget::new(8, 512).unwrap(),
         ObservationLimits::new(1_000, 10, 1_024, 1).unwrap(),
     )
     .unwrap()
-    .resolve_source_connection(&ExactRegistry(source_connection_key))
+    .authorize(&ExactRegistry(source_connection_key))
     .unwrap()
+}
+
+pub fn resolved_source(source_connection_key: &str) -> AuthorizedObservationRequest {
+    authorized_source(source_connection_key, &["Sales/~North", "audit", "public"])
 }
