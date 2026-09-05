@@ -534,6 +534,10 @@ mod tests {
             read_bounded_json::<serde_json::Value>(&mut io::empty(), MAX_ARTIFACT_BYTES + 1)
                 .unwrap_err();
         assert_eq!(oversized.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(
+            oversized.to_string(),
+            "review input exceeds the artifact size limit"
+        );
 
         let grown = read_bounded_json::<serde_json::Value>(
             &mut io::repeat(b' ').take(MAX_ARTIFACT_BYTES + 1),
@@ -541,10 +545,15 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(grown.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(
+            grown.to_string(),
+            "review input grew beyond the artifact size limit"
+        );
 
         let read_failure =
             read_bounded_json::<serde_json::Value>(&mut FailingReader, 0).unwrap_err();
         assert_eq!(read_failure.kind(), io::ErrorKind::Other);
+        assert_eq!(read_failure.to_string(), "injected read failure");
 
         let labeled = label_input(
             "worksheet",
@@ -552,6 +561,38 @@ mod tests {
         );
         assert_eq!(labeled.kind(), io::ErrorKind::PermissionDenied);
         assert_eq!(labeled.to_string(), "worksheet: unsafe");
+    }
+
+    #[test]
+    fn private_json_diagnostic_hides_unknown_field_names() {
+        #[derive(Debug, serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct StrictReviewInput {}
+
+        // Original metadata types permit additional fields. This strict test-only type
+        // exercises the shared reader's confidentiality contract for future callers.
+        let error = read_bounded_json::<StrictReviewInput>(
+            &mut br#"{"synthetic-private-field-sentinel":true}"#.as_slice(),
+            0,
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(error.to_string(), "review input is invalid");
+        assert_eq!(
+            label_input("worksheet", error).to_string(),
+            "worksheet: review input is invalid"
+        );
+    }
+
+    #[test]
+    fn private_json_diagnostic_hides_rejected_enum_values() {
+        let error = read_bounded_json::<conceptweave_zotero::Disposition>(
+            &mut br#""synthetic-private-enum-sentinel""#.as_slice(),
+            0,
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(error.to_string(), "review input is invalid");
     }
 
     #[test]
