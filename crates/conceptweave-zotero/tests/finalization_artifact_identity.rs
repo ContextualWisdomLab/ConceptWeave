@@ -11,6 +11,7 @@ use std::process::Command;
 #[test]
 fn finalization_rejects_distinct_path_spellings_for_one_input_file() {
     let item = ZoteroItem {
+        source_record: None,
         key: "ITEM".into(),
         version: 7,
         data: ItemData {
@@ -34,6 +35,7 @@ fn finalization_rejects_distinct_path_spellings_for_one_input_file() {
         library_version: worksheet.library_version,
         rule_revision: worksheet.rule_revision.clone(),
         snapshot_digest: worksheet.snapshot_digest.clone(),
+        proposal_digest: conceptweave_zotero::classification_proposal_digest(&report),
         snapshot_items: worksheet.snapshot_items.clone(),
     };
 
@@ -52,6 +54,10 @@ fn finalization_rejects_distinct_path_spellings_for_one_input_file() {
     object.insert(
         "reviewer_subject".into(),
         serde_json::to_value(&approval.reviewer_subject).unwrap(),
+    );
+    object.insert(
+        "proposal_digest".into(),
+        serde_json::to_value(&approval.proposal_digest).unwrap(),
     );
 
     let temp = std::env::temp_dir().canonicalize().unwrap();
