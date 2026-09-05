@@ -27,6 +27,7 @@ sequenceDiagram
     participant Discovery
     participant Validator
     participant Steward
+    participant Governance as External approval verifier
     participant Publisher
 
     Source->>Observation: immutable snapshot
@@ -74,6 +75,24 @@ sequenceDiagram
         Intake->>Intake: verify capture binding and select canonical pending rows
         Intake-->>Steward: create-new bounded evidence view with missing text visible
         Note over Intake,Steward: read-only view; legacy apply commands reject it
+    end
+    opt separate capture-bound review campaign
+        Note over Intake,Steward: offline CLI through finalization; external verification is a separate library boundary
+        Report->>Intake: original report, without importing metadata decisions
+        Capture->>Intake: exact retained capture
+        Intake->>Intake: create blank capture-bound worksheet
+        loop next pending evidence view
+            Intake-->>Steward: exact text and pending decisions
+            Steward->>Intake: completed decision slots only
+            Intake->>Intake: reject duplicate keys, stale selection and changed evidence
+            Intake->>Report: new capture-bound worksheet; prior work preserved
+        end
+        Steward->>Intake: complete worksheet and independently issued approval input
+        Intake->>Intake: reverify capture/report and finalize complete labels
+        Intake->>Governance: entire capture-bound reviewed set after local validation
+        Governance-->>Intake: authenticated receipt decision or rejection
+        Intake-->>Steward: capture-bound aggregate result or failure
+        Note over Intake,Governance: no transfer to the independent Zotero write authority
     end
     Report->>Steward: review dispositions and merge candidates
     Steward->>Intake: save partially completed worksheet

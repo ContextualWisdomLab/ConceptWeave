@@ -6,6 +6,8 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
+- Private review commands now show saved text, accept completed decisions without replacing earlier work, and prepare a complete review for independent approval verification. They do not supply decisions or approve a review.
+
 - Private inspection of pending papers alongside their saved text, preserving missing material and leaving previous reports and decisions unchanged.
 
 - Private, replayable paper-text capture for later research review, preserving unavailable material and leaving earlier reports and approvals unchanged.
@@ -28,6 +30,10 @@ All notable changes to ConceptWeave are documented here.
 
 ### Security
 
+- Invalid private review files no longer expose rejected field names or values in error messages. File-role, size and access errors remain distinguishable.
+
+- Completed text-review files reject changed evidence, stale decisions and duplicate fields before updating local work. Earlier approvals cannot silently acquire later text evidence.
+
 - Local research requests bypass environment-configured proxies. This prevents unintended proxy forwarding; local peer authentication remains an explicit release limitation.
 
 - Source receipts bind complete captured metadata and actual classifier inputs; earlier report and review artifacts require regeneration under the versioned digest representation.
@@ -36,5 +42,7 @@ All notable changes to ConceptWeave are documented here.
 - Unsafe Rust is forbidden in the core domain crate.
 
 ### Fixed
+
+- Oversized private review outputs fail before creating a file, so a successful save stays within the corresponding reader's size limit. Large saved-text captures retain their separate limit.
 
 - Research reads accept valid responses exactly at their documented size limit while still rejecting oversized, incomplete or invalidly encoded responses.

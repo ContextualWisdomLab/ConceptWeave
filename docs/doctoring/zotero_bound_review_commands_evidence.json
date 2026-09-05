@@ -1,0 +1,53 @@
+{
+  "evidence_kind": "offline_capture_bound_review_view_v1",
+  "source_commit": "2fadbdaba3cd546f6c345ed4a950baef79325982",
+  "preflight_at": "2026-09-05T12:19:52.551Z",
+  "output_created_at": "2026-09-05T12:20:49.714Z",
+  "artifact_audited_at": "2026-09-05T12:21:47.264Z",
+  "command": "--bound-full-text-review REPORT WORKSHEET CAPTURE 25 VIEW",
+  "input_file_sha256": {
+    "metadata_report": "bf45248413f433a537fe8fc62c02b93eef3c7e47ff6245f31610e9ba72031d8d",
+    "capture_bound_blank_worksheet": "36bcf0679de068a744fd4ae8709cd192d99cb556591420d7a43c2b5f0e633a46",
+    "full_text_capture": "56d385398c8da559aa597a4e3783d946638855bba19ac808ce81d917bf06f94d"
+  },
+  "capture_digest": "sha256:429d98dc90e172b4f0bb4e3e1c493feb33b61664793d02a53d8183fb76f76a50",
+  "output": {
+    "file_name": "conceptweave-zotero-20260905-bound-review-batch-001-v1.json",
+    "outside_repository": true,
+    "bytes": 1590742,
+    "file_sha256": "e99a1963f3b5d7adfb62070785f2b69f1d9efd1d4882d365a5ca6f6b8d70f34a",
+    "mode": "0600",
+    "regular_single_link": true,
+    "byte_equal_prior_read_only_view": true
+  },
+  "measurement": {
+    "elapsed_seconds": 2.22,
+    "user_seconds": 1.72,
+    "system_seconds": 0.09,
+    "maximum_resident_bytes": 288505856,
+    "peak_memory_footprint_bytes": 287343168
+  },
+  "audit": {
+    "all_three_input_hashes_unchanged": true,
+    "all_inputs_regular_single_link_mode_0600": true,
+    "worksheet_rows": 3715,
+    "blank_worksheet_decisions": 3715,
+    "selected_pending_rows": 25,
+    "remaining_papers": 3715,
+    "selected_parents_with_nonempty_text": 21,
+    "selected_parents_without_nonempty_text": 4,
+    "selected_attachment_records": 21,
+    "selected_attachment_http_200": 21,
+    "zotero_requests": 0,
+    "model_requests": 0,
+    "new_proposals": 0,
+    "authentic_decisions": 0,
+    "independently_approved_labels": 0
+  },
+  "limits": [
+    "This verifies offline pending-view creation, not real decision application or approval.",
+    "Application and finalization were exercised with synthetic test-only inputs, never fabricated campaign labels.",
+    "Byte equality with the earlier view confirms reuse; it is not additional retained-text coverage.",
+    "Protected integration, external governance verification and Zotero write admission remain separate gates."
+  ]
+}
