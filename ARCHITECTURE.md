@@ -6,7 +6,9 @@ ConceptWeave owns the process that turns observed enterprise evidence into gover
 
 ```mermaid
 flowchart LR
-    S[Source systems and artifacts] --> SP[Source Observation port]
+    S[Source systems and artifacts] --> R[ObservationRequest admission]
+    R --> A[Registry authorization]
+    A --> SP[Authorized Source Observation port]
     SP --> O[Immutable Source Observation]
     O --> D[Semantic Discovery]
     D --> V[Model Validation]
@@ -27,7 +29,7 @@ flowchart LR
 
 | Context | Type | Owns | Does not own |
 | --- | --- | --- | --- |
-| Source Observation | Supporting | bounded source-access port policy, immutable observations, parser/extractor receipts, evidence locations | credentials, source-system business truth, semantic inference |
+| Source Observation | Supporting | bounded request admission, registry authorization capability binding, source-access port policy, immutable observations, parser/extractor receipts, evidence locations | credentials, source-system business truth, semantic inference |
 | Semantic Discovery | Core | candidate generation and evidence binding | publication authority |
 | Model Validation | Supporting | deterministic validation reports | human review decisions |
 | Governance & Publication | Core | proposal lifecycle, review receipts, releases, supersession authority | catalog/search runtime |
@@ -38,9 +40,13 @@ The generation-to-client dependency crosses only versioned public release contra
 
 ## Aggregate and value-object boundaries
 
-### ObservationRequest / ObservationRequestBudget / ObservationLimits
+### ObservationRequest / ObservationRequestBudget / ObservationLimits / AuthorizedObservationRequest
 
-Provider-independent Source Observation port value objects. A request contains only a bounded opaque source registry key (at most 128 bytes, lowercase multiword `snake_case`), an explicit non-empty exact-schema allowlist, a caller-selected positive authorization-metadata budget (maximum schema count plus total retained UTF-8 schema bytes), and positive operation/statement-timeout, row, byte, and concurrency execution budgets. Request count/byte admission is enforced before registry or database access and deliberately does not reuse PostgreSQL's build-time identifier-length default as a security constant. A registry boundary must resolve the key before issuing the opaque capability accepted by an immutable snapshot. Raw DSNs, URLs, shell-style connection parameters, one-word/generic keys, malformed registry identifiers, unknown registry entries, over-budget allowlists, blank schema names, and exact duplicates fail closed. Exact schema identifiers retain source spelling. Caller cancellation and source-disappearance/resource-limit outcomes are part of the typed port seam. Concrete PostgreSQL drivers, credentials, catalog SQL, and scheduling remain adapter responsibilities outside the domain and observation-fact crates. ADR 0004 remains Proposed until a concrete adapter and conformance evidence are integrated.
+Provider-independent Source Observation port value objects. A raw request contains only a bounded opaque source registry key (at most 128 bytes, lowercase multiword `snake_case`), an explicit non-empty exact-schema allowlist, a caller-selected positive authorization-metadata budget (maximum schema count plus total retained UTF-8 schema bytes), and positive operation/statement-timeout, row, byte, and concurrency execution budgets. Request count/byte admission is enforced before registry or database access and deliberately does not reuse PostgreSQL's build-time identifier-length default as a security constant.
+
+A well-formed key is not authority. `ObservationRequest::authorize` resolves the exact key through the caller's `SourceConnectionRegistry` and produces `AuthorizedObservationRequest`, which privately binds the validated request to the opaque `ResolvedSourceConnection`. `SourceObservationPort::observe` accepts only this authorized envelope. Unknown registry entries therefore fail before adapter execution, and raw DSNs, URLs, shell-style connection parameters, one-word/generic keys, malformed registry identifiers, over-budget allowlists, blank schema names, exact duplicates and raw credentials do not cross the canonical execution seam. The concrete adapter maps the authorized opaque capability to credentials only inside its ACL.
+
+Exact schema identifiers retain source spelling. Caller cancellation and source-disappearance/resource-limit outcomes are part of the typed port seam. The end-to-end operation budget covers authorization, connection and catalog work; runtime integration must account for pre-adapter authorization elapsed time rather than restarting the deadline at `observe`. Concrete PostgreSQL drivers, credentials, catalog SQL and scheduling remain adapter responsibilities outside the domain and observation-fact crates. ADR 0004 remains Proposed until a concrete adapter and conformance evidence prove these invariants.
 
 ### PostgresSchemaSnapshot
 
@@ -109,7 +115,7 @@ crates/
   conceptweave-domain/       # Core candidate/evidence lifecycle contracts
   conceptweave-client/       # Offline release admission, compatibility, integrity and supersession validation
   conceptweave-observation/  # Provider-independent immutable source-observation facts
-  conceptweave-source-port/  # Provider-independent source-access budgets/cancellation/failure seam
+  conceptweave-source-port/  # Request admission, registry authorization and source-access execution seam
 contracts/                   # Versioned public JSON Schemas and fixtures
 docs/
   adr/                       # Proposed/accepted architecture decisions
