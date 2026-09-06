@@ -1155,64 +1155,14 @@ impl std::error::Error for WorksheetError {}
 pub fn build_steward_review_worksheet(
     report: &ClassificationReport,
 ) -> Result<StewardReviewWorksheet, WorksheetError> {
-    let disposition_counts =
-        report
-            .classified_items
-            .iter()
-            .fold(BTreeMap::new(), |mut counts, item| {
-                *counts.entry(item.proposed_disposition).or_insert(0) += 1;
-                counts
-            });
-    let provenance_complete_count = report
-        .classified_items
-        .iter()
-        .filter(|item| {
-            !item.item_key.trim().is_empty()
-                && item
-                    .child_item_keys
-                    .iter()
-                    .all(|child_key| !child_key.trim().is_empty())
-        })
-        .count();
-    let abstention_count = report
-        .classified_items
-        .iter()
-        .filter(|item| item.proposed_disposition == Disposition::NeedsStewardReview)
-        .count();
-    if report.rule_revision.trim().is_empty()
-        || report.snapshot_digest.trim().is_empty()
-        || report.snapshot_items.len() != report.observed_item_count
-        || report.audit_summary.snapshot_item_count != report.observed_item_count
-        || report.classified_items.len() != report.audit_summary.bibliographic_item_count
-        || report.classified_items.len() != report.audit_summary.proposed_disposition_count
-        || report.audit_summary.provenance_complete_count != provenance_complete_count
-        || provenance_complete_count != report.classified_items.len()
-        || report.audit_summary.abstention_count != abstention_count
-        || report.audit_summary.duplicate_candidate_count != report.duplicate_candidates.len()
-        || report.audit_summary.failure_count != 0
-        || report.audit_summary.disposition_counts != disposition_counts
-    {
+    validate_classification_report(report).map_err(|_| WorksheetError::InvalidReport)?;
+    if report.rule_revision.trim().is_empty() || report.snapshot_digest.trim().is_empty() {
         return Err(WorksheetError::InvalidReport);
     }
-
-    let mut snapshot_versions = BTreeMap::new();
-    for item in &report.snapshot_items {
-        if item.item_key.trim().is_empty()
-            || snapshot_versions
-                .insert(item.item_key.as_str(), item.item_version)
-                .is_some()
-        {
-            return Err(WorksheetError::InvalidReport);
-        }
-    }
-
-    let mut decision_keys = BTreeSet::new();
     let mut decisions = Vec::with_capacity(report.classified_items.len());
     for item in &report.classified_items {
-        if !decision_keys.insert(item.item_key.as_str())
-            || snapshot_versions.get(item.item_key.as_str()) != Some(&item.item_version)
-            || (item.proposed_disposition == Disposition::NeedsStewardReview)
-                != item.abstention_reason.is_some()
+        if (item.proposed_disposition == Disposition::NeedsStewardReview)
+            != item.abstention_reason.is_some()
         {
             return Err(WorksheetError::InvalidReport);
         }
