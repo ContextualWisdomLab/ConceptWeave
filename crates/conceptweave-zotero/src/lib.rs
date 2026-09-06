@@ -879,7 +879,7 @@ pub fn classify_snapshot(
     mut items: Vec<ZoteroItem>,
 ) -> ClassificationReport {
     items.sort_by(|left, right| left.key.cmp(&right.key));
-    let snapshot_items = items
+    let snapshot_items: Vec<_> = items
         .iter()
         .map(|item| SnapshotItemRevision {
             item_key: item.key.clone(),
