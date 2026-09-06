@@ -6,6 +6,10 @@
 
 ## Context
 
+The installed-version and runtime-availability statements in this original context
+and its original alternatives describe 2026-09-04, not current host state. Later
+local evidence records Zotero 10.0.1; that alone establishes no write approval.
+
 Issue #8 requires classification changes to default to dry-run, preserve complete collection and tag state, reject stale review input, and make rollback reconstructable. The installed Zotero 9.0.6 Local API cannot write. Zotero 10+ writes additionally require a runtime-granted key, the same server identity, and fresh library/item versions. A planner can establish the review and recovery contract now without inventing authority or adding an unsafe Zotero 9 mutation path.
 
 ## Decision
@@ -15,6 +19,32 @@ ConceptWeave builds a local-only `ClassificationWritePlan` from an externally ve
 Execute planning fails closed for Zotero versions below 10. The plan contains no API key and performs no network call. A later adapter must preflight all operations and return item-level partial-success and rollback receipts; it must not claim cross-item transactionality or delete source records and attachments.
 
 ## Consequences
+
+### Source-scope amendment (2026-09-06, Proposed)
+
+In the context of reviewed collection/tag replacement, facing a report whose
+supporting title or inventory can change without changing its copied raw digest,
+we decided for shared report admission and a required v2 proposal binding, and
+against trusting only copied snapshot coordinates or duplicating inventory
+validation, to reject changed evidence before consuming approval, accepting that
+old receipts need fresh review and independent reissuance.
+
+Regression `dcde49e` demonstrated two failures: changed titles and inconsistent
+observed counts still returned plans. Repair `c348278` checks the shared inventory,
+audit and pending-source invariants, then compares the proposal digest, before
+calling authority. Existing item/metadata error precedence remains unchanged.
+The digest covers proposals, projected unclassified metadata and pending keys;
+it does not claim full-text capture or duplicate-candidate authority. Duplicate
+membership remains bound by the separate duplicate review contract.
+
+Governance must authenticate the complete reviewed set, including the binding
+and requested changes. Test extension `1fe3d7d` exercises omitted/blank bindings,
+retained plan identity, and a recomputed binding rejected by the original receipt.
+No issuer, API write, automatic legacy backfill, or approval bypass is added.
+Mode is a caller-supplied planning argument, not a field authenticated by this
+reviewed set; Execute planning therefore supplies no execution authority.
+This amendment remains Proposed until protected integration; later consumers must
+adopt the required field without deriving fresh authority from serialized plans.
 
 - Review and rollback semantics can be tested on Zotero 9 without changing the library.
 - Exact before-state checks prevent silent loss of unrelated collections or automatic-tag metadata.

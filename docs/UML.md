@@ -65,7 +65,10 @@ sequenceDiagram
     Steward->>Intake: verified canonical-item decisions
     Intake->>Report: before/after/rollback identity manifest
     Report-->>Steward: reversible local mapping; source records preserved
-    Steward->>Intake: verified collection/tag changes
+    Steward->>Intake: reviewed collection/tag changes and receipt
+    Intake->>Intake: existing item/metadata gates; shared inventory/audit validation; v2 binding
+    Intake->>Steward: independently verify complete reviewed set
+    Steward-->>Intake: authority result, not a replacement digest
     Intake->>Report: dry-run write plan with exact rollback state
     Intake-->>Zotero: Zotero 9 execute rejected; no mutation transport
 ```

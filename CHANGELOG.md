@@ -6,6 +6,8 @@ All notable changes to ConceptWeave are documented here.
 
 ### Fixed
 
+- Research change plans reject changed supporting evidence and incomplete inventories before approval, and preserve the identity of the reviewed evidence.
+
 - Duplicate review rejects incomplete source inventories and changed supporting evidence before approval, while retaining reversible identity mappings.
 - Research evaluation rejects incomplete source inventories and invalidates prior approvals when retained source metadata changes.
 - Research reports retain standalone files and notes that previously disappeared from the classification view, and flag sources whose parent relationships remain unresolved.

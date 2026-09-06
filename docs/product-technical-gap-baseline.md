@@ -103,6 +103,26 @@ This is display evidence, not approved reclassification or write evidence.
 Write-plan source-scope validation and proposal-bound approval remain open;
 this local integration is not a hosted-check, protected-merge, or release claim.
 
+### PR #13 write-scope repair checkpoint (2026-09-06)
+
+The preceding integration-only gap is locally repaired by `c348278` with tests
+`dcde49e` (two RED failures) and `1fe3d7d` (binding/independent-receipt coverage).
+Shared report admission now precedes authority, and the required v2 proposal
+binding is retained in the plan. Legacy item/metadata errors retain precedence.
+Independent static review found no blocking issue; it is not GitHub approval.
+
+Rust 1.98.0 workspace: 97 passing tests, 18 result suites including two doctests;
+strict all-target Clippy, warnings-denied rustdoc and unchanged coverage gate pass.
+Coverage: 169/169 functions, 1533/1533 source-normalized regions and 292/292
+normalized branches. Raw LLVM remains 1831/1852 lines, 2739/2777 regions and
+255/292 branches, not 100%. Logs use `/tmp/conceptweave-pr13-write-scope-` with
+`final.log`, `clippy.log`, `rustdoc.log` and `coverage.log` suffixes.
+
+PRD/TRD/ADR 0007 and DDD views retain separate metadata, duplicate-membership,
+full-text and execution authority. No real decisions, approvals or Zotero writes
+occurred. Protected merge, release, descendant adoption and actual reclassification
+remain open; no local evidence is transferred to a remote or later head.
+
 - No generic `utils/helpers/services/common` domain buckets.
 - Adapters remain outside the core domain model; external DTOs cross Anti-Corruption Layers.
 - Source Observation facts are not source-system business truth, and relational constraints are not semantic authority by themselves.

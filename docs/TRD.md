@@ -59,6 +59,15 @@ Evaluation must separate extraction recall, semantic correctness, structural cor
 
 ## 11. Zotero research intake
 
+Classification write planning also calls the shared report validator before
+external authority. Its required `proposal_digest` binds the reviewed v2 proposal,
+unclassified-metadata and pending-key payloads and is retained in the plan. Legacy
+receipts missing the field fail deserialization; blank bindings fail admission.
+All existing local item/metadata errors retain precedence. Independent governance
+authenticates the entire set; recomputing the digest cannot renew approval. This
+does not replace full-text or duplicate-membership review contracts (ADR 0007).
+Mode remains caller-supplied planning input, not receipt-bound execution authority.
+
 `ClassificationReport.unclassified_items` retains every input record excluded from bibliographic classification, using the existing `ZoteroItem` metadata projection. Bibliographic proposals and this inventory are disjoint and together account for the observed record count on reader-admitted input. The existing child index is consumed once from bibliographic roots; records never reached remain in sorted `pending_source_item_keys`, including standalone roots, their descendants, orphan trees and cycles. The traversal is iterative, uses no new dependency and costs O(n log n) time/O(n) auxiliary space. It does not validate arbitrary offline input or preserve note bodies, attachment-specific fields and unknown provider JSON.
 
 Evaluation now calls `validate_classification_report` before governance: counts, disjoint complete key/version partitions, types, direct children and recomputed pending keys must agree. Equal partition count and one successful removal of each unique snapshot coordinate prove completeness. This owner has no original parent/type snapshot coordinates, so consistency is not source authentication. Later restoration, review, duplicate and write consumers must adopt this guard and require both inventory fields without empty legacy defaults. Keep bibliographic progress distinct from whole-library completion. Full-text report-digest changes require fresh bound verification, not capture rewriting. See [source-scope evidence and integration map](doctoring/zotero_source_scope.md).

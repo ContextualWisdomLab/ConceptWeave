@@ -40,6 +40,11 @@ Validate syntax, identifiers, relationship cardinality, mapping completeness, du
 
 ### FR-5 Governed review
 
+Research changes must use the evidence actually reviewed. Changed supporting
+metadata or incomplete source inventories must stop a change plan before approval
+is consumed. Older reviews lacking this evidence binding require fresh independent
+approval; displaying a plan does not mean that the library has been changed.
+
 A candidate cannot become authoritative solely because an LLM or automated extractor produced it. The publication lifecycle is Draft -> Proposed -> Validated -> Reviewed -> Published, with explicit rejection and supersession paths.
 
 ### FR-6 Publication
