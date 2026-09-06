@@ -1267,6 +1267,7 @@ pub fn reviewed_golden_set_from_worksheet(
         || approval.proposal_digest.trim().is_empty()
         || worksheet.rule_revision.trim().is_empty()
         || worksheet.snapshot_digest.trim().is_empty()
+        || worksheet.proposal_digest.trim().is_empty()
     {
         return Err(EvaluationError::InvalidReview);
     }
@@ -1281,6 +1282,7 @@ pub fn reviewed_golden_set_from_worksheet(
     if worksheet.library_version != expected.library_version
         || worksheet.rule_revision != expected.rule_revision
         || worksheet.snapshot_digest != expected.snapshot_digest
+        || worksheet.proposal_digest != expected.proposal_digest
         || worksheet.snapshot_items != expected.snapshot_items
     {
         return Err(EvaluationError::SnapshotMismatch);
