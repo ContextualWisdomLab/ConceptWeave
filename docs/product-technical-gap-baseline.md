@@ -89,6 +89,37 @@ Remaining work: mandatory adoption by restoration, worksheet, duplicate and writ
 
 ## DDD fitness constraints
 
+### PR #18 local authorization successor verification (2026-09-06)
+
+Baseline `fe2cff4f9fc40496bbb4339ba4242543beacea9b` passed 108 tests/20 suites.
+Normal merge `2dfec77ab32d7dde5a9c92c6c29bc91df4058294` retains that head and
+parent `06d836a07fdb434683f88a31b45150a8a06f27f7`. Independent review verified
+the authorization/transport block is identical to original PR #18 and the
+write-plan/executor block identical to the repaired PR #17. No new runtime,
+credential storage, revocation API or authority issuer was introduced.
+
+The inherited HTTP 500 fixture lacked server identity, so PR #18 rejected it
+before interpreting status. RED `d5bc6e3` proves `InvalidResponse` differed from
+the intended `RequestFailed`; `5790358` adds the matching server header while
+retaining the explicit error assertion. The executor still keeps the exact
+request, complete matching observation and proposal binding as indeterminate,
+with exactly one POST and no inferred applied/inverse operations. Independent
+read-only re-review found no further inheritance issue; this is not approval.
+
+Final source passed 131 tests/20 result suites including three doctests, strict
+Clippy, warnings-denied rustdoc, format/CI-contract/diff and the unchanged coverage
+gate: 247/247 functions, 2154/2154 normalized regions, 370/370 normalized branches.
+Raw LLVM remains 2821/2874 lines, 4265/4349 regions and 330/370 branches, not 100%.
+Logs use `/tmp/conceptweave-pr18-scope-` with `baseline.log`, `red.log`, `final.log`,
+`clippy-final.log`, `rustdoc-final.log` and `coverage-final.log` suffixes.
+
+Native visual reinspection was attempted after verification but the Mac was
+locked; no fresh screenshot was obtained. Previously verified 3,719 displayed
+items remain historical display evidence only. Actual decisions/independent
+approvals remain 0/3,715, plus four unresolved standalone sources. No real
+authorization, write, recovery, protected merge or release occurred. PR #19
+approved execution must inherit this chain next; the root checkout remains older.
+
 ### PR #17 authenticated transport successor verification (2026-09-06)
 
 Baseline `c88f9a34c1fc4e72e38cf66b1d2f3fcb305e560a` passed 100 tests/19 suites.
