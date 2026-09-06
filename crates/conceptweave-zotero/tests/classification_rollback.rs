@@ -274,10 +274,7 @@ fn rollback_reconciles_failed_write_without_guessing() {
             expected_outcome.1
         );
         assert_eq!(result.not_attempted_item_keys, ["A"]);
-        assert_eq!(
-            result.remaining_operations.len(),
-            1
-        );
+        assert_eq!(result.remaining_operations.len(), 1);
     }
 }
 

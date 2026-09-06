@@ -907,9 +907,13 @@ pub struct ClassificationRollbackReceipt {
     pub indeterminate_item_key: Option<String>,
     /// Complete operation retained for manual reconciliation of indeterminate state.
     pub indeterminate_operation: Option<ClassificationRollbackOperation>,
+    /// Exact submitted inverse request; observations do not authorize its retry.
+    pub indeterminate_request: Option<ClassificationWriteRequest>,
+    /// Complete readback after failure, retained without causal completion claims.
+    pub reconciliation_observation: Option<ClassificationItemState>,
     /// Items whose inverse write was not attempted.
     pub not_attempted_item_keys: Vec<String>,
-    /// Proven unchanged and untouched operations eligible for automatic retry.
+    /// Untouched operations only; this audit list does not grant retry authority.
     pub remaining_operations: Vec<ClassificationRollbackOperation>,
 }
 
@@ -1927,28 +1931,19 @@ pub fn execute_classification_rollback<PreflightError, WriteError>(
         }
 
         let reconciled = preflight(&operation.item_key).ok();
-        let restored = reconciled.as_ref().is_some_and(|state| {
-            matches_rollback_restored(state, current_library_version, operation)
-        });
-        let unchanged = reconciled.as_ref().is_some_and(|state| {
-            matches_rollback_current_at(state, current_library_version, operation)
-        });
-        if restored {
-            restored_item_keys.push(operation.item_key.clone());
-        }
-        let indeterminate = !restored && !unchanged;
-        let remaining_start = index + usize::from(restored || !unchanged);
         return ClassificationRollbackReceipt {
             outcome: ClassificationRollbackOutcome::PartialFailure,
             restored_item_keys,
             failed_item_key: Some(operation.item_key.clone()),
-            indeterminate_item_key: indeterminate.then(|| operation.item_key.clone()),
-            indeterminate_operation: indeterminate.then(|| operation.clone()),
+            indeterminate_item_key: Some(operation.item_key.clone()),
+            indeterminate_operation: Some(operation.clone()),
+            indeterminate_request: Some(request),
+            reconciliation_observation: reconciled,
             not_attempted_item_keys: operations[index + 1..]
                 .iter()
                 .map(|operation| operation.item_key.clone())
                 .collect(),
-            remaining_operations: operations[remaining_start..].to_vec(),
+            remaining_operations: operations[index + 1..].to_vec(),
         };
     }
     ClassificationRollbackReceipt {
@@ -1957,6 +1952,8 @@ pub fn execute_classification_rollback<PreflightError, WriteError>(
         failed_item_key: None,
         indeterminate_item_key: None,
         indeterminate_operation: None,
+        indeterminate_request: None,
+        reconciliation_observation: None,
         not_attempted_item_keys: Vec::new(),
         remaining_operations: Vec::new(),
     }
@@ -1984,6 +1981,8 @@ fn rollback_preflight_failure(
         failed_item_key: Some(failed_item_key.to_owned()),
         indeterminate_item_key: None,
         indeterminate_operation: None,
+        indeterminate_request: None,
+        reconciliation_observation: None,
         not_attempted_item_keys: operations
             .iter()
             .map(|item| item.item_key.clone())
