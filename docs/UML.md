@@ -49,6 +49,7 @@ sequenceDiagram
     participant Report as Local proposal report
     participant Capture as Private text capture
     participant Steward
+    participant Governance as External approval verifier
 
     loop bounded pages
         Intake->>Zotero: read items at one library version
@@ -104,8 +105,17 @@ sequenceDiagram
     Steward->>Intake: verified canonical-item decisions
     Intake->>Report: before/after/rollback identity manifest
     Report-->>Steward: reversible local mapping; source records preserved
-    Steward->>Intake: verified collection/tag changes
-    Intake->>Report: dry-run write plan with exact rollback state
+    Steward->>Intake: collection/tag changes and independent approval
+    Intake->>Intake: validate complete local request and every changed item
+    alt invalid or stale request
+        Intake-->>Steward: reject without redeeming approval
+    else locally valid request
+        Intake->>Governance: verify complete write set exactly once
+        Governance-->>Intake: approval or denial
+        opt approved
+            Intake->>Report: dry-run write plan with exact rollback state
+        end
+    end
     Intake-->>Zotero: Zotero 9 execute rejected
     opt caller supplies authenticated Zotero 10+ adapter
         Intake->>Zotero: preflight every planned item

@@ -43,6 +43,8 @@ All notable changes to ConceptWeave are documented here.
 
 ### Fixed
 
+- Invalid or stale classification changes are rejected before redeeming approval, preserving it when a request cannot produce a valid plan.
+
 - Oversized private review outputs fail before creating a file, so a successful save stays within the corresponding reader's size limit. Large saved-text captures retain their separate limit.
 
 - Research reads accept valid responses exactly at their documented size limit while still rejecting oversized, incomplete or invalidly encoded responses.
