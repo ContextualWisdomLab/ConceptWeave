@@ -7,8 +7,8 @@ use std::{
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, ObservationLimitError,
     ObservationLimits, ObservationRequest, ObservationRequestBudget, ObservationRequestBudgetError,
-    ObservationRequestError, SourceConnectionRegistry, SourceObservationFailure,
-    SourceObservationPort,
+    ObservationRequestError, ResolvedSourceConnection, SourceConnectionRegistry,
+    SourceObservationFailure, SourceObservationPort,
 };
 
 fn limits() -> ObservationLimits {
@@ -209,12 +209,18 @@ impl SourceConnectionRegistry for ExactRegistry {
         source_connection_key == "grc_readonly_connection"
     }
 
+    fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
+        (source_connection_key == "grc_readonly_connection")
+            .then(|| "policy_revision_a".to_owned())
+    }
+
     fn authorizes_schema_scope(
         &self,
-        source_connection_key: &str,
+        source_connection: &ResolvedSourceConnection,
         allowed_schema_names: &[String],
     ) -> bool {
-        source_connection_key == "grc_readonly_connection"
+        source_connection.source_connection_key() == "grc_readonly_connection"
+            && source_connection.connection_policy_binding() == "policy_revision_a"
             && allowed_schema_names.len() == 1
             && allowed_schema_names[0] == "governance_core"
     }
@@ -245,7 +251,7 @@ fn adapter_execution_requires_a_registry_authorized_request() {
 
     let authorized = request
         .authorize(&ExactRegistry)
-        .expect("registry authorization must issue the source-and-schema execution capability");
+        .expect("registry authorization must issue the source-policy-and-schema execution capability");
     assert_eq!(
         authorized.request().source_connection_key(),
         "grc_readonly_connection"
@@ -253,6 +259,10 @@ fn adapter_execution_requires_a_registry_authorized_request() {
     assert_eq!(
         authorized.source_connection().source_connection_key(),
         "grc_readonly_connection"
+    );
+    assert_eq!(
+        authorized.source_connection().connection_policy_binding(),
+        "policy_revision_a"
     );
 }
 
@@ -278,10 +288,11 @@ impl SourceObservationPort for EchoPort {
             if cancellation.is_cancelled() {
                 return Err(SourceObservationFailure::Cancelled);
             }
-            Ok(request
-                .source_connection()
-                .source_connection_key()
-                .to_owned())
+            Ok(format!(
+                "{}:{}",
+                request.source_connection().source_connection_key(),
+                request.source_connection().connection_policy_binding()
+            ))
         }
     }
 }
@@ -321,7 +332,7 @@ fn explicit_port_carries_authorization_and_cancellation_without_inventing_succes
     );
     assert_eq!(
         poll_ready(EchoPort.observe(&request, &Cancellation(false))),
-        Ok("grc_readonly_connection".to_owned())
+        Ok("grc_readonly_connection:policy_revision_a".to_owned())
     );
 
     let bounded_failures = [
