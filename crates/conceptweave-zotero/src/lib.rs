@@ -519,6 +519,10 @@ pub struct ClassificationWriteReceipt {
     pub failed_item_key: Option<String>,
     /// Item whose state could not be proven after an unverifiable write response.
     pub indeterminate_item_key: Option<String>,
+    /// Exact submitted request whose completion is unknown; audit evidence, not retry authority.
+    pub indeterminate_request: Option<ClassificationWriteRequest>,
+    /// Subsequent observation, if available; it cannot prove causal completion.
+    pub reconciliation_observation: Option<ClassificationItemState>,
     /// Items whose write was not attempted.
     pub not_attempted_item_keys: Vec<String>,
     /// Verified inverse operations in safe reverse application order.
@@ -1332,6 +1336,8 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
             applied_item_keys: Vec::new(),
             failed_item_key: None,
             indeterminate_item_key: None,
+            indeterminate_request: None,
+            reconciliation_observation: None,
             not_attempted_item_keys: plan
                 .operations
                 .iter()
@@ -1373,40 +1379,16 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
         });
         let Some(state) = verified_state else {
             let reconciled_state = preflight(&operation.item_key).ok();
-            let reconciled_after = reconciled_state.as_ref().is_some_and(|state| {
-                matches_after_state(state, server_id, current_library_version, operation)
-            });
-            let reconciled_before = reconciled_state.as_ref().is_some_and(|state| {
-                matches_before_state(state, server_id, current_library_version, operation)
-            });
-            if let Some(state) = reconciled_state.as_ref().filter(|_| reconciled_after) {
-                applied_item_keys.push(operation.item_key.clone());
-                rollback_operations.push(ClassificationRollbackOperation {
-                    item_key: operation.item_key.clone(),
-                    item_version: state.item_version,
-                    collection_keys: operation.rollback_collection_keys.clone(),
-                    tags: operation.rollback_tags.clone(),
-                });
-            } else if let Some(state) = reconciled_state.as_ref().filter(|state| {
-                state.server_id == server_id
-                    && state.library_version > current_library_version
-                    && state.item_key == operation.item_key
-                    && state.item_version > operation.item_version
-            }) {
-                rollback_operations.push(ClassificationRollbackOperation {
-                    item_key: operation.item_key.clone(),
-                    item_version: state.item_version,
-                    collection_keys: operation.rollback_collection_keys.clone(),
-                    tags: operation.rollback_tags.clone(),
-                });
-            }
+            // A delayed request or concurrent writer can explain any observed state.
+            // Retain the observation without granting completion, retry, or inverse authority.
             rollback_operations.reverse();
             return partial_failure_receipt(
                 plan,
                 operation_index,
                 applied_item_keys,
                 rollback_operations,
-                (!reconciled_after && !reconciled_before).then_some(operation.item_key.as_str()),
+                request,
+                reconciled_state,
             );
         };
         current_library_version = state.library_version;
@@ -1432,6 +1414,8 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
         applied_item_keys,
         failed_item_key: None,
         indeterminate_item_key: None,
+        indeterminate_request: None,
+        reconciliation_observation: None,
         not_attempted_item_keys: Vec::new(),
         rollback_operations,
     }
@@ -1486,6 +1470,8 @@ fn preflight_failure_receipt(
         applied_item_keys: Vec::new(),
         failed_item_key: failed_item_key.map(str::to_owned),
         indeterminate_item_key: None,
+        indeterminate_request: None,
+        reconciliation_observation: None,
         not_attempted_item_keys: plan
             .operations
             .iter()
@@ -1500,7 +1486,8 @@ fn partial_failure_receipt(
     failed_index: usize,
     applied_item_keys: Vec<String>,
     rollback_operations: Vec<ClassificationRollbackOperation>,
-    indeterminate_item_key: Option<&str>,
+    indeterminate_request: ClassificationWriteRequest,
+    reconciliation_observation: Option<ClassificationItemState>,
 ) -> ClassificationWriteReceipt {
     ClassificationWriteReceipt {
         review_id: plan.review_id.clone(),
@@ -1514,7 +1501,9 @@ fn partial_failure_receipt(
         outcome: ClassificationWriteOutcome::PartialFailure,
         applied_item_keys,
         failed_item_key: Some(plan.operations[failed_index].item_key.clone()),
-        indeterminate_item_key: indeterminate_item_key.map(str::to_owned),
+        indeterminate_item_key: Some(indeterminate_request.item_key.clone()),
+        indeterminate_request: Some(indeterminate_request),
+        reconciliation_observation,
         not_attempted_item_keys: plan
             .operations
             .iter()
