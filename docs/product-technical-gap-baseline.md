@@ -89,6 +89,50 @@ Remaining work: mandatory adoption by restoration, worksheet, duplicate and writ
 
 ## DDD fitness constraints
 
+### PR #20 rollback uncertainty repair (2026-09-06)
+
+Untouched `a03a7248c894a1e0765968ddf58514d98c517da3` passed 116 tests/21 suites.
+Normal merge `c53e36b` retains it and PR #19 `6dc6176`; conflicts preserve the
+original rollback functionality and corrected forward-write uncertainty. Missing
+required review proposal binding was repaired in test fixture `e5f583a`.
+
+Independent review found the inverse executor repeated the forward-write causal
+error: matching restored metadata implied completion, while unchanged metadata
+cleared uncertainty and re-enqueued the failed inverse. Initial `318b370` RED had
+an empty-vector type error and is not behavioral evidence. Independent test-only
+`c0fc17ba5262882662b487114d24c75e7ffb5d3d` against unchanged `e5f583a` compiled,
+then failed one of six tests: observed restored keys `[B]` versus expected empty.
+Its worktree `/private/tmp/conceptweave-rollback-red.O5zdby` and log
+`/tmp/conceptweave-pr20-causal-independent-red.log` are preserved.
+
+Owner fix `4e28613` always retains failed or invalid inverse attempts as unknown,
+with complete operation, exact submitted request and optional readback. Only
+directly verified earlier restorations remain restored; remaining operations
+contain untouched work only and confer no retry authority. `ff66a54` compares
+complete request/observation in all three retained readback scenarios; `006efd0`
+corrects the six invalid-response cases. Coverage found an obsolete self-comparison
+after inference removal; `876cbfe` removes it without weakening shared-library,
+server, metadata or item-revision preflight. Independent final review confirmed
+these checks remain intact. `b238bc6` corrects misleading authority docstrings.
+
+At `876cbfe`, 139 tests/21 suites including three doctests, strict Clippy,
+warnings-denied rustdoc and unchanged coverage gate pass: 262/262 functions,
+2332/2332 normalized regions, 394/394 normalized branches. Raw LLVM remains
+3007/3067 lines, 4525/4622 regions and 350/394 branches, not 100%. Logs use
+`/tmp/conceptweave-pr20-causal-` with `verified.log`, `clippy-verified.log`,
+`rustdoc-verified.log` and `coverage-verified.log`; docstring-only follow-up uses
+`release-check.log` and `rustdoc-release-check.log` (not a release claim).
+
+PRD/TRD/Proposed ADR explicitly keep detached operation DTO authority and complete
+original-write scope open. Empty inverse lists do not prove recovery of an unknown
+original write; existing authoritative successor wrappers must be adopted rather
+than inventing a competing capability layer. PR #21 delayed reconciliation
+`09c84e4cdb1393a5e450f5200b87f292eeea956f` repeats the causal inference and is next.
+No fresh native visual evidence: reinspection again encountered the locked Mac.
+Historical 3,719 displayed items are not classification proof. Decisions/approvals
+remain 0/3,715 plus four unresolved sources; no real authorization, mutation,
+recovery, protected merge or release occurred. Root adoption remains outstanding.
+
 ### PR #19 approved execution successor verification (2026-09-06)
 
 Baseline `62c19ee23e3c827bc7db15c79f4755ff040489e9` passed 109 tests/20 suites.
