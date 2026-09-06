@@ -1,5 +1,6 @@
 use conceptweave_source_port::{
-    ObservationLimits, ObservationRequest, ObservationRequestBudget, SourceConnectionRegistry,
+    ObservationLimits, ObservationRequest, ObservationRequestBudget, ObservationRequestError,
+    SourceConnectionRegistry,
 };
 
 struct SourceOnlyRegistry;
@@ -8,10 +9,15 @@ impl SourceConnectionRegistry for SourceOnlyRegistry {
     fn contains_source_connection(&self, source_connection_key: &str) -> bool {
         source_connection_key == "grc_readonly_connection"
     }
+
+    fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
+        (source_connection_key == "grc_readonly_connection")
+            .then(|| "policy_revision_a".to_owned())
+    }
 }
 
 #[test]
-fn source_key_authorization_cannot_self_authorize_arbitrary_schema_scope() {
+fn source_key_and_binding_cannot_self_authorize_arbitrary_schema_scope() {
     let request = ObservationRequest::new(
         "grc_readonly_connection",
         vec!["restricted_finance".to_owned()],
@@ -20,8 +26,9 @@ fn source_key_authorization_cannot_self_authorize_arbitrary_schema_scope() {
     )
     .expect("request metadata is syntactically valid");
 
-    assert!(
-        request.authorize(&SourceOnlyRegistry).is_err(),
-        "authorizing only the source key must not implicitly authorize a caller-selected schema scope"
+    assert_eq!(
+        request.authorize(&SourceOnlyRegistry),
+        Err(ObservationRequestError::UnauthorizedSchemaScope),
+        "authorizing only the source key and policy binding must not implicitly authorize a caller-selected schema scope"
     );
 }
