@@ -44,6 +44,7 @@ Older worksheets require regeneration, not a fabricated digest or approval. The 
 
 The CLI finalizes an original report, completed worksheet, and approval receipt into the reviewed golden set without another Zotero read. Each path argument and each opened input device/inode identity must be distinct. Inputs remain direct temporary-directory children, regular single-link files, exact owner-only `0600`, and bounded to 16 MiB; output retains create-new `0600` semantics. This keeps sensitive review material local and makes snapshot drift or aliased artifacts a validation failure instead of silently substituting current library state.
 
+The same offline boundary may emit an aggregate progress checkpoint for a partial worksheet. The checkpoint revalidates every immutable coordinate and proposal field, counts only human-supplied non-abstention decisions, contains no item or reviewer identity, and treats zero required decisions as incomplete. It is operational coverage evidence, not an approval receipt or semantic-quality result.
 ### Proposed offline input continuity amendment — September 7
 
 PR29 normal merge `4845200` retains offline finalization and inherits PR28 source binding plus report/worksheet preservation. Worksheet destinations reuse canonical-pair validation before capture; both artifacts serialize before either write, and second-write failure does not unlink the first artifact. This is sequential local output, not an atomic pair or approval issuance.
@@ -118,6 +119,12 @@ Guards only in later worksheet commands leave direct evaluation exposed. Another
 GREEN source `f6735b585022aac1c8ceff86c150d9b64fd77ec2` passed 68 tests across 14 unfiltered workspace suites (including two doctests), up from 64 after parent integration and 58 before it. Strict Clippy passed. Full coverage, independent source review, descendant integration, hosted exact-head checks and protected merge remain separate gates. No genuine decision, approval or Zotero write was issued. Visual inspection was attempted again, but the Mac was locked; no fresh screenshot verification is claimed.
 
 ## Alternatives considered
+
+### Proposed review-progress scope amendment — September 7
+
+PR30 exposes incremental local progress and extracts shared worksheet comparison. Normal merge `7251238` inherits repaired source identity, finalization and private input boundaries while preserving the child's coverage improvements. The extracted comparator omitted the required proposal digest, allowing old worksheet progress after changed content. RED `4099434` compiled with one passing and two failing tests: blank binding was admitted and pending/content identity fields were missing. `bee32f4` adds one shared digest comparison and includes the opaque proposal binding and pending count in existing aggregate output. `b2b0ef4` verifies one filled paper decision plus an unresolved source stays incomplete, preserving bibliographic counts and excluding the private source key.
+
+We reject snapshot-only identity because restored proposal and retained metadata can change under that coordinate. We reject treating nonbibliographic sources as paper decisions because their disposition is not inferred truth. We report both scopes, require zero pending sources for local completion, and retain separate approval and write gates. No new digest, source-text export or authority mechanism is added. Existing early finalization checks preserve error precedence. The stricter completion meaning corrects consumers that equated filled slots with complete source scope; later consumers must inherit it before claiming preparation completion. Protected review and release remain pending.
 
 ### September 6 duplicate source-scope admission (Proposed)
 
