@@ -6,6 +6,16 @@ This file records code-current product and technical gaps. Exact PR/check/run co
 
 ## September 6 source inventory checkpoint
 
+### September 7 PR26 private export repair
+
+Final source `58ff5985890d5a0b4aaadaa1f8d604e1bc96a1e2` passes 163 tests/24 suites including three doctests, strict Clippy, warnings-denied rustdoc, formatting, CI contract and diff checks. The unchanged pinned coverage gate passes 294/294 functions, 2,536/2,536 normalized regions and 422/422 normalized branches. Raw coverage remains 3,382/3,444 lines, 5,139/5,246 regions and 377/422 branches, not 100%. Logs: `/tmp/conceptweave-pr26-verified.log` and `/tmp/conceptweave-pr26-{clippy,rustdoc,coverage}-verified.log`. The earlier coverage failure is retained in `/tmp/conceptweave-pr26-coverage.log`; it is not a successful checkpoint.
+
+Original PR26 `e2dc6006ed3e56d8388e82912826cf37efed0541` passed 128 tests/24 suites. Ordinary merge `227b3e9` retains it and PR25 `51631fbf711b403a40f3b9fafa2ec3958d54ceaf`; integrated tests passed 160/24. RED `68575a6` compiled and failed both regression tests: a replacement file was deleted after write failure, and buffered bytes were flushed while dropping a failed writer. `ab391b2` preserves the explicit write result, disassembles the buffer without retry, and removes pathname cleanup from both the shared writer and second-artifact failure. Existing private creation, successful write and overwrite-refusal checks remain.
+
+RED `fb5b5e5` compiled and failed canonical-alias admission. `e928858` rejects equal canonical destinations before the Local API read; both artifacts are still serialized from one captured report before either is written. Independent read-only review found no further production defect. The first coverage run exposed two untested error propagation points in the extracted admission function; `58ff598` adds both invalid-path cases without changing runtime or coverage exclusions. Final verification is recorded separately below.
+
+TRD and Proposed ADR 0006 describe retained partial files and sequential, nontransactional output. A report surviving a failed worksheet write is not a completed pair, approval or durable publication. Root and later CLI owners still require this inherited fix; PR27 finalization must also compare the newly required worksheet proposal binding before governance. Actual decisions and independent approvals remain 0/3,715 plus four unresolved standalone sources. No real source metadata or authority was created for these synthetic tests. Native Visual Inspection was attempted but the Mac is locked, so no new screen evidence exists. No hosted GREEN, protected approval/merge or release is claimed.
+
 ### PR25 worksheet admission and identity repair
 
 Original PR25 `c6b4c17e931951a2e1d4ea79ac79363f6306a5bf` passed 126 tests/24 suites. Normal merge `4a1a3bb` retains it and PR24 `35c57ca4510a65cf48069285d78b95cf47db65ba`; integrated tests passed 153/24. RED `900038e` compiled with 4 passing and 2 failing tests: omitted retained inventory and hidden pending keys still produced worksheets. `5b54d06` reuses shared report validation and removes 54 lines of divergent audit/coordinate checks. Valid standalone, orphan, cyclic and attached source metadata remains reviewable with blank decisions. Completion admission remains distinct.
