@@ -482,7 +482,7 @@ pub fn classify_snapshot(
     mut items: Vec<ZoteroItem>,
 ) -> ClassificationReport {
     items.sort_by(|left, right| left.key.cmp(&right.key));
-    let children = child_index(&items);
+    let mut children = child_index(&items);
     let bibliographic: Vec<&ZoteroItem> =
         items.iter().filter(|item| is_bibliographic(item)).collect();
     let duplicate_candidates = duplicate_candidates(&bibliographic);
@@ -504,10 +504,9 @@ pub fn classify_snapshot(
         .map(|item| item.item_key.clone())
         .collect();
     while let Some(parent_item_key) = parent_item_keys.pop() {
-        for child_item_key in children.get(&parent_item_key).into_iter().flatten() {
-            if pending_source_item_keys.remove(child_item_key) {
-                parent_item_keys.push(child_item_key.clone());
-            }
+        for child_item_key in children.remove(&parent_item_key).unwrap_or_default() {
+            pending_source_item_keys.remove(&child_item_key);
+            parent_item_keys.push(child_item_key);
         }
     }
 
