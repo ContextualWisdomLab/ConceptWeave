@@ -89,6 +89,26 @@ Remaining work: mandatory adoption by restoration, worksheet, duplicate and writ
 
 ## DDD fitness constraints
 
+### PR #16 multilingual successor verification (2026-09-06)
+
+Baseline `044018cef4e5d3e919b278a1cfebe56857863601` passed 87 tests/19 suites.
+Normal merge `4f3ac52a27ff1090b94c63ff807ddb5bd9ce872f` retains that entire delta
+and parent `42ddd81adf8d994f67a30f0c6b8383d637073c72`. Production source is identical
+to the repaired parent; `review_contract.rs` is identical to the prior PR #16.
+An independent static review confirmed all seven non-English cases, English
+match, blank metadata and unmatched metadata remain without reduced assertions.
+This is abstention safety, not multilingual classification or completed research.
+
+Exact merged source passed 109 tests/19 result suites including three doctests,
+strict all-target Clippy, warnings-denied rustdoc, format, CI-contract and diff
+checks, plus the unchanged coverage gate: 185/185 functions, 1770/1770 normalized
+regions and 320/320 normalized branches. Raw LLVM remains 1998/2050 lines,
+2934/3014 regions and 280/320 branches, not 100%. Logs use the
+`/tmp/conceptweave-pr16-scope-` prefix (`baseline`, `final`, `clippy`, `rustdoc`,
+`coverage`, each with `.log`). No new production code, live write, paper decision,
+approval, protected merge or release is claimed. Next owner is PR #17 authenticated
+transport; it must preserve required bindings and indeterminate-request semantics.
+
 ### PR #15 execution-scope and uncertainty repair (2026-09-06)
 
 Baseline `45e9c493` passed 87 tests/19 result suites; normal merge `2887f70`
