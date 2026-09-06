@@ -73,6 +73,14 @@ GREEN source `f6735b585022aac1c8ceff86c150d9b64fd77ec2` passed 68 tests across 1
 
 ## Alternatives considered
 
+### September 6 derived audit repair (Proposed)
+
+Live PR #11 findings [3934799129](https://github.com/ContextualWisdomLab/ConceptWeave/pull/11#discussion_r3934799129) and [3934994550](https://github.com/ContextualWisdomLab/ConceptWeave/pull/11#discussion_r3934994550) were rechecked after source-scope integration. Source identity must not absorb derived audit fields, but accepting arbitrary audit values alongside a verified report can still misstate completeness. RED `ebdd852` proved both forged audit reaching governance and duplicate source keys counted as complete provenance.
+
+We extracted the existing aggregate computation and reuse it during report construction and shared admission. A parent and every linked child must each have one nonblank identity in the complete snapshot to count as provenance-complete. Audit fields are recomputed before independent verification; zero item revisions remain valid. This adds an O(n log n) identity-count pass and rejects inconsistent audit reports, without changing the raw source digest or minting approval. Copying a second audit implementation or mixing counters into source identity was rejected. Duplicate candidate semantics remain owned by the subsequent duplicate boundary; comparing its count is not candidate authentication.
+
+`cb4c06b` exposed a slice-inference compilation error, repaired by the explicit owned vector in `935e035`. Existing prediction-tampering tests then needed coherent attacker-controlled counters to reach their original gates; `23178a9` retains their original mismatch and unverified-approval expectations. All 75 workspace tests passed. Full coverage, hosted checks, descendant adoption and protection-compliant merge remain separate requirements.
+
 The follow-up `8ccb0d5b3d7705786b6c40c3bcf5a10ff32046d9` removes duplicate evaluator identity checks subsumed by the entry validator. Equal partition lengths plus one successful removal per unique coordinate prove no leftover source; testing impossible duplicate branches would require bypassing the real entry boundary. Existing malformed-report cases remain, and `d1344c7` adds legacy-v1 rejection and empty/orphan/cycle/blank-identity regressions. The unchanged pinned coverage gate now passes all normalized owned regions and branches; raw instantiated gaps remain explicitly reported in the Gap baseline. No coverage exclusion, dependency or authority service was added.
 
 - First-match classification was rejected because FR-9 requires ambiguous evidence to abstain rather than acquire an arbitrary priority-based disposition.
