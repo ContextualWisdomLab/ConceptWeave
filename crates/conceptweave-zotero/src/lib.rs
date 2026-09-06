@@ -1265,7 +1265,11 @@ impl fmt::Display for EvaluationError {
 
 impl std::error::Error for EvaluationError {}
 
-/// Evaluates a steward review only when it covers every bibliographic item.
+/// Evaluates a review covering every bibliographic item with no unresolved sources.
+///
+/// Standalone sources, orphan trees and disconnected cycles must be resolved
+/// before completion. Sampled quality evaluation remains available separately.
+/// Success proves reviewed metadata coverage, not a Zotero write or full-text approval.
 pub fn evaluate_complete_reviewed_classification<F>(
     report: &ClassificationReport,
     golden: &ReviewedGoldenSet,
@@ -1274,7 +1278,9 @@ pub fn evaluate_complete_reviewed_classification<F>(
 where
     F: FnOnce(&ReviewedGoldenSet) -> bool,
 {
-    if golden.labels.len() != report.classified_items.len() {
+    if golden.labels.len() != report.classified_items.len()
+        || !report.pending_source_item_keys.is_empty()
+    {
         return Err(EvaluationError::IncompleteReview);
     }
     let evaluation = evaluate_reviewed_golden_set(report, golden, verify_approval)?;
