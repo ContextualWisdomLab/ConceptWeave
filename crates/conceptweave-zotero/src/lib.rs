@@ -1108,11 +1108,11 @@ mod tests {
                 let result = read_snapshot_with(&mut |start| {
                     starts.push(start);
                     let key = if start == invalid_start {
-                        blank_key
+                        blank_key.to_owned()
                     } else {
-                        "A"
+                        format!("A{start}")
                     };
-                    Ok(fetched_page(3, vec![item(key, "attachment", "", "", "")]))
+                    Ok(fetched_page(3, vec![item(&key, "attachment", "", "", "")]))
                 });
                 assert!(matches!(result, Err(ReadError::SnapshotChanged)));
                 assert_eq!(
