@@ -341,7 +341,7 @@ pub struct ReviewedClassificationWriteSet {
     pub rule_revision: String,
     /// Exact reviewed raw-snapshot digest.
     pub snapshot_digest: String,
-    /// Required content identity of the complete report reviewed by the steward.
+    /// Required identity of reviewed proposals, unclassified metadata, and pending keys.
     pub proposal_digest: String,
     /// Exact item-key/item-version coordinates reviewed by the steward.
     pub snapshot_items: Vec<SnapshotItemRevision>,
@@ -1034,6 +1034,8 @@ fn normalized_metadata(
 /// Local identity, execution-mode, and metadata checks finish before the caller's
 /// governance verifier runs. Invalid input never consumes a one-use approval;
 /// a locally valid complete review is verified exactly once before returning a plan.
+/// The verifier must authenticate every field of the reviewed set, including its
+/// proposal digest and requested changes. Recomputing a digest grants no authority.
 pub fn build_classification_write_plan<F>(
     report: &ClassificationReport,
     reviewed: &ReviewedClassificationWriteSet,
