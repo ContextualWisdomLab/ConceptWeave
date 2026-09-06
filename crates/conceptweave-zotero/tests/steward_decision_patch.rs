@@ -67,6 +67,45 @@ fn decision_patch_is_snapshot_bound_idempotent_and_non_overwriting() {
 }
 
 #[test]
+fn stale_patch_cannot_use_a_fresh_worksheet_for_changed_content() {
+    let update = patch("A", 7, Disposition::AlignmentVersioning);
+    let mut report = report();
+    report.classified_items[0]
+        .title
+        .push_str(" changed evidence");
+    let worksheet = build_steward_review_worksheet(&report).unwrap();
+    assert_eq!(
+        apply_steward_decision_patch(&report, &worksheet, &update),
+        Err(WorksheetError::InvalidReport)
+    );
+}
+
+#[test]
+fn patch_deserialization_requires_content_binding() {
+    let mut value = serde_json::to_value(patch("A", 7, Disposition::AlignmentVersioning)).unwrap();
+    value.as_object_mut().unwrap().remove("proposal_digest");
+    assert!(serde_json::from_value::<StewardDecisionPatch>(value).is_err());
+}
+
+#[test]
+fn late_invalid_update_preserves_the_original_worksheet() {
+    let report = report();
+    let worksheet = build_steward_review_worksheet(&report).unwrap();
+    let before = worksheet.clone();
+    let mut update = patch("A", 7, Disposition::Generation);
+    update.decisions.push(StewardDecisionUpdate {
+        item_key: "UNKNOWN".into(),
+        item_version: 7,
+        reviewed_disposition: Disposition::OutOfScope,
+    });
+    assert_eq!(
+        apply_steward_decision_patch(&report, &worksheet, &update),
+        Err(WorksheetError::InvalidReport)
+    );
+    assert_eq!(worksheet, before);
+}
+
+#[test]
 fn decision_patch_rejects_invalid_identity_and_truth() {
     let report = report();
     let worksheet = build_steward_review_worksheet(&report).unwrap();
