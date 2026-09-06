@@ -6,6 +6,167 @@ use std::cell::Cell;
 use std::cell::RefCell;
 
 #[test]
+fn full_text_write_observation_preserves_original_attempt_without_granting_recovery() {
+    for failed_index in 0..2 {
+        for observation in 0..5 {
+            let report = report_fixture();
+            let capture = capture_with(&report, 4096, &mut |request_path, _| {
+                Ok(response_fixture(request_path))
+            })
+            .unwrap();
+            let mut scope = write_scope_fixture(&report, &capture);
+            scope.mode = WriteMode::Execute;
+            let plan =
+                build_full_text_write_plan(&report, &capture, scope, |_| true, |_| true).unwrap();
+            let store = WriteStore::from_report(&report);
+            let attempted_request = RefCell::new(None);
+            let receipt = execute_full_text_write_plan(
+                &plan,
+                |item_key| {
+                    if store.read_count.get() >= 2 {
+                        return Err(());
+                    }
+                    store.read_item(item_key)
+                },
+                |request| {
+                    if store.write_count.get() == failed_index {
+                        *attempted_request.borrow_mut() = Some(request.clone());
+                        if observation == 1 {
+                            store.write_item(request).unwrap();
+                        }
+                        return Err(());
+                    }
+                    store.write_item(request)
+                },
+            );
+            let original = serde_json::to_value(&receipt).unwrap();
+            let request = attempted_request.borrow().clone().unwrap();
+            assert_eq!(
+                request.library_version,
+                report.library_version + failed_index as u64
+            );
+            assert_eq!(
+                original["indeterminate_request"],
+                serde_json::to_value(&request).unwrap()
+            );
+            assert_eq!(
+                original["write_result"]["indeterminate_item_key"],
+                request.item_key
+            );
+            assert_eq!(
+                original["write_result"]["rollback_operations"]
+                    .as_array()
+                    .unwrap()
+                    .len(),
+                failed_index
+            );
+            assert_eq!(
+                original["write_result"]["not_attempted_item_keys"]
+                    .as_array()
+                    .unwrap()
+                    .len(),
+                1 - failed_index
+            );
+            let reads_before = store.read_count.get();
+            let writes_before = store.write_count.get();
+            let observed = crate::observe_full_text_write(&receipt, |item_key| {
+                assert_eq!(item_key, request.item_key);
+                let mut state = store.read_item(item_key)?;
+                match observation {
+                    2 => {
+                        state.server_id = "OTHER_SERVER".into();
+                        state.item_key = "OTHER_ITEM".into();
+                    }
+                    3 => state.collection_keys = vec![" ".into()],
+                    4 => return Err(()),
+                    _ => {}
+                }
+                Ok(state)
+            })
+            .unwrap();
+            let result = serde_json::to_value(observed).unwrap();
+            assert_eq!(result["write_receipt"], original);
+            assert_eq!(store.read_count.get(), reads_before + 1);
+            assert_eq!(store.write_count.get(), writes_before);
+            if observation == 4 {
+                assert!(result["observed_state"].is_null());
+            } else {
+                let state = &result["observed_state"];
+                match observation {
+                    0 => assert_eq!(state["item_version"], request.item_version),
+                    1 => assert_eq!(
+                        state["collection_keys"],
+                        serde_json::json!(request.collection_keys)
+                    ),
+                    2 => assert_eq!(state["server_id"], "OTHER_SERVER"),
+                    _ => assert_eq!(state["collection_keys"], serde_json::json!([" "])),
+                }
+            }
+            assert_eq!(serde_json::to_value(&receipt).unwrap(), original);
+            assert!(!result.to_string().contains("synthetic-write-authority"));
+            assert!(!result.to_string().contains("synthetic-write-review"));
+            assert!(
+                crate::execute_full_text_rollback(
+                    &receipt,
+                    |_| -> Result<crate::ClassificationItemState, ()> {
+                        panic!("unknown write read")
+                    },
+                    |_| -> Result<crate::ClassificationItemState, ()> {
+                        panic!("unknown write mutation")
+                    },
+                )
+                .is_err()
+            );
+        }
+    }
+}
+
+#[test]
+fn full_text_write_observation_refuses_non_unknown_receipts_without_reading() {
+    for scenario in 0..4 {
+        let report = report_fixture();
+        let capture = capture_with(&report, 4096, &mut |request_path, _| {
+            Ok(response_fixture(request_path))
+        })
+        .unwrap();
+        let mut scope = write_scope_fixture(&report, &capture);
+        if scenario != 0 {
+            scope.mode = WriteMode::Execute;
+        }
+        let plan =
+            build_full_text_write_plan(&report, &capture, scope, |_| true, |_| true).unwrap();
+        let store = WriteStore::from_report(&report);
+        if scenario == 1 {
+            store.library_version.set(99);
+        }
+        let receipt = execute_full_text_write_plan(
+            &plan,
+            |item_key| store.read_item(item_key),
+            |request| {
+                if scenario == 3 {
+                    Err(())
+                } else {
+                    store.write_item(request)
+                }
+            },
+        );
+        assert!(
+            serde_json::to_value(&receipt)
+                .unwrap()
+                .get("indeterminate_request")
+                .is_none()
+        );
+        assert!(
+            crate::observe_full_text_write(
+                &receipt,
+                |_| -> Result<crate::ClassificationItemState, ()> { panic!("no unknown request") },
+            )
+            .is_err()
+        );
+    }
+}
+
+#[test]
 fn full_text_write_reconciliation_distinguishes_restored_unknown_and_failed_reads() {
     for observation in 0..3 {
         let report = report_fixture();
