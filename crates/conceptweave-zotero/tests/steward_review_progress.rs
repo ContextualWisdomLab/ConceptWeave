@@ -165,13 +165,21 @@ fn progress_preserves_pending_source_scope_and_opaque_identity() {
             tags: vec![],
         },
     };
-    let report = classify_snapshot("9.0.6".into(), None, 42, vec![source]);
-    let worksheet = build_steward_review_worksheet(&report).unwrap();
+    let paper: ZoteroItem = serde_json::from_value(serde_json::json!({
+        "key": "PAPER", "version": 1,
+        "data": {"itemType": "book", "title": "ontology learning"}
+    }))
+    .unwrap();
+    let report = classify_snapshot("9.0.6".into(), None, 42, vec![source, paper]);
+    let mut worksheet = build_steward_review_worksheet(&report).unwrap();
+    worksheet.decisions[0].reviewed_disposition = Some(Disposition::Generation);
     let progress = assess_steward_review_progress(&report, &worksheet).unwrap();
     let json = serde_json::to_value(&progress).unwrap();
     assert_eq!(json["pending_source_count"], 1);
     assert_eq!(json["proposal_digest"], worksheet.proposal_digest);
     assert!(!progress.complete);
-    assert_eq!(progress.total_count, 0);
+    assert_eq!(progress.total_count, 1);
+    assert_eq!(progress.decided_count, 1);
+    assert_eq!(progress.remaining_count, 0);
     assert!(!json.to_string().contains("PRIVATE_SOURCE"));
 }
