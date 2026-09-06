@@ -1,4 +1,7 @@
-use conceptweave_zotero::{Disposition, ItemData, ZoteroItem, classify_snapshot};
+use conceptweave_zotero::{
+    Disposition, EvaluationError, GoldenLabel, GoldenSetApproval, ItemData, ReviewedGoldenSet,
+    ZoteroItem, classification_proposal_digest, classify_snapshot, evaluate_reviewed_golden_set,
+};
 
 fn item(key: &str, title: &str, abstract_note: &str) -> ZoteroItem {
     ZoteroItem {
@@ -80,4 +83,55 @@ fn abstentions_retain_only_the_abstract_needed_for_local_steward_review() {
     assert!(conflict.review_abstract_note.is_none());
     let serialized = serde_json::to_string(conflict).unwrap();
     assert_eq!(serialized.matches("Ontology learning").count(), 1);
+}
+
+#[test]
+fn changed_review_context_invalidates_prior_approval_before_verification() {
+    for (original, replacement) in [
+        (
+            "Unmatched original abstract.",
+            Some("Changed review context."),
+        ),
+        ("Unmatched original abstract.", None),
+        ("", Some("Added review context.")),
+    ] {
+        let mut report = classify_snapshot(
+            "10.0.1".into(),
+            Some("synthetic-server".into()),
+            42,
+            vec![item("REVIEW01", "Unmatched domain study", original)],
+        );
+        let approved = ReviewedGoldenSet {
+            approval: GoldenSetApproval {
+                receipt_id: "synthetic-receipt".into(),
+                reviewer_subject: "synthetic-steward".into(),
+                library_version: report.library_version,
+                rule_revision: report.rule_revision.into(),
+                snapshot_digest: report.snapshot_digest.clone(),
+                proposal_digest: classification_proposal_digest(&report),
+                snapshot_items: report.snapshot_items.clone(),
+            },
+            labels: vec![GoldenLabel::new("REVIEW01", Disposition::Generation)],
+        };
+        let result =
+            evaluate_reviewed_golden_set(&report, &approved, |set| set == &approved).unwrap();
+        let aggregate = serde_json::to_string(&result).unwrap();
+        for private_value in ["REVIEW01", "synthetic-steward", "Unmatched domain study"] {
+            assert!(!aggregate.contains(private_value));
+        }
+        if !original.is_empty() {
+            assert!(!aggregate.contains(original));
+        }
+        report.classified_items[0].review_abstract_note = replacement.map(str::to_owned);
+        assert_ne!(
+            classification_proposal_digest(&report),
+            approved.approval.proposal_digest
+        );
+        assert_eq!(
+            evaluate_reviewed_golden_set(&report, &approved, |_| {
+                panic!("changed review context must fail before governance")
+            }),
+            Err(EvaluationError::SnapshotMismatch)
+        );
+    }
 }
