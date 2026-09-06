@@ -9,12 +9,14 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fmt;
+use std::io::{self, Write};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 const CAPTURE_KIND: &str = "non_atomic_fulltext_sweep_v1";
 const INVALID_EVIDENCE: FullTextError = FullTextError("full-text capture evidence is invalid");
 const BUDGET_EXCEEDED: FullTextError = FullTextError("full-text capture budget exceeded");
 const CAPTURE_DEADLINE: Duration = Duration::from_secs(300);
+const MAX_PERSISTED_CAPTURE_BYTES: u64 = 512 * 1024 * 1024;
 
 /// A bounded full-text observation artifact, not an atomic snapshot or approval.
 ///
@@ -101,6 +103,7 @@ pub fn verify_full_text_capture(
     report: &ClassificationReport,
 ) -> Result<(), FullTextError> {
     let snapshot = validate_report(report)?;
+    validate_persisted_capture_size(capture, MAX_PERSISTED_CAPTURE_BYTES)?;
     let evidence = &capture.capture_evidence;
     if evidence.records.len() > snapshot.len() {
         return Err(INVALID_EVIDENCE);
@@ -366,6 +369,40 @@ fn unix_millis(time: SystemTime) -> Result<u64, FullTextError> {
         .ok_or(INVALID_EVIDENCE)
 }
 
+struct SizeLimitedWriter {
+    written: u64,
+    max_bytes: u64,
+}
+
+impl Write for SizeLimitedWriter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let length = bytes.len() as u64;
+        if length > self.max_bytes - self.written {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "full-text capture exceeds the persisted size limit",
+            ));
+        }
+        self.written += length;
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+fn validate_persisted_capture_size(
+    capture: &FullTextCapture,
+    max_bytes: u64,
+) -> Result<(), FullTextError> {
+    let mut writer = SizeLimitedWriter {
+        written: 0,
+        max_bytes,
+    };
+    serde_json::to_writer(&mut writer, capture).map_err(|_| BUDGET_EXCEEDED)
+}
+
 fn json_digest(value: &impl Serialize) -> String {
     let mut digest = Sha256::new();
     serde_json::to_writer(&mut digest, value).expect("capture values are JSON-compatible");
@@ -415,6 +452,93 @@ fn fetch_response(
         version,
         body: bounded_body_with_limit(&mut response, limit).map_err(|_| INVALID_EVIDENCE)?,
     })
+}
+
+#[cfg(test)]
+#[test]
+fn persisted_capture_limit_counts_outer_json_escaping_at_the_exact_boundary() {
+    let content_body = serde_json::to_string(&serde_json::json!({
+        "content": "\\".repeat(1850)
+    }))
+    .unwrap();
+    let manifest_body = r#"{"ABCD2345":1}"#.to_owned();
+    let metadata_body =
+        r#"{"key":"ABCD2345","version":1,"data":{"itemType":"attachment"}}"#.to_owned();
+    let capture_evidence = CaptureEvidence {
+        capture_kind: CAPTURE_KIND.into(),
+        metadata_report_digest: format!("sha256:{}", "a".repeat(64)),
+        metadata_snapshot_digest: format!("sha256:{}", "b".repeat(64)),
+        bibliographic_item_count: 1,
+        started_unix_ms: 0,
+        finished_unix_ms: 0,
+        library_before: CapturedResponse {
+            status: 200,
+            version: Some(1),
+            body: "[]".into(),
+        },
+        manifest_before: CapturedResponse {
+            status: 200,
+            version: None,
+            body: manifest_body.clone(),
+        },
+        records: vec![CapturedItem {
+            item_key: "ABCD2345".into(),
+            metadata_response: CapturedResponse {
+                status: 200,
+                version: Some(1),
+                body: metadata_body,
+            },
+            content_response: CapturedResponse {
+                status: 200,
+                version: Some(1),
+                body: content_body,
+            },
+        }],
+        manifest_after: CapturedResponse {
+            status: 200,
+            version: None,
+            body: manifest_body,
+        },
+        library_after: CapturedResponse {
+            status: 200,
+            version: Some(1),
+            body: "[]".into(),
+        },
+    };
+    let capture = FullTextCapture {
+        capture_digest: json_digest(&capture_evidence),
+        capture_evidence,
+    };
+    let raw_body_bytes: usize = [
+        &capture.capture_evidence.library_before,
+        &capture.capture_evidence.manifest_before,
+        &capture.capture_evidence.manifest_after,
+        &capture.capture_evidence.library_after,
+    ]
+    .into_iter()
+    .chain(
+        capture
+            .capture_evidence
+            .records
+            .iter()
+            .flat_map(|record| [&record.metadata_response, &record.content_response]),
+    )
+    .map(|response| response.body.len())
+    .sum();
+    let serialized_bytes = serde_json::to_vec(&capture).unwrap().len() as u64;
+    assert!(raw_body_bytes <= 4096);
+    assert!(serialized_bytes > 8192);
+    assert_eq!(
+        validate_persisted_capture_size(&capture, 8192),
+        Err(BUDGET_EXCEEDED)
+    );
+    validate_persisted_capture_size(&capture, serialized_bytes).unwrap();
+    SizeLimitedWriter {
+        written: 0,
+        max_bytes: 0,
+    }
+    .flush()
+    .unwrap();
 }
 
 #[cfg(test)]
