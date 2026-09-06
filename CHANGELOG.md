@@ -29,6 +29,7 @@ All notable changes to ConceptWeave are documented here.
 - Owner-only file permissions for sensitive local Zotero classification reports.
 - A complete-review evaluator that rejects partial steward labels as full reclassification evidence.
 - A snapshot-bound steward worksheet with one blank decision per bibliographic item and no duplicated bibliographic text.
+- An explicit `--worksheet` CLI mode that writes the live worksheet with owner-only report protections.
 
 ### Security
 
