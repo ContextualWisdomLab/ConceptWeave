@@ -186,7 +186,7 @@ fn dry_run_receipt_enumerates_every_operation_as_not_attempted() {
 }
 
 #[test]
-fn confirmed_unexpected_mutation_retains_known_inverse_rollback() {
+fn unexpected_observation_cannot_authorize_inverse_rollback() {
     let report = classification_report();
     let plan =
         build_classification_write_plan(&report, &reviewed(&report), WriteMode::Execute, |_| true)
@@ -219,11 +219,14 @@ fn confirmed_unexpected_mutation_retains_known_inverse_rollback() {
     assert_receipt_binding(&receipt, &report);
     assert_eq!(receipt.failed_item_key.as_deref(), Some("A"));
     assert_eq!(receipt.indeterminate_item_key.as_deref(), Some("A"));
-    assert_eq!(receipt.rollback_operations.len(), 1);
-    assert_eq!(receipt.rollback_operations[0].item_key, "A");
-    assert_eq!(receipt.rollback_operations[0].item_version, 8);
-    assert!(receipt.rollback_operations[0].collection_keys.is_empty());
-    assert!(receipt.rollback_operations[0].tags.is_empty());
+    assert!(receipt.rollback_operations.is_empty());
+    assert!(receipt.applied_item_keys.is_empty());
+    let audit = serde_json::to_value(&receipt).unwrap();
+    assert_eq!(audit["indeterminate_request"]["item_key"], "A");
+    assert_eq!(
+        audit["reconciliation_observation"]["collection_keys"][0],
+        "unexpected_collection"
+    );
 }
 
 #[test]

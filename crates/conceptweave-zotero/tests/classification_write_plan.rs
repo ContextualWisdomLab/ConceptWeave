@@ -143,7 +143,7 @@ fn execution_preflights_every_item_and_returns_reversible_partial_failure() {
     assert_eq!(written, ["A", "B"]);
     assert_eq!(receipt.outcome, ClassificationWriteOutcome::PartialFailure);
     assert_eq!(receipt.failed_item_key.as_deref(), Some("B"));
-    assert_eq!(receipt.indeterminate_item_key, None);
+    assert_eq!(receipt.indeterminate_item_key.as_deref(), Some("B"));
     assert!(receipt.not_attempted_item_keys.is_empty());
     assert_eq!(receipt.applied_item_keys, ["A"]);
     assert_eq!(receipt.rollback_operations.len(), 1);
@@ -175,7 +175,7 @@ fn dry_run_execution_never_calls_the_write_boundary() {
 }
 
 #[test]
-fn execution_reconciles_a_committed_write_after_its_response_is_lost() {
+fn matching_observation_does_not_prove_a_lost_write_completed() {
     let report = classification_report("10.0.0");
     let plan =
         build_classification_write_plan(&report, &reviewed(&report), WriteMode::Execute, |_| true)
@@ -211,10 +211,16 @@ fn execution_reconciles_a_committed_write_after_its_response_is_lost() {
 
     assert_eq!(receipt.outcome, ClassificationWriteOutcome::PartialFailure);
     assert_eq!(receipt.failed_item_key.as_deref(), Some("B"));
-    assert_eq!(receipt.indeterminate_item_key, None);
-    assert_eq!(receipt.applied_item_keys, ["A", "B"]);
-    assert_eq!(receipt.rollback_operations[0].item_key, "B");
-    assert_eq!(receipt.rollback_operations[0].item_version, 10);
+    assert_eq!(receipt.indeterminate_item_key.as_deref(), Some("B"));
+    assert_eq!(receipt.applied_item_keys, ["A"]);
+    assert_eq!(receipt.rollback_operations.len(), 1);
+    assert_eq!(receipt.rollback_operations[0].item_key, "A");
+    assert_eq!(receipt.rollback_operations[0].item_version, 8);
+    let audit = serde_json::to_value(&receipt).unwrap();
+    assert_eq!(audit["indeterminate_request"]["item_key"], "B");
+    assert_eq!(audit["indeterminate_request"]["library_version"], 43);
+    assert_eq!(audit["indeterminate_request"]["item_version"], 9);
+    assert_eq!(audit["reconciliation_observation"]["item_version"], 10);
 }
 
 #[test]
