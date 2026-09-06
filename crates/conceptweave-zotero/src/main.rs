@@ -215,4 +215,57 @@ mod tests {
         assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
         assert!(!rejected.exists());
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn permission_failure_preserves_a_replacement_at_the_output_path() {
+        use std::os::unix::fs::PermissionsExt;
+        let output = unique_temp_path("permission-replaced");
+        let retained = unique_temp_path("permission-original");
+        assert!(!output.exists() && !retained.exists());
+        let error = create_report_file_with(&output, |file| {
+            assert_eq!(file.metadata()?.permissions().mode() & 0o077, 0);
+            fs::rename(
+                unique_temp_path("permission-replaced"),
+                unique_temp_path("permission-original"),
+            )?;
+            let mut replacement = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(unique_temp_path("permission-replaced"))?;
+            replacement.write_all(b"unrelated replacement")?;
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "injected failure",
+            ))
+        })
+        .unwrap_err();
+        let preserved = fs::read(&output).ok();
+        if output.exists() {
+            fs::remove_file(&output).unwrap();
+        }
+        fs::remove_file(retained).unwrap();
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(
+            preserved.as_deref(),
+            Some(b"unrelated replacement".as_slice())
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn report_output_returns_the_checked_canonical_parent() {
+        let output = Path::new("/tmp").join(format!(
+            "conceptweave-zotero-{}-canonical.json",
+            std::process::id()
+        ));
+        let expected = Path::new("/tmp")
+            .canonicalize()
+            .unwrap()
+            .join(output.file_name().unwrap());
+        assert_eq!(
+            validate_output_path(output.to_str().unwrap()).unwrap(),
+            expected
+        );
+    }
 }
