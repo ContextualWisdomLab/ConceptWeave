@@ -45,7 +45,7 @@ fn failed_http_write_with_matching_observation_remains_indeterminate() {
             r#"{"key":"ABCD2345","version":7,"data":{"itemType":"book"}}"#,
         ),
         library_response("server-10", 42),
-        "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        "HTTP/1.1 500 Internal Server Error\r\nZotero-Server-ID: server-10\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
             .into(),
         library_response("server-10", 43),
         item_response("server-10", 43),
@@ -62,7 +62,11 @@ fn failed_http_write_with_matching_observation_remains_indeterminate() {
     let receipt = execute_classification_write_plan(
         &plan,
         |key| adapter.get_item(key),
-        |request| adapter.write_item(request),
+        |request| {
+            let result = adapter.write_item(request);
+            assert_eq!(result, Err(ZoteroTransportError::RequestFailed));
+            result
+        },
     );
     let requests = server.join().unwrap();
     assert_eq!(requests.len(), 7);
@@ -137,7 +141,7 @@ fn synthetic_server_retains_headers_and_body_larger_than_its_read_buffer() {
 #[test]
 fn authenticated_calls_never_use_environment_proxies() {
     let mut failures = Vec::new();
-    for request_kind in ["read", "write"] {
+    for request_kind in ["read", "write", "authorize"] {
         for proxy_variable in [
             "HTTP_PROXY",
             "http_proxy",
@@ -200,6 +204,19 @@ fn authenticated_routing_child() {
     let Ok(request_kind) = std::env::var(PROXY_CHILD_CASE) else {
         return;
     };
+    if request_kind == "authorize" {
+        let body = format!(r#"{{"key":"{SYNTHETIC_API_KEY}","remember":true}}"#);
+        let (result, server) = authorization_fixture("200 OK", &body);
+        assert!(result.unwrap().remembered());
+        let requests = server.join().unwrap();
+        assert_eq!(requests.len(), 1);
+        assert!(requests[0].starts_with("POST /api/local/authorize HTTP/1.1\r\n"));
+        assert!(requests[0].contains("zotero-server-id: server-10\r\n"));
+        assert!(requests[0].ends_with(r#"{"appName":"ConceptWeave"}"#));
+        assert!(!requests[0].contains(SYNTHETIC_API_KEY));
+        assert!(!requests[0].contains("zotero-api-key:"));
+        return;
+    }
     let responses = match request_kind.as_str() {
         "read" => vec![
             library_response("server-10", 42),
@@ -311,4 +328,59 @@ fn authenticated_write_rejects_one_byte_over_the_limit() {
     let result = transport(base).write_item(&write_request());
     server.join().unwrap();
     assert_eq!(result.unwrap_err(), ZoteroTransportError::InvalidResponse);
+}
+
+fn authorization_fixture(
+    status: &str,
+    body: &str,
+) -> (
+    Result<Zotero10LocalAuthorization, ZoteroTransportError>,
+    thread::JoinHandle<Vec<String>>,
+) {
+    let response = authorize_response(status, Some("server-10"), body);
+    let (items_base, server) = serve(vec![Box::leak(response.into_boxed_str())]);
+    let result = Zotero10LocalAuthorization::request_with_base(
+        "ConceptWeave",
+        "server-10",
+        items_base.trim_end_matches("/api/users/0/items").into(),
+    );
+    (result, server)
+}
+
+#[test]
+fn authorization_accepts_exactly_the_byte_limit() {
+    let mut body = format!(r#"{{"key":"{SYNTHETIC_API_KEY}","remember":true}}"#);
+    body.push_str(&" ".repeat(MAX_AUTH_RESPONSE_BYTES as usize - body.len()));
+    let (result, server) = authorization_fixture("200 OK", &body);
+    server.join().unwrap();
+    assert!(
+        result
+            .expect("exact-limit authorization must succeed")
+            .remembered()
+    );
+}
+
+#[test]
+fn authorization_denial_accepts_exactly_the_byte_limit() {
+    let mut body = r#"{"denied":true}"#.to_owned();
+    body.push_str(&" ".repeat(MAX_AUTH_RESPONSE_BYTES as usize - body.len()));
+    let (result, server) = authorization_fixture("403 Forbidden", &body);
+    server.join().unwrap();
+    assert!(matches!(result, Err(ZoteroTransportError::Denied)));
+}
+
+#[test]
+fn authorization_rejects_one_byte_over_the_limit_for_success_and_denial() {
+    for (status, mut body) in [
+        (
+            "200 OK",
+            format!(r#"{{"key":"{SYNTHETIC_API_KEY}","remember":true}}"#),
+        ),
+        ("403 Forbidden", r#"{"denied":true}"#.to_owned()),
+    ] {
+        body.push_str(&" ".repeat(MAX_AUTH_RESPONSE_BYTES as usize + 1 - body.len()));
+        let (result, server) = authorization_fixture(status, &body);
+        server.join().unwrap();
+        assert!(matches!(result, Err(ZoteroTransportError::InvalidResponse)));
+    }
 }
