@@ -300,6 +300,57 @@ fn finalization_rejects_changed_review_evidence_under_the_original_approval() {
 }
 
 #[test]
+fn locally_rebound_finalization_does_not_renew_independent_approval() {
+    let mut report = report();
+    let mut worksheet = complete_worksheet();
+    let issued_set =
+        reviewed_golden_set_from_worksheet(&report, &worksheet, approval(&report, &worksheet))
+            .unwrap();
+    assert!(
+        conceptweave_zotero::evaluate_reviewed_golden_set(&report, &issued_set, |value| value
+            == &issued_set)
+        .is_ok()
+    );
+    report.classified_items[0].title.push_str(" changed");
+    worksheet.proposal_digest = classification_proposal_digest(&report);
+    let rebound =
+        reviewed_golden_set_from_worksheet(&report, &worksheet, approval(&report, &worksheet))
+            .unwrap();
+    assert_eq!(
+        conceptweave_zotero::evaluate_reviewed_golden_set(&report, &rebound, |value| value
+            == &issued_set),
+        Err(EvaluationError::UnverifiedApproval)
+    );
+}
+
+#[test]
+fn pending_source_conversion_does_not_prove_complete_review() {
+    let items = [("A", "book"), ("source", "attachment")]
+        .into_iter()
+        .map(|(key, item_type)| {
+            serde_json::from_value::<ZoteroItem>(serde_json::json!({
+                "key": key, "version": 7,
+                "data": {"itemType": item_type, "title": "synthetic ontology learning"}
+            }))
+            .unwrap()
+        })
+        .collect();
+    let report = classify_snapshot("9.0.6".into(), None, 42, items);
+    let mut worksheet = build_steward_review_worksheet(&report).unwrap();
+    worksheet.decisions[0].reviewed_disposition = Some(Disposition::Generation);
+    let local_set =
+        reviewed_golden_set_from_worksheet(&report, &worksheet, approval(&report, &worksheet))
+            .unwrap();
+    assert_eq!(report.pending_source_item_keys, ["source"]);
+    assert_eq!(
+        conceptweave_zotero::evaluate_complete_reviewed_classification(&report, &local_set, |_| {
+            panic!("pending scope must not contact governance")
+        }),
+        Err(EvaluationError::IncompleteReview)
+    );
+}
+
+#[test]
 fn finalization_rejects_stale_worksheet_even_with_current_approval_coordinates() {
     for changed_field in 0..3 {
         let mut report = report();
