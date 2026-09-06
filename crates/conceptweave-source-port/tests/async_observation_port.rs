@@ -67,7 +67,7 @@ impl SourceObservationPort for AsyncEchoPort {
 
     fn observe<'a>(
         &'a self,
-        request: &'a AuthorizedObservationRequest,
+        request: AuthorizedObservationRequest,
         cancellation: &'a dyn ObservationCancellation,
     ) -> impl Future<Output = Result<Self::Snapshot, SourceObservationFailure>> + Send + 'a {
         async move {
@@ -121,18 +121,19 @@ fn authorized_request() -> AuthorizedObservationRequest {
 }
 
 #[test]
-fn source_port_accepts_a_send_awaitable_adapter_without_a_runtime_dependency() {
-    let request = authorized_request();
+fn source_port_consumes_one_authorized_operation_capability_per_execution() {
+    let cancelled_request = authorized_request();
+    let active_request = authorized_request();
     let cancelled_signal = Cancellation(true);
     let active_signal = Cancellation(false);
 
-    let cancelled = assert_send(AsyncEchoPort.observe(&request, &cancelled_signal));
+    let cancelled = assert_send(AsyncEchoPort.observe(cancelled_request, &cancelled_signal));
     assert_eq!(
         poll_ready(cancelled),
         Err(SourceObservationFailure::Cancelled)
     );
 
-    let completed = assert_send(AsyncEchoPort.observe(&request, &active_signal));
+    let completed = assert_send(AsyncEchoPort.observe(active_request, &active_signal));
     assert_eq!(
         poll_ready(completed),
         Ok("grc_readonly_connection:policy_revision_a".to_owned())
