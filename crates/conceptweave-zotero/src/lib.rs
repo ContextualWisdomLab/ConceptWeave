@@ -397,6 +397,13 @@ fn read_snapshot_with_clock(
             page.body_bytes,
             page.total,
         )?;
+        if page
+            .items
+            .iter()
+            .any(|item| item.version > page.library_version)
+        {
+            return Err(ReadError::SnapshotChanged);
+        }
         items.extend(page.items);
         snapshot_bytes = next_snapshot_bytes;
         debug_assert_eq!(items.len(), next_item_count);
