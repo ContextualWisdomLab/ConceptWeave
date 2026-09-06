@@ -153,7 +153,7 @@ fn worksheet_is_snapshot_bound_complete_and_contains_no_bibliographic_text() {
 #[test]
 fn worksheet_rejects_each_inconsistent_report_coordinate() {
     let mut invalid = report();
-    invalid.rule_revision = "";
+    invalid.rule_revision.clear();
     assert_eq!(
         build_steward_review_worksheet(&invalid),
         Err(WorksheetError::InvalidReport)

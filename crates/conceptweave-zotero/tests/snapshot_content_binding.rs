@@ -36,6 +36,7 @@ fn golden_approval_rejects_same_revision_coordinates_with_changed_snapshot_conte
             snapshot_items: vec![SnapshotItemRevision {
                 item_key: "A".into(),
                 item_version: 1,
+                parent_item_key: None,
             }],
         },
         labels: vec![GoldenLabel::new("A", Disposition::Generation)],
