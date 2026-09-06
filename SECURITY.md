@@ -2,7 +2,7 @@
 
 ## Trust boundaries
 
-All source artifacts, generated candidate payloads, external ontology files, model outputs, future web-retrieved content, and semantic-release payloads received by a client are untrusted input. Source Observation request metadata is also untrusted until trusted local policy binds source identity and explicitly admits exact schema scope plus the complete provider-independent resource envelope.
+All source artifacts, generated candidate payloads, external ontology files, model outputs, future web-retrieved content, and semantic-release payloads received by a client are untrusted input. Source Observation request metadata is also untrusted until it passes ConceptWeave's provider-independent structural caps and trusted local policy binds source identity and explicitly admits exact schema scope plus the complete provider-independent resource envelope.
 
 ## Required controls
 
@@ -10,6 +10,8 @@ All source artifacts, generated candidate payloads, external ontology files, mod
 - immutable source digests and parser/extractor provenance;
 - no credentials, secrets, tokens, DSNs, or raw authorization material in semantic evidence;
 - Source Observation keys and connection-policy bindings are bounded opaque identifiers, never connection material;
+- authorization-metadata budgets are capped before trusted source policy: no request may retain more than 4,096 exact schema identifiers or 1,048,576 UTF-8 schema-name bytes, and over-cap budget construction fails with typed errors before registry/database access;
+- the structural caps are product-level denial-of-service guardrails, not PostgreSQL identifier semantics or source authority; trusted source policy may only admit an equal-or-narrower effective envelope;
 - source-key recognition, exact-schema authorization, and complete resource-envelope admission are distinct controls; schema/resource policy defaults to deny;
 - positive caller-selected metadata/runtime limits are structurally bounded requests, not effective policy; wider-than-policy schema-count/schema-byte/operation/statement/row/byte/concurrency ceilings fail before adapter/source/snapshot side effects;
 - schema and resource policy are evaluated against the same immutable `ResolvedSourceConnection`; stale key-to-binding mappings must fail before credential/source access;
@@ -38,7 +40,7 @@ All source artifacts, generated candidate payloads, external ontology files, mod
 6. provenance stripping during export or consumption;
 7. malicious or oversized schema/API/release artifacts;
 8. external-source SSRF or credential leakage;
-9. caller-self-authorized schema scope or resource ceilings reaching a broadly privileged source credential;
+9. caller-selected authorization metadata attempting pre-policy memory/resource exhaustion or caller-self-authorized schema/resource ceilings reaching a broadly privileged source credential;
 10. mutable source-key retargeting that reuses an old authorization for a different physical/policy source;
 11. model/provider compromise or unexpected retention;
 12. governance bypass from Proposed/Validated directly to Published;
