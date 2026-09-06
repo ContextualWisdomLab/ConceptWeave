@@ -41,13 +41,20 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
             "report output must be a direct child of the system temp directory",
         ));
     }
-    if fs::symlink_metadata(&path).is_ok() {
+    let file_name = path.file_name().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "report output has no file name",
+        )
+    })?;
+    let validated_path = resolved_parent.join(file_name);
+    if fs::symlink_metadata(&validated_path).is_ok() {
         return Err(io::Error::new(
             io::ErrorKind::AlreadyExists,
             "report output must not already exist or be a symlink",
         ));
     }
-    Ok(path)
+    Ok(validated_path)
 }
 
 /// Creates a new sensitive report file or fails closed on unsupported platforms.
@@ -73,7 +80,7 @@ fn set_owner_only_permissions(file: &File) -> io::Result<()> {
 }
 
 #[cfg(unix)]
-/// Creates a private file and removes it if final permission enforcement fails.
+/// Creates a private file; failure leaves an empty file rather than unlinking a raced path.
 fn create_report_file_with(
     path: &Path,
     set_permissions: fn(&File) -> io::Result<()>,
@@ -83,11 +90,7 @@ fn create_report_file_with(
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     let file = options.mode(0o600).open(path)?;
-    if let Err(error) = set_permissions(&file) {
-        drop(file);
-        let _ = fs::remove_file(path);
-        return Err(error);
-    }
+    set_permissions(&file)?;
     Ok(file)
 }
 
@@ -127,10 +130,19 @@ mod tests {
         assert_eq!(
             validate_output_path(allowed.to_str().unwrap()).unwrap(),
             allowed
+                .parent()
+                .unwrap()
+                .canonicalize()
+                .unwrap()
+                .join(allowed.file_name().unwrap())
         );
 
         assert!(validate_output_path("relative.json").is_err());
         assert!(validate_output_path("/").is_err());
+        let missing_name =
+            validate_output_path(env::temp_dir().join("..").to_str().unwrap()).unwrap_err();
+        assert_eq!(missing_name.kind(), io::ErrorKind::InvalidInput);
+        assert_eq!(missing_name.to_string(), "report output has no file name");
         assert!(validate_output_path("/tmp/missing-directory/report.json").is_err());
         assert!(
             validate_output_path(
@@ -213,6 +225,59 @@ mod tests {
         })
         .unwrap_err();
         assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
-        assert!(!rejected.exists());
+        assert_eq!(fs::metadata(&rejected).unwrap().len(), 0);
+        fs::remove_file(rejected).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn permission_failure_preserves_a_replacement_at_the_output_path() {
+        use std::os::unix::fs::PermissionsExt;
+        let output = unique_temp_path("permission-replaced");
+        let retained = unique_temp_path("permission-original");
+        assert!(!output.exists());
+        assert!(!retained.exists());
+        let error = create_report_file_with(&output, |file| {
+            assert_eq!(file.metadata()?.permissions().mode() & 0o077, 0);
+            fs::rename(
+                unique_temp_path("permission-replaced"),
+                unique_temp_path("permission-original"),
+            )?;
+            let mut replacement = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(unique_temp_path("permission-replaced"))?;
+            replacement.write_all(b"unrelated replacement")?;
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "injected failure",
+            ))
+        })
+        .unwrap_err();
+        let preserved = fs::read(&output).ok();
+        let _ = fs::remove_file(&output);
+        fs::remove_file(retained).unwrap();
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(
+            preserved.as_deref(),
+            Some(b"unrelated replacement".as_slice())
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn report_output_returns_the_checked_canonical_parent() {
+        let output = Path::new("/tmp").join(format!(
+            "conceptweave-zotero-{}-canonical.json",
+            std::process::id()
+        ));
+        let expected = Path::new("/tmp")
+            .canonicalize()
+            .unwrap()
+            .join(output.file_name().unwrap());
+        assert_eq!(
+            validate_output_path(output.to_str().unwrap()).unwrap(),
+            expected
+        );
     }
 }
