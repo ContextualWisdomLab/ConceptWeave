@@ -59,7 +59,9 @@ sequenceDiagram
     Note over Report,Steward: Pending sources prevent a whole-library completion claim; inventory is not approval
     Intake->>Report: derive snapshot-bound decision worksheet without bibliographic text
     Report->>Steward: review dispositions and merge candidates
-    Steward->>Intake: verified labels for every bibliographic item
+    Steward->>Intake: completed worksheet + approval receipt
+    Intake->>Report: offline finalization against the original saved report
+    Report-->>Steward: reviewed golden set or fail-closed validation error
     Steward->>Intake: reviewed labels and independently issued receipt
     Intake->>Intake: validate complete partitions and recompute pending ancestry
     Intake->>Intake: verify v2 proposal and retained-source binding

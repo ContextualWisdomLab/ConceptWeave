@@ -6,6 +6,16 @@ This file records code-current product and technical gaps. Exact PR/check/run co
 
 ## September 6 source inventory checkpoint
 
+### September 7 PR29 offline finalization continuity repair
+
+Original PR29 `f73705e15f1236fa8bd34fec032bc78d9b57760c` passed 149 tests/28 suites. Normal merge `4845200` retains it and repaired PR28 `63eb0f116408372675f132b9836fe7be4bdd7134`; integrated tests passed 190/28. Offline finalization remains local unverified metadata output. The request enum retains parent canonical-pair admission before capture, both serializations before writes and no pathname cleanup on failure. Complete source/worksheet/approval binding comes from the inherited shared validation, not a new authority issuer.
+
+RED `7c2c0d1` compiled with two failures: direct symlink opening succeeded; nameless-input validation took the old error path. The second is not an unauthorized-read claim. Canonical fixes `b06f54a` and `7ccbbbe` were reused with attribution as `f97ef46` and `630d258`, pinning the admitted parent and refusing symlink opens. A separate review found no existing FIFO repair. RED `bce7efa` replaced a checked unit-test regular file with an actual FIFO and timed out after 2.01 seconds. `ddf3f62` adds `O_NONBLOCK` at the existing opening boundary; existing device/inode validation then rejects the replacement without waiting for a writer. Independent bounded read-only review found no additional defect. No new abstraction or unpinned dependency was introduced.
+
+Final source `ddf3f62` passes 193 tests/28 suites including three doctests, strict Clippy, warnings-denied rustdoc, formatting, CI contract and diff checks. Unchanged coverage passes 318/318 reported functions, 2,778/2,778 normalized regions and 494/494 normalized branches. Raw 3,798/3,860 lines, 5,873/5,980 regions and 449/494 branches are not 100%. Logs: `/tmp/conceptweave-pr29-{baseline,integrated,opening-red,fifo-red,verified,clippy-verified,rustdoc-verified,coverage-verified}.log`. TRD and Proposed ADR0006 trace alternatives, retained failures and consumer obligations.
+
+Root/later private readers must inherit FIFO protection and the source-scope cascade. Authentic decisions and independent approvals remain 0/3,715 plus four unresolved standalone sources. Unit fixtures do not count as real research or approval. Native Visual Inspection was retried and the Mac remains locked, so no fresh screen evidence exists. Keep Draft; no hosted GREEN, protected merge, release or Zotero mutation is claimed.
+
 ### September 7 PR28 metadata roundtrip continuity repair
 
 Normal merge `13b5529` preserves original PR28 `ba6b3dfc71cf89ed4c57b85da0dd9ca5f983efee` and PR27 `fd5ef23c1c23fa36ef106400e15c9438eaa5cd41`. RED `97fc490` compiled with four passing and two failing roundtrip tests: inconsistent retained parent coordinates passed shared admission, while valid pending orphan metadata failed worksheet restoration. `1157b1d` centralizes parent validation and removes divergent worksheet checks; `e102894` removes an implied evaluator guard and preserves coherent-mutation stale-approval rejection. Independent read-only review found no further production defect in the bounded repair.
