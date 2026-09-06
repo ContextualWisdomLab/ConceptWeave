@@ -56,6 +56,7 @@ fn plan() -> conceptweave_zotero::ClassificationWritePlan {
         library_version: report.library_version,
         rule_revision: report.rule_revision.into(),
         snapshot_digest: report.snapshot_digest.clone(),
+        proposal_digest: conceptweave_zotero::classification_proposal_digest(&report),
         snapshot_items: report.snapshot_items.clone(),
         changes: vec![
             ReviewedClassificationChange {
@@ -216,12 +217,14 @@ fn rollback_is_one_shot_and_second_execution_fails_before_write() {
 #[test]
 fn rollback_reconciles_failed_write_without_guessing() {
     for (current, expected_outcome) in [
-        ("restored", (vec!["B"], None)),
-        ("unchanged", (vec![], None)),
+        ("restored", (Vec::<String>::new(), Some("B"))),
+        ("unchanged", (vec![], Some("B"))),
         ("indeterminate", (vec![], Some("B"))),
     ] {
         let receipt = applied_receipt();
         let mut reads = 0;
+        let mut submitted_request = None;
+        let mut observed_state = None;
         let result = execute_classification_rollback(
             &receipt.rollback_operations,
             |key| {
@@ -232,7 +235,7 @@ fn rollback_reconciles_failed_write_without_guessing() {
                     .find(|item| item.item_key == key)
                     .unwrap();
                 let reconciliation = reads > receipt.rollback_operations.len();
-                Ok::<_, ()>(ClassificationItemState {
+                let state = ClassificationItemState {
                     server_id: operation.server_id.clone(),
                     library_version: if reconciliation && current != "unchanged" {
                         45
@@ -254,9 +257,17 @@ fn rollback_reconciles_failed_write_without_guessing() {
                     } else {
                         operation.expected_tags.clone()
                     },
-                })
+                };
+                if reconciliation {
+                    observed_state = Some(state.clone());
+                }
+                Ok::<_, ()>(state)
             },
-            |_| Err::<ClassificationItemState, _>(()),
+            |request| {
+                assert!(submitted_request.is_none());
+                submitted_request = Some(request.clone());
+                Err::<ClassificationItemState, _>(())
+            },
         );
         assert_eq!(
             result.outcome,
@@ -273,10 +284,11 @@ fn rollback_reconciles_failed_write_without_guessing() {
             expected_outcome.1
         );
         assert_eq!(result.not_attempted_item_keys, ["A"]);
-        assert_eq!(
-            result.remaining_operations.len(),
-            if current == "unchanged" { 2 } else { 1 }
-        );
+        assert!(submitted_request.is_some());
+        assert!(observed_state.is_some());
+        assert_eq!(result.indeterminate_request, submitted_request);
+        assert_eq!(result.reconciliation_observation, observed_state);
+        assert_eq!(result.remaining_operations.len(), 1);
     }
 }
 
@@ -421,6 +433,11 @@ fn rollback_rejects_each_unverified_restoration_response() {
             failed.outcome,
             ClassificationRollbackOutcome::PartialFailure
         );
-        assert_eq!(failed.indeterminate_item_key, None);
+        assert_eq!(failed.indeterminate_item_key.as_deref(), Some("B"));
+        assert!(failed.restored_item_keys.is_empty());
+        assert_eq!(
+            failed.remaining_operations,
+            receipt.rollback_operations[1..]
+        );
     }
 }
