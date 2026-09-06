@@ -9,8 +9,8 @@ use std::{
 
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, ObservationLimits, ObservationRequest,
-    ObservationRequestBudget, SourceConnectionRegistry, SourceObservationFailure,
-    SourceObservationPort,
+    ObservationRequestBudget, ResolvedSourceConnection, SourceConnectionRegistry,
+    SourceObservationFailure, SourceObservationPort,
 };
 
 struct MutableRegistry {
@@ -22,14 +22,20 @@ impl SourceConnectionRegistry for MutableRegistry {
         source_connection_key == "grc_readonly_connection"
     }
 
+    fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
+        (source_connection_key == "grc_readonly_connection")
+            .then(|| (*self.active_binding.lock().expect("binding lock")).to_owned())
+    }
+
     fn authorizes_schema_scope(
         &self,
-        source_connection_key: &str,
+        source_connection: &ResolvedSourceConnection,
         allowed_schema_names: &[String],
     ) -> bool {
-        source_connection_key == "grc_readonly_connection"
+        source_connection.source_connection_key() == "grc_readonly_connection"
+            && source_connection.connection_policy_binding()
+                == *self.active_binding.lock().expect("binding lock")
             && allowed_schema_names == ["governance_core"]
-            && *self.active_binding.lock().expect("binding lock") == "policy_revision_a"
     }
 }
 
@@ -56,11 +62,15 @@ impl SourceObservationPort for RetargetableAdapter {
         _cancellation: &'a dyn ObservationCancellation,
     ) -> impl Future<Output = Result<Self::Snapshot, SourceObservationFailure>> + Send + 'a {
         async move {
+            let active_binding = *self.active_binding.lock().expect("binding lock");
+            if request.source_connection().connection_policy_binding() != active_binding {
+                return Err(SourceObservationFailure::SourceUnavailable);
+            }
+
             self.source_accesses.fetch_add(1, Ordering::Relaxed);
-            let binding = *self.active_binding.lock().expect("binding lock");
             self.snapshot_constructions.fetch_add(1, Ordering::Relaxed);
             Ok(format!(
-                "{}:{binding}",
+                "{}:{active_binding}",
                 request.source_connection().source_connection_key()
             ))
         }
@@ -103,6 +113,10 @@ fn stale_connection_policy_binding_fails_before_source_or_snapshot_side_effects(
     let authorized = request()
         .authorize(&registry)
         .expect("revision A source and exact schema scope are authorized");
+    assert_eq!(
+        authorized.source_connection().connection_policy_binding(),
+        "policy_revision_a"
+    );
 
     *active_binding.lock().expect("binding lock") = "policy_revision_b";
     let adapter = RetargetableAdapter {
@@ -118,4 +132,27 @@ fn stale_connection_policy_binding_fails_before_source_or_snapshot_side_effects(
     );
     assert_eq!(adapter.source_accesses.load(Ordering::Relaxed), 0);
     assert_eq!(adapter.snapshot_constructions.load(Ordering::Relaxed), 0);
+}
+
+#[test]
+fn unchanged_connection_policy_binding_executes_exactly_once() {
+    let active_binding = Arc::new(Mutex::new("policy_revision_a"));
+    let registry = MutableRegistry {
+        active_binding: Arc::clone(&active_binding),
+    };
+    let authorized = request()
+        .authorize(&registry)
+        .expect("revision A source and exact schema scope are authorized");
+    let adapter = RetargetableAdapter {
+        active_binding,
+        source_accesses: AtomicUsize::new(0),
+        snapshot_constructions: AtomicUsize::new(0),
+    };
+
+    assert_eq!(
+        poll_ready(adapter.observe(&authorized, &Cancellation)),
+        Ok("grc_readonly_connection:policy_revision_a".to_owned())
+    );
+    assert_eq!(adapter.source_accesses.load(Ordering::Relaxed), 1);
+    assert_eq!(adapter.snapshot_constructions.load(Ordering::Relaxed), 1);
 }
