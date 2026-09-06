@@ -883,6 +883,56 @@ mod tests {
     }
 
     #[test]
+    fn reader_rejects_future_item_revisions_before_another_page() {
+        for item_type in ["book", "attachment", "note", "annotation"] {
+            for invalid_start in [0, 1] {
+                let mut starts = Vec::new();
+                let result = read_snapshot_with(&mut |start| {
+                    starts.push(start);
+                    let mut observed = item(&format!("I{start}"), "book", "x", "", "");
+                    observed.version = 42;
+                    let mut page_items = vec![observed];
+                    if start == invalid_start {
+                        let mut future = item(&format!("I{}", start + 1), item_type, "x", "", "");
+                        future.version = 43;
+                        page_items.push(future);
+                    }
+                    Ok(fetched_page(4, page_items))
+                });
+                assert!(matches!(result, Err(ReadError::SnapshotChanged)));
+                assert_eq!(
+                    starts,
+                    if invalid_start == 0 {
+                        vec![0]
+                    } else {
+                        vec![0, 1]
+                    }
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn reader_preserves_item_revisions_within_the_library_version() {
+        for zotero_version in ["9.0.6", "10.0.1"] {
+            for (library_version, item_version) in
+                [(0, 0), (42, 0), (42, 41), (42, 42), (u64::MAX, u64::MAX)]
+            {
+                let mut observed = item("A", "book", "semantic web", "", "");
+                observed.version = item_version;
+                let mut page = fetched_page(1, vec![observed]);
+                page.library_version = library_version;
+                page.zotero_version = zotero_version.into();
+                let report = read_snapshot_with(&mut |_| Ok(page.clone())).unwrap();
+                assert_eq!(report.library_version, library_version);
+                assert_eq!(report.observed_item_count, 1);
+                assert_eq!(report.classified_items.len(), 1);
+                assert_eq!(report.classified_items[0].item_version, item_version);
+            }
+        }
+    }
+
+    #[test]
     fn reader_core_paginates_and_preserves_one_snapshot_contract() {
         let mut pages = vec![
             fetched_page(2, vec![item("A", "book", "ontology quality", "", "")]),
