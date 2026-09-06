@@ -894,7 +894,7 @@ pub enum ClassificationRollbackOutcome {
     PartialFailure,
 }
 
-/// Current state of one previously indeterminate rollback operation.
+/// Legacy state vocabulary; metadata-only reconciliation emits only `Indeterminate`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ClassificationRollbackState {

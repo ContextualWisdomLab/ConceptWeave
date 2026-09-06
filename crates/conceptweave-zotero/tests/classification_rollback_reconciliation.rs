@@ -38,7 +38,7 @@ fn state(
 }
 
 #[test]
-fn later_reconciliation_distinguishes_restored_unchanged_and_indeterminate_state() {
+fn later_reconciliation_preserves_metadata_without_settling_rollback() {
     let operation = operation();
     let cases = [
         (
