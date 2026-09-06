@@ -113,6 +113,10 @@ fn assert_receipt_binding(
     assert_eq!(receipt.library_version, 42);
     assert_eq!(receipt.rule_revision, report.rule_revision);
     assert_eq!(receipt.snapshot_digest, report.snapshot_digest);
+    assert_eq!(
+        serde_json::to_value(receipt).unwrap()["proposal_digest"],
+        conceptweave_zotero::classification_proposal_digest(report)
+    );
 }
 
 #[test]
