@@ -1,7 +1,8 @@
 use conceptweave_zotero::{
     Disposition, EvaluationError, GoldenLabel, GoldenSetApproval, ItemData, ReviewedGoldenSet,
     SnapshotItemRevision, ZoteroItem, classification_proposal_digest,
-    classification_snapshot_digest, classify_snapshot, evaluate_reviewed_golden_set,
+    classification_snapshot_digest, classify_snapshot, evaluate_complete_reviewed_classification,
+    evaluate_reviewed_golden_set,
 };
 
 fn item(key: &str, title: &str) -> ZoteroItem {
@@ -19,6 +20,134 @@ fn item(key: &str, title: &str) -> ZoteroItem {
         },
         source_record: None,
     }
+}
+
+#[test]
+fn complete_review_requires_one_steward_label_per_bibliographic_item() {
+    use std::cell::Cell;
+
+    let report = report();
+    let verifier_calls = Cell::new(0);
+    assert_eq!(
+        evaluate_complete_reviewed_classification(&report, &golden(vec![]), |_| {
+            verifier_calls.set(verifier_calls.get() + 1);
+            true
+        },),
+        Err(EvaluationError::IncompleteReview)
+    );
+    assert_eq!(
+        evaluate_complete_reviewed_classification(
+            &report,
+            &golden(vec![
+                GoldenLabel::new("A", Disposition::Generation),
+                GoldenLabel::new("B", Disposition::EvaluationGovernance),
+            ]),
+            |_| {
+                verifier_calls.set(verifier_calls.get() + 1);
+                true
+            },
+        ),
+        Err(EvaluationError::IncompleteReview)
+    );
+    assert_eq!(verifier_calls.get(), 0);
+    assert_eq!(
+        evaluate_complete_reviewed_classification(
+            &report,
+            &golden(vec![
+                GoldenLabel::new("A", Disposition::Generation),
+                GoldenLabel::new("A", Disposition::Generation),
+                GoldenLabel::new("B", Disposition::EvaluationGovernance),
+            ]),
+            |_| {
+                verifier_calls.set(verifier_calls.get() + 1);
+                true
+            },
+        ),
+        Err(EvaluationError::DuplicateItem)
+    );
+    assert_eq!(verifier_calls.get(), 0);
+
+    let evaluation = evaluate_complete_reviewed_classification(
+        &report,
+        &golden(vec![
+            GoldenLabel::new("A", Disposition::Generation),
+            GoldenLabel::new("B", Disposition::EvaluationGovernance),
+            GoldenLabel::new("C", Disposition::OutOfScope),
+        ]),
+        verify_synthetic_approval,
+    )
+    .unwrap();
+    assert_eq!(evaluation.reviewed_count, 3);
+}
+
+#[test]
+fn complete_review_rejects_pending_sources_without_blocking_sampled_evaluation() {
+    use std::cell::Cell;
+
+    for parent_key in ["", "missing", "source", "A"] {
+        let mut source_item = item("source", "synthetic attachment");
+        source_item.data.item_type = "attachment".into();
+        source_item.data.parent_item = parent_key.into();
+        let report = classify_snapshot(
+            "9.0.6".into(),
+            None,
+            42,
+            vec![item("A", "ontology learning"), source_item],
+        );
+        let mut reviewed = golden(vec![GoldenLabel::new("A", Disposition::Generation)]);
+        reviewed.approval.snapshot_digest = classification_snapshot_digest(&report);
+        reviewed.approval.proposal_digest = classification_proposal_digest(&report);
+        reviewed.approval.snapshot_items = report.snapshot_items.clone();
+        let issued_review = reviewed.clone();
+        assert!(
+            evaluate_reviewed_golden_set(&report, &reviewed, |value| { value == &issued_review })
+                .is_ok()
+        );
+
+        let verifier_calls = Cell::new(0);
+        let result = evaluate_complete_reviewed_classification(&report, &reviewed, |value| {
+            verifier_calls.set(verifier_calls.get() + 1);
+            value == &issued_review
+        });
+        if parent_key == "A" {
+            assert_eq!(result.unwrap().reviewed_count, 1);
+            assert_eq!(verifier_calls.get(), 1);
+        } else {
+            assert_eq!(result, Err(EvaluationError::IncompleteReview));
+            assert_eq!(verifier_calls.get(), 0);
+            let mut forged_report = report;
+            forged_report.pending_source_item_keys.clear();
+            reviewed.approval.proposal_digest = classification_proposal_digest(&forged_report);
+            assert_eq!(
+                evaluate_complete_reviewed_classification(&forged_report, &reviewed, |_| {
+                    verifier_calls.set(verifier_calls.get() + 1);
+                    true
+                }),
+                Err(EvaluationError::InvalidReview)
+            );
+            assert_eq!(verifier_calls.get(), 0);
+        }
+    }
+}
+
+#[test]
+fn invalid_local_review_never_reaches_the_approval_verifier() {
+    use std::cell::Cell;
+
+    let verifier_calls = Cell::new(0);
+    let result = evaluate_reviewed_golden_set(
+        &report(),
+        &golden(vec![
+            GoldenLabel::new("A", Disposition::Generation),
+            GoldenLabel::new("A", Disposition::Generation),
+        ]),
+        |_| {
+            verifier_calls.set(verifier_calls.get() + 1);
+            true
+        },
+    );
+    assert_eq!(result, Err(EvaluationError::DuplicateItem));
+    assert_eq!(verifier_calls.get(), 0);
 }
 
 fn report() -> conceptweave_zotero::ClassificationReport {
@@ -236,6 +365,7 @@ fn reviewed_golden_set_rejects_stale_unknown_and_duplicate_labels() {
         (EvaluationError::InvalidExpectedDisposition, "abstention"),
         (EvaluationError::UnknownItem, "absent"),
         (EvaluationError::DuplicateItem, "duplicate"),
+        (EvaluationError::IncompleteReview, "every bibliographic"),
     ] {
         assert!(error.to_string().contains(fragment));
     }

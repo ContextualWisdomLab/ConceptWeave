@@ -1241,6 +1241,8 @@ pub enum EvaluationError {
     UnknownItem,
     /// A reviewed key occurs more than once.
     DuplicateItem,
+    /// Bibliographic labels are incomplete or source records remain unresolved.
+    IncompleteReview,
 }
 
 impl fmt::Display for EvaluationError {
@@ -1254,11 +1256,36 @@ impl fmt::Display for EvaluationError {
             }
             Self::UnknownItem => "golden set contains an item absent from the report",
             Self::DuplicateItem => "golden set contains a duplicate item",
+            Self::IncompleteReview => {
+                "complete review must label every bibliographic item exactly once and resolve all pending sources"
+            }
         })
     }
 }
 
 impl std::error::Error for EvaluationError {}
+
+/// Evaluates a review covering every bibliographic item with no unresolved sources.
+///
+/// Standalone sources, orphan trees and disconnected cycles must be resolved
+/// before completion. Sampled quality evaluation remains available separately.
+/// Success proves reviewed metadata coverage, not a Zotero write or full-text approval.
+pub fn evaluate_complete_reviewed_classification<F>(
+    report: &ClassificationReport,
+    golden: &ReviewedGoldenSet,
+    verify_approval: F,
+) -> Result<GoldenSetEvaluation, EvaluationError>
+where
+    F: FnOnce(&ReviewedGoldenSet) -> bool,
+{
+    if golden.labels.len() != report.classified_items.len()
+        || !report.pending_source_item_keys.is_empty()
+    {
+        return Err(EvaluationError::IncompleteReview);
+    }
+    let evaluation = evaluate_reviewed_golden_set(report, golden, verify_approval)?;
+    Ok(evaluation)
+}
 
 /// Checks that every observed item belongs to exactly one report partition.
 ///

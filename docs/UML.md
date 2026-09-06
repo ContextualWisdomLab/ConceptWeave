@@ -58,10 +58,12 @@ sequenceDiagram
     Intake->>Report: write proposals, complete inventory and unresolved source keys
     Note over Report,Steward: Pending sources prevent a whole-library completion claim; inventory is not approval
     Report->>Steward: review dispositions and merge candidates
+    Steward->>Intake: verified labels for every bibliographic item
     Steward->>Intake: reviewed labels and independently issued receipt
     Intake->>Intake: validate complete partitions and recompute pending ancestry
     Intake->>Intake: verify v2 proposal and retained-source binding
     Note over Intake,Steward: Only locally valid reports reach independent governance verification
+    Intake-->>Steward: aggregate bibliographic review evidence or incomplete-review failure
     Steward->>Intake: verified canonical-item decisions
     Intake->>Report: before/after/rollback identity manifest
     Report-->>Steward: reversible local mapping; source records preserved
