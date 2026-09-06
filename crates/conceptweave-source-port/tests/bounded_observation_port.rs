@@ -7,8 +7,8 @@ use std::{
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, ObservationLimitError,
     ObservationLimits, ObservationRequest, ObservationRequestBudget, ObservationRequestBudgetError,
-    ObservationRequestError, ResolvedSourceConnection, SourceConnectionRegistry,
-    SourceObservationFailure, SourceObservationPort,
+    ObservationRequestError, ObservationResourceEnvelope, ResolvedSourceConnection,
+    SourceConnectionRegistry, SourceObservationFailure, SourceObservationPort,
 };
 
 fn limits() -> ObservationLimits {
@@ -126,6 +126,10 @@ fn request_preserves_exact_source_reference_and_canonicalizes_allowlist_only_by_
     assert_eq!(request.allowed_schema_names(), ["Audit/Event", "Risk-Core"]);
     assert_eq!(request.request_budget(), request_budget());
     assert_eq!(request.limits(), limits());
+    assert_eq!(
+        request.resource_envelope(),
+        ObservationResourceEnvelope::new(request_budget(), limits())
+    );
 }
 
 #[test]
@@ -224,6 +228,24 @@ impl SourceConnectionRegistry for ExactRegistry {
             && allowed_schema_names.len() == 1
             && allowed_schema_names[0] == "governance_core"
     }
+
+    fn authorizes_resource_envelope(
+        &self,
+        source_connection: &ResolvedSourceConnection,
+        resource_envelope: ObservationResourceEnvelope,
+    ) -> bool {
+        let request_budget = resource_envelope.request_budget();
+        let limits = resource_envelope.limits();
+        source_connection.source_connection_key() == "grc_readonly_connection"
+            && source_connection.connection_policy_binding() == "policy_revision_a"
+            && request_budget.max_schema_count() <= 8
+            && request_budget.max_schema_bytes() <= 512
+            && limits.operation_timeout_ms() <= 2_500
+            && limits.statement_timeout_ms() <= 2_500
+            && limits.max_rows() <= 5_000
+            && limits.max_bytes() <= 1_048_576
+            && limits.max_concurrent_queries() <= 2
+    }
 }
 
 struct DenyRegistry;
@@ -251,7 +273,7 @@ fn adapter_execution_requires_a_registry_authorized_request() {
 
     let authorized = request
         .authorize(&ExactRegistry)
-        .expect("registry authorization must issue the source-policy-and-schema execution capability");
+        .expect("registry authorization must issue the source-policy-schema-and-resource execution capability");
     assert_eq!(
         authorized.request().source_connection_key(),
         "grc_readonly_connection"
