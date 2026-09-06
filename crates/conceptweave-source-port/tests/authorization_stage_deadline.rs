@@ -63,6 +63,42 @@ impl SourceConnectionRegistry for SlowSourceLookupRegistry {
 }
 
 #[derive(Default)]
+struct SlowBindingRegistry {
+    schema_calls: AtomicUsize,
+    resource_calls: AtomicUsize,
+}
+
+impl SourceConnectionRegistry for SlowBindingRegistry {
+    fn contains_source_connection(&self, source_connection_key: &str) -> bool {
+        source_connection_key == SOURCE_KEY
+    }
+
+    fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
+        assert_eq!(source_connection_key, SOURCE_KEY);
+        thread::sleep(Duration::from_millis(20));
+        Some(POLICY_BINDING.to_owned())
+    }
+
+    fn authorizes_schema_scope(
+        &self,
+        _source_connection: &ResolvedSourceConnection,
+        _allowed_schema_names: &[String],
+    ) -> bool {
+        self.schema_calls.fetch_add(1, Ordering::Relaxed);
+        true
+    }
+
+    fn authorizes_resource_envelope(
+        &self,
+        _source_connection: &ResolvedSourceConnection,
+        _resource_envelope: ObservationResourceEnvelope,
+    ) -> bool {
+        self.resource_calls.fetch_add(1, Ordering::Relaxed);
+        true
+    }
+}
+
+#[derive(Default)]
 struct SlowSchemaRegistry {
     resource_calls: AtomicUsize,
 }
@@ -107,6 +143,18 @@ fn expired_source_lookup_stops_before_later_registry_policy_stages() {
         Err(ObservationRequestError::OperationTimeout)
     );
     assert_eq!(registry.binding_calls.load(Ordering::Relaxed), 0);
+    assert_eq!(registry.schema_calls.load(Ordering::Relaxed), 0);
+    assert_eq!(registry.resource_calls.load(Ordering::Relaxed), 0);
+}
+
+#[test]
+fn expired_binding_lookup_stops_before_schema_and_resource_policy_stages() {
+    let registry = SlowBindingRegistry::default();
+
+    assert_eq!(
+        request(5).authorize(&registry),
+        Err(ObservationRequestError::OperationTimeout)
+    );
     assert_eq!(registry.schema_calls.load(Ordering::Relaxed), 0);
     assert_eq!(registry.resource_calls.load(Ordering::Relaxed), 0);
 }
