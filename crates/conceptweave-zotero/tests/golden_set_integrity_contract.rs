@@ -2,7 +2,110 @@ use conceptweave_zotero::{
     Disposition, EvaluationError, GoldenLabel, GoldenSetApproval, ItemData, ReviewedGoldenSet,
     SnapshotItemRevision, ZoteroItem, classification_proposal_digest,
     classification_snapshot_digest, classify_snapshot, evaluate_reviewed_golden_set,
+    validate_classification_report,
 };
+use sha2::{Digest, Sha256};
+
+#[test]
+fn derived_audit_mutation_fails_before_governance() {
+    for mutation in 0..8 {
+        let mut report = scope_report();
+        let audit = &mut report.audit_summary;
+        match mutation {
+            0 => audit.snapshot_item_count += 1,
+            1 => audit.bibliographic_item_count += 1,
+            2 => audit.proposed_disposition_count += 1,
+            3 => audit.provenance_complete_count += 1,
+            4 => audit.abstention_count += 1,
+            5 => audit.duplicate_candidate_count += 1,
+            6 => audit.failure_count += 1,
+            _ => audit.disposition_counts.clear(),
+        }
+        let golden = scope_golden(&report);
+        assert_eq!(
+            evaluate_reviewed_golden_set(&report, &golden, |_| panic!(
+                "forged audit reached governance"
+            )),
+            Err(EvaluationError::InvalidReview),
+            "audit mutation {mutation}"
+        );
+    }
+}
+
+#[test]
+fn ambiguous_source_coordinates_never_count_as_complete_provenance() {
+    for items in [
+        vec![
+            bibliographic("A", 1, "ontology learning"),
+            bibliographic("A", 2, "ontology learning"),
+        ],
+        vec![
+            bibliographic("A", 1, "ontology learning"),
+            child_note("C", 1, "A"),
+            child_note("C", 2, "A"),
+        ],
+        vec![
+            bibliographic("A", 1, "ontology learning"),
+            child_note("A", 1, ""),
+        ],
+    ] {
+        let report = classify_snapshot("10.0.1".into(), None, 42, items);
+        assert_eq!(report.audit_summary.provenance_complete_count, 0);
+        assert_eq!(
+            validate_classification_report(&report),
+            Err(EvaluationError::InvalidReview)
+        );
+    }
+}
+
+#[test]
+fn legacy_proposal_receipt_is_rejected_without_calling_governance() {
+    let report = scope_report();
+    let mut golden = scope_golden(&report);
+    let mut proposals = report.classified_items.iter().collect::<Vec<_>>();
+    proposals.sort_by_key(|item| (&item.item_key, item.item_version));
+    let old_bytes =
+        serde_json::to_vec(&("conceptweave-classification-proposals-v1", proposals)).unwrap();
+    golden.approval.proposal_digest = format!("sha256:{:x}", Sha256::digest(old_bytes));
+    assert_eq!(
+        evaluate_reviewed_golden_set(&report, &golden, |_| panic!(
+            "legacy receipt reached governance"
+        )),
+        Err(EvaluationError::SnapshotMismatch)
+    );
+}
+
+#[test]
+fn empty_and_unresolved_scope_remain_valid_without_becoming_reviewed_papers() {
+    for (items, pending) in [
+        (vec![], vec![]),
+        (vec![child_note("S", 0, "")], vec!["S"]),
+        (vec![child_note("C", 1, "MISSING")], vec!["C"]),
+        (
+            vec![child_note("C", 1, "D"), child_note("D", 1, "C")],
+            vec!["C", "D"],
+        ),
+        (vec![child_note("C", 1, "C")], vec!["C"]),
+    ] {
+        let report = classify_snapshot("10.0.1".into(), None, 42, items);
+        assert_eq!(validate_classification_report(&report), Ok(()));
+        assert_eq!(report.pending_source_item_keys, pending);
+        assert!(report.classified_items.is_empty());
+    }
+}
+
+#[test]
+fn blank_snapshot_identity_is_rejected_before_governance() {
+    let mut report = scope_report();
+    report.snapshot_items[0].item_key = " \t\n".into();
+    let golden = scope_golden(&report);
+    assert_eq!(
+        evaluate_reviewed_golden_set(&report, &golden, |_| panic!(
+            "invalid identity reached governance"
+        )),
+        Err(EvaluationError::InvalidReview)
+    );
+}
 
 fn bibliographic(key: &str, version: u64, title: &str) -> ZoteroItem {
     ZoteroItem {
@@ -172,6 +275,8 @@ fn approved_snapshot_cannot_authorize_a_prediction_changed_to_match_the_label() 
     );
 
     report.classified_items[0].proposed_disposition = Disposition::AlignmentVersioning;
+    report.audit_summary.disposition_counts =
+        std::collections::BTreeMap::from([(Disposition::AlignmentVersioning, 1)]);
     let verifier_called = std::cell::Cell::new(false);
     assert_eq!(
         evaluate_reviewed_golden_set(&report, &golden, |candidate| {
@@ -198,6 +303,8 @@ fn rewriting_the_proposal_digest_cannot_reuse_an_independent_approval() {
     };
     let approved_golden = golden.clone();
     report.classified_items[0].proposed_disposition = Disposition::AlignmentVersioning;
+    report.audit_summary.disposition_counts =
+        std::collections::BTreeMap::from([(Disposition::AlignmentVersioning, 1)]);
     golden.approval.proposal_digest = classification_proposal_digest(&report);
     let imported_golden =
         serde_json::from_slice::<ReviewedGoldenSet>(&serde_json::to_vec(&golden).unwrap()).unwrap();
@@ -320,4 +427,174 @@ fn malformed_proposal_identities_fail_before_governance() {
             Err(EvaluationError::InvalidReview)
         );
     }
+}
+
+fn scope_report() -> conceptweave_zotero::ClassificationReport {
+    classify_snapshot(
+        "10.0.1".into(),
+        None,
+        42,
+        vec![
+            bibliographic("A", 1, "ontology learning"),
+            child_note("C", 1, "A"),
+            child_note("S", 0, ""),
+            child_note("T", 1, ""),
+        ],
+    )
+}
+
+fn scope_golden(report: &conceptweave_zotero::ClassificationReport) -> ReviewedGoldenSet {
+    ReviewedGoldenSet {
+        approval: approval(report, report.snapshot_items.clone()),
+        labels: vec![GoldenLabel::new("A", Disposition::Generation)],
+    }
+}
+
+#[test]
+fn malformed_source_scope_fails_before_approval_even_with_recomputed_receipt() {
+    for mutation in [
+        "count",
+        "snapshot_count",
+        "missing",
+        "duplicate",
+        "overlap",
+        "unknown",
+        "revision",
+        "blank",
+        "top_level_book",
+        "blank_type",
+        "proposal_type",
+        "proposal_blank_type",
+        "future_snapshot",
+        "pending_missing",
+        "pending_extra",
+        "pending_duplicate",
+        "child_missing",
+        "child_extra",
+        "child_duplicate",
+        "parent_changed",
+    ] {
+        let mut report = scope_report();
+        match mutation {
+            "count" => report.observed_item_count += 1,
+            "snapshot_count" => {
+                report.snapshot_items.pop();
+            }
+            "missing" => {
+                report.unclassified_items.pop();
+            }
+            "duplicate" => report
+                .unclassified_items
+                .push(report.unclassified_items[0].clone()),
+            "overlap" => report.unclassified_items[0].key = "A".into(),
+            "unknown" => report.unclassified_items[0].key = "unknown".into(),
+            "revision" => report.unclassified_items[0].version += 1,
+            "blank" => report.unclassified_items[0].key = " ".into(),
+            "top_level_book" => report.unclassified_items[1].data.item_type = "book".into(),
+            "blank_type" => report.unclassified_items[0].data.item_type.clear(),
+            "proposal_type" => report.classified_items[0].item_type = "attachment".into(),
+            "proposal_blank_type" => report.classified_items[0].item_type.clear(),
+            "future_snapshot" => {
+                report.snapshot_items[0].item_version = 43;
+                report.classified_items[0].item_version = 43;
+            }
+            "pending_missing" => report.pending_source_item_keys.clear(),
+            "pending_extra" => report.pending_source_item_keys.push("A".into()),
+            "pending_duplicate" => report.pending_source_item_keys.push("S".into()),
+            "child_missing" => report.classified_items[0].child_item_keys.clear(),
+            "child_extra" => report.classified_items[0].child_item_keys.push("S".into()),
+            "child_duplicate" => report.classified_items[0].child_item_keys.push("C".into()),
+            "parent_changed" => report.unclassified_items[0].data.parent_item = "missing".into(),
+            _ => unreachable!(),
+        }
+        let golden = scope_golden(&report);
+        let calls = std::cell::Cell::new(0);
+        assert_eq!(
+            evaluate_reviewed_golden_set(&report, &golden, |_| {
+                calls.set(calls.get() + 1);
+                true
+            }),
+            Err(EvaluationError::InvalidReview),
+            "mutation {mutation}"
+        );
+        assert_eq!(calls.get(), 0, "mutation {mutation}");
+    }
+}
+
+#[test]
+fn source_metadata_mutations_invalidate_the_original_approval_before_verification() {
+    for mutation in [
+        "title",
+        "abstract",
+        "doi",
+        "tags",
+        "collections",
+        "type",
+        "parent",
+    ] {
+        let mut report = scope_report();
+        let golden = scope_golden(&report);
+        let source = &mut report.unclassified_items[1];
+        match mutation {
+            "title" => source.data.title = "changed evidence".into(),
+            "abstract" => source.data.abstract_note = "changed evidence".into(),
+            "doi" => source.data.doi = "10.1/changed".into(),
+            "tags" => source.data.tags.push(conceptweave_zotero::ItemTag {
+                tag: "changed".into(),
+            }),
+            "collections" => source.data.collections.push("changed".into()),
+            "type" => source.data.item_type = "attachment".into(),
+            "parent" => {
+                source.data.parent_item = "C".into();
+                report.pending_source_item_keys = vec!["T".into()];
+            }
+            _ => unreachable!(),
+        }
+        let calls = std::cell::Cell::new(0);
+        assert_eq!(
+            evaluate_reviewed_golden_set(&report, &golden, |_| {
+                calls.set(calls.get() + 1);
+                true
+            }),
+            Err(EvaluationError::SnapshotMismatch),
+            "mutation {mutation}"
+        );
+        assert_eq!(calls.get(), 0);
+    }
+}
+
+#[test]
+fn rewritten_source_scope_receipt_still_requires_independent_approval() {
+    let mut report = scope_report();
+    let mut golden = scope_golden(&report);
+    let approved = golden.clone();
+    report.unclassified_items[1].data.title = "changed evidence".into();
+    golden.approval.proposal_digest = classification_proposal_digest(&report);
+    let calls = std::cell::Cell::new(0);
+    assert_eq!(
+        evaluate_reviewed_golden_set(&report, &golden, |candidate| {
+            calls.set(calls.get() + 1);
+            candidate == &approved
+        }),
+        Err(EvaluationError::UnverifiedApproval)
+    );
+    assert_eq!(calls.get(), 1);
+}
+
+#[test]
+fn valid_pending_source_scope_is_order_independent_and_not_additional_paper_labels() {
+    let mut report = scope_report();
+    let golden = scope_golden(&report);
+    report.unclassified_items.reverse();
+    report.pending_source_item_keys.reverse();
+    report.snapshot_items.reverse();
+    let result =
+        evaluate_reviewed_golden_set(&report, &golden, |candidate| candidate == &golden).unwrap();
+    assert_eq!(result.reviewed_count, 1);
+    assert_eq!(result.correct_count, 1);
+    assert_eq!(
+        classification_proposal_digest(&report),
+        golden.approval.proposal_digest
+    );
+    assert_eq!(report.pending_source_item_keys.len(), 2);
 }
