@@ -225,6 +225,10 @@ mod tests {
                 .is_ok()
         );
         assert!(validate_output_request(None, output.to_str().unwrap()).is_ok());
+        assert!(validate_output_request(None, "relative-output").is_err());
+        assert!(
+            validate_output_request(Some("relative-report"), output.to_str().unwrap()).is_err()
+        );
     }
 
     #[test]
