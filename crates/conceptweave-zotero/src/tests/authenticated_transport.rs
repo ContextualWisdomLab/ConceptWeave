@@ -62,7 +62,11 @@ fn failed_http_write_with_matching_observation_remains_indeterminate() {
     let receipt = execute_classification_write_plan(
         &plan,
         |key| adapter.get_item(key),
-        |request| adapter.write_item(request),
+        |request| {
+            let result = adapter.write_item(request);
+            assert_eq!(result, Err(ZoteroTransportError::RequestFailed));
+            result
+        },
     );
     let requests = server.join().unwrap();
     assert_eq!(requests.len(), 7);
