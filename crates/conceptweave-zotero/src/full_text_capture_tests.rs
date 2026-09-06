@@ -1,6 +1,9 @@
 use super::*;
 use crate::{StewardReviewWorksheet, ZoteroItem, classify_snapshot};
 
+#[path = "full_text_write_tests.rs"]
+mod full_text_write_tests;
+
 fn completed_full_text_view(
     report: &ClassificationReport,
     worksheet: &FullTextReviewWorksheet,
