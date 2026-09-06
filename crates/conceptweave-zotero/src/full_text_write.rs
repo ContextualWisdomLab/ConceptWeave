@@ -99,9 +99,10 @@ pub struct FullTextRollbackReceipt {
 }
 
 /// Read-only reconciliation retaining the same scope and untouched recovery work.
-/// An indeterminate result cannot be retried until another observation resolves it.
+/// The complete preceding receipt stays attached; observation never resolves causality.
 #[derive(Serialize)]
-pub struct FullTextRollbackReconciliationReceipt {
+pub struct FullTextRollbackReconciliationReceipt<'receipt> {
+    rollback_receipt: &'receipt FullTextRollbackReceipt,
     full_text_write_v1: FullTextWriteBinding,
     reconciliation_result: crate::ClassificationRollbackReconciliationReceipt,
     remaining_operations: Vec<crate::ClassificationRollbackOperation>,
@@ -176,21 +177,11 @@ pub fn build_full_text_write_plan(
 pub fn execute_full_text_write_plan<ReadError, WriteError>(
     plan: &FullTextWritePlan,
     preflight: impl FnMut(&str) -> Result<ClassificationItemState, ReadError>,
-    mut write_item: impl FnMut(
-        &ClassificationWriteRequest,
-    ) -> Result<ClassificationItemState, WriteError>,
+    write_item: impl FnMut(&ClassificationWriteRequest) -> Result<ClassificationItemState, WriteError>,
 ) -> FullTextWriteReceipt {
-    let mut last_request = None;
     let write_result =
-        crate::execute_classification_write_plan(&plan.write_plan, preflight, |request| {
-            last_request = Some(request.clone());
-            write_item(request)
-        });
-    let indeterminate_request = if write_result.indeterminate_item_key.is_some() {
-        last_request
-    } else {
-        None
-    };
+        crate::execute_classification_write_plan(&plan.write_plan, preflight, write_item);
+    let indeterminate_request = write_result.indeterminate_request.clone();
     FullTextWriteReceipt {
         full_text_write_v1: plan.full_text_write_v1.clone(),
         write_result,
@@ -268,13 +259,14 @@ pub fn retry_full_text_rollback<ReadError, WriteError>(
 pub fn reconcile_full_text_rollback<ReadError>(
     receipt: &FullTextRollbackReceipt,
     read_item: impl FnOnce(&str) -> Result<ClassificationItemState, ReadError>,
-) -> Result<FullTextRollbackReconciliationReceipt, FullTextError> {
+) -> Result<FullTextRollbackReconciliationReceipt<'_>, FullTextError> {
     let operation = receipt
         .rollback_result
         .indeterminate_operation
         .as_ref()
         .ok_or(INVALID_WRITE_SCOPE)?;
     Ok(FullTextRollbackReconciliationReceipt {
+        rollback_receipt: receipt,
         full_text_write_v1: receipt.full_text_write_v1.clone(),
         reconciliation_result: crate::reconcile_classification_rollback(operation, read_item),
         remaining_operations: receipt.rollback_result.remaining_operations.clone(),
@@ -284,7 +276,7 @@ pub fn reconcile_full_text_rollback<ReadError>(
 /// Retries a resolved operation and its untouched tail through complete preflight.
 /// Already restored work is not written again; unresolved work makes zero I/O.
 pub fn retry_full_text_reconciled_rollback<ReadError, WriteError>(
-    receipt: &FullTextRollbackReconciliationReceipt,
+    receipt: &FullTextRollbackReconciliationReceipt<'_>,
     preflight: impl FnMut(&str) -> Result<ClassificationItemState, ReadError>,
     write_item: impl FnMut(&ClassificationWriteRequest) -> Result<ClassificationItemState, WriteError>,
 ) -> Result<FullTextRollbackReceipt, FullTextError> {

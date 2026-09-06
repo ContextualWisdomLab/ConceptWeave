@@ -188,7 +188,9 @@ fn prepare_full_text_review(
     reviewed: &FullTextReviewedGoldenSet,
 ) -> Result<crate::GoldenSetEvaluation, FullTextError> {
     validate_review_capture(report, capture, &reviewed.capture_digest)?;
-    if reviewed.reviewed_golden_set.labels.len() != report.classified_items.len() {
+    if reviewed.reviewed_golden_set.labels.len() != report.classified_items.len()
+        || !report.pending_source_item_keys.is_empty()
+    {
         return Err(FullTextError("full-text review is invalid or unverified"));
     }
     crate::prepare_reviewed_golden_set(report, &reviewed.reviewed_golden_set)
