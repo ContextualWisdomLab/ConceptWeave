@@ -181,6 +181,7 @@ fn matching_observation_does_not_prove_a_lost_write_completed() {
         build_classification_write_plan(&report, &reviewed(&report), WriteMode::Execute, |_| true)
             .unwrap();
     let mut b_reads = 0;
+    let mut submitted_requests = Vec::new();
     let receipt = execute_classification_write_plan(
         &plan,
         |item_key| {
@@ -201,6 +202,7 @@ fn matching_observation_does_not_prove_a_lost_write_completed() {
             Ok::<_, ()>(preflight_state(&plan, item_key))
         },
         |request| {
+            submitted_requests.push(request.clone());
             if request.item_key == "B" {
                 Err(())
             } else {
@@ -217,6 +219,10 @@ fn matching_observation_does_not_prove_a_lost_write_completed() {
     assert_eq!(receipt.rollback_operations[0].item_key, "A");
     assert_eq!(receipt.rollback_operations[0].item_version, 8);
     let audit = serde_json::to_value(&receipt).unwrap();
+    assert_eq!(
+        receipt.indeterminate_request.as_ref(),
+        submitted_requests.last()
+    );
     assert_eq!(audit["indeterminate_request"]["item_key"], "B");
     assert_eq!(audit["indeterminate_request"]["library_version"], 43);
     assert_eq!(audit["indeterminate_request"]["item_version"], 9);
@@ -246,6 +252,11 @@ fn execution_names_an_item_when_failed_write_reconciliation_is_unavailable() {
     assert_eq!(receipt.outcome, ClassificationWriteOutcome::PartialFailure);
     assert_eq!(receipt.failed_item_key.as_deref(), Some("A"));
     assert_eq!(receipt.indeterminate_item_key.as_deref(), Some("A"));
+    assert_eq!(
+        receipt.indeterminate_request.as_ref().unwrap().item_key,
+        "A"
+    );
+    assert!(receipt.reconciliation_observation.is_none());
     assert!(receipt.rollback_operations.is_empty());
     assert_eq!(receipt.not_attempted_item_keys, ["B"]);
 }
