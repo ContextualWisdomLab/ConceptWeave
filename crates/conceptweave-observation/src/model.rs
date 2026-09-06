@@ -279,6 +279,7 @@ impl PrimaryKeyObservation {
 pub struct UniqueConstraintObservation {
     constraint_name: String,
     column_names: Vec<String>,
+    nulls_not_distinct: Option<bool>,
 }
 
 impl UniqueConstraintObservation {
@@ -293,7 +294,24 @@ impl UniqueConstraintObservation {
         Ok(Self {
             constraint_name,
             column_names,
+            nulls_not_distinct: None,
         })
+    }
+
+    /// Records observed NULL comparison behavior without inferring a provider default.
+    ///
+    /// True means NULL values compare equal for uniqueness; false means they are
+    /// distinct. The original constructor leaves this evidence unobserved.
+    #[must_use]
+    pub const fn with_nulls_not_distinct(mut self, nulls_not_distinct: bool) -> Self {
+        self.nulls_not_distinct = Some(nulls_not_distinct);
+        self
+    }
+
+    /// Returns observed NULL comparison behavior, or None when it was not captured.
+    #[must_use]
+    pub const fn nulls_not_distinct(&self) -> Option<bool> {
+        self.nulls_not_distinct
     }
 
     /// Returns the exact source constraint identifier.

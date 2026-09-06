@@ -38,6 +38,11 @@ fn unique_null_comparison_evidence_changes_observation_and_snapshot_identity() {
         )
         .unwrap()
     });
+    assert_ne!(
+        snapshots[1].snapshot_digest(),
+        snapshots[2].snapshot_digest(),
+        "NULLS DISTINCT and NULLS NOT DISTINCT must not share source-content identity"
+    );
     for left in 0..snapshots.len() {
         for right in left + 1..snapshots.len() {
             assert_ne!(
