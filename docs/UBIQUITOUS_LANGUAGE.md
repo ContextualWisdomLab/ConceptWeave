@@ -4,6 +4,10 @@
 | --- | --- |
 | Source Snapshot | Immutable revision of source evidence observed by ConceptWeave. |
 | Observation | Deterministically extracted fact from a Source Snapshot. |
+| Observation Request | Structurally bounded request for an exact source key, exact schema scope, and provider-independent metadata/runtime resource ceilings. Its positive values are requested limits, not authority. |
+| Resolved Source Connection | Opaque source key plus immutable connection-policy binding issued together by trusted local source policy; it carries no credential or provider connection object. |
+| Observation Resource Envelope | Provider-independent value object combining requested schema-count/schema-byte and operation/statement/row/byte/concurrency ceilings for one trusted policy decision. Constructing it does not authorize it. |
+| Authorized Observation Request | Execution capability produced only after the same local policy binds source identity and explicitly admits the exact schema scope and complete Observation Resource Envelope within one non-resetting operation budget. |
 | Evidence Reference | Stable source identity, digest, and location supporting a candidate or release. |
 | Semantic Candidate | Evidence-bound proposal for a concept, relation, constraint, dimension, measure, or physical mapping. |
 | Semantic Model Proposal | Versioned collection of candidates presented for validation/review. |
