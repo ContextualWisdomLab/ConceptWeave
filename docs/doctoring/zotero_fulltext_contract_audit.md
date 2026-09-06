@@ -138,6 +138,10 @@ Bray, T. (Ed.). (2017). *The JavaScript Object Notation (JSON) data interchange 
 
 Serde contributors. (n.d.). *Container attributes*. Serde. Retrieved September 5, 2026, from https://serde.rs/container-attrs.html
 
+Serde contributors. (n.d.). *Field attributes*. Serde. Retrieved September 6, 2026, from https://serde.rs/field-attrs.html
+
+Serde contributors. (n.d.). *Implementing Serialize*. Serde. Retrieved September 6, 2026, from https://serde.rs/impl-serialize.html
+
 Zotero. (2026a, July 29). *Zotero local API*. https://www.zotero.org/support/dev/web_api/v3/local_api
 
 Zotero. (2026b, July 29). *Zotero Web API full-text content requests*. https://www.zotero.org/support/dev/web_api/v3/fulltext_content

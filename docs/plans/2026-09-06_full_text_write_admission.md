@@ -20,6 +20,14 @@ Run from `/Users/seonghobae/Documents/ChatGPT/ConceptWeave`:
 
 Baseline expectation: existing 240 tests pass. New admission capability is absent. Actual paper decisions and independently verified approvals remain each 0/3,715. Test doubles are synthetic unit-only inputs, never research labels or approvals.
 
+Extract the unfiltered result count without accidentally matching nested `90 filtered out` summaries:
+
+```sh
+awk '/^test result: ok\./ && /; 0 filtered out;/ {total += $4; suites += 1} END {print "passed=" total, "unfiltered_suites=" suites}' /tmp/conceptweave-fulltext-write-final-tests-20260906.log
+```
+
+Final verified result: `passed=252 unfiltered_suites=41`, including six doctests. Focused filtered results are not a substitute for this full count.
+
 ## Task 1 — Preserve a failing contract
 
 Add `/Users/seonghobae/Documents/ChatGPT/ConceptWeave/crates/conceptweave-zotero/src/full_text_write_tests.rs`, reusing the adjacent private capture and completed-view fixture functions. Register it in `full_text_capture_tests.rs`.
@@ -43,3 +51,9 @@ Keep plans and recovery evidence opaque and serialize-only. Receipts retain the 
 Run the focused test, full workspace, strict all-target Clippy, formatting, warnings-denied rustdoc, existing CI contract check and existing coverage gate. Do not change thresholds, coverage exclusions, locked versions or fixtures to obtain GREEN. Record exact commands, counts and raw versus normalized coverage separately in the Gap baseline and ignored `results.tsv`.
 
 Update PRD/TRD/Proposed ADR 0007/architecture guidance/UML/CHANGELOG to state implemented behavior and remaining gates. Create a Draft successor against #38, reread its exact head/base/body, inspect current reviews/checks, and retain all protected gates. Update the existing hourly task with exact evidence and next work; do not treat local GREEN as approval or protected publication.
+
+## Tooling and experiment evidence
+
+CodeGraph was healthy and synchronized before exploration and after edits; its large-file queries trimmed the desired planner bodies, so their specific missing ranges were read directly. No code-review-graph MCP tool or executable is available in this environment; do not claim its indexing. DeepWiki returned repository-not-found for structure/content/question requests. Context7 returned its monthly quota limit; no alternate credentials or paid route were used. Existing serde APIs were checked against the official field-attribute and Serialize documentation, with APA entries in the full-text contract audit. The ADR skill's referenced identity instructions are absent, so the existing Proposed ADR was extended with a Y-Statement and no allocator, Accepted transition or new ADR number.
+
+Admission RED `47d4e89` and recovery RED `79e1c22` preserve absent-API failures. Initial admission GREEN `d36dad8` passed 3 focused tests; recovery GREEN `425fb8c` passed 7. The first full coverage run found two missing branch outcomes (dry-run recovery refusal and indeterminate reconciliation retry refusal), despite passing workspace/static checks. Added cases in `bdf55bf` also cover already restored delayed observations, failed reads, known partial writes and compile-time opaque/persistence boundaries. Nine focused tests pass at this candidate; final unfiltered measurements are recorded in the Gap baseline after fresh full verification. No coverage threshold, exclusion or dependency changed.

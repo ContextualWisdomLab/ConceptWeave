@@ -6,6 +6,8 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
+- Full-text-reviewed changes can now carry separately verified destination and execution approval through the local write and recovery workflow. Unknown writes remain unresolved until their state is proven; no command issues approval or changes the live library.
+
 - Private review commands now show saved text, accept completed decisions without replacing earlier work, and prepare a complete review for independent approval verification. They do not supply decisions or approve a review.
 
 - Private inspection of pending papers alongside their saved text, preserving missing material and leaving previous reports and decisions unchanged.

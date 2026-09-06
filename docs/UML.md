@@ -93,7 +93,23 @@ sequenceDiagram
         Intake->>Governance: entire capture-bound reviewed set after local validation
         Governance-->>Intake: authenticated receipt decision or rejection
         Intake-->>Steward: capture-bound aggregate result or failure
-        Note over Intake,Governance: no transfer to the independent Zotero write authority
+        Note over Intake,Governance: meaning review alone never grants destination authority
+        opt separate full-text metadata change requested
+            Steward->>Intake: full review, explicit replacements and requested mode
+            Intake->>Intake: validate capture/report/labels and every write precondition
+            alt invalid local scope
+                Intake-->>Steward: reject before either approval verifier
+            else valid local scope
+                Intake->>Governance: verify entire full-text review exactly once
+                opt meaning authority accepted
+                    Intake->>Governance: verify complete write scope including mode
+                    opt destination authority accepted
+                        Intake->>Report: opaque plan and versioned scope commitment
+                        Note over Intake,Report: execution, rollback, retry and delayed rollback reconciliation retain this commitment
+                    end
+                end
+            end
+        end
     end
     Report->>Steward: review dispositions and merge candidates
     Steward->>Intake: save partially completed worksheet
