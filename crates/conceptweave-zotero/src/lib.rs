@@ -4,6 +4,7 @@
 //! Deterministic, read-only classification of a Zotero library snapshot.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::io::Read;
@@ -13,6 +14,7 @@ use std::time::{Duration, Instant};
 pub const RULE_REVISION: &str = "ontology-research-v2";
 
 const SUPPORTED_API_VERSION: u64 = 3;
+const SNAPSHOT_DIGEST_DOMAIN: &str = "conceptweave-zotero-snapshot-v2";
 const SUPPORTED_API_VERSION_HEADER: &str = "3";
 const PAGE_LIMIT: usize = 100;
 const MAX_PAGE_BYTES: u64 = 8 * 1024 * 1024;
@@ -25,7 +27,7 @@ const LOCAL_API: &str = "http://127.0.0.1:23119/api/users/0/items";
 static TEST_LOCAL_API: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 
 /// A Zotero item returned by the Local API.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ZoteroItem {
     /// Stable item key.
     pub key: String,
@@ -33,6 +35,38 @@ pub struct ZoteroItem {
     pub version: u64,
     /// Item metadata.
     pub data: ItemData,
+    /// Complete original JSON object, captured automatically during deserialization.
+    ///
+    /// Offline callers constructing synthetic typed items use `None`. The digest
+    /// binds this source value together with the actual typed classifier input,
+    /// so later projection changes also invalidate the receipt. It retains omitted fields,
+    /// unknown metadata, nested objects, and array order exactly as observed.
+    #[serde(skip)]
+    pub source_record: Option<serde_json::Value>,
+}
+
+impl<'de> Deserialize<'de> for ZoteroItem {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct ItemProjection {
+            key: String,
+            version: u64,
+            data: ItemData,
+        }
+
+        let source_record = serde_json::Value::deserialize(deserializer)?;
+        let projection =
+            ItemProjection::deserialize(&source_record).map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            key: projection.key,
+            version: projection.version,
+            data: projection.data,
+            source_record: Some(source_record),
+        })
+    }
 }
 
 /// Metadata used by the classifier.
@@ -69,7 +103,7 @@ pub struct ItemTag {
 }
 
 /// One mutually exclusive proposed disposition.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Disposition {
     /// Evidence about ontology or taxonomy generation.
@@ -168,6 +202,10 @@ pub struct ClassificationReport {
     pub rule_revision: &'static str,
     /// Number of items read, including child notes and attachments.
     pub observed_item_count: usize,
+    /// Complete item-revision identity of every observed record.
+    pub snapshot_items: Vec<SnapshotItemRevision>,
+    /// Canonical SHA-256 digest of every observed raw Zotero item.
+    pub snapshot_digest: String,
     /// One proposal for every top-level bibliographic item.
     pub classified_items: Vec<ClassifiedItem>,
     /// Metadata for every remaining record, sorted by its original key.
@@ -185,6 +223,333 @@ pub struct ClassificationReport {
     pub pending_source_item_keys: Vec<String>,
     /// Reversible DOI/title duplicate candidates.
     pub duplicate_candidates: Vec<DuplicateCandidate>,
+}
+
+/// One steward-reviewed expected disposition in a local golden set.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct GoldenLabel {
+    /// Zotero item key used only to join the local report and local review set.
+    pub item_key: String,
+    /// Steward-approved disposition used as evaluation truth.
+    pub expected_disposition: Disposition,
+}
+
+impl GoldenLabel {
+    /// Creates a local golden label.
+    pub fn new(item_key: impl Into<String>, expected_disposition: Disposition) -> Self {
+        Self {
+            item_key: item_key.into(),
+            expected_disposition,
+        }
+    }
+}
+
+/// Version-bound steward labels that remain outside the repository.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct ReviewedGoldenSet {
+    /// Approval receipt verified by the caller's governance boundary.
+    pub approval: GoldenSetApproval,
+    /// Item-level expected dispositions.
+    pub labels: Vec<GoldenLabel>,
+}
+
+/// One item revision in the exact reviewed classification snapshot.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+pub struct SnapshotItemRevision {
+    /// Stable Zotero item key.
+    pub item_key: String,
+    /// Item revision observed during review.
+    pub item_version: u64,
+}
+
+/// Governance receipt binding a steward approval to exact input and proposals.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct GoldenSetApproval {
+    /// Opaque receipt identifier.
+    pub receipt_id: String,
+    /// Stable reviewer subject understood by the governance verifier.
+    pub reviewer_subject: String,
+    /// Zotero library version reviewed by the steward.
+    pub library_version: u64,
+    /// Classifier rule revision whose proposals were reviewed.
+    pub rule_revision: String,
+    /// Immutable digest over the approved snapshot, verified by the caller.
+    pub snapshot_digest: String,
+    /// Digest of the actual proposal records reviewed and verified by the caller.
+    pub proposal_digest: String,
+    /// Complete sorted item-revision identity of the reviewed report.
+    pub snapshot_items: Vec<SnapshotItemRevision>,
+}
+
+/// Computes the canonical content identity verified by a golden-set approval.
+pub fn classification_snapshot_digest(report: &ClassificationReport) -> String {
+    report.snapshot_digest.clone()
+}
+
+/// Computes the versioned SHA-256 identity of the report's current proposals.
+///
+/// Every proposal field is covered, including its prediction, evidence, and item
+/// revision, plus unclassified metadata and pending source identities. This is
+/// not a full-text backup. Records are sorted by item key and revision so ordering does
+/// not change their identity. No second source snapshot is stored. Governance
+/// must bind this value when issuing an approval; recomputing it alone grants no
+/// authority. Evaluation recomputes it rather than trusting report metadata.
+pub fn classification_proposal_digest(report: &ClassificationReport) -> String {
+    let mut proposals = report.classified_items.iter().collect::<Vec<_>>();
+    proposals.sort_by_key(|item| (&item.item_key, item.item_version));
+    let mut source_items = report.unclassified_items.iter().collect::<Vec<_>>();
+    source_items.sort_by_key(|item| (&item.key, item.version));
+    let mut pending_keys = report.pending_source_item_keys.iter().collect::<Vec<_>>();
+    pending_keys.sort();
+    let proposal_bytes = serde_json::to_vec(&(
+        "conceptweave-classification-proposals-v2",
+        proposals,
+        source_items,
+        pending_keys,
+    ))
+    .expect("classification proposal records contain only JSON-serializable values");
+    format!("sha256:{:x}", Sha256::digest(proposal_bytes))
+}
+
+/// Integer evidence from which precision and recall can be calculated exactly.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+pub struct DispositionEvaluation {
+    /// Correct predictions for this disposition.
+    pub true_positive: usize,
+    /// All classifier predictions for reviewed items in this disposition.
+    pub predicted: usize,
+    /// All steward labels expecting this disposition.
+    pub expected: usize,
+}
+
+/// Aggregate-only evaluation result; item keys and bibliographic text are omitted.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct GoldenSetEvaluation {
+    /// Opaque review receipt identifier.
+    pub review_id: String,
+    /// Zotero library revision bound to the verified receipt.
+    pub library_version: u64,
+    /// Classifier revision bound to the verified receipt.
+    pub rule_revision: String,
+    /// Opaque immutable snapshot digest from the verified receipt.
+    pub snapshot_digest: String,
+    /// Opaque digest binding the exact proposal records used for these counts.
+    pub proposal_digest: String,
+    /// Number of steward-reviewed items.
+    pub reviewed_count: usize,
+    /// Number of exact disposition matches.
+    pub correct_count: usize,
+    /// Number of reviewed items on which the classifier abstained.
+    pub abstention_count: usize,
+    /// Precision/recall numerators and denominators per observed disposition.
+    pub by_disposition: BTreeMap<Disposition, DispositionEvaluation>,
+}
+
+/// A fail-closed golden-set contract violation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EvaluationError {
+    /// Review receipt, labels, or revisions are missing or incompatible.
+    InvalidReview,
+    /// The golden set was reviewed against another library or rule revision.
+    SnapshotMismatch,
+    /// The caller's governance boundary did not verify the approval receipt.
+    UnverifiedApproval,
+    /// Abstention cannot be used as steward-approved semantic truth.
+    InvalidExpectedDisposition,
+    /// A reviewed key is absent from the classification report.
+    UnknownItem,
+    /// A reviewed key occurs more than once.
+    DuplicateItem,
+}
+
+impl fmt::Display for EvaluationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::InvalidReview => "golden-set review metadata or labels are invalid",
+            Self::SnapshotMismatch => "golden set does not match the report snapshot",
+            Self::UnverifiedApproval => "golden-set approval receipt is unverified",
+            Self::InvalidExpectedDisposition => {
+                "steward truth cannot use the classifier abstention disposition"
+            }
+            Self::UnknownItem => "golden set contains an item absent from the report",
+            Self::DuplicateItem => "golden set contains a duplicate item",
+        })
+    }
+}
+
+impl std::error::Error for EvaluationError {}
+
+/// Checks that every observed item belongs to exactly one report partition.
+///
+/// Child links and unresolved source keys are recomputed from preserved metadata.
+/// Orphans and disconnected cycles remain valid pending evidence. This checks
+/// internal consistency, not source authenticity or independent approval.
+pub fn validate_classification_report(
+    report: &ClassificationReport,
+) -> Result<(), EvaluationError> {
+    let invalid = EvaluationError::InvalidReview;
+    if report.observed_item_count != report.snapshot_items.len()
+        || report
+            .classified_items
+            .len()
+            .checked_add(report.unclassified_items.len())
+            != Some(report.observed_item_count)
+    {
+        return Err(invalid);
+    }
+    let mut remaining_items = BTreeMap::new();
+    for item in &report.snapshot_items {
+        if item.item_key.trim().is_empty()
+            || item.item_version > report.library_version
+            || remaining_items
+                .insert(item.item_key.as_str(), item.item_version)
+                .is_some()
+        {
+            return Err(invalid);
+        }
+    }
+    let children = child_index(&report.unclassified_items);
+    for item in &report.classified_items {
+        let mut reported_children = item.child_item_keys.clone();
+        reported_children.sort();
+        let mut actual_children = children.get(&item.item_key).cloned().unwrap_or_default();
+        actual_children.sort();
+        if item.item_type.trim().is_empty()
+            || matches!(
+                item.item_type.as_str(),
+                "attachment" | "note" | "annotation"
+            )
+            || remaining_items.remove(item.item_key.as_str()) != Some(item.item_version)
+            || reported_children != actual_children
+        {
+            return Err(invalid);
+        }
+    }
+    for item in &report.unclassified_items {
+        if item.data.item_type.trim().is_empty()
+            || is_bibliographic(item)
+            || remaining_items.remove(item.key.as_str()) != Some(item.version)
+        {
+            return Err(invalid);
+        }
+    }
+    let mut reported_pending = report.pending_source_item_keys.clone();
+    reported_pending.sort();
+    // Equal partition size and one successful removal per record prove completeness.
+    if reported_pending
+        != pending_source_keys(
+            &report.classified_items,
+            &report.unclassified_items,
+            children,
+        )
+    {
+        return Err(invalid);
+    }
+    Ok(())
+}
+
+/// Evaluates reviewed labels without copying item identities into the result.
+///
+/// Structural, source, proposal, and label validation run before governance is
+/// contacted. The verifier must authenticate the complete reviewed set against
+/// an independently issued receipt, including both digests and every label;
+/// accepting a self-declared receipt identifier or digest is not verification.
+pub fn evaluate_reviewed_golden_set<F>(
+    report: &ClassificationReport,
+    golden: &ReviewedGoldenSet,
+    verify_approval: F,
+) -> Result<GoldenSetEvaluation, EvaluationError>
+where
+    F: FnOnce(&ReviewedGoldenSet) -> bool,
+{
+    validate_classification_report(report)?;
+    if golden.approval.receipt_id.trim().is_empty()
+        || golden.approval.reviewer_subject.trim().is_empty()
+        || golden.labels.is_empty()
+        || golden.approval.rule_revision.trim().is_empty()
+        || golden.approval.snapshot_digest.trim().is_empty()
+        || golden.approval.proposal_digest.trim().is_empty()
+    {
+        return Err(EvaluationError::InvalidReview);
+    }
+    let report_snapshot = report
+        .snapshot_items
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let approved_snapshot = golden
+        .approval
+        .snapshot_items
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    if approved_snapshot.len() != golden.approval.snapshot_items.len() {
+        return Err(EvaluationError::InvalidReview);
+    }
+    if golden.approval.library_version != report.library_version
+        || golden.approval.rule_revision != report.rule_revision
+        || golden.approval.snapshot_digest != classification_snapshot_digest(report)
+        || approved_snapshot != report_snapshot
+    {
+        return Err(EvaluationError::SnapshotMismatch);
+    }
+
+    let classified = report
+        .classified_items
+        .iter()
+        .map(|item| (item.item_key.as_str(), item.proposed_disposition))
+        .collect::<BTreeMap<_, _>>();
+    if golden.approval.proposal_digest != classification_proposal_digest(report) {
+        return Err(EvaluationError::SnapshotMismatch);
+    }
+    let mut seen = BTreeSet::new();
+    let mut correct_count = 0;
+    let mut abstention_count = 0;
+    let mut by_disposition = BTreeMap::<Disposition, DispositionEvaluation>::new();
+
+    for label in &golden.labels {
+        if label.item_key.trim().is_empty() {
+            return Err(EvaluationError::InvalidReview);
+        }
+        if label.expected_disposition == Disposition::NeedsStewardReview {
+            return Err(EvaluationError::InvalidExpectedDisposition);
+        }
+        if !seen.insert(label.item_key.as_str()) {
+            return Err(EvaluationError::DuplicateItem);
+        }
+        let predicted = classified
+            .get(label.item_key.as_str())
+            .copied()
+            .ok_or(EvaluationError::UnknownItem)?;
+        by_disposition.entry(predicted).or_default().predicted += 1;
+        by_disposition
+            .entry(label.expected_disposition)
+            .or_default()
+            .expected += 1;
+        if predicted == label.expected_disposition {
+            correct_count += 1;
+            by_disposition.entry(predicted).or_default().true_positive += 1;
+        }
+        if predicted == Disposition::NeedsStewardReview {
+            abstention_count += 1;
+        }
+    }
+
+    if !verify_approval(golden) {
+        return Err(EvaluationError::UnverifiedApproval);
+    }
+
+    Ok(GoldenSetEvaluation {
+        review_id: golden.approval.receipt_id.clone(),
+        library_version: golden.approval.library_version,
+        rule_revision: golden.approval.rule_revision.clone(),
+        snapshot_digest: golden.approval.snapshot_digest.clone(),
+        proposal_digest: golden.approval.proposal_digest.clone(),
+        reviewed_count: golden.labels.len(),
+        correct_count,
+        abstention_count,
+        by_disposition,
+    })
 }
 
 /// Failure raised when a bounded, immutable Local API read cannot be proven.
@@ -482,7 +847,21 @@ pub fn classify_snapshot(
     mut items: Vec<ZoteroItem>,
 ) -> ClassificationReport {
     items.sort_by(|left, right| left.key.cmp(&right.key));
-    let mut children = child_index(&items);
+    let snapshot_items = items
+        .iter()
+        .map(|item| SnapshotItemRevision {
+            item_key: item.key.clone(),
+            item_version: item.version,
+        })
+        .collect();
+    let snapshot_records: Vec<_> = items
+        .iter()
+        .map(|item| (&item.source_record, item))
+        .collect();
+    let snapshot_bytes = serde_json::to_vec(&(SNAPSHOT_DIGEST_DOMAIN, snapshot_records))
+        .expect("Zotero snapshot items contain only JSON-compatible values");
+    let snapshot_digest = format!("sha256:{:x}", Sha256::digest(snapshot_bytes));
+    let children = child_index(&items);
     let bibliographic: Vec<&ZoteroItem> =
         items.iter().filter(|item| is_bibliographic(item)).collect();
     let duplicate_candidates = duplicate_candidates(&bibliographic);
@@ -495,6 +874,31 @@ pub fn classify_snapshot(
         .into_iter()
         .filter(|item| !is_bibliographic(item))
         .collect();
+    let pending_source_item_keys =
+        pending_source_keys(&classified_items, &unclassified_items, children);
+
+    ClassificationReport {
+        zotero_version,
+        api_version: None,
+        schema_version: None,
+        server_id,
+        library_version,
+        rule_revision: RULE_REVISION,
+        observed_item_count,
+        snapshot_items,
+        snapshot_digest,
+        classified_items,
+        unclassified_items,
+        pending_source_item_keys,
+        duplicate_candidates,
+    }
+}
+
+fn pending_source_keys(
+    classified_items: &[ClassifiedItem],
+    unclassified_items: &[ZoteroItem],
+    mut children: BTreeMap<String, Vec<String>>,
+) -> Vec<String> {
     let mut pending_source_item_keys: BTreeSet<_> = unclassified_items
         .iter()
         .map(|item| item.key.clone())
@@ -510,19 +914,7 @@ pub fn classify_snapshot(
         }
     }
 
-    ClassificationReport {
-        zotero_version,
-        api_version: None,
-        schema_version: None,
-        server_id,
-        library_version,
-        rule_revision: RULE_REVISION,
-        observed_item_count,
-        classified_items,
-        unclassified_items,
-        pending_source_item_keys: pending_source_item_keys.into_iter().collect(),
-        duplicate_candidates,
-    }
+    pending_source_item_keys.into_iter().collect()
 }
 
 fn is_bibliographic(item: &ZoteroItem) -> bool {
@@ -801,6 +1193,7 @@ mod tests {
                 collections: vec![],
                 tags: vec![],
             },
+            source_record: None,
         }
     }
 
