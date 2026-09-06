@@ -1,19 +1,38 @@
-use conceptweave_source_port::ObservationRequestBudget;
+use conceptweave_source_port::{
+    ObservationRequestBudget, ObservationRequestBudgetError, MAX_STRUCTURAL_SCHEMA_BYTES,
+    MAX_STRUCTURAL_SCHEMA_COUNT,
+};
 
 #[test]
-fn schema_count_budget_cannot_be_effectively_unbounded_by_caller_choice() {
-    assert!(
-        ObservationRequestBudget::new(usize::MAX, 512).is_err(),
-        "a caller-selected structural budget must not permit an effectively unbounded schema count before trusted policy runs"
+fn schema_count_budget_cannot_exceed_canonical_structural_cap() {
+    assert_eq!(
+        ObservationRequestBudget::new(MAX_STRUCTURAL_SCHEMA_COUNT + 1, 512),
+        Err(ObservationRequestBudgetError::SchemaCountLimitTooLarge {
+            maximum: MAX_STRUCTURAL_SCHEMA_COUNT,
+        })
     );
 }
 
 #[test]
-fn schema_byte_budget_cannot_be_effectively_unbounded_by_caller_choice() {
-    assert!(
-        ObservationRequestBudget::new(8, usize::MAX).is_err(),
-        "a caller-selected structural budget must not permit effectively unbounded retained schema bytes before trusted policy runs"
+fn schema_byte_budget_cannot_exceed_canonical_structural_cap() {
+    assert_eq!(
+        ObservationRequestBudget::new(8, MAX_STRUCTURAL_SCHEMA_BYTES + 1),
+        Err(ObservationRequestBudgetError::SchemaByteLimitTooLarge {
+            maximum: MAX_STRUCTURAL_SCHEMA_BYTES,
+        })
     );
+}
+
+#[test]
+fn canonical_structural_caps_remain_constructible() {
+    let budget = ObservationRequestBudget::new(
+        MAX_STRUCTURAL_SCHEMA_COUNT,
+        MAX_STRUCTURAL_SCHEMA_BYTES,
+    )
+    .expect("canonical provider-independent structural ceilings remain valid");
+
+    assert_eq!(budget.max_schema_count(), MAX_STRUCTURAL_SCHEMA_COUNT);
+    assert_eq!(budget.max_schema_bytes(), MAX_STRUCTURAL_SCHEMA_BYTES);
 }
 
 #[test]
