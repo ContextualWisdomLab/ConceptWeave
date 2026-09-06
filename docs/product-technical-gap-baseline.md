@@ -54,6 +54,12 @@ Protected central source is `.github/main@b5efbc2762e472e4a380b0503b1f050f76fbb0
 - `.github#1873@41935494aa234eb458f1cc08f006daaa278b9760` is closed/unmerged because repository dependency-graph initialization, not its retry/sleep source delta, was the verified root cause of the observed public-repository 403.
 - #35 remains an exact consumer canary for current runner admission and Dependency Review behavior. Its central workflows are queued, so no protected recovery or dependency-review success is inferred from repository settings alone.
 
+## September 6 source-scope admission checkpoint
+
+PR #10 source `f6735b585022aac1c8ceff86c150d9b64fd77ec2` repairs evaluation admission and independently approved scope binding after normal integration of producer `51c7df6d03f072449422fd58ca24b2f9d6026f07`. RED `3f2cf55` failed three new integrity tests; GREEN passed 68 tests/14 unfiltered suites and strict Clippy. See the Proposed [ADR 0006 amendment](adr/0006-zotero-research-intake.md). This local result does not establish hosted GREEN, protection-compliant merge, release, downstream adoption or full coverage.
+
+Remaining work: mandatory adoption by restoration, worksheet, duplicate and write consumers without empty defaults or weakened full-text binding. Genuine reviewed decisions and approvals remain 0/3,715 bibliographic proposals, with four additional standalone sources unresolved. Native visual inspection remains unverified at this checkpoint because the Mac was locked. No UI change or new utility repository was needed.
+
 ## P0 product gaps
 
 1. **Concrete Source Observation adapter** — maintained Rust PostgreSQL driver behind `conceptweave-source-port`; adapter-local registry/credential resolution; explicit read-only session/transaction; exact schema allowlist; total operation and statement deadlines; cancellation plus row/byte/concurrency budgets; complete immutable snapshot or fail closed; source-disappearance handling; deterministic replay against a frozen anonymized GRC-shaped fixture.

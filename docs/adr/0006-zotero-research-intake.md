@@ -60,6 +60,16 @@ This change does not reconcile a source, validate arbitrary offline input, retai
 - Human review remains necessary for ambiguous records and every duplicate merge.
 - Zotero 9 cannot apply approved collection/tag changes automatically.
 
+### September 6 source-scope admission amendment (Proposed)
+
+PR #10 is the earliest evaluation owner. Its previous head `4bb633305b04a1dd4c4ce526806c9469bcb79fd3` was normally merged with producer `51c7df6d03f072449422fd58ca24b2f9d6026f07`, preserving raw-input binding and all inventory fields. RED `3f2cf55` reproduced three authority failures: omitted scope accepted with a recomputed receipt, changed unclassified metadata accepted under the original receipt, and a rewritten receipt reusing independent approval.
+
+We selected one public structural validator before evaluation governance, reusing the producer's bounded ancestry traversal. Counts, unique snapshot identities/revisions, disjoint and complete partitions, record types, direct children and recomputed pending identities must agree. Orphans and disconnected cycles remain pending evidence, not extra bibliographic labels. This supersedes the earlier proposal-only approval digest with `conceptweave-classification-proposals-v2`, covering sorted proposals, projected unclassified metadata and pending identities. Existing v1 approvals require independent reapproval; recomputation is not migration authority.
+
+Guards only in later worksheet commands leave direct evaluation exposed. Another copied traversal or utility repository is unnecessary. The cost is an incompatible approval digest and another bounded validation pass. Snapshot coordinates here contain key/version only: internal consistency and independently approved scope binding do not prove original parent/type authenticity. Projected metadata is not a note/PDF backup. Later restoration, worksheet, duplicate and write owners must adopt the validator and required fields without weakening full-text capture bindings.
+
+GREEN source `f6735b585022aac1c8ceff86c150d9b64fd77ec2` passed 68 tests across 14 unfiltered workspace suites (including two doctests), up from 64 after parent integration and 58 before it. Strict Clippy passed. Full coverage, independent source review, descendant integration, hosted exact-head checks and protected merge remain separate gates. No genuine decision, approval or Zotero write was issued. Visual inspection was attempted again, but the Mac was locked; no fresh screenshot verification is claimed.
+
 ## Alternatives considered
 
 - First-match classification was rejected because FR-9 requires ambiguous evidence to abstain rather than acquire an arbitrary priority-based disposition.
