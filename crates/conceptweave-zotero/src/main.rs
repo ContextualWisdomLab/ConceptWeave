@@ -130,6 +130,11 @@ mod tests {
         assert_eq!(
             validate_output_path(allowed.to_str().unwrap()).unwrap(),
             allowed
+                .parent()
+                .unwrap()
+                .canonicalize()
+                .unwrap()
+                .join(allowed.file_name().unwrap())
         );
 
         assert!(validate_output_path("relative.json").is_err());
