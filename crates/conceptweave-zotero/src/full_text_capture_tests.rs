@@ -375,6 +375,63 @@ fn capture_rejects_unbound_reports_before_any_request() {
 }
 
 #[test]
+fn capture_rejects_incomplete_or_inconsistent_retained_sources_before_fetch() {
+    for mismatch_parent in [false, true] {
+        let mut report = report_fixture();
+        if mismatch_parent {
+            report.unclassified_items[0].data.parent_item = "DEFG5678".into();
+        } else {
+            report.unclassified_items.pop();
+        }
+        let mut calls = 0;
+        assert!(
+            capture_with(&report, 4096, &mut |_, _| {
+                calls += 1;
+                unreachable!()
+            })
+            .is_err()
+        );
+        assert_eq!(calls, 0);
+    }
+}
+
+#[test]
+fn capture_preserves_pending_sources_and_rejects_rebound_report_context() {
+    let items: Vec<ZoteroItem> = serde_json::from_value(serde_json::json!([
+        {"key":"ABCD2345","version":2,"data":{"itemType":"journalArticle","title":"fixture paper"}},
+        {"key":"BCDE3456","version":1,"data":{"itemType":"attachment"}}
+    ]))
+    .unwrap();
+    let mut report = classify_snapshot("10.0.1".into(), Some("fixture-server".into()), 2, items);
+    report.api_version = Some(3);
+    report.schema_version = Some(44);
+    let original_report = serde_json::to_vec(&report).unwrap();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        let mut response = response_fixture(request_path);
+        if request_path == "fulltext?since=0" {
+            response.body = r#"{"BCDE3456":12403}"#.into();
+        } else if request_path == "items/BCDE3456" {
+            response.body =
+                r#"{"key":"BCDE3456","version":1,"data":{"itemType":"attachment"}}"#.into();
+        }
+        Ok(response)
+    })
+    .unwrap();
+    let restored: FullTextCapture =
+        serde_json::from_slice(&serde_json::to_vec(&capture).unwrap()).unwrap();
+    verify_full_text_capture(&restored, &report).unwrap();
+    assert_eq!(serde_json::to_vec(&report).unwrap(), original_report);
+    assert_eq!(report.pending_source_item_keys, vec!["BCDE3456"]);
+    assert_eq!(capture.capture_evidence.bibliographic_item_count, 1);
+    assert_eq!(capture.capture_evidence.records.len(), 1);
+    let snapshot_digest = report.snapshot_digest.clone();
+    report.unclassified_items[0].data.title = "changed retained source context".into();
+    assert!(build_steward_review_worksheet(&report).is_ok());
+    assert_eq!(report.snapshot_digest, snapshot_digest);
+    assert!(verify_full_text_capture(&restored, &report).is_err());
+}
+
+#[test]
 fn capture_rejects_foreign_manifest_items_and_duplicate_manifest_keys() {
     for body in [r#"{"EFGH6789":0}"#, r#"{"BCDE3456":1,"BCDE3456":2}"#] {
         let mut calls = 0;
