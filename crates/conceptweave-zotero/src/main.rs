@@ -425,6 +425,41 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
+    fn replaced_fifo_does_not_block_before_identity_rejection() {
+        let target = unique_temp_path("fifo-replacement");
+        let retained = unique_temp_path("fifo-retained");
+        write_private_output(&target, b"{}").unwrap();
+        let checked_metadata = fs::symlink_metadata(&target).unwrap();
+        fs::rename(&target, &retained).unwrap();
+        assert!(
+            std::process::Command::new("mkfifo")
+                .arg(&target)
+                .status()
+                .unwrap()
+                .success()
+        );
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let opened_path = target.clone();
+        std::thread::spawn(move || {
+            let result = open_with_metadata(&opened_path).map(|(_, metadata)| metadata);
+            let _ = sender.send(result);
+        });
+        let result = receiver.recv_timeout(std::time::Duration::from_secs(2));
+        fs::remove_file(&target).unwrap();
+        fs::remove_file(&retained).unwrap();
+        let opened_metadata = result
+            .expect("opening a raced FIFO must not wait for a writer")
+            .unwrap();
+        assert_eq!(
+            validate_opened_identity(&checked_metadata, &opened_metadata)
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::PermissionDenied
+        );
+    }
+
+    #[test]
     fn worksheet_mode_is_explicit_and_rejects_ambiguous_arguments() {
         let report = "/tmp/conceptweave-zotero-report.json";
         let worksheet = "/tmp/conceptweave-zotero-worksheet.json";
