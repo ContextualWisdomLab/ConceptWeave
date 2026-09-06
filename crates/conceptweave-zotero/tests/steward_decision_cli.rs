@@ -10,7 +10,7 @@ use std::process::Command;
 
 #[test]
 fn decision_patch_cli_writes_one_owner_only_updated_worksheet() {
-    let report = classify_snapshot(
+    let mut report = classify_snapshot(
         "9.0.6".into(),
         None,
         42,
@@ -88,6 +88,56 @@ fn decision_patch_cli_writes_one_owner_only_updated_worksheet() {
         fs::read(&replay_path).unwrap(),
         fs::read(&output_path).unwrap()
     );
+
+    let original_output = fs::read(&output_path).unwrap();
+    assert!(!run_patch(&report_path, &worksheet_path, &patch_path, &output_path).success());
+    assert_eq!(fs::read(&output_path).unwrap(), original_output);
+
+    let rejected_output = temp_path("decision-binding-rejected");
+    assert!(!rejected_output.exists());
+    for missing in [true, false] {
+        let mut value = serde_json::to_value(&patch).unwrap();
+        if missing {
+            value.as_object_mut().unwrap().remove("proposal_digest");
+        } else {
+            value["proposal_digest"] = serde_json::json!("");
+        }
+        let invalid_path = private_input("decision-binding-invalid", &value);
+        assert!(
+            !run_patch(
+                &report_path,
+                &worksheet_path,
+                &invalid_path,
+                &rejected_output
+            )
+            .success()
+        );
+        assert!(!rejected_output.exists());
+        fs::remove_file(invalid_path).unwrap();
+    }
+
+    report.classified_items[0]
+        .title
+        .push_str(" changed review context");
+    let current = build_steward_review_worksheet(&report).unwrap();
+    let current_report_path = private_input("decision-binding-current-report", &report);
+    let current_worksheet_path = private_input("decision-binding-current-worksheet", &current);
+    let original_patch = fs::read(&patch_path).unwrap();
+    let current_bytes = fs::read(&current_worksheet_path).unwrap();
+    assert!(
+        !run_patch(
+            &current_report_path,
+            &current_worksheet_path,
+            &patch_path,
+            &rejected_output
+        )
+        .success()
+    );
+    assert!(!rejected_output.exists());
+    assert_eq!(fs::read(&patch_path).unwrap(), original_patch);
+    assert_eq!(fs::read(&current_worksheet_path).unwrap(), current_bytes);
+    fs::remove_file(current_report_path).unwrap();
+    fs::remove_file(current_worksheet_path).unwrap();
 
     for path in [
         report_path,
