@@ -1130,6 +1130,9 @@ pub struct StewardReviewWorksheet {
     pub rule_revision: String,
     /// Canonical content digest of the complete raw snapshot.
     pub snapshot_digest: String,
+    /// Versioned identity of proposals, review context and retained source scope.
+    /// Older worksheets require regeneration; this binding is not approval.
+    pub proposal_digest: String,
     /// Complete parent and child item-revision coordinates.
     pub snapshot_items: Vec<SnapshotItemRevision>,
     /// Deterministically ordered editable decisions for bibliographic items.
@@ -1152,6 +1155,9 @@ impl fmt::Display for WorksheetError {
 impl std::error::Error for WorksheetError {}
 
 /// Builds a complete local worksheet without copying titles, abstracts, or evidence.
+///
+/// Complete inventory validation precedes projection. Valid unresolved sources
+/// may be reviewed, but worksheet creation never proves completed review.
 pub fn build_steward_review_worksheet(
     report: &ClassificationReport,
 ) -> Result<StewardReviewWorksheet, WorksheetError> {
@@ -1180,6 +1186,7 @@ pub fn build_steward_review_worksheet(
         library_version: report.library_version,
         rule_revision: report.rule_revision.into(),
         snapshot_digest: report.snapshot_digest.clone(),
+        proposal_digest: classification_proposal_digest(report),
         snapshot_items: report.snapshot_items.clone(),
         decisions,
     })
