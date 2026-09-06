@@ -53,12 +53,10 @@ fn write_private_output_with(
 ) -> io::Result<()> {
     let file = create_report_file(path)?;
     let mut writer = BufWriter::new(file);
-    if let Err(error) = write(&mut writer, content) {
-        drop(writer);
-        let _ = fs::remove_file(path);
-        return Err(error);
-    }
-    Ok(())
+    let result = write(&mut writer, content);
+    // Never retry buffered writes on drop or unlink a possibly replaced pathname.
+    let _ = writer.into_parts();
+    result
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -166,10 +164,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let report_content = serde_json::to_vec_pretty(&report)?;
         let worksheet_content = serde_json::to_vec_pretty(&worksheet)?;
         write_private_output(&report_output, &report_content)?;
-        if let Err(error) = write_private_output(&output, &worksheet_content) {
-            let _ = fs::remove_file(report_output);
-            return Err(error.into());
-        }
+        write_private_output(&output, &worksheet_content)?;
     } else {
         write_private_output(&output, &serde_json::to_vec_pretty(&report)?)?;
     }
@@ -245,7 +240,7 @@ mod tests {
     }
 
     #[test]
-    fn failed_private_output_is_removed_for_retry() {
+    fn failed_private_output_is_preserved_and_requires_a_new_path() {
         let output = unique_temp_path("failed-output");
         let _ = fs::remove_file(&output);
         let error = write_private_output_with(&output, b"content", |_, _| {
@@ -256,7 +251,9 @@ mod tests {
         })
         .unwrap_err();
         assert_eq!(error.kind(), io::ErrorKind::WriteZero);
-        assert!(!output.exists());
+        assert_eq!(fs::metadata(&output).unwrap().len(), 0);
+        assert!(write_private_output(&output, b"retry").is_err());
+        fs::remove_file(&output).unwrap();
 
         write_private_output(&output, b"complete").unwrap();
         assert_eq!(fs::read(&output).unwrap(), b"complete");
