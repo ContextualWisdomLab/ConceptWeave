@@ -1,69 +1,70 @@
 # Product / Technical Gap Baseline
 
-**Snapshot:** 2026-09-05
+**Snapshot:** 2026-09-06
 
-This file records code-current product and technical gaps. Exact PR/check/run coordinates are evidence snapshots, not mutable-head dependencies. Live protected-branch, PR, issue and workflow state wins whenever it advances after this snapshot. Because this documentation update creates a Foundation successor, the Foundation SHA below is the exact pre-refresh head; PR metadata must be refreshed to the resulting successor SHA.
+This file records code-current product and technical gaps. Exact PR/check/run coordinates are evidence snapshots, never mutable-head dependencies. Live protected-branch, PR, issue and workflow state wins whenever it advances after this snapshot.
 
 ## Protected truth and active stack
 
 Protected/default `main` remains `f4f440dd58c77d7cd90dff8a1eb2eeb9a9940425`; only the bootstrap state is shipped there and no immutable ConceptWeave release exists.
 
-The active roots observed immediately before this baseline refresh are:
+Current active roots observed for this refresh:
 
-1. Foundation PR #1 — pre-refresh exact head `5cdd319b9425989e632149b243a3308dd630c0ae`, Draft/open/mergeable. The current Foundation makes Product CI draft-aware while keeping Ready/non-Draft quality requirements intact. Product CI still cannot materialize from protected `main` because that branch does not yet contain `.github/workflows/product.yml`.
-2. Product-CI bootstrap PR #35 — exact head `daa543ce2cc2b2eb6d35a7265abcf2a7466e7381`, open/non-Draft/mergeable. It adds only the pull-request form of Product CI so #1 can later be marked Ready without a no-op commit. Exact-head CodeQL PR, Security Scan and SAST Semgrep remain queued; `Security Scan / Detect changed scope` is pre-runner with no steps and no runner assignment, and no independent submitted review exists yet.
-3. Client Consumption PR #5 — exact head `cbb9cda0c93d8b762195423834f1d6a27dbfa613`, Draft/open/mergeable. The current source retains language-neutral semantic-release admission, integrity, compatibility, diff/resolution and supersession validation. Previously valid review findings are source-repaired, but current protected evidence remains independently required.
-4. Source Observation PR #6 — exact head `d255f5c08a621024809c7e076989eccf0662a330`, Draft/open/mergeable. PostgreSQL targeted `ON DELETE SET NULL (...)` / `SET DEFAULT (...)` column provenance and registry/ACL-resolved source identity are source-repaired. The next P0 slice is the concrete bounded read-only PostgreSQL adapter.
-5. Zotero Research Classification root PR #9 — exact head `cda546672cd95b5f8bed7024f70e4e6b39a134c8`, Draft/open/mergeable. The dependent research/write-back stack remains proposal/review oriented and does not elevate local classifier output to semantic authority.
+1. Foundation PR #1 — `b538470c963e6524ddc0c3f652a46a4fc8265150`, Draft/open/mergeable. Product CI still cannot originate from protected `main` because `.github/workflows/product.yml` has not yet been integrated.
+2. Product-CI bootstrap PR #35 — `a31ae0c2df920f2794f7ddb456795b04797ab472`, open/non-Draft/mergeable. Security Scan and SAST are terminal success; existing CodeQL/OpenCode/Strix evidence is terminal failure; Noema has a blocking `CHANGES_REQUESTED`; no qualifying independent APPROVE exists.
+3. Client Consumption PR #5 — `fcf36c8a99f015b963c9f812787df127ac2e2f9e`, Draft/open/mergeable. It retains deterministic generic release admission, integrity, compatibility, diff/resolution and supersession validation.
+4. Source Observation PR #6 — this baseline was refreshed from successor source immediately after `21386548889ca1152cfc4dc6dcd3c1f11c658675`; the documentation commit itself creates a newer ordinary forward head. The stack remains Draft/open/mergeable on Client #5 and now carries source-key + immutable policy-binding + exact-schema authorization, one non-resetting operation budget, snapshot-side exact-schema containment, stale-binding fail-closed port fixtures, and binding-preserving immutable snapshot/receipt provenance. No live PostgreSQL adapter or exact-head Rust GREEN is claimed.
+5. Zotero Research Classification root #9 and its #13→#38 descendants remain a separately coordinated single-writer lane. This Source Observation writer does not mutate their source/ref/PR metadata.
 
-Predecessor reviews/checks never transfer to successor heads. No force-push, destructive rebase, self-approval, fail-open scanner substitution or routine administrator bypass is acceptance evidence.
+Predecessor reviews/checks never transfer to successor heads. No force-push, destructive rebase, self-approval, review dismissal, fail-open scanner substitution, no-op retrigger, mutable supplier dependency, or routine administrator bypass is acceptance evidence.
 
 ## Foundation capability status
 
 | Area | Status | Evidence / next verification |
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | PRD/TRD/ADR/context map define ConceptWeave ownership of `observe -> discover -> propose -> align -> validate -> review -> publish`, governed immutable semantic releases and stable Client contracts. Foreign product truth remains behind released/versioned ports and ACLs. |
-| Truth/publication lifecycle | REPAIRED_PENDING_CI | Rust and the public Draft 2020-12 semantic-candidate schema enforce compatible publication-state/truth-status semantics. Hosted exact-head Product evidence still requires the bootstrap workflow on protected `main`. |
-| Source Observation | ACTIVE_CHILD | Immutable PostgreSQL table/column/PK/unique/FK/CHECK evidence, exact identifiers, targeted delete-column provenance, canonical snapshot digest syntax, UTC provenance, receipts, bounded request budgets/cancellation and registry-authorized opaque source identity exist. No live PostgreSQL adapter is claimed; ADR 0004 remains Proposed. |
-| Client Consumption | ACTIVE_CHILD | Offline Published+Authoritative admission, compatibility, exact resolution/diff, canonical digest verification, detached artifact verification and explicit supersession validation exist. Current exact-head protected evidence and prerequisite integration remain outstanding. |
-| Quality gate | ACTIVE_PR | Rust 1.98.0, unsafe forbidden, public docs required, exact checkout, fmt, Clippy, tests, rustdoc, owned 100% coverage, Draft-2020-12 schema fixtures, lock freshness and clean-tree checks. Every head movement requires fresh exact-head evidence. |
-| Security / dependency review | CONSUMER_REVALIDATION_PENDING | The earlier public non-fork exact-range HTTP 403 was traced to an uninitialized repository dependency graph, not to a retryable central workflow defect. `.github#1873` was closed unmerged after enabling Dependabot vulnerability alerts initialized affected graphs and the same exact comparison returned HTTP 200. The hard gate remains fail closed; a current ConceptWeave head must still execute the pinned Dependency Review action successfully before acceptance. |
-| Review / runner admission | BLOCKED_OWNER | #35's exact-head central runs are still queued before useful execution; `Detect changed scope` has no runner assignment or steps. Queueing blocks this validation lane only and is not a reason to stop Source Observation or other repository-owned work. |
-| Standards / research | REPAIRED_PENDING_CI | Doctoring remains bound to authoritative standards/primary research and exact implementation contracts; hosted exact-head evidence remains independently required after head changes. |
+| Truth/publication lifecycle | REPAIRED_PENDING_CI | Rust and public contracts preserve observed/inferred/proposed/authoritative/rejected/superseded distinctions. Protected exact-head Product evidence is still unavailable until bootstrap #35 integrates. |
+| Source Observation | ACTIVE_CHILD | Immutable PostgreSQL facts, deterministic content digest, exact-schema authorization, source-policy binding, non-resetting deadline, cancellation/resource failures, snapshot containment and policy-binding provenance exist in source. ADR 0004 remains Proposed because production adapter/runtime evidence does not. |
+| Client Consumption | ACTIVE_CHILD | Offline Published+Authoritative admission, compatibility, exact resolution/diff, detached artifact verification and explicit supersession validation exist. Current protected evidence and prerequisite integration remain outstanding. |
+| Quality gate | BLOCKED_BY_BOOTSTRAP | Rust 1.98.0, unsafe forbidden, public docs, fmt, strict Clippy, tests, rustdoc, release build and owned 100% coverage remain required. This execution environment has no Rust toolchain and current #6 has no hosted Product/Rust run, so source commits are not GREEN evidence. |
+| Central review plane | OWNER_REPAIR_PENDING | `.github/main` is `fe827e133e7d867015d088777553e22736344c55`. `.github#1929` remains open: the current app-token dispatcher identity and repository authorization allowlist are not reconciled, so fresh substantive OpenCode/CodeQL evidence for #35 is still unavailable. |
+| Noema | OWNER_REVIEW_REPAIR_PENDING | #35 retains a contradicted external-Cargo-capability `CHANGES_REQUESTED`; `.github#1924` is the generic owner path. Failure-artifact capture on central main improves diagnosis but is not adjudication repair. |
+| Strix | OWNER_RUNTIME_REPAIR_PENDING | #35 reached the trusted gateway but failed on repeated HTTP 500. Central account-selection bias was repaired, while `contextual-orchestrator#1049` still owns HTTP-500 failover/exhaustion behavior. |
 | Release | NOT_STARTED | No immutable ConceptWeave release exists. Version/CHANGELOG/tag/package/semantic_release/SBOM/provenance/reproducibility/rollback are required on the exact protected release head. |
 
-## Dependency Review incident correction
+## Source Observation current contract
 
-The prior Foundation predecessor exposed a real hosted failure: the authenticated Dependency Review compare preflight returned HTTP 403 for a public, non-fork ConceptWeave exact range. The initially proposed central repair retried the same token-bound request while retaining fail-closed behavior.
+`ObservationRequest` admits only bounded opaque source keys, explicit exact-schema allowlists, bounded authorization metadata, and positive operation/statement/row/byte/concurrency limits. The local `SourceConnectionRegistry` must issue a bounded opaque immutable connection-policy binding and authorize the exact schema scope against the resulting `ResolvedSourceConnection`; both additional policy decisions default to fail closed. A known key without a binding cannot execute, and connection material such as a PostgreSQL DSN is rejected as an invalid binding rather than crossing the port seam.
 
-Fresh owner RCA invalidated that causal hypothesis. The same authenticated exact-range request returned HTTP 200 for a repository whose dependency graph was initialized and HTTP 403 for affected repositories whose graph was not initialized. Enabling Dependabot vulnerability alerts initialized the dependency graph in ConceptWeave and pingora-gateway, after which the exact compare endpoint returned HTTP 200. Therefore `.github#1873` was correctly closed without merge: retries would extend queue occupancy but would not establish repository capability.
+`AuthorizedObservationRequest` carries only the validated request, source key, opaque policy binding, and private monotonic operation-start coordinate. The adapter receives only `remaining_operation_budget()` rather than a reset timeout. A later adapter ACL may resolve credentials only for the exact key-and-binding pair. A capability authorized for revision A must not silently retarget to revision B after the registry changes; the port fixture requires stale-binding failure before source and snapshot side effects and has an unchanged-binding positive control.
 
-Acceptance remains stricter than the RCA. HTTP 200 availability alone is not GREEN. A fresh exact ConceptWeave consumer run must reach and complete the pinned Dependency Review action; 403, transport failure, skipped substitution or a sibling scanner cannot satisfy the hard gate.
+`PostgresSchemaSnapshot::new` requires the complete authorized envelope, rejects locally observed table schemas outside the exact authorized allowlist before digest/receipt construction, and retains the authorized policy binding as immutable provenance. Source-content digest identity remains separate from source key and policy revision. Public `SourceObservationReceipt` retains source id, exact policy binding, digest, extractor revision, observation time and verified location. Foreign-key target schemas remain relationship evidence and do not grant read authority for those schemas.
 
-## Central control-plane evidence
+These are source-reviewed executable contracts, not a claimed executed RED→GREEN. The next acceptance is unchanged-head Rust 1.98 Product/test/fmt/Clippy/rustdoc/release/owned-coverage evidence plus observed repair of any real failures. Only then should a concrete maintained Rust PostgreSQL adapter be added.
 
-Protected central source is `.github/main@b5efbc2762e472e4a380b0503b1f050f76fbb008` at this snapshot. This is evidence only, not a mutable ConceptWeave dependency.
+## Central owner evidence relevant to #35
 
-- The current central source includes queue/admission and changed-scope/review-runtime repairs already integrated through ordinary protected history.
-- `.github#1873@41935494aa234eb458f1cc08f006daaa278b9760` is closed/unmerged because repository dependency-graph initialization, not its retry/sleep source delta, was the verified root cause of the observed public-repository 403.
-- #35 remains an exact consumer canary for current runner admission and Dependency Review behavior. Its central workflows are queued, so no protected recovery or dependency-review success is inferred from repository settings alone.
+Protected central source is `.github/main@fe827e133e7d867015d088777553e22736344c55` at this snapshot. `.github#1929` remains open and records that the app-token producer dispatches as `opencode-agent[bot]` while the effective authorization evidence has continued to reject that identity. ConceptWeave does not edit the central allowlist or replay stale failed handles. Owner acceptance requires the intended legitimate producer identities to be reconciled explicitly, followed by a newly emitted current-workflow repository dispatch that passes metadata validation and produces a terminal authenticated verdict.
+
+#35 also remains blocked by the separate Noema contradicted-capability review and contextual-orchestrator/Strix HTTP-500 failover lane. These are owner-path blockers for #35 only; they do not justify speculative Source Observation provider fallbacks or weakening ConceptWeave gates.
 
 ## P0 product gaps
 
-1. **Concrete Source Observation adapter** — maintained Rust PostgreSQL driver behind `conceptweave-source-port`; adapter-local registry/credential resolution; explicit read-only session/transaction; exact schema allowlist; total operation and statement deadlines; cancellation plus row/byte/concurrency budgets; complete immutable snapshot or fail closed; source-disappearance handling; deterministic replay against a frozen anonymized GRC-shaped fixture.
-2. **Observed PostgreSQL surface completion** — domains/enums/indexes/comments, quoted identifiers and cross-schema collisions as generic observed evidence without importing source-system business truth.
-3. **Ontology discovery** — deterministic term/concept/taxonomy/non-taxonomic-relation candidate generation with exact source receipts and abstention for unsupported semantics.
-4. **Semantic-layer discovery** — dimensions, measures, grain, units, relationships and physical mappings with deterministic calculation contracts; do not infer business authority from relational structure alone.
-5. **LLM Proposal** — every production model call through a released `contextual-orchestrator`; outputs remain proposed/inferred and preserve source/model/prompt/provenance evidence.
-6. **Alignment / matching** — retrieval/pruning/structural evidence first, bounded optional LLM assistance, OAEI-style evaluation, deterministic reproducibility and steward-visible decisions.
-7. **Validation engine** — RDF/OWL/SKOS/SHACL and semantic-layer validation, consistency/conflict/duplicate detection, bounded reasoning and explicit unsupported-feature failure.
-8. **Governance persistence** — PostgreSQL 3NF candidates/evidence/validation/review/release/supersession receipts, transactional outbox and temporal history only where domain semantics require it.
-9. **Review workflow** — Keyverse identity context, tenant/role/purpose authorization, steward decisions, maker-checker where required, stale-decision protection and immutable publication receipt.
-10. **Publication adapters** — versioned OWL/RDFS/SKOS/SHACL/JSON-LD plus explicitly version-bound Apache Ossie export; draft/incubating formats cannot be presented as final standards.
-11. **Client completion** — language-neutral release/supersession contract, provenance/signature verification, relation/mapping/dimension/measure resolution, compatibility/deprecation, match/explain/query-plan contracts while downstream products retain physical authorization/execution.
-12. **CWL integration** — only released/versioned `semantic_release`/contract/ACL seams to `semantic-data-portal`, `context-graph-contracts`, GRC, EA and other consumers; no source copying, cross-service SQL or mutable supplier heads.
-13. **Evaluation / multilingual** — reviewed golden fixtures, ontology-learning/matching metrics, source-evidence binding, abstention, reproducibility, KO/EN/JA/ZH/VI/ES/DE/FR labels, CJK/font/text-expansion checks where UI or published labels are material.
-14. **Observability / recovery / release** — structured telemetry, security evidence, backup/restore, package/SBOM/provenance/signing, reproducible build and rollback proof before immutable release.
+1. **Exact-head Source Observation verification** — run Rust 1.98 fmt, strict Clippy, tests, warnings-denied rustdoc, release build, owned 100% coverage and applicable security/dependency gates on one unchanged #6 head; repair only observed failures.
+2. **Concrete PostgreSQL Source Observation adapter** — maintained patched Rust PostgreSQL driver; exact-binding least-privilege credential resolution; explicit `REPEATABLE READ READ ONLY`; exact-schema `pg_catalog` evidence; one remaining-budget clock across connect/transaction/statements/cancellation; row/byte/concurrency bounds; stale-binding rejection; complete immutable snapshot or fail closed; source disappearance; frozen anonymized GRC-shaped replay.
+3. **Observed PostgreSQL surface completion** — domains/enums/indexes/comments, quoted identifiers and cross-schema collisions as generic observed evidence without importing source-system business truth.
+4. **Ontology discovery** — deterministic term/concept/taxonomy/non-taxonomic-relation candidate generation with exact source receipts and abstention for unsupported semantics.
+5. **Semantic-layer discovery** — dimensions, measures, grain, units, relationships and physical mappings with deterministic calculation contracts; relational structure alone is not semantic authority.
+6. **LLM Proposal** — every production model call through a released `contextual-orchestrator`; outputs remain proposed/inferred and preserve source/model/prompt/provenance evidence.
+7. **Alignment / matching** — retrieval/pruning/structural evidence first, bounded optional LLM assistance, OAEI-style evaluation, deterministic reproducibility and steward-visible decisions.
+8. **Validation engine** — RDF/OWL/SKOS/SHACL and semantic-layer validation, consistency/conflict/duplicate detection, bounded reasoning and explicit unsupported-feature failure.
+9. **Governance persistence** — PostgreSQL 3NF candidates/evidence/validation/review/release/supersession receipts, transactional outbox and temporal history only where domain semantics require it.
+10. **Review workflow** — Keyverse identity context, tenant/role/purpose authorization, steward decisions, maker-checker where required, stale-decision protection and immutable publication receipt.
+11. **Publication adapters** — versioned OWL/RDFS/SKOS/SHACL/JSON-LD plus explicitly version-bound Apache Ossie export; draft/incubating formats cannot be presented as final standards.
+12. **Client completion** — language-neutral release/supersession contract, provenance/signature verification, relation/mapping/dimension/measure resolution, compatibility/deprecation, match/explain/query-plan contracts while downstream products retain physical authorization/execution.
+13. **CWL integration** — only released/versioned `semantic_release`/contract/ACL seams to `semantic-data-portal`, `context-graph-contracts`, GRC, EA and other consumers; no source copying, cross-service SQL or mutable supplier heads.
+14. **Evaluation / multilingual** — reviewed golden fixtures, ontology-learning/matching metrics, source-evidence binding, abstention, reproducibility, KO/EN/JA/ZH/VI/ES/DE/FR labels, CJK/font/text-expansion checks where UI or published labels are material.
+15. **Observability / recovery / release** — structured telemetry, security evidence, backup/restore, package/SBOM/provenance/signing, reproducible build and rollback proof before immutable release.
 
 ## DDD fitness constraints
 
