@@ -89,6 +89,40 @@ Remaining work: mandatory adoption by restoration, worksheet, duplicate and writ
 
 ## DDD fitness constraints
 
+### PR #22 steward-context binding verification (2026-09-06)
+
+Untouched `7179d13b45d160682e4cce1473c145d465fe657b` passed 120 tests/23 suites.
+Normal merge `49daf4c` retains that delta and parent PR #21 `425d8df`; integrated
+tests passed 143/23. Documentation conflicts preserve both private abstract
+minimization and corrected source-version/uncertainty contracts. The original
+PR #22 production implementation is unchanged: an abstention retains a nonblank
+abstract only when it is not already in matched evidence; decided items omit it.
+
+Independent review identified missing binding regression evidence, not a runtime
+defect. Test `ebcf2a3` covers insertion, replacement and removal of review context:
+each changes the inherited v2 proposal digest and rejects the original approval
+before contacting governance. `b44d603` also rejects locally rewritten digests
+against the independent original receipt, preserves whitespace omission and
+verbatim Japanese context, and retains all four original minimization cases.
+Evaluation aggregates exclude synthetic item/reviewer/title/abstract values.
+This is context retention, not multilingual classification or real approval.
+
+Final 144 tests/23 suites including three doctests, strict Clippy, warnings-denied
+rustdoc, format/CI-contract/diff and unchanged coverage pass. Coverage is 269/269
+functions, 2369/2369 normalized regions, 404/404 normalized branches; raw LLVM is
+3083/3143 lines, 4625/4722 regions, 360/404 branches, not 100%. Logs use
+`/tmp/conceptweave-pr22-scope-` with `baseline.log`, `integration.log`,
+`complete.log`, `clippy-complete.log`, `rustdoc.log`, `coverage-complete.log`.
+Independent final review found no remaining issue in the reviewed delta.
+
+Sensitive report context stays private; no fresh real-data capture or visual
+evidence was collected. Latest native visual attempt encountered the locked Mac;
+historical 3,719 displayed items are not classification evidence. Real decisions
+and approvals remain 0/3,715 plus four unresolved sources. No real mutation,
+authorization, recovery, protected merge or release occurred. Next successor is
+PR #23 owner-only report permissions `2a3619f52e1d3e4f699c91be1fc2d0e9a6e234c8`;
+root and authoritative full-text envelope adoption remain outstanding.
+
 ### PR #21 delayed observation authority repair (2026-09-06)
 
 Untouched `09c84e4cdb1393a5e450f5200b87f292eeea956f` passed 119 tests/22 suites.
