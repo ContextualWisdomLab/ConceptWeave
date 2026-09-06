@@ -4,6 +4,10 @@ All notable changes to ConceptWeave are documented here.
 
 ## Unreleased
 
+### Fixed
+
+- Zotero research intake rejects incomplete or late results after a five-minute read budget, even when individual pages arrive within their request limits.
+
 ### Added
 
 - Initial ConceptWeave product, DDD, security, test, and operability baselines.
