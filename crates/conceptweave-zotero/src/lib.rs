@@ -25,8 +25,8 @@ pub use full_text_capture::{
     reconcile_full_text_rollback, retry_full_text_reconciled_rollback, retry_full_text_rollback,
 };
 pub use full_text_capture::{
-    FullTextWritePlan, FullTextWriteReceipt, FullTextWriteScope, build_full_text_write_plan,
-    execute_full_text_write_plan,
+    FullTextWriteObservation, FullTextWritePlan, FullTextWriteReceipt, FullTextWriteScope,
+    build_full_text_write_plan, execute_full_text_write_plan, observe_full_text_write,
 };
 
 /// Classification rule revision recorded in every report.

@@ -63,6 +63,24 @@ pub struct FullTextWriteReceipt {
     full_text_write_v1: FullTextWriteBinding,
     #[serde(serialize_with = "serialize_write_result")]
     write_result: ClassificationWriteReceipt,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    indeterminate_request: Option<ClassificationWriteRequest>,
+}
+
+/// A later, unverified observation attached to the complete original write receipt.
+///
+/// Matching metadata does not establish who changed it or whether an earlier
+/// request has finished. This evidence neither clears uncertainty nor authorizes
+/// retry or rollback. Save it only as an owner-only artifact; keep earlier views.
+///
+/// ```compile_fail
+/// use conceptweave_zotero::FullTextWriteObservation;
+/// let forged = serde_json::from_str::<FullTextWriteObservation<'_>>("{}");
+/// ```
+#[derive(Serialize)]
+pub struct FullTextWriteObservation<'receipt> {
+    write_receipt: &'receipt FullTextWriteReceipt,
+    observed_state: Option<ClassificationItemState>,
 }
 
 /// One bound rollback attempt, including operations still awaiting resolution.
@@ -158,16 +176,45 @@ pub fn build_full_text_write_plan(
 pub fn execute_full_text_write_plan<ReadError, WriteError>(
     plan: &FullTextWritePlan,
     preflight: impl FnMut(&str) -> Result<ClassificationItemState, ReadError>,
-    write_item: impl FnMut(&ClassificationWriteRequest) -> Result<ClassificationItemState, WriteError>,
+    mut write_item: impl FnMut(
+        &ClassificationWriteRequest,
+    ) -> Result<ClassificationItemState, WriteError>,
 ) -> FullTextWriteReceipt {
+    let mut last_request = None;
+    let write_result =
+        crate::execute_classification_write_plan(&plan.write_plan, preflight, |request| {
+            last_request = Some(request.clone());
+            write_item(request)
+        });
+    let indeterminate_request = if write_result.indeterminate_item_key.is_some() {
+        last_request
+    } else {
+        None
+    };
     FullTextWriteReceipt {
         full_text_write_v1: plan.full_text_write_v1.clone(),
-        write_result: crate::execute_classification_write_plan(
-            &plan.write_plan,
-            preflight,
-            write_item,
-        ),
+        write_result,
+        indeterminate_request,
     }
+}
+
+/// Reads an indeterminate original request's item once, without sending a write.
+///
+/// Other receipts fail before I/O. A failed read records no observation and omits
+/// the adapter error. Even foreign or malformed returned state remains unverified
+/// evidence: the original outcome, inverse work and untouched items never change.
+pub fn observe_full_text_write<ReadError>(
+    receipt: &FullTextWriteReceipt,
+    read_item: impl FnOnce(&str) -> Result<ClassificationItemState, ReadError>,
+) -> Result<FullTextWriteObservation<'_>, FullTextError> {
+    let request = receipt
+        .indeterminate_request
+        .as_ref()
+        .ok_or(INVALID_WRITE_SCOPE)?;
+    Ok(FullTextWriteObservation {
+        write_receipt: receipt,
+        observed_state: read_item(&request.item_key).ok(),
+    })
 }
 
 /// Restores verified writes without accepting detached or mixed inverse operations.
