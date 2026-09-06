@@ -21,6 +21,7 @@
 - requests equal to or narrower than every local source-policy ceiling are explicitly admitted and preserve the exact requested envelope;
 - source/binding/schema/resource local policy work shares one monotonic operation budget; elapsed authorization reduces the adapter remainder and exhaustion wins before side effects;
 - a capability for binding A presented after live mapping changes to B fails before source/snapshot side effects, while unchanged A executes the expected control once;
+- `AuthorizedObservationRequest` is non-`Clone` and is consumed by `SourceObservationPort::observe`; cancellation and success controls obtain separate authorizations so one policy grant cannot be replayed to multiply source/resource work;
 - the awaitable `Send` port preserves cancellation and typed resource/source failures without adding a runtime dependency to the port crate;
 - immutable PostgreSQL snapshot construction requires the complete authorized envelope, rejects locally observed schemas outside the exact scope, and keeps foreign-key target schema names as relationship evidence rather than read authority;
 - snapshot and receipt provenance retain the exact immutable connection-policy binding separately from deterministic source-content digest identity;
@@ -51,7 +52,7 @@ Digest identity syntax and detached-byte integrity remain separate controls. The
 
 ### Source observation runtime
 
-A frozen anonymized PostgreSQL fixture must exercise real least-privilege exact-binding credential resolution, stale-binding rejection before credential/source access, `REPEATABLE READ READ ONLY`, exact-schema `pg_catalog` capture, operation/statement/row/byte/concurrency enforcement from the policy-admitted envelope, cancellation cleanup, source disappearance, complete-or-fail snapshot construction, domains/enums/indexes/comments, quoted identifiers and cross-schema collisions. OpenAPI/AsyncAPI fixtures, malformed contracts, deep nesting, invalid encoding, archive bombs, parser cancellation, and exact digest/location provenance follow behind their own adapters.
+A frozen anonymized PostgreSQL fixture must exercise real least-privilege exact-binding credential resolution, stale-binding rejection before credential/source access, one fresh authorization per attempted observation/retry, `REPEATABLE READ READ ONLY`, exact-schema `pg_catalog` capture, operation/statement/row/byte/concurrency enforcement from the policy-admitted envelope, cancellation cleanup, source disappearance, complete-or-fail snapshot construction, domains/enums/indexes/comments, quoted identifiers and cross-schema collisions. OpenAPI/AsyncAPI fixtures, malformed contracts, deep nesting, invalid encoding, archive bombs, parser cancellation, and exact digest/location provenance follow behind their own adapters.
 
 ### Ontology and semantic discovery
 
@@ -79,7 +80,7 @@ No bypass of Reviewed before Published, immutable published releases, rejection,
 
 ### Security
 
-Prompt injection, malicious ontology/source/release content, SSRF, cross-tenant leakage, secret leakage, expression injection, resource exhaustion, over-cap structural request metadata, caller-self-authorized schema/resource requests, stale source binding replay, malformed source provenance, hostile export values, compatibility downgrade, stale/superseded use, and detached-artifact tampering.
+Prompt injection, malicious ontology/source/release content, SSRF, cross-tenant leakage, secret leakage, expression injection, resource exhaustion, over-cap structural request metadata, caller-self-authorized schema/resource requests, stale source binding replay, authorized-capability replay amplification, malformed source provenance, hostile export values, compatibility downgrade, stale/superseded use, and detached-artifact tampering.
 
 ### Evaluation
 
