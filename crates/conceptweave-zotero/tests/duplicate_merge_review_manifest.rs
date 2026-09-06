@@ -36,6 +36,11 @@ fn report() -> conceptweave_zotero::ClassificationReport {
             ),
             item("C", 3, "Shared Ontology Title", ""),
             item("D", 4, "Shared Ontology Title", ""),
+            {
+                let mut note = item("NOTE", 0, "Standalone source", "");
+                note.data.item_type = "note".into();
+                note
+            },
         ],
     )
 }
@@ -47,6 +52,7 @@ fn reviewed(report: &conceptweave_zotero::ClassificationReport) -> ReviewedDupli
         library_version: report.library_version,
         rule_revision: report.rule_revision.clone(),
         snapshot_digest: report.snapshot_digest.clone(),
+        proposal_digest: conceptweave_zotero::classification_proposal_digest(report),
         snapshot_items: report.snapshot_items.clone(),
         duplicate_candidates: report.duplicate_candidates.clone(),
         decisions: vec![
@@ -74,6 +80,10 @@ fn reviewed_duplicate_decision_has_exact_before_after_and_rollback_mappings() {
     assert_eq!(manifest.authority_receipt, "authority-receipt-1");
     assert_eq!(manifest.library_version, report.library_version);
     assert_eq!(manifest.rule_revision, report.rule_revision);
+    assert_eq!(
+        manifest.proposal_digest,
+        conceptweave_zotero::classification_proposal_digest(&report)
+    );
     assert_eq!(manifest.operations.len(), 2);
     assert_eq!(manifest.operations[0].identity_kind, "doi");
     assert_eq!(manifest.operations[1].identity_kind, "title");
@@ -99,6 +109,82 @@ fn reviewed_duplicate_decision_has_exact_before_after_and_rollback_mappings() {
     assert_eq!(
         serialized["operations"][0]["rollback_canonical_keys"],
         serialized["operations"][0]["before_canonical_keys"]
+    );
+}
+
+#[test]
+fn duplicate_scope_and_decisions_fail_before_governance() {
+    for mutation in 0..7 {
+        let mut report = report();
+        let mut review = reviewed(&report);
+        match mutation {
+            0 => report.observed_item_count += 1,
+            1 => report.unclassified_items.clear(),
+            2 => report.pending_source_item_keys.clear(),
+            3 => report.audit_summary.failure_count = 1,
+            4 => review.decisions[0].retained_item_key = "missing".into(),
+            5 => review.decisions[0].normalized_identity = "missing".into(),
+            _ => review.decisions[0] = review.decisions[1].clone(),
+        }
+        let called = std::cell::Cell::new(false);
+        assert!(
+            build_duplicate_merge_review_manifest(&report, &review, |_| {
+                called.set(true);
+                true
+            })
+            .is_err(),
+            "invalid scope or decision {mutation} accepted"
+        );
+        assert!(
+            !called.get(),
+            "invalid scope or decision {mutation} reached governance"
+        );
+    }
+}
+
+#[test]
+fn retained_source_change_invalidates_duplicate_approval() {
+    let mut report = report();
+    let review = reviewed(&report);
+    report.unclassified_items[0].data.title = "Changed standalone evidence".into();
+    assert_eq!(
+        build_duplicate_merge_review_manifest(&report, &review, |_| panic!(
+            "changed scope reached governance"
+        )),
+        Err(DuplicateReviewError::SnapshotMismatch)
+    );
+}
+
+#[test]
+fn duplicate_receipt_requires_explicit_source_scope_binding() {
+    let mut legacy = serde_json::to_value(reviewed(&report())).unwrap();
+    legacy.as_object_mut().unwrap().remove("proposal_digest");
+    assert!(serde_json::from_value::<ReviewedDuplicateMergeSet>(legacy).is_err());
+}
+
+#[test]
+fn rewritten_duplicate_scope_receipt_cannot_reuse_independent_approval() {
+    let mut report = report();
+    let mut review = reviewed(&report);
+    let original_review = review.clone();
+    report.unclassified_items[0].data.title = "Changed retained evidence".into();
+    review.proposal_digest = conceptweave_zotero::classification_proposal_digest(&report);
+    let called = std::cell::Cell::new(0);
+    assert_eq!(
+        build_duplicate_merge_review_manifest(&report, &review, |candidate| {
+            called.set(called.get() + 1);
+            candidate == &original_review
+        }),
+        Err(DuplicateReviewError::UnverifiedApproval)
+    );
+    assert_eq!(called.get(), 1);
+
+    review.proposal_digest.clear();
+    assert_eq!(
+        build_duplicate_merge_review_manifest(&report, &review, |_| panic!(
+            "blank binding reached governance"
+        )),
+        Err(DuplicateReviewError::InvalidReview)
     );
 }
 
@@ -225,6 +311,7 @@ fn overlapping_duplicate_groups_require_one_consistent_canonical_choice() {
         library_version: report.library_version,
         rule_revision: report.rule_revision.clone(),
         snapshot_digest: report.snapshot_digest.clone(),
+        proposal_digest: conceptweave_zotero::classification_proposal_digest(&report),
         snapshot_items: report.snapshot_items.clone(),
         duplicate_candidates: report.duplicate_candidates.clone(),
         decisions: vec![
@@ -268,6 +355,7 @@ fn duplicate_review_rejects_ambiguous_snapshot_key_revisions() {
         library_version: report.library_version,
         rule_revision: report.rule_revision.clone(),
         snapshot_digest: report.snapshot_digest.clone(),
+        proposal_digest: conceptweave_zotero::classification_proposal_digest(&report),
         snapshot_items: report.snapshot_items.clone(),
         duplicate_candidates: report.duplicate_candidates.clone(),
         decisions: report
