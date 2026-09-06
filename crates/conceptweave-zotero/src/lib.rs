@@ -1067,6 +1067,115 @@ mod tests {
     }
 
     #[test]
+    fn source_inventory_retains_standalone_and_nested_metadata_without_proposals() {
+        let mut standalone = item("A", "attachment", "Ontology Learning", "10.1/X", "");
+        standalone.version = 0;
+        standalone.data.collections = vec!["COLLECTION".into()];
+        standalone.data.tags = vec![ItemTag {
+            tag: "Evidence".into(),
+        }];
+        let report = read_snapshot_with(&mut |_| {
+            Ok(fetched_page(
+                6,
+                vec![
+                    item("F", "annotation", "", "", "C"),
+                    item("E", "note", "", "", ""),
+                    item("D", "annotation", "", "", "A"),
+                    item("C", "attachment", "", "", "B"),
+                    item("B", "book", "Ontology Learning", "10.1/X", ""),
+                    standalone.clone(),
+                ],
+            ))
+        })
+        .unwrap();
+        let serialized = serde_json::to_value(&report).unwrap();
+        assert_eq!(
+            serialized["pending_source_item_keys"],
+            serde_json::json!(["A", "D", "E"])
+        );
+        let inventory = serialized["unclassified_items"]
+            .as_array()
+            .expect("every excluded source must survive in the report");
+        assert_eq!(
+            inventory
+                .iter()
+                .map(|entry| entry["key"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            ["A", "C", "D", "E", "F"]
+        );
+        assert_eq!(inventory[0]["version"], 0);
+        assert_eq!(inventory[0]["data"]["title"], "Ontology Learning");
+        assert_eq!(
+            inventory[0]["data"]["collections"],
+            serde_json::json!(["COLLECTION"])
+        );
+        assert_eq!(
+            inventory[0]["data"]["tags"],
+            serde_json::json!([{"tag":"Evidence"}])
+        );
+        assert_eq!(inventory[4]["data"]["parentItem"], "C");
+        assert_eq!(report.observed_item_count, 6);
+        assert_eq!(report.classified_items.len(), 1);
+        assert_eq!(report.classified_items[0].item_key, "B");
+        assert_eq!(report.classified_items[0].child_item_keys, ["C"]);
+        assert!(report.duplicate_candidates.is_empty());
+    }
+
+    #[test]
+    fn source_inventory_keeps_orphans_cycles_and_unattached_annotations_pending() {
+        let sources = vec![
+            item("A", "book", "", "", ""),
+            item("B", "note", "", "", "missing"),
+            item("C", "attachment", "", "", "B"),
+            item("D", "note", "", "", "E"),
+            item("E", "attachment", "", "", "D"),
+            item("F", "annotation", "", "", "F"),
+            item("G", "annotation", "", "", ""),
+        ];
+        let forward =
+            serde_json::to_value(classify_snapshot("10".into(), None, 42, sources.clone()))
+                .unwrap();
+        let reverse = serde_json::to_value(classify_snapshot(
+            "10".into(),
+            None,
+            42,
+            sources.into_iter().rev().collect(),
+        ))
+        .unwrap();
+        assert_eq!(
+            forward["pending_source_item_keys"],
+            serde_json::json!(["B", "C", "D", "E", "F", "G"])
+        );
+        assert_eq!(forward, reverse);
+        assert_eq!(forward["unclassified_items"].as_array().unwrap().len(), 6);
+    }
+
+    #[test]
+    fn source_inventory_distinguishes_empty_and_fully_linked_evidence() {
+        for sources in [
+            vec![],
+            vec![item("A", "book", "", "", "")],
+            vec![
+                item("A", "book", "", "", ""),
+                item("B", "attachment", "", "", "A"),
+                item("C", "annotation", "", "", "B"),
+            ],
+        ] {
+            let serialized =
+                serde_json::to_value(classify_snapshot("10".into(), None, 42, sources)).unwrap();
+            assert_eq!(
+                serialized["pending_source_item_keys"],
+                serde_json::json!([])
+            );
+            assert_eq!(
+                serialized["observed_item_count"].as_u64().unwrap() as usize,
+                serialized["classified_items"].as_array().unwrap().len()
+                    + serialized["unclassified_items"].as_array().unwrap().len()
+            );
+        }
+    }
+
+    #[test]
     fn classifies_every_bibliographic_item_and_links_children() {
         let mut generation = item("B", "journalArticle", "Ontology Learning", "10.1/X", "");
         generation.data.tags.push(ItemTag {
