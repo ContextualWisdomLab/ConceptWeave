@@ -18,7 +18,7 @@ fn report_fixture() -> ClassificationReport {
 fn response_fixture(request_path: &str) -> CapturedResponse {
     let (status, version, body) = match request_path {
         "items?limit=1" => (200, Some(2), "[]"),
-        "fulltext?since=0" => (200, None, r#"{"BCDE3456":12403,"CDEF4567":0}"#),
+        "fulltext?since=0" => (200, Some(2), r#"{"BCDE3456":12403,"CDEF4567":0}"#),
         "items/BCDE3456" => (
             200,
             Some(1),
