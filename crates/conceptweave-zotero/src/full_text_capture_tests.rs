@@ -93,6 +93,11 @@ fn full_text_review_rejects_modified_display_and_never_overwrites_work() {
         ("/capture_digest", serde_json::json!("changed")),
         ("/metadata_report_digest", serde_json::json!("changed")),
         ("/proposal_digest", serde_json::json!("changed")),
+        (
+            "/review_batch/proposal_digest",
+            serde_json::json!("changed"),
+        ),
+        ("/review_batch/pending_source_count", serde_json::json!(1)),
         ("/view_kind", serde_json::json!("changed")),
         ("/bibliographic_item_count", serde_json::json!(1)),
         ("/review_batch/remaining_count", serde_json::json!(1)),
@@ -696,6 +701,27 @@ fn review_view_separates_two_text_parents_and_excludes_standalone_attachments() 
     assert!(second.contains("second parent evidence"));
     assert!(!second.contains("fixture text"));
     assert!(!second.contains("standalone evidence"));
+    assert_eq!(report.pending_source_item_keys, ["FGHI789A"]);
+
+    let bound = build_full_text_review_worksheet(&report, &capture).unwrap();
+    let completed = completed_full_text_view(&report, &bound, &capture, 2);
+    let decided = apply_full_text_review_view(&report, &bound, &capture, &completed).unwrap();
+    let golden = finalize_full_text_review(
+        &report,
+        &decided,
+        &capture,
+        full_text_approval_fixture(&report, &capture),
+    )
+    .unwrap();
+    let mut approval_calls = 0;
+    assert!(
+        evaluate_full_text_review(&report, &capture, &golden, |_| {
+            approval_calls += 1;
+            true
+        })
+        .is_err()
+    );
+    assert_eq!(approval_calls, 0);
     assert_eq!(report.pending_source_item_keys, ["FGHI789A"]);
 }
 
