@@ -145,6 +145,15 @@ fn review_view_separates_two_text_parents_and_excludes_standalone_attachments() 
     )
     .unwrap();
     assert_eq!(both["bibliographic_item_count"], 2);
+    assert_eq!(both["review_batch"]["pending_source_count"], 1);
+    assert_eq!(
+        both["review_batch"]["proposal_digest"],
+        both["proposal_digest"]
+    );
+    assert_eq!(both["proposal_digest"], worksheet.proposal_digest);
+    assert_eq!(report.pending_source_item_keys, ["FGHI789A"]);
+    assert!(!both.to_string().contains("standalone evidence"));
+    assert!(!both.to_string().contains("FGHI789A"));
     assert_eq!(
         both["attachment_evidence"]["ABCD2345"]
             .as_array()
@@ -180,6 +189,7 @@ fn review_view_separates_two_text_parents_and_excludes_standalone_attachments() 
     assert!(second.contains("second parent evidence"));
     assert!(!second.contains("fixture text"));
     assert!(!second.contains("standalone evidence"));
+    assert_eq!(report.pending_source_item_keys, ["FGHI789A"]);
 }
 
 #[test]
@@ -203,6 +213,15 @@ fn review_view_rejects_changed_capture_report_and_invalid_pending_work() {
     let mut changed_report = report_fixture();
     changed_report.classified_items[0].title = "different report evidence".into();
     assert!(build_full_text_review_json(&changed_report, &worksheet, &capture, 2).is_err());
+    let mut changed_report = report_fixture();
+    changed_report.unclassified_items[0].data.title = Some("changed retained source".into());
+    let fresh_worksheet = build_steward_review_worksheet(&changed_report).unwrap();
+    assert_eq!(fresh_worksheet.snapshot_digest, worksheet.snapshot_digest);
+    assert_ne!(fresh_worksheet.proposal_digest, worksheet.proposal_digest);
+    assert!(build_full_text_review_json(&changed_report, &fresh_worksheet, &capture, 2).is_err());
+    let mut unbound = worksheet.clone();
+    unbound.proposal_digest.clear();
+    assert!(build_full_text_review_json(&report, &unbound, &capture, 2).is_err());
     for limit in [0, 101] {
         assert!(build_full_text_review_json(&report, &worksheet, &capture, limit).is_err());
     }
