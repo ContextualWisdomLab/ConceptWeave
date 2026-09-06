@@ -6,6 +6,14 @@ This file records code-current product and technical gaps. Exact PR/check/run co
 
 ## September 6 source inventory checkpoint
 
+### September 7 PR31 decision-patch content repair
+
+Original PR31 `61072a70f7ec5a1fbd0b477430aacb8e770aa109` passed 158 tests/33 suites. Normal merge `ef0ce43` retains it and PR30 `ee1ac9925c5287e9f10c2e9581b7cf513b170bd7`; integrated tests passed 204/33. RED `7208d80` compiled with three passing and two failing tests: an old patch applied after changed report context and fresh worksheet generation, and serialized patches without content binding loaded. The valid-first/unknown-later batch already preserved the original worksheet. `89bb941` adds required patch proposal identity and compares it before updates, reusing the existing digest. Missing fields fail loading, stale/blank identities cannot equal the recomputed expected identity, and no automatic backfill is permitted. Independent bounded review found no additional defect; atomic failure, same-label idempotency and conflicting-decision rejection remain.
+
+Final source `89bb941` passes 207 tests/33 suites including three doctests, strict Clippy, warnings-denied rustdoc, formatting, CI contract and diff checks. Unchanged coverage passes 331/331 reported functions, 2,965/2,965 normalized regions and 544/544 normalized branches. Raw 3,971/4,033 lines, 6,125/6,232 regions and 499/544 branches are not 100%. Logs: `/tmp/conceptweave-pr31-{baseline,integrated,binding-red,verified,clippy,rustdoc,coverage}.log`. PRD/TRD/Proposed ADR0006 trace the separate report/worksheet/patch identities and legacy regeneration requirement.
+
+Root and later patch consumers must inherit this required binding alongside the prior source, progress and FIFO repairs. Actual decisions and independent approvals remain 0/3,715 plus four unresolved standalone sources. Synthetic fixture labels are not real review evidence. Native Visual Inspection was retried, but the Mac is locked; no fresh screenshot is claimed. Keep Draft. No real Zotero write, hosted GREEN, protected merge or release occurred.
+
 ### September 7 PR30 content-bound progress repair
 
 Original PR30 `a11e889d1680ab4d91f3565e3debf7ed0f10ba23` passed 156 tests/32 suites. Normal merge `7251238` retains it and PR29 `e21f14fbb4954762ffc97521af9a6cdd9982c630`; integrated tests passed 200/32. Child private-helper coverage improvements remain, combined with parent FIFO/source/approval/output safety. RED `4099434` compiled with one passing and two failing progress tests: blank proposal binding was accepted and pending/content identity fields were absent. `bee32f4` compares the existing digest in the shared worksheet validator and adds opaque proposal identity plus pending count to aggregate progress. `b2b0ef4` proves filled bibliographic slots do not hide an unresolved standalone source. Independent bounded review found no collateral finalization error-precedence or privacy regression.
