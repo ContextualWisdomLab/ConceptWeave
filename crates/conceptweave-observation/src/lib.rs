@@ -18,7 +18,7 @@ pub use model::{
 use conceptweave_source_port::AuthorizedObservationRequest;
 use sha2::{Digest, Sha256};
 
-const SNAPSHOT_DIGEST_DOMAIN_V1: &[u8] = b"conceptweave.postgres_schema_snapshot.v1";
+const SNAPSHOT_DIGEST_DOMAIN_V2: &[u8] = b"conceptweave.postgres_schema_snapshot.v2";
 
 /// Immutable receipt binding one exact observed source coordinate to snapshot provenance.
 ///
@@ -183,7 +183,7 @@ impl PostgresSchemaSnapshot {
 
 fn compute_snapshot_digest(tables: &[TableObservation]) -> String {
     let mut hasher = Sha256::new();
-    encode_bytes(&mut hasher, SNAPSHOT_DIGEST_DOMAIN_V1);
+    encode_bytes(&mut hasher, SNAPSHOT_DIGEST_DOMAIN_V2);
     encode_len(&mut hasher, tables.len());
 
     for table in tables {
@@ -211,6 +211,7 @@ fn compute_snapshot_digest(tables: &[TableObservation]) -> String {
                     hasher.update([1]);
                     encode_str(&mut hasher, observation.constraint_name());
                     encode_str_slice(&mut hasher, observation.column_names());
+                    encode_optional_bool(&mut hasher, observation.nulls_not_distinct());
                 }
                 TableConstraintObservation::ForeignKey(observation) => {
                     hasher.update([2]);
