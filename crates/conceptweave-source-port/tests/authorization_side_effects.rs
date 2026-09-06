@@ -9,8 +9,9 @@ use std::{
 
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, ObservationLimits, ObservationRequest,
-    ObservationRequestBudget, ObservationRequestError, ResolvedSourceConnection,
-    SourceConnectionRegistry, SourceObservationFailure, SourceObservationPort,
+    ObservationRequestBudget, ObservationRequestError, ObservationResourceEnvelope,
+    ResolvedSourceConnection, SourceConnectionRegistry, SourceObservationFailure,
+    SourceObservationPort,
 };
 
 fn limits() -> ObservationLimits {
@@ -42,6 +43,24 @@ impl SourceConnectionRegistry for ExactRegistry {
             && source_connection.connection_policy_binding() == "policy_revision_a"
             && allowed_schema_names.len() == 1
             && allowed_schema_names[0] == "governance_core"
+    }
+
+    fn authorizes_resource_envelope(
+        &self,
+        source_connection: &ResolvedSourceConnection,
+        resource_envelope: ObservationResourceEnvelope,
+    ) -> bool {
+        let request_budget = resource_envelope.request_budget();
+        let limits = resource_envelope.limits();
+        source_connection.source_connection_key() == "grc_readonly_connection"
+            && source_connection.connection_policy_binding() == "policy_revision_a"
+            && request_budget.max_schema_count() <= 8
+            && request_budget.max_schema_bytes() <= 512
+            && limits.operation_timeout_ms() <= 2_500
+            && limits.statement_timeout_ms() <= 2_500
+            && limits.max_rows() <= 5_000
+            && limits.max_bytes() <= 1_048_576
+            && limits.max_concurrent_queries() <= 2
     }
 }
 
@@ -139,7 +158,7 @@ fn denied_authorization_has_no_execution_side_effects_and_authorized_control_exe
 
     let authorized = request
         .authorize(&ExactRegistry)
-        .expect("known registry key, policy binding and schema scope must issue the execution capability");
+        .expect("known source, policy binding, schema scope and resource envelope must issue the execution capability");
     assert_eq!(
         authorized.source_connection().connection_policy_binding(),
         "policy_revision_a"
