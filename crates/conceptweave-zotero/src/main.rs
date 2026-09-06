@@ -42,7 +42,10 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
         ));
     }
     let file_name = path.file_name().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidInput, "report output has no file name")
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "report output has no file name",
+        )
     })?;
     let validated_path = resolved_parent.join(file_name);
     if fs::symlink_metadata(&validated_path).is_ok() {
@@ -77,7 +80,7 @@ fn set_owner_only_permissions(file: &File) -> io::Result<()> {
 }
 
 #[cfg(unix)]
-/// Creates a private file and removes it if final permission enforcement fails.
+/// Creates a private file; failure leaves an empty file rather than unlinking a raced path.
 fn create_report_file_with(
     path: &Path,
     set_permissions: fn(&File) -> io::Result<()>,
@@ -87,11 +90,7 @@ fn create_report_file_with(
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     let file = options.mode(0o600).open(path)?;
-    if let Err(error) = set_permissions(&file) {
-        drop(file);
-        let _ = fs::remove_file(path);
-        return Err(error);
-    }
+    set_permissions(&file)?;
     Ok(file)
 }
 
@@ -217,7 +216,8 @@ mod tests {
         })
         .unwrap_err();
         assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
-        assert!(!rejected.exists());
+        assert_eq!(fs::metadata(&rejected).unwrap().len(), 0);
+        fs::remove_file(rejected).unwrap();
     }
 
     #[cfg(unix)]
