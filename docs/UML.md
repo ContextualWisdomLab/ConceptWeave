@@ -54,7 +54,9 @@ sequenceDiagram
         Intake->>Intake: validate page consistency and every item revision; fail entire read on mismatch
     end
     Intake->>Intake: classify or abstain; link children; find duplicate candidates
-    Intake->>Report: write proposals and evidence
+    Intake->>Intake: retain excluded metadata; traverse parent links from bibliographic roots
+    Intake->>Report: write proposals, complete inventory and unresolved source keys
+    Note over Report,Steward: Pending sources prevent a whole-library completion claim; inventory is not approval
     Report->>Steward: review dispositions and merge candidates
     Intake-->>Zotero: no mutation
 ```

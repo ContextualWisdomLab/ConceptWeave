@@ -31,6 +31,12 @@ No dedicated utility repository or Zotero mutation path is created. A future Zot
 
 ## Consequences
 
+### September 6 source-scope amendment (Proposed)
+
+In the context of a genuine 8,326-record library observation and a native 3,719-top-level selection, facing three standalone PDFs and one note omitted from the 3,715 bibliographic proposals, we decided to retain every nonbibliographic metadata record and derive unresolved ancestry using the existing child index. We rejected silently excluding these sources, guessing paper labels from file titles, and a standalone-only list that would still hide orphan or cyclic child relationships. Reusing `ZoteroItem` avoids another adapter or DTO, at the cost of a larger private report and an explicitly projected, not lossless, source representation. Consuming each adjacency list once makes traversal finite without recursion or repeated ancestry walks. The [executed source-scope record](../doctoring/zotero_source_scope.md) binds the failing tests, source, actual observation and consumer integration requirements.
+
+This change does not reconcile a source, validate arbitrary offline input, retain full note/file contents or grant review/write authority. Consumers must require and validate the new inventory, recompute pending keys and distinguish bibliographic progress from full-library completion before adoption. Direct evaluation, duplicate and write routes must not bypass that validation. Existing proposal-only approval digests do not bind this added scope; incompatible full-text captures must fail their whole-report binding. The schema and governance integration remain pending in dependent owners; no backward-compatible empty default, capture rewrite or approved-label backfill is accepted. The original Zotero 9.0.6 observation above is historical; this amendment was tested against Zotero 10.0.1 while retaining read-only behavior.
+
 - A complete snapshot can be audited and replayed without changing the research library.
 - Rule evidence and explicit abstention reasons are visible; automated classification is not governance approval.
 - Cross-cutting papers cannot be silently forced into whichever rule family happens to be evaluated first.
