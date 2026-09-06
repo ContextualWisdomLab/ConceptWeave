@@ -1252,6 +1252,9 @@ pub struct GoldenSetApproval {
 ///
 /// The supplied approval must already bind the current complete proposal records.
 /// This function validates that binding without creating or renewing authority.
+/// The worksheet must independently match the current proposal identity; changing
+/// approval coordinates cannot refresh an older worksheet. Successful conversion
+/// is still unverified input, not complete-library, full-text or write authority.
 pub fn reviewed_golden_set_from_worksheet(
     report: &ClassificationReport,
     worksheet: &StewardReviewWorksheet,
