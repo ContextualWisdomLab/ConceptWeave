@@ -27,11 +27,9 @@ impl SourceConnectionRegistry for ExactRegistry<'_> {
     ) -> bool {
         source_connection.source_connection_key() == self.source_connection_key
             && source_connection.connection_policy_binding() == TEST_POLICY_BINDING
-            && allowed_schema_names.iter().all(|schema_name| {
-                self.allowed_schema_names
-                    .iter()
-                    .any(|allowed| *allowed == schema_name.as_str())
-            })
+            && allowed_schema_names
+                .iter()
+                .all(|schema_name| self.allowed_schema_names.contains(&schema_name.as_str()))
     }
 
     fn authorizes_resource_envelope(

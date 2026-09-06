@@ -1,10 +1,7 @@
 use std::{
     future::Future,
-    sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    },
-    task::{Context, Poll, Wake, Waker},
+    sync::atomic::{AtomicUsize, Ordering},
+    task::{Context, Poll, Waker},
 };
 
 use conceptweave_source_port::{
@@ -119,30 +116,21 @@ struct CountedObservationPort {
 impl SourceObservationPort for CountedObservationPort {
     type Snapshot = ObservationResourceEnvelope;
 
-    fn observe<'a>(
+    async fn observe<'a>(
         &'a self,
         request: AuthorizedObservationRequest,
         _cancellation: &'a dyn ObservationCancellation,
-    ) -> impl Future<Output = Result<Self::Snapshot, SourceObservationFailure>> + Send + 'a {
-        async move {
-            self.adapter_invocations.fetch_add(1, Ordering::Relaxed);
-            self.source_accesses.fetch_add(1, Ordering::Relaxed);
-            let resource_envelope = request.request().resource_envelope();
-            self.snapshot_constructions.fetch_add(1, Ordering::Relaxed);
-            Ok(resource_envelope)
-        }
+    ) -> Result<Self::Snapshot, SourceObservationFailure> {
+        self.adapter_invocations.fetch_add(1, Ordering::Relaxed);
+        self.source_accesses.fetch_add(1, Ordering::Relaxed);
+        let resource_envelope = request.request().resource_envelope();
+        self.snapshot_constructions.fetch_add(1, Ordering::Relaxed);
+        Ok(resource_envelope)
     }
 }
 
-struct NoopWake;
-
-impl Wake for NoopWake {
-    fn wake(self: Arc<Self>) {}
-}
-
 fn poll_ready<F: Future>(future: F) -> F::Output {
-    let waker = Waker::from(Arc::new(NoopWake));
-    let mut context = Context::from_waker(&waker);
+    let mut context = Context::from_waker(Waker::noop());
     let mut future = std::pin::pin!(future);
 
     match future.as_mut().poll(&mut context) {

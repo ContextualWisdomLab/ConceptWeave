@@ -4,7 +4,7 @@ use std::{
         Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
     },
-    task::{Context, Poll, Wake, Waker},
+    task::{Context, Poll, Waker},
 };
 
 use conceptweave_source_port::{
@@ -75,36 +75,27 @@ struct RetargetableAdapter {
 impl SourceObservationPort for RetargetableAdapter {
     type Snapshot = String;
 
-    fn observe<'a>(
+    async fn observe<'a>(
         &'a self,
         request: AuthorizedObservationRequest,
         _cancellation: &'a dyn ObservationCancellation,
-    ) -> impl Future<Output = Result<Self::Snapshot, SourceObservationFailure>> + Send + 'a {
-        async move {
-            let active_binding = *self.active_binding.lock().expect("binding lock");
-            if request.source_connection().connection_policy_binding() != active_binding {
-                return Err(SourceObservationFailure::SourceUnavailable);
-            }
-
-            self.source_accesses.fetch_add(1, Ordering::Relaxed);
-            self.snapshot_constructions.fetch_add(1, Ordering::Relaxed);
-            Ok(format!(
-                "{}:{active_binding}",
-                request.source_connection().source_connection_key()
-            ))
+    ) -> Result<Self::Snapshot, SourceObservationFailure> {
+        let active_binding = *self.active_binding.lock().expect("binding lock");
+        if request.source_connection().connection_policy_binding() != active_binding {
+            return Err(SourceObservationFailure::SourceUnavailable);
         }
+
+        self.source_accesses.fetch_add(1, Ordering::Relaxed);
+        self.snapshot_constructions.fetch_add(1, Ordering::Relaxed);
+        Ok(format!(
+            "{}:{active_binding}",
+            request.source_connection().source_connection_key()
+        ))
     }
 }
 
-struct NoopWake;
-
-impl Wake for NoopWake {
-    fn wake(self: Arc<Self>) {}
-}
-
 fn poll_ready<F: Future>(future: F) -> F::Output {
-    let waker = Waker::from(Arc::new(NoopWake));
-    let mut context = Context::from_waker(&waker);
+    let mut context = Context::from_waker(Waker::noop());
     let mut future = std::pin::pin!(future);
 
     match future.as_mut().poll(&mut context) {

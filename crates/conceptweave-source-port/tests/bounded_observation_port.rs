@@ -1,7 +1,6 @@
 use std::{
     future::Future,
-    sync::Arc,
-    task::{Context, Poll, Wake, Waker},
+    task::{Context, Poll, Waker},
 };
 
 use conceptweave_source_port::{
@@ -295,33 +294,24 @@ struct EchoPort;
 impl SourceObservationPort for EchoPort {
     type Snapshot = String;
 
-    fn observe<'a>(
+    async fn observe<'a>(
         &'a self,
         request: AuthorizedObservationRequest,
         cancellation: &'a dyn ObservationCancellation,
-    ) -> impl Future<Output = Result<Self::Snapshot, SourceObservationFailure>> + Send + 'a {
-        async move {
-            if cancellation.is_cancelled() {
-                return Err(SourceObservationFailure::Cancelled);
-            }
-            Ok(format!(
-                "{}:{}",
-                request.source_connection().source_connection_key(),
-                request.source_connection().connection_policy_binding()
-            ))
+    ) -> Result<Self::Snapshot, SourceObservationFailure> {
+        if cancellation.is_cancelled() {
+            return Err(SourceObservationFailure::Cancelled);
         }
+        Ok(format!(
+            "{}:{}",
+            request.source_connection().source_connection_key(),
+            request.source_connection().connection_policy_binding()
+        ))
     }
 }
 
-struct NoopWake;
-
-impl Wake for NoopWake {
-    fn wake(self: Arc<Self>) {}
-}
-
 fn poll_ready<F: Future>(future: F) -> F::Output {
-    let waker = Waker::from(Arc::new(NoopWake));
-    let mut context = Context::from_waker(&waker);
+    let mut context = Context::from_waker(Waker::noop());
     let mut future = std::pin::pin!(future);
 
     match future.as_mut().poll(&mut context) {

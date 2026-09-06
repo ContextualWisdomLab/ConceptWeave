@@ -1,10 +1,7 @@
 use std::{
     future::Future,
-    sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    },
-    task::{Context, Poll, Wake, Waker},
+    sync::atomic::{AtomicUsize, Ordering},
+    task::{Context, Poll, Waker},
     thread,
     time::Duration,
 };
@@ -93,32 +90,23 @@ struct CountedObservationPort {
 impl SourceObservationPort for CountedObservationPort {
     type Snapshot = Duration;
 
-    fn observe<'a>(
+    async fn observe<'a>(
         &'a self,
         request: AuthorizedObservationRequest,
         _cancellation: &'a dyn ObservationCancellation,
-    ) -> impl Future<Output = Result<Self::Snapshot, SourceObservationFailure>> + Send + 'a {
-        async move {
-            self.adapter_invocations.fetch_add(1, Ordering::Relaxed);
-            let Some(remaining) = request.remaining_operation_budget() else {
-                return Err(SourceObservationFailure::OperationTimeout);
-            };
-            self.source_accesses.fetch_add(1, Ordering::Relaxed);
-            self.snapshot_constructions.fetch_add(1, Ordering::Relaxed);
-            Ok(remaining)
-        }
+    ) -> Result<Self::Snapshot, SourceObservationFailure> {
+        self.adapter_invocations.fetch_add(1, Ordering::Relaxed);
+        let Some(remaining) = request.remaining_operation_budget() else {
+            return Err(SourceObservationFailure::OperationTimeout);
+        };
+        self.source_accesses.fetch_add(1, Ordering::Relaxed);
+        self.snapshot_constructions.fetch_add(1, Ordering::Relaxed);
+        Ok(remaining)
     }
 }
 
-struct NoopWake;
-
-impl Wake for NoopWake {
-    fn wake(self: Arc<Self>) {}
-}
-
 fn poll_ready<F: Future>(future: F) -> F::Output {
-    let waker = Waker::from(Arc::new(NoopWake));
-    let mut context = Context::from_waker(&waker);
+    let mut context = Context::from_waker(Waker::noop());
     let mut future = std::pin::pin!(future);
 
     match future.as_mut().poll(&mut context) {
