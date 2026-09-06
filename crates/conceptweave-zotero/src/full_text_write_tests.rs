@@ -623,6 +623,7 @@ fn write_scope_fixture(
         library_version: report.library_version,
         rule_revision: report.rule_revision.clone(),
         snapshot_digest: report.snapshot_digest.clone(),
+        proposal_digest: crate::classification_proposal_digest(report),
         snapshot_items: report.snapshot_items.clone(),
         changes: report
             .classified_items
