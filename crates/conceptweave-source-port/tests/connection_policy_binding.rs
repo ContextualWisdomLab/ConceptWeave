@@ -77,7 +77,7 @@ impl SourceObservationPort for RetargetableAdapter {
 
     fn observe<'a>(
         &'a self,
-        request: &'a AuthorizedObservationRequest,
+        request: AuthorizedObservationRequest,
         _cancellation: &'a dyn ObservationCancellation,
     ) -> impl Future<Output = Result<Self::Snapshot, SourceObservationFailure>> + Send + 'a {
         async move {
@@ -145,7 +145,7 @@ fn stale_connection_policy_binding_fails_before_source_or_snapshot_side_effects(
     };
 
     assert_eq!(
-        poll_ready(adapter.observe(&authorized, &Cancellation)),
+        poll_ready(adapter.observe(authorized, &Cancellation)),
         Err(SourceObservationFailure::SourceUnavailable),
         "an authorization issued for policy revision A must not silently retarget to revision B"
     );
@@ -169,7 +169,7 @@ fn unchanged_connection_policy_binding_executes_exactly_once() {
     };
 
     assert_eq!(
-        poll_ready(adapter.observe(&authorized, &Cancellation)),
+        poll_ready(adapter.observe(authorized, &Cancellation)),
         Ok("grc_readonly_connection:policy_revision_a".to_owned())
     );
     assert_eq!(adapter.source_accesses.load(Ordering::Relaxed), 1);
