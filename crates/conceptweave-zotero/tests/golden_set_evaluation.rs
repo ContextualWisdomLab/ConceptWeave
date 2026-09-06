@@ -81,6 +81,45 @@ fn complete_review_requires_one_steward_label_per_bibliographic_item() {
 }
 
 #[test]
+fn complete_review_rejects_pending_sources_without_blocking_sampled_evaluation() {
+    use std::cell::Cell;
+
+    for parent_key in ["", "missing", "A"] {
+        let mut source_item = item("source", "synthetic attachment");
+        source_item.data.item_type = "attachment".into();
+        source_item.data.parent_item = parent_key.into();
+        let report = classify_snapshot(
+            "9.0.6".into(),
+            None,
+            42,
+            vec![item("A", "ontology learning"), source_item],
+        );
+        let mut reviewed = golden(vec![GoldenLabel::new("A", Disposition::Generation)]);
+        reviewed.approval.snapshot_digest = classification_snapshot_digest(&report);
+        reviewed.approval.proposal_digest = classification_proposal_digest(&report);
+        reviewed.approval.snapshot_items = report.snapshot_items.clone();
+        let issued_review = reviewed.clone();
+        assert!(
+            evaluate_reviewed_golden_set(&report, &reviewed, |value| { value == &issued_review })
+                .is_ok()
+        );
+
+        let verifier_calls = Cell::new(0);
+        let result = evaluate_complete_reviewed_classification(&report, &reviewed, |value| {
+            verifier_calls.set(verifier_calls.get() + 1);
+            value == &issued_review
+        });
+        if parent_key == "A" {
+            assert_eq!(result.unwrap().reviewed_count, 1);
+            assert_eq!(verifier_calls.get(), 1);
+        } else {
+            assert_eq!(result, Err(EvaluationError::IncompleteReview));
+            assert_eq!(verifier_calls.get(), 0);
+        }
+    }
+}
+
+#[test]
 fn invalid_local_review_never_reaches_the_approval_verifier() {
     use std::cell::Cell;
 
