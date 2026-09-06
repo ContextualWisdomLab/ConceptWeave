@@ -41,6 +41,7 @@ fn transitive_duplicate_component_accepts_one_component_level_canonical_key() {
         library_version: report.library_version,
         rule_revision: report.rule_revision.into(),
         snapshot_digest: report.snapshot_digest.clone(),
+        proposal_digest: conceptweave_zotero::classification_proposal_digest(&report),
         snapshot_items: report.snapshot_items.clone(),
         duplicate_candidates: report.duplicate_candidates.clone(),
         decisions: report
@@ -97,6 +98,7 @@ fn duplicate_review_rejects_blank_snapshot_item_identity() {
         library_version: report.library_version,
         rule_revision: report.rule_revision.into(),
         snapshot_digest: report.snapshot_digest.clone(),
+        proposal_digest: conceptweave_zotero::classification_proposal_digest(&report),
         snapshot_items: report.snapshot_items.clone(),
         duplicate_candidates: report.duplicate_candidates.clone(),
         decisions: vec![DuplicateMergeDecision {
@@ -138,6 +140,7 @@ fn duplicate_review_binds_every_item_revision_to_the_reviewed_snapshot() {
         library_version: report.library_version,
         rule_revision: report.rule_revision.into(),
         snapshot_digest: report.snapshot_digest.clone(),
+        proposal_digest: conceptweave_zotero::classification_proposal_digest(&report),
         snapshot_items: report.snapshot_items.clone(),
         duplicate_candidates: report.duplicate_candidates.clone(),
         decisions: report
