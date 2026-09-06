@@ -3,6 +3,41 @@ use conceptweave_zotero::{
     WriteMode, WritePlanError, ZoteroItem, build_classification_write_plan, classify_snapshot,
 };
 
+#[test]
+fn write_scope_rejects_changed_evidence_before_authority() {
+    let mut report = classification_report("10.0.1");
+    let review = reviewed(&report);
+    report.classified_items[0].title.push_str(" changed evidence");
+    let called = std::cell::Cell::new(false);
+    let result = build_classification_write_plan(&report, &review, WriteMode::DryRun, |_| {
+        called.set(true);
+        true
+    });
+    assert_eq!(result, Err(WritePlanError::SnapshotMismatch));
+    assert!(!called.get());
+}
+
+#[test]
+fn write_scope_rejects_inconsistent_inventory_before_authority() {
+    for mutation in ["count", "pending", "audit"] {
+        let mut report = classification_report("10.0.1");
+        match mutation {
+            "count" => report.observed_item_count += 1,
+            "pending" => report.pending_source_item_keys.push("absent".into()),
+            "audit" => report.audit_summary.failure_count += 1,
+            _ => unreachable!(),
+        }
+        let review = reviewed(&report);
+        let called = std::cell::Cell::new(false);
+        let result = build_classification_write_plan(&report, &review, WriteMode::DryRun, |_| {
+            called.set(true);
+            true
+        });
+        assert_eq!(result, Err(WritePlanError::InvalidReview), "{mutation}");
+        assert!(!called.get(), "{mutation}");
+    }
+}
+
 fn tag(name: &str, tag_type: Option<u64>) -> ItemTag {
     ItemTag {
         tag: name.into(),
