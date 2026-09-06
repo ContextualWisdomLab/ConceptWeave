@@ -170,6 +170,19 @@ pub struct ClassificationReport {
     pub observed_item_count: usize,
     /// One proposal for every top-level bibliographic item.
     pub classified_items: Vec<ClassifiedItem>,
+    /// Metadata for every remaining record, sorted by its original key.
+    ///
+    /// Together with `classified_items`, this accounts for all observed items.
+    /// Notes, attachments and annotations remain evidence, not paper proposals.
+    /// Only the fields represented by `ItemData` are retained; this is not a
+    /// full-text capture or a lossless copy of the provider's original JSON.
+    pub unclassified_items: Vec<ZoteroItem>,
+    /// Sorted keys whose parent chain does not reach a bibliographic proposal.
+    ///
+    /// Standalone sources, their descendants, orphan trees and cycles remain
+    /// pending. An empty list proves only parent-link accounting for this input,
+    /// never research completion, semantic approval or permission to write.
+    pub pending_source_item_keys: Vec<String>,
     /// Reversible DOI/title duplicate candidates.
     pub duplicate_candidates: Vec<DuplicateCandidate>,
 }
@@ -473,10 +486,30 @@ pub fn classify_snapshot(
     let bibliographic: Vec<&ZoteroItem> =
         items.iter().filter(|item| is_bibliographic(item)).collect();
     let duplicate_candidates = duplicate_candidates(&bibliographic);
-    let classified_items = bibliographic
+    let classified_items: Vec<_> = bibliographic
         .into_iter()
         .map(|item| classify_item(item, children.get(&item.key).cloned().unwrap_or_default()))
         .collect();
+    let observed_item_count = items.len();
+    let unclassified_items: Vec<_> = items
+        .into_iter()
+        .filter(|item| !is_bibliographic(item))
+        .collect();
+    let mut pending_source_item_keys: BTreeSet<_> = unclassified_items
+        .iter()
+        .map(|item| item.key.clone())
+        .collect();
+    let mut parent_item_keys: Vec<_> = classified_items
+        .iter()
+        .map(|item| item.item_key.clone())
+        .collect();
+    while let Some(parent_item_key) = parent_item_keys.pop() {
+        for child_item_key in children.get(&parent_item_key).into_iter().flatten() {
+            if pending_source_item_keys.remove(child_item_key) {
+                parent_item_keys.push(child_item_key.clone());
+            }
+        }
+    }
 
     ClassificationReport {
         zotero_version,
@@ -485,8 +518,10 @@ pub fn classify_snapshot(
         server_id,
         library_version,
         rule_revision: RULE_REVISION,
-        observed_item_count: items.len(),
+        observed_item_count,
         classified_items,
+        unclassified_items,
+        pending_source_item_keys: pending_source_item_keys.into_iter().collect(),
         duplicate_candidates,
     }
 }
