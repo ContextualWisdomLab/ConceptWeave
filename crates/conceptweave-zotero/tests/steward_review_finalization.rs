@@ -358,7 +358,7 @@ fn finalization_rejects_stale_worksheet_even_with_current_approval_coordinates()
         match changed_field {
             0 => report.classified_items[0].title.push_str(" changed"),
             1 => report.classified_items[0].evidence.field_values.clear(),
-            _ => report.classified_items[0].review_abstract_note = Some("changed context".into()),
+            _ => report.classified_items[1].review_abstract_note = Some("changed context".into()),
         }
         let current_receipt = approval(&report, &worksheet);
         assert_eq!(
