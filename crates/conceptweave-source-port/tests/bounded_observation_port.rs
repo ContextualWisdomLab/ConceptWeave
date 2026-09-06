@@ -132,6 +132,34 @@ fn request_preserves_exact_source_reference_and_canonicalizes_allowlist_only_by_
 }
 
 #[test]
+fn cumulative_schema_bytes_admit_exact_utf8_boundary_and_reject_one_byte_over() {
+    for schema_names in [["a", "b"], ["감사", "기록"]] {
+        let total_bytes = schema_names.iter().map(|name| name.len()).sum::<usize>();
+        for maximum in [total_bytes - 1, total_bytes] {
+            let result = ObservationRequest::new(
+                "grc_readonly_connection",
+                schema_names.map(str::to_owned).to_vec(),
+                ObservationRequestBudget::new(2, maximum).unwrap(),
+                limits(),
+            );
+            if maximum == total_bytes {
+                assert!(
+                    result.is_ok(),
+                    "the exact UTF-8 byte boundary remains valid"
+                );
+            } else {
+                assert_eq!(
+                    result,
+                    Err(ObservationRequestError::SchemaByteLimitExceeded {
+                        max_schema_bytes: maximum
+                    })
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn request_rejects_non_registry_source_connection_keys_before_adapter_access() {
     for source_connection_key in [
         "postgres://reader:secret@example.invalid/database",

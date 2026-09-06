@@ -162,3 +162,22 @@ fn elapsed_budget_takes_precedence_after_a_slow_unknown_registry_lookup() {
         Err(ObservationRequestError::OperationTimeout)
     );
 }
+
+#[test]
+fn expired_capability_cannot_restart_the_budget_before_source_access() {
+    let port = CountedObservationPort::default();
+    let authorized = request(250)
+        .authorize(&DelayedRegistry {
+            delay: Duration::ZERO,
+        })
+        .expect("authorization starts with an available operation budget");
+    thread::sleep(Duration::from_millis(250));
+
+    assert_eq!(
+        poll_ready(port.observe(authorized, &Cancellation)),
+        Err(SourceObservationFailure::OperationTimeout)
+    );
+    assert_eq!(port.adapter_invocations.load(Ordering::Relaxed), 1);
+    assert_eq!(port.source_accesses.load(Ordering::Relaxed), 0);
+    assert_eq!(port.snapshot_constructions.load(Ordering::Relaxed), 0);
+}

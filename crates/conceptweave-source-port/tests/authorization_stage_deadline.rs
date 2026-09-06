@@ -150,6 +150,61 @@ fn expired_source_lookup_stops_before_later_registry_policy_stages() {
     assert_eq!(registry.resource_calls.load(Ordering::Relaxed), 0);
 }
 
+struct SlowResourceRegistry {
+    policy_result: bool,
+    resource_calls: AtomicUsize,
+}
+
+impl SourceConnectionRegistry for SlowResourceRegistry {
+    fn contains_source_connection(&self, source_connection_key: &str) -> bool {
+        source_connection_key == SOURCE_KEY
+    }
+
+    fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
+        (source_connection_key == SOURCE_KEY).then(|| POLICY_BINDING.to_owned())
+    }
+
+    fn authorizes_schema_scope(
+        &self,
+        source_connection: &ResolvedSourceConnection,
+        allowed_schema_names: &[String],
+    ) -> bool {
+        assert_eq!(
+            source_connection.connection_policy_binding(),
+            POLICY_BINDING
+        );
+        assert_eq!(allowed_schema_names, ["governance_core"]);
+        true
+    }
+
+    fn authorizes_resource_envelope(
+        &self,
+        source_connection: &ResolvedSourceConnection,
+        resource_envelope: ObservationResourceEnvelope,
+    ) -> bool {
+        assert_eq!(source_connection.source_connection_key(), SOURCE_KEY);
+        assert_eq!(resource_envelope.limits().operation_timeout_ms(), 50);
+        self.resource_calls.fetch_add(1, Ordering::Relaxed);
+        thread::sleep(Duration::from_millis(60));
+        self.policy_result
+    }
+}
+
+#[test]
+fn expired_resource_policy_takes_precedence_over_allow_and_deny_results() {
+    for policy_result in [false, true] {
+        let registry = SlowResourceRegistry {
+            policy_result,
+            resource_calls: AtomicUsize::new(0),
+        };
+        assert_eq!(
+            request(50).authorize(&registry),
+            Err(ObservationRequestError::OperationTimeout)
+        );
+        assert_eq!(registry.resource_calls.load(Ordering::Relaxed), 1);
+    }
+}
+
 #[test]
 fn expired_binding_lookup_stops_before_schema_and_resource_policy_stages() {
     let registry = SlowBindingRegistry::default();

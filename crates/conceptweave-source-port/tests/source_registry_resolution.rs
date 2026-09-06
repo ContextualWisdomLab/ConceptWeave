@@ -89,3 +89,26 @@ fn known_source_without_a_safe_immutable_policy_binding_fails_closed() {
         "a policy binding is an opaque identifier and must not become a DSN or credential carrier"
     );
 }
+
+#[test]
+fn execution_authorization_rejects_missing_or_unsafe_policy_bindings() {
+    for (registry, expected_error) in [
+        (
+            &KeyOnlyRegistry as &dyn SourceConnectionRegistry,
+            ObservationRequestError::MissingConnectionPolicyBinding,
+        ),
+        (
+            &BlankBindingRegistry,
+            ObservationRequestError::InvalidConnectionPolicyBinding,
+        ),
+        (
+            &ConnectionMaterialBindingRegistry,
+            ObservationRequestError::InvalidConnectionPolicyBinding,
+        ),
+    ] {
+        assert_eq!(
+            request("grc_readonly_connection").authorize(registry),
+            Err(expected_error)
+        );
+    }
+}

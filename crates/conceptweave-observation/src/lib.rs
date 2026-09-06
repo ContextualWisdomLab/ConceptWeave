@@ -376,20 +376,28 @@ mod internal_model_tests {
 
     #[test]
     fn internal_snapshot_model_rejects_noncanonical_digest_input() {
-        let error = model::PostgresSchemaSnapshot::new(
-            &resolved_source(),
-            "not-a-digest",
-            "postgres_introspector_v1",
-            "2026-09-05T03:30:00Z",
-            Vec::new(),
-        )
-        .expect_err("the private storage model must still fail closed on malformed digest input");
-
-        assert_eq!(
-            error,
-            model::ObservationError::InvalidObservationField {
-                field: "snapshot_digest"
-            }
-        );
+        for digest_input in [
+            "not-a-digest".to_owned(),
+            format!("SHA256:{}", "a".repeat(64)),
+            format!("sha256:{}", "A".repeat(64)),
+            format!("sha256:{}", "g".repeat(64)),
+        ] {
+            let error = model::PostgresSchemaSnapshot::new(
+                &resolved_source(),
+                digest_input,
+                "postgres_introspector_v1",
+                "2026-09-05T03:30:00Z",
+                Vec::new(),
+            )
+            .expect_err(
+                "the private storage model must still fail closed on malformed digest input",
+            );
+            assert_eq!(
+                error,
+                model::ObservationError::InvalidObservationField {
+                    field: "snapshot_digest"
+                }
+            );
+        }
     }
 }
