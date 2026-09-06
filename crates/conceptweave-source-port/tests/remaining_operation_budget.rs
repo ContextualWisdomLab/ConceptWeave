@@ -96,7 +96,7 @@ impl SourceObservationPort for CountedObservationPort {
 
     fn observe<'a>(
         &'a self,
-        request: &'a AuthorizedObservationRequest,
+        request: AuthorizedObservationRequest,
         _cancellation: &'a dyn ObservationCancellation,
     ) -> impl Future<Output = Result<Self::Snapshot, SourceObservationFailure>> + Send + 'a {
         async move {
@@ -137,7 +137,7 @@ fn registry_authorization_consumes_the_same_operation_budget_seen_by_the_adapter
         })
         .expect("authorization must complete inside the operation budget");
 
-    let remaining = poll_ready(port.observe(&authorized, &Cancellation))
+    let remaining = poll_ready(port.observe(authorized, &Cancellation))
         .expect("adapter must receive the unexpired remainder");
 
     assert!(remaining <= Duration::from_millis(230));
