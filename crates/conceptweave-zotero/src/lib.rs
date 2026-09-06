@@ -208,6 +208,19 @@ pub struct ClassificationReport {
     pub snapshot_digest: String,
     /// One proposal for every top-level bibliographic item.
     pub classified_items: Vec<ClassifiedItem>,
+    /// Metadata for every remaining record, sorted by its original key.
+    ///
+    /// Together with `classified_items`, this accounts for all observed items.
+    /// Notes, attachments and annotations remain evidence, not paper proposals.
+    /// Only the fields represented by `ItemData` are retained; this is not a
+    /// full-text capture or a lossless copy of the provider's original JSON.
+    pub unclassified_items: Vec<ZoteroItem>,
+    /// Sorted keys whose parent chain does not reach a bibliographic proposal.
+    ///
+    /// Standalone sources, their descendants, orphan trees and cycles remain
+    /// pending. An empty list proves only parent-link accounting for this input,
+    /// never research completion, semantic approval or permission to write.
+    pub pending_source_item_keys: Vec<String>,
     /// Reversible DOI/title duplicate candidates.
     pub duplicate_candidates: Vec<DuplicateCandidate>,
 }
@@ -702,6 +715,13 @@ fn read_snapshot_with_clock(
             page.body_bytes,
             page.total,
         )?;
+        if page
+            .items
+            .iter()
+            .any(|item| item.key.trim().is_empty() || item.version > page.library_version)
+        {
+            return Err(ReadError::SnapshotChanged);
+        }
         items.extend(page.items);
         snapshot_bytes = next_snapshot_bytes;
         debug_assert_eq!(items.len(), next_item_count);
@@ -781,14 +801,33 @@ pub fn classify_snapshot(
     let snapshot_bytes = serde_json::to_vec(&(SNAPSHOT_DIGEST_DOMAIN, snapshot_records))
         .expect("Zotero snapshot items contain only JSON-compatible values");
     let snapshot_digest = format!("sha256:{:x}", Sha256::digest(snapshot_bytes));
-    let children = child_index(&items);
+    let mut children = child_index(&items);
     let bibliographic: Vec<&ZoteroItem> =
         items.iter().filter(|item| is_bibliographic(item)).collect();
     let duplicate_candidates = duplicate_candidates(&bibliographic);
-    let classified_items = bibliographic
+    let classified_items: Vec<_> = bibliographic
         .into_iter()
         .map(|item| classify_item(item, children.get(&item.key).cloned().unwrap_or_default()))
         .collect();
+    let observed_item_count = items.len();
+    let unclassified_items: Vec<_> = items
+        .into_iter()
+        .filter(|item| !is_bibliographic(item))
+        .collect();
+    let mut pending_source_item_keys: BTreeSet<_> = unclassified_items
+        .iter()
+        .map(|item| item.key.clone())
+        .collect();
+    let mut parent_item_keys: Vec<_> = classified_items
+        .iter()
+        .map(|item| item.item_key.clone())
+        .collect();
+    while let Some(parent_item_key) = parent_item_keys.pop() {
+        for child_item_key in children.remove(&parent_item_key).unwrap_or_default() {
+            pending_source_item_keys.remove(&child_item_key);
+            parent_item_keys.push(child_item_key);
+        }
+    }
 
     ClassificationReport {
         zotero_version,
@@ -797,10 +836,12 @@ pub fn classify_snapshot(
         server_id,
         library_version,
         rule_revision: RULE_REVISION,
-        observed_item_count: items.len(),
+        observed_item_count,
         snapshot_items,
         snapshot_digest,
         classified_items,
+        unclassified_items,
+        pending_source_item_keys: pending_source_item_keys.into_iter().collect(),
         duplicate_candidates,
     }
 }
@@ -1205,6 +1246,56 @@ mod tests {
     }
 
     #[test]
+    fn reader_rejects_future_item_revisions_before_another_page() {
+        for item_type in ["book", "attachment", "note", "annotation"] {
+            for invalid_start in [0, 1] {
+                let mut starts = Vec::new();
+                let result = read_snapshot_with(&mut |start| {
+                    starts.push(start);
+                    let mut observed = item(&format!("I{start}"), "book", "x", "", "");
+                    observed.version = 42;
+                    let mut page_items = vec![observed];
+                    if start == invalid_start {
+                        let mut future = item(&format!("I{}", start + 1), item_type, "x", "", "");
+                        future.version = 43;
+                        page_items.push(future);
+                    }
+                    Ok(fetched_page(4, page_items))
+                });
+                assert!(matches!(result, Err(ReadError::SnapshotChanged)));
+                assert_eq!(
+                    starts,
+                    if invalid_start == 0 {
+                        vec![0]
+                    } else {
+                        vec![0, 1]
+                    }
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn reader_preserves_item_revisions_within_the_library_version() {
+        for zotero_version in ["9.0.6", "10.0.1"] {
+            for (library_version, item_version) in
+                [(0, 0), (42, 0), (42, 41), (42, 42), (u64::MAX, u64::MAX)]
+            {
+                let mut observed = item("A", "book", "semantic web", "", "");
+                observed.version = item_version;
+                let mut page = fetched_page(1, vec![observed]);
+                page.library_version = library_version;
+                page.zotero_version = zotero_version.into();
+                let report = read_snapshot_with(&mut |_| Ok(page.clone())).unwrap();
+                assert_eq!(report.library_version, library_version);
+                assert_eq!(report.observed_item_count, 1);
+                assert_eq!(report.classified_items.len(), 1);
+                assert_eq!(report.classified_items[0].item_version, item_version);
+            }
+        }
+    }
+
+    #[test]
     fn reader_core_paginates_and_preserves_one_snapshot_contract() {
         let mut pages = vec![
             fetched_page(2, vec![item("A", "book", "ontology quality", "", "")]),
@@ -1329,6 +1420,142 @@ mod tests {
             checked_snapshot_usage(1, 1, 0, 1, 1),
             Err(ReadError::SnapshotChanged)
         ));
+    }
+
+    #[test]
+    fn reader_rejects_blank_source_identity_before_another_page() {
+        for blank_key in ["", " ", "\t\n"] {
+            for invalid_start in [0, 1] {
+                let mut starts = Vec::new();
+                let result = read_snapshot_with(&mut |start| {
+                    starts.push(start);
+                    let key = if start == invalid_start {
+                        blank_key.to_owned()
+                    } else {
+                        format!("A{start}")
+                    };
+                    Ok(fetched_page(3, vec![item(&key, "attachment", "", "", "")]))
+                });
+                assert!(matches!(result, Err(ReadError::SnapshotChanged)));
+                assert_eq!(
+                    starts,
+                    if invalid_start == 0 {
+                        vec![0]
+                    } else {
+                        vec![0, 1]
+                    }
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn source_inventory_retains_standalone_and_nested_metadata_without_proposals() {
+        let mut standalone = item("A", "attachment", "Ontology Learning", "10.1/X", "");
+        standalone.version = 0;
+        standalone.data.collections = vec!["COLLECTION".into()];
+        standalone.data.tags = vec![ItemTag {
+            tag: "Evidence".into(),
+        }];
+        let report = read_snapshot_with(&mut |_| {
+            Ok(fetched_page(
+                6,
+                vec![
+                    item("F", "annotation", "", "", "C"),
+                    item("E", "note", "", "", ""),
+                    item("D", "annotation", "", "", "A"),
+                    item("C", "attachment", "", "", "B"),
+                    item("B", "book", "Ontology Learning", "10.1/X", ""),
+                    standalone.clone(),
+                ],
+            ))
+        })
+        .unwrap();
+        let serialized = serde_json::to_value(&report).unwrap();
+        assert_eq!(
+            serialized["pending_source_item_keys"],
+            serde_json::json!(["A", "D", "E"])
+        );
+        let inventory = serialized["unclassified_items"]
+            .as_array()
+            .expect("every excluded source must survive in the report");
+        assert_eq!(
+            inventory
+                .iter()
+                .map(|entry| entry["key"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            ["A", "C", "D", "E", "F"]
+        );
+        assert_eq!(inventory[0]["version"], 0);
+        assert_eq!(inventory[0]["data"]["title"], "Ontology Learning");
+        assert_eq!(
+            inventory[0]["data"]["collections"],
+            serde_json::json!(["COLLECTION"])
+        );
+        assert_eq!(
+            inventory[0]["data"]["tags"],
+            serde_json::json!([{"tag":"Evidence"}])
+        );
+        assert_eq!(inventory[4]["data"]["parentItem"], "C");
+        assert_eq!(report.observed_item_count, 6);
+        assert_eq!(report.classified_items.len(), 1);
+        assert_eq!(report.classified_items[0].item_key, "B");
+        assert_eq!(report.classified_items[0].child_item_keys, ["C"]);
+        assert!(report.duplicate_candidates.is_empty());
+    }
+
+    #[test]
+    fn source_inventory_keeps_orphans_cycles_and_unattached_annotations_pending() {
+        let sources = vec![
+            item("A", "book", "", "", ""),
+            item("B", "note", "", "", "missing"),
+            item("C", "attachment", "", "", "B"),
+            item("D", "note", "", "", "E"),
+            item("E", "attachment", "", "", "D"),
+            item("F", "annotation", "", "", "F"),
+            item("G", "annotation", "", "", ""),
+        ];
+        let forward =
+            serde_json::to_value(classify_snapshot("10".into(), None, 42, sources.clone()))
+                .unwrap();
+        let reverse = serde_json::to_value(classify_snapshot(
+            "10".into(),
+            None,
+            42,
+            sources.into_iter().rev().collect(),
+        ))
+        .unwrap();
+        assert_eq!(
+            forward["pending_source_item_keys"],
+            serde_json::json!(["B", "C", "D", "E", "F", "G"])
+        );
+        assert_eq!(forward, reverse);
+        assert_eq!(forward["unclassified_items"].as_array().unwrap().len(), 6);
+    }
+
+    #[test]
+    fn source_inventory_distinguishes_empty_and_fully_linked_evidence() {
+        for sources in [
+            vec![],
+            vec![item("A", "book", "", "", "")],
+            vec![
+                item("A", "book", "", "", ""),
+                item("B", "attachment", "", "", "A"),
+                item("C", "annotation", "", "", "B"),
+            ],
+        ] {
+            let serialized =
+                serde_json::to_value(classify_snapshot("10".into(), None, 42, sources)).unwrap();
+            assert_eq!(
+                serialized["pending_source_item_keys"],
+                serde_json::json!([])
+            );
+            assert_eq!(
+                serialized["observed_item_count"].as_u64().unwrap() as usize,
+                serialized["classified_items"].as_array().unwrap().len()
+                    + serialized["unclassified_items"].as_array().unwrap().len()
+            );
+        }
     }
 
     #[test]
