@@ -40,6 +40,11 @@ Validate syntax, identifiers, relationship cardinality, mapping completeness, du
 
 ### FR-5 Governed review
 
+When a write response is lost, show the affected item as unresolved even if a
+later read looks unchanged or matches the requested result. Preserve what was
+submitted and what was later observed, keep confirmed earlier results, and do not
+automatically repeat or undo the uncertain change.
+
 Research changes must use the evidence actually reviewed. Changed supporting
 metadata or incomplete source inventories must stop a change plan before approval
 is consumed. Older reviews lacking this evidence binding require fresh independent
@@ -71,7 +76,9 @@ Read a complete Zotero Local API observation with one consistent library version
 
 For every connected duplicate component, accept externally verified steward decisions selecting one component-level canonical item. Produce a local-only manifest that binds decisions to the raw snapshot, complete item revisions, exact duplicate membership, current proposals and retained source metadata. Reject missing or inconsistent source inventory and invalid decisions before requesting approval. Changed retained evidence requires fresh independent approval, even when duplicate members are unchanged. Record every component source revision plus before, after, and rollback canonical-key mappings. Classification preserves every Zotero source record.
 
-Reviewed collection and tag changes default to a local dry-run plan. Each operation binds the authority receipt, server/library/item revisions, raw-snapshot digest, and complete before/after/rollback metadata. Zotero 9 execute requests fail closed. No plan contains credentials or permits `NeedsStewardReview`, source-record deletion, or attachment deletion.
+Reviewed collection and tag changes default to a local dry-run plan. Each operation binds the authority receipt, server/library/item revisions, raw-snapshot digest, and complete before/after/rollback metadata. Execution-critical plan state is immutable outside the owner crate, so callers cannot turn a dry run into execution or alter validated operations. Zotero 9 execute requests fail closed. No plan contains credentials or permits `NeedsStewardReview`, source-record deletion, or attachment deletion.
+
+For execute-mode plans, the runtime must preflight every item before the first write, stop at the first failed or unverifiable response, reconcile that item through the same server before declaring its state, and emit a secret-free receipt bound to the exact reviewed plan coordinates. Dry-run receipts enumerate every planned item as untouched. Execution receipts identify verified writes, the failed item, any indeterminate item, untouched items, and reverse-ordered rollback operations bound to proven post-write item revisions, including an identity- and version-confirmed unexpected mutation. Cross-item atomicity is not claimed.
 
 Evaluate classifier quality only against a steward-reviewed local golden set whose governance receipt is externally verified and binds both the complete source/classifier-input snapshot and every current proposal field, in addition to the item-key/item-version coordinates. Same-version changes to unmodeled provider metadata, absent/default fields, classifier inputs, predictions or supporting evidence must invalidate the corresponding binding. Evaluation recomputes proposal identity before contacting governance; a locally changed digest cannot renew an approval. Legacy unbound approvals require reissuance, never automatic backfill. Abstention is a prediction outcome, never an approved truth label. Evaluation emits the verified library revision, rule revision, opaque snapshot and proposal digests, and aggregate counts for exact matches, abstentions, and per-disposition true-positive/predicted/expected totals; it must not copy Zotero keys, reviewer identity, or bibliographic text into the result.
 Every successful classification report includes aggregate evidence for snapshot coverage, proposal coverage, provenance completeness, abstentions, duplicate candidates, disposition totals, and zero unreported failures.

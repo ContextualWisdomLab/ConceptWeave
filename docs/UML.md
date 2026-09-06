@@ -70,5 +70,15 @@ sequenceDiagram
     Intake->>Steward: independently verify complete reviewed set
     Steward-->>Intake: authority result, not a replacement digest
     Intake->>Report: dry-run write plan with exact rollback state
-    Intake-->>Zotero: Zotero 9 execute rejected; no mutation transport
+    Intake-->>Zotero: Zotero 9 execute rejected
+    opt caller supplies authenticated Zotero 10+ adapter
+        Intake->>Zotero: preflight every planned item
+        Zotero-->>Intake: exact server/library/item state
+        loop stop on first failure
+            Intake->>Zotero: conditional complete metadata replacement
+            Zotero-->>Intake: post-write revision and complete state
+        end
+        Intake->>Report: applied/failed/untouched receipt + reverse rollback operations
+        Note over Intake,Report: Failed response stays unknown; retain exact request and observation, no inferred inverse
+    end
 ```
