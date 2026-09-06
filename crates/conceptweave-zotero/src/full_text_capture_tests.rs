@@ -218,6 +218,33 @@ fn capture_rejects_parent_version_status_and_bookend_drift() {
 }
 
 #[test]
+fn manifest_bookends_require_the_bound_library_version_even_after_rehash() {
+    let report = report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let saved = serde_json::to_value(capture).unwrap();
+    for (field, version) in [
+        ("manifest_before", serde_json::Value::Null),
+        ("manifest_before", serde_json::json!(3)),
+        ("manifest_after", serde_json::Value::Null),
+        ("manifest_after", serde_json::json!(3)),
+    ] {
+        let mut restored: FullTextCapture = serde_json::from_value(saved.clone()).unwrap();
+        let value = serde_json::to_value(&restored).unwrap();
+        let mut value = value;
+        value["capture_evidence"][field]["version"] = version;
+        restored = serde_json::from_value(value).unwrap();
+        restored.capture_digest = json_digest(&restored.capture_evidence);
+        assert!(
+            verify_full_text_capture(&restored, &report).is_err(),
+            "{field} accepted an unbound manifest version"
+        );
+    }
+}
+
+#[test]
 fn capture_checks_total_budget_before_another_request() {
     let mut calls = 0;
     assert!(
