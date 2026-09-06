@@ -36,6 +36,19 @@ impl SourceConnectionRegistry for BlankBindingRegistry {
     }
 }
 
+struct ConnectionMaterialBindingRegistry;
+
+impl SourceConnectionRegistry for ConnectionMaterialBindingRegistry {
+    fn contains_source_connection(&self, source_connection_key: &str) -> bool {
+        source_connection_key == "grc_readonly_connection"
+    }
+
+    fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
+        (source_connection_key == "grc_readonly_connection")
+            .then(|| "postgres://reader:secret@example.invalid/database".to_owned())
+    }
+}
+
 fn request(source_connection_key: &str) -> ObservationRequest {
     ObservationRequest::new(
         source_connection_key,
@@ -61,7 +74,7 @@ fn registry_resolution_issues_key_and_policy_binding_only_for_a_registered_sourc
 }
 
 #[test]
-fn known_source_without_an_immutable_policy_binding_fails_closed() {
+fn known_source_without_a_safe_immutable_policy_binding_fails_closed() {
     assert_eq!(
         request("grc_readonly_connection").resolve_source_connection(&KeyOnlyRegistry),
         Err(ObservationRequestError::MissingConnectionPolicyBinding)
@@ -69,5 +82,11 @@ fn known_source_without_an_immutable_policy_binding_fails_closed() {
     assert_eq!(
         request("grc_readonly_connection").resolve_source_connection(&BlankBindingRegistry),
         Err(ObservationRequestError::InvalidConnectionPolicyBinding)
+    );
+    assert_eq!(
+        request("grc_readonly_connection")
+            .resolve_source_connection(&ConnectionMaterialBindingRegistry),
+        Err(ObservationRequestError::InvalidConnectionPolicyBinding),
+        "a policy binding is an opaque identifier and must not become a DSN or credential carrier"
     );
 }
