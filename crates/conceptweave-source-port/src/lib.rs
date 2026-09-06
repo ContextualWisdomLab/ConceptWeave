@@ -449,33 +449,63 @@ impl ObservationRequest {
     /// resource-envelope authorization. The returned execution envelope is the only request type
     /// accepted by [`SourceObservationPort`] and privately retains the monotonic start coordinate so
     /// adapter code can query the remaining budget without receiving wall-clock provenance. If any
-    /// registry work consumes the budget, timeout takes precedence over authorization results.
+    /// registry stage consumes the budget, timeout takes precedence over that stage's authorization
+    /// result and no later registry policy stage is started.
     pub fn authorize(
         self,
         registry: &dyn SourceConnectionRegistry,
     ) -> Result<AuthorizedObservationRequest, ObservationRequestError> {
         let operation_started_at = Instant::now();
-        let source_connection = self.resolve_source_connection(registry);
-        let schema_scope_authorized = source_connection.as_ref().is_ok_and(|resolved| {
-            registry.authorizes_schema_scope(resolved, &self.allowed_schema_names)
-        });
-        let resource_envelope = self.resource_envelope();
-        let resource_envelope_authorized = schema_scope_authorized
-            && source_connection.as_ref().is_ok_and(|resolved| {
-                registry.authorizes_resource_envelope(resolved, resource_envelope)
-            });
-        let elapsed = Instant::now().saturating_duration_since(operation_started_at);
         let operation_timeout = Duration::from_millis(self.limits.operation_timeout_ms);
-        if elapsed >= operation_timeout {
+        let budget_exhausted = || {
+            Instant::now().saturating_duration_since(operation_started_at) >= operation_timeout
+        };
+
+        let source_exists = registry.contains_source_connection(&self.source_connection_key);
+        if budget_exhausted() {
             return Err(ObservationRequestError::OperationTimeout);
         }
-        let source_connection = source_connection?;
+        if !source_exists {
+            return Err(ObservationRequestError::UnknownSourceConnectionKey);
+        }
+
+        let connection_policy_binding =
+            registry.connection_policy_binding(&self.source_connection_key);
+        if budget_exhausted() {
+            return Err(ObservationRequestError::OperationTimeout);
+        }
+        let connection_policy_binding = connection_policy_binding
+            .ok_or(ObservationRequestError::MissingConnectionPolicyBinding)?;
+        if !is_valid_opaque_multiword_identifier(
+            &connection_policy_binding,
+            MAX_CONNECTION_POLICY_BINDING_BYTES,
+        ) {
+            return Err(ObservationRequestError::InvalidConnectionPolicyBinding);
+        }
+        let source_connection = ResolvedSourceConnection {
+            source_connection_key: self.source_connection_key.clone(),
+            connection_policy_binding,
+        };
+
+        let schema_scope_authorized =
+            registry.authorizes_schema_scope(&source_connection, &self.allowed_schema_names);
+        if budget_exhausted() {
+            return Err(ObservationRequestError::OperationTimeout);
+        }
         if !schema_scope_authorized {
             return Err(ObservationRequestError::UnauthorizedSchemaScope);
+        }
+
+        let resource_envelope = self.resource_envelope();
+        let resource_envelope_authorized =
+            registry.authorizes_resource_envelope(&source_connection, resource_envelope);
+        if budget_exhausted() {
+            return Err(ObservationRequestError::OperationTimeout);
         }
         if !resource_envelope_authorized {
             return Err(ObservationRequestError::UnauthorizedResourceEnvelope);
         }
+
         Ok(AuthorizedObservationRequest {
             request: self,
             source_connection,
