@@ -8,6 +8,23 @@ use conceptweave_observation::{
 mod support;
 
 #[test]
+fn snapshot_digest_uses_the_v2_framing_domain() {
+    let snapshot = PostgresSchemaSnapshot::new(
+        &support::resolved_source("warehouse_primary"),
+        "postgres_introspector_v1",
+        "2026-09-05T03:30:00Z",
+        Vec::new(),
+    )
+    .unwrap();
+    // Independent SHA-256 vector: big-endian u64 domain length, UTF-8 v2 domain,
+    // then big-endian u64 zero table count. Existing v1 receipts stay historical.
+    assert_eq!(
+        snapshot.snapshot_digest(),
+        "sha256:81fc16da60127e6574a183cd63077a7136791767240c0868de64b5cbf5bf879e"
+    );
+}
+
+#[test]
 fn unique_null_comparison_evidence_changes_observation_and_snapshot_identity() {
     let unknown =
         UniqueConstraintObservation::new("event_parent_uq", vec!["parent_key".to_owned()]).unwrap();
