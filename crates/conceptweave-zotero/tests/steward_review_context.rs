@@ -35,6 +35,8 @@ fn abstentions_retain_only_the_abstract_needed_for_local_steward_review() {
                 "This abstract must not be copied into review-only context.",
             ),
             item("EMPTY001", "Unmatched title", ""),
+            item("SPACE001", "Unmatched title", " \n\t "),
+            item("CJK00001", "Unmatched title", "地域固有の語彙を調査する。"),
             item(
                 "CONFLICT",
                 "Unmatched title",
@@ -69,6 +71,32 @@ fn abstentions_retain_only_the_abstract_needed_for_local_steward_review() {
         .unwrap();
     assert_eq!(empty.proposed_disposition, Disposition::NeedsStewardReview);
     assert!(empty.review_abstract_note.is_none());
+
+    let whitespace = report
+        .classified_items
+        .iter()
+        .find(|item| item.item_key == "SPACE001")
+        .unwrap();
+    assert!(whitespace.review_abstract_note.is_none());
+    assert!(
+        serde_json::to_value(whitespace)
+            .unwrap()
+            .get("review_abstract_note")
+            .is_none()
+    );
+    let non_english = report
+        .classified_items
+        .iter()
+        .find(|item| item.item_key == "CJK00001")
+        .unwrap();
+    assert_eq!(
+        non_english.proposed_disposition,
+        Disposition::NeedsStewardReview
+    );
+    assert_eq!(
+        non_english.review_abstract_note.as_deref(),
+        Some("地域固有の語彙を調査する。")
+    );
 
     let conflict = report
         .classified_items
@@ -132,6 +160,12 @@ fn changed_review_context_invalidates_prior_approval_before_verification() {
                 panic!("changed review context must fail before governance")
             }),
             Err(EvaluationError::SnapshotMismatch)
+        );
+        let mut rewritten = approved.clone();
+        rewritten.approval.proposal_digest = classification_proposal_digest(&report);
+        assert_eq!(
+            evaluate_reviewed_golden_set(&report, &rewritten, |set| set == &approved),
+            Err(EvaluationError::UnverifiedApproval)
         );
     }
 }
