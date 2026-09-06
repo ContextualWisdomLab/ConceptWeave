@@ -51,7 +51,7 @@ fn reviewed(report: &conceptweave_zotero::ClassificationReport) -> ReviewedDupli
         library_version: report.library_version,
         rule_revision: report.rule_revision.into(),
         snapshot_digest: report.snapshot_digest.clone(),
-        proposal_digest: conceptweave_zotero::classification_proposal_digest(&report),
+        proposal_digest: conceptweave_zotero::classification_proposal_digest(report),
         snapshot_items: report.snapshot_items.clone(),
         duplicate_candidates: report.duplicate_candidates.clone(),
         decisions: vec![
