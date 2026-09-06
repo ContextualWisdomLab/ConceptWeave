@@ -567,7 +567,7 @@ impl ObservationRequest {
     }
 }
 
-/// Registry-authorized request envelope accepted by a concrete source adapter.
+/// Single-use registry-authorized operation capability accepted by a concrete source adapter.
 ///
 /// This value can only be created by [`ObservationRequest::authorize`], which binds the exact
 /// request to the opaque [`ResolvedSourceConnection`] issued by the authorized registry after the
@@ -575,9 +575,12 @@ impl ObservationRequest {
 /// resource envelope against the same immutable connection-policy revision. It also retains a
 /// private monotonic operation-start coordinate so the adapter can cap connection, transaction,
 /// statement and cancellation work by the true remaining budget. Its `Debug` representation
-/// deliberately omits that private coordinate. It carries no connection string, credential, token,
-/// provider-specific connection object, or wall-clock time.
-#[derive(Clone, Eq, PartialEq)]
+/// deliberately omits that private coordinate. The capability is intentionally not `Clone` and is
+/// consumed by [`SourceObservationPort::observe`], so one authorization cannot be replayed to
+/// multiply the policy-admitted row, byte, concurrency, or source-access budget. Retry after
+/// cancellation or failure requires a fresh authorization. It carries no connection string,
+/// credential, token, provider-specific connection object, or wall-clock time.
+#[derive(Eq, PartialEq)]
 pub struct AuthorizedObservationRequest {
     request: ObservationRequest,
     source_connection: ResolvedSourceConnection,
@@ -688,23 +691,26 @@ pub enum SourceObservationFailure {
 
 /// Port implemented by a concrete read-only source adapter.
 ///
-/// Implementations receive only a registry-authorized request whose exact schema scope and complete
-/// provider-independent resource envelope were accepted against the same immutable connection-policy
-/// binding. They resolve credentials from that exact opaque capability inside the adapter ACL, use
-/// only read-only source access, honor the exact schema allowlist, query
-/// [`AuthorizedObservationRequest::remaining_operation_budget`] before adapter-side blocking work,
-/// enforce every policy-admitted [`ObservationLimits`] bound, check caller cancellation, and return
-/// a typed failure rather than a partial or invented snapshot when captured metadata cannot construct
-/// the immutable snapshot. Observation execution is awaitable so asynchronous database clients do not
-/// need to hide a nested executor or block an asynchronous web executor thread.
+/// Implementations receive exactly one registry-authorized operation capability whose exact schema
+/// scope and complete provider-independent resource envelope were accepted against the same
+/// immutable connection-policy binding. `observe` consumes that capability so policy-admitted
+/// per-operation limits cannot be amplified by replaying one authorization. Retry after cancellation
+/// or failure therefore requires a fresh [`ObservationRequest::authorize`] call. Adapters resolve
+/// credentials from the exact opaque capability inside their ACL, use only read-only source access,
+/// honor the exact schema allowlist, query [`AuthorizedObservationRequest::remaining_operation_budget`]
+/// before adapter-side blocking work, enforce every policy-admitted [`ObservationLimits`] bound,
+/// check caller cancellation, and return a typed failure rather than a partial or invented snapshot
+/// when captured metadata cannot construct the immutable snapshot. Observation execution is awaitable
+/// so asynchronous database clients do not need to hide a nested executor or block an asynchronous
+/// web executor thread.
 pub trait SourceObservationPort: Sync {
     /// Immutable snapshot type produced only after a complete bounded observation.
     type Snapshot;
 
-    /// Executes one bounded asynchronous observation after trusted registry policy has issued the source capability.
+    /// Executes one bounded asynchronous observation by consuming its trusted single-use capability.
     fn observe<'a>(
         &'a self,
-        request: &'a AuthorizedObservationRequest,
+        request: AuthorizedObservationRequest,
         cancellation: &'a dyn ObservationCancellation,
     ) -> impl Future<Output = Result<Self::Snapshot, SourceObservationFailure>> + Send + 'a;
 }
