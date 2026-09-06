@@ -120,6 +120,12 @@ GREEN source `f6735b585022aac1c8ceff86c150d9b64fd77ec2` passed 68 tests across 1
 
 ## Alternatives considered
 
+### Proposed review-progress scope amendment — September 7
+
+PR30 exposes incremental local progress and extracts shared worksheet comparison. Normal merge `7251238` inherits repaired source identity, finalization and private input boundaries while preserving the child's coverage improvements. The extracted comparator omitted the required proposal digest, allowing old worksheet progress after changed content. RED `4099434` compiled with one passing and two failing tests: blank binding was admitted and pending/content identity fields were missing. `bee32f4` adds one shared digest comparison and includes the opaque proposal binding and pending count in existing aggregate output. `b2b0ef4` verifies one filled paper decision plus an unresolved source stays incomplete, preserving bibliographic counts and excluding the private source key.
+
+We reject snapshot-only identity because restored proposal and retained metadata can change under that coordinate. We reject treating nonbibliographic sources as paper decisions because their disposition is not inferred truth. We report both scopes, require zero pending sources for local completion, and retain separate approval and write gates. No new digest, source-text export or authority mechanism is added. Existing early finalization checks preserve error precedence. The stricter completion meaning corrects consumers that equated filled slots with complete source scope; later consumers must inherit it before claiming preparation completion. Protected review and release remain pending.
+
 ### September 6 duplicate source-scope admission (Proposed)
 
 PR #12 already binds exact candidate membership and complete item revisions in `ReviewedDuplicateMergeSet`; the prior audit-owner concern about unbound duplicate authority therefore does not describe this consumer. Its real remaining gap was that retained metadata and inventory were absent from its receipt, and external verification preceded local decision checks. RED `4656d6b` reproduced missing legacy scope binding, malformed inventory accepted, and altered standalone evidence reaching governance.
