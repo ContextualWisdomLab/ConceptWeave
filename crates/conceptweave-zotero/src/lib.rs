@@ -509,6 +509,8 @@ pub struct ClassificationWriteReceipt {
     pub rule_revision: String,
     /// Exact raw-snapshot digest bound to this attempt.
     pub snapshot_digest: String,
+    /// Verified proposal and retained-source identity bound to this attempt.
+    pub proposal_digest: String,
     /// Overall execution outcome.
     pub outcome: ClassificationWriteOutcome,
     /// Items whose post-write state was verified, in application order.
@@ -1325,6 +1327,7 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
             library_version: plan.library_version,
             rule_revision: plan.rule_revision.clone(),
             snapshot_digest: plan.snapshot_digest.clone(),
+            proposal_digest: plan.proposal_digest.clone(),
             outcome: ClassificationWriteOutcome::DryRun,
             applied_item_keys: Vec::new(),
             failed_item_key: None,
@@ -1424,6 +1427,7 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
         library_version: plan.library_version,
         rule_revision: plan.rule_revision.clone(),
         snapshot_digest: plan.snapshot_digest.clone(),
+        proposal_digest: plan.proposal_digest.clone(),
         outcome: ClassificationWriteOutcome::Applied,
         applied_item_keys,
         failed_item_key: None,
@@ -1477,6 +1481,7 @@ fn preflight_failure_receipt(
         library_version: plan.library_version,
         rule_revision: plan.rule_revision.clone(),
         snapshot_digest: plan.snapshot_digest.clone(),
+        proposal_digest: plan.proposal_digest.clone(),
         outcome: ClassificationWriteOutcome::PreflightFailure,
         applied_item_keys: Vec::new(),
         failed_item_key: failed_item_key.map(str::to_owned),
@@ -1505,6 +1510,7 @@ fn partial_failure_receipt(
         library_version: plan.library_version,
         rule_revision: plan.rule_revision.clone(),
         snapshot_digest: plan.snapshot_digest.clone(),
+        proposal_digest: plan.proposal_digest.clone(),
         outcome: ClassificationWriteOutcome::PartialFailure,
         applied_item_keys,
         failed_item_key: Some(plan.operations[failed_index].item_key.clone()),
