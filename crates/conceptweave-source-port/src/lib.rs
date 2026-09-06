@@ -1,8 +1,9 @@
 //! Bounded Source Observation port contracts for ConceptWeave.
 //!
-//! This crate owns provider-independent access budgets, exact source allowlists, caller
-//! cancellation, and fail-closed adapter outcomes. PostgreSQL drivers, credentials, catalog SQL,
-//! and immutable snapshot construction remain behind an adapter implementation.
+//! This crate owns provider-independent access budgets, exact source allowlists, trusted local
+//! policy admission, caller cancellation, and fail-closed adapter outcomes. PostgreSQL drivers,
+//! credentials, catalog SQL, and immutable snapshot construction remain behind an adapter
+//! implementation.
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
@@ -30,7 +31,11 @@ pub enum ObservationLimitError {
     ZeroConcurrencyLimit,
 }
 
-/// Explicit positive resource limits that the Source Observation runtime must enforce.
+/// Explicit positive resource limits requested for one Source Observation operation.
+///
+/// Positive values make the request structurally bounded, but they are not authority. The trusted
+/// local [`SourceConnectionRegistry`] must explicitly admit the complete resource envelope before
+/// adapter execution.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ObservationLimits {
     operation_timeout_ms: u64,
@@ -41,7 +46,7 @@ pub struct ObservationLimits {
 }
 
 impl ObservationLimits {
-    /// Creates a conservative bounded policy whose total operation deadline equals the statement timeout.
+    /// Creates a conservative bounded request whose total operation deadline equals the statement timeout.
     ///
     /// This constructor preserves the original API while making the end-to-end deadline explicit for
     /// every request. Use [`Self::with_timeouts`] when authorization/connection/catalog work needs a
@@ -64,7 +69,7 @@ impl ObservationLimits {
         )
     }
 
-    /// Creates a bounded policy with separate end-to-end and per-statement time budgets.
+    /// Creates a bounded request with separate end-to-end and per-statement time budgets.
     pub const fn with_timeouts(
         operation_timeout_ms: u64,
         statement_timeout_ms: u64,
@@ -96,31 +101,31 @@ impl ObservationLimits {
         })
     }
 
-    /// Returns the policy ceiling for authorization, connection and all catalog work.
+    /// Returns the requested ceiling for authorization, connection and all catalog work.
     #[must_use]
     pub const fn operation_timeout_ms(&self) -> u64 {
         self.operation_timeout_ms
     }
 
-    /// Returns the maximum time one source statement may execute, in milliseconds.
+    /// Returns the requested maximum time one source statement may execute, in milliseconds.
     #[must_use]
     pub const fn statement_timeout_ms(&self) -> u64 {
         self.statement_timeout_ms
     }
 
-    /// Returns the maximum number of source metadata rows the request may observe.
+    /// Returns the requested maximum number of source metadata rows the request may observe.
     #[must_use]
     pub const fn max_rows(&self) -> u64 {
         self.max_rows
     }
 
-    /// Returns the maximum number of source metadata bytes the request may retain.
+    /// Returns the requested maximum number of source metadata bytes the request may retain.
     #[must_use]
     pub const fn max_bytes(&self) -> u64 {
         self.max_bytes
     }
 
-    /// Returns the maximum number of catalog queries the adapter may run concurrently.
+    /// Returns the requested maximum number of catalog queries the adapter may run concurrently.
     #[must_use]
     pub const fn max_concurrent_queries(&self) -> u32 {
         self.max_concurrent_queries
@@ -140,7 +145,8 @@ pub enum ObservationRequestBudgetError {
 ///
 /// These bounds are intentionally provider-independent. They limit how much exact schema-selection
 /// metadata ConceptWeave accepts before registry or database access without assuming PostgreSQL's
-/// build-time identifier length or normalizing source spelling.
+/// build-time identifier length or normalizing source spelling. Positive values are only requested
+/// ceilings; trusted local policy must still admit them.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ObservationRequestBudget {
     max_schema_count: usize,
@@ -165,16 +171,53 @@ impl ObservationRequestBudget {
         })
     }
 
-    /// Returns the maximum number of exact schema identifiers the request may retain.
+    /// Returns the requested maximum number of exact schema identifiers the request may retain.
     #[must_use]
     pub const fn max_schema_count(&self) -> usize {
         self.max_schema_count
     }
 
-    /// Returns the maximum total UTF-8 bytes retained across exact schema identifiers.
+    /// Returns the requested maximum total UTF-8 bytes retained across exact schema identifiers.
     #[must_use]
     pub const fn max_schema_bytes(&self) -> usize {
         self.max_schema_bytes
+    }
+}
+
+/// Complete provider-independent resource request evaluated by trusted local source policy.
+///
+/// This value combines authorization-metadata and runtime ceilings so one policy decision cannot
+/// admit only part of the resource contract. Constructing the value does not confer authority;
+/// [`ObservationRequest::authorize`] must obtain an explicit registry decision for it.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ObservationResourceEnvelope {
+    request_budget: ObservationRequestBudget,
+    limits: ObservationLimits,
+}
+
+impl ObservationResourceEnvelope {
+    /// Combines the caller-requested metadata and runtime ceilings into one policy input.
+    #[must_use]
+    pub const fn new(
+        request_budget: ObservationRequestBudget,
+        limits: ObservationLimits,
+    ) -> Self {
+        Self {
+            request_budget,
+            limits,
+        }
+    }
+
+    /// Returns the requested authorization-metadata ceilings.
+    #[must_use]
+    pub const fn request_budget(&self) -> ObservationRequestBudget {
+        self.request_budget
+    }
+
+    /// Returns the requested runtime resource ceilings.
+    #[must_use]
+    pub const fn limits(&self) -> ObservationLimits {
+        self.limits
     }
 }
 
@@ -191,18 +234,20 @@ pub enum ObservationRequestError {
     InvalidConnectionPolicyBinding,
     /// The source existed, but the registry did not authorize the exact requested schema scope.
     UnauthorizedSchemaScope,
+    /// The source and schema were authorized, but trusted local policy did not admit the requested resource envelope.
+    UnauthorizedResourceEnvelope,
     /// Registry authorization exhausted the request's end-to-end operation budget.
     OperationTimeout,
     /// No source schema was explicitly authorized for observation.
     EmptySchemaAllowlist,
     /// The requested schema count exceeded the caller-selected authorization-metadata budget.
     SchemaCountLimitExceeded {
-        /// Maximum allowed schema count.
+        /// Maximum allowed schema count within the caller-requested metadata envelope.
         max_schema_count: usize,
     },
     /// The requested schema identifiers exceeded the caller-selected total UTF-8 byte budget.
     SchemaByteLimitExceeded {
-        /// Maximum allowed total UTF-8 bytes across schema identifiers.
+        /// Maximum allowed total UTF-8 bytes within the caller-requested metadata envelope.
         max_schema_bytes: usize,
     },
     /// One authorized source schema identifier was blank.
@@ -214,12 +259,12 @@ pub enum ObservationRequestError {
     },
 }
 
-/// Read-only registry boundary used to authorize an opaque source connection and exact schema scope.
+/// Read-only registry boundary used to authorize source identity, exact schema scope and resources.
 ///
 /// A source key is only a lookup coordinate. A successful registry implementation must also issue
 /// an opaque immutable connection-policy binding for the exact mapping it authorizes. Schema scope
-/// is then evaluated against that resolved key-and-binding pair, preventing a later key remap from
-/// silently inheriting an earlier authorization.
+/// and the complete provider-independent resource envelope are then evaluated against that same
+/// resolved key-and-binding pair. Both policy decisions default to deny.
 pub trait SourceConnectionRegistry {
     /// Returns whether the exact key names a source the caller may observe.
     fn contains_source_connection(&self, source_connection_key: &str) -> bool;
@@ -250,6 +295,21 @@ pub trait SourceConnectionRegistry {
         let _ = (source_connection, allowed_schema_names);
         false
     }
+
+    /// Returns whether trusted local policy admits the complete requested resource envelope.
+    ///
+    /// The default is fail-closed. Implementations must evaluate the envelope against the same
+    /// immutable source-policy binding used for schema authorization. A wider-than-policy request
+    /// must be rejected; equal or narrower requests may be admitted explicitly. Provider-specific
+    /// settings, credentials, DSNs and runtime connection objects do not belong in this decision.
+    fn authorizes_resource_envelope(
+        &self,
+        source_connection: &ResolvedSourceConnection,
+        resource_envelope: ObservationResourceEnvelope,
+    ) -> bool {
+        let _ = (source_connection, resource_envelope);
+        false
+    }
 }
 
 /// Opaque proof that an exact source key and immutable policy revision were resolved together.
@@ -278,11 +338,11 @@ impl ResolvedSourceConnection {
 /// `source_connection_key` is a bounded opaque identifier, not source authority by itself. Before
 /// adapter execution, [`Self::authorize`] must resolve it through the caller's authorized
 /// [`SourceConnectionRegistry`], bind the registry's immutable connection-policy revision, verify
-/// the exact requested schema scope against that same resolved binding, and carry the capability
-/// into an [`AuthorizedObservationRequest`]. The adapter later maps only that exact authorized
-/// binding to credentials inside its own ACL. Schema identifiers retain exact source spelling and
-/// are sorted only to make request identity deterministic. Callers must also provide an explicit
-/// provider-independent authorization-metadata budget before the request can be constructed.
+/// the exact requested schema scope and complete provider-independent resource envelope against that
+/// same resolved binding, and carry the capability into an [`AuthorizedObservationRequest`]. The
+/// adapter later maps only that exact authorized binding to credentials inside its own ACL. Schema
+/// identifiers retain exact source spelling and are sorted only to make request identity
+/// deterministic.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ObservationRequest {
     source_connection_key: String,
@@ -292,7 +352,10 @@ pub struct ObservationRequest {
 }
 
 impl ObservationRequest {
-    /// Creates a bounded request with an explicit non-empty exact-schema allowlist.
+    /// Creates a structurally bounded request with an explicit non-empty exact-schema allowlist.
+    ///
+    /// Successful construction does not mean the caller-selected resource ceilings are authorized;
+    /// trusted registry policy must admit them in [`Self::authorize`].
     pub fn new(
         source_connection_key: impl Into<String>,
         mut allowed_schema_names: Vec<String>,
@@ -380,14 +443,13 @@ impl ObservationRequest {
         })
     }
 
-    /// Consumes this request after registry authorization and binds the resulting capability to it.
+    /// Consumes this request after trusted registry authorization and binds the capability to it.
     ///
-    /// The operation budget starts before source-key, immutable policy-binding, and exact-schema
-    /// authorization. The returned execution envelope is the only request type accepted by
-    /// [`SourceObservationPort`] and privately retains the monotonic start coordinate so adapter
-    /// code can query the remaining budget without receiving wall-clock provenance. If registry
-    /// work consumes the budget, timeout takes precedence over either authorization result so
-    /// over-budget policy work never leaks into adapter admission.
+    /// The operation budget starts before source-key, immutable policy-binding, exact-schema and
+    /// resource-envelope authorization. The returned execution envelope is the only request type
+    /// accepted by [`SourceObservationPort`] and privately retains the monotonic start coordinate so
+    /// adapter code can query the remaining budget without receiving wall-clock provenance. If any
+    /// registry work consumes the budget, timeout takes precedence over authorization results.
     pub fn authorize(
         self,
         registry: &dyn SourceConnectionRegistry,
@@ -397,6 +459,11 @@ impl ObservationRequest {
         let schema_scope_authorized = source_connection.as_ref().is_ok_and(|resolved| {
             registry.authorizes_schema_scope(resolved, &self.allowed_schema_names)
         });
+        let resource_envelope = self.resource_envelope();
+        let resource_envelope_authorized = schema_scope_authorized
+            && source_connection.as_ref().is_ok_and(|resolved| {
+                registry.authorizes_resource_envelope(resolved, resource_envelope)
+            });
         let elapsed = Instant::now().saturating_duration_since(operation_started_at);
         let operation_timeout = Duration::from_millis(self.limits.operation_timeout_ms);
         if elapsed >= operation_timeout {
@@ -406,6 +473,9 @@ impl ObservationRequest {
         if !schema_scope_authorized {
             return Err(ObservationRequestError::UnauthorizedSchemaScope);
         }
+        if !resource_envelope_authorized {
+            return Err(ObservationRequestError::UnauthorizedResourceEnvelope);
+        }
         Ok(AuthorizedObservationRequest {
             request: self,
             source_connection,
@@ -413,22 +483,28 @@ impl ObservationRequest {
         })
     }
 
-    /// Returns exact authorized schema identifiers in deterministic lexical order.
+    /// Returns exact requested schema identifiers in deterministic lexical order.
     #[must_use]
     pub fn allowed_schema_names(&self) -> &[String] {
         &self.allowed_schema_names
     }
 
-    /// Returns the authorization-metadata budget applied before registry or database access.
+    /// Returns the caller-requested authorization-metadata budget.
     #[must_use]
     pub const fn request_budget(&self) -> ObservationRequestBudget {
         self.request_budget
     }
 
-    /// Returns the resource limits the operation runtime and source adapter must jointly enforce.
+    /// Returns the caller-requested runtime resource limits.
     #[must_use]
     pub const fn limits(&self) -> ObservationLimits {
         self.limits
+    }
+
+    /// Returns the complete provider-independent resource envelope evaluated by trusted policy.
+    #[must_use]
+    pub const fn resource_envelope(&self) -> ObservationResourceEnvelope {
+        ObservationResourceEnvelope::new(self.request_budget, self.limits)
     }
 }
 
@@ -436,11 +512,11 @@ impl ObservationRequest {
 ///
 /// This value can only be created by [`ObservationRequest::authorize`], which binds the exact
 /// request to the opaque [`ResolvedSourceConnection`] issued by the authorized registry after the
-/// same policy boundary has explicitly accepted the request's exact schema scope against the same
-/// immutable connection-policy revision. It also retains a private monotonic operation-start
-/// coordinate so the adapter can cap connection, transaction, statement and cancellation work by
-/// the true remaining budget. It carries no connection string, credential, token,
-/// provider-specific connection object, or wall-clock time.
+/// same policy boundary has explicitly accepted both the exact schema scope and complete requested
+/// resource envelope against the same immutable connection-policy revision. It also retains a
+/// private monotonic operation-start coordinate so the adapter can cap connection, transaction,
+/// statement and cancellation work by the true remaining budget. It carries no connection string,
+/// credential, token, provider-specific connection object, or wall-clock time.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AuthorizedObservationRequest {
     request: ObservationRequest,
@@ -449,7 +525,7 @@ pub struct AuthorizedObservationRequest {
 }
 
 impl AuthorizedObservationRequest {
-    /// Returns the validated request metadata and execution budgets bound to this authorization.
+    /// Returns the validated and policy-admitted request metadata and resource ceilings.
     #[must_use]
     pub const fn request(&self) -> &ObservationRequest {
         &self.request
@@ -523,39 +599,39 @@ pub enum SourceObservationFailure {
     StatementTimeout,
     /// Captured source metadata was malformed, contradictory, duplicated, or otherwise inadmissible.
     InvalidCapturedMetadata,
-    /// Observed metadata exceeded the explicit row budget.
+    /// Observed metadata exceeded the explicitly admitted row budget.
     RowLimitExceeded {
-        /// Configured maximum row count.
+        /// Policy-admitted maximum row count.
         max_rows: u64,
     },
-    /// Observed metadata exceeded the explicit byte budget.
+    /// Observed metadata exceeded the explicitly admitted byte budget.
     ByteLimitExceeded {
-        /// Configured maximum retained byte count.
+        /// Policy-admitted maximum retained byte count.
         max_bytes: u64,
     },
-    /// The adapter could not remain within the explicit concurrent-query budget.
+    /// The adapter could not remain within the explicitly admitted concurrent-query budget.
     ConcurrencyLimitExceeded {
-        /// Configured maximum concurrent query count.
+        /// Policy-admitted maximum concurrent query count.
         max_concurrent_queries: u32,
     },
 }
 
 /// Port implemented by a concrete read-only source adapter.
 ///
-/// Implementations receive only a registry-authorized request whose exact schema scope was accepted
-/// against the same immutable connection-policy binding, resolve credentials from that exact opaque
-/// capability inside the adapter ACL, use only read-only source access, honor the exact schema
-/// allowlist, query [`AuthorizedObservationRequest::remaining_operation_budget`] before adapter-side
-/// blocking work, enforce every adapter-side [`ObservationLimits`] bound, check caller cancellation,
-/// and return a typed failure rather than a partial or invented snapshot when captured metadata
-/// cannot construct the immutable snapshot. Observation execution is awaitable so asynchronous
-/// database clients do not need to hide a nested executor or block an asynchronous web executor
-/// thread.
+/// Implementations receive only a registry-authorized request whose exact schema scope and complete
+/// provider-independent resource envelope were accepted against the same immutable connection-policy
+/// binding. They resolve credentials from that exact opaque capability inside the adapter ACL, use
+/// only read-only source access, honor the exact schema allowlist, query
+/// [`AuthorizedObservationRequest::remaining_operation_budget`] before adapter-side blocking work,
+/// enforce every policy-admitted [`ObservationLimits`] bound, check caller cancellation, and return
+/// a typed failure rather than a partial or invented snapshot when captured metadata cannot construct
+/// the immutable snapshot. Observation execution is awaitable so asynchronous database clients do not
+/// need to hide a nested executor or block an asynchronous web executor thread.
 pub trait SourceObservationPort: Sync {
     /// Immutable snapshot type produced only after a complete bounded observation.
     type Snapshot;
 
-    /// Executes one bounded asynchronous observation after registry authorization has issued the source capability.
+    /// Executes one bounded asynchronous observation after trusted registry policy has issued the source capability.
     fn observe<'a>(
         &'a self,
         request: &'a AuthorizedObservationRequest,
