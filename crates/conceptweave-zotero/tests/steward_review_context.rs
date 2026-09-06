@@ -134,7 +134,7 @@ fn changed_review_context_invalidates_prior_approval_before_verification() {
                 receipt_id: "synthetic-receipt".into(),
                 reviewer_subject: "synthetic-steward".into(),
                 library_version: report.library_version,
-                rule_revision: report.rule_revision.into(),
+                rule_revision: report.rule_revision.clone(),
                 snapshot_digest: report.snapshot_digest.clone(),
                 proposal_digest: classification_proposal_digest(&report),
                 snapshot_items: report.snapshot_items.clone(),
