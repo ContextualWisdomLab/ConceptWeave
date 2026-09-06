@@ -60,6 +60,12 @@ Evaluation must separate extraction recall, semantic correctness, structural cor
 ## 11. Zotero research intake
 
 Execution receipts retain the verified proposal/source binding in every outcome.
+The authenticated-transport regression composes the executor with an ephemeral
+loopback HTTP fixture: a failed POST followed by a GET matching the requested
+complete state still produces an indeterminate receipt, preserves the entire
+submitted request and observed state, and produces no inferred inverse. Exactly
+one POST is observed. This is synthetic wire-contract evidence, not an approved
+live write, provider peer authentication or real-library recovery.
 On a failed or invalid write response, `indeterminate_request` preserves the exact
 submitted server/library/item preconditions and complete replacement arrays;
 `reconciliation_observation` retains any subsequent read without attributing it

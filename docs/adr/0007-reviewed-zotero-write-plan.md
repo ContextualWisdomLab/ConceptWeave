@@ -56,6 +56,13 @@ adopt the required field without deriving fresh authority from serialized plans.
 
 ### Execution evidence correction (2026-09-06, Proposed)
 
+PR #17 integration preserves the transport implementation while inheriting the
+original-owner fix. Test `97cce5a`, strengthened by `29a3771`, composes authenticated
+HTTP with the executor and verifies failed POST plus a fully matching observed
+state remains unknown. Complete request/observation, proposal binding, single POST
+and no inferred inverse are asserted. No new runtime, retry policy or authority
+issuer is introduced; synthetic transport evidence does not prove live recovery.
+
 In the context of uncertain write responses, facing concurrent edits and delayed
 requests that can produce indistinguishable observations, we decided for preserving
 uncertainty and the exact submitted request, and against inferring completion or

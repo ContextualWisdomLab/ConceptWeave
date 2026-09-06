@@ -89,6 +89,34 @@ Remaining work: mandatory adoption by restoration, worksheet, duplicate and writ
 
 ## DDD fitness constraints
 
+### PR #17 authenticated transport successor verification (2026-09-06)
+
+Baseline `c88f9a34c1fc4e72e38cf66b1d2f3fcb305e560a` passed 100 tests/19 suites.
+Normal merge `a2768ae` retains that transport and parent `84b27fb`; documentation
+conflicts retain the original wire contract while replacing unsafe post-read
+completion/rollback inference. No original transport implementation is replaced.
+Independent review found missing executor-plus-HTTP regression coverage, added
+in `97cce5a` and strengthened in `29a3771` to compare the entire observed state.
+
+The synthetic fixture returns a failed POST followed by fully matching metadata.
+Exactly one POST is observed; the receipt preserves the exact submitted request,
+complete observation and proposal binding, remains indeterminate, and emits no
+applied or inverse operations. It uses an ephemeral loopback port and synthetic
+credentials only. Existing proxy, conditional-write and provider-response tests
+remain intact. This does not prove peer authentication, live mutation or recovery.
+
+Final source passed 123 tests/19 result suites including three doctests, strict
+Clippy, warnings-denied rustdoc, format/CI-contract/diff and unchanged coverage
+gate: 226/226 functions, 2022/2022 normalized regions, 354/354 normalized branches.
+Raw LLVM: 2508/2560 lines, 3799/3880 regions, 314/354 branches, not 100%.
+Logs use `/tmp/conceptweave-pr17-scope-` with `baseline.log`, `complete.log`,
+`clippy-complete.log`, `rustdoc.log` and `coverage-complete.log`.
+
+Protected merge, release, authentic decisions and real library reclassification
+remain open. Next verified dependencies are PR #18 local authorization then PR #19
+approved execution; they must preserve scope and uncertainty without reissuing
+authority from audit JSON. The root checkout still lacks this cascade.
+
 ### PR #16 multilingual successor verification (2026-09-06)
 
 Baseline `044018cef4e5d3e919b278a1cfebe56857863601` passed 87 tests/19 suites.
