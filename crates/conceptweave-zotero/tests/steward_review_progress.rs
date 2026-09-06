@@ -129,3 +129,57 @@ fn progress_is_exact_aggregate_only_and_fail_closed() {
     assert_eq!(empty.total_count, 0);
     assert!(!empty.complete);
 }
+
+#[test]
+fn progress_rejects_stale_or_blank_content_binding() {
+    let mut report = classification_report();
+    let worksheet = build_steward_review_worksheet(&report).unwrap();
+    let mut blank = worksheet.clone();
+    blank.proposal_digest.clear();
+    assert_eq!(
+        assess_steward_review_progress(&report, &blank),
+        Err(WorksheetError::InvalidReport)
+    );
+    report.classified_items[0]
+        .title
+        .push_str(" changed context");
+    assert_eq!(
+        assess_steward_review_progress(&report, &worksheet),
+        Err(WorksheetError::InvalidReport)
+    );
+}
+
+#[test]
+fn progress_preserves_pending_source_scope_and_opaque_identity() {
+    let source = ZoteroItem {
+        source_record: None,
+        key: "PRIVATE_SOURCE".into(),
+        version: 1,
+        data: ItemData {
+            item_type: "attachment".into(),
+            title: "private source".into(),
+            abstract_note: String::new(),
+            doi: String::new(),
+            parent_item: String::new(),
+            collections: vec![],
+            tags: vec![],
+        },
+    };
+    let paper: ZoteroItem = serde_json::from_value(serde_json::json!({
+        "key": "PAPER", "version": 1,
+        "data": {"itemType": "book", "title": "ontology learning"}
+    }))
+    .unwrap();
+    let report = classify_snapshot("9.0.6".into(), None, 42, vec![source, paper]);
+    let mut worksheet = build_steward_review_worksheet(&report).unwrap();
+    worksheet.decisions[0].reviewed_disposition = Some(Disposition::Generation);
+    let progress = assess_steward_review_progress(&report, &worksheet).unwrap();
+    let json = serde_json::to_value(&progress).unwrap();
+    assert_eq!(json["pending_source_count"], 1);
+    assert_eq!(json["proposal_digest"], worksheet.proposal_digest);
+    assert!(!progress.complete);
+    assert_eq!(progress.total_count, 1);
+    assert_eq!(progress.decided_count, 1);
+    assert_eq!(progress.remaining_count, 0);
+    assert!(!json.to_string().contains("PRIVATE_SOURCE"));
+}

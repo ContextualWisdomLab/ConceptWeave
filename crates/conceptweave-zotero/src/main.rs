@@ -292,7 +292,7 @@ fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<(T, ArtifactI
     }
 }
 
-/// Opens a review input once and returns metadata from the opened handle.
+/// Opens without following a symlink or waiting for a raced FIFO, then reads handle metadata.
 fn open_with_metadata(path: &Path) -> io::Result<(File, fs::Metadata)> {
     #[cfg(unix)]
     use std::os::unix::fs::OpenOptionsExt;
@@ -300,7 +300,7 @@ fn open_with_metadata(path: &Path) -> io::Result<(File, fs::Metadata)> {
     let mut options = OpenOptions::new();
     options.read(true);
     #[cfg(unix)]
-    options.custom_flags(libc::O_NOFOLLOW);
+    options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
     let file = options.open(path)?;
     file.metadata().map(|metadata| (file, metadata))
 }
@@ -358,7 +358,23 @@ fn label_input(name: &str, error: io::Error) -> io::Error {
     io::Error::new(error.kind(), format!("{name}: {error}"))
 }
 
-/// Writes one bounded create-new owner-only artifact and removes a failed partial write.
+/// Validates canonical report and worksheet destinations before reading Zotero.
+fn validate_output_request(
+    report_output: Option<&str>,
+    output: &str,
+) -> io::Result<(Option<PathBuf>, PathBuf)> {
+    let output = validate_output_path(output)?;
+    let report_output = report_output.map(validate_output_path).transpose()?;
+    if report_output.as_ref() == Some(&output) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "report and worksheet output paths must differ",
+        ));
+    }
+    Ok((report_output, output))
+}
+
+/// Writes one bounded create-new private artifact; failures may leave partial files.
 fn write_private_output(path: &Path, content: &[u8]) -> io::Result<()> {
     if content.len() as u64 > MAX_ARTIFACT_BYTES {
         return Err(io::Error::new(
@@ -386,12 +402,10 @@ fn write_private_output_with(
 ) -> io::Result<()> {
     let file = create_report_file(path)?;
     let mut writer = BufWriter::new(file);
-    if let Err(error) = write(&mut writer, content) {
-        drop(writer);
-        let _ = fs::remove_file(path);
-        return Err(error);
-    }
-    Ok(())
+    let result = write(&mut writer, content);
+    // Never retry buffered writes on drop or unlink a possibly replaced pathname.
+    let _ = writer.into_parts();
+    result
 }
 
 /// Returns canonical directories in which a sensitive report may be created.
@@ -466,7 +480,7 @@ fn set_owner_only_permissions(file: &File) -> io::Result<()> {
 }
 
 #[cfg(unix)]
-/// Creates a private file and removes it if final permission enforcement fails.
+/// Creates a private file; failure leaves an empty file rather than unlinking a raced path.
 fn create_report_file_with(
     path: &Path,
     set_permissions: fn(&File) -> io::Result<()>,
@@ -476,11 +490,7 @@ fn create_report_file_with(
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     let file = options.mode(0o600).open(path)?;
-    if let Err(error) = set_permissions(&file) {
-        drop(file);
-        let _ = fs::remove_file(path);
-        return Err(error);
-    }
+    set_permissions(&file)?;
     Ok(file)
 }
 
@@ -507,20 +517,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             write_private_output(&output, &serde_json::to_vec_pretty(&report)?)?;
         }
         OutputRequest::Worksheet { report, worksheet } => {
-            let report_output = validate_output_path(&report)?;
-            let worksheet_output = validate_output_path(&worksheet)?;
+            let (report_output, worksheet_output) =
+                validate_output_request(Some(&report), &worksheet)?;
+            let report_output = report_output.expect("worksheet request includes report path");
             let report = read_local_snapshot()?;
             if report.zotero_version.starts_with("9.") {
                 eprintln!("Zotero 9 Local API is read-only; writing local proposal output only");
             }
             let worksheet = build_steward_review_worksheet(&report)?;
-            write_private_output(&report_output, &serde_json::to_vec_pretty(&report)?)?;
-            if let Err(error) =
-                write_private_output(&worksheet_output, &serde_json::to_vec_pretty(&worksheet)?)
-            {
-                let _ = fs::remove_file(report_output);
-                return Err(error.into());
-            }
+            let report_content = serde_json::to_vec_pretty(&report)?;
+            let worksheet_content = serde_json::to_vec_pretty(&worksheet)?;
+            write_private_output(&report_output, &report_content)?;
+            write_private_output(&worksheet_output, &worksheet_content)?;
         }
         OutputRequest::ReviewProgress {
             report,
@@ -658,6 +666,63 @@ mod tests {
         assert!(parse_output_request(["--capture-full-text", report]).is_err());
         assert!(parse_output_request(["--capture-full-text", report, report]).is_err());
         assert!(parse_output_request(["--capture-full-text", report, output, "extra"]).is_err());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn opening_private_input_refuses_a_symlink_before_reading() {
+        use std::os::unix::fs::symlink;
+        let target = unique_temp_path("open-target");
+        let link = unique_temp_path("open-symlink");
+        write_private_output(&target, b"{}").unwrap();
+        symlink(&target, &link).unwrap();
+        let result = open_with_metadata(&link);
+        fs::remove_file(&link).unwrap();
+        fs::remove_file(&target).unwrap();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn private_input_rejects_a_nameless_child_of_the_validated_parent() {
+        let path = env::temp_dir().join("..");
+        let error = read_private_json::<serde_json::Value>(path.to_str().unwrap()).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+        assert_eq!(error.to_string(), "review input has no file name");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn replaced_fifo_does_not_block_before_identity_rejection() {
+        let target = unique_temp_path("fifo-replacement");
+        let retained = unique_temp_path("fifo-retained");
+        write_private_output(&target, b"{}").unwrap();
+        let checked_metadata = fs::symlink_metadata(&target).unwrap();
+        fs::rename(&target, &retained).unwrap();
+        assert!(
+            std::process::Command::new("mkfifo")
+                .arg(&target)
+                .status()
+                .unwrap()
+                .success()
+        );
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let opened_path = target.clone();
+        std::thread::spawn(move || {
+            let result = open_with_metadata(&opened_path).map(|(_, metadata)| metadata);
+            let _ = sender.send(result);
+        });
+        let result = receiver.recv_timeout(std::time::Duration::from_secs(2));
+        fs::remove_file(&target).unwrap();
+        fs::remove_file(&retained).unwrap();
+        let opened_metadata = result
+            .expect("opening a raced FIFO must not wait for a writer")
+            .unwrap();
+        assert_eq!(
+            validate_opened_identity(&checked_metadata, &opened_metadata)
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::PermissionDenied
+        );
     }
 
     #[test]
@@ -1139,7 +1204,78 @@ mod tests {
     }
 
     #[test]
-    fn failed_private_output_is_removed_for_retry() {
+    fn canonical_output_aliases_are_rejected_without_creating_files() {
+        let output =
+            Path::new("/tmp").join(format!("conceptweave-alias-{}.json", std::process::id()));
+        let canonical = output
+            .parent()
+            .unwrap()
+            .canonicalize()
+            .unwrap()
+            .join(output.file_name().unwrap());
+        let result =
+            validate_output_request(Some(output.to_str().unwrap()), canonical.to_str().unwrap());
+        assert!(!output.exists());
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidInput);
+        let other = unique_temp_path("other-output");
+        assert!(
+            validate_output_request(Some(output.to_str().unwrap()), other.to_str().unwrap())
+                .is_ok()
+        );
+        assert!(validate_output_request(None, output.to_str().unwrap()).is_ok());
+        assert!(validate_output_request(None, "relative-output").is_err());
+        assert!(
+            validate_output_request(Some("relative-report"), output.to_str().unwrap()).is_err()
+        );
+    }
+
+    #[test]
+    fn write_failure_preserves_replacement_at_output_path() {
+        let output = unique_temp_path("write-race");
+        let retained = unique_temp_path("write-race-retained");
+        assert!(!output.exists());
+        assert!(!retained.exists());
+        let error = write_private_output_with(&output, b"content", |_, _| {
+            let output = unique_temp_path("write-race");
+            fs::rename(&output, unique_temp_path("write-race-retained"))?;
+            let mut replacement = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(output)?;
+            replacement.write_all(b"unrelated replacement")?;
+            Err(io::Error::new(io::ErrorKind::WriteZero, "injected failure"))
+        })
+        .unwrap_err();
+        let replacement = fs::read(&output);
+        let _ = fs::remove_file(output);
+        fs::remove_file(retained).unwrap();
+        assert_eq!(error.kind(), io::ErrorKind::WriteZero);
+        assert_eq!(replacement.unwrap(), b"unrelated replacement");
+    }
+
+    #[test]
+    fn write_failure_does_not_retry_buffered_bytes_on_drop() {
+        let output = unique_temp_path("write-buffer");
+        let retained = unique_temp_path("write-buffer-retained");
+        assert!(!output.exists());
+        assert!(!retained.exists());
+        let error = write_private_output_with(&output, b"buffered content", |writer, content| {
+            fs::rename(
+                unique_temp_path("write-buffer"),
+                unique_temp_path("write-buffer-retained"),
+            )?;
+            writer.write_all(content)?;
+            Err(io::Error::new(io::ErrorKind::WriteZero, "injected failure"))
+        })
+        .unwrap_err();
+        let retained_bytes = fs::read(&retained).unwrap();
+        fs::remove_file(retained).unwrap();
+        assert_eq!(error.kind(), io::ErrorKind::WriteZero);
+        assert!(retained_bytes.is_empty());
+    }
+
+    #[test]
+    fn failed_private_output_is_preserved_and_requires_a_new_path() {
         let output = unique_temp_path("failed-output");
         let _ = fs::remove_file(&output);
         let error = write_private_output_with(&output, b"content", &mut |_, _| {
@@ -1150,7 +1286,9 @@ mod tests {
         })
         .unwrap_err();
         assert_eq!(error.kind(), io::ErrorKind::WriteZero);
-        assert!(!output.exists());
+        assert_eq!(fs::metadata(&output).unwrap().len(), 0);
+        assert!(write_private_output(&output, b"retry").is_err());
+        fs::remove_file(&output).unwrap();
 
         write_private_output(&output, b"complete").unwrap();
         assert_eq!(fs::read(&output).unwrap(), b"complete");
@@ -1177,7 +1315,9 @@ mod tests {
         let _ = fs::remove_file(&allowed);
         assert_eq!(
             validate_output_path(allowed.to_str().unwrap()).unwrap(),
-            env::temp_dir()
+            allowed
+                .parent()
+                .unwrap()
                 .canonicalize()
                 .unwrap()
                 .join(allowed.file_name().unwrap())
@@ -1271,6 +1411,59 @@ mod tests {
         })
         .unwrap_err();
         assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
-        assert!(!rejected.exists());
+        assert_eq!(fs::metadata(&rejected).unwrap().len(), 0);
+        fs::remove_file(rejected).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn permission_failure_preserves_a_replacement_at_the_output_path() {
+        use std::os::unix::fs::PermissionsExt;
+        let output = unique_temp_path("permission-replaced");
+        let retained = unique_temp_path("permission-original");
+        assert!(!output.exists());
+        assert!(!retained.exists());
+        let error = create_report_file_with(&output, |file| {
+            assert_eq!(file.metadata()?.permissions().mode() & 0o077, 0);
+            fs::rename(
+                unique_temp_path("permission-replaced"),
+                unique_temp_path("permission-original"),
+            )?;
+            let mut replacement = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(unique_temp_path("permission-replaced"))?;
+            replacement.write_all(b"unrelated replacement")?;
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "injected failure",
+            ))
+        })
+        .unwrap_err();
+        let preserved = fs::read(&output).ok();
+        let _ = fs::remove_file(&output);
+        fs::remove_file(retained).unwrap();
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(
+            preserved.as_deref(),
+            Some(b"unrelated replacement".as_slice())
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn report_output_returns_the_checked_canonical_parent() {
+        let output = Path::new("/tmp").join(format!(
+            "conceptweave-zotero-{}-canonical.json",
+            std::process::id()
+        ));
+        let expected = Path::new("/tmp")
+            .canonicalize()
+            .unwrap()
+            .join(output.file_name().unwrap());
+        assert_eq!(
+            validate_output_path(output.to_str().unwrap()).unwrap(),
+            expected
+        );
     }
 }

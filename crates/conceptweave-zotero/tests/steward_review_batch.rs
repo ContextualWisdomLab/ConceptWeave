@@ -149,6 +149,35 @@ fn review_batch_rejects_invalid_or_complete_workloads() {
 }
 
 #[test]
+fn batch_keeps_pending_scope_separate_from_bibliographic_slots() {
+    let mut source = item("PRIVATE_SOURCE", "unresolved source", "");
+    source.data.item_type = "attachment".into();
+    let report = classify_snapshot(
+        "9.0.6".into(),
+        None,
+        42,
+        vec![item("A", "unmatched", "context"), source],
+    );
+    let mut worksheet = build_steward_review_worksheet(&report).unwrap();
+    let batch = build_steward_review_batch(&report, &worksheet, 1).unwrap();
+    let value = serde_json::to_value(&batch).unwrap();
+    assert_eq!(value["pending_source_count"], 1);
+    assert_eq!(value["proposal_digest"], worksheet.proposal_digest);
+    assert_eq!(batch.remaining_count, 1);
+    assert!(!value.to_string().contains("PRIVATE_SOURCE"));
+    worksheet.decisions[0].reviewed_disposition = Some(Disposition::OutOfScope);
+    assert_eq!(
+        build_steward_review_batch(&report, &worksheet, 1),
+        Err(WorksheetError::NoPendingDecisions)
+    );
+    assert!(
+        !conceptweave_zotero::assess_steward_review_progress(&report, &worksheet)
+            .unwrap()
+            .complete
+    );
+}
+
+#[test]
 fn completed_review_batch_must_preserve_the_context_shown_to_the_steward() {
     let report = classify_snapshot(
         "9.0.6".into(),
@@ -162,6 +191,7 @@ fn completed_review_batch_must_preserve_the_context_shown_to_the_steward() {
 
     let patch = decision_patch_from_review_batch(&report, &worksheet, &batch).unwrap();
     assert_eq!(patch.decisions.len(), 1);
+    assert_eq!(patch.proposal_digest, batch.proposal_digest);
     assert_eq!(patch.decisions[0].item_key, "A");
     assert_eq!(
         patch.decisions[0].reviewed_disposition,
@@ -169,6 +199,21 @@ fn completed_review_batch_must_preserve_the_context_shown_to_the_steward() {
     );
 
     for invalid in [
+        {
+            let mut invalid = batch.clone();
+            invalid.proposal_digest.clear();
+            invalid
+        },
+        {
+            let mut invalid = batch.clone();
+            invalid.proposal_digest = "stale-binding".into();
+            invalid
+        },
+        {
+            let mut invalid = batch.clone();
+            invalid.pending_source_count += 1;
+            invalid
+        },
         {
             let mut invalid = batch.clone();
             invalid.decisions[0].title = "different context".into();
@@ -189,6 +234,26 @@ fn completed_review_batch_must_preserve_the_context_shown_to_the_steward() {
             decision_patch_from_review_batch(&report, &worksheet, &invalid),
             Err(WorksheetError::InvalidReport)
         );
+    }
+
+    let mut changed_report = classify_snapshot(
+        "9.0.6".into(),
+        None,
+        42,
+        vec![item("A", "unmatched", "review context")],
+    );
+    changed_report.classified_items[0].review_abstract_note = Some("changed context".into());
+    let fresh_worksheet = build_steward_review_worksheet(&changed_report).unwrap();
+    assert_eq!(fresh_worksheet.snapshot_digest, worksheet.snapshot_digest);
+    assert_ne!(fresh_worksheet.proposal_digest, worksheet.proposal_digest);
+    assert_eq!(
+        decision_patch_from_review_batch(&changed_report, &fresh_worksheet, &batch),
+        Err(WorksheetError::InvalidReport)
+    );
+    for required_field in ["proposal_digest", "pending_source_count"] {
+        let mut missing = serde_json::to_value(&batch).unwrap();
+        missing.as_object_mut().unwrap().remove(required_field);
+        assert!(serde_json::from_value::<StewardReviewBatch>(missing).is_err());
     }
 
     let mut empty = batch.clone();
