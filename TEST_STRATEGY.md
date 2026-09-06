@@ -12,7 +12,8 @@
 
 ## Current Source Observation contract tests
 
-- request metadata rejects blank/malformed source keys, empty/blank/duplicate exact schema names, zero limits, and schema metadata outside the caller-requested structural count/byte envelope before registry/database access;
+- `ObservationRequestBudget` rejects caller-requested schema-count ceilings above 4,096 and retained schema-name bytes above 1,048,576 with typed over-cap errors before registry/database access; exact-cap and ordinary narrower controls remain constructible;
+- request metadata rejects blank/malformed source keys, empty/blank/duplicate exact schema names, zero limits, and schema metadata outside the caller-requested narrower structural count/byte envelope before registry/database access;
 - source resolution requires a registered key plus bounded opaque immutable connection-policy binding and rejects connection material masquerading as a binding;
 - source-key recognition alone cannot authorize schema scope; exact schema policy defaults to deny and is case/normalization preserving;
 - source+schema authorization alone cannot authorize resources; complete `ObservationResourceEnvelope` policy defaults to deny;
@@ -78,7 +79,7 @@ No bypass of Reviewed before Published, immutable published releases, rejection,
 
 ### Security
 
-Prompt injection, malicious ontology/source/release content, SSRF, cross-tenant leakage, secret leakage, expression injection, resource exhaustion, caller-self-authorized schema/resource requests, stale source binding replay, malformed source provenance, hostile export values, compatibility downgrade, stale/superseded use, and detached-artifact tampering.
+Prompt injection, malicious ontology/source/release content, SSRF, cross-tenant leakage, secret leakage, expression injection, resource exhaustion, over-cap structural request metadata, caller-self-authorized schema/resource requests, stale source binding replay, malformed source provenance, hostile export values, compatibility downgrade, stale/superseded use, and detached-artifact tampering.
 
 ### Evaluation
 
