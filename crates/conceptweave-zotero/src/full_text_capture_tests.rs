@@ -725,6 +725,25 @@ fn review_view_separates_two_text_parents_and_excludes_standalone_attachments() 
         .is_err()
     );
     assert_eq!(approval_calls, 0);
+    let scope = full_text_write_tests::write_scope_fixture(&report, &capture);
+    let write_calls = std::cell::Cell::new(0);
+    assert!(
+        crate::build_full_text_write_plan(
+            &report,
+            &capture,
+            scope,
+            |_| {
+                write_calls.set(write_calls.get() + 1);
+                true
+            },
+            |_| {
+                write_calls.set(write_calls.get() + 1);
+                true
+            },
+        )
+        .is_err()
+    );
+    assert_eq!(write_calls.get(), 0);
     assert_eq!(report.pending_source_item_keys, ["FGHI789A"]);
 }
 

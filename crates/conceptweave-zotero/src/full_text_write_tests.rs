@@ -550,58 +550,44 @@ fn full_text_write_bound_rollback_retry_and_delayed_reconciliation() {
             |_| -> Result<crate::ClassificationItemState, ()> { Err(()) },
         )
         .unwrap();
-        let retried = if delayed_read {
-            assert!(
-                crate::retry_full_text_rollback(
-                    &partial,
-                    |_| -> Result<crate::ClassificationItemState, ()> {
-                        panic!("must reconcile first")
-                    },
-                    |_| -> Result<crate::ClassificationItemState, ()> {
-                        panic!("must reconcile first")
-                    }
-                )
-                .is_err()
-            );
-            let reconciled =
-                crate::reconcile_full_text_rollback(&partial, |item_key| store.read_item(item_key))
-                    .unwrap();
-            assert_eq!(
-                serde_json::to_value(&reconciled).unwrap()["reconciliation_result"]["state"],
-                "unchanged"
-            );
-            crate::retry_full_text_reconciled_rollback(
-                &reconciled,
-                |item_key| store.read_item(item_key),
-                |request| store.write_item(request),
-            )
-            .unwrap()
-        } else {
+        assert!(
             crate::retry_full_text_rollback(
                 &partial,
-                |item_key| store.read_item(item_key),
-                |request| store.write_item(request),
+                |_| -> Result<crate::ClassificationItemState, ()> { panic!("unknown inverse") },
+                |_| -> Result<crate::ClassificationItemState, ()> { panic!("unknown inverse") },
             )
-            .unwrap()
-        };
-        let result = serde_json::to_value(retried).unwrap();
+            .is_err()
+        );
+        let reconciled =
+            crate::reconcile_full_text_rollback(&partial, |item_key| store.read_item(item_key))
+                .unwrap();
+        let result = serde_json::to_value(&reconciled).unwrap();
+        assert_eq!(
+            result["rollback_receipt"],
+            serde_json::to_value(&partial).unwrap()
+        );
         assert_eq!(
             result["full_text_write_v1"],
             serde_json::to_value(&plan).unwrap()["full_text_write_v1"]
         );
-        assert_eq!(result["rollback_result"]["outcome"], "restored");
-        assert_eq!(
-            result["rollback_result"]["restored_item_keys"]
-                .as_array()
-                .unwrap()
-                .len(),
-            2
+        assert_eq!(result["reconciliation_result"]["state"], "indeterminate");
+        assert!(
+            crate::retry_full_text_reconciled_rollback(
+                &reconciled,
+                |_| -> Result<crate::ClassificationItemState, ()> {
+                    panic!("observation is not authority")
+                },
+                |_| -> Result<crate::ClassificationItemState, ()> {
+                    panic!("observation is not authority")
+                },
+            )
+            .is_err()
         );
-        assert_eq!(store.write_count.get(), 4);
+        assert_eq!(store.write_count.get(), 2);
     }
 }
 
-fn write_scope_fixture(
+pub(super) fn write_scope_fixture(
     report: &ClassificationReport,
     capture: &FullTextCapture,
 ) -> FullTextWriteScope {
