@@ -13,6 +13,7 @@ use std::{
 };
 
 const MAX_SOURCE_CONNECTION_KEY_BYTES: usize = 128;
+const MAX_CONNECTION_POLICY_BINDING_BYTES: usize = 128;
 
 /// Invalid zero-valued resource bounds for one source-observation request.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -186,7 +187,7 @@ pub enum ObservationRequestError {
     UnknownSourceConnectionKey,
     /// The known source did not expose an immutable connection-policy binding.
     MissingConnectionPolicyBinding,
-    /// The registry returned a blank connection-policy binding that cannot identify a policy revision.
+    /// The registry returned a policy binding that is not a bounded opaque multiword snake_case id.
     InvalidConnectionPolicyBinding,
     /// The source existed, but the registry did not authorize the exact requested schema scope.
     UnauthorizedSchemaScope,
@@ -225,8 +226,10 @@ pub trait SourceConnectionRegistry {
 
     /// Returns the opaque immutable policy revision for the exact registered source mapping.
     ///
-    /// The default is fail-closed. The value is provider-independent evidence, not a DSN,
-    /// credential, token, connection object, or wall-clock timestamp.
+    /// The default is fail-closed. The returned value must be a bounded lowercase multiword
+    /// `snake_case` identifier, such as `policy_revision_a` or a digest encoded as an opaque
+    /// identifier. It is provider-independent evidence, not a DSN, credential, token, connection
+    /// object, or wall-clock timestamp.
     fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
         let _ = source_connection_key;
         None
@@ -297,7 +300,10 @@ impl ObservationRequest {
         limits: ObservationLimits,
     ) -> Result<Self, ObservationRequestError> {
         let source_connection_key = source_connection_key.into();
-        if !is_valid_source_connection_key(&source_connection_key) {
+        if !is_valid_opaque_multiword_identifier(
+            &source_connection_key,
+            MAX_SOURCE_CONNECTION_KEY_BYTES,
+        ) {
             return Err(ObservationRequestError::InvalidSourceConnectionKey);
         }
         if allowed_schema_names.is_empty() {
@@ -362,7 +368,10 @@ impl ObservationRequest {
         let connection_policy_binding = registry
             .connection_policy_binding(&self.source_connection_key)
             .ok_or(ObservationRequestError::MissingConnectionPolicyBinding)?;
-        if connection_policy_binding.trim().is_empty() {
+        if !is_valid_opaque_multiword_identifier(
+            &connection_policy_binding,
+            MAX_CONNECTION_POLICY_BINDING_BYTES,
+        ) {
             return Err(ObservationRequestError::InvalidConnectionPolicyBinding);
         }
         Ok(ResolvedSourceConnection {
@@ -385,9 +394,9 @@ impl ObservationRequest {
     ) -> Result<AuthorizedObservationRequest, ObservationRequestError> {
         let operation_started_at = Instant::now();
         let source_connection = self.resolve_source_connection(registry);
-        let schema_scope_authorized = source_connection
-            .as_ref()
-            .is_ok_and(|resolved| registry.authorizes_schema_scope(resolved, &self.allowed_schema_names));
+        let schema_scope_authorized = source_connection.as_ref().is_ok_and(|resolved| {
+            registry.authorizes_schema_scope(resolved, &self.allowed_schema_names)
+        });
         let elapsed = Instant::now().saturating_duration_since(operation_started_at);
         let operation_timeout = Duration::from_millis(self.limits.operation_timeout_ms);
         if elapsed >= operation_timeout {
@@ -468,9 +477,9 @@ impl AuthorizedObservationRequest {
     }
 }
 
-fn is_valid_source_connection_key(value: &str) -> bool {
+fn is_valid_opaque_multiword_identifier(value: &str, max_bytes: usize) -> bool {
     let bytes = value.as_bytes();
-    if bytes.len() > MAX_SOURCE_CONNECTION_KEY_BYTES {
+    if bytes.len() > max_bytes {
         return false;
     }
 
