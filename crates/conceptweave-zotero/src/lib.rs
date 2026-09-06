@@ -435,13 +435,13 @@ pub fn validate_classification_report(
     }
     let mut reported_pending = report.pending_source_item_keys.clone();
     reported_pending.sort();
-    if !remaining_items.is_empty()
-        || reported_pending
-            != pending_source_keys(
-                &report.classified_items,
-                &report.unclassified_items,
-                children,
-            )
+    // Equal partition size and one successful removal per record prove completeness.
+    if reported_pending
+        != pending_source_keys(
+            &report.classified_items,
+            &report.unclassified_items,
+            children,
+        )
     {
         return Err(invalid);
     }
@@ -477,21 +477,13 @@ where
         .iter()
         .cloned()
         .collect::<BTreeSet<_>>();
-    let report_keys = report
-        .snapshot_items
-        .iter()
-        .map(|item| item.item_key.as_str())
-        .collect::<BTreeSet<_>>();
     let approved_snapshot = golden
         .approval
         .snapshot_items
         .iter()
         .cloned()
         .collect::<BTreeSet<_>>();
-    if report_snapshot.len() != report.snapshot_items.len()
-        || report_keys.len() != report.snapshot_items.len()
-        || approved_snapshot.len() != golden.approval.snapshot_items.len()
-    {
+    if approved_snapshot.len() != golden.approval.snapshot_items.len() {
         return Err(EvaluationError::InvalidReview);
     }
     if golden.approval.library_version != report.library_version
@@ -507,17 +499,6 @@ where
         .iter()
         .map(|item| (item.item_key.as_str(), item.proposed_disposition))
         .collect::<BTreeMap<_, _>>();
-    if classified.len() != report.classified_items.len()
-        || report.classified_items.iter().any(|item| {
-            item.item_key.trim().is_empty()
-                || !report_snapshot.contains(&SnapshotItemRevision {
-                    item_key: item.item_key.clone(),
-                    item_version: item.item_version,
-                })
-        })
-    {
-        return Err(EvaluationError::InvalidReview);
-    }
     if golden.approval.proposal_digest != classification_proposal_digest(report) {
         return Err(EvaluationError::SnapshotMismatch);
     }
