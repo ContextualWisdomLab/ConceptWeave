@@ -9,8 +9,8 @@ use std::{
 
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, ObservationLimits, ObservationRequest,
-    ObservationRequestBudget, ObservationRequestError, SourceConnectionRegistry,
-    SourceObservationFailure, SourceObservationPort,
+    ObservationRequestBudget, ObservationRequestError, ResolvedSourceConnection,
+    SourceConnectionRegistry, SourceObservationFailure, SourceObservationPort,
 };
 
 fn limits() -> ObservationLimits {
@@ -28,12 +28,18 @@ impl SourceConnectionRegistry for ExactRegistry {
         source_connection_key == "grc_readonly_connection"
     }
 
+    fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
+        (source_connection_key == "grc_readonly_connection")
+            .then(|| "policy_revision_a".to_owned())
+    }
+
     fn authorizes_schema_scope(
         &self,
-        source_connection_key: &str,
+        source_connection: &ResolvedSourceConnection,
         allowed_schema_names: &[String],
     ) -> bool {
-        source_connection_key == "grc_readonly_connection"
+        source_connection.source_connection_key() == "grc_readonly_connection"
+            && source_connection.connection_policy_binding() == "policy_revision_a"
             && allowed_schema_names.len() == 1
             && allowed_schema_names[0] == "governance_core"
     }
@@ -133,7 +139,11 @@ fn denied_authorization_has_no_execution_side_effects_and_authorized_control_exe
 
     let authorized = request
         .authorize(&ExactRegistry)
-        .expect("known registry key and schema scope must issue the execution capability");
+        .expect("known registry key, policy binding and schema scope must issue the execution capability");
+    assert_eq!(
+        authorized.source_connection().connection_policy_binding(),
+        "policy_revision_a"
+    );
     assert_eq!(
         poll_ready(port.observe(&authorized, &Cancellation(false))),
         Ok("grc_readonly_connection".to_owned())
