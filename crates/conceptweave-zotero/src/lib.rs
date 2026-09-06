@@ -894,6 +894,31 @@ pub enum ClassificationRollbackOutcome {
     PartialFailure,
 }
 
+/// Legacy state vocabulary; metadata-only reconciliation emits only `Indeterminate`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClassificationRollbackState {
+    /// The restoration metadata is present at a newer item revision.
+    Restored,
+    /// The expected post-write metadata and item revision remain unchanged.
+    Unchanged,
+    /// The observed state proves neither safe outcome.
+    Indeterminate,
+}
+
+/// Secret-free evidence from one delayed, read-only rollback reconciliation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ClassificationRollbackReconciliationReceipt {
+    /// Causal state remains indeterminate; metadata alone cannot settle the write.
+    pub state: ClassificationRollbackState,
+    /// Complete operation under reconciliation.
+    pub operation: ClassificationRollbackOperation,
+    /// Successfully observed state, absent when validation or reading failed.
+    pub observed_state: Option<ClassificationItemState>,
+    /// Legacy audit slot; this read-only observer never grants a retry operation.
+    pub retry_operation: Option<ClassificationRollbackOperation>,
+}
+
 /// Secret-free evidence for restored, failed, indeterminate, and pending inverse writes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ClassificationRollbackReceipt {
@@ -1971,6 +1996,38 @@ pub fn execute_classification_rollback_with_zotero10(
     )
 }
 
+/// Re-reads one indeterminate rollback operation without performing a write.
+pub fn reconcile_classification_rollback<ReadError>(
+    operation: &ClassificationRollbackOperation,
+    read_item: impl FnOnce(&str) -> Result<ClassificationItemState, ReadError>,
+) -> ClassificationRollbackReconciliationReceipt {
+    let valid_operation = !operation.server_id.trim().is_empty()
+        && !operation.item_key.trim().is_empty()
+        && normalized_metadata(
+            &operation.expected_collection_keys,
+            &operation.expected_tags,
+        )
+        .is_ok()
+        && normalized_metadata(&operation.collection_keys, &operation.tags).is_ok();
+    let observed_state = valid_operation
+        .then(|| read_item(&operation.item_key).ok())
+        .flatten();
+    ClassificationRollbackReconciliationReceipt {
+        state: ClassificationRollbackState::Indeterminate,
+        operation: operation.clone(),
+        observed_state,
+        retry_operation: None,
+    }
+}
+
+/// Reconciles one rollback operation through the server-bound Zotero 10 adapter.
+pub fn reconcile_classification_rollback_with_zotero10(
+    operation: &ClassificationRollbackOperation,
+    adapter: &Zotero10LocalAdapter,
+) -> ClassificationRollbackReconciliationReceipt {
+    reconcile_classification_rollback(operation, |item_key| adapter.get_item(item_key))
+}
+
 fn rollback_preflight_failure(
     operations: &[ClassificationRollbackOperation],
     failed_item_key: &str,
@@ -3012,6 +3069,52 @@ mod tests {
         assert_eq!(receipt.outcome, ClassificationRollbackOutcome::Restored);
         assert_eq!(receipt.restored_item_keys, ["ABCD2345"]);
         assert_eq!(server.join().unwrap().len(), 4);
+    }
+
+    #[test]
+    fn zotero10_adapter_reconciles_an_indeterminate_rollback_without_writing() {
+        let operation = ClassificationRollbackOperation {
+            server_id: "server-10".into(),
+            item_key: "ABCD2345".into(),
+            item_version: 43,
+            expected_collection_keys: vec!["CDEF4567".into()],
+            expected_tags: vec![ItemTag {
+                tag: "classified".into(),
+                tag_type: None,
+            }],
+            collection_keys: vec!["BCDE3456".into()],
+            tags: vec![ItemTag {
+                tag: "kept".into(),
+                tag_type: Some(1),
+            }],
+        };
+        let item_body = r#"{"key":"ABCD2345","version":43,"data":{"itemType":"book","collections":["CDEF4567"],"tags":[{"tag":"classified"}]}}"#;
+        let responses: Vec<&'static str> = vec![
+            Box::leak(library_response("server-10", 99).into_boxed_str()),
+            Box::leak(raw_response(Some("server-10"), Some(43), item_body).into_boxed_str()),
+            Box::leak(library_response("server-10", 99).into_boxed_str()),
+        ];
+        let (base, server) = serve(responses);
+
+        let receipt = reconcile_classification_rollback_with_zotero10(&operation, &transport(base));
+
+        assert_eq!(receipt.state, ClassificationRollbackState::Indeterminate);
+        assert!(receipt.retry_operation.is_none());
+        assert_eq!(receipt.operation, operation);
+        assert_eq!(
+            receipt.observed_state,
+            Some(ClassificationItemState {
+                server_id: operation.server_id,
+                library_version: 99,
+                item_key: operation.item_key,
+                item_version: 43,
+                collection_keys: operation.expected_collection_keys,
+                tags: operation.expected_tags,
+            })
+        );
+        let requests = server.join().unwrap();
+        assert_eq!(requests.len(), 3);
+        assert!(requests.iter().all(|request| request.starts_with("GET ")));
     }
 
     #[test]

@@ -89,6 +89,40 @@ Remaining work: mandatory adoption by restoration, worksheet, duplicate and writ
 
 ## DDD fitness constraints
 
+### PR #21 delayed observation authority repair (2026-09-06)
+
+Untouched `09c84e4cdb1393a5e450f5200b87f292eeea956f` passed 119 tests/22 suites.
+Normal merge `ec2baac` preserves that delta and repaired PR #20 `000b37b`;
+integration passed 142 tests/22 suites. Conflicts retain the delayed observer
+while preserving parent forward/inverse uncertainty and complete request fields.
+
+Behavioral RED `f2cf4ae` compiled and failed one of two reconciliation tests:
+metadata-only observation returned `Restored` instead of `Indeterminate`.
+Owner fix `f9c2c03` retains local operation validation, the single callback read,
+complete operation and complete observation, but never infers completion or
+termination and never emits a retry operation. The obsolete state classifier is
+removed. All eight metadata cases remain; the adapter test compares the complete
+state and proves its three HTTP requests are GETs. Legacy enum variants and the
+optional retry slot remain compatible, not authority-producing outputs.
+
+At `f9c2c03`, 142 tests/22 suites including three doctests, strict Clippy,
+warnings-denied rustdoc, format/CI-contract/diff and unchanged coverage pass:
+268/268 functions, 2360/2360 normalized regions and 400/400 normalized branches.
+Raw LLVM remains 3077/3137 lines, 4616/4713 regions and 356/400 branches, not 100%.
+Logs use `/tmp/conceptweave-pr21-causal-` with `red.log`, `final.log`, `clippy.log`,
+`rustdoc.log`, `coverage.log`; doc/test-name-only follow-up uses `complete.log`
+and `rustdoc-complete.log`. Independent review found no blocking issue.
+
+PRD/TRD/Proposed ADR retain the distinct downstream gap: opaque full-text wrappers
+must retain the entire prior rollback receipt, exact submitted request, binding
+and untouched tail. An operation-only observation cannot substitute that envelope.
+No new approval or capability layer was introduced. Next verified successor is
+PR #22 review context `7179d13b45d160682e4cce1473c145d465fe657b`.
+No fresh visual evidence was collected; the latest native attempt encountered
+the locked Mac. Historical 3,719 displayed items are not classification evidence.
+Actual decisions/approvals stay 0/3,715 plus four pending sources. No real
+authorization, mutation, recovery, protected merge or release occurred.
+
 ### PR #20 rollback uncertainty repair (2026-09-06)
 
 Untouched `a03a7248c894a1e0765968ddf58514d98c517da3` passed 116 tests/21 suites.
