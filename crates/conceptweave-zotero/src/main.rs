@@ -391,6 +391,28 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(unix)]
+    fn opening_private_input_refuses_a_symlink_before_reading() {
+        use std::os::unix::fs::symlink;
+        let target = unique_temp_path("open-target");
+        let link = unique_temp_path("open-symlink");
+        write_private_output(&target, b"{}").unwrap();
+        symlink(&target, &link).unwrap();
+        let result = open_with_metadata(&link);
+        fs::remove_file(&link).unwrap();
+        fs::remove_file(&target).unwrap();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn private_input_rejects_a_nameless_child_of_the_validated_parent() {
+        let path = env::temp_dir().join("..");
+        let error = read_private_json::<serde_json::Value>(path.to_str().unwrap()).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+        assert_eq!(error.to_string(), "review input has no file name");
+    }
+
+    #[test]
     fn worksheet_mode_is_explicit_and_rejects_ambiguous_arguments() {
         let report = "/tmp/conceptweave-zotero-report.json";
         let worksheet = "/tmp/conceptweave-zotero-worksheet.json";
