@@ -21,6 +21,10 @@ pub use full_text_capture::{
     build_full_text_review_worksheet, evaluate_full_text_review, finalize_full_text_review,
 };
 pub use full_text_capture::{
+    FullTextRollbackReceipt, FullTextRollbackReconciliationReceipt, execute_full_text_rollback,
+    reconcile_full_text_rollback, retry_full_text_reconciled_rollback, retry_full_text_rollback,
+};
+pub use full_text_capture::{
     FullTextWritePlan, FullTextWriteReceipt, FullTextWriteScope, build_full_text_write_plan,
     execute_full_text_write_plan,
 };

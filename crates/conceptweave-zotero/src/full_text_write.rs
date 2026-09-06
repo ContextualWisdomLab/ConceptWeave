@@ -38,10 +38,9 @@ struct FullTextWriteBinding {
 /// executable restoration. Retain the owner-only scope to verify receipt hashes.
 ///
 /// ```compile_fail
-/// use conceptweave_zotero::{FullTextWritePlan, execute_classification_write_plan};
-/// fn detach(plan: &FullTextWritePlan) {
-///     execute_classification_write_plan(&plan.write_plan,
-///         |_| Ok::<_, ()>(unreachable!()), |_| Ok::<_, ()>(unreachable!()));
+/// use conceptweave_zotero::{FullTextWritePlan, ClassificationWritePlan};
+/// fn detach(plan: &FullTextWritePlan) -> &ClassificationWritePlan {
+///     &plan.write_plan
 /// }
 /// ```
 #[derive(Serialize)]
@@ -59,6 +58,23 @@ pub struct FullTextWriteReceipt {
     full_text_write_v1: FullTextWriteBinding,
     #[serde(serialize_with = "serialize_write_result")]
     write_result: ClassificationWriteReceipt,
+}
+
+/// One bound rollback attempt, including operations still awaiting resolution.
+/// Keep earlier receipts: this outcome reports this attempt, not a new approval.
+#[derive(Serialize)]
+pub struct FullTextRollbackReceipt {
+    full_text_write_v1: FullTextWriteBinding,
+    rollback_result: crate::ClassificationRollbackReceipt,
+}
+
+/// Read-only reconciliation retaining the same scope and untouched recovery work.
+/// An indeterminate result cannot be retried until another observation resolves it.
+#[derive(Serialize)]
+pub struct FullTextRollbackReconciliationReceipt {
+    full_text_write_v1: FullTextWriteBinding,
+    reconciliation_result: crate::ClassificationRollbackReconciliationReceipt,
+    remaining_operations: Vec<crate::ClassificationRollbackOperation>,
 }
 
 fn serialize_write_result<S: serde::Serializer>(
@@ -140,4 +156,91 @@ pub fn execute_full_text_write_plan<ReadError, WriteError>(
             write_item,
         ),
     }
+}
+
+/// Restores verified writes without accepting detached or mixed inverse operations.
+/// Unknown write state, dry-run and an empty inverse set fail before any I/O.
+/// An unknown write requires separate write reconciliation, not an empty rollback.
+pub fn execute_full_text_rollback<ReadError, WriteError>(
+    receipt: &FullTextWriteReceipt,
+    preflight: impl FnMut(&str) -> Result<ClassificationItemState, ReadError>,
+    write_item: impl FnMut(&ClassificationWriteRequest) -> Result<ClassificationItemState, WriteError>,
+) -> Result<FullTextRollbackReceipt, FullTextError> {
+    if receipt.full_text_write_v1.mode != WriteMode::Execute
+        || receipt.write_result.indeterminate_item_key.is_some()
+        || receipt.write_result.rollback_operations.is_empty()
+    {
+        return Err(INVALID_WRITE_SCOPE);
+    }
+    Ok(FullTextRollbackReceipt {
+        full_text_write_v1: receipt.full_text_write_v1.clone(),
+        rollback_result: crate::execute_classification_rollback(
+            &receipt.write_result.rollback_operations,
+            preflight,
+            write_item,
+        ),
+    })
+}
+
+/// Retries only the unchanged or unattempted work retained by one bound receipt.
+/// An unresolved operation must be reconciled first; it cannot be silently dropped.
+pub fn retry_full_text_rollback<ReadError, WriteError>(
+    receipt: &FullTextRollbackReceipt,
+    preflight: impl FnMut(&str) -> Result<ClassificationItemState, ReadError>,
+    write_item: impl FnMut(&ClassificationWriteRequest) -> Result<ClassificationItemState, WriteError>,
+) -> Result<FullTextRollbackReceipt, FullTextError> {
+    if receipt.rollback_result.indeterminate_operation.is_some()
+        || receipt.rollback_result.remaining_operations.is_empty()
+    {
+        return Err(INVALID_WRITE_SCOPE);
+    }
+    Ok(FullTextRollbackReceipt {
+        full_text_write_v1: receipt.full_text_write_v1.clone(),
+        rollback_result: crate::execute_classification_rollback(
+            &receipt.rollback_result.remaining_operations,
+            preflight,
+            write_item,
+        ),
+    })
+}
+
+/// Observes the unresolved operation in a bound rollback receipt, without writing.
+/// The untouched tail stays attached so resolving one item cannot discard it.
+pub fn reconcile_full_text_rollback<ReadError>(
+    receipt: &FullTextRollbackReceipt,
+    read_item: impl FnOnce(&str) -> Result<ClassificationItemState, ReadError>,
+) -> Result<FullTextRollbackReconciliationReceipt, FullTextError> {
+    let operation = receipt
+        .rollback_result
+        .indeterminate_operation
+        .as_ref()
+        .ok_or(INVALID_WRITE_SCOPE)?;
+    Ok(FullTextRollbackReconciliationReceipt {
+        full_text_write_v1: receipt.full_text_write_v1.clone(),
+        reconciliation_result: crate::reconcile_classification_rollback(operation, read_item),
+        remaining_operations: receipt.rollback_result.remaining_operations.clone(),
+    })
+}
+
+/// Retries a resolved operation and its untouched tail through complete preflight.
+/// Already restored work is not written again; unresolved work makes zero I/O.
+pub fn retry_full_text_reconciled_rollback<ReadError, WriteError>(
+    receipt: &FullTextRollbackReconciliationReceipt,
+    preflight: impl FnMut(&str) -> Result<ClassificationItemState, ReadError>,
+    write_item: impl FnMut(&ClassificationWriteRequest) -> Result<ClassificationItemState, WriteError>,
+) -> Result<FullTextRollbackReceipt, FullTextError> {
+    if receipt.reconciliation_result.state == crate::ClassificationRollbackState::Indeterminate {
+        return Err(INVALID_WRITE_SCOPE);
+    }
+    let operations = receipt
+        .reconciliation_result
+        .retry_operation
+        .iter()
+        .cloned()
+        .chain(receipt.remaining_operations.iter().cloned())
+        .collect::<Vec<_>>();
+    Ok(FullTextRollbackReceipt {
+        full_text_write_v1: receipt.full_text_write_v1.clone(),
+        rollback_result: crate::execute_classification_rollback(&operations, preflight, write_item),
+    })
 }
