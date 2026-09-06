@@ -92,7 +92,7 @@ impl SourceObservationPort for CountedObservationPort {
 
     fn observe<'a>(
         &'a self,
-        request: &'a AuthorizedObservationRequest,
+        request: AuthorizedObservationRequest,
         cancellation: &'a dyn ObservationCancellation,
     ) -> impl Future<Output = Result<Self::Snapshot, SourceObservationFailure>> + Send + 'a {
         async move {
@@ -142,16 +142,11 @@ fn denied_authorization_has_no_execution_side_effects_and_authorized_control_exe
     let port = CountedObservationPort::default();
 
     let denied = request.clone().authorize(&DenyRegistry);
-    let denied_execution = denied
-        .as_ref()
-        .ok()
-        .map(|authorized| port.observe(authorized, &Cancellation(false)));
 
     assert_eq!(
         denied,
         Err(ObservationRequestError::UnknownSourceConnectionKey)
     );
-    assert!(denied_execution.is_none());
     assert_eq!(port.adapter_invocations.load(Ordering::Relaxed), 0);
     assert_eq!(port.source_accesses.load(Ordering::Relaxed), 0);
     assert_eq!(port.snapshot_constructions.load(Ordering::Relaxed), 0);
@@ -164,7 +159,7 @@ fn denied_authorization_has_no_execution_side_effects_and_authorized_control_exe
         "policy_revision_a"
     );
     assert_eq!(
-        poll_ready(port.observe(&authorized, &Cancellation(false))),
+        poll_ready(port.observe(authorized, &Cancellation(false))),
         Ok("grc_readonly_connection".to_owned())
     );
     assert_eq!(port.adapter_invocations.load(Ordering::Relaxed), 1);
