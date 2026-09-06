@@ -6,6 +6,14 @@ This file records code-current product and technical gaps. Exact PR/check/run co
 
 ## September 6 source inventory checkpoint
 
+### September 7 PR28 metadata roundtrip continuity repair
+
+Normal merge `13b5529` preserves original PR28 `ba6b3dfc71cf89ed4c57b85da0dd9ca5f983efee` and PR27 `fd5ef23c1c23fa36ef106400e15c9438eaa5cd41`. RED `97fc490` compiled with four passing and two failing roundtrip tests: inconsistent retained parent coordinates passed shared admission, while valid pending orphan metadata failed worksheet restoration. `1157b1d` centralizes parent validation and removes divergent worksheet checks; `e102894` removes an implied evaluator guard and preserves coherent-mutation stale-approval rejection. Independent read-only review found no further production defect in the bounded repair.
+
+Source `e102894` passes 179 tests/26 suites including three doctests, strict all-target Clippy, warnings-denied rustdoc, formatting, CI contract and diff checks. The unchanged coverage gate passes 299/299 functions, 2,642/2,642 normalized regions and 470/470 normalized branches. Raw coverage remains 3,449/3,511 lines, 5,245/5,352 regions and 425/470 branches, not 100%. Logs: `/tmp/conceptweave-pr28-{parent-red,final-tests,clippy,rustdoc,coverage}.log`. Documentation amendment `29cc97a` distinguishes the restored metadata projection from raw source/full-text capture. Unknown provider fields stay excluded; no new capture mechanism or dependency was added.
+
+Root and later consumers have not yet inherited these repairs. Authentic decisions and independent approvals remain 0/3,715, with four unresolved standalone sources. Synthetic fixtures are not paper review evidence. Native Zotero Visual Inspection was retried but the Mac is locked; no new screen evidence exists. No real Zotero write, hosted GREEN, protected approval/merge or release is claimed. Preserve Draft and continue normal successor integration with fresh exact-head evidence.
+
 ### September 7 PR27 finalization continuity repair
 
 Final source `da2556b` passes 172 tests/25 suites including three doctests, strict all-target Clippy, warnings-denied rustdoc, formatting, CI contract and diff checks. The unchanged pinned coverage gate passes 295/295 functions, 2,611/2,611 normalized regions and 468/468 normalized branches. Raw coverage remains 3,436/3,498 lines, 5,214/5,321 regions and 423/468 branches, not 100%. Logs: `/tmp/conceptweave-pr27-verified.log` and `/tmp/conceptweave-pr27-{clippy,rustdoc,coverage}-verified.log`. Both baseline and integration finished before their successors were edited; the final documentation commit receives its own full verification.
