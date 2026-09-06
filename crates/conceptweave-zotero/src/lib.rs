@@ -909,13 +909,13 @@ pub enum ClassificationRollbackState {
 /// Secret-free evidence from one delayed, read-only rollback reconciliation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ClassificationRollbackReconciliationReceipt {
-    /// State proven by the delayed observation.
+    /// Causal state remains indeterminate; metadata alone cannot settle the write.
     pub state: ClassificationRollbackState,
     /// Complete operation under reconciliation.
     pub operation: ClassificationRollbackOperation,
     /// Successfully observed state, absent when validation or reading failed.
     pub observed_state: Option<ClassificationItemState>,
-    /// Operation eligible for the existing complete-preflight retry path.
+    /// Legacy audit slot; this read-only observer never grants a retry operation.
     pub retry_operation: Option<ClassificationRollbackOperation>,
 }
 
@@ -2012,16 +2012,11 @@ pub fn reconcile_classification_rollback<ReadError>(
     let observed_state = valid_operation
         .then(|| read_item(&operation.item_key).ok())
         .flatten();
-    let state = observed_state
-        .as_ref()
-        .map(|observed| classify_rollback_state(observed, operation))
-        .unwrap_or(ClassificationRollbackState::Indeterminate);
     ClassificationRollbackReconciliationReceipt {
-        state,
+        state: ClassificationRollbackState::Indeterminate,
         operation: operation.clone(),
         observed_state,
-        retry_operation: (state == ClassificationRollbackState::Unchanged)
-            .then(|| operation.clone()),
+        retry_operation: None,
     }
 }
 
@@ -2050,32 +2045,6 @@ fn rollback_preflight_failure(
             .map(|item| item.item_key.clone())
             .collect(),
         remaining_operations: operations.to_vec(),
-    }
-}
-
-fn classify_rollback_state(
-    state: &ClassificationItemState,
-    operation: &ClassificationRollbackOperation,
-) -> ClassificationRollbackState {
-    let Some((collections, tags)) = normalized_metadata(&state.collection_keys, &state.tags).ok()
-    else {
-        return ClassificationRollbackState::Indeterminate;
-    };
-    if state.server_id != operation.server_id || state.item_key != operation.item_key {
-        return ClassificationRollbackState::Indeterminate;
-    }
-    if state.item_version == operation.item_version
-        && collections == operation.expected_collection_keys
-        && tags == operation.expected_tags
-    {
-        ClassificationRollbackState::Unchanged
-    } else if state.item_version > operation.item_version
-        && collections == operation.collection_keys
-        && tags == operation.tags
-    {
-        ClassificationRollbackState::Restored
-    } else {
-        ClassificationRollbackState::Indeterminate
     }
 }
 
@@ -3132,7 +3101,20 @@ mod tests {
         assert_eq!(receipt.state, ClassificationRollbackState::Indeterminate);
         assert!(receipt.retry_operation.is_none());
         assert_eq!(receipt.operation, operation);
-        assert_eq!(server.join().unwrap().len(), 3);
+        assert_eq!(
+            receipt.observed_state,
+            Some(ClassificationItemState {
+                server_id: operation.server_id,
+                library_version: 99,
+                item_key: operation.item_key,
+                item_version: 43,
+                collection_keys: operation.expected_collection_keys,
+                tags: operation.expected_tags,
+            })
+        );
+        let requests = server.join().unwrap();
+        assert_eq!(requests.len(), 3);
+        assert!(requests.iter().all(|request| request.starts_with("GET ")));
     }
 
     #[test]
