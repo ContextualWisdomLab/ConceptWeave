@@ -6,6 +6,8 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
+- Research inventory now distinguishes three additional statistical-library candidates from adopted integrations and reviewed papers, with source-bound limitations and follow-up requirements.
+
 - Full-text-reviewed changes can now carry separately verified destination and execution approval through the local write and recovery workflow. Unknown writes remain unresolved until their state is proven; no command issues approval or changes the live library.
 
 - Private review commands now show saved text, accept completed decisions without replacing earlier work, and prepare a complete review for independent approval verification. They do not supply decisions or approve a review.

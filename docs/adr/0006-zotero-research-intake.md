@@ -47,6 +47,12 @@ No dedicated utility repository or Zotero mutation path is created. A future Zot
 
 ## Consequences
 
+### 2026-09-06 statistical-owner discovery amendment (Proposed)
+
+In the context of identifying reusable evidence from CWL statistical libraries, facing source-level implementations without verified consumer releases and methods with different population/anchor/observation assumptions, we decided to record exact-source cultivation requirements within the existing Research Intake inventory, and against importing their numerical code, inventing relevance weights or creating another utility owner, to keep research evidence distinct from semantic decisions, accepting that release, design-conformance and runtime validation remain prerequisites.
+
+The [three-owner audit](../doctoring/cwl_ontology_capability_inventory.md#statistical-library-contract-audits-2026-09-06) records kaefa's heuristic search and unavailable criteria, aFIPC's eligible versus skipped anchors, and nonnest2's unchecked observation-alignment precondition. The positive consequence is an inspectable path from source and primary literature to future acceptance tests. The negative consequence is no immediate scoring adoption or paper-decision increase. Reusing existing measurement owners is preferred; a new repository has no demonstrated independent deployment/consumer need. Next evidence is a released owner contract, population/design and full failure-denominator checks, applicable recovery/error measurements, and exact-consumer conformance. This amendment does not approve a license, change any equation or promote this ADR to Accepted.
+
 ### 2026-09-05 earliest-owner private artifact repair amendment (Proposed)
 
 In the context of independently reviewed stacked pull requests, facing a shared private JSON defect fixed only in a later child, we decided for a minimal repair at the original reader boundary and ordinary parent-to-child merges and against accepting vulnerable predecessors, reverse-merging later full-text features or discarding predecessor deltas, to make each proposed slice independently verifiable, accepting repeated checks at every changed head.

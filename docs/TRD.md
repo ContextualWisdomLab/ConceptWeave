@@ -57,6 +57,8 @@ Source artifacts are untrusted input. Adapters must enforce source size/type bou
 
 ## 10. Evaluation
 
+Future statistical-evidence admission must bind response population/design, modeled-variable identity, paired observation order and missingness, estimator/criterion revision, applicable anchor/item/category versions, and attempted/failed/unavailable counts. Preserve declared versus applied/skipped anchors and distinguish model distinguishability from relative fit. A fit statistic is not calibrated semantic confidence. The [kaefa/aFIPC/nonnest2 source audit](doctoring/cwl_ontology_capability_inventory.md#statistical-library-contract-audits-2026-09-06) identifies owner conformance work, not implemented consumer contracts. Existing measurement owners retain computation; no legacy R code, new Python/R hot path or heuristic scoring fallback is adopted. A future owner release must meet the Rust-first production policy and exact-consumer verification before use.
+
 Evaluation must separate extraction recall, semantic correctness, structural correctness, ontology consistency, mapping accuracy, measure correctness, and governance outcomes. Model-judge scores may supplement but never replace deterministic golden fixtures and human-reviewed expert cases.
 
 ## 11. Zotero research intake
