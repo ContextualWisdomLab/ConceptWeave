@@ -7,37 +7,39 @@ const SYNTHETIC_API_KEY: &str = "0123456789abcdef0123456789abcdef";
 
 #[test]
 fn failed_http_write_with_matching_observation_remains_indeterminate() {
-    let report = classify_snapshot(
-        "10.0.1".into(),
-        Some("server-10".into()),
-        42,
-        vec![item("ABCD2345", "book", "ontology learning", "", "")],
-    );
-    let expected_request = write_request();
-    let review = ReviewedClassificationWriteSet {
-        review_id: "synthetic-review".into(),
-        authority_receipt: "synthetic-authority".into(),
-        server_id: report.server_id.clone(),
-        zotero_version: report.zotero_version.clone(),
-        library_version: report.library_version,
-        rule_revision: report.rule_revision.into(),
-        snapshot_digest: report.snapshot_digest.clone(),
-        proposal_digest: classification_proposal_digest(&report),
-        snapshot_items: report.snapshot_items.clone(),
-        changes: vec![ReviewedClassificationChange {
-            item_key: expected_request.item_key.clone(),
-            item_version: expected_request.item_version,
-            reviewed_disposition: Disposition::Generation,
-            before_collection_keys: vec![],
-            before_tags: vec![],
-            after_collection_keys: expected_request.collection_keys.clone(),
-            after_tags: expected_request.tags.clone(),
-        }],
-    };
-    let plan =
-        build_classification_write_plan(&report, &review, WriteMode::Execute, |set| set == &review)
-            .unwrap();
-    let responses = vec![
+    for use_public_boundary in [false, true] {
+        let report = classify_snapshot(
+            "10.0.1".into(),
+            Some("server-10".into()),
+            42,
+            vec![item("ABCD2345", "book", "ontology learning", "", "")],
+        );
+        let expected_request = write_request();
+        let review = ReviewedClassificationWriteSet {
+            review_id: "synthetic-review".into(),
+            authority_receipt: "synthetic-authority".into(),
+            server_id: report.server_id.clone(),
+            zotero_version: report.zotero_version.clone(),
+            library_version: report.library_version,
+            rule_revision: report.rule_revision.into(),
+            snapshot_digest: report.snapshot_digest.clone(),
+            proposal_digest: classification_proposal_digest(&report),
+            snapshot_items: report.snapshot_items.clone(),
+            changes: vec![ReviewedClassificationChange {
+                item_key: expected_request.item_key.clone(),
+                item_version: expected_request.item_version,
+                reviewed_disposition: Disposition::Generation,
+                before_collection_keys: vec![],
+                before_tags: vec![],
+                after_collection_keys: expected_request.collection_keys.clone(),
+                after_tags: expected_request.tags.clone(),
+            }],
+        };
+        let plan = build_classification_write_plan(&report, &review, WriteMode::Execute, |set| {
+            set == &review
+        })
+        .unwrap();
+        let responses = vec![
         library_response("server-10", 42),
         raw_response(
             Some("server-10"),
@@ -51,67 +53,72 @@ fn failed_http_write_with_matching_observation_remains_indeterminate() {
         item_response("server-10", 43),
         library_response("server-10", 43),
     ];
-    let (base, server) = serve(
-        responses
-            .into_iter()
-            .map(|response| &*Box::leak(response.into_boxed_str()))
-            .collect(),
-    );
-    let adapter =
-        Zotero10LocalAdapter::new_with_base(SYNTHETIC_API_KEY, "server-10", base).unwrap();
-    let receipt = execute_classification_write_plan(
-        &plan,
-        |key| adapter.get_item(key),
-        |request| {
-            let result = adapter.write_item(request);
-            assert_eq!(result, Err(ZoteroTransportError::RequestFailed));
-            result
-        },
-    );
-    let requests = server.join().unwrap();
-    assert_eq!(requests.len(), 7);
-    assert_eq!(
-        requests
-            .iter()
-            .filter(|request| request.starts_with("POST "))
-            .count(),
-        1
-    );
-    let body: serde_json::Value =
-        serde_json::from_str(requests[3].split_once("\r\n\r\n").unwrap().1).unwrap();
-    assert_eq!(
-        body[0]["collections"],
-        serde_json::json!(expected_request.collection_keys)
-    );
-    assert_eq!(
-        body[0]["tags"],
-        serde_json::to_value(&expected_request.tags).unwrap()
-    );
-    assert_eq!(receipt.outcome, ClassificationWriteOutcome::PartialFailure);
-    assert_eq!(receipt.indeterminate_item_key.as_deref(), Some("ABCD2345"));
-    assert_eq!(
-        receipt.indeterminate_request,
-        Some(expected_request.clone())
-    );
-    assert_eq!(
-        receipt.reconciliation_observation,
-        Some(ClassificationItemState {
-            server_id: expected_request.server_id,
-            library_version: 43,
-            item_key: expected_request.item_key,
-            item_version: 43,
-            collection_keys: expected_request.collection_keys,
-            tags: expected_request.tags,
-        })
-    );
-    assert_eq!(receipt.proposal_digest, review.proposal_digest);
-    assert!(receipt.applied_item_keys.is_empty());
-    assert!(receipt.rollback_operations.is_empty());
-    assert!(
-        !serde_json::to_string(&plan)
-            .unwrap()
-            .contains(SYNTHETIC_API_KEY)
-    );
+        let (base, server) = serve(
+            responses
+                .into_iter()
+                .map(|response| &*Box::leak(response.into_boxed_str()))
+                .collect(),
+        );
+        let adapter =
+            Zotero10LocalAdapter::new_with_base(SYNTHETIC_API_KEY, "server-10", base).unwrap();
+        let receipt = if use_public_boundary {
+            execute_classification_write_plan_with_zotero10(&plan, &adapter)
+        } else {
+            execute_classification_write_plan(
+                &plan,
+                |key| adapter.get_item(key),
+                |request| {
+                    let result = adapter.write_item(request);
+                    assert_eq!(result, Err(ZoteroTransportError::RequestFailed));
+                    result
+                },
+            )
+        };
+        let requests = server.join().unwrap();
+        assert_eq!(requests.len(), 7);
+        assert_eq!(
+            requests
+                .iter()
+                .filter(|request| request.starts_with("POST "))
+                .count(),
+            1
+        );
+        let body: serde_json::Value =
+            serde_json::from_str(requests[3].split_once("\r\n\r\n").unwrap().1).unwrap();
+        assert_eq!(
+            body[0]["collections"],
+            serde_json::json!(expected_request.collection_keys)
+        );
+        assert_eq!(
+            body[0]["tags"],
+            serde_json::to_value(&expected_request.tags).unwrap()
+        );
+        assert_eq!(receipt.outcome, ClassificationWriteOutcome::PartialFailure);
+        assert_eq!(receipt.indeterminate_item_key.as_deref(), Some("ABCD2345"));
+        assert_eq!(
+            receipt.indeterminate_request,
+            Some(expected_request.clone())
+        );
+        assert_eq!(
+            receipt.reconciliation_observation,
+            Some(ClassificationItemState {
+                server_id: expected_request.server_id,
+                library_version: 43,
+                item_key: expected_request.item_key,
+                item_version: 43,
+                collection_keys: expected_request.collection_keys,
+                tags: expected_request.tags,
+            })
+        );
+        assert_eq!(receipt.proposal_digest, review.proposal_digest);
+        assert!(receipt.applied_item_keys.is_empty());
+        assert!(receipt.rollback_operations.is_empty());
+        assert!(
+            !serde_json::to_string(&plan)
+                .unwrap()
+                .contains(SYNTHETIC_API_KEY)
+        );
+    }
 }
 
 #[test]

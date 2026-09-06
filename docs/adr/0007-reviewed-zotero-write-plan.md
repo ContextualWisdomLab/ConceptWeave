@@ -18,7 +18,7 @@ ConceptWeave builds a local-only `ClassificationWritePlan` from an externally ve
 
 Execute planning fails closed for Zotero versions below 10. The plan contains no API key and performs no network call. Dry-run enumerates every operation as not attempted. The execution core accepts caller-owned preflight and write functions, preflights the complete plan before the first mutation, and verifies server, library, item revision, collection, and typed-tag responses. After a failed or invalid response, a follow-up read is observation only: matching before-state cannot prove a delayed request terminated, and matching after-state or a newer revision cannot prove which writer caused it. The receipt keeps the exact submitted request and optional observation, always names that item as indeterminate, and creates no inverse for that unconfirmed write. Earlier directly verified applied items and their inverse coordinates remain intact. The API key remains adapter-owned. Cross-item transactionality is not claimed, and source records and attachments are never deleted.
 
-The authenticated Zotero 10+ adapter is a narrow loopback transport for those injected functions. A caller may supply credentials directly or perform one official `/api/local/authorize` request with a bounded nonblank application name and expected server identity. Every authorization, read, and write response must repeat that identity before status classification. Success returns an exact 32-character header-safe key plus the remembered decision; denial requires same-server bounded JSON with `denied: true`. The private authorization wrapper can only disclose the remembered decision or be consumed into the existing adapter; neither value is debuggable or serializable. Denial and rate limiting never trigger an automatic retry or repeated prompt, and only a bounded integer retry delay is retained. Writes distinguish an expired authorization from a matching-server stale precondition, while a different-server `412` invalidates the read/write partition as a database switch. Static error categories cannot echo a credential, response body, or URL. Cross-item transactionality is not claimed, and source records and attachments are never deleted.
+The authenticated Zotero 10+ adapter is a narrow loopback transport for those injected functions. A caller may supply credentials directly or perform one official `/api/local/authorize` request with a bounded nonblank application name and expected server identity. Every authorization, read, and write response must repeat that identity before status classification. Success returns an exact 32-character header-safe key plus the remembered decision; denial requires same-server bounded JSON with `denied: true`. The private authorization wrapper can only disclose the remembered decision or be consumed into the existing adapter; neither value is debuggable or serializable. Denial and rate limiting never trigger an automatic retry or repeated prompt, and only a bounded integer retry delay is retained. Writes distinguish an expired authorization from a matching-server stale precondition, while a different-server `412` invalidates the read/write partition as a database switch. One public adapter execution boundary delegates to the existing reviewed execution core, preserving its complete preflight, reconciliation, and rollback receipt rather than creating parallel mutation logic. Static error categories cannot echo a credential, response body, or URL. Cross-item transactionality is not claimed, and source records and attachments are never deleted.
 
 ## Consequences
 
@@ -55,6 +55,18 @@ adopt the required field without deriving fresh authority from serialized plans.
 ## Alternatives considered
 
 ### Execution evidence correction (2026-09-06, Proposed)
+
+PR #19 keeps its thin public adapter execution boundary and adopts the same
+private proposal-bound plan and uncertainty semantics. Integration `bf4b2e5`
+exposed the test's missing required digest. `785cdf5` uses the existing verified
+plan builder and exercises both core and public wrapper on failed HTTP writes;
+`5693f12` aligns the source fixture with the reviewed nonempty before-state after
+the builder correctly rejected it as stale. No validator was relaxed. The test
+verifier is synthetic and provides no real-world approval. A stale PRD paragraph
+allowing an inverse for an observed unexpected mutation is corrected to match
+the original-owner runtime and this decision. Existing delegation is retained
+instead of adding a second execution path, accepting that genuine authorization,
+independent approval and live recovery evidence remain separate outstanding gates.
 
 PR #17 integration preserves the transport implementation while inheriting the
 original-owner fix. Test `97cce5a`, strengthened by `29a3771`, composes authenticated

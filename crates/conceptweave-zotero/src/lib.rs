@@ -1819,6 +1819,23 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
     }
 }
 
+/// Executes a reviewed plan through one server-bound Zotero 10 adapter.
+///
+/// The adapter may be created from a successful local authorization or from an
+/// exact caller-owned local key. The existing execution core retains dry-run,
+/// complete-preflight and receipt behavior. A failed write remains indeterminate;
+/// matching observations do not grant completion, retry, or rollback authority.
+pub fn execute_classification_write_plan_with_zotero10(
+    plan: &ClassificationWritePlan,
+    adapter: &Zotero10LocalAdapter,
+) -> ClassificationWriteReceipt {
+    execute_classification_write_plan(
+        plan,
+        |item_key| adapter.get_item(item_key),
+        |request| adapter.write_item(request),
+    )
+}
+
 fn matches_before_state(
     state: &ClassificationItemState,
     server_id: &str,
@@ -2705,6 +2722,74 @@ mod tests {
             Ok(_) => panic!("authorization unexpectedly succeeded"),
             Err(error) => error,
         }
+    }
+
+    #[test]
+    fn approved_zotero10_adapter_executes_the_reviewed_plan_boundary() {
+        let mut source_item = item("ABCD2345", "book", "ontology learning", "", "");
+        source_item.data.collections = vec!["BCDE3456".into()];
+        source_item.data.tags = vec![ItemTag {
+            tag: "kept".into(),
+            tag_type: Some(1),
+        }];
+        let report = classify_snapshot(
+            "10.0.0".into(),
+            Some("server-10".into()),
+            42,
+            vec![source_item],
+        );
+        let review = ReviewedClassificationWriteSet {
+            review_id: "review-1".into(),
+            authority_receipt: "authority-1".into(),
+            server_id: report.server_id.clone(),
+            zotero_version: report.zotero_version.clone(),
+            library_version: report.library_version,
+            rule_revision: report.rule_revision.into(),
+            snapshot_digest: report.snapshot_digest.clone(),
+            proposal_digest: classification_proposal_digest(&report),
+            snapshot_items: report.snapshot_items.clone(),
+            changes: vec![ReviewedClassificationChange {
+                item_key: "ABCD2345".into(),
+                item_version: 7,
+                reviewed_disposition: Disposition::Generation,
+                before_collection_keys: vec!["BCDE3456".into()],
+                after_collection_keys: vec!["CDEF4567".into()],
+                before_tags: vec![ItemTag {
+                    tag: "kept".into(),
+                    tag_type: Some(1),
+                }],
+                after_tags: vec![ItemTag {
+                    tag: "classified".into(),
+                    tag_type: None,
+                }],
+            }],
+        };
+        let plan = build_classification_write_plan(&report, &review, WriteMode::Execute, |set| {
+            set == &review
+        })
+        .unwrap();
+        let before = library_response("server-10", 42);
+        let item = item_response("server-10", 7);
+        let after = library_response("server-10", 42);
+        let written_body = r#"{"successful":{"0":{"key":"ABCD2345","version":43,"data":{"itemType":"book","collections":["CDEF4567"],"tags":[{"tag":"classified"}]}}}}"#;
+        let written = format!(
+            "HTTP/1.1 200 OK\r\nZotero-Server-ID: server-10\r\nLast-Modified-Version: 43\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{written_body}",
+            written_body.len()
+        );
+        let (base, server) = serve(vec![
+            Box::leak(before.into_boxed_str()),
+            Box::leak(item.into_boxed_str()),
+            Box::leak(after.into_boxed_str()),
+            Box::leak(written.into_boxed_str()),
+        ]);
+
+        let receipt = execute_classification_write_plan_with_zotero10(&plan, &transport(base));
+
+        assert_eq!(receipt.outcome, ClassificationWriteOutcome::Applied);
+        assert_eq!(receipt.proposal_digest, review.proposal_digest);
+        assert_eq!(receipt.applied_item_keys, ["ABCD2345"]);
+        assert_eq!(receipt.rollback_operations[0].item_version, 43);
+        assert_eq!(server.join().unwrap().len(), 4);
     }
 
     #[test]
