@@ -56,6 +56,8 @@ All LLM-backed induction uses `contextual-orchestrator`. Model output is untrust
 
 ### FR-9 Research evidence intake
 
+Evaluation must reject omitted or inconsistent retained sources before requesting approval. Changing retained source metadata invalidates prior approval, even when paper predictions stay unchanged. Empty or unresolved-only inventories remain auditable evidence and must not acquire reviewed-paper counts.
+
 Preserve every observed source, including standalone files and notes outside the bibliographic proposals. Keep unresolved source relationships visible instead of treating a completed bibliography worksheet as a completed library review. All standalone sources and records without a valid path to a bibliographic parent need explicit reconciliation; notes, files and annotations must not acquire paper labels from their titles. Retraction and correction evidence remains separate from topic classification and approval. The current producer retains this inventory; downstream reconciliation, completion admission and independent governance remain required, not implemented by inventory generation alone.
 
 Library reads must finish within a bounded observation window or fail visibly without returning a partial classification. Slowly arriving pages cannot keep a run open indefinitely, and missing time budget must not be handled by silently dropping papers.

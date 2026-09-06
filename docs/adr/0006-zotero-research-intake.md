@@ -72,6 +72,8 @@ GREEN source `f6735b585022aac1c8ceff86c150d9b64fd77ec2` passed 68 tests across 1
 
 ## Alternatives considered
 
+The follow-up `8ccb0d5b3d7705786b6c40c3bcf5a10ff32046d9` removes duplicate evaluator identity checks subsumed by the entry validator. Equal partition lengths plus one successful removal per unique coordinate prove no leftover source; testing impossible duplicate branches would require bypassing the real entry boundary. Existing malformed-report cases remain, and `d1344c7` adds legacy-v1 rejection and empty/orphan/cycle/blank-identity regressions. The unchanged pinned coverage gate now passes all normalized owned regions and branches; raw instantiated gaps remain explicitly reported in the Gap baseline. No coverage exclusion, dependency or authority service was added.
+
 - First-match classification was rejected because FR-9 requires ambiguous evidence to abstain rather than acquire an arbitrary priority-based disposition.
 - Hard-coding Zotero schema 42 was rejected because the documented compatibility contract is API v3; schema revision is instead recorded and checked for within-read drift.
 - Direct Zotero 9 writes were rejected because the supported Local API write capability is Zotero 10+ only.
