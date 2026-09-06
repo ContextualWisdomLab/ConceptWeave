@@ -303,7 +303,7 @@ impl SourceObservationPort for EchoPort {
 
     fn observe<'a>(
         &'a self,
-        request: &'a AuthorizedObservationRequest,
+        request: AuthorizedObservationRequest,
         cancellation: &'a dyn ObservationCancellation,
     ) -> impl Future<Output = Result<Self::Snapshot, SourceObservationFailure>> + Send + 'a {
         async move {
@@ -338,7 +338,16 @@ fn poll_ready<F: Future>(future: F) -> F::Output {
 
 #[test]
 fn explicit_port_carries_authorization_and_cancellation_without_inventing_success() {
-    let request = ObservationRequest::new(
+    let cancelled_request = ObservationRequest::new(
+        "grc_readonly_connection",
+        vec!["governance_core".to_owned()],
+        request_budget(),
+        limits(),
+    )
+    .expect("valid request")
+    .authorize(&ExactRegistry)
+    .expect("authorized request");
+    let active_request = ObservationRequest::new(
         "grc_readonly_connection",
         vec!["governance_core".to_owned()],
         request_budget(),
@@ -349,11 +358,11 @@ fn explicit_port_carries_authorization_and_cancellation_without_inventing_succes
     .expect("authorized request");
 
     assert_eq!(
-        poll_ready(EchoPort.observe(&request, &Cancellation(true))),
+        poll_ready(EchoPort.observe(cancelled_request, &Cancellation(true))),
         Err(SourceObservationFailure::Cancelled)
     );
     assert_eq!(
-        poll_ready(EchoPort.observe(&request, &Cancellation(false))),
+        poll_ready(EchoPort.observe(active_request, &Cancellation(false))),
         Ok("grc_readonly_connection:policy_revision_a".to_owned())
     );
 
