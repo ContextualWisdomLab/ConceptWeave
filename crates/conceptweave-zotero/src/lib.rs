@@ -1101,6 +1101,33 @@ mod tests {
     }
 
     #[test]
+    fn reader_rejects_blank_source_identity_before_another_page() {
+        for blank_key in ["", " ", "\t\n"] {
+            for invalid_start in [0, 1] {
+                let mut starts = Vec::new();
+                let result = read_snapshot_with(&mut |start| {
+                    starts.push(start);
+                    let key = if start == invalid_start {
+                        blank_key
+                    } else {
+                        "A"
+                    };
+                    Ok(fetched_page(3, vec![item(key, "attachment", "", "", "")]))
+                });
+                assert!(matches!(result, Err(ReadError::SnapshotChanged)));
+                assert_eq!(
+                    starts,
+                    if invalid_start == 0 {
+                        vec![0]
+                    } else {
+                        vec![0, 1]
+                    }
+                );
+            }
+        }
+    }
+
+    #[test]
     fn source_inventory_retains_standalone_and_nested_metadata_without_proposals() {
         let mut standalone = item("A", "attachment", "Ontology Learning", "10.1/X", "");
         standalone.version = 0;
