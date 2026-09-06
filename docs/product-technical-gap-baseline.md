@@ -89,6 +89,42 @@ Remaining work: mandatory adoption by restoration, worksheet, duplicate and writ
 
 ## DDD fitness constraints
 
+### PR #19 approved execution successor verification (2026-09-06)
+
+Baseline `62c19ee23e3c827bc7db15c79f4755ff040489e9` passed 109 tests/20 suites.
+Normal merge `bf4b2e561fdbd8e085c0d98dfa76ca97ad4d6ade` retains that head and
+parent `b68d21aa24f355608c4673ad037cc2ff8af031f6`. Integration failed visibly
+because the synthetic direct-plan constructor omitted required `proposal_digest`.
+`785cdf5` replaces it with the existing report/review builder and checks the
+output digest. This exposed a stale synthetic before-state; `5693f12` fixes the
+source fixture, preserving the original nonempty-to-nonempty metadata scenario.
+Neither required binding nor before-state validation was weakened.
+
+The existing failed-POST/matching-observation test now runs both the generic
+executor and public adapter boundary. It retains the exact transport-error check
+on the generic route and complete receipt/request/observation/digest, one POST,
+and no inferred applied/inverse assertions on both. No second runtime execution
+path or approval issuer was added. Independent review found no runtime bypass;
+its fixture finding was addressed before final validation.
+
+Final source passed 132 tests/20 suites including three doctests, strict Clippy,
+warnings-denied rustdoc, format/CI-contract/diff and unchanged coverage gates.
+Functions 252/252, normalized regions 2164/2164, normalized branches 370/370;
+raw LLVM 2900/2944 lines, 4393/4466 regions and 330/370 branches remain below 100%.
+Logs use `/tmp/conceptweave-pr19-scope-` with `baseline.log`, `integration.log`,
+`final.log` (stale fixture failure), `complete.log`, `clippy-complete.log`,
+`rustdoc-complete.log` and `coverage-complete.log` suffixes.
+
+PRD's inherited unexpected-mutation inverse claim is removed; ADR 0007 remains
+Proposed and records observation-only semantics and the rejected duplicate path.
+No fresh visual evidence was collected; the latest attempt was blocked by the
+locked Mac, and historical 3,719 displayed items do not establish reclassification.
+Real decisions/independent approvals stay 0/3,715 plus four unresolved sources.
+No real authorization, mutation, recovery, protected merge or release occurred.
+Next verified successor is PR #20 `a03a7248c894a1e0765968ddf58514d98c517da3`;
+rollback must retain unknown original-write scope rather than derive authority
+from serialized audit data. Root checkout adoption remains outstanding.
+
 ### PR #18 local authorization successor verification (2026-09-06)
 
 Baseline `fe2cff4f9fc40496bbb4339ba4242543beacea9b` passed 108 tests/20 suites.

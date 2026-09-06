@@ -56,6 +56,18 @@ adopt the required field without deriving fresh authority from serialized plans.
 
 ### Execution evidence correction (2026-09-06, Proposed)
 
+PR #19 keeps its thin public adapter execution boundary and adopts the same
+private proposal-bound plan and uncertainty semantics. Integration `bf4b2e5`
+exposed the test's missing required digest. `785cdf5` uses the existing verified
+plan builder and exercises both core and public wrapper on failed HTTP writes;
+`5693f12` aligns the source fixture with the reviewed nonempty before-state after
+the builder correctly rejected it as stale. No validator was relaxed. The test
+verifier is synthetic and provides no real-world approval. A stale PRD paragraph
+allowing an inverse for an observed unexpected mutation is corrected to match
+the original-owner runtime and this decision. Existing delegation is retained
+instead of adding a second execution path, accepting that genuine authorization,
+independent approval and live recovery evidence remain separate outstanding gates.
+
 PR #17 integration preserves the transport implementation while inheriting the
 original-owner fix. Test `97cce5a`, strengthened by `29a3771`, composes authenticated
 HTTP with the executor and verifies failed POST plus a fully matching observed
