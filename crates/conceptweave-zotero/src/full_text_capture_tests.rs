@@ -214,7 +214,7 @@ fn review_view_rejects_changed_capture_report_and_invalid_pending_work() {
     changed_report.classified_items[0].title = "different report evidence".into();
     assert!(build_full_text_review_json(&changed_report, &worksheet, &capture, 2).is_err());
     let mut changed_report = report_fixture();
-    changed_report.unclassified_items[0].data.title = Some("changed retained source".into());
+    changed_report.unclassified_items[0].data.title = "changed retained source".into();
     let fresh_worksheet = build_steward_review_worksheet(&changed_report).unwrap();
     assert_eq!(fresh_worksheet.snapshot_digest, worksheet.snapshot_digest);
     assert_ne!(fresh_worksheet.proposal_digest, worksheet.proposal_digest);
