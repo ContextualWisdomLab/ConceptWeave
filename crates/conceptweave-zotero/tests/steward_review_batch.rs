@@ -236,12 +236,13 @@ fn completed_review_batch_must_preserve_the_context_shown_to_the_steward() {
         );
     }
 
-    let changed_report = classify_snapshot(
+    let mut changed_report = classify_snapshot(
         "9.0.6".into(),
         None,
         42,
-        vec![item("A", "unmatched", "changed context")],
+        vec![item("A", "unmatched", "review context")],
     );
+    changed_report.classified_items[0].review_abstract_note = Some("changed context".into());
     let fresh_worksheet = build_steward_review_worksheet(&changed_report).unwrap();
     assert_eq!(fresh_worksheet.snapshot_digest, worksheet.snapshot_digest);
     assert_ne!(fresh_worksheet.proposal_digest, worksheet.proposal_digest);
