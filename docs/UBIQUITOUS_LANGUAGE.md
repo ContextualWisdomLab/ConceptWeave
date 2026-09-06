@@ -16,6 +16,8 @@
 | Dimension | Governed categorical or temporal axis used to group/filter analytical facts. |
 | Measure | Governed calculation with explicit expression, grain, units, null semantics, and evidence. |
 | Semantic Steward | Authorized reviewer responsible for accepting or rejecting semantic meaning. |
+| Reviewed Classification Change | Authorized complete replacement of one paper's collection and tag state, bound to its observed revision. |
+| Classification Write Plan | Local deterministic artifact retaining the verified proposal/source-scope binding, exact preconditions and before/after/rollback metadata; dry-run by default, never proof of execution. |
 | Reviewed Duplicate Merge Set | Independently verified decisions selecting one canonical item per connected duplicate component, bound to exact source revisions, candidate membership, proposals and retained source scope. |
 | Authority Receipt | Opaque proof checked by the Governance & Publication boundary; it contains no reviewer identity or credential. |
 | Canonical-Key Operation | Reversible local mapping from every source in a connected duplicate component to one retained key, with complete reviewed revisions and the exact rollback mapping. |

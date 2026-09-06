@@ -6,9 +6,14 @@
 - Semantic Discovery -> Model Validation: **Conformist to published candidate contract**; validation must not rewrite discovery evidence.
 - Model Validation -> Governance & Publication: **Customer/Supplier**; governance consumes deterministic validation receipts.
 - Governance & Publication -> Interoperability: **Published Language**; adapters consume immutable release contracts.
-- Research Intake -> Governance & Publication: **Anti-Corruption Layer**; Intake validates source inventory, audit, receipt bindings and all duplicate operations before Governance verifies the complete independently issued review, including candidate membership and retained-source identity. The opaque authority receipt does not authorize source mutation.
+- Research Intake -> Governance & Publication: **Anti-Corruption Layer**; Governance verifies complete duplicate and classification-write review sets before Intake emits canonical-key operations or write plans. Duplicate admission includes source inventory, audit, candidate membership and retained-source bindings. Opaque authority receipts and local plans are not proof of source mutation.
 
 ## External relationships
+
+Classification-write admission reuses the same complete inventory/audit validator
+and binds proposals, projected unclassified metadata and pending keys before
+Governance verifies the entire reviewed change set. Duplicate membership and
+full-text decisions retain their separate contracts; no new owner is introduced.
 
 - Zotero Local API -> research evidence intake: **Anti-Corruption Layer into Semantic Discovery**. Zotero remains the bibliographic system of record; ConceptWeave consumes a version-pinned, read-only Local API snapshot and emits proposal evidence only. Item metadata, attachments, collection/tag truth, and future write authority remain in Zotero. No Zotero record becomes semantic authority without ConceptWeave validation/review/publication.
 - contextual-orchestrator -> Semantic Discovery: **Anti-Corruption Layer**. Model/provider envelopes never enter the domain model directly.

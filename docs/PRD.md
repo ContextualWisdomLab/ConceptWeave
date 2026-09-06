@@ -40,6 +40,11 @@ Validate syntax, identifiers, relationship cardinality, mapping completeness, du
 
 ### FR-5 Governed review
 
+Research changes must use the evidence actually reviewed. Changed supporting
+metadata or incomplete source inventories must stop a change plan before approval
+is consumed. Older reviews lacking this evidence binding require fresh independent
+approval; displaying a plan does not mean that the library has been changed.
+
 A candidate cannot become authoritative solely because an LLM or automated extractor produced it. The publication lifecycle is Draft -> Proposed -> Validated -> Reviewed -> Published, with explicit rejection and supersession paths.
 
 ### FR-6 Publication
@@ -65,6 +70,8 @@ Library reads must finish within a bounded observation window or fail visibly wi
 Read a complete Zotero Local API observation with one consistent library version and propose exactly one research disposition for every top-level bibliographic item. This consistency check does not establish an atomic provider snapshot. A record claiming a revision newer than the observed library invalidates the complete read; it must not be omitted or assigned a different revision to make the read pass. Each proposal retains the item key/version, exact matched metadata values, rule revision, linked child records, and any model receipt. Weak evidence and evidence that matches multiple specific disposition families must abstain into steward review. Duplicate DOI/title identities are review candidates only: intake never merges, deletes, or silently mutates Zotero records.
 
 For every connected duplicate component, accept externally verified steward decisions selecting one component-level canonical item. Produce a local-only manifest that binds decisions to the raw snapshot, complete item revisions, exact duplicate membership, current proposals and retained source metadata. Reject missing or inconsistent source inventory and invalid decisions before requesting approval. Changed retained evidence requires fresh independent approval, even when duplicate members are unchanged. Record every component source revision plus before, after, and rollback canonical-key mappings. Classification preserves every Zotero source record.
+
+Reviewed collection and tag changes default to a local dry-run plan. Each operation binds the authority receipt, server/library/item revisions, raw-snapshot digest, and complete before/after/rollback metadata. Zotero 9 execute requests fail closed. No plan contains credentials or permits `NeedsStewardReview`, source-record deletion, or attachment deletion.
 
 Evaluate classifier quality only against a steward-reviewed local golden set whose governance receipt is externally verified and binds both the complete source/classifier-input snapshot and every current proposal field, in addition to the item-key/item-version coordinates. Same-version changes to unmodeled provider metadata, absent/default fields, classifier inputs, predictions or supporting evidence must invalidate the corresponding binding. Evaluation recomputes proposal identity before contacting governance; a locally changed digest cannot renew an approval. Legacy unbound approvals require reissuance, never automatic backfill. Abstention is a prediction outcome, never an approved truth label. Evaluation emits the verified library revision, rule revision, opaque snapshot and proposal digests, and aggregate counts for exact matches, abstentions, and per-disposition true-positive/predicted/expected totals; it must not copy Zotero keys, reviewer identity, or bibliographic text into the result.
 Every successful classification report includes aggregate evidence for snapshot coverage, proposal coverage, provenance completeness, abstentions, duplicate candidates, disposition totals, and zero unreported failures.

@@ -96,10 +96,13 @@ pub struct ItemData {
 }
 
 /// A Zotero item tag.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 pub struct ItemTag {
     /// Tag text.
     pub tag: String,
+    /// Zotero automatic-tag marker, preserved for exact write rollback.
+    #[serde(default, rename = "type", skip_serializing_if = "Option::is_none")]
+    pub tag_type: Option<u64>,
 }
 
 /// One mutually exclusive proposed disposition.
@@ -161,7 +164,7 @@ pub struct ClassifiedItem {
     /// Collection keys observed with the item.
     pub collection_keys: Vec<String>,
     /// Tag text observed with the item.
-    pub tags: Vec<String>,
+    pub tags: Vec<ItemTag>,
     /// Proposed disposition; never an authoritative governance decision.
     pub proposed_disposition: Disposition,
     /// Deterministic reason for abstention, absent when a rule proposes a disposition.
@@ -290,6 +293,158 @@ impl fmt::Display for DuplicateReviewError {
 }
 
 impl std::error::Error for DuplicateReviewError {}
+
+/// Requested behavior for a reviewed classification change set.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WriteMode {
+    /// Validate and emit a plan without contacting Zotero.
+    #[default]
+    DryRun,
+    /// Permit a future authenticated Zotero 10+ adapter to apply the plan.
+    Execute,
+}
+
+/// One steward-reviewed complete collection and tag replacement.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct ReviewedClassificationChange {
+    /// Stable top-level bibliographic item key.
+    pub item_key: String,
+    /// Exact item revision reviewed by the steward.
+    pub item_version: u64,
+    /// Approved classification; abstention cannot be written.
+    pub reviewed_disposition: Disposition,
+    /// Complete collection state observed before the change.
+    pub before_collection_keys: Vec<String>,
+    /// Complete collection state requested after the change.
+    pub after_collection_keys: Vec<String>,
+    /// Complete tag state observed before the change.
+    pub before_tags: Vec<ItemTag>,
+    /// Complete tag state requested after the change.
+    pub after_tags: Vec<ItemTag>,
+}
+
+/// Governance-bound reviewed changes retained outside the repository.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct ReviewedClassificationWriteSet {
+    /// Opaque review receipt identifier.
+    pub review_id: String,
+    /// Opaque governance authority receipt.
+    pub authority_receipt: String,
+    /// Exact Local API server identity, when supplied by Zotero.
+    pub server_id: Option<String>,
+    /// Exact Zotero version reviewed for write capability.
+    pub zotero_version: String,
+    /// Exact reviewed library revision.
+    pub library_version: u64,
+    /// Exact reviewed classifier revision.
+    pub rule_revision: String,
+    /// Exact reviewed raw-snapshot digest.
+    pub snapshot_digest: String,
+    /// Required identity of reviewed proposals, unclassified metadata, and pending keys.
+    pub proposal_digest: String,
+    /// Exact item-key/item-version coordinates reviewed by the steward.
+    pub snapshot_items: Vec<SnapshotItemRevision>,
+    /// Reviewed item-level changes.
+    pub changes: Vec<ReviewedClassificationChange>,
+}
+
+/// One deterministic item operation with an exact rollback state.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ClassificationWriteOperation {
+    /// Stable top-level bibliographic item key.
+    pub item_key: String,
+    /// Optimistic item-version precondition.
+    pub item_version: u64,
+    /// Approved classification.
+    pub reviewed_disposition: Disposition,
+    /// Complete collection state before the change.
+    pub before_collection_keys: Vec<String>,
+    /// Complete collection state after the change.
+    pub after_collection_keys: Vec<String>,
+    /// Complete collection rollback state.
+    pub rollback_collection_keys: Vec<String>,
+    /// Complete tag state before the change.
+    pub before_tags: Vec<ItemTag>,
+    /// Complete tag state after the change.
+    pub after_tags: Vec<ItemTag>,
+    /// Complete tag rollback state, including Zotero tag type.
+    pub rollback_tags: Vec<ItemTag>,
+}
+
+/// Local-only, snapshot-bound plan for reviewed Zotero classification writes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ClassificationWritePlan {
+    /// Requested write behavior; dry-run is the default.
+    pub mode: WriteMode,
+    /// Opaque review receipt identifier.
+    pub review_id: String,
+    /// Opaque governance authority receipt.
+    pub authority_receipt: String,
+    /// Exact Local API server identity.
+    pub server_id: Option<String>,
+    /// Exact Zotero version used to establish execute eligibility.
+    pub zotero_version: String,
+    /// Exact library-version precondition.
+    pub library_version: u64,
+    /// Exact classifier revision.
+    pub rule_revision: String,
+    /// Exact raw-snapshot digest.
+    pub snapshot_digest: String,
+    /// Content identity retained from the independently verified review.
+    pub proposal_digest: String,
+    /// Deterministically ordered item operations.
+    pub operations: Vec<ClassificationWriteOperation>,
+    /// Classification writes never delete source records or attachments.
+    pub source_records_preserved: bool,
+}
+
+/// A fail-closed reviewed write-plan contract violation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WritePlanError {
+    /// Required review metadata or item changes are absent.
+    InvalidReview,
+    /// The reviewed set belongs to another snapshot.
+    SnapshotMismatch,
+    /// The caller's governance boundary rejected the complete reviewed set.
+    UnverifiedApproval,
+    /// A change does not identify a classified top-level item.
+    UnknownItem,
+    /// More than one change targets the same item.
+    DuplicateItem,
+    /// An item revision or complete before-state is stale.
+    StaleItem,
+    /// A collection or tag value is blank or duplicated.
+    InvalidMetadata,
+    /// A reviewed change makes no collection or tag change.
+    NoChange,
+    /// An abstention cannot become a write instruction.
+    UnreviewedDisposition,
+    /// Execute mode is unsupported by this Zotero major version.
+    UnsupportedExecute,
+    /// Execute mode lacks a nonblank Local API server identity.
+    MissingServerIdentity,
+}
+
+impl fmt::Display for WritePlanError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::InvalidReview => "classification write review is invalid",
+            Self::SnapshotMismatch => "classification write review does not match the snapshot",
+            Self::UnverifiedApproval => "classification write approval is unverified",
+            Self::UnknownItem => "classification write targets an unknown item",
+            Self::DuplicateItem => "classification write repeats an item",
+            Self::StaleItem => "classification write item preconditions are stale",
+            Self::InvalidMetadata => "classification write metadata is blank or duplicated",
+            Self::NoChange => "classification write contains no metadata change",
+            Self::UnreviewedDisposition => "steward-review abstention cannot be written",
+            Self::UnsupportedExecute => "this Zotero version does not support local execution",
+            Self::MissingServerIdentity => "local execution requires a Zotero server identity",
+        })
+    }
+}
+
+impl std::error::Error for WritePlanError {}
 
 /// Complete local classification report for one immutable library version.
 #[derive(Debug, Serialize)]
@@ -834,6 +989,189 @@ where
     Ok(DuplicateMergeReviewManifest {
         review_id: reviewed.review_id.clone(),
         authority_receipt: reviewed.authority_receipt.clone(),
+        library_version: reviewed.library_version,
+        rule_revision: reviewed.rule_revision.clone(),
+        snapshot_digest: reviewed.snapshot_digest.clone(),
+        proposal_digest: reviewed.proposal_digest.clone(),
+        operations,
+        source_records_preserved: true,
+    })
+}
+
+fn normalized_metadata(
+    collection_keys: &[String],
+    tags: &[ItemTag],
+) -> Result<(Vec<String>, Vec<ItemTag>), WritePlanError> {
+    if collection_keys.iter().any(|key| key.trim().is_empty())
+        || tags.iter().any(|tag| tag.tag.trim().is_empty())
+        || tags
+            .iter()
+            .any(|tag| tag.tag_type.is_some_and(|tag_type| tag_type > 1))
+        || collection_keys.iter().collect::<BTreeSet<_>>().len() != collection_keys.len()
+        || tags
+            .iter()
+            .map(|tag| tag.tag.as_str())
+            .collect::<BTreeSet<_>>()
+            .len()
+            != tags.len()
+    {
+        return Err(WritePlanError::InvalidMetadata);
+    }
+    let mut collection_keys = collection_keys.to_vec();
+    let mut tags = tags.to_vec();
+    for tag in &mut tags {
+        if tag.tag_type == Some(0) {
+            tag.tag_type = None;
+        }
+    }
+    collection_keys.sort();
+    tags.sort();
+    Ok((collection_keys, tags))
+}
+
+/// Builds a deterministic reviewed write plan without contacting or mutating Zotero.
+///
+/// Local identity, execution-mode, and metadata checks finish before the caller's
+/// governance verifier runs. Invalid input never consumes a one-use approval;
+/// a locally valid complete review is verified exactly once before returning a plan.
+/// The verifier must authenticate every field of the reviewed set, including its
+/// proposal digest and requested changes. Recomputing a digest grants no authority.
+pub fn build_classification_write_plan<F>(
+    report: &ClassificationReport,
+    reviewed: &ReviewedClassificationWriteSet,
+    mode: WriteMode,
+    verify_review: F,
+) -> Result<ClassificationWritePlan, WritePlanError>
+where
+    F: FnOnce(&ReviewedClassificationWriteSet) -> bool,
+{
+    if reviewed.review_id.trim().is_empty()
+        || reviewed.authority_receipt.trim().is_empty()
+        || reviewed.rule_revision.trim().is_empty()
+        || reviewed.snapshot_digest.trim().is_empty()
+        || reviewed.proposal_digest.trim().is_empty()
+        || reviewed.changes.is_empty()
+    {
+        return Err(WritePlanError::InvalidReview);
+    }
+    if reviewed.server_id != report.server_id
+        || reviewed.zotero_version != report.zotero_version
+        || reviewed.library_version != report.library_version
+        || reviewed.rule_revision != report.rule_revision
+        || reviewed.snapshot_digest != report.snapshot_digest
+        || reviewed.snapshot_items != report.snapshot_items
+    {
+        return Err(WritePlanError::SnapshotMismatch);
+    }
+    if mode == WriteMode::Execute
+        && report
+            .zotero_version
+            .split('.')
+            .next()
+            .and_then(|major| major.parse::<u64>().ok())
+            .is_none_or(|major| major < 10)
+    {
+        return Err(WritePlanError::UnsupportedExecute);
+    }
+    if mode == WriteMode::Execute
+        && reviewed
+            .server_id
+            .as_deref()
+            .is_none_or(|server_id| server_id.trim().is_empty())
+    {
+        return Err(WritePlanError::MissingServerIdentity);
+    }
+
+    if report
+        .snapshot_items
+        .iter()
+        .any(|item| item.item_key.trim().is_empty())
+        || report
+            .snapshot_items
+            .iter()
+            .map(|item| item.item_key.as_str())
+            .collect::<BTreeSet<_>>()
+            .len()
+            != report.snapshot_items.len()
+        || report
+            .classified_items
+            .iter()
+            .map(|item| item.item_key.as_str())
+            .collect::<BTreeSet<_>>()
+            .len()
+            != report.classified_items.len()
+    {
+        return Err(WritePlanError::InvalidReview);
+    }
+    let classified = report
+        .classified_items
+        .iter()
+        .map(|item| (item.item_key.as_str(), item))
+        .collect::<BTreeMap<_, _>>();
+    let snapshot_revisions = report
+        .snapshot_items
+        .iter()
+        .map(|item| (item.item_key.as_str(), item.item_version))
+        .collect::<BTreeMap<_, _>>();
+    let mut seen_items = BTreeSet::new();
+    let mut operations = Vec::with_capacity(reviewed.changes.len());
+    for change in &reviewed.changes {
+        if change.item_key.trim().is_empty() {
+            return Err(WritePlanError::InvalidReview);
+        }
+        if !seen_items.insert(change.item_key.as_str()) {
+            return Err(WritePlanError::DuplicateItem);
+        }
+        if change.reviewed_disposition == Disposition::NeedsStewardReview {
+            return Err(WritePlanError::UnreviewedDisposition);
+        }
+        let item = classified
+            .get(change.item_key.as_str())
+            .ok_or(WritePlanError::UnknownItem)?;
+        if snapshot_revisions.get(change.item_key.as_str()) != Some(&item.item_version) {
+            return Err(WritePlanError::StaleItem);
+        }
+        let (actual_collections, actual_tags) =
+            normalized_metadata(&item.collection_keys, &item.tags)?;
+        let (before_collections, before_tags) =
+            normalized_metadata(&change.before_collection_keys, &change.before_tags)?;
+        let (after_collections, after_tags) =
+            normalized_metadata(&change.after_collection_keys, &change.after_tags)?;
+        if change.item_version != item.item_version
+            || before_collections != actual_collections
+            || before_tags != actual_tags
+        {
+            return Err(WritePlanError::StaleItem);
+        }
+        if before_collections == after_collections && before_tags == after_tags {
+            return Err(WritePlanError::NoChange);
+        }
+        operations.push(ClassificationWriteOperation {
+            item_key: change.item_key.clone(),
+            item_version: change.item_version,
+            reviewed_disposition: change.reviewed_disposition,
+            rollback_collection_keys: before_collections.clone(),
+            before_collection_keys: before_collections,
+            after_collection_keys: after_collections,
+            rollback_tags: before_tags.clone(),
+            before_tags,
+            after_tags,
+        });
+    }
+    operations.sort_by(|left, right| left.item_key.cmp(&right.item_key));
+    validate_classification_report(report).map_err(|_| WritePlanError::InvalidReview)?;
+    if reviewed.proposal_digest != classification_proposal_digest(report) {
+        return Err(WritePlanError::SnapshotMismatch);
+    }
+    if !verify_review(reviewed) {
+        return Err(WritePlanError::UnverifiedApproval);
+    }
+    Ok(ClassificationWritePlan {
+        mode,
+        review_id: reviewed.review_id.clone(),
+        authority_receipt: reviewed.authority_receipt.clone(),
+        server_id: reviewed.server_id.clone(),
+        zotero_version: reviewed.zotero_version.clone(),
         library_version: reviewed.library_version,
         rule_revision: reviewed.rule_revision.clone(),
         snapshot_digest: reviewed.snapshot_digest.clone(),
@@ -1411,7 +1749,7 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
         item_type: item.data.item_type.clone(),
         title: item.data.title.clone(),
         collection_keys: item.data.collections.clone(),
-        tags: item.data.tags.iter().map(|tag| tag.tag.clone()).collect(),
+        tags: item.data.tags.clone(),
         proposed_disposition,
         abstention_reason,
         evidence: ClassificationEvidence {
@@ -1867,6 +2205,7 @@ mod tests {
         standalone.data.collections = vec!["COLLECTION".into()];
         standalone.data.tags = vec![ItemTag {
             tag: "Evidence".into(),
+            tag_type: None,
         }];
         let report = read_snapshot_with(&mut |_| {
             Ok(fetched_page(
@@ -1974,6 +2313,7 @@ mod tests {
         let mut generation = item("B", "journalArticle", "Ontology Learning", "10.1/X", "");
         generation.data.tags.push(ItemTag {
             tag: "SHACL".into(),
+            tag_type: Some(1),
         });
         let report = classify_snapshot(
             "9.0.6".into(),
