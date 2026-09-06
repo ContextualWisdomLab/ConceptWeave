@@ -6,6 +6,14 @@ This file records code-current product and technical gaps. Exact PR/check/run co
 
 ## September 6 source inventory checkpoint
 
+### September 7 PR30 content-bound progress repair
+
+Original PR30 `a11e889d1680ab4d91f3565e3debf7ed0f10ba23` passed 156 tests/32 suites. Normal merge `7251238` retains it and PR29 `e21f14fbb4954762ffc97521af9a6cdd9982c630`; integrated tests passed 200/32. Child private-helper coverage improvements remain, combined with parent FIFO/source/approval/output safety. RED `4099434` compiled with one passing and two failing progress tests: blank proposal binding was accepted and pending/content identity fields were absent. `bee32f4` compares the existing digest in the shared worksheet validator and adds opaque proposal identity plus pending count to aggregate progress. `b2b0ef4` proves filled bibliographic slots do not hide an unresolved standalone source. Independent bounded review found no collateral finalization error-precedence or privacy regression.
+
+Final source `b2b0ef4` passes 202 tests/32 suites including three doctests, strict Clippy, warnings-denied rustdoc, formatting, CI contract and diff checks. The unchanged coverage gate passes 328/328 reported functions, 2,905/2,905 normalized regions and 518/518 normalized branches. Raw 3,923/3,985 lines, 6,065/6,172 regions and 473/518 branches are not 100%. Logs: `/tmp/conceptweave-pr30-{baseline,integrated,progress-red,verified,clippy,rustdoc,coverage}.log`. PRD/TRD/Proposed ADR0006 explicitly distinguish bibliographic slot counts, pending source scope, local preparation, independent approval and applied reclassification. No new digest, dependency or authority issuer was added.
+
+Root and later consumers must inherit content binding, pending completion semantics and prior FIFO protection. Actual decisions and independent approvals remain 0/3,715 plus four unresolved standalone sources. Synthetic unit fixtures do not count as research review. Native Visual Inspection was retried, but the Mac is locked and no fresh screenshot exists. Keep Draft; no real Zotero write, hosted GREEN, protected merge or release is claimed.
+
 ### September 7 PR29 offline finalization continuity repair
 
 Original PR29 `f73705e15f1236fa8bd34fec032bc78d9b57760c` passed 149 tests/28 suites. Normal merge `4845200` retains it and repaired PR28 `63eb0f116408372675f132b9836fe7be4bdd7134`; integrated tests passed 190/28. Offline finalization remains local unverified metadata output. The request enum retains parent canonical-pair admission before capture, both serializations before writes and no pathname cleanup on failure. Complete source/worksheet/approval binding comes from the inherited shared validation, not a new authority issuer.
