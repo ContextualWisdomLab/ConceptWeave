@@ -4,6 +4,10 @@ All notable changes to ConceptWeave are documented here.
 
 ## Unreleased
 
+### Fixed
+
+- Zotero research intake rejects incomplete or late results after a five-minute read budget, even when individual pages arrive within their request limits.
+
 ### Added
 
 - Private review commands now show saved text, accept completed decisions without replacing earlier work, and prepare a complete review for independent approval verification. They do not supply decisions or approve a review.

@@ -56,6 +56,8 @@ All LLM-backed induction uses released `contextual-orchestrator` contracts. Mode
 
 ### FR-9 Research evidence intake
 
+Library reads must finish within a bounded observation window or fail visibly without returning a partial classification. Slowly arriving pages cannot keep a run open indefinitely, and missing time budget must not be handled by silently dropping papers.
+
 Read one immutable Zotero Local API library-version snapshot and propose exactly one research disposition for every top-level bibliographic item. Each proposal retains the item key/version, exact matched metadata values, rule revision, linked child records, and any model receipt. Weak evidence and evidence that matches multiple specific disposition families must abstain into steward review. A local abstention retains its nonempty abstract exactly once, as matched evidence when applicable or otherwise as review context; decided items omit the review-only copy. Duplicate DOI/title identities are review candidates only: intake never merges, deletes, or silently mutates Zotero records.
 
 Full-text enrichment must distinguish listed attachments, returned nonempty text, complete or partial indexing, and reviewed meaning. Missing abstracts or unavailable text never remove papers from the campaign denominator or prove irrelevance. Newly retrieved text requires its own immutable evidence capture and renewed review of any changed proposal; it cannot silently replace evidence beneath an earlier approval. The [full-text audit](doctoring/zotero_fulltext_contract_audit.md) establishes availability only. A separate proposed local capture now preserves the observed text for later review, with missing material still visible. Retained text is neither completed classification nor approved meaning.
