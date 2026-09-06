@@ -50,7 +50,8 @@ sequenceDiagram
 
     loop bounded pages
         Intake->>Zotero: read items at one library version
-        Zotero-->>Intake: items + immutable version headers
+        Zotero-->>Intake: items + observed library version
+        Intake->>Intake: validate page consistency and every item revision; fail entire read on mismatch
     end
     Intake->>Intake: classify or abstain; link children; find duplicate candidates
     Intake->>Report: write proposals and evidence

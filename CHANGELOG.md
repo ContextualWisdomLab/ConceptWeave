@@ -6,6 +6,7 @@ All notable changes to ConceptWeave are documented here.
 
 ### Fixed
 
+- Zotero research intake rejects a read whose records claim revisions newer than the library being observed, without dropping papers or changing their recorded revisions.
 - Zotero research intake rejects incomplete or late results after a five-minute read budget, even when individual pages arrive within their request limits.
 
 ### Added
