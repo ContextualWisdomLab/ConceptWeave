@@ -36,6 +36,20 @@ No dedicated utility repository or Zotero mutation path is created. A future Zot
 
 ## Consequences
 
+### Private output failure amendment (Proposed, 2026-09-06)
+
+The checked canonical parent is used to reconstruct the output path, reusing
+existing fix `86288cdf5959040a95221c2ca2d99e243d25dc27` as `25154b6` rather than
+introducing another path policy. The report is opened exclusively with mode
+`0600`, then permissions are enforced on its handle before any report bytes are
+serialized. If enforcement fails, `48d7068` returns the error without unlinking
+the pathname: it may now refer to an unrelated replacement. An inode comparison
+followed by unlink would still race, so that alternative is rejected. The downside
+is a possible empty private file requiring later deliberate cleanup; confidentiality
+and unrelated-file preservation take precedence over automatic cleanup. RED
+`7cfc7fb` demonstrates both raw-parent reuse and replacement deletion. This policy
+must also reach the later shared private-output writer before final adoption.
+
 ### 2026-09-05 integrity amendment (Proposed)
 
 In the context of replaying a Zotero research classification against a steward's approved labels, facing source fields lost during projection and predictions mutable after review, we decided for separate source-and-input and proposal-content digests verified with the complete reviewed set, and against typed-only source hashing or a report's self-declared cached proposal identity, to preserve the exact evidence used for evaluation, accepting a receipt-format break, report regeneration and fresh governance approval.

@@ -89,6 +89,45 @@ Remaining work: mandatory adoption by restoration, worksheet, duplicate and writ
 
 ## DDD fitness constraints
 
+### PR #23 private report path repair (2026-09-06)
+
+Untouched `2a3619f52e1d3e4f699c91be1fc2d0e9a6e234c8` passed 121 tests/23 suites.
+Normal merge `01d6e3f` preserves that delta and PR #22 `51d1682`; integration
+passed 145/23. Unix creation-time `0600`, handle-based permission enforcement,
+exclusive creation, and non-Unix rejection remain intact.
+
+Independent review found two existing defects. RED `7cfc7fb` compiled and failed
+two of five CLI tests: raw `/tmp` was returned instead of the checked canonical
+parent, and permission failure deleted an unrelated replacement at the output
+path. Existing canonical owner fix `86288cdf5959040a95221c2ca2d99e243d25dc27`
+was reused with provenance as `25154b6`. `48d7068` propagates permission errors
+without unlinking a pathname that may have changed. Report serialization never
+starts on that failure; an empty private file may remain for deliberate cleanup.
+The regression verifies no group/other mode bits before the injected setter and
+preserves the replacement sentinel. Only synthetic temporary files were used.
+
+`c0db7ff` corrects the old raw-system-temp test expectation. Coverage then exposed
+the reachable nameless `..` case; `522e46b` reuses the later-owner rejection test
+and removes incidental branches from test cleanup, with no coverage exclusions
+or weakened runtime checks. Independent review found no further production issue.
+The later shared private-output writer still needs this no-unlink failure policy.
+
+Final 147 tests/23 suites including three doctests, strict Clippy, warnings-denied
+rustdoc, format/CI-contract/diff and unchanged coverage pass. Coverage: 278/278
+functions, 2404/2404 normalized regions, 404/404 normalized branches; raw LLVM
+3183/3244 lines, 4795/4896 regions, 360/404 branches remain below 100%.
+Logs use `/tmp/conceptweave-pr23-private-` with `red.log`, `final.log` (old path
+expectation failure), `verified.log`, `clippy-verified.log`, `rustdoc-verified.log`
+and `coverage-verified.log`; baseline/integration use `pr23-scope-` instead.
+README and Proposed ADR record the empty-file downside and rejected racy cleanup.
+
+No fresh visual evidence was collected; latest native attempt encountered the
+locked Mac. Historical 3,719 displayed items are not reclassification evidence.
+Real decisions/approvals remain 0/3,715 plus four unresolved sources; no actual
+authorization, mutation, recovery, protected merge or release occurred. Next
+verified successor is PR #24 complete review evaluation
+`1e73e1545de32ae9a349c469a7794c5c3fc2ae9b`; root and shared-writer adoption remain open.
+
 ### PR #22 steward-context binding verification (2026-09-06)
 
 Untouched `7179d13b45d160682e4cce1473c145d465fe657b` passed 120 tests/23 suites.
