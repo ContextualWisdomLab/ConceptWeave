@@ -6,8 +6,8 @@ use std::{
 
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, ObservationLimits, ObservationRequest,
-    ObservationRequestBudget, SourceConnectionRegistry, SourceObservationFailure,
-    SourceObservationPort,
+    ObservationRequestBudget, ResolvedSourceConnection, SourceConnectionRegistry,
+    SourceObservationFailure, SourceObservationPort,
 };
 
 struct ExactRegistry;
@@ -17,12 +17,18 @@ impl SourceConnectionRegistry for ExactRegistry {
         source_connection_key == "grc_readonly_connection"
     }
 
+    fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
+        (source_connection_key == "grc_readonly_connection")
+            .then(|| "policy_revision_a".to_owned())
+    }
+
     fn authorizes_schema_scope(
         &self,
-        source_connection_key: &str,
+        source_connection: &ResolvedSourceConnection,
         allowed_schema_names: &[String],
     ) -> bool {
-        source_connection_key == "grc_readonly_connection"
+        source_connection.source_connection_key() == "grc_readonly_connection"
+            && source_connection.connection_policy_binding() == "policy_revision_a"
             && allowed_schema_names.len() == 1
             && allowed_schema_names[0] == "governance_core"
     }
@@ -50,10 +56,11 @@ impl SourceObservationPort for AsyncEchoPort {
             if cancellation.is_cancelled() {
                 return Err(SourceObservationFailure::Cancelled);
             }
-            Ok(request
-                .source_connection()
-                .source_connection_key()
-                .to_owned())
+            Ok(format!(
+                "{}:{}",
+                request.source_connection().source_connection_key(),
+                request.source_connection().connection_policy_binding()
+            ))
         }
     }
 }
@@ -110,6 +117,6 @@ fn source_port_accepts_a_send_awaitable_adapter_without_a_runtime_dependency() {
     let completed = assert_send(AsyncEchoPort.observe(&request, &active_signal));
     assert_eq!(
         poll_ready(completed),
-        Ok("grc_readonly_connection".to_owned())
+        Ok("grc_readonly_connection:policy_revision_a".to_owned())
     );
 }
