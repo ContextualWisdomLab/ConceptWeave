@@ -46,7 +46,12 @@ fn snapshot_issues_exact_evidence_receipt_for_observed_column() {
         .source_receipt(location)
         .expect("observed location can be receipted");
 
+    assert_eq!(snapshot.connection_policy_binding(), "fixture_policy_revision_a");
     assert_eq!(receipt.source_id(), "warehouse_source");
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        "fixture_policy_revision_a"
+    );
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
     assert_eq!(receipt.extractor_revision(), "catalog-v1");
     assert_eq!(receipt.observed_at_utc(), "2026-09-02T06:00:00Z");
