@@ -1,8 +1,16 @@
 # Product / Technical Gap Baseline
 
-**Snapshot:** 2026-09-06
+**Snapshot:** 2026-09-07
 
 This file records code-current product and technical gaps. Exact PR/check/run coordinates are evidence snapshots, not mutable-head dependencies. Live protected-branch, PR, issue and workflow state wins whenever it advances after this snapshot. Refresh the changed PR's metadata after each documentation commit; evidence from another PR or an earlier head does not transfer.
+
+## September 7 PR39 source-scope integration in verification
+
+Baseline at `6779fc40c71eccb03b0784cee6c3b5c14fb6e25a` passes 258 tests/41 unfiltered suites. Normal merge `4e856c5` preserves PR39 and PR38 `76d3df5733c37761b6778e24d89f22c01f367bb3`; no predecessor was closed or force-pushed. Fixture `e9ff78e` adds the required proposal digest after an integration compile failure, not a production RED. The focused integrated run then fails five tests: the inherited complete-source regression and four obsolete recovery expectations. Committed regression `75b9de7` separately fails on the missing whole prior rollback receipt. Logs are `/tmp/conceptweave-pr39-{baseline,focused-red,behavior-red,envelope-red}.log`.
+
+Repair `9fcc8bb` restores pending-source admission in shared full-text preparation, retains the whole preceding rollback receipt by reference and reuses the core exact failed request. Independent bounded review requested coverage of earlier successfully restored work; the follow-up includes both inverse failure positions. Existing matching-value scenarios remain tested but no longer infer completion or permit recovery. Proposed ADR0007 records the boundary, alternatives and lifetime trade-off. Final workspace, strict checks and coverage are not yet claimed.
+
+Actual paper decisions and independently approved labels remain separately 0/3,715 with four pending sources. The native Zotero visual inspection succeeded at the PR37 checkpoint; older locked-screen observations below are historical. No real Zotero write, hosted GREEN, protected merge, release or immutable CO adoption is claimed.
 
 ## Historical source-inventory owner repair checkpoint
 

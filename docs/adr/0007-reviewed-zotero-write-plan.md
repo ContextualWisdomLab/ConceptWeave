@@ -12,6 +12,35 @@ The installed-version and runtime-availability statements in the original altern
 
 ## Decision
 
+### Complete-source and recovery-envelope integration (2026-09-07, Proposed)
+
+PR39 normal merge `4e856c5` retains its typed full-text write scope and PR38's
+complete inventory validation. An extracted preparation helper had bypassed the
+pending-source completion gate: a completed paper worksheet could reach meaning
+approval while standalone evidence remained unresolved. The inherited mixed-source
+test fails at that boundary. The guard belongs in shared full-text preparation,
+which both evaluation and write admission call, not only in the public evaluator.
+Write preparation also retains the parent's proposal binding and inventory checks
+before either real authority callback. Starting and locally finalizing review
+remain distinct from complete admission; no paper or pending source is dropped.
+
+The delayed rollback wrapper had copied an operation tail and binding but omitted
+the preceding receipt's verified outcomes, exact failed request and observation.
+Committed test `75b9de7` fails because that preceding envelope is absent. Repair
+`9fcc8bb` borrows the opaque prior receipt using the existing original-observation
+pattern, while preserving existing serialized binding, observation and tail fields.
+An observation cannot outlive its source receipt or deserialize into executable
+authority. The executor reuses the core's exact failed request instead of tracking
+the last request a second time. Follow-up tests include an earlier verified inverse
+before a later failure, as well as matching, changed and unavailable observations.
+
+An operation-only reconstruction was rejected because it loses prior evidence;
+duplicating the whole receipt into a new owned authority type was unnecessary for
+this in-process read-only view. The borrowed lifetime requires callers to retain
+the earlier receipt; durable restart admission remains separate unfinished work.
+Matching metadata never proves causal completion or permits a retry. These local
+changes supply neither independent governance approval nor live-write permission.
+
 ConceptWeave builds a local-only `ClassificationWritePlan` from an externally verified complete review set. Dry-run is the default. The review must match the exact Zotero version, server identity, library version, classifier revision, raw-snapshot digest, complete item-key/item-version coordinates, and observed collection/tag state. The plan retains the reviewed Zotero version used for execute eligibility, while private fields and read-only accessors prevent external callers from mutating validated execution state. Write-execution receipts copy the plan's review and snapshot coordinates. Legacy rollback receipts retain conditional restoration evidence but do not carry those review/authority coordinates; they must not be advertised as full-text-bound approval evidence. It rejects unknown or duplicate items, detached item revisions, blank or duplicate metadata, unsupported tag types, no-op changes, and `NeedsStewardReview` as a write decision. Operations are deterministic and retain complete before, after, and rollback states. Manual tag markers `None` and `0` are canonicalized to `None`; automatic tag type `1` is preserved.
 
 Execute planning fails closed for Zotero versions below 10. The plan contains no API key and performs no network call. Dry-run enumerates every operation as not attempted. The execution core accepts caller-owned preflight and write functions, preflights the complete plan before the first mutation, and verifies server, library, item revision, collection, and typed-tag responses. After a failed or invalid response, a follow-up read is observation only: matching before-state cannot prove a delayed request terminated, and matching after-state or a newer revision cannot prove which writer caused it. The receipt keeps the exact submitted request and optional observation, always names that item as indeterminate, and creates no inverse for that unconfirmed write. Earlier directly verified applied items and their inverse coordinates remain intact. The API key remains adapter-owned. Cross-item transactionality is not claimed, and source records and attachments are never deleted.
