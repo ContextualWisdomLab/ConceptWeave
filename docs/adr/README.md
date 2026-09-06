@@ -5,3 +5,4 @@
 - [ADR 0003 — Standards and LLM engineering boundary](0003-standards-llm-boundary.md)
 - [ADR 0004 — Bounded Source Observation port](0004-source-observation-port.md) — Proposed
 - [ADR 0005 — Semantic-release client boundary](0005-semantic-release-client-boundary.md) — Proposed
+- [ADR 0006 — Single-use Source Observation authorization capability](0006-single-use-source-observation-capability.md) — Proposed
