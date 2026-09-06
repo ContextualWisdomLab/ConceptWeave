@@ -217,6 +217,8 @@ pub struct ReviewedDuplicateMergeSet {
     pub rule_revision: String,
     /// Exact raw-snapshot digest reviewed by the steward.
     pub snapshot_digest: String,
+    /// Required v2 identity of proposals, retained metadata and pending sources.
+    pub proposal_digest: String,
     /// Exact item-key/item-version coordinates reviewed by the steward.
     pub snapshot_items: Vec<SnapshotItemRevision>,
     /// Exact duplicate membership reviewed by the steward.
@@ -257,6 +259,8 @@ pub struct DuplicateMergeReviewManifest {
     pub rule_revision: String,
     /// Exact raw-snapshot digest shared with the reviewed decisions.
     pub snapshot_digest: String,
+    /// Verified identity of the proposals and complete retained source scope.
+    pub proposal_digest: String,
     /// Deterministically ordered canonical-key operations.
     pub operations: Vec<DuplicateMergeOperation>,
     /// Classification never deletes or mutates Zotero source records.
@@ -342,6 +346,8 @@ pub struct ReviewedClassificationWriteSet {
     pub rule_revision: String,
     /// Exact reviewed raw-snapshot digest.
     pub snapshot_digest: String,
+    /// Required identity of reviewed proposals, unclassified metadata, and pending keys.
+    pub proposal_digest: String,
     /// Exact item-key/item-version coordinates reviewed by the steward.
     pub snapshot_items: Vec<SnapshotItemRevision>,
     /// Reviewed item-level changes.
@@ -400,6 +406,8 @@ pub struct ClassificationWritePlan {
     rule_revision: String,
     /// Exact raw-snapshot digest.
     snapshot_digest: String,
+    /// Content identity retained from the independently verified review.
+    proposal_digest: String,
     /// Deterministically ordered item operations.
     operations: Vec<ClassificationWriteOperation>,
     /// Classification writes never delete source records or attachments.
@@ -936,6 +944,8 @@ pub struct ClassificationWriteReceipt {
     pub rule_revision: String,
     /// Exact raw-snapshot digest bound to this attempt.
     pub snapshot_digest: String,
+    /// Verified proposal and retained-source identity bound to this attempt.
+    pub proposal_digest: String,
     /// Overall execution outcome.
     pub outcome: ClassificationWriteOutcome,
     /// Items whose post-write state was verified, in application order.
@@ -944,6 +954,10 @@ pub struct ClassificationWriteReceipt {
     pub failed_item_key: Option<String>,
     /// Item whose state could not be proven after an unverifiable write response.
     pub indeterminate_item_key: Option<String>,
+    /// Exact submitted request whose completion is unknown; audit evidence, not retry authority.
+    pub indeterminate_request: Option<ClassificationWriteRequest>,
+    /// Subsequent observation, if available; it cannot prove causal completion.
+    pub reconciliation_observation: Option<ClassificationItemState>,
     /// Items whose write was not attempted.
     pub not_attempted_item_keys: Vec<String>,
     /// Verified inverse operations in safe reverse application order.
@@ -1020,6 +1034,19 @@ pub struct ClassificationReport {
     pub snapshot_digest: String,
     /// One proposal for every top-level bibliographic item.
     pub classified_items: Vec<ClassifiedItem>,
+    /// Metadata for every remaining record, sorted by its original key.
+    ///
+    /// Together with `classified_items`, this accounts for all observed items.
+    /// Notes, attachments and annotations remain evidence, not paper proposals.
+    /// Only the fields represented by `ItemData` are retained; this is not a
+    /// full-text capture or a lossless copy of the provider's original JSON.
+    pub unclassified_items: Vec<ZoteroItem>,
+    /// Sorted keys whose parent chain does not reach a bibliographic proposal.
+    ///
+    /// Standalone sources, their descendants, orphan trees and cycles remain
+    /// pending. An empty list proves only parent-link accounting for this input,
+    /// never research completion, semantic approval or permission to write.
+    pub pending_source_item_keys: Vec<String>,
     /// Reversible DOI/title duplicate candidates.
     pub duplicate_candidates: Vec<DuplicateCandidate>,
     /// Aggregate completeness evidence for this successful snapshot.
@@ -1111,16 +1138,25 @@ pub fn classification_snapshot_digest(report: &ClassificationReport) -> String {
 /// Computes the versioned SHA-256 identity of the report's current proposals.
 ///
 /// Every proposal field is covered, including its prediction, evidence, and item
-/// revision. Records are sorted by item key and revision so page ordering does
+/// revision, plus unclassified metadata and pending source identities. This is
+/// not a full-text backup. Records are sorted by item key and revision so ordering does
 /// not change their identity. No second source snapshot is stored. Governance
 /// must bind this value when issuing an approval; recomputing it alone grants no
 /// authority. Evaluation recomputes it rather than trusting report metadata.
 pub fn classification_proposal_digest(report: &ClassificationReport) -> String {
     let mut proposals = report.classified_items.iter().collect::<Vec<_>>();
     proposals.sort_by_key(|item| (&item.item_key, item.item_version));
-    let proposal_bytes =
-        serde_json::to_vec(&("conceptweave-classification-proposals-v1", proposals))
-            .expect("classification proposal records contain only JSON-serializable values");
+    let mut source_items = report.unclassified_items.iter().collect::<Vec<_>>();
+    source_items.sort_by_key(|item| (&item.key, item.version));
+    let mut pending_keys = report.pending_source_item_keys.iter().collect::<Vec<_>>();
+    pending_keys.sort();
+    let proposal_bytes = serde_json::to_vec(&(
+        "conceptweave-classification-proposals-v2",
+        proposals,
+        source_items,
+        pending_keys,
+    ))
+    .expect("classification proposal records contain only JSON-serializable values");
     format!("sha256:{:x}", Sha256::digest(proposal_bytes))
 }
 
@@ -1192,6 +1228,84 @@ impl fmt::Display for EvaluationError {
 
 impl std::error::Error for EvaluationError {}
 
+/// Checks that every observed item belongs to exactly one report partition.
+///
+/// Child links and unresolved source keys are recomputed from preserved metadata.
+/// Orphans and disconnected cycles remain valid pending evidence. This checks
+/// internal consistency, not source authenticity or independent approval.
+pub fn validate_classification_report(
+    report: &ClassificationReport,
+) -> Result<(), EvaluationError> {
+    let invalid = EvaluationError::InvalidReview;
+    if report.observed_item_count != report.snapshot_items.len()
+        || report
+            .classified_items
+            .len()
+            .checked_add(report.unclassified_items.len())
+            != Some(report.observed_item_count)
+    {
+        return Err(invalid);
+    }
+    let mut remaining_items = BTreeMap::new();
+    for item in &report.snapshot_items {
+        if item.item_key.trim().is_empty()
+            || item.item_version > report.library_version
+            || remaining_items
+                .insert(item.item_key.as_str(), item.item_version)
+                .is_some()
+        {
+            return Err(invalid);
+        }
+    }
+    let children = child_index(&report.unclassified_items);
+    for item in &report.classified_items {
+        let mut reported_children = item.child_item_keys.clone();
+        reported_children.sort();
+        let mut actual_children = children.get(&item.item_key).cloned().unwrap_or_default();
+        actual_children.sort();
+        if item.item_type.trim().is_empty()
+            || matches!(
+                item.item_type.as_str(),
+                "attachment" | "note" | "annotation"
+            )
+            || remaining_items.remove(item.item_key.as_str()) != Some(item.item_version)
+            || reported_children != actual_children
+        {
+            return Err(invalid);
+        }
+    }
+    for item in &report.unclassified_items {
+        if item.data.item_type.trim().is_empty()
+            || is_bibliographic(item)
+            || remaining_items.remove(item.key.as_str()) != Some(item.version)
+        {
+            return Err(invalid);
+        }
+    }
+    if report.audit_summary
+        != classification_audit(
+            &report.snapshot_items,
+            &report.classified_items,
+            report.duplicate_candidates.len(),
+        )
+    {
+        return Err(invalid);
+    }
+    let mut reported_pending = report.pending_source_item_keys.clone();
+    reported_pending.sort();
+    // Equal partition size and one successful removal per record prove completeness.
+    if reported_pending
+        != pending_source_keys(
+            &report.classified_items,
+            &report.unclassified_items,
+            children,
+        )
+    {
+        return Err(invalid);
+    }
+    Ok(())
+}
+
 /// Evaluates reviewed labels without copying item identities into the result.
 ///
 /// Structural, source, proposal, and label validation run before governance is
@@ -1206,6 +1320,7 @@ pub fn evaluate_reviewed_golden_set<F>(
 where
     F: FnOnce(&ReviewedGoldenSet) -> bool,
 {
+    validate_classification_report(report)?;
     if golden.approval.receipt_id.trim().is_empty()
         || golden.approval.reviewer_subject.trim().is_empty()
         || golden.labels.is_empty()
@@ -1220,21 +1335,13 @@ where
         .iter()
         .cloned()
         .collect::<BTreeSet<_>>();
-    let report_keys = report
-        .snapshot_items
-        .iter()
-        .map(|item| item.item_key.as_str())
-        .collect::<BTreeSet<_>>();
     let approved_snapshot = golden
         .approval
         .snapshot_items
         .iter()
         .cloned()
         .collect::<BTreeSet<_>>();
-    if report_snapshot.len() != report.snapshot_items.len()
-        || report_keys.len() != report.snapshot_items.len()
-        || approved_snapshot.len() != golden.approval.snapshot_items.len()
-    {
+    if approved_snapshot.len() != golden.approval.snapshot_items.len() {
         return Err(EvaluationError::InvalidReview);
     }
     if golden.approval.library_version != report.library_version
@@ -1250,17 +1357,6 @@ where
         .iter()
         .map(|item| (item.item_key.as_str(), item.proposed_disposition))
         .collect::<BTreeMap<_, _>>();
-    if classified.len() != report.classified_items.len()
-        || report.classified_items.iter().any(|item| {
-            item.item_key.trim().is_empty()
-                || !report_snapshot.contains(&SnapshotItemRevision {
-                    item_key: item.item_key.clone(),
-                    item_version: item.item_version,
-                })
-        })
-    {
-        return Err(EvaluationError::InvalidReview);
-    }
     if golden.approval.proposal_digest != classification_proposal_digest(report) {
         return Err(EvaluationError::SnapshotMismatch);
     }
@@ -1315,6 +1411,11 @@ where
 }
 
 /// Builds a local-only reversible canonical-key manifest from steward-reviewed decisions.
+///
+/// Validates source scope, receipt bindings and all operations before contacting
+/// governance. The verifier must authenticate the complete independently issued
+/// review, including candidate membership and the v2 proposal digest. Legacy
+/// receipts require reapproval; digest recomputation alone grants no authority.
 pub fn build_duplicate_merge_review_manifest<F>(
     report: &ClassificationReport,
     reviewed: &ReviewedDuplicateMergeSet,
@@ -1326,12 +1427,14 @@ where
     if reviewed.review_id.trim().is_empty()
         || reviewed.authority_receipt.trim().is_empty()
         || reviewed.snapshot_digest.trim().is_empty()
+        || reviewed.proposal_digest.trim().is_empty()
         || reviewed.rule_revision.trim().is_empty()
         || reviewed.decisions.len() != report.duplicate_candidates.len()
     {
         return Err(DuplicateReviewError::InvalidReview);
     }
     if reviewed.snapshot_digest != report.snapshot_digest
+        || reviewed.proposal_digest != classification_proposal_digest(report)
         || reviewed.library_version != report.library_version
         || reviewed.rule_revision != report.rule_revision
         || reviewed.snapshot_items != report.snapshot_items
@@ -1339,24 +1442,7 @@ where
     {
         return Err(DuplicateReviewError::SnapshotMismatch);
     }
-    if !verify_review(reviewed) {
-        return Err(DuplicateReviewError::UnverifiedApproval);
-    }
-
-    if report
-        .snapshot_items
-        .iter()
-        .any(|item| item.item_key.trim().is_empty())
-        || report
-            .snapshot_items
-            .iter()
-            .map(|item| item.item_key.as_str())
-            .collect::<BTreeSet<_>>()
-            .len()
-            != report.snapshot_items.len()
-    {
-        return Err(DuplicateReviewError::InvalidReview);
-    }
+    validate_classification_report(report).map_err(|_| DuplicateReviewError::InvalidReview)?;
     let item_revisions = report
         .snapshot_items
         .iter()
@@ -1458,6 +1544,9 @@ where
         });
     }
 
+    if !verify_review(reviewed) {
+        return Err(DuplicateReviewError::UnverifiedApproval);
+    }
     operations.sort_by(|left, right| {
         (&left.identity_kind, &left.normalized_identity)
             .cmp(&(&right.identity_kind, &right.normalized_identity))
@@ -1468,6 +1557,7 @@ where
         library_version: reviewed.library_version,
         rule_revision: reviewed.rule_revision.clone(),
         snapshot_digest: reviewed.snapshot_digest.clone(),
+        proposal_digest: reviewed.proposal_digest.clone(),
         operations,
         source_records_preserved: true,
     })
@@ -1509,6 +1599,8 @@ fn normalized_metadata(
 /// Local identity, execution-mode, and metadata checks finish before the caller's
 /// governance verifier runs. Invalid input never consumes a one-use approval;
 /// a locally valid complete review is verified exactly once before returning a plan.
+/// The verifier must authenticate every field of the reviewed set, including its
+/// proposal digest and requested changes. Recomputing a digest grants no authority.
 pub fn build_classification_write_plan<F>(
     report: &ClassificationReport,
     reviewed: &ReviewedClassificationWriteSet,
@@ -1522,6 +1614,7 @@ where
         || reviewed.authority_receipt.trim().is_empty()
         || reviewed.rule_revision.trim().is_empty()
         || reviewed.snapshot_digest.trim().is_empty()
+        || reviewed.proposal_digest.trim().is_empty()
         || reviewed.changes.is_empty()
     {
         return Err(WritePlanError::InvalidReview);
@@ -1631,6 +1724,10 @@ where
         });
     }
     operations.sort_by(|left, right| left.item_key.cmp(&right.item_key));
+    validate_classification_report(report).map_err(|_| WritePlanError::InvalidReview)?;
+    if reviewed.proposal_digest != classification_proposal_digest(report) {
+        return Err(WritePlanError::SnapshotMismatch);
+    }
     if !verify_review(reviewed) {
         return Err(WritePlanError::UnverifiedApproval);
     }
@@ -1643,6 +1740,7 @@ where
         library_version: reviewed.library_version,
         rule_revision: reviewed.rule_revision.clone(),
         snapshot_digest: reviewed.snapshot_digest.clone(),
+        proposal_digest: reviewed.proposal_digest.clone(),
         operations,
         source_records_preserved: true,
     })
@@ -1668,10 +1766,13 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
             library_version: plan.library_version,
             rule_revision: plan.rule_revision.clone(),
             snapshot_digest: plan.snapshot_digest.clone(),
+            proposal_digest: plan.proposal_digest.clone(),
             outcome: ClassificationWriteOutcome::DryRun,
             applied_item_keys: Vec::new(),
             failed_item_key: None,
             indeterminate_item_key: None,
+            indeterminate_request: None,
+            reconciliation_observation: None,
             not_attempted_item_keys: plan
                 .operations
                 .iter()
@@ -1713,46 +1814,16 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
         });
         let Some(state) = verified_state else {
             let reconciled_state = preflight(&operation.item_key).ok();
-            let reconciled_after = reconciled_state.as_ref().is_some_and(|state| {
-                matches_after_state(state, server_id, current_library_version, operation)
-            });
-            let reconciled_before = reconciled_state.as_ref().is_some_and(|state| {
-                matches_before_state(state, server_id, current_library_version, operation)
-            });
-            if let Some(state) = reconciled_state.as_ref().filter(|_| reconciled_after) {
-                applied_item_keys.push(operation.item_key.clone());
-                rollback_operations.push(ClassificationRollbackOperation {
-                    server_id: server_id.to_owned(),
-                    item_key: operation.item_key.clone(),
-                    item_version: state.item_version,
-                    expected_collection_keys: operation.after_collection_keys.clone(),
-                    expected_tags: operation.after_tags.clone(),
-                    collection_keys: operation.rollback_collection_keys.clone(),
-                    tags: operation.rollback_tags.clone(),
-                });
-            } else if let Some(state) = reconciled_state.as_ref().filter(|state| {
-                state.server_id == server_id
-                    && state.library_version > current_library_version
-                    && state.item_key == operation.item_key
-                    && state.item_version > operation.item_version
-            }) {
-                rollback_operations.push(ClassificationRollbackOperation {
-                    server_id: server_id.to_owned(),
-                    item_key: operation.item_key.clone(),
-                    item_version: state.item_version,
-                    expected_collection_keys: state.collection_keys.clone(),
-                    expected_tags: state.tags.clone(),
-                    collection_keys: operation.rollback_collection_keys.clone(),
-                    tags: operation.rollback_tags.clone(),
-                });
-            }
+            // A delayed request or concurrent writer can explain any observed state.
+            // Retain the observation without granting completion, retry, or inverse authority.
             rollback_operations.reverse();
             return partial_failure_receipt(
                 plan,
                 operation_index,
                 applied_item_keys,
                 rollback_operations,
-                (!reconciled_after && !reconciled_before).then_some(operation.item_key.as_str()),
+                request,
+                reconciled_state,
             );
         };
         current_library_version = state.library_version;
@@ -1776,10 +1847,13 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
         library_version: plan.library_version,
         rule_revision: plan.rule_revision.clone(),
         snapshot_digest: plan.snapshot_digest.clone(),
+        proposal_digest: plan.proposal_digest.clone(),
         outcome: ClassificationWriteOutcome::Applied,
         applied_item_keys,
         failed_item_key: None,
         indeterminate_item_key: None,
+        indeterminate_request: None,
+        reconciliation_observation: None,
         not_attempted_item_keys: Vec::new(),
         rollback_operations,
     }
@@ -1789,7 +1863,8 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
 ///
 /// The adapter may be created from a successful local authorization or from an
 /// exact caller-owned local key. The existing execution core retains dry-run,
-/// complete-preflight, reconciliation, and rollback-receipt behavior.
+/// complete-preflight and receipt behavior. A failed write remains indeterminate;
+/// matching observations do not grant completion, retry, or rollback authority.
 pub fn execute_classification_write_plan_with_zotero10(
     plan: &ClassificationWritePlan,
     adapter: &Zotero10LocalAdapter,
@@ -1998,10 +2073,13 @@ fn preflight_failure_receipt(
         library_version: plan.library_version,
         rule_revision: plan.rule_revision.clone(),
         snapshot_digest: plan.snapshot_digest.clone(),
+        proposal_digest: plan.proposal_digest.clone(),
         outcome: ClassificationWriteOutcome::PreflightFailure,
         applied_item_keys: Vec::new(),
         failed_item_key: failed_item_key.map(str::to_owned),
         indeterminate_item_key: None,
+        indeterminate_request: None,
+        reconciliation_observation: None,
         not_attempted_item_keys: plan
             .operations
             .iter()
@@ -2016,7 +2094,8 @@ fn partial_failure_receipt(
     failed_index: usize,
     applied_item_keys: Vec<String>,
     rollback_operations: Vec<ClassificationRollbackOperation>,
-    indeterminate_item_key: Option<&str>,
+    indeterminate_request: ClassificationWriteRequest,
+    reconciliation_observation: Option<ClassificationItemState>,
 ) -> ClassificationWriteReceipt {
     ClassificationWriteReceipt {
         review_id: plan.review_id.clone(),
@@ -2026,10 +2105,13 @@ fn partial_failure_receipt(
         library_version: plan.library_version,
         rule_revision: plan.rule_revision.clone(),
         snapshot_digest: plan.snapshot_digest.clone(),
+        proposal_digest: plan.proposal_digest.clone(),
         outcome: ClassificationWriteOutcome::PartialFailure,
         applied_item_keys,
         failed_item_key: Some(plan.operations[failed_index].item_key.clone()),
-        indeterminate_item_key: indeterminate_item_key.map(str::to_owned),
+        indeterminate_item_key: Some(indeterminate_request.item_key.clone()),
+        indeterminate_request: Some(indeterminate_request),
+        reconciliation_observation,
         not_attempted_item_keys: plan
             .operations
             .iter()
@@ -2263,6 +2345,13 @@ fn read_snapshot_with_clock(
             page.body_bytes,
             page.total,
         )?;
+        if page
+            .items
+            .iter()
+            .any(|item| item.key.trim().is_empty() || item.version > page.library_version)
+        {
+            return Err(ReadError::SnapshotChanged);
+        }
         items.extend(page.items);
         snapshot_bytes = next_snapshot_bytes;
         debug_assert_eq!(items.len(), next_item_count);
@@ -2328,7 +2417,7 @@ pub fn classify_snapshot(
     mut items: Vec<ZoteroItem>,
 ) -> ClassificationReport {
     items.sort_by(|left, right| left.key.cmp(&right.key));
-    let snapshot_items = items
+    let snapshot_items: Vec<_> = items
         .iter()
         .map(|item| SnapshotItemRevision {
             item_key: item.key.clone(),
@@ -2345,41 +2434,24 @@ pub fn classify_snapshot(
     let children = child_index(&items);
     let bibliographic: Vec<&ZoteroItem> =
         items.iter().filter(|item| is_bibliographic(item)).collect();
-    let bibliographic_item_count = bibliographic.len();
     let duplicate_candidates = duplicate_candidates(&bibliographic);
     let classified_items: Vec<ClassifiedItem> = bibliographic
         .into_iter()
         .map(|item| classify_item(item, children.get(&item.key).cloned().unwrap_or_default()))
         .collect();
+    let observed_item_count = items.len();
+    let unclassified_items: Vec<_> = items
+        .into_iter()
+        .filter(|item| !is_bibliographic(item))
+        .collect();
+    let pending_source_item_keys =
+        pending_source_keys(&classified_items, &unclassified_items, children);
 
-    let mut disposition_counts = BTreeMap::new();
-    for item in &classified_items {
-        *disposition_counts
-            .entry(item.proposed_disposition)
-            .or_insert(0) += 1;
-    }
-    let audit_summary = ClassificationAudit {
-        snapshot_item_count: items.len(),
-        bibliographic_item_count,
-        proposed_disposition_count: classified_items.len(),
-        provenance_complete_count: classified_items
-            .iter()
-            .filter(|item| {
-                !item.item_key.trim().is_empty()
-                    && item
-                        .child_item_keys
-                        .iter()
-                        .all(|child_key| !child_key.trim().is_empty())
-            })
-            .count(),
-        abstention_count: classified_items
-            .iter()
-            .filter(|item| item.proposed_disposition == Disposition::NeedsStewardReview)
-            .count(),
-        duplicate_candidate_count: duplicate_candidates.len(),
-        failure_count: 0,
-        disposition_counts,
-    };
+    let audit_summary = classification_audit(
+        &snapshot_items,
+        &classified_items,
+        duplicate_candidates.len(),
+    );
 
     ClassificationReport {
         zotero_version,
@@ -2388,13 +2460,80 @@ pub fn classify_snapshot(
         server_id,
         library_version,
         rule_revision: RULE_REVISION,
-        observed_item_count: items.len(),
+        observed_item_count,
         snapshot_items,
         snapshot_digest,
         classified_items,
+        unclassified_items,
+        pending_source_item_keys,
         duplicate_candidates,
         audit_summary,
     }
+}
+
+fn classification_audit(
+    snapshot_items: &[SnapshotItemRevision],
+    classified_items: &[ClassifiedItem],
+    duplicate_candidate_count: usize,
+) -> ClassificationAudit {
+    let mut identity_counts = BTreeMap::new();
+    for item in snapshot_items {
+        *identity_counts
+            .entry(item.item_key.as_str())
+            .or_insert(0usize) += 1;
+    }
+    let mut disposition_counts = BTreeMap::new();
+    for item in classified_items {
+        *disposition_counts
+            .entry(item.proposed_disposition)
+            .or_insert(0) += 1;
+    }
+    ClassificationAudit {
+        snapshot_item_count: snapshot_items.len(),
+        bibliographic_item_count: classified_items.len(),
+        proposed_disposition_count: classified_items.len(),
+        provenance_complete_count: classified_items
+            .iter()
+            .filter(|item| {
+                !item.item_key.trim().is_empty()
+                    && identity_counts.get(item.item_key.as_str()) == Some(&1)
+                    && item.child_item_keys.iter().all(|child_key| {
+                        !child_key.trim().is_empty()
+                            && identity_counts.get(child_key.as_str()) == Some(&1)
+                    })
+            })
+            .count(),
+        abstention_count: classified_items
+            .iter()
+            .filter(|item| item.proposed_disposition == Disposition::NeedsStewardReview)
+            .count(),
+        duplicate_candidate_count,
+        failure_count: 0,
+        disposition_counts,
+    }
+}
+
+fn pending_source_keys(
+    classified_items: &[ClassifiedItem],
+    unclassified_items: &[ZoteroItem],
+    mut children: BTreeMap<String, Vec<String>>,
+) -> Vec<String> {
+    let mut pending_source_item_keys: BTreeSet<_> = unclassified_items
+        .iter()
+        .map(|item| item.key.clone())
+        .collect();
+    let mut parent_item_keys: Vec<_> = classified_items
+        .iter()
+        .map(|item| item.item_key.clone())
+        .collect();
+    while let Some(parent_item_key) = parent_item_keys.pop() {
+        for child_item_key in children.remove(&parent_item_key).unwrap_or_default() {
+            pending_source_item_keys.remove(&child_item_key);
+            parent_item_keys.push(child_item_key);
+        }
+    }
+
+    pending_source_item_keys.into_iter().collect()
 }
 
 fn is_bibliographic(item: &ZoteroItem) -> bool {
@@ -2783,22 +2922,34 @@ mod tests {
 
     #[test]
     fn approved_zotero10_adapter_executes_the_reviewed_plan_boundary() {
-        let plan = ClassificationWritePlan {
-            mode: WriteMode::Execute,
+        let mut source_item = item("ABCD2345", "book", "ontology learning", "", "");
+        source_item.data.collections = vec!["BCDE3456".into()];
+        source_item.data.tags = vec![ItemTag {
+            tag: "kept".into(),
+            tag_type: Some(1),
+        }];
+        let report = classify_snapshot(
+            "10.0.0".into(),
+            Some("server-10".into()),
+            42,
+            vec![source_item],
+        );
+        let review = ReviewedClassificationWriteSet {
             review_id: "review-1".into(),
             authority_receipt: "authority-1".into(),
-            server_id: Some("server-10".into()),
-            zotero_version: "10.0.0".into(),
-            library_version: 42,
-            rule_revision: "ontology-research-v2".into(),
-            snapshot_digest: "sha256:reviewed".into(),
-            operations: vec![ClassificationWriteOperation {
+            server_id: report.server_id.clone(),
+            zotero_version: report.zotero_version.clone(),
+            library_version: report.library_version,
+            rule_revision: report.rule_revision.into(),
+            snapshot_digest: report.snapshot_digest.clone(),
+            proposal_digest: classification_proposal_digest(&report),
+            snapshot_items: report.snapshot_items.clone(),
+            changes: vec![ReviewedClassificationChange {
                 item_key: "ABCD2345".into(),
                 item_version: 7,
                 reviewed_disposition: Disposition::Generation,
                 before_collection_keys: vec!["BCDE3456".into()],
                 after_collection_keys: vec!["CDEF4567".into()],
-                rollback_collection_keys: vec!["BCDE3456".into()],
                 before_tags: vec![ItemTag {
                     tag: "kept".into(),
                     tag_type: Some(1),
@@ -2807,13 +2958,12 @@ mod tests {
                     tag: "classified".into(),
                     tag_type: None,
                 }],
-                rollback_tags: vec![ItemTag {
-                    tag: "kept".into(),
-                    tag_type: Some(1),
-                }],
             }],
-            source_records_preserved: true,
         };
+        let plan = build_classification_write_plan(&report, &review, WriteMode::Execute, |set| {
+            set == &review
+        })
+        .unwrap();
         let before = library_response("server-10", 42);
         let item = item_response("server-10", 7);
         let after = library_response("server-10", 42);
@@ -2832,6 +2982,7 @@ mod tests {
         let receipt = execute_classification_write_plan_with_zotero10(&plan, &transport(base));
 
         assert_eq!(receipt.outcome, ClassificationWriteOutcome::Applied);
+        assert_eq!(receipt.proposal_digest, review.proposal_digest);
         assert_eq!(receipt.applied_item_keys, ["ABCD2345"]);
         assert_eq!(receipt.rollback_operations[0].item_version, 43);
         assert_eq!(server.join().unwrap().len(), 4);
@@ -3604,6 +3755,56 @@ mod tests {
     }
 
     #[test]
+    fn reader_rejects_future_item_revisions_before_another_page() {
+        for item_type in ["book", "attachment", "note", "annotation"] {
+            for invalid_start in [0, 1] {
+                let mut starts = Vec::new();
+                let result = read_snapshot_with(&mut |start| {
+                    starts.push(start);
+                    let mut observed = item(&format!("I{start}"), "book", "x", "", "");
+                    observed.version = 42;
+                    let mut page_items = vec![observed];
+                    if start == invalid_start {
+                        let mut future = item(&format!("I{}", start + 1), item_type, "x", "", "");
+                        future.version = 43;
+                        page_items.push(future);
+                    }
+                    Ok(fetched_page(4, page_items))
+                });
+                assert!(matches!(result, Err(ReadError::SnapshotChanged)));
+                assert_eq!(
+                    starts,
+                    if invalid_start == 0 {
+                        vec![0]
+                    } else {
+                        vec![0, 1]
+                    }
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn reader_preserves_item_revisions_within_the_library_version() {
+        for zotero_version in ["9.0.6", "10.0.1"] {
+            for (library_version, item_version) in
+                [(0, 0), (42, 0), (42, 41), (42, 42), (u64::MAX, u64::MAX)]
+            {
+                let mut observed = item("A", "book", "semantic web", "", "");
+                observed.version = item_version;
+                let mut page = fetched_page(1, vec![observed]);
+                page.library_version = library_version;
+                page.zotero_version = zotero_version.into();
+                let report = read_snapshot_with(&mut |_| Ok(page.clone())).unwrap();
+                assert_eq!(report.library_version, library_version);
+                assert_eq!(report.observed_item_count, 1);
+                assert_eq!(report.classified_items.len(), 1);
+                assert_eq!(report.classified_items[0].item_version, item_version);
+            }
+        }
+    }
+
+    #[test]
     fn reader_core_paginates_and_preserves_one_snapshot_contract() {
         let mut pages = vec![
             fetched_page(2, vec![item("A", "book", "ontology quality", "", "")]),
@@ -3728,6 +3929,143 @@ mod tests {
             checked_snapshot_usage(1, 1, 0, 1, 1),
             Err(ReadError::SnapshotChanged)
         ));
+    }
+
+    #[test]
+    fn reader_rejects_blank_source_identity_before_another_page() {
+        for blank_key in ["", " ", "\t\n"] {
+            for invalid_start in [0, 1] {
+                let mut starts = Vec::new();
+                let result = read_snapshot_with(&mut |start| {
+                    starts.push(start);
+                    let key = if start == invalid_start {
+                        blank_key.to_owned()
+                    } else {
+                        format!("A{start}")
+                    };
+                    Ok(fetched_page(3, vec![item(&key, "attachment", "", "", "")]))
+                });
+                assert!(matches!(result, Err(ReadError::SnapshotChanged)));
+                assert_eq!(
+                    starts,
+                    if invalid_start == 0 {
+                        vec![0]
+                    } else {
+                        vec![0, 1]
+                    }
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn source_inventory_retains_standalone_and_nested_metadata_without_proposals() {
+        let mut standalone = item("A", "attachment", "Ontology Learning", "10.1/X", "");
+        standalone.version = 0;
+        standalone.data.collections = vec!["COLLECTION".into()];
+        standalone.data.tags = vec![ItemTag {
+            tag: "Evidence".into(),
+            tag_type: None,
+        }];
+        let report = read_snapshot_with(&mut |_| {
+            Ok(fetched_page(
+                6,
+                vec![
+                    item("F", "annotation", "", "", "C"),
+                    item("E", "note", "", "", ""),
+                    item("D", "annotation", "", "", "A"),
+                    item("C", "attachment", "", "", "B"),
+                    item("B", "book", "Ontology Learning", "10.1/X", ""),
+                    standalone.clone(),
+                ],
+            ))
+        })
+        .unwrap();
+        let serialized = serde_json::to_value(&report).unwrap();
+        assert_eq!(
+            serialized["pending_source_item_keys"],
+            serde_json::json!(["A", "D", "E"])
+        );
+        let inventory = serialized["unclassified_items"]
+            .as_array()
+            .expect("every excluded source must survive in the report");
+        assert_eq!(
+            inventory
+                .iter()
+                .map(|entry| entry["key"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            ["A", "C", "D", "E", "F"]
+        );
+        assert_eq!(inventory[0]["version"], 0);
+        assert_eq!(inventory[0]["data"]["title"], "Ontology Learning");
+        assert_eq!(
+            inventory[0]["data"]["collections"],
+            serde_json::json!(["COLLECTION"])
+        );
+        assert_eq!(
+            inventory[0]["data"]["tags"],
+            serde_json::json!([{"tag":"Evidence"}])
+        );
+        assert_eq!(inventory[4]["data"]["parentItem"], "C");
+        assert_eq!(report.observed_item_count, 6);
+        assert_eq!(report.classified_items.len(), 1);
+        assert_eq!(report.classified_items[0].item_key, "B");
+        assert_eq!(report.classified_items[0].child_item_keys, ["C"]);
+        assert!(report.duplicate_candidates.is_empty());
+    }
+
+    #[test]
+    fn source_inventory_keeps_orphans_cycles_and_unattached_annotations_pending() {
+        let sources = vec![
+            item("A", "book", "", "", ""),
+            item("B", "note", "", "", "missing"),
+            item("C", "attachment", "", "", "B"),
+            item("D", "note", "", "", "E"),
+            item("E", "attachment", "", "", "D"),
+            item("F", "annotation", "", "", "F"),
+            item("G", "annotation", "", "", ""),
+        ];
+        let forward =
+            serde_json::to_value(classify_snapshot("10".into(), None, 42, sources.clone()))
+                .unwrap();
+        let reverse = serde_json::to_value(classify_snapshot(
+            "10".into(),
+            None,
+            42,
+            sources.into_iter().rev().collect(),
+        ))
+        .unwrap();
+        assert_eq!(
+            forward["pending_source_item_keys"],
+            serde_json::json!(["B", "C", "D", "E", "F", "G"])
+        );
+        assert_eq!(forward, reverse);
+        assert_eq!(forward["unclassified_items"].as_array().unwrap().len(), 6);
+    }
+
+    #[test]
+    fn source_inventory_distinguishes_empty_and_fully_linked_evidence() {
+        for sources in [
+            vec![],
+            vec![item("A", "book", "", "", "")],
+            vec![
+                item("A", "book", "", "", ""),
+                item("B", "attachment", "", "", "A"),
+                item("C", "annotation", "", "", "B"),
+            ],
+        ] {
+            let serialized =
+                serde_json::to_value(classify_snapshot("10".into(), None, 42, sources)).unwrap();
+            assert_eq!(
+                serialized["pending_source_item_keys"],
+                serde_json::json!([])
+            );
+            assert_eq!(
+                serialized["observed_item_count"].as_u64().unwrap() as usize,
+                serialized["classified_items"].as_array().unwrap().len()
+                    + serialized["unclassified_items"].as_array().unwrap().len()
+            );
+        }
     }
 
     #[test]
