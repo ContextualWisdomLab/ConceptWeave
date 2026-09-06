@@ -1,7 +1,9 @@
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationLimits, ObservationRequest, ObservationRequestBudget,
-    SourceConnectionRegistry,
+    ResolvedSourceConnection, SourceConnectionRegistry,
 };
+
+const TEST_POLICY_BINDING: &str = "fixture_policy_revision_a";
 
 struct ExactRegistry<'a> {
     source_connection_key: &'a str,
@@ -13,12 +15,18 @@ impl SourceConnectionRegistry for ExactRegistry<'_> {
         source_connection_key == self.source_connection_key
     }
 
+    fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
+        (source_connection_key == self.source_connection_key)
+            .then(|| TEST_POLICY_BINDING.to_owned())
+    }
+
     fn authorizes_schema_scope(
         &self,
-        source_connection_key: &str,
+        source_connection: &ResolvedSourceConnection,
         allowed_schema_names: &[String],
     ) -> bool {
-        source_connection_key == self.source_connection_key
+        source_connection.source_connection_key() == self.source_connection_key
+            && source_connection.connection_policy_binding() == TEST_POLICY_BINDING
             && allowed_schema_names.iter().all(|schema_name| {
                 self.allowed_schema_names
                     .iter()
