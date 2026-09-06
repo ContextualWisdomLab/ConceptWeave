@@ -42,6 +42,12 @@ fn validate_output_request(
 ) -> io::Result<(Option<PathBuf>, PathBuf)> {
     let output = validate_output_path(output)?;
     let report_output = report_output.map(validate_output_path).transpose()?;
+    if report_output.as_ref() == Some(&output) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "report and worksheet output paths must differ",
+        ));
+    }
     Ok((report_output, output))
 }
 
