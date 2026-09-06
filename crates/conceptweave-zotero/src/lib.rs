@@ -131,7 +131,7 @@ pub enum Disposition {
 }
 
 /// Deterministic reason that a bibliographic item requires steward review.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AbstentionReason {
     /// Title, abstract, and tags contain no classification metadata.
@@ -1104,6 +1104,92 @@ pub struct ClassificationAudit {
     pub failure_count: usize,
     /// Proposal totals by disposition.
     pub disposition_counts: BTreeMap<Disposition, usize>,
+}
+
+/// One editable local steward decision without duplicated bibliographic text.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct StewardReviewDecision {
+    /// Stable Zotero item key used to join the sensitive classification report.
+    pub item_key: String,
+    /// Exact item revision observed in the classified snapshot.
+    pub item_version: u64,
+    /// Deterministic proposal supplied for comparison, never as approval.
+    pub proposed_disposition: Disposition,
+    /// Deterministic abstention reason when the proposal requires review.
+    pub abstention_reason: Option<AbstentionReason>,
+    /// Steward decision to fill; abstention is rejected by completion evaluation.
+    pub reviewed_disposition: Option<Disposition>,
+}
+
+/// Snapshot-bound local worksheet for one decision per bibliographic item.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct StewardReviewWorksheet {
+    /// Zotero library revision observed with the source snapshot.
+    pub library_version: u64,
+    /// Classifier revision that produced the proposals.
+    pub rule_revision: String,
+    /// Canonical content digest of the complete raw snapshot.
+    pub snapshot_digest: String,
+    /// Versioned identity of proposals, review context and retained source scope.
+    /// Older worksheets require regeneration; this binding is not approval.
+    pub proposal_digest: String,
+    /// Complete parent and child item-revision coordinates.
+    pub snapshot_items: Vec<SnapshotItemRevision>,
+    /// Deterministically ordered editable decisions for bibliographic items.
+    pub decisions: Vec<StewardReviewDecision>,
+}
+
+/// A classification report cannot safely produce a review worksheet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorksheetError {
+    /// Report identity or coverage is incomplete, duplicated, or inconsistent.
+    InvalidReport,
+}
+
+impl fmt::Display for WorksheetError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("classification report is invalid for steward review")
+    }
+}
+
+impl std::error::Error for WorksheetError {}
+
+/// Builds a complete local worksheet without copying titles, abstracts, or evidence.
+///
+/// Complete inventory validation precedes projection. Valid unresolved sources
+/// may be reviewed, but worksheet creation never proves completed review.
+pub fn build_steward_review_worksheet(
+    report: &ClassificationReport,
+) -> Result<StewardReviewWorksheet, WorksheetError> {
+    validate_classification_report(report).map_err(|_| WorksheetError::InvalidReport)?;
+    if report.rule_revision.trim().is_empty() || report.snapshot_digest.trim().is_empty() {
+        return Err(WorksheetError::InvalidReport);
+    }
+    let mut decisions = Vec::with_capacity(report.classified_items.len());
+    for item in &report.classified_items {
+        if (item.proposed_disposition == Disposition::NeedsStewardReview)
+            != item.abstention_reason.is_some()
+        {
+            return Err(WorksheetError::InvalidReport);
+        }
+        decisions.push(StewardReviewDecision {
+            item_key: item.item_key.clone(),
+            item_version: item.item_version,
+            proposed_disposition: item.proposed_disposition,
+            abstention_reason: item.abstention_reason,
+            reviewed_disposition: None,
+        });
+    }
+    decisions.sort_by(|left, right| left.item_key.cmp(&right.item_key));
+
+    Ok(StewardReviewWorksheet {
+        library_version: report.library_version,
+        rule_revision: report.rule_revision.into(),
+        snapshot_digest: report.snapshot_digest.clone(),
+        proposal_digest: classification_proposal_digest(report),
+        snapshot_items: report.snapshot_items.clone(),
+        decisions,
+    })
 }
 
 /// One steward-reviewed expected disposition in a local golden set.
