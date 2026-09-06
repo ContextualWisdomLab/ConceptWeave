@@ -126,6 +126,12 @@ GREEN source `f6735b585022aac1c8ceff86c150d9b64fd77ec2` passed 68 tests across 1
 
 ## Alternatives considered
 
+### Proposed review-batch scope projection amendment — September 7
+
+PR33 exports sensitive bounded metadata views. Normal merge `2f3962e` preserves its context minimization guards and PR32's shared source/patch/private-file contracts. The existing batch-to-patch test then failed because the view omitted the required proposal identity. RED `7373579` compiled with one passing and two failing tests for patch compatibility and omitted pending-source scope. `ce15389` copies the two already validated progress fields into the existing batch: opaque proposal identity and pending-source count. No new digest, record class, full-text capture or authority mechanism is introduced.
+
+We reject recomputing a separate batch hash because the completed patch must retain the exact reviewed report scope. We reject silently backfilling the digest at conversion because that could relabel an old view as current. We reject treating unresolved records as paper slots; the batch keeps both counts and no-pending-decisions means only no blank bibliographic slots. A test fills the last paper slot while a standalone source remains and verifies batch exhaustion alongside incomplete source progress. Existing repeated-view determinism, 1–100 limit, blank-start decisions and minimized abstract guards remain. The view is not a reservation or approval, and stripping metadata context does not grant full-text provenance. Legacy batch artifacts require regeneration; later batch consumers must preserve these fields before protected release.
+
 ### Proposed decision CLI integration amendment — September 7
 
 PR32 exposes the patch owner as an offline command. Normal merge `b7cae29` retains the original CLI delta and PR31's required proposal binding with prior private-file protections. The existing arm reads three distinct private inputs, delegates the typed patch unchanged to the canonical validator, serializes the returned worksheet and creates a new output. We retain that implementation rather than add another validator or infer a patch digest in the CLI. Two synthetic fixture constructors adopt the required binding; no production source is copied or new dependency introduced.
