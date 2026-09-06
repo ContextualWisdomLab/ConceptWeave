@@ -6,6 +6,14 @@ This file records code-current product and technical gaps. Exact PR/check/run co
 
 ## September 6 source inventory checkpoint
 
+### September 7 PR37 source continuity verification in progress
+
+Normal merge `c4d40f7` retains PR37's pending full-text view and PR36's source inventory and private-file protections. Tests `cd830ff` add nested proposal/pending-source identity and stale capture rejection against a fresh worksheet. Independent review found a test-only `String`/`Option` mismatch; the failed compilation is retained in `/tmp/conceptweave-pr37-verified.log`, and `21fd648` corrects it without claiming a production RED. Proposed ADR0006 `d53475f` records the reuse decision and downstream envelope requirement.
+
+The prerequisite subsequently advanced to `3ab00417c229aeae59709f8980c79d5339687893` through manifest-version experiments and reversion. Its tree is exactly the same as `aca72e7` (`01067eb790e9e9f55395a0ddd6fb930dae685bcb`); another normal merge preserves that history. Workspace integration and corrected-source tests are still running in `/tmp/conceptweave-pr37-integrated.log` and `/tmp/conceptweave-pr37-final.log`. No final test count, coverage result or hosted verification is claimed at this checkpoint. Counts from earlier checkpoints include filtered subprocess results; final reporting must separate unfiltered suite totals.
+
+Actual decisions and independent approvals remain 0/3,715 with four unresolved sources. Native Visual Inspection remains incomplete because the Mac is locked. No fresh screenshot, real Zotero write, protected merge or release exists. Root and later consumers still require adoption. PR37 remains OPEN Draft; local source must finish verification before push and exact-head readback.
+
 ### September 7 PR36 full-text source continuity verification
 
 Original PR36 `d3f991dcc1b746afed7c36f315e8937c39390c5e` passed 202 tests/39 suites. Normal merge `707f2f2` preserves its private full-text capture/proxy-isolation delta and PR34 `9eb89b8d4e751c34e640261f4883381571c83f25`. Existing capture admission delegates to worksheet construction, so shared inventory and parent consistency checks are inherited before any request. Existing whole-report hashing includes retained metadata and pending keys. No duplicate validator or hash was added. Initial integration failed compilation because two parent test callbacks required mutable borrows under PR36's writer signature; `c7052d9` repairs those calls and adds source-scope regressions. This is not a new production RED claim.
