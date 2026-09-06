@@ -1823,7 +1823,8 @@ pub fn execute_classification_write_plan<PreflightError, WriteError>(
 ///
 /// The adapter may be created from a successful local authorization or from an
 /// exact caller-owned local key. The existing execution core retains dry-run,
-/// complete-preflight, reconciliation, and rollback-receipt behavior.
+/// complete-preflight and receipt behavior. A failed write remains indeterminate;
+/// matching observations do not grant completion, retry, or rollback authority.
 pub fn execute_classification_write_plan_with_zotero10(
     plan: &ClassificationWritePlan,
     adapter: &Zotero10LocalAdapter,
@@ -2725,22 +2726,28 @@ mod tests {
 
     #[test]
     fn approved_zotero10_adapter_executes_the_reviewed_plan_boundary() {
-        let plan = ClassificationWritePlan {
-            mode: WriteMode::Execute,
+        let report = classify_snapshot(
+            "10.0.0".into(),
+            Some("server-10".into()),
+            42,
+            vec![item("ABCD2345", "book", "ontology learning", "", "")],
+        );
+        let review = ReviewedClassificationWriteSet {
             review_id: "review-1".into(),
             authority_receipt: "authority-1".into(),
-            server_id: Some("server-10".into()),
-            zotero_version: "10.0.0".into(),
-            library_version: 42,
-            rule_revision: "ontology-research-v2".into(),
-            snapshot_digest: "sha256:reviewed".into(),
-            operations: vec![ClassificationWriteOperation {
+            server_id: report.server_id.clone(),
+            zotero_version: report.zotero_version.clone(),
+            library_version: report.library_version,
+            rule_revision: report.rule_revision.into(),
+            snapshot_digest: report.snapshot_digest.clone(),
+            proposal_digest: classification_proposal_digest(&report),
+            snapshot_items: report.snapshot_items.clone(),
+            changes: vec![ReviewedClassificationChange {
                 item_key: "ABCD2345".into(),
                 item_version: 7,
                 reviewed_disposition: Disposition::Generation,
                 before_collection_keys: vec!["BCDE3456".into()],
                 after_collection_keys: vec!["CDEF4567".into()],
-                rollback_collection_keys: vec!["BCDE3456".into()],
                 before_tags: vec![ItemTag {
                     tag: "kept".into(),
                     tag_type: Some(1),
@@ -2749,13 +2756,12 @@ mod tests {
                     tag: "classified".into(),
                     tag_type: None,
                 }],
-                rollback_tags: vec![ItemTag {
-                    tag: "kept".into(),
-                    tag_type: Some(1),
-                }],
             }],
-            source_records_preserved: true,
         };
+        let plan = build_classification_write_plan(&report, &review, WriteMode::Execute, |set| {
+            set == &review
+        })
+        .unwrap();
         let before = library_response("server-10", 42);
         let item = item_response("server-10", 7);
         let after = library_response("server-10", 42);
@@ -2774,6 +2780,7 @@ mod tests {
         let receipt = execute_classification_write_plan_with_zotero10(&plan, &transport(base));
 
         assert_eq!(receipt.outcome, ClassificationWriteOutcome::Applied);
+        assert_eq!(receipt.proposal_digest, review.proposal_digest);
         assert_eq!(receipt.applied_item_keys, ["ABCD2345"]);
         assert_eq!(receipt.rollback_operations[0].item_version, 43);
         assert_eq!(server.join().unwrap().len(), 4);
