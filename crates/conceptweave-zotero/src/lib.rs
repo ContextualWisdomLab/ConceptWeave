@@ -209,6 +209,8 @@ pub struct ReviewedDuplicateMergeSet {
     pub rule_revision: String,
     /// Exact raw-snapshot digest reviewed by the steward.
     pub snapshot_digest: String,
+    /// Required v2 identity of proposals, retained metadata and pending sources.
+    pub proposal_digest: String,
     /// Exact item-key/item-version coordinates reviewed by the steward.
     pub snapshot_items: Vec<SnapshotItemRevision>,
     /// Exact duplicate membership reviewed by the steward.
@@ -249,6 +251,8 @@ pub struct DuplicateMergeReviewManifest {
     pub rule_revision: String,
     /// Exact raw-snapshot digest shared with the reviewed decisions.
     pub snapshot_digest: String,
+    /// Verified identity of the proposals and complete retained source scope.
+    pub proposal_digest: String,
     /// Deterministically ordered canonical-key operations.
     pub operations: Vec<DuplicateMergeOperation>,
     /// Classification never deletes or mutates Zotero source records.
@@ -687,6 +691,11 @@ where
 }
 
 /// Builds a local-only reversible canonical-key manifest from steward-reviewed decisions.
+///
+/// Validates source scope, receipt bindings and all operations before contacting
+/// governance. The verifier must authenticate the complete independently issued
+/// review, including candidate membership and the v2 proposal digest. Legacy
+/// receipts require reapproval; digest recomputation alone grants no authority.
 pub fn build_duplicate_merge_review_manifest<F>(
     report: &ClassificationReport,
     reviewed: &ReviewedDuplicateMergeSet,
@@ -695,39 +704,24 @@ pub fn build_duplicate_merge_review_manifest<F>(
 where
     F: FnOnce(&ReviewedDuplicateMergeSet) -> bool,
 {
+    validate_classification_report(report).map_err(|_| DuplicateReviewError::InvalidReview)?;
     if reviewed.review_id.trim().is_empty()
         || reviewed.authority_receipt.trim().is_empty()
         || reviewed.snapshot_digest.trim().is_empty()
+        || reviewed.proposal_digest.trim().is_empty()
         || reviewed.rule_revision.trim().is_empty()
         || reviewed.decisions.len() != report.duplicate_candidates.len()
     {
         return Err(DuplicateReviewError::InvalidReview);
     }
     if reviewed.snapshot_digest != report.snapshot_digest
+        || reviewed.proposal_digest != classification_proposal_digest(report)
         || reviewed.library_version != report.library_version
         || reviewed.rule_revision != report.rule_revision
         || reviewed.snapshot_items != report.snapshot_items
         || reviewed.duplicate_candidates != report.duplicate_candidates
     {
         return Err(DuplicateReviewError::SnapshotMismatch);
-    }
-    if !verify_review(reviewed) {
-        return Err(DuplicateReviewError::UnverifiedApproval);
-    }
-
-    if report
-        .snapshot_items
-        .iter()
-        .any(|item| item.item_key.trim().is_empty())
-        || report
-            .snapshot_items
-            .iter()
-            .map(|item| item.item_key.as_str())
-            .collect::<BTreeSet<_>>()
-            .len()
-            != report.snapshot_items.len()
-    {
-        return Err(DuplicateReviewError::InvalidReview);
     }
     let item_revisions = report
         .snapshot_items
@@ -830,6 +824,9 @@ where
         });
     }
 
+    if !verify_review(reviewed) {
+        return Err(DuplicateReviewError::UnverifiedApproval);
+    }
     operations.sort_by(|left, right| {
         (&left.identity_kind, &left.normalized_identity)
             .cmp(&(&right.identity_kind, &right.normalized_identity))
@@ -840,6 +837,7 @@ where
         library_version: reviewed.library_version,
         rule_revision: reviewed.rule_revision.clone(),
         snapshot_digest: reviewed.snapshot_digest.clone(),
+        proposal_digest: reviewed.proposal_digest.clone(),
         operations,
         source_records_preserved: true,
     })
