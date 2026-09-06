@@ -3,6 +3,307 @@ use crate::{
     FullTextWriteScope, WriteMode, build_full_text_write_plan, execute_full_text_write_plan,
 };
 use std::cell::Cell;
+use std::cell::RefCell;
+
+struct WriteStore {
+    items: RefCell<BTreeMap<String, crate::ClassificationItemState>>,
+    library_version: Cell<u64>,
+    read_count: Cell<usize>,
+    write_count: Cell<usize>,
+}
+
+impl WriteStore {
+    fn from_report(report: &ClassificationReport) -> Self {
+        Self {
+            items: RefCell::new(
+                report
+                    .classified_items
+                    .iter()
+                    .map(|item| {
+                        (
+                            item.item_key.clone(),
+                            crate::ClassificationItemState {
+                                server_id: report.server_id.clone().unwrap(),
+                                library_version: report.library_version,
+                                item_key: item.item_key.clone(),
+                                item_version: item.item_version,
+                                collection_keys: item.collection_keys.clone(),
+                                tags: item.tags.clone(),
+                            },
+                        )
+                    })
+                    .collect(),
+            ),
+            library_version: Cell::new(report.library_version),
+            read_count: Cell::new(0),
+            write_count: Cell::new(0),
+        }
+    }
+
+    fn read_item(&self, item_key: &str) -> Result<crate::ClassificationItemState, ()> {
+        self.read_count.set(self.read_count.get() + 1);
+        let mut item = self.items.borrow().get(item_key).ok_or(())?.clone();
+        item.library_version = self.library_version.get();
+        Ok(item)
+    }
+
+    fn write_item(
+        &self,
+        request: &crate::ClassificationWriteRequest,
+    ) -> Result<crate::ClassificationItemState, ()> {
+        assert_eq!(request.library_version, self.library_version.get());
+        assert_eq!(
+            request.item_version,
+            self.items.borrow()[&request.item_key].item_version
+        );
+        self.write_count.set(self.write_count.get() + 1);
+        self.library_version.set(self.library_version.get() + 1);
+        let state = crate::ClassificationItemState {
+            server_id: request.server_id.clone(),
+            library_version: self.library_version.get(),
+            item_key: request.item_key.clone(),
+            item_version: self.library_version.get(),
+            collection_keys: request.collection_keys.clone(),
+            tags: request.tags.clone(),
+        };
+        self.items
+            .borrow_mut()
+            .insert(request.item_key.clone(), state.clone());
+        Ok(state)
+    }
+}
+
+#[test]
+fn full_text_write_rejects_substituted_mode_destinations_and_labels_under_old_authority() {
+    let report = report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let original = serde_json::to_value(write_scope_fixture(&report, &capture)).unwrap();
+    for scenario in 0..3 {
+        let mut scope = write_scope_fixture(&report, &capture);
+        match scenario {
+            0 => scope.mode = WriteMode::Execute,
+            1 => {
+                scope.reviewed_writes.changes[0].after_collection_keys =
+                    vec!["OTHER_COLLECTION".into()]
+            }
+            _ => {
+                let mut reviewed = serde_json::to_value(&scope.full_text_review).unwrap();
+                reviewed["full_text_golden_set_v1"]["labels"][0]["expected_disposition"] =
+                    serde_json::json!(crate::Disposition::SemanticConsumptionBridge);
+                scope.full_text_review = serde_json::from_value(reviewed).unwrap();
+                scope.reviewed_writes.changes[0].reviewed_disposition =
+                    crate::Disposition::SemanticConsumptionBridge;
+            }
+        }
+        assert!(
+            build_full_text_write_plan(
+                &report,
+                &capture,
+                scope,
+                |reviewed| serde_json::to_value(reviewed).unwrap() == original["full_text_review"],
+                |received| serde_json::to_value(received).unwrap() == original
+            )
+            .is_err()
+        );
+    }
+}
+
+#[test]
+fn full_text_write_and_rollback_preserve_binding_and_conditional_state() {
+    let report = report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let mut scope = write_scope_fixture(&report, &capture);
+    scope.mode = WriteMode::Execute;
+    let plan = build_full_text_write_plan(&report, &capture, scope, |_| true, |_| true).unwrap();
+    let expected_binding = serde_json::to_value(&plan).unwrap()["full_text_write_v1"].clone();
+    let store = WriteStore::from_report(&report);
+    let receipt = execute_full_text_write_plan(
+        &plan,
+        |item_key| store.read_item(item_key),
+        |request| store.write_item(request),
+    );
+    let result = serde_json::to_value(&receipt).unwrap();
+    assert_eq!(result["full_text_write_v1"], expected_binding);
+    assert_eq!(result["write_result"]["outcome"], "applied");
+    assert_eq!(store.read_count.get(), 2);
+    assert_eq!(store.write_count.get(), 2);
+    let rollback = crate::execute_full_text_rollback(
+        &receipt,
+        |item_key| store.read_item(item_key),
+        |request| store.write_item(request),
+    )
+    .unwrap();
+    let result = serde_json::to_value(&rollback).unwrap();
+    assert_eq!(result["full_text_write_v1"], expected_binding);
+    assert_eq!(result["rollback_result"]["outcome"], "restored");
+    assert!(
+        store
+            .items
+            .borrow()
+            .values()
+            .all(|item| item.collection_keys.is_empty())
+    );
+    assert_eq!(store.write_count.get(), 4);
+    assert!(
+        crate::retry_full_text_rollback(
+            &rollback,
+            |_| -> Result<crate::ClassificationItemState, ()> { panic!("nothing to retry") },
+            |_| -> Result<crate::ClassificationItemState, ()> { panic!("nothing to retry") }
+        )
+        .is_err()
+    );
+    assert!(
+        crate::reconcile_full_text_rollback(
+            &rollback,
+            |_| -> Result<crate::ClassificationItemState, ()> { panic!("nothing to reconcile") }
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn full_text_write_stale_preflight_and_unknown_writes_never_grant_empty_restoration() {
+    for unknown_write in [false, true] {
+        let report = report_fixture();
+        let capture = capture_with(&report, 4096, &mut |request_path, _| {
+            Ok(response_fixture(request_path))
+        })
+        .unwrap();
+        let mut scope = write_scope_fixture(&report, &capture);
+        scope.mode = WriteMode::Execute;
+        let plan =
+            build_full_text_write_plan(&report, &capture, scope, |_| true, |_| true).unwrap();
+        let store = WriteStore::from_report(&report);
+        if !unknown_write {
+            store.library_version.set(99);
+        }
+        let receipt = execute_full_text_write_plan(
+            &plan,
+            |item_key| {
+                if store.read_count.get() >= 2 {
+                    return Err(());
+                }
+                store.read_item(item_key)
+            },
+            |_| -> Result<crate::ClassificationItemState, ()> {
+                assert!(unknown_write);
+                Err(())
+            },
+        );
+        let result = serde_json::to_value(&receipt).unwrap();
+        assert_eq!(
+            result["full_text_write_v1"],
+            serde_json::to_value(&plan).unwrap()["full_text_write_v1"]
+        );
+        assert_eq!(
+            result["write_result"]["outcome"],
+            if unknown_write {
+                "partial_failure"
+            } else {
+                "preflight_failure"
+            }
+        );
+        assert!(
+            crate::execute_full_text_rollback(
+                &receipt,
+                |_| -> Result<crate::ClassificationItemState, ()> {
+                    panic!("no known restoration")
+                },
+                |_| -> Result<crate::ClassificationItemState, ()> {
+                    panic!("no known restoration")
+                }
+            )
+            .is_err()
+        );
+    }
+}
+
+#[test]
+fn full_text_write_bound_rollback_retry_and_delayed_reconciliation() {
+    for delayed_read in [false, true] {
+        let report = report_fixture();
+        let capture = capture_with(&report, 4096, &mut |request_path, _| {
+            Ok(response_fixture(request_path))
+        })
+        .unwrap();
+        let mut scope = write_scope_fixture(&report, &capture);
+        scope.mode = WriteMode::Execute;
+        let plan =
+            build_full_text_write_plan(&report, &capture, scope, |_| true, |_| true).unwrap();
+        let store = WriteStore::from_report(&report);
+        let written = execute_full_text_write_plan(
+            &plan,
+            |item_key| store.read_item(item_key),
+            |request| store.write_item(request),
+        );
+        store.read_count.set(0);
+        let partial = crate::execute_full_text_rollback(
+            &written,
+            |item_key| {
+                if delayed_read && store.read_count.get() >= 2 {
+                    return Err(());
+                }
+                store.read_item(item_key)
+            },
+            |_| -> Result<crate::ClassificationItemState, ()> { Err(()) },
+        )
+        .unwrap();
+        let retried = if delayed_read {
+            assert!(
+                crate::retry_full_text_rollback(
+                    &partial,
+                    |_| -> Result<crate::ClassificationItemState, ()> {
+                        panic!("must reconcile first")
+                    },
+                    |_| -> Result<crate::ClassificationItemState, ()> {
+                        panic!("must reconcile first")
+                    }
+                )
+                .is_err()
+            );
+            let reconciled =
+                crate::reconcile_full_text_rollback(&partial, |item_key| store.read_item(item_key))
+                    .unwrap();
+            assert_eq!(
+                serde_json::to_value(&reconciled).unwrap()["reconciliation_result"]["state"],
+                "unchanged"
+            );
+            crate::retry_full_text_reconciled_rollback(
+                &reconciled,
+                |item_key| store.read_item(item_key),
+                |request| store.write_item(request),
+            )
+            .unwrap()
+        } else {
+            crate::retry_full_text_rollback(
+                &partial,
+                |item_key| store.read_item(item_key),
+                |request| store.write_item(request),
+            )
+            .unwrap()
+        };
+        let result = serde_json::to_value(retried).unwrap();
+        assert_eq!(
+            result["full_text_write_v1"],
+            serde_json::to_value(&plan).unwrap()["full_text_write_v1"]
+        );
+        assert_eq!(result["rollback_result"]["outcome"], "restored");
+        assert_eq!(
+            result["rollback_result"]["restored_item_keys"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(store.write_count.get(), 4);
+    }
+}
 
 fn write_scope_fixture(
     report: &ClassificationReport,
