@@ -10,6 +10,23 @@
 - public Rust documentation with `missing_docs` denied;
 - every CI result is valid only for the unchanged exact PR head.
 
+## Current Source Observation contract tests
+
+- request metadata rejects blank/malformed source keys, empty/blank/duplicate exact schema names, zero limits, and schema metadata outside the caller-requested structural count/byte envelope before registry/database access;
+- source resolution requires a registered key plus bounded opaque immutable connection-policy binding and rejects connection material masquerading as a binding;
+- source-key recognition alone cannot authorize schema scope; exact schema policy defaults to deny and is case/normalization preserving;
+- source+schema authorization alone cannot authorize resources; complete `ObservationResourceEnvelope` policy defaults to deny;
+- wider-than-policy schema-count/schema-byte/operation/statement/row/byte/concurrency requests return `UnauthorizedResourceEnvelope` before adapter/source/snapshot side effects;
+- requests equal to or narrower than every local source-policy ceiling are explicitly admitted and preserve the exact requested envelope;
+- source/binding/schema/resource local policy work shares one monotonic operation budget; elapsed authorization reduces the adapter remainder and exhaustion wins before side effects;
+- a capability for binding A presented after live mapping changes to B fails before source/snapshot side effects, while unchanged A executes the expected control once;
+- the awaitable `Send` port preserves cancellation and typed resource/source failures without adding a runtime dependency to the port crate;
+- immutable PostgreSQL snapshot construction requires the complete authorized envelope, rejects locally observed schemas outside the exact scope, and keeps foreign-key target schema names as relationship evidence rather than read authority;
+- snapshot and receipt provenance retain the exact immutable connection-policy binding separately from deterministic source-content digest identity;
+- PostgreSQL observation value objects preserve exact identifiers, ordering, FK action/match/deferrability/validation/enforcement evidence, CHECK reconstruction/status, strict UTC provenance and owner-computed deterministic digest identity.
+
+These contract fixtures are not runtime GREEN by existence alone. A concrete adapter and the first release candidate require one unchanged exact head to pass Rust 1.98 tests, fmt, strict Clippy, warnings-denied rustdoc, release build, owned 100% coverage, applicable security/dependency gates, and independent review.
+
 ## Current Client Consumption tests
 
 - authoritative + Published release admits offline for the exact current or explicitly supported legacy contract version;
@@ -31,9 +48,9 @@ Digest identity syntax and detached-byte integrity remain separate controls. The
 
 ## Future product test families
 
-### Source observation
+### Source observation runtime
 
-Realistic PostgreSQL schema snapshots, OpenAPI/AsyncAPI fixtures, malformed contracts, deep nesting, invalid encoding, duplicate identifiers, archive bombs, parser cancellation, and exact digest/location provenance.
+A frozen anonymized PostgreSQL fixture must exercise real least-privilege exact-binding credential resolution, stale-binding rejection before credential/source access, `REPEATABLE READ READ ONLY`, exact-schema `pg_catalog` capture, operation/statement/row/byte/concurrency enforcement from the policy-admitted envelope, cancellation cleanup, source disappearance, complete-or-fail snapshot construction, domains/enums/indexes/comments, quoted identifiers and cross-schema collisions. OpenAPI/AsyncAPI fixtures, malformed contracts, deep nesting, invalid encoding, archive bombs, parser cancellation, and exact digest/location provenance follow behind their own adapters.
 
 ### Ontology and semantic discovery
 
@@ -61,7 +78,7 @@ No bypass of Reviewed before Published, immutable published releases, rejection,
 
 ### Security
 
-Prompt injection, malicious ontology/source/release content, SSRF, cross-tenant leakage, secret leakage, expression injection, resource exhaustion, replay, malformed source provenance, hostile export values, compatibility downgrade, stale/superseded use, and detached-artifact tampering.
+Prompt injection, malicious ontology/source/release content, SSRF, cross-tenant leakage, secret leakage, expression injection, resource exhaustion, caller-self-authorized schema/resource requests, stale source binding replay, malformed source provenance, hostile export values, compatibility downgrade, stale/superseded use, and detached-artifact tampering.
 
 ### Evaluation
 
