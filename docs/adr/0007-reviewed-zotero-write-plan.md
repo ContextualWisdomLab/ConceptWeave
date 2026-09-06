@@ -6,7 +6,7 @@
 
 ## Context
 
-Issue #8 requires classification changes to default to dry-run, preserve complete collection and tag state, reject stale review input, and make rollback reconstructable. The installed Zotero 9.0.6 Local API cannot write. Zotero 10+ writes additionally require a runtime-granted key, the same server identity, and fresh library/item versions. A planner can establish the review and recovery contract now without inventing authority or adding an unsafe Zotero 9 mutation path.
+Issue #8 requires classification changes to default to dry-run, preserve complete collection and tag state, reject stale review input, and make rollback reconstructable. At initial planning the installed Zotero 9.0.6 Local API could not write; the later Zotero 10.0.1 audit is recorded separately in the current Gap baseline. Zotero 10+ writes additionally require a runtime-granted key, the same server identity, and fresh library/item versions. A planner establishes the review and recovery contract without inventing authority or adding an unsafe Zotero 9 mutation path.
 
 ## Decision
 
@@ -28,7 +28,7 @@ Rejected alternatives were per-caller guards, which duplicate validation and mis
 
 ## Full-text write admission contract
 
-A full-text-reviewed golden set and its aggregate evaluation are not authority to replace Zotero collections or tags. The next increment must combine the complete capture-bound golden set, a separately approved explicit write set, and the requested mode in a required, non-flattened input. Every changed item's disposition must match its approved golden label. All local capture/report/proposal/full-denominator and write-state checks must finish before either external authority verifier runs. Reuse the existing full-text evaluator and repaired planner; do not insert a permissive verifier bridge, derive destinations from disposition names, backfill receipts or convert aggregate evaluation into approval.
+A full-text-reviewed golden set and its aggregate evaluation are not authority to replace Zotero collections or tags. Admission must combine the complete capture-bound golden set, a separately approved explicit write set, and the requested mode in a required, non-flattened input. Every changed item's disposition must match its approved golden label. All local capture/report/proposal/full-denominator and write-state checks must finish before either external authority verifier runs. Reuse the existing full-text evaluator and repaired planner; do not insert a permissive verifier bridge, derive destinations from disposition names, backfill receipts or convert aggregate evaluation into approval.
 
 The returned opaque, serialize-only plan must retain a versioned binding for the complete labels, capture/proposal coordinates, approvals, destinations and mode. Write execution, partial failure, rollback, retry and delayed reconciliation must preserve that same binding. No executable legacy-plan downcast or freely mixed rollback operations may detach it. Existing legacy write DTOs accept unknown nested JSON fields, so strict outer deserialization alone is insufficient. Begin with typed-only admission, or separately document and test an intentional owned-DTO compatibility change before claiming strict persisted JSON admission.
 
