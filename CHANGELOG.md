@@ -6,6 +6,8 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
+- Research inventory now separates message ancestry, data changes and work dependencies from reviewed semantic relationships, with release limits and owner follow-up evidence.
+
 - Unresolved changes can be inspected again without resending them or losing the original outcome. Later observations do not authorize retry or recovery.
 
 - Research inventory now distinguishes three additional statistical-library candidates from adopted integrations and reviewed papers, with source-bound limitations and follow-up requirements.

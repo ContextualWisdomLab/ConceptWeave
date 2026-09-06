@@ -4,7 +4,15 @@
 
 This file records code-current product and technical gaps. Exact PR/check/run coordinates are evidence snapshots, not mutable-head dependencies. Live protected-branch, PR, issue and workflow state wins whenever it advances after this snapshot. Refresh the changed PR's metadata after each documentation commit; evidence from another PR or an earlier head does not transfer.
 
-## Latest Source Observation prerequisite checkpoint
+## Latest relationship-owner discovery checkpoint
+
+The September 6 follow-up [ThreadWeave/mightyETL/scopeweave audit](doctoring/cwl_ontology_capability_inventory.md#threading-cdc-and-work-dependency-contracts-2026-09-06) advances bounded source coverage **30/76 → 33/76**, leaving **43** repositories. The paginated census remains 76 repositories, one archived and 11 forks. Each new observation binds the actual protected default, complete tracked-file tree, package declaration, selected implementation/tests and complete GitHub release/tag queries. GitHub releases with resolved source remain **7/33**. Separately, PyPI reports ThreadWeave 0.1.0; no artifact was downloaded or bound to current 0.2.0 source. Do not silently count registry metadata as an eighth resolved GitHub release or verified consumer adoption.
+
+Three existing scopeweave unit scripts passed at `2c328875e00e86537df3e965170be80532571cad` with Node v24.19.0; Java/Python tests, live services, browser/E2E and private source data were not exercised. The audit distinguishes header/fallback/subject-grouping ancestry, raw CDC versus optional canonical mapping, and typed work dependencies with cycles/dangling links and fixed heuristic readiness weights. mightyETL's PostgreSQL DDL claim conflicts with the pinned Debezium 3.4 provider documentation. Its [existing owner issue #159](https://github.com/ContextualWisdomLab/mightyETL/issues/159#issuecomment-5558302366) now receives the exact-source finding and regression requirements; no competing owner writer or DDL service was created.
+
+PRD FR-9, TRD evaluation, Context Map, Ubiquitous Language and Proposed ADR 0006 now retain these distinct evidence kinds and pre-adoption requirements. This is source discovery and owner cultivation, not completed reclassification. Lifecycle capability **28**, last authentic decisions **0/3,715**, independent approvals **0/3,715**, and verified adoption **0** are unchanged. No Zotero/model request, paper artifact read or authority issuer was used. The next loop keeps protected prerequisite review/root repair, real full-denominator review/governance and released owner consumption open. The checkpoints below retain their historical denominators.
+
+## Previous Source Observation prerequisite checkpoint
 
 The canonical Source Observation owner explicitly handed off PR #6's UNIQUE null-comparison finding, with no overlapping writer. An isolated worktree retained `e3c415600300b6c2d5b852c457ea6ab2e5222e08` and unchanged Client #5 base `fcf36c8a99f015b963c9f812787df127ac2e2f9e`, then normally pushed exact successor `331f8edcd7cebb1719e5cea3187f3848ce7b9e71`. [PR #6](https://github.com/ContextualWisdomLab/ConceptWeave/pull/6) remains OPEN Draft. This research lane records its evidence without copying or adopting the unprotected supplier source.
 

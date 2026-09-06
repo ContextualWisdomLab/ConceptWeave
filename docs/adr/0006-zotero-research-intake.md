@@ -47,6 +47,14 @@ No dedicated utility repository or Zotero mutation path is created. A future Zot
 
 ## Consequences
 
+### 2026-09-06 relationship-owner discovery amendment (Proposed)
+
+In the context of identifying CWL relationship evidence for research intake, facing different meanings of message ancestry, database changes and project dependencies plus incomplete source-to-release bindings, we decided for exact-source audits and proposed owner-specific admission requirements, and against copying implementations, accepting every edge as semantic truth or creating a new utility repository, to preserve observable provenance and existing domain ownership, accepting that integration and paper-decision counts do not advance yet.
+
+The [ThreadWeave/mightyETL/scopeweave audit](../doctoring/cwl_ontology_capability_inventory.md#threading-cdc-and-work-dependency-contracts-2026-09-06) links protected source, selected regression definitions, three executed work-dependency unit scripts and primary references. ThreadWeave's PyPI 0.1.0 metadata is not current 0.2.0 source provenance. mightyETL's PostgreSQL DDL description contradicts version-matched provider documentation and was routed to its existing documentation owner, not repaired in the consumer. scopeweave's cycle/missing-link behavior and fixed readiness weights must remain visible. For example, a missing mail ancestor cannot become a fabricated organization relation, and a quiet CDC topic cannot certify that no schema change occurred.
+
+The benefit is a testable consumer boundary before adoption; the cost is delayed reuse while licensing, real producer capability, owner releases and exact-consumer verification remain unresolved. Direct source reuse was rejected because it would duplicate owners and import their runtime/meaning assumptions. A separate utility was rejected because no independent consumer/deployment need was demonstrated. Follow-up belongs first in those canonical owners, including a failing DDL-capability documentation check, followed by protected review and release; ConceptWeave then needs source-bound conformance with missing, cyclic, unsupported and heuristic observations. This amendment adds no runtime, approved dependency or publication authority and does not change the ADR's Proposed status.
+
 ### 2026-09-06 statistical-owner discovery amendment (Proposed)
 
 In the context of identifying reusable evidence from CWL statistical libraries, facing source-level implementations without verified consumer releases and methods with different population/anchor/observation assumptions, we decided to record exact-source cultivation requirements within the existing Research Intake inventory, and against importing their numerical code, inventing relevance weights or creating another utility owner, to keep research evidence distinct from semantic decisions, accepting that release, design-conformance and runtime validation remain prerequisites.
