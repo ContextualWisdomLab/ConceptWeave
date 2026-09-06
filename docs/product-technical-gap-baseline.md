@@ -6,6 +6,16 @@ This file records code-current product and technical gaps. Exact PR/check/run co
 
 ## September 6 source inventory checkpoint
 
+### PR25 worksheet admission and identity repair
+
+Original PR25 `c6b4c17e931951a2e1d4ea79ac79363f6306a5bf` passed 126 tests/24 suites. Normal merge `4a1a3bb` retains it and PR24 `35c57ca4510a65cf48069285d78b95cf47db65ba`; integrated tests passed 153/24. RED `900038e` compiled with 4 passing and 2 failing tests: omitted retained inventory and hidden pending keys still produced worksheets. `5b54d06` reuses shared report validation and removes 54 lines of divergent audit/coordinate checks. Valid standalone, orphan, cyclic and attached source metadata remains reviewable with blank decisions. Completion admission remains distinct.
+
+RED `30aa091` compiled with 6 passing and 2 failing tests: changed retained metadata produced an equal worksheet and missing proposal binding deserialized successfully. Final source `97046c7` adds a required worksheet `proposal_digest` from the existing v2 hash; source/context changes produce different identities and missing binding fails loading. No new hash, library or authority issuer was introduced. Independent read-only review found no additional production regression. Required downstream repair: compare worksheet/report binding before progress, patch and finalization, including blank or locally rewritten digest rejection; never backfill older worksheets or infer full-text authority.
+
+Final local tests are 158/24 suites including three doctests, strict Clippy, warnings-denied rustdoc, formatting, CI contract and diff checks pass. Unchanged pinned coverage passes 282/282 functions, 2,468/2,468 normalized regions and 414/414 normalized branches. Raw coverage remains 3,232/3,293 lines, 4,858/4,960 regions and 369/414 branches, not 100%. Logs: `/tmp/conceptweave-pr25-{baseline,integration,source-red,binding-red,final,clippy-final,rustdoc-final,coverage-final}.log`.
+
+The root runtime and later consumers have not adopted this repair. Actual decisions and independent approvals remain 0/3,715 plus four unresolved standalone sources. No real Zotero record, classification label or approval was created. Native Visual Inspection was attempted again but the Mac is locked, so there is no new screenshot evidence. PRD/TRD and Proposed ADR 0006 record scope, compatibility and remaining adoption. Local verification is not hosted current-head GREEN, protected approval/merge or release.
+
 ### PR24 pending-source completion repair
 
 Final source `5b2282a` passes strict all-target Clippy, warnings-denied rustdoc, formatting, CI contract and diff checks. The unchanged pinned coverage gate passes 279/279 functions, 2,420/2,420 normalized regions and 408/408 normalized branches. Raw coverage remains 3,198/3,259 lines, 4,810/4,912 regions and 363/408 branches, not 100%. Logs: `/tmp/conceptweave-pr24-{clippy,rustdoc,coverage}-verified.log`. No predecessor or later-head coverage is attributed to this source.
