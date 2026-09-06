@@ -289,16 +289,25 @@ pub fn classification_snapshot_digest(report: &ClassificationReport) -> String {
 /// Computes the versioned SHA-256 identity of the report's current proposals.
 ///
 /// Every proposal field is covered, including its prediction, evidence, and item
-/// revision. Records are sorted by item key and revision so page ordering does
+/// revision, plus unclassified metadata and pending source identities. This is
+/// not a full-text backup. Records are sorted by item key and revision so ordering does
 /// not change their identity. No second source snapshot is stored. Governance
 /// must bind this value when issuing an approval; recomputing it alone grants no
 /// authority. Evaluation recomputes it rather than trusting report metadata.
 pub fn classification_proposal_digest(report: &ClassificationReport) -> String {
     let mut proposals = report.classified_items.iter().collect::<Vec<_>>();
     proposals.sort_by_key(|item| (&item.item_key, item.item_version));
-    let proposal_bytes =
-        serde_json::to_vec(&("conceptweave-classification-proposals-v1", proposals))
-            .expect("classification proposal records contain only JSON-serializable values");
+    let mut source_items = report.unclassified_items.iter().collect::<Vec<_>>();
+    source_items.sort_by_key(|item| (&item.key, item.version));
+    let mut pending_keys = report.pending_source_item_keys.iter().collect::<Vec<_>>();
+    pending_keys.sort();
+    let proposal_bytes = serde_json::to_vec(&(
+        "conceptweave-classification-proposals-v2",
+        proposals,
+        source_items,
+        pending_keys,
+    ))
+    .expect("classification proposal records contain only JSON-serializable values");
     format!("sha256:{:x}", Sha256::digest(proposal_bytes))
 }
 
@@ -370,6 +379,75 @@ impl fmt::Display for EvaluationError {
 
 impl std::error::Error for EvaluationError {}
 
+/// Checks that every observed item belongs to exactly one report partition.
+///
+/// Child links and unresolved source keys are recomputed from preserved metadata.
+/// Orphans and disconnected cycles remain valid pending evidence. This checks
+/// internal consistency, not source authenticity or independent approval.
+pub fn validate_classification_report(
+    report: &ClassificationReport,
+) -> Result<(), EvaluationError> {
+    let invalid = EvaluationError::InvalidReview;
+    if report.observed_item_count != report.snapshot_items.len()
+        || report
+            .classified_items
+            .len()
+            .checked_add(report.unclassified_items.len())
+            != Some(report.observed_item_count)
+    {
+        return Err(invalid);
+    }
+    let mut remaining_items = BTreeMap::new();
+    for item in &report.snapshot_items {
+        if item.item_key.trim().is_empty()
+            || item.item_version > report.library_version
+            || remaining_items
+                .insert(item.item_key.as_str(), item.item_version)
+                .is_some()
+        {
+            return Err(invalid);
+        }
+    }
+    let children = child_index(&report.unclassified_items);
+    for item in &report.classified_items {
+        let mut reported_children = item.child_item_keys.clone();
+        reported_children.sort();
+        let mut actual_children = children.get(&item.item_key).cloned().unwrap_or_default();
+        actual_children.sort();
+        if item.item_type.trim().is_empty()
+            || matches!(
+                item.item_type.as_str(),
+                "attachment" | "note" | "annotation"
+            )
+            || remaining_items.remove(item.item_key.as_str()) != Some(item.item_version)
+            || reported_children != actual_children
+        {
+            return Err(invalid);
+        }
+    }
+    for item in &report.unclassified_items {
+        if item.data.item_type.trim().is_empty()
+            || is_bibliographic(item)
+            || remaining_items.remove(item.key.as_str()) != Some(item.version)
+        {
+            return Err(invalid);
+        }
+    }
+    let mut reported_pending = report.pending_source_item_keys.clone();
+    reported_pending.sort();
+    if !remaining_items.is_empty()
+        || reported_pending
+            != pending_source_keys(
+                &report.classified_items,
+                &report.unclassified_items,
+                children,
+            )
+    {
+        return Err(invalid);
+    }
+    Ok(())
+}
+
 /// Evaluates reviewed labels without copying item identities into the result.
 ///
 /// Structural, source, proposal, and label validation run before governance is
@@ -384,6 +462,7 @@ pub fn evaluate_reviewed_golden_set<F>(
 where
     F: FnOnce(&ReviewedGoldenSet) -> bool,
 {
+    validate_classification_report(report)?;
     if golden.approval.receipt_id.trim().is_empty()
         || golden.approval.reviewer_subject.trim().is_empty()
         || golden.labels.is_empty()
@@ -801,7 +880,7 @@ pub fn classify_snapshot(
     let snapshot_bytes = serde_json::to_vec(&(SNAPSHOT_DIGEST_DOMAIN, snapshot_records))
         .expect("Zotero snapshot items contain only JSON-compatible values");
     let snapshot_digest = format!("sha256:{:x}", Sha256::digest(snapshot_bytes));
-    let mut children = child_index(&items);
+    let children = child_index(&items);
     let bibliographic: Vec<&ZoteroItem> =
         items.iter().filter(|item| is_bibliographic(item)).collect();
     let duplicate_candidates = duplicate_candidates(&bibliographic);
@@ -814,6 +893,31 @@ pub fn classify_snapshot(
         .into_iter()
         .filter(|item| !is_bibliographic(item))
         .collect();
+    let pending_source_item_keys =
+        pending_source_keys(&classified_items, &unclassified_items, children);
+
+    ClassificationReport {
+        zotero_version,
+        api_version: None,
+        schema_version: None,
+        server_id,
+        library_version,
+        rule_revision: RULE_REVISION,
+        observed_item_count,
+        snapshot_items,
+        snapshot_digest,
+        classified_items,
+        unclassified_items,
+        pending_source_item_keys,
+        duplicate_candidates,
+    }
+}
+
+fn pending_source_keys(
+    classified_items: &[ClassifiedItem],
+    unclassified_items: &[ZoteroItem],
+    mut children: BTreeMap<String, Vec<String>>,
+) -> Vec<String> {
     let mut pending_source_item_keys: BTreeSet<_> = unclassified_items
         .iter()
         .map(|item| item.key.clone())
@@ -829,21 +933,7 @@ pub fn classify_snapshot(
         }
     }
 
-    ClassificationReport {
-        zotero_version,
-        api_version: None,
-        schema_version: None,
-        server_id,
-        library_version,
-        rule_revision: RULE_REVISION,
-        observed_item_count,
-        snapshot_items,
-        snapshot_digest,
-        classified_items,
-        unclassified_items,
-        pending_source_item_keys: pending_source_item_keys.into_iter().collect(),
-        duplicate_candidates,
-    }
+    pending_source_item_keys.into_iter().collect()
 }
 
 fn is_bibliographic(item: &ZoteroItem) -> bool {
