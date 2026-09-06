@@ -1166,50 +1166,10 @@ pub fn build_steward_review_worksheet(
         return Err(WorksheetError::InvalidReport);
     }
 
-    let mut snapshot_coordinates = BTreeMap::new();
-    let mut expected_child_keys: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
-    for item in &report.snapshot_items {
-        if item.item_key.trim().is_empty()
-            || item
-                .parent_item_key
-                .as_ref()
-                .is_some_and(|parent_key| parent_key.trim().is_empty())
-            || snapshot_coordinates
-                .insert(
-                    item.item_key.as_str(),
-                    (item.item_version, item.parent_item_key.as_deref()),
-                )
-                .is_some()
-        {
-            return Err(WorksheetError::InvalidReport);
-        }
-        if let Some(parent_key) = item.parent_item_key.as_deref() {
-            expected_child_keys
-                .entry(parent_key)
-                .or_default()
-                .insert(item.item_key.as_str());
-        }
-    }
-    if snapshot_coordinates.values().any(|(_, parent_key)| {
-        parent_key.is_some_and(|parent_key| !snapshot_coordinates.contains_key(parent_key))
-    }) {
-        return Err(WorksheetError::InvalidReport);
-    }
-
-    let mut decision_keys = BTreeSet::new();
     let mut decisions = Vec::with_capacity(report.classified_items.len());
     for item in &report.classified_items {
-        let actual_child_keys: BTreeSet<&str> =
-            item.child_item_keys.iter().map(String::as_str).collect();
-        if !decision_keys.insert(item.item_key.as_str())
-            || snapshot_coordinates.get(item.item_key.as_str()) != Some(&(item.item_version, None))
-            || actual_child_keys.len() != item.child_item_keys.len()
-            || expected_child_keys
-                .remove(item.item_key.as_str())
-                .unwrap_or_default()
-                != actual_child_keys
-            || (item.proposed_disposition == Disposition::NeedsStewardReview)
-                != item.abstention_reason.is_some()
+        if (item.proposed_disposition == Disposition::NeedsStewardReview)
+            != item.abstention_reason.is_some()
         {
             return Err(WorksheetError::InvalidReport);
         }
@@ -1508,8 +1468,15 @@ pub fn validate_classification_report(
     for item in &report.snapshot_items {
         if item.item_key.trim().is_empty()
             || item.item_version > report.library_version
+            || item
+                .parent_item_key
+                .as_ref()
+                .is_some_and(|key| key.trim().is_empty())
             || remaining_items
-                .insert(item.item_key.as_str(), item.item_version)
+                .insert(
+                    item.item_key.as_str(),
+                    (item.item_version, item.parent_item_key.as_deref()),
+                )
                 .is_some()
         {
             return Err(invalid);
@@ -1526,16 +1493,18 @@ pub fn validate_classification_report(
                 item.item_type.as_str(),
                 "attachment" | "note" | "annotation"
             )
-            || remaining_items.remove(item.item_key.as_str()) != Some(item.item_version)
+            || remaining_items.remove(item.item_key.as_str()) != Some((item.item_version, None))
             || reported_children != actual_children
         {
             return Err(invalid);
         }
     }
     for item in &report.unclassified_items {
+        let parent_key =
+            (!item.data.parent_item.is_empty()).then_some(item.data.parent_item.as_str());
         if item.data.item_type.trim().is_empty()
             || is_bibliographic(item)
-            || remaining_items.remove(item.key.as_str()) != Some(item.version)
+            || remaining_items.remove(item.key.as_str()) != Some((item.version, parent_key))
         {
             return Err(invalid);
         }
