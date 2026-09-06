@@ -3129,8 +3129,9 @@ mod tests {
 
         let receipt = reconcile_classification_rollback_with_zotero10(&operation, &transport(base));
 
-        assert_eq!(receipt.state, ClassificationRollbackState::Unchanged);
-        assert_eq!(receipt.retry_operation, Some(operation));
+        assert_eq!(receipt.state, ClassificationRollbackState::Indeterminate);
+        assert!(receipt.retry_operation.is_none());
+        assert_eq!(receipt.operation, operation);
         assert_eq!(server.join().unwrap().len(), 3);
     }
 

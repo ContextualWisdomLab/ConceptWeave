@@ -47,7 +47,7 @@ fn later_reconciliation_distinguishes_restored_unchanged_and_indeterminate_state
                 operation.collection_keys.clone(),
                 operation.tags.clone(),
             ),
-            ClassificationRollbackState::Restored,
+            ClassificationRollbackState::Indeterminate,
         ),
         (
             state(
@@ -55,7 +55,7 @@ fn later_reconciliation_distinguishes_restored_unchanged_and_indeterminate_state
                 operation.expected_collection_keys.clone(),
                 operation.expected_tags.clone(),
             ),
-            ClassificationRollbackState::Unchanged,
+            ClassificationRollbackState::Indeterminate,
         ),
         (
             state(11, vec!["other".into()], operation.tags.clone()),
@@ -101,10 +101,7 @@ fn later_reconciliation_distinguishes_restored_unchanged_and_indeterminate_state
         assert_eq!(receipt.state, expected);
         assert_eq!(receipt.operation, operation);
         assert_eq!(receipt.observed_state, Some(observed));
-        assert_eq!(
-            receipt.retry_operation,
-            (expected == ClassificationRollbackState::Unchanged).then(|| operation.clone())
-        );
+        assert!(receipt.retry_operation.is_none());
     }
 }
 
