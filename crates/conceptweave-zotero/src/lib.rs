@@ -2726,11 +2726,17 @@ mod tests {
 
     #[test]
     fn approved_zotero10_adapter_executes_the_reviewed_plan_boundary() {
+        let mut source_item = item("ABCD2345", "book", "ontology learning", "", "");
+        source_item.data.collections = vec!["BCDE3456".into()];
+        source_item.data.tags = vec![ItemTag {
+            tag: "kept".into(),
+            tag_type: Some(1),
+        }];
         let report = classify_snapshot(
             "10.0.0".into(),
             Some("server-10".into()),
             42,
-            vec![item("ABCD2345", "book", "ontology learning", "", "")],
+            vec![source_item],
         );
         let review = ReviewedClassificationWriteSet {
             review_id: "review-1".into(),
