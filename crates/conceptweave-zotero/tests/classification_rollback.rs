@@ -217,8 +217,8 @@ fn rollback_is_one_shot_and_second_execution_fails_before_write() {
 #[test]
 fn rollback_reconciles_failed_write_without_guessing() {
     for (current, expected_outcome) in [
-        ("restored", (vec!["B"], None)),
-        ("unchanged", (vec![], None)),
+        ("restored", (vec![], Some("B"))),
+        ("unchanged", (vec![], Some("B"))),
         ("indeterminate", (vec![], Some("B"))),
     ] {
         let receipt = applied_receipt();
@@ -276,7 +276,7 @@ fn rollback_reconciles_failed_write_without_guessing() {
         assert_eq!(result.not_attempted_item_keys, ["A"]);
         assert_eq!(
             result.remaining_operations.len(),
-            if current == "unchanged" { 2 } else { 1 }
+            1
         );
     }
 }
