@@ -13,6 +13,8 @@
 
 ## External relationships
 
+The PostgreSQL ACL owns catalog interpretation, including the supporting-index null-comparison fact for a unique constraint. Source Observation owns its typed unknown/observed representation and v2 content framing. Semantic Discovery must retain those distinctions; Governance & Publication and consuming products acquire neither source access nor semantic approval from an observation receipt.
+
 - contextual-orchestrator -> Semantic Discovery: **Anti-Corruption Layer**. Model/provider envelopes never enter the domain model directly.
 - contextual-orchestrator -> future Model Alignment/Client Consumption assistance: **Anti-Corruption Layer**. Matching/explanation outputs remain candidate evidence and never grant authority.
 - LineageWeave -> Source Observation: **Anti-Corruption Layer**. Inferred/proposed lineage remains explicitly non-authoritative until ConceptWeave governance evaluates it.

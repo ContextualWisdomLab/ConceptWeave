@@ -4,6 +4,8 @@ ConceptWeave has no production network service or durable database in the founda
 
 ## Runtime requirements
 
+Snapshot framing is v2 after the unique null-comparison extension. Preserve v1 captures and receipts unchanged for historical replay; do not compare a freshly computed v2 digest to a v1 receipt as if they shared an encoding. Wire-version negotiation, migration and concrete PostgreSQL catalog extraction remain explicit adapter/release prerequisites, not implemented operational capabilities.
+
 - explicit startup/readiness/liveness semantics;
 - bounded source job queues, deadlines, cancellation, retry classification, and idempotency;
 - Source Observation rejects schema-selection metadata budgets above the canonical provider-independent 4,096-schema/1,048,576-byte structural caps before trusted source policy; source-specific policy may only narrow that envelope;

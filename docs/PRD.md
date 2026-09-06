@@ -32,6 +32,8 @@ Each request also carries caller-selected positive schema-count/total-UTF-8-byte
 
 The end-to-end operation deadline includes source lookup, immutable binding, exact-schema authorization, resource-envelope authorization, connection and catalog work; implementation must not silently restart that deadline after authorization. Registry authorization remains bounded local policy, while remote credential/network work belongs in the adapter and consumes only the remaining admitted budget. Exact source identifiers are not normalized or truncated. For foreign keys, observed `ON UPDATE`/`ON DELETE` actions, any local-column subset targeted by `ON DELETE SET NULL (...)` or `SET DEFAULT (...)`, match type, deferrability/initial timing, and PostgreSQL validation/enforcement state are retained as typed source evidence; each metadata family remains explicitly absent if the adapter did not observe it rather than inventing defaults. For CHECK constraints, preserve the PostgreSQL-reconstructed definition together with validation, enforcement, and `NO INHERIT` status; do not infer ordered expression-column coordinates from SQL text.
 
+Source observation must also distinguish whether a unique constraint treats missing values as distinct or equal. If that behavior was not observed, it remains unknown. A change in this behavior must change the evidence identity used by later proposals, even when the constraint name and columns are unchanged. This does not establish a business key or authorize publication.
+
 ### FR-2 Candidate discovery
 
 Produce candidates for concepts, taxonomies, non-taxonomic relations, semantic constraints, dimensions, measures, and physical-to-semantic mappings. Each candidate starts as inferred rather than authoritative.

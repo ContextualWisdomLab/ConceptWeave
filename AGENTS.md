@@ -1,5 +1,7 @@
 # AGENTS.md — ConceptWeave
 
+Unique-constraint null comparison remains unknown unless observed. Preserve explicit false and true separately in v2 snapshot framing; never rewrite historical v1 receipts or treat source key semantics as business truth.
+
 Read the organization `ContextualWisdomLab/.github` master context and product goal directive before material work. Live GitHub state and this repository's accepted ADRs override remembered chat state.
 
 ## Product boundary

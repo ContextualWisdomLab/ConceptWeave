@@ -42,6 +42,7 @@ sequenceDiagram
     Adapter->>Adapter: verify exact binding; read remaining budget
     Adapter->>Source: least-privilege read-only metadata access
     Source-->>Adapter: complete bounded catalog evidence
+    Note over Adapter,Snapshot: retain unknown/distinct/not-distinct UNIQUE evidence; v2 content framing
     Adapter->>Snapshot: authorized envelope + complete observations
     Snapshot-->>Adapter: immutable snapshot or fail closed
 ```

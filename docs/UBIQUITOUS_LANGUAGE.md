@@ -4,6 +4,8 @@
 | --- | --- |
 | Source Snapshot | Immutable revision of source evidence observed by ConceptWeave. |
 | Observation | Deterministically extracted fact from a Source Snapshot. |
+| Unique Null Comparison | Observed behavior that treats nulls as distinct or not distinct for a unique constraint. Unknown means the behavior was not observed, not that a default was inferred. |
+| Snapshot Framing Version | Explicit content-encoding domain used before hashing observation facts. v2 distinguishes unknown, observed false and observed true unique null comparison; old receipts are not rewritten. |
 | Observation Request | Structurally bounded request for an exact source key, exact schema scope, and provider-independent metadata/runtime resource ceilings. Its positive values are requested limits, not authority. |
 | Resolved Source Connection | Opaque source key plus immutable connection-policy binding issued together by trusted local source policy; it carries no credential or provider connection object. |
 | Observation Resource Envelope | Provider-independent value object combining requested schema-count/schema-byte and operation/statement/row/byte/concurrency ceilings for one trusted policy decision. Constructing it does not authorize it. |

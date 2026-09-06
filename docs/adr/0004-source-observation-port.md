@@ -108,6 +108,20 @@ The concrete adapter must read the remaining budget before potentially blocking 
 
 This ADR remains **Proposed**. The port can now represent canonically capped pre-policy schema-selection metadata, source-key plus immutable-policy-binding authorization, exact schema-scope authorization, trusted complete resource-envelope admission, stale-binding rejection at the port seam, non-resetting budget with post-stage cutoff, canonical snapshot scope binding, and binding-preserving public provenance. No production PostgreSQL adapter or exact-head runtime conformance has yet proved the full decision.
 
+## UNIQUE null-comparison refinement (2026-09-06; Proposed)
+
+In the context of preserving immutable relational evidence for later semantic proposals, facing a demonstrated identity collision between otherwise equal UNIQUE constraints with different null comparison, we decided for an optional observed boolean and explicitly versioned v2 content framing and against inferring an unobserved default, retaining v1 framing for changed bytes, or adding a general index model, to achieve distinguishable and reproducible source evidence, accepting new snapshot digests even for observations with no unique constraints and a future explicit compatibility boundary for historical v1 evidence.
+
+The Source Observation owner remains responsible for the value and digest. The PostgreSQL ACL later reads the supporting index through pg_constraint.conindid and preserves pg_index.indnullsnotdistinct. No database query, provider type, dependency, general-index surface, unique deferrability or period semantics is introduced here. Missing evidence is None; observed false and true are distinct. The existing optional-boolean encoder is reused. Old receipts remain historical and immutable; this change does not provide wire-version negotiation, rewrite old receipts, establish a business key, or approve semantic publication.
+
+Alternatives rejected: an ordinary boolean defaults unknown evidence to a database assumption; an adapter-only flag leaves canonical identity incomplete; comments or parsing reconstructed SQL do not bind the typed fact; adding bytes under the old framing domain obscures a format change. A general index abstraction is unnecessary for the reviewed collision and remains outside this handoff.
+
+The schema-byte admission check now compares each name against the remaining admitted byte ceiling before adding its length. The accumulator starts at zero and stays at or below the already validated product cap, so subtraction and the following addition remain bounded. This replaces two guards, including an unreachable allocation-sized overflow branch, without changing the cap, error, exact identifiers or authorization order. Tests cover cumulative ASCII and UTF-8 boundaries. Standard async test implementations and std::task::Waker::noop replace hand-written wrappers; the production Send future contract is unchanged.
+
+Evidence: the UNIQUE null-comparison review on PR #6; functional collision RED at bab6984; collision plus framing RED at 8b5b738; focused six-test GREEN at 6c23924. Full validation exposed unrelated pre-existing documentation, formatting, Clippy and coverage failures; ordinary successor commits retain that evidence and repair it. Runtime e3ac294 passes 132 tests including two doctests, strict fmt/Clippy/rustdoc, release build, and the unchanged coverage gate (228/228 functions, 2026/2026 normalized regions, 194/194 normalized branches). Raw LLVM remains 1807/1825 lines, 2192/2206 regions and 188/194 branches: this is not a claim of 100% raw coverage. See ../doctoring/source-observation-unique-null-semantics.md for exact hashes, commands, standards and remaining gates.
+
+Positive consequence: unique null comparison now participates in value, snapshot and receipt identity without silently upgrading unknown evidence. Negative consequence: framing v2 is not hash-compatible with v1 and needs explicit consumer admission before any serialized release. Open risks: no concrete PostgreSQL adapter conformance, protected Product evidence, current-head independent approval, or immutable release is established by local tests. ADR 0004 and refining ADR 0006 remain Proposed.
+
 ## Test and evidence contract
 
 The Source Observation lineage includes:
@@ -130,7 +144,7 @@ The Source Observation lineage includes:
 - review `5124149676` and `cf5eda13013e347a9bd7907e5266605858762134`: caller-mintable effectively unbounded structural request budgets identified and committed as executable specifications;
 - `dfe12164db4900e6b423570d53737a8197b113d2` → `d1aff3389f97a500668ba3c02df256b349fc9b9a`: provider-independent hard structural metadata caps, typed over-cap errors, and exact boundary/control coverage.
 
-These are committed executable specifications and source repairs, not claimed observed RED→GREEN. The current execution environment has no Rust toolchain, and exact-head GitHub Product/Rust/coverage/rustdoc evidence is still required.
+The earlier writer recorded these as unexecuted specifications/source repairs because that environment had no Rust toolchain. The 2026-09-06 local verification above supersedes that environment limitation, not the missing protected GitHub evidence or concrete adapter conformance.
 
 Required runtime acceptance before ADR status can become Accepted:
 

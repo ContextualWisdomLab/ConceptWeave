@@ -1,5 +1,7 @@
 # Security Baseline
 
+Source-content identity must distinguish unknown and both observed unique-constraint null-comparison values. Evidence framing changes explicitly to v2; historical v1 receipts cannot be rewritten or used to infer an unobserved setting. This fixes an evidence-collision risk without granting semantic or publication authority.
+
 ## Trust boundaries
 
 All source artifacts, generated candidate payloads, external ontology files, model outputs, future web-retrieved content, and semantic-release payloads received by a client are untrusted input. Source Observation request metadata is also untrusted until it passes ConceptWeave's provider-independent structural caps and trusted local policy binds source identity and explicitly admits exact schema scope plus the complete provider-independent resource envelope.
