@@ -275,6 +275,8 @@ fn approved_snapshot_cannot_authorize_a_prediction_changed_to_match_the_label() 
     );
 
     report.classified_items[0].proposed_disposition = Disposition::AlignmentVersioning;
+    report.audit_summary.disposition_counts =
+        std::collections::BTreeMap::from([(Disposition::AlignmentVersioning, 1)]);
     let verifier_called = std::cell::Cell::new(false);
     assert_eq!(
         evaluate_reviewed_golden_set(&report, &golden, |candidate| {
@@ -301,6 +303,8 @@ fn rewriting_the_proposal_digest_cannot_reuse_an_independent_approval() {
     };
     let approved_golden = golden.clone();
     report.classified_items[0].proposed_disposition = Disposition::AlignmentVersioning;
+    report.audit_summary.disposition_counts =
+        std::collections::BTreeMap::from([(Disposition::AlignmentVersioning, 1)]);
     golden.approval.proposal_digest = classification_proposal_digest(&report);
     let imported_golden =
         serde_json::from_slice::<ReviewedGoldenSet>(&serde_json::to_vec(&golden).unwrap()).unwrap();
