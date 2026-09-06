@@ -7,6 +7,58 @@ use conceptweave_zotero::{
 use sha2::{Digest, Sha256};
 
 #[test]
+fn derived_audit_mutation_fails_before_governance() {
+    for mutation in 0..8 {
+        let mut report = scope_report();
+        let audit = &mut report.audit_summary;
+        match mutation {
+            0 => audit.snapshot_item_count += 1,
+            1 => audit.bibliographic_item_count += 1,
+            2 => audit.proposed_disposition_count += 1,
+            3 => audit.provenance_complete_count += 1,
+            4 => audit.abstention_count += 1,
+            5 => audit.duplicate_candidate_count += 1,
+            6 => audit.failure_count += 1,
+            _ => audit.disposition_counts.clear(),
+        }
+        let golden = scope_golden(&report);
+        assert_eq!(
+            evaluate_reviewed_golden_set(&report, &golden, |_| panic!(
+                "forged audit reached governance"
+            )),
+            Err(EvaluationError::InvalidReview),
+            "audit mutation {mutation}"
+        );
+    }
+}
+
+#[test]
+fn ambiguous_source_coordinates_never_count_as_complete_provenance() {
+    for items in [
+        vec![
+            bibliographic("A", 1, "ontology learning"),
+            bibliographic("A", 2, "ontology learning"),
+        ],
+        vec![
+            bibliographic("A", 1, "ontology learning"),
+            child_note("C", 1, "A"),
+            child_note("C", 2, "A"),
+        ],
+        vec![
+            bibliographic("A", 1, "ontology learning"),
+            child_note("A", 1, ""),
+        ],
+    ] {
+        let report = classify_snapshot("10.0.1".into(), None, 42, items);
+        assert_eq!(report.audit_summary.provenance_complete_count, 0);
+        assert_eq!(
+            validate_classification_report(&report),
+            Err(EvaluationError::InvalidReview)
+        );
+    }
+}
+
+#[test]
 fn legacy_proposal_receipt_is_rejected_without_calling_governance() {
     let report = scope_report();
     let mut golden = scope_golden(&report);
