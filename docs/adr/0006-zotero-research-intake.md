@@ -124,6 +124,12 @@ GREEN source `f6735b585022aac1c8ceff86c150d9b64fd77ec2` passed 68 tests across 1
 
 ## Alternatives considered
 
+### Proposed decision CLI integration amendment — September 7
+
+PR32 exposes the patch owner as an offline command. Normal merge `b7cae29` retains the original CLI delta and PR31's required proposal binding with prior private-file protections. The existing arm reads three distinct private inputs, delegates the typed patch unchanged to the canonical validator, serializes the returned worksheet and creates a new output. We retain that implementation rather than add another validator or infer a patch digest in the CLI. Two synthetic fixture constructors adopt the required binding; no production source is copied or new dependency introduced.
+
+Test commit `d3a2c7a` extends the real binary contract: a valid patch cannot overwrite existing output; missing and blank binding produce no output; an old patch fails against changed report content even with a fresh valid worksheet; the rejected operation preserves patch and worksheet bytes. Successful owner-only output and identical replay remain covered. These are inherited-owner GREEN checks, not a newly reproduced CLI defect or actual steward review. Rejected alternatives are duplicate CLI validation, automatic legacy binding repair and cleanup of failed paths. Local output remains unverified metadata preparation; failures after writing starts may retain partial private files. Root and subsequent command consumers must inherit the binding and private-open repairs before release. Protected checks and independent approval remain separate.
+
 ### Proposed decision-patch content identity amendment — September 7
 
 PR31 accumulates local decisions without overwriting conflicts. Normal merge `ef0ce43` preserves the original patch delta and PR30's content-bound worksheet/progress contract. A valid current worksheet alone does not prove that an older patch reviewed the current content: RED `7208d80` compiled with three passing and two failing tests, accepting both an unbound serialized patch and an old patch after changed report context plus fresh worksheet generation. `89bb941` adds a required patch `proposal_digest` and compares it with the existing recomputed identity before any updates. No new hash or authority issuer is added. Missing fields fail loading; blank/stale values cannot equal the expected digest.
