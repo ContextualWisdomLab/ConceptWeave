@@ -456,6 +456,15 @@ pub fn validate_classification_report(
             return Err(invalid);
         }
     }
+    if report.audit_summary
+        != classification_audit(
+            &report.snapshot_items,
+            &report.classified_items,
+            report.duplicate_candidates.len(),
+        )
+    {
+        return Err(invalid);
+    }
     let mut reported_pending = report.pending_source_item_keys.clone();
     reported_pending.sort();
     // Equal partition size and one successful removal per record prove completeness.
@@ -887,7 +896,6 @@ pub fn classify_snapshot(
     let children = child_index(&items);
     let bibliographic: Vec<&ZoteroItem> =
         items.iter().filter(|item| is_bibliographic(item)).collect();
-    let bibliographic_item_count = bibliographic.len();
     let duplicate_candidates = duplicate_candidates(&bibliographic);
     let classified_items: Vec<ClassifiedItem> = bibliographic
         .into_iter()
@@ -901,34 +909,11 @@ pub fn classify_snapshot(
     let pending_source_item_keys =
         pending_source_keys(&classified_items, &unclassified_items, children);
 
-    let mut disposition_counts = BTreeMap::new();
-    for item in &classified_items {
-        *disposition_counts
-            .entry(item.proposed_disposition)
-            .or_insert(0) += 1;
-    }
-    let audit_summary = ClassificationAudit {
-        snapshot_item_count: observed_item_count,
-        bibliographic_item_count,
-        proposed_disposition_count: classified_items.len(),
-        provenance_complete_count: classified_items
-            .iter()
-            .filter(|item| {
-                !item.item_key.trim().is_empty()
-                    && item
-                        .child_item_keys
-                        .iter()
-                        .all(|child_key| !child_key.trim().is_empty())
-            })
-            .count(),
-        abstention_count: classified_items
-            .iter()
-            .filter(|item| item.proposed_disposition == Disposition::NeedsStewardReview)
-            .count(),
-        duplicate_candidate_count: duplicate_candidates.len(),
-        failure_count: 0,
-        disposition_counts,
-    };
+    let audit_summary = classification_audit(
+        &snapshot_items,
+        &classified_items,
+        duplicate_candidates.len(),
+    );
 
     ClassificationReport {
         zotero_version,
@@ -945,6 +930,48 @@ pub fn classify_snapshot(
         pending_source_item_keys,
         duplicate_candidates,
         audit_summary,
+    }
+}
+
+fn classification_audit(
+    snapshot_items: &[SnapshotItemRevision],
+    classified_items: &[ClassifiedItem],
+    duplicate_candidate_count: usize,
+) -> ClassificationAudit {
+    let mut identity_counts = BTreeMap::new();
+    for item in snapshot_items {
+        *identity_counts
+            .entry(item.item_key.as_str())
+            .or_insert(0usize) += 1;
+    }
+    let mut disposition_counts = BTreeMap::new();
+    for item in classified_items {
+        *disposition_counts
+            .entry(item.proposed_disposition)
+            .or_insert(0) += 1;
+    }
+    ClassificationAudit {
+        snapshot_item_count: snapshot_items.len(),
+        bibliographic_item_count: classified_items.len(),
+        proposed_disposition_count: classified_items.len(),
+        provenance_complete_count: classified_items
+            .iter()
+            .filter(|item| {
+                !item.item_key.trim().is_empty()
+                    && identity_counts.get(item.item_key.as_str()) == Some(&1)
+                    && item.child_item_keys.iter().all(|child_key| {
+                        !child_key.trim().is_empty()
+                            && identity_counts.get(child_key.as_str()) == Some(&1)
+                    })
+            })
+            .count(),
+        abstention_count: classified_items
+            .iter()
+            .filter(|item| item.proposed_disposition == Disposition::NeedsStewardReview)
+            .count(),
+        duplicate_candidate_count,
+        failure_count: 0,
+        disposition_counts,
     }
 }
 
