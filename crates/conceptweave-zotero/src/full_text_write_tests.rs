@@ -5,6 +5,141 @@ use crate::{
 use std::cell::Cell;
 use std::cell::RefCell;
 
+#[test]
+fn full_text_write_reconciliation_distinguishes_restored_unknown_and_failed_reads() {
+    for observation in 0..3 {
+        let report = report_fixture();
+        let capture = capture_with(&report, 4096, &mut |request_path, _| {
+            Ok(response_fixture(request_path))
+        })
+        .unwrap();
+        let mut scope = write_scope_fixture(&report, &capture);
+        scope.mode = WriteMode::Execute;
+        let plan =
+            build_full_text_write_plan(&report, &capture, scope, |_| true, |_| true).unwrap();
+        let store = WriteStore::from_report(&report);
+        let written = execute_full_text_write_plan(
+            &plan,
+            |item_key| store.read_item(item_key),
+            |request| store.write_item(request),
+        );
+        store.read_count.set(0);
+        let partial = crate::execute_full_text_rollback(
+            &written,
+            |item_key| {
+                if store.read_count.get() >= 2 {
+                    return Err(());
+                }
+                store.read_item(item_key)
+            },
+            |request| -> Result<crate::ClassificationItemState, ()> {
+                if observation == 0 {
+                    store.write_item(request).unwrap();
+                }
+                Err(())
+            },
+        )
+        .unwrap();
+        let reconciled = crate::reconcile_full_text_rollback(&partial, |item_key| {
+            if observation == 2 {
+                return Err(());
+            }
+            let mut state = store.read_item(item_key)?;
+            if observation == 1 {
+                state.collection_keys = vec!["UNEXPECTED_CHANGE".into()];
+            }
+            Ok(state)
+        })
+        .unwrap();
+        let result = serde_json::to_value(&reconciled).unwrap();
+        assert_eq!(
+            result["full_text_write_v1"],
+            serde_json::to_value(&plan).unwrap()["full_text_write_v1"]
+        );
+        assert_eq!(result["remaining_operations"].as_array().unwrap().len(), 1);
+        if observation == 0 {
+            assert_eq!(result["reconciliation_result"]["state"], "restored");
+            let restored = crate::retry_full_text_reconciled_rollback(
+                &reconciled,
+                |item_key| store.read_item(item_key),
+                |request| store.write_item(request),
+            )
+            .unwrap();
+            let final_result = serde_json::to_value(restored).unwrap();
+            assert_eq!(final_result["rollback_result"]["outcome"], "restored");
+            assert_eq!(
+                final_result["rollback_result"]["restored_item_keys"]
+                    .as_array()
+                    .unwrap()
+                    .len(),
+                1
+            );
+            assert_eq!(store.write_count.get(), 4);
+        } else {
+            assert_eq!(result["reconciliation_result"]["state"], "indeterminate");
+            assert!(
+                crate::retry_full_text_reconciled_rollback(
+                    &reconciled,
+                    |_| -> Result<crate::ClassificationItemState, ()> {
+                        panic!("unresolved retry read")
+                    },
+                    |_| -> Result<crate::ClassificationItemState, ()> {
+                        panic!("unresolved retry write")
+                    }
+                )
+                .is_err()
+            );
+            assert_eq!(store.write_count.get(), 2);
+        }
+    }
+}
+
+#[test]
+fn full_text_write_known_partial_failure_keeps_only_verified_inverse_work() {
+    let report = report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let mut scope = write_scope_fixture(&report, &capture);
+    scope.mode = WriteMode::Execute;
+    let plan = build_full_text_write_plan(&report, &capture, scope, |_| true, |_| true).unwrap();
+    let store = WriteStore::from_report(&report);
+    let receipt = execute_full_text_write_plan(
+        &plan,
+        |item_key| store.read_item(item_key),
+        |request| {
+            if store.write_count.get() == 1 {
+                return Err(());
+            }
+            store.write_item(request)
+        },
+    );
+    let result = serde_json::to_value(&receipt).unwrap();
+    assert_eq!(result["write_result"]["outcome"], "partial_failure");
+    assert!(result["write_result"]["indeterminate_item_key"].is_null());
+    assert_eq!(
+        result["write_result"]["rollback_operations"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    let restored = crate::execute_full_text_rollback(
+        &receipt,
+        |item_key| store.read_item(item_key),
+        |request| store.write_item(request),
+    )
+    .unwrap();
+    let restored = serde_json::to_value(restored).unwrap();
+    assert_eq!(
+        restored["full_text_write_v1"],
+        serde_json::to_value(&plan).unwrap()["full_text_write_v1"]
+    );
+    assert_eq!(restored["rollback_result"]["outcome"], "restored");
+    assert_eq!(store.write_count.get(), 2);
+}
+
 struct WriteStore {
     items: RefCell<BTreeMap<String, crate::ClassificationItemState>>,
     library_version: Cell<u64>,
@@ -462,7 +597,15 @@ fn full_text_write_dry_run_preserves_binding_without_reads_or_writes() {
         |_| -> Result<crate::ClassificationItemState, ()> { panic!("dry-run write") },
     );
     let plan_json = serde_json::to_value(&plan).unwrap();
-    let receipt_json = serde_json::to_value(receipt).unwrap();
+    let receipt_json = serde_json::to_value(&receipt).unwrap();
+    assert!(
+        crate::execute_full_text_rollback(
+            &receipt,
+            |_| -> Result<crate::ClassificationItemState, ()> { panic!("dry-run recovery read") },
+            |_| -> Result<crate::ClassificationItemState, ()> { panic!("dry-run recovery write") }
+        )
+        .is_err()
+    );
     assert_eq!(
         receipt_json["full_text_write_v1"],
         plan_json["full_text_write_v1"]

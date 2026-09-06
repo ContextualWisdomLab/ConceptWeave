@@ -38,6 +38,11 @@ struct FullTextWriteBinding {
 /// executable restoration. Retain the owner-only scope to verify receipt hashes.
 ///
 /// ```compile_fail
+/// use conceptweave_zotero::FullTextWritePlan;
+/// let forged = serde_json::from_str::<FullTextWritePlan>("{}");
+/// ```
+///
+/// ```compile_fail
 /// use conceptweave_zotero::{FullTextWritePlan, ClassificationWritePlan};
 /// fn detach(plan: &FullTextWritePlan) -> &ClassificationWritePlan {
 ///     &plan.write_plan
@@ -62,6 +67,13 @@ pub struct FullTextWriteReceipt {
 
 /// One bound rollback attempt, including operations still awaiting resolution.
 /// Keep earlier receipts: this outcome reports this attempt, not a new approval.
+///
+/// ```compile_fail
+/// use conceptweave_zotero::FullTextRollbackReceipt;
+/// fn mix(left: &mut FullTextRollbackReceipt, right: &FullTextRollbackReceipt) {
+///     left.rollback_result.remaining_operations = right.rollback_result.remaining_operations.clone();
+/// }
+/// ```
 #[derive(Serialize)]
 pub struct FullTextRollbackReceipt {
     full_text_write_v1: FullTextWriteBinding,
