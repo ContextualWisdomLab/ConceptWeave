@@ -541,6 +541,7 @@ fn source_metadata_mutations_invalidate_the_original_approval_before_verificatio
             "doi" => source.data.doi = "10.1/changed".into(),
             "tags" => source.data.tags.push(conceptweave_zotero::ItemTag {
                 tag: "changed".into(),
+                tag_type: None,
             }),
             "collections" => source.data.collections.push("changed".into()),
             "type" => source.data.item_type = "attachment".into(),

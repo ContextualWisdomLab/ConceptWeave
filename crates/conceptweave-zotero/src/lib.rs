@@ -2193,6 +2193,7 @@ mod tests {
         standalone.data.collections = vec!["COLLECTION".into()];
         standalone.data.tags = vec![ItemTag {
             tag: "Evidence".into(),
+            tag_type: None,
         }];
         let report = read_snapshot_with(&mut |_| {
             Ok(fetched_page(

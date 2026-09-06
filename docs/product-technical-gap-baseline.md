@@ -89,6 +89,20 @@ Remaining work: mandatory adoption by restoration, worksheet, duplicate and writ
 
 ## DDD fitness constraints
 
+### PR #13 source-scope integration checkpoint (2026-09-06)
+
+Normal merge `5df57a7` preserves write-plan head `b41217b` and source-scope
+parent `3d2c252`. Two inherited test inputs lacked the optional tag type added
+by write planning; explicitly retaining `None` restores their original manual-tag
+semantics. Rust 1.98.0 workspace verification passed 94 tests across 18 result
+suites, including two documentation tests. The initial shell selected Rust 1.97.1;
+the verified invocation is `cargo +1.98.0 test --workspace`.
+
+Native Zotero visual inspection again showed 3,719 items and attachment icons.
+This is display evidence, not approved reclassification or write evidence.
+Write-plan source-scope validation and proposal-bound approval remain open;
+this local integration is not a hosted-check, protected-merge, or release claim.
+
 - No generic `utils/helpers/services/common` domain buckets.
 - Adapters remain outside the core domain model; external DTOs cross Anti-Corruption Layers.
 - Source Observation facts are not source-system business truth, and relational constraints are not semantic authority by themselves.
