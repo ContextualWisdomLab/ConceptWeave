@@ -4,6 +4,12 @@ All notable changes to ConceptWeave are documented here.
 
 ## Unreleased
 
+### Fixed
+
+- Research reports retain standalone files and notes that previously disappeared from the classification view, and flag sources whose parent relationships remain unresolved.
+- Zotero research intake rejects a read whose records claim revisions newer than the library being observed, without dropping papers or changing their recorded revisions.
+- Zotero research intake rejects incomplete or late results after a five-minute read budget, even when individual pages arrive within their request limits.
+
 ### Added
 
 - Initial ConceptWeave product, DDD, security, test, and operability baselines.

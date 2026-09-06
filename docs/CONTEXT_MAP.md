@@ -9,6 +9,7 @@
 
 ## External relationships
 
+- Zotero Local API -> research evidence intake: **Anti-Corruption Layer into Semantic Discovery**. Zotero remains the bibliographic system of record; ConceptWeave consumes a version-pinned, read-only Local API snapshot and emits proposal evidence only. Item metadata, attachments, collection/tag truth, and future write authority remain in Zotero. No Zotero record becomes semantic authority without ConceptWeave validation/review/publication.
 - contextual-orchestrator -> Semantic Discovery: **Anti-Corruption Layer**. Model/provider envelopes never enter the domain model directly.
 - LineageWeave -> Source Observation: **Anti-Corruption Layer**. Inferred/proposed lineage remains explicitly non-authoritative until ConceptWeave governance evaluates it.
 - context-graph-contracts <-> Interoperability: **Shared Kernel only for versioned public contracts**, kept minimal.
