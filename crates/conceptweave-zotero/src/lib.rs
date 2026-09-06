@@ -1228,6 +1228,10 @@ pub struct StewardReviewBatch {
     pub rule_revision: String,
     /// Canonical digest of the complete raw snapshot.
     pub snapshot_digest: String,
+    /// Opaque identity retained unchanged when completed decisions become a patch.
+    pub proposal_digest: String,
+    /// Unresolved source records, separate from blank bibliographic decision slots.
+    pub pending_source_count: usize,
     /// Pending decisions before this non-reserving view was created.
     pub remaining_count: usize,
     /// First pending decisions in canonical item-key order.
@@ -1387,6 +1391,8 @@ pub fn build_steward_review_batch(
         library_version: report.library_version,
         rule_revision: report.rule_revision.clone(),
         snapshot_digest: report.snapshot_digest.clone(),
+        proposal_digest: progress.proposal_digest,
+        pending_source_count: progress.pending_source_count,
         remaining_count: progress.remaining_count,
         decisions,
     })
