@@ -6,6 +6,7 @@
 - Semantic Discovery -> Model Validation: **Conformist to published candidate contract**; validation must not rewrite discovery evidence.
 - Model Validation -> Governance & Publication: **Customer/Supplier**; governance consumes deterministic validation receipts.
 - Governance & Publication -> Interoperability: **Published Language**; adapters consume immutable release contracts.
+- Research Intake -> Governance & Publication: **Anti-Corruption Layer**; Intake validates source inventory, audit, receipt bindings and all duplicate operations before Governance verifies the complete independently issued review, including candidate membership and retained-source identity. The opaque authority receipt does not authorize source mutation.
 
 ## External relationships
 

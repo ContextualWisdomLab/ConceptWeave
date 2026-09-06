@@ -62,5 +62,8 @@ sequenceDiagram
     Intake->>Intake: validate complete partitions and recompute pending ancestry
     Intake->>Intake: verify v2 proposal and retained-source binding
     Note over Intake,Steward: Only locally valid reports reach independent governance verification
+    Steward->>Intake: verified canonical-item decisions
+    Intake->>Report: before/after/rollback identity manifest
+    Report-->>Steward: reversible local mapping; source records preserved
     Intake-->>Zotero: no mutation
 ```
