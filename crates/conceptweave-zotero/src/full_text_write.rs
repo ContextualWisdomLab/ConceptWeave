@@ -273,25 +273,12 @@ pub fn reconcile_full_text_rollback<ReadError>(
     })
 }
 
-/// Retries a resolved operation and its untouched tail through complete preflight.
-/// Already restored work is not written again; unresolved work makes zero I/O.
+/// Rejects retries from read-only observations without calling either adapter.
+/// Metadata cannot resolve causal uncertainty; independent resolution is required.
 pub fn retry_full_text_reconciled_rollback<ReadError, WriteError>(
-    receipt: &FullTextRollbackReconciliationReceipt<'_>,
-    preflight: impl FnMut(&str) -> Result<ClassificationItemState, ReadError>,
-    write_item: impl FnMut(&ClassificationWriteRequest) -> Result<ClassificationItemState, WriteError>,
+    _receipt: &FullTextRollbackReconciliationReceipt<'_>,
+    _preflight: impl FnMut(&str) -> Result<ClassificationItemState, ReadError>,
+    _write_item: impl FnMut(&ClassificationWriteRequest) -> Result<ClassificationItemState, WriteError>,
 ) -> Result<FullTextRollbackReceipt, FullTextError> {
-    if receipt.reconciliation_result.state == crate::ClassificationRollbackState::Indeterminate {
-        return Err(INVALID_WRITE_SCOPE);
-    }
-    let operations = receipt
-        .reconciliation_result
-        .retry_operation
-        .iter()
-        .cloned()
-        .chain(receipt.remaining_operations.iter().cloned())
-        .collect::<Vec<_>>();
-    Ok(FullTextRollbackReceipt {
-        full_text_write_v1: receipt.full_text_write_v1.clone(),
-        rollback_result: crate::execute_classification_rollback(&operations, preflight, write_item),
-    })
+    Err(INVALID_WRITE_SCOPE)
 }
