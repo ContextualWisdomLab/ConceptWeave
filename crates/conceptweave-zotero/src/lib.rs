@@ -20,6 +20,10 @@ pub use full_text_capture::{
     FullTextReviewedGoldenSet, apply_full_text_review_view, build_bound_full_text_review_json,
     build_full_text_review_worksheet, evaluate_full_text_review, finalize_full_text_review,
 };
+pub use full_text_capture::{
+    FullTextWritePlan, FullTextWriteReceipt, FullTextWriteScope, build_full_text_write_plan,
+    execute_full_text_write_plan,
+};
 
 /// Classification rule revision recorded in every report.
 pub const RULE_REVISION: &str = "ontology-research-v2";
@@ -1799,6 +1803,17 @@ pub fn evaluate_reviewed_golden_set<F>(
 where
     F: FnOnce(&ReviewedGoldenSet) -> bool,
 {
+    let evaluation = prepare_reviewed_golden_set(report, golden)?;
+    if !verify_approval(golden) {
+        return Err(EvaluationError::UnverifiedApproval);
+    }
+    Ok(evaluation)
+}
+
+fn prepare_reviewed_golden_set(
+    report: &ClassificationReport,
+    golden: &ReviewedGoldenSet,
+) -> Result<GoldenSetEvaluation, EvaluationError> {
     if golden.approval.receipt_id.trim().is_empty()
         || golden.approval.reviewer_subject.trim().is_empty()
         || golden.labels.is_empty()
@@ -1889,10 +1904,6 @@ where
         if predicted == Disposition::NeedsStewardReview {
             abstention_count += 1;
         }
-    }
-
-    if !verify_approval(golden) {
-        return Err(EvaluationError::UnverifiedApproval);
     }
 
     Ok(GoldenSetEvaluation {
@@ -2112,6 +2123,18 @@ pub fn build_classification_write_plan<F>(
 where
     F: FnOnce(&ReviewedClassificationWriteSet) -> bool,
 {
+    let plan = prepare_classification_write_plan(report, reviewed, mode)?;
+    if !verify_review(reviewed) {
+        return Err(WritePlanError::UnverifiedApproval);
+    }
+    Ok(plan)
+}
+
+fn prepare_classification_write_plan(
+    report: &ClassificationReport,
+    reviewed: &ReviewedClassificationWriteSet,
+    mode: WriteMode,
+) -> Result<ClassificationWritePlan, WritePlanError> {
     if reviewed.review_id.trim().is_empty()
         || reviewed.authority_receipt.trim().is_empty()
         || reviewed.rule_revision.trim().is_empty()
@@ -2225,9 +2248,6 @@ where
         });
     }
     operations.sort_by(|left, right| left.item_key.cmp(&right.item_key));
-    if !verify_review(reviewed) {
-        return Err(WritePlanError::UnverifiedApproval);
-    }
     Ok(ClassificationWritePlan {
         mode,
         review_id: reviewed.review_id.clone(),
