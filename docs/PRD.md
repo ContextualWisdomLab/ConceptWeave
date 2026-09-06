@@ -40,6 +40,11 @@ Validate syntax, identifiers, relationship cardinality, mapping completeness, du
 
 ### FR-5 Governed review
 
+When a write response is lost, show the affected item as unresolved even if a
+later read looks unchanged or matches the requested result. Preserve what was
+submitted and what was later observed, keep confirmed earlier results, and do not
+automatically repeat or undo the uncertain change.
+
 Research changes must use the evidence actually reviewed. Changed supporting
 metadata or incomplete source inventories must stop a change plan before approval
 is consumed. Older reviews lacking this evidence binding require fresh independent

@@ -89,6 +89,36 @@ Remaining work: mandatory adoption by restoration, worksheet, duplicate and writ
 
 ## DDD fitness constraints
 
+### PR #15 execution-scope and uncertainty repair (2026-09-06)
+
+Baseline `45e9c493` passed 87 tests/19 result suites; normal merge `2887f70`
+preserves that executor and parent `eb8eaa4`, passing 109 tests/19 suites.
+RED `e8b4c06` failed three receipt-binding tests, repaired by `b91ad9f` retaining
+the proposal/source digest across dry-run, applied, preflight and partial failure.
+
+Independent review then found a root causal-completion defect: matching before
+metadata could hide a delayed request, while matching after or unrelated newer
+metadata could invent applied/rollback status. Existing scenarios were preserved
+with corrected expectations in RED `646a10c` (two failures). Runtime `c09d101`
+removes those inferences and retains the exact submitted request plus optional
+observation. Only earlier directly verified operations retain applied/inverse
+status. Test `e169630` compares the complete captured request and missing fields.
+Independent static review found no remaining actionable owner defect; it is not
+GitHub approval. Original and later executor paths both require propagation.
+
+Final source: 109 passing tests/19 result suites including three doctests, strict
+all-target Clippy, warnings-denied rustdoc and unchanged coverage gate passed.
+Coverage: 185/185 functions, 1770/1770 source-normalized regions, 320/320 normalized
+branches. Raw LLVM is 1998/2050 lines, 2934/3014 regions and 280/320 branches, not
+100%. Evidence logs: `/tmp/conceptweave-pr15-causal-final.log`, `-clippy-final.log`,
+`-rustdoc.log`, and `-coverage.log` share the `conceptweave-pr15-causal` prefix.
+
+No real library write, paper decision, approval or release occurred. Subsequent
+execution/recovery/full-text consumers must inherit unknown-request semantics,
+retain exact request and earlier receipt fields, and reject retry/rollback of an
+unknown original write even when its inverse list is empty. Protected integration,
+descendant adoption, live write/rollback and actual reclassification remain open.
+
 ### PR #13 source-scope integration checkpoint (2026-09-06)
 
 Normal merge `5df57a7` preserves write-plan head `b41217b` and source-scope

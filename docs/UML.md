@@ -79,5 +79,6 @@ sequenceDiagram
             Zotero-->>Intake: post-write revision and complete state
         end
         Intake->>Report: applied/failed/untouched receipt + reverse rollback operations
+        Note over Intake,Report: Failed response stays unknown; retain exact request and observation, no inferred inverse
     end
 ```

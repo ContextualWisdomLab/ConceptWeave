@@ -6,6 +6,9 @@ All notable changes to ConceptWeave are documented here.
 
 ### Fixed
 
+- Failed write responses no longer turn later observations into proof of completion or permission to undo another change; the submitted request and unresolved result remain available for investigation.
+- Every execution outcome retains the identity of the reviewed supporting evidence.
+
 - Research change plans reject changed supporting evidence and incomplete inventories before approval, and preserve the identity of the reviewed evidence.
 
 - Duplicate review rejects incomplete source inventories and changed supporting evidence before approval, while retaining reversible identity mappings.
