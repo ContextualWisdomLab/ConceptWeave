@@ -85,8 +85,21 @@ fn failed_http_write_with_matching_observation_remains_indeterminate() {
     );
     assert_eq!(receipt.outcome, ClassificationWriteOutcome::PartialFailure);
     assert_eq!(receipt.indeterminate_item_key.as_deref(), Some("ABCD2345"));
-    assert_eq!(receipt.indeterminate_request, Some(expected_request));
-    assert_eq!(receipt.reconciliation_observation.unwrap().item_version, 43);
+    assert_eq!(
+        receipt.indeterminate_request,
+        Some(expected_request.clone())
+    );
+    assert_eq!(
+        receipt.reconciliation_observation,
+        Some(ClassificationItemState {
+            server_id: expected_request.server_id,
+            library_version: 43,
+            item_key: expected_request.item_key,
+            item_version: 43,
+            collection_keys: expected_request.collection_keys,
+            tags: expected_request.tags,
+        })
+    );
     assert_eq!(receipt.proposal_digest, review.proposal_digest);
     assert!(receipt.applied_item_keys.is_empty());
     assert!(receipt.rollback_operations.is_empty());
