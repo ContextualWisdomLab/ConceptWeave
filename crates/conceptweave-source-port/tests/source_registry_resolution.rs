@@ -11,8 +11,7 @@ impl SourceConnectionRegistry for TestRegistry {
     }
 
     fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
-        (source_connection_key == "grc_readonly_connection")
-            .then(|| "policy_revision_a".to_owned())
+        (source_connection_key == "grc_readonly_connection").then(|| "policy_revision_a".to_owned())
     }
 }
 

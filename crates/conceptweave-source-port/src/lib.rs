@@ -227,10 +227,7 @@ pub struct ObservationResourceEnvelope {
 impl ObservationResourceEnvelope {
     /// Combines the caller-requested metadata and runtime ceilings into one policy input.
     #[must_use]
-    pub const fn new(
-        request_budget: ObservationRequestBudget,
-        limits: ObservationLimits,
-    ) -> Self {
+    pub const fn new(request_budget: ObservationRequestBudget, limits: ObservationLimits) -> Self {
         Self {
             request_budget,
             limits,
@@ -486,9 +483,8 @@ impl ObservationRequest {
     ) -> Result<AuthorizedObservationRequest, ObservationRequestError> {
         let operation_started_at = Instant::now();
         let operation_timeout = Duration::from_millis(self.limits.operation_timeout_ms);
-        let budget_exhausted = || {
-            Instant::now().saturating_duration_since(operation_started_at) >= operation_timeout
-        };
+        let budget_exhausted =
+            || Instant::now().saturating_duration_since(operation_started_at) >= operation_timeout;
 
         let source_exists = registry.contains_source_connection(&self.source_connection_key);
         if budget_exhausted() {

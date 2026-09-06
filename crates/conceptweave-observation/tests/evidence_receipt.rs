@@ -46,7 +46,10 @@ fn snapshot_issues_exact_evidence_receipt_for_observed_column() {
         .source_receipt(location)
         .expect("observed location can be receipted");
 
-    assert_eq!(snapshot.connection_policy_binding(), "fixture_policy_revision_a");
+    assert_eq!(
+        snapshot.connection_policy_binding(),
+        "fixture_policy_revision_a"
+    );
     assert_eq!(receipt.source_id(), "warehouse_source");
     assert_eq!(
         receipt.connection_policy_binding(),

@@ -42,8 +42,7 @@ impl SourceConnectionRegistry for DelayedRegistry {
     }
 
     fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
-        (source_connection_key == "grc_readonly_connection")
-            .then(|| "policy_revision_a".to_owned())
+        (source_connection_key == "grc_readonly_connection").then(|| "policy_revision_a".to_owned())
     }
 
     fn authorizes_schema_scope(
@@ -154,7 +153,10 @@ fn exhausted_authorization_fails_before_adapter_source_or_snapshot_side_effects(
         delay: Duration::from_millis(20),
     });
 
-    assert_eq!(authorization, Err(ObservationRequestError::OperationTimeout));
+    assert_eq!(
+        authorization,
+        Err(ObservationRequestError::OperationTimeout)
+    );
     assert_eq!(port.adapter_invocations.load(Ordering::Relaxed), 0);
     assert_eq!(port.source_accesses.load(Ordering::Relaxed), 0);
     assert_eq!(port.snapshot_constructions.load(Ordering::Relaxed), 0);
@@ -162,11 +164,13 @@ fn exhausted_authorization_fails_before_adapter_source_or_snapshot_side_effects(
 
 #[test]
 fn elapsed_budget_takes_precedence_after_a_slow_unknown_registry_lookup() {
-    let authorization = request_with_key("unknown_readonly_connection", 5).authorize(
-        &DelayedRegistry {
+    let authorization =
+        request_with_key("unknown_readonly_connection", 5).authorize(&DelayedRegistry {
             delay: Duration::from_millis(20),
-        },
-    );
+        });
 
-    assert_eq!(authorization, Err(ObservationRequestError::OperationTimeout));
+    assert_eq!(
+        authorization,
+        Err(ObservationRequestError::OperationTimeout)
+    );
 }

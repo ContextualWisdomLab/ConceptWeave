@@ -118,7 +118,10 @@ impl SourceConnectionRegistry for SlowSchemaRegistry {
         allowed_schema_names: &[String],
     ) -> bool {
         assert_eq!(source_connection.source_connection_key(), SOURCE_KEY);
-        assert_eq!(source_connection.connection_policy_binding(), POLICY_BINDING);
+        assert_eq!(
+            source_connection.connection_policy_binding(),
+            POLICY_BINDING
+        );
         assert_eq!(allowed_schema_names, ["governance_core"]);
         thread::sleep(Duration::from_millis(20));
         true

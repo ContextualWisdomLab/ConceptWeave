@@ -1,6 +1,6 @@
 use conceptweave_source_port::{
-    ObservationRequestBudget, ObservationRequestBudgetError, MAX_STRUCTURAL_SCHEMA_BYTES,
-    MAX_STRUCTURAL_SCHEMA_COUNT,
+    MAX_STRUCTURAL_SCHEMA_BYTES, MAX_STRUCTURAL_SCHEMA_COUNT, ObservationRequestBudget,
+    ObservationRequestBudgetError,
 };
 
 #[test]
@@ -25,11 +25,9 @@ fn schema_byte_budget_cannot_exceed_canonical_structural_cap() {
 
 #[test]
 fn canonical_structural_caps_remain_constructible() {
-    let budget = ObservationRequestBudget::new(
-        MAX_STRUCTURAL_SCHEMA_COUNT,
-        MAX_STRUCTURAL_SCHEMA_BYTES,
-    )
-    .expect("canonical provider-independent structural ceilings remain valid");
+    let budget =
+        ObservationRequestBudget::new(MAX_STRUCTURAL_SCHEMA_COUNT, MAX_STRUCTURAL_SCHEMA_BYTES)
+            .expect("canonical provider-independent structural ceilings remain valid");
 
     assert_eq!(budget.max_schema_count(), MAX_STRUCTURAL_SCHEMA_COUNT);
     assert_eq!(budget.max_schema_bytes(), MAX_STRUCTURAL_SCHEMA_BYTES);

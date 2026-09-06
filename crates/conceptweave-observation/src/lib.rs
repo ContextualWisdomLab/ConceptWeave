@@ -11,8 +11,8 @@ mod model;
 pub use model::{
     CheckConstraintObservation, ColumnObservation, ForeignKeyAction, ForeignKeyDeferrability,
     ForeignKeyMatchType, ForeignKeyObservation, ForeignKeyReferenceBehavior, ObservationError,
-    ObservationLocation, ObservationLocationKind, PrimaryKeyObservation, TableConstraintObservation,
-    TableObservation, UniqueConstraintObservation,
+    ObservationLocation, ObservationLocationKind, PrimaryKeyObservation,
+    TableConstraintObservation, TableObservation, UniqueConstraintObservation,
 };
 
 use conceptweave_source_port::AuthorizedObservationRequest;
@@ -246,10 +246,7 @@ fn compute_snapshot_digest(tables: &[TableObservation]) -> String {
     encoded
 }
 
-fn encode_reference_behavior(
-    hasher: &mut Sha256,
-    behavior: Option<&ForeignKeyReferenceBehavior>,
-) {
+fn encode_reference_behavior(hasher: &mut Sha256, behavior: Option<&ForeignKeyReferenceBehavior>) {
     match behavior {
         None => hasher.update([0]),
         Some(behavior) => {
@@ -289,10 +286,7 @@ fn encode_foreign_key_match_type(hasher: &mut Sha256, match_type: ForeignKeyMatc
     hasher.update([tag]);
 }
 
-fn encode_foreign_key_deferrability(
-    hasher: &mut Sha256,
-    deferrability: ForeignKeyDeferrability,
-) {
+fn encode_foreign_key_deferrability(hasher: &mut Sha256, deferrability: ForeignKeyDeferrability) {
     let tag = match deferrability {
         ForeignKeyDeferrability::NotDeferrable => 0,
         ForeignKeyDeferrability::InitiallyImmediate => 1,

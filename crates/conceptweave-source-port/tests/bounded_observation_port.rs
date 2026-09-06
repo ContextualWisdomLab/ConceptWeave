@@ -172,12 +172,7 @@ fn request_rejects_non_registry_source_connection_keys_before_adapter_access() {
 #[test]
 fn request_rejects_blank_source_empty_or_blank_schema_and_exact_duplicates() {
     assert_eq!(
-        ObservationRequest::new(
-            "  ",
-            vec!["public".to_owned()],
-            request_budget(),
-            limits(),
-        ),
+        ObservationRequest::new("  ", vec!["public".to_owned()], request_budget(), limits(),),
         Err(ObservationRequestError::InvalidSourceConnectionKey)
     );
     assert_eq!(
@@ -214,8 +209,7 @@ impl SourceConnectionRegistry for ExactRegistry {
     }
 
     fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
-        (source_connection_key == "grc_readonly_connection")
-            .then(|| "policy_revision_a".to_owned())
+        (source_connection_key == "grc_readonly_connection").then(|| "policy_revision_a".to_owned())
     }
 
     fn authorizes_schema_scope(
