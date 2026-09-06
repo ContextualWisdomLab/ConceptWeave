@@ -45,7 +45,7 @@ fn failed_http_write_with_matching_observation_remains_indeterminate() {
             r#"{"key":"ABCD2345","version":7,"data":{"itemType":"book"}}"#,
         ),
         library_response("server-10", 42),
-        "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        "HTTP/1.1 500 Internal Server Error\r\nZotero-Server-ID: server-10\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
             .into(),
         library_response("server-10", 43),
         item_response("server-10", 43),
