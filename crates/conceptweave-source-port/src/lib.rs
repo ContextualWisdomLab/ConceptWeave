@@ -574,13 +574,24 @@ impl ObservationRequest {
 /// same policy boundary has explicitly accepted both the exact schema scope and complete requested
 /// resource envelope against the same immutable connection-policy revision. It also retains a
 /// private monotonic operation-start coordinate so the adapter can cap connection, transaction,
-/// statement and cancellation work by the true remaining budget. It carries no connection string,
-/// credential, token, provider-specific connection object, or wall-clock time.
-#[derive(Clone, Debug, Eq, PartialEq)]
+/// statement and cancellation work by the true remaining budget. Its `Debug` representation
+/// deliberately omits that private coordinate. It carries no connection string, credential, token,
+/// provider-specific connection object, or wall-clock time.
+#[derive(Clone, Eq, PartialEq)]
 pub struct AuthorizedObservationRequest {
     request: ObservationRequest,
     source_connection: ResolvedSourceConnection,
     operation_started_at: Instant,
+}
+
+impl std::fmt::Debug for AuthorizedObservationRequest {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("AuthorizedObservationRequest")
+            .field("request", &self.request)
+            .field("source_connection", &self.source_connection)
+            .finish_non_exhaustive()
+    }
 }
 
 impl AuthorizedObservationRequest {
