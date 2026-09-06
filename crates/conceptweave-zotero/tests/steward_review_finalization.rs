@@ -300,6 +300,41 @@ fn finalization_rejects_changed_review_evidence_under_the_original_approval() {
 }
 
 #[test]
+fn finalization_rejects_stale_worksheet_even_with_current_approval_coordinates() {
+    for changed_field in 0..3 {
+        let mut report = report();
+        let worksheet = complete_worksheet();
+        match changed_field {
+            0 => report.classified_items[0].title.push_str(" changed"),
+            1 => report.classified_items[0].evidence.field_values.clear(),
+            _ => report.classified_items[0].review_abstract_note = Some("changed context".into()),
+        }
+        let current_receipt = approval(&report, &worksheet);
+        assert_eq!(
+            reviewed_golden_set_from_worksheet(&report, &worksheet, current_receipt),
+            Err(EvaluationError::SnapshotMismatch)
+        );
+    }
+}
+
+#[test]
+fn finalization_rejects_blank_or_replaced_worksheet_binding() {
+    let report = report();
+    for (binding, expected) in [
+        ("", EvaluationError::InvalidReview),
+        ("  ", EvaluationError::InvalidReview),
+        ("sha256:replaced", EvaluationError::SnapshotMismatch),
+    ] {
+        let mut worksheet = complete_worksheet();
+        worksheet.proposal_digest = binding.into();
+        assert_eq!(
+            reviewed_golden_set_from_worksheet(&report, &worksheet, approval(&report, &worksheet)),
+            Err(expected)
+        );
+    }
+}
+
+#[test]
 fn finalization_rejects_missing_or_replaced_proposal_binding() {
     let report = report();
     let worksheet = complete_worksheet();
