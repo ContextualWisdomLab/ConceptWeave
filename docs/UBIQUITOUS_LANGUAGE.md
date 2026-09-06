@@ -23,6 +23,7 @@
 | Reviewed Classification Change | Authorized complete replacement of one paper's collection and tag state, bound to its observed revision. |
 | Classification Write Plan | Local deterministic dry-run artifact containing exact preconditions and before/after/rollback metadata; not proof of execution. |
 | Classification Write Receipt | Secret-free, reviewed-plan-bound result that distinguishes dry-run, verified completion, preflight failure, and partial failure while retaining applied, failed, untouched, and safely reversible coordinates. |
+| Original Write Observation | Later unverified item state attached to the complete unresolved write receipt and exact submitted request; not proof of causal completion or recovery authority. |
 | Classification Rollback Operation | Reverse-ordered complete-state restoration bound to the post-write item revision returned by the Local API. |
 | Reviewed Duplicate Merge Set | Complete steward decisions selecting one consistent canonical item across every overlapping duplicate group in a snapshot. |
 | Authority Receipt | Opaque proof checked by the Governance & Publication boundary; it contains no reviewer identity or credential. |

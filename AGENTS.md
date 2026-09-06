@@ -21,6 +21,7 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - Full-text decisions use the separate blank-start worksheet and atomic exact-view application; reverify the capture/report relation through finalization and whole-envelope governance. No reviewed-set downcast grants Zotero write authority.
 - Offline full-text commands reuse the private-file boundary and pass completed-view bytes unchanged into atomic validation. Finalized files await external approval verification; no CLI command issues approval or writes Zotero.
 - Full-text writes require a complete typed review, explicit destinations and mode; finish both local validation paths before real authority verification. Keep scope bindings through opaque execution/recovery receipts. Unknown original writes cannot become empty successful rollbacks, and serialized audit files are not executable authority.
+- Delayed original-write observations retain the exact submitted request and complete earlier receipt; matching metadata does not prove causal completion or authorize retry/rollback.
 - Published semantic truth is immutable; correction uses supersession/new release.
 - Public Rust APIs require beginner-readable documentation.
 - Owned production coverage target is 100% line/function/region/branch where tooling exposes it.

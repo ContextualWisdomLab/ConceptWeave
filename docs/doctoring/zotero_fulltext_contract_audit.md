@@ -138,6 +138,12 @@ The subsequent [private command evidence](zotero_bound_review_commands_evidence.
 
 For restored owned review artifacts, unknown fields must fail instead of disappearing during deserialization. Serde documents that distinction and disallows combining its strict container attribute with flattening (Serde contributors, n.d.). JSON object-name duplication has inconsistent receiver behavior under RFC 8259; ConceptWeave rejects duplicate decoded keys recursively before comparing completed evidence views, rather than accepting last-key-wins projection (Bray, 2017, Section 4). These primary references support the input-contract choice, not semantic-label correctness. Context7's monthly quota was exhausted and DeepWiki did not index this repository during this follow-up; direct official documentation and current source/tests supplied the evidence.
 
+## Indeterminate original-write inspection (2026-09-06)
+
+The official Local API and write-request documentation, reread September 6, distinguish version preconditions from duplicate-prevention tokens. Tokens are optional for unversioned writes, duplicate successful tokens return a precondition failure, and versioned requests should omit the redundant token. Zotero 10's local cache is held in memory for up to 12 hours and disappears on restart (Zotero, 2026a, 2026c). These are documented semantics, not a live write/restart experiment. No authorization prompt or source mutation ran here.
+
+ConceptWeave therefore adds inspection rather than token replay. At `dcc36310394c68fca74251ae85fe72d942be32ba`, an indeterminate full-text write receipt retains the actual submitted request, including any library revision advanced by earlier successful writes. One later read returns unverified evidence attached to the unchanged original receipt. Matching metadata alone is insufficient evidence of causal completion or quiescence; this is a conservative design conclusion, not a claim that Zotero documents a durable reconciliation endpoint. Prior inverse work and untouched items stay attached, read failures omit errors, and unknown-write rollback remains denied. The [Proposed ADR](../adr/0007-reviewed-zotero-write-plan.md#original-write-observation-follow-up-2026-09-06-still-proposed) records alternatives, examples, costs and remaining durable/governance gaps. No private capture was read, paper decision added or approval verified.
+
 ## References
 
 Bray, T. (Ed.). (2017). *The JavaScript Object Notation (JSON) data interchange format* (RFC 8259, Section 4). Internet Engineering Task Force. https://www.rfc-editor.org/rfc/rfc8259#section-4
@@ -151,5 +157,7 @@ Serde contributors. (n.d.). *Implementing Serialize*. Serde. Retrieved September
 Zotero. (2026a, July 29). *Zotero local API*. https://www.zotero.org/support/dev/web_api/v3/local_api
 
 Zotero. (2026b, July 29). *Zotero Web API full-text content requests*. https://www.zotero.org/support/dev/web_api/v3/fulltext_content
+
+Zotero. (2026c, July 29). *Zotero Web API write requests*. https://www.zotero.org/support/dev/web_api/v3/write_requests
 
 Zotero. (n.d.). *Zotero* (Version 10.0.1, commit 36749bd0bd4fdac9ee46c16f7aa7bed094a0851f) [Computer software]. GitHub. https://github.com/zotero/zotero/tree/36749bd0bd4fdac9ee46c16f7aa7bed094a0851f

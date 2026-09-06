@@ -106,6 +106,14 @@ sequenceDiagram
                     opt destination authority accepted
                         Intake->>Report: opaque plan and versioned scope commitment
                         Note over Intake,Report: execution, rollback, retry and delayed rollback reconciliation retain this commitment
+                        opt original write remains indeterminate
+                            Intake->>Report: retain exact submitted request and complete unknown outcome
+                            Steward->>Intake: request read-only inspection using opaque receipt
+                            Intake->>Zotero: read retained item once; never resend change
+                            Zotero-->>Intake: later unverified state or read failure
+                            Intake->>Report: observation attached to unchanged original receipt
+                            Note over Intake,Report: matching values grant no completion, retry or rollback claim
+                        end
                     end
                 end
             end

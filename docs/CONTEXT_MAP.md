@@ -15,6 +15,7 @@ The Full-Text Review View is an in-context read projection over that verified ca
 ## External relationships
 
 - Zotero Local API -> research evidence intake: **Anti-Corruption Layer into Semantic Discovery**. Zotero remains the bibliographic system of record; ConceptWeave consumes a version-pinned snapshot and emits proposal evidence. Execute-mode metadata changes cross only a caller-owned authenticated adapter after complete preflight; ConceptWeave retains no API key and records verified item-level outcomes and rollback coordinates. Item metadata, attachments, collection/tag truth, and write authority remain in Zotero. No Zotero record becomes semantic authority without ConceptWeave validation/review/publication.
+  Delayed original-write inspection remains a read-only projection of this boundary, retaining the original unknown outcome and exact attempt rather than issuing recovery authority.
 - contextual-orchestrator -> Semantic Discovery: **Anti-Corruption Layer**. Model/provider envelopes never enter the domain model directly.
 - LineageWeave -> Source Observation: **Anti-Corruption Layer**. Inferred/proposed lineage remains explicitly non-authoritative until ConceptWeave governance evaluates it.
 - context-graph-contracts <-> Interoperability: **Shared Kernel only for versioned public contracts**, kept minimal.

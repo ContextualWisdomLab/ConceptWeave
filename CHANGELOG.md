@@ -6,6 +6,8 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
+- Unresolved changes can be inspected again without resending them or losing the original outcome. Later observations do not authorize retry or recovery.
+
 - Research inventory now distinguishes three additional statistical-library candidates from adopted integrations and reviewed papers, with source-bound limitations and follow-up requirements.
 
 - Full-text-reviewed changes can now carry separately verified destination and execution approval through the local write and recovery workflow. Unknown writes remain unresolved until their state is proven; no command issues approval or changes the live library.
