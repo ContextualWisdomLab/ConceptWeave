@@ -6,6 +6,14 @@ This file records code-current product and technical gaps. Exact PR/check/run co
 
 ## September 6 source inventory checkpoint
 
+### September 7 PR32 decision CLI continuity verification
+
+Original PR32 `1e711728d83efc1e60fc3d43ba0c67c467dd6a43` passed 161 tests/34 suites. Normal merge `b7cae29` retains it and PR31 `eaf248afd33dcac477daf1e3a31d79d47c5cbb69`; two synthetic patch constructors adopt required proposal identity, and integrated tests pass 210/34. The thin apply arm remains unchanged: private distinct inputs go to the canonical validator without binding backfill; output is serialized before create-new writing. No additional production defect or new RED is claimed.
+
+Test `d3a2c7a` extends actual binary execution: valid-patch nonoverwrite, missing/blank binding no-output rejection, stale patch against regenerated current worksheet rejection, and unchanged patch/worksheet bytes. Existing valid `0600` output and equal replay remain. Independent bounded review found no additional defect. Final source passes 210 tests/34 suites including three doctests, strict Clippy, warnings-denied rustdoc, formatting, CI contract and diff checks. Unchanged coverage passes 332/332 reported functions, 2,997/2,997 normalized regions and 548/548 normalized branches. Raw 4,060/4,122 lines, 6,228/6,335 regions and 503/548 branches are not 100%. Logs: `/tmp/conceptweave-pr32-{baseline,integrated,verified,clippy,rustdoc,coverage}.log`.
+
+README/TRD/Proposed ADR0006 distinguish current-content binding, no legacy backfill, pre-write rejection and possible retained partial files after write failure. Root/later consumers still require cascade adoption. Authentic decisions and independent approvals remain 0/3,715 plus four unresolved sources; synthetic unit data is not real research. Native Visual Inspection was retried, but the Mac is locked and no fresh screenshot exists. Keep Draft; no Zotero mutation, hosted GREEN, protected merge or release occurred.
+
 ### September 7 PR31 decision-patch content repair
 
 Original PR31 `61072a70f7ec5a1fbd0b477430aacb8e770aa109` passed 158 tests/33 suites. Normal merge `ef0ce43` retains it and PR30 `ee1ac9925c5287e9f10c2e9581b7cf513b170bd7`; integrated tests passed 204/33. RED `7208d80` compiled with three passing and two failing tests: an old patch applied after changed report context and fresh worksheet generation, and serialized patches without content binding loaded. The valid-first/unknown-later batch already preserved the original worksheet. `89bb941` adds required patch proposal identity and compares it before updates, reusing the existing digest. Missing fields fail loading, stale/blank identities cannot equal the recomputed expected identity, and no automatic backfill is permitted. Independent bounded review found no additional defect; atomic failure, same-label idempotency and conflicting-decision rejection remain.
