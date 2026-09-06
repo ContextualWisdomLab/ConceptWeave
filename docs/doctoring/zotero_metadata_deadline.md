@@ -1,10 +1,10 @@
 # Zotero metadata read deadline
 
-Status: owner repair and the complete forward chain locally verified; #9 through #38 normally pushed, #39 local only pending a fresh remote gate. Protected integration remains required. No actual library or paper artifact was read in this experiment.
+Status: owner repair and the complete forward chain locally verified; #9 and its 27 descendants through #38 normally pushed, #39 local only pending a fresh remote gate. Protected integration remains required. No actual library or paper artifact was read in this experiment.
 
 ## Finding and cause
 
-[PR #9's unresolved review](https://github.com/ContextualWisdomLab/ConceptWeave/pull/9#discussion_r3935157013) identified that one item per page can trigger up to 50,000 requests, each with a fresh timeout. Exact baseline `a2a84884f67dcac6f6892c958d55450aea6d6c88` has item/byte bounds but no total elapsed-time bound. The same body remains in later research descendants. The real call path is `read_local_snapshot` → `read_snapshot_with` → page transport → complete `classify_snapshot`; the CLI receives a report only after that function returns.
+[PR #9's unresolved review](https://github.com/ContextualWisdomLab/ConceptWeave/pull/9#discussion_r3935157013) identified that one item per page can trigger up to 50,000 requests, each with a fresh timeout. Exact baseline `a2a84884f67dcac6f6892c958d55450aea6d6c88` had item/byte bounds but no total elapsed-time bound. The later research descendants retained the same unbounded body before this repair. The real call path is `read_local_snapshot` → `read_snapshot_with` → page transport → complete `classify_snapshot`; the CLI receives a report only after that function returns.
 
 ## Decision and limits
 
@@ -21,7 +21,7 @@ The accepted report still includes the full observed denominator. No late/partia
 
 Reproduce with `cargo +1.98.0 test --workspace --locked` and `bash scripts/check_coverage.sh`. Logs are `/tmp/conceptweave-pr9-deadline-{baseline,red,green,coverage}-20260906.log`. The initial provider review references API pagination, which permits bounded pages; that does not supply an application-wide read deadline (Zotero, n.d.). The same TRD amendment removes the separately reviewed stale schema-42 requirement and states the implemented API-v3/present-stable-schema contract; no parser behavior changes for that documentation correction.
 
-Next: revalidate the final documentation head, normal-push #9 after a fresh writer/head/base check, merge its delta forward through every dependent research PR without reversing later features, and rerun each changed head's checks. Local success does not resolve protected approval, provider transport security or the other open findings. No predecessor may be closed to hide missing propagation.
+At this owner-only checkpoint, the required follow-up was final-head verification, a fresh writer/head/base check, normal #9 push and full forward propagation with per-head checks. The checkpoint below records the executed work and remaining remote gate. Local success does not resolve protected approval, provider transport security or other open findings. No predecessor may be closed to hide missing propagation.
 
 ## Forward integration checkpoint — September 6, 2026
 
