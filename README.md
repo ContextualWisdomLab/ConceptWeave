@@ -22,6 +22,14 @@ If file-permission setup fails, the command stops before writing report content.
 An empty file may remain; inspect it before removing it. The command does not
 delete a pathname that another process may have replaced.
 
+Create a small deterministic view of the next pending records for human review:
+
+```sh
+cargo +1.98.0 run --bin conceptweave-zotero -- --review-batch /tmp/report.json /tmp/current-worksheet.json 25 /tmp/review-batch.json
+```
+
+The batch repeats on unchanged input and is not a reservation or assignment. It contains sensitive bibliographic context, must remain owner-only, and becomes a decision patch only after a steward fills every `reviewed_disposition`.
+
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ContextualWisdomLab/ConceptWeave)
 
 **Automatic, evidence-bound ontology and semantic-layer engineering for governed enterprise meaning.**

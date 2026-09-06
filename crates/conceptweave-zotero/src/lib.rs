@@ -145,7 +145,7 @@ pub enum AbstentionReason {
 }
 
 /// Evidence for a deterministic proposed disposition.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ClassificationEvidence {
     /// Metadata fields whose values matched.
     pub fields: Vec<String>,
@@ -156,7 +156,7 @@ pub struct ClassificationEvidence {
 }
 
 /// A single top-level bibliographic classification proposal.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ClassifiedItem {
     /// Stable Zotero item key.
     pub item_key: String,
@@ -1189,16 +1189,73 @@ pub struct StewardDecisionPatch {
     pub decisions: Vec<StewardDecisionUpdate>,
 }
 
+/// Maximum number of sensitive records exposed in one local steward review batch.
+pub const MAX_REVIEW_BATCH_ITEMS: usize = 100;
+
+/// One pending decision with the report context required for human review.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct StewardReviewBatchDecision {
+    /// Stable Zotero item key used to apply the completed decision.
+    pub item_key: String,
+    /// Exact item revision reviewed by the steward.
+    pub item_version: u64,
+    /// Zotero item type retained for local review context.
+    pub item_type: String,
+    /// Human-readable title retained in this owner-only artifact.
+    pub title: String,
+    /// Minimal abstract context retained only for abstained proposals.
+    pub review_abstract_note: Option<String>,
+    /// Collection keys observed with the item.
+    pub collection_keys: Vec<String>,
+    /// Typed tags observed with the item.
+    pub tags: Vec<ItemTag>,
+    /// Deterministic proposal shown for comparison, never as approval.
+    pub proposed_disposition: Disposition,
+    /// Deterministic abstention reason when the proposal requires review.
+    pub abstention_reason: Option<AbstentionReason>,
+    /// Deterministic evidence retained from the exact report snapshot.
+    pub evidence: ClassificationEvidence,
+    /// Blank slot for the human steward to fill with non-abstention truth.
+    pub reviewed_disposition: Option<Disposition>,
+}
+
+/// Deterministic owner-only view of the next pending steward decisions.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct StewardReviewBatch {
+    /// Zotero library revision shared with the report and worksheet.
+    pub library_version: u64,
+    /// Classifier revision whose proposals are being reviewed.
+    pub rule_revision: String,
+    /// Canonical digest of the complete raw snapshot.
+    pub snapshot_digest: String,
+    /// Opaque identity retained unchanged when completed decisions become a patch.
+    pub proposal_digest: String,
+    /// Unresolved source records, separate from blank bibliographic decision slots.
+    pub pending_source_count: usize,
+    /// Pending decisions before this non-reserving view was created.
+    pub remaining_count: usize,
+    /// First pending decisions in canonical item-key order.
+    pub decisions: Vec<StewardReviewBatchDecision>,
+}
+
 /// A classification report cannot safely produce a review worksheet.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorksheetError {
     /// Report identity or coverage is incomplete, duplicated, or inconsistent.
     InvalidReport,
+    /// Requested review batch size is outside the supported local bound.
+    InvalidBatchLimit,
+    /// The canonical worksheet contains no blank decision.
+    NoPendingDecisions,
 }
 
 impl fmt::Display for WorksheetError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("classification report is invalid for steward review")
+        formatter.write_str(match self {
+            Self::InvalidReport => "classification report is invalid for steward review",
+            Self::InvalidBatchLimit => "review batch limit must be between 1 and 100",
+            Self::NoPendingDecisions => "steward worksheet has no pending decisions",
+        })
     }
 }
 
@@ -1220,6 +1277,17 @@ pub fn build_steward_review_worksheet(
     for item in &report.classified_items {
         if (item.proposed_disposition == Disposition::NeedsStewardReview)
             != item.abstention_reason.is_some()
+            || (item.proposed_disposition != Disposition::NeedsStewardReview
+                && item.review_abstract_note.is_some())
+            || item
+                .review_abstract_note
+                .as_ref()
+                .is_some_and(|review_abstract| {
+                    item.evidence
+                        .field_values
+                        .values()
+                        .any(|value| value == review_abstract)
+                })
         {
             return Err(WorksheetError::InvalidReport);
         }
@@ -1276,6 +1344,57 @@ pub fn assess_steward_review_progress(
         complete: total_count > 0
             && remaining_count == 0
             && report.pending_source_item_keys.is_empty(),
+    })
+}
+
+/// Builds a deterministic, non-reserving view of the next pending review decisions.
+pub fn build_steward_review_batch(
+    report: &ClassificationReport,
+    worksheet: &StewardReviewWorksheet,
+    limit: usize,
+) -> Result<StewardReviewBatch, WorksheetError> {
+    if !(1..=MAX_REVIEW_BATCH_ITEMS).contains(&limit) {
+        return Err(WorksheetError::InvalidBatchLimit);
+    }
+    let progress = assess_steward_review_progress(report, worksheet)?;
+    if progress.remaining_count == 0 {
+        return Err(WorksheetError::NoPendingDecisions);
+    }
+    let classified_by_key: BTreeMap<_, _> = report
+        .classified_items
+        .iter()
+        .map(|item| (item.item_key.as_str(), item))
+        .collect();
+    let decisions = worksheet
+        .decisions
+        .iter()
+        .filter(|decision| decision.reviewed_disposition.is_none())
+        .take(limit)
+        .map(|decision| {
+            let item = classified_by_key[decision.item_key.as_str()];
+            StewardReviewBatchDecision {
+                item_key: item.item_key.clone(),
+                item_version: item.item_version,
+                item_type: item.item_type.clone(),
+                title: item.title.clone(),
+                review_abstract_note: item.review_abstract_note.clone(),
+                collection_keys: item.collection_keys.clone(),
+                tags: item.tags.clone(),
+                proposed_disposition: item.proposed_disposition,
+                abstention_reason: item.abstention_reason,
+                evidence: item.evidence.clone(),
+                reviewed_disposition: None,
+            }
+        })
+        .collect();
+    Ok(StewardReviewBatch {
+        library_version: report.library_version,
+        rule_revision: report.rule_revision.clone(),
+        snapshot_digest: report.snapshot_digest.clone(),
+        proposal_digest: progress.proposal_digest,
+        pending_source_count: progress.pending_source_count,
+        remaining_count: progress.remaining_count,
+        decisions,
     })
 }
 

@@ -6,6 +6,14 @@ This file records code-current product and technical gaps. Exact PR/check/run co
 
 ## September 6 source inventory checkpoint
 
+### September 7 PR33 batch scope repair
+
+Original PR33 `d82b2f2896bc4cfef5d34ac6f6f83f7cee1072f6` passed 166 tests/36 suites. Normal merge `2f3962e` retains it and PR32 `ea25437c54b4e452f008f6b1ccad92d5516dd7b9`, preserving original abstract minimization guards with the shared validator. The existing batch-to-patch test failed for missing proposal identity. Explicit RED `7373579` compiled with one passing and two failing tests for patch compatibility and pending-source projection. `ce15389` passes existing validated progress identity and pending count into the batch, without new hashing or authority. No blank slots means exhausted paper decisions, not resolved source scope. Independent bounded review found no added defect.
+
+Full verification then exposed an inherited stale-review fixture assigning review-only context to a non-abstained proposal; the retained privacy gate correctly returned InvalidReview earlier. Test-only `acbaf1d` mutates the actual abstained item instead, retaining structurally valid changed-content rejection as SnapshotMismatch. Final source passes 216 tests/36 suites including three doctests, strict Clippy, warnings-denied rustdoc, formatting, CI contract and diff checks. Unchanged coverage passes 340/340 reported functions, 3,120/3,120 normalized regions and 568/568 normalized branches. Raw 4,204/4,266 lines, 6,425/6,532 regions and 523/568 branches are not 100%. Logs: `/tmp/conceptweave-pr33-{baseline,integrated,binding-red,verified,final,clippy-final,rustdoc-final,coverage-final}.log`; `verified` is the failed intermediate run, not final GREEN.
+
+PRD/TRD/Proposed ADR0006 distinguish sensitive batch views, exact metadata identity, pending counts and no reservation/approval. PR34 owns completed-view context validation; plain patch compatibility does not prove displayed content integrity or full-text review. Root/later consumers remain unadopted. Actual decisions and independent approvals remain 0/3,715 plus four unresolved standalone sources. Native Visual Inspection was retried but the Mac is locked; no new screenshot, Zotero write, hosted GREEN, protected merge or release is claimed. Keep Draft.
+
 ### September 7 PR32 decision CLI continuity verification
 
 Original PR32 `1e711728d83efc1e60fc3d43ba0c67c467dd6a43` passed 161 tests/34 suites. Normal merge `b7cae29` retains it and PR31 `eaf248afd33dcac477daf1e3a31d79d47c5cbb69`; two synthetic patch constructors adopt required proposal identity, and integrated tests pass 210/34. The thin apply arm remains unchanged: private distinct inputs go to the canonical validator without binding backfill; output is serialized before create-new writing. No additional production defect or new RED is claimed.
