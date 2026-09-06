@@ -217,7 +217,7 @@ fn rollback_is_one_shot_and_second_execution_fails_before_write() {
 #[test]
 fn rollback_reconciles_failed_write_without_guessing() {
     for (current, expected_outcome) in [
-        ("restored", (vec![], Some("B"))),
+        ("restored", (Vec::<String>::new(), Some("B"))),
         ("unchanged", (vec![], Some("B"))),
         ("indeterminate", (vec![], Some("B"))),
     ] {
