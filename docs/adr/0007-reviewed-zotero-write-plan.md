@@ -18,6 +18,8 @@ ConceptWeave builds a local-only `ClassificationWritePlan` from an externally ve
 
 Execute planning fails closed for Zotero versions below 10. The plan contains no API key and performs no network call. Dry-run enumerates every operation as not attempted. The execution core accepts caller-owned preflight and write functions, preflights the complete plan before the first mutation, and verifies server, library, item revision, collection, and typed-tag responses. After a failed or invalid response, a follow-up read is observation only: matching before-state cannot prove a delayed request terminated, and matching after-state or a newer revision cannot prove which writer caused it. The receipt keeps the exact submitted request and optional observation, always names that item as indeterminate, and creates no inverse for that unconfirmed write. Earlier directly verified applied items and their inverse coordinates remain intact. The API key remains adapter-owned. Cross-item transactionality is not claimed, and source records and attachments are never deleted.
 
+The authenticated Zotero 10+ adapter is a narrow loopback transport for those injected functions. It holds caller-supplied credentials in a non-debuggable, non-serializable value, validates official object keys, disables redirects, bounds response reads, sends the server identity on reads and writes, and sends the API key only on writes. Item reads are bracketed by library-wide version reads so the returned object and library coordinates describe one stable boundary. A one-item collection POST carries the reviewed library version in `If-Unmodified-Since-Version` and the reviewed item version in its body, replaces complete collection and typed-tag arrays, and accepts only a bounded success response that proves the exact resulting state and advanced version. Static error categories cannot echo a credential, response body, or URL. Cross-item transactionality is not claimed, and source records and attachments are never deleted.
+
 ## Consequences
 
 ### Source-scope amendment (2026-09-06, Proposed)
@@ -48,11 +50,18 @@ adopt the required field without deriving fresh authority from serialized plans.
 
 - Review and rollback semantics can be tested on Zotero 9 without changing the library.
 - Exact before-state checks prevent silent loss of unrelated collections or automatic-tag metadata.
-- AC5 is implemented and AC6 now has deterministic preflight, partial-failure, and rollback-receipt semantics. AC6 remains incomplete until an authenticated Zotero 10+ adapter and approved live write/rollback are verified.
+- AC5 is implemented. AC6 now has deterministic preflight, partial-failure, rollback-receipt, and synthetic authenticated transport evidence. AC6 remains incomplete until approved live Zotero 10 write, partial-failure, and rollback behavior is verified.
 
 ## Alternatives considered
 
 ### Execution evidence correction (2026-09-06, Proposed)
+
+PR #17 integration preserves the transport implementation while inheriting the
+original-owner fix. Test `97cce5a`, strengthened by `29a3771`, composes authenticated
+HTTP with the executor and verifies failed POST plus a fully matching observed
+state remains unknown. Complete request/observation, proposal binding, single POST
+and no inferred inverse are asserted. No new runtime, retry policy or authority
+issuer is introduced; synthetic transport evidence does not prove live recovery.
 
 In the context of uncertain write responses, facing concurrent edits and delayed
 requests that can produce indistinguishable observations, we decided for preserving
@@ -75,4 +84,4 @@ list of previously verified inverse operations is empty.
 
 - Writing through Zotero 9 was rejected because the provider does not support it.
 - Storing only collection/tag deltas was rejected because Zotero array updates are complete replacements and cannot prove lossless rollback.
-- Adding the HTTP writer now was rejected because no Zotero 10+ runtime or approved local key is available for end-to-end verification.
+- Treating mock transport coverage as live proof was rejected because no approved Zotero 10 runtime/key write and rollback exercise has been performed.
