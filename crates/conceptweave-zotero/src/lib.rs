@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::io::Read;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Classification rule revision recorded in every report.
 pub const RULE_REVISION: &str = "ontology-research-v2";
@@ -328,6 +328,14 @@ fn optional_header(headers: &ureq::http::HeaderMap, name: &'static str) -> Optio
 
 fn read_snapshot_with(
     fetch_page: &mut dyn FnMut(usize) -> Result<FetchedPage, ReadError>,
+) -> Result<ClassificationReport, ReadError> {
+    let started = Instant::now();
+    read_snapshot_with_clock(fetch_page, &mut || started.elapsed())
+}
+
+fn read_snapshot_with_clock(
+    fetch_page: &mut dyn FnMut(usize) -> Result<FetchedPage, ReadError>,
+    _elapsed: &mut dyn FnMut() -> Duration,
 ) -> Result<ClassificationReport, ReadError> {
     let mut items = Vec::new();
     let mut snapshot_bytes = 0_u64;
@@ -789,6 +797,76 @@ mod tests {
         assert_eq!(report.library_version, 42);
         assert_eq!(report.classified_items.len(), 1);
         assert_eq!(local_api_base(), LOCAL_API);
+    }
+
+    #[test]
+    fn reader_deadline_rejects_slow_drip_without_another_request() {
+        let elapsed = std::cell::Cell::new(Duration::ZERO);
+        let mut starts = Vec::new();
+        let result = read_snapshot_with_clock(
+            &mut |start| {
+                starts.push(start);
+                elapsed.set(elapsed.get() + Duration::from_secs(50));
+                Ok(fetched_page(
+                    7,
+                    vec![item(&format!("P{start}"), "book", "semantic web", "", "")],
+                ))
+            },
+            &mut || elapsed.get(),
+        );
+        assert!(matches!(result, Err(ReadError::Budget("elapsed-time"))));
+        assert_eq!(starts, vec![0, 1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn reader_deadline_rejects_expired_admission_page_and_report() {
+        // Expired before first I/O, after a page, before next I/O, and after
+        // classifying the final page; no partial or late report may escape.
+        for (ticks, total, expected_calls) in [
+            (vec![300], 1, 0),
+            (vec![0, 301], 1, 1),
+            (vec![0, 0, 300], 2, 1),
+            (vec![0, 0, 300], 1, 1),
+            (vec![0, 300], 0, 1),
+        ] {
+            let mut ticks = ticks.into_iter();
+            let mut calls = 0;
+            let result = read_snapshot_with_clock(
+                &mut |start| {
+                    calls += 1;
+                    let items = if total == 0 {
+                        vec![]
+                    } else {
+                        vec![item(&format!("P{start}"), "book", "x", "", "")]
+                    };
+                    Ok(fetched_page(total, items))
+                },
+                &mut || Duration::from_secs(ticks.next().unwrap()),
+            );
+            assert!(matches!(result, Err(ReadError::Budget("elapsed-time"))));
+            assert_eq!(calls, expected_calls);
+        }
+    }
+
+    #[test]
+    fn reader_deadline_accepts_complete_short_pages_before_limit() {
+        for total in [0, 2] {
+            let report = read_snapshot_with_clock(
+                &mut |start| {
+                    let items = if total == 0 {
+                        vec![]
+                    } else {
+                        vec![item(&format!("P{start}"), "book", "semantic web", "", "")]
+                    };
+                    Ok(fetched_page(total, items))
+                },
+                &mut || Duration::from_secs(300) - Duration::from_nanos(1),
+            )
+            .unwrap();
+            assert_eq!(report.observed_item_count, total);
+            assert_eq!(report.classified_items.len(), total);
+            assert_eq!(report.library_version, 42);
+        }
     }
 
     #[test]
