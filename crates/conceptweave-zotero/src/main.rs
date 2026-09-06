@@ -36,6 +36,21 @@ where
     Ok(request)
 }
 
+fn validate_output_request(
+    report_output: Option<&str>,
+    output: &str,
+) -> io::Result<(Option<PathBuf>, PathBuf)> {
+    let output = validate_output_path(output)?;
+    let report_output = report_output.map(validate_output_path).transpose()?;
+    if report_output.as_ref() == Some(&output) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "report and worksheet output paths must differ",
+        ));
+    }
+    Ok((report_output, output))
+}
+
 fn write_private_output(path: &Path, content: &[u8]) -> io::Result<()> {
     write_private_output_with(path, content, write_all_and_flush)
 }
@@ -53,12 +68,10 @@ fn write_private_output_with(
 ) -> io::Result<()> {
     let file = create_report_file(path)?;
     let mut writer = BufWriter::new(file);
-    if let Err(error) = write(&mut writer, content) {
-        drop(writer);
-        let _ = fs::remove_file(path);
-        return Err(error);
-    }
-    Ok(())
+    let result = write(&mut writer, content);
+    // Never retry buffered writes on drop or unlink a possibly replaced pathname.
+    let _ = writer.into_parts();
+    result
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -95,13 +108,20 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
             "report output must be a direct child of the system temp directory",
         ));
     }
-    if fs::symlink_metadata(&path).is_ok() {
+    let file_name = path.file_name().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "report output has no file name",
+        )
+    })?;
+    let validated_path = resolved_parent.join(file_name);
+    if fs::symlink_metadata(&validated_path).is_ok() {
         return Err(io::Error::new(
             io::ErrorKind::AlreadyExists,
             "report output must not already exist or be a symlink",
         ));
     }
-    Ok(path)
+    Ok(validated_path)
 }
 
 /// Creates a new sensitive report file or fails closed on unsupported platforms.
@@ -127,7 +147,7 @@ fn set_owner_only_permissions(file: &File) -> io::Result<()> {
 }
 
 #[cfg(unix)]
-/// Creates a private file and removes it if final permission enforcement fails.
+/// Creates a private file; failure leaves an empty file rather than unlinking a raced path.
 fn create_report_file_with(
     path: &Path,
     set_permissions: fn(&File) -> io::Result<()>,
@@ -137,11 +157,7 @@ fn create_report_file_with(
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     let file = options.mode(0o600).open(path)?;
-    if let Err(error) = set_permissions(&file) {
-        drop(file);
-        let _ = fs::remove_file(path);
-        return Err(error);
-    }
+    set_permissions(&file)?;
     Ok(file)
 }
 
@@ -149,11 +165,7 @@ fn create_report_file_with(
 /// Reads one Zotero snapshot and writes its sensitive local proposal report.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (report_output, output) = parse_output_request(env::args().skip(1))?;
-    let output = validate_output_path(&output)?;
-    let report_output = report_output
-        .as_deref()
-        .map(validate_output_path)
-        .transpose()?;
+    let (report_output, output) = validate_output_request(report_output.as_deref(), &output)?;
     let report = read_local_snapshot()?;
     if report.zotero_version.starts_with("9.") {
         eprintln!("Zotero 9 Local API is read-only; writing local proposal output only");
@@ -163,10 +175,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let report_content = serde_json::to_vec_pretty(&report)?;
         let worksheet_content = serde_json::to_vec_pretty(&worksheet)?;
         write_private_output(&report_output, &report_content)?;
-        if let Err(error) = write_private_output(&output, &worksheet_content) {
-            let _ = fs::remove_file(report_output);
-            return Err(error.into());
-        }
+        write_private_output(&output, &worksheet_content)?;
     } else {
         write_private_output(&output, &serde_json::to_vec_pretty(&report)?)?;
     }
@@ -197,7 +206,78 @@ mod tests {
     }
 
     #[test]
-    fn failed_private_output_is_removed_for_retry() {
+    fn canonical_output_aliases_are_rejected_without_creating_files() {
+        let output =
+            Path::new("/tmp").join(format!("conceptweave-alias-{}.json", std::process::id()));
+        let canonical = output
+            .parent()
+            .unwrap()
+            .canonicalize()
+            .unwrap()
+            .join(output.file_name().unwrap());
+        let result =
+            validate_output_request(Some(output.to_str().unwrap()), canonical.to_str().unwrap());
+        assert!(!output.exists());
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidInput);
+        let other = unique_temp_path("other-output");
+        assert!(
+            validate_output_request(Some(output.to_str().unwrap()), other.to_str().unwrap())
+                .is_ok()
+        );
+        assert!(validate_output_request(None, output.to_str().unwrap()).is_ok());
+        assert!(validate_output_request(None, "relative-output").is_err());
+        assert!(
+            validate_output_request(Some("relative-report"), output.to_str().unwrap()).is_err()
+        );
+    }
+
+    #[test]
+    fn write_failure_preserves_replacement_at_output_path() {
+        let output = unique_temp_path("write-race");
+        let retained = unique_temp_path("write-race-retained");
+        assert!(!output.exists());
+        assert!(!retained.exists());
+        let error = write_private_output_with(&output, b"content", |_, _| {
+            let output = unique_temp_path("write-race");
+            fs::rename(&output, unique_temp_path("write-race-retained"))?;
+            let mut replacement = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(output)?;
+            replacement.write_all(b"unrelated replacement")?;
+            Err(io::Error::new(io::ErrorKind::WriteZero, "injected failure"))
+        })
+        .unwrap_err();
+        let replacement = fs::read(&output);
+        let _ = fs::remove_file(output);
+        fs::remove_file(retained).unwrap();
+        assert_eq!(error.kind(), io::ErrorKind::WriteZero);
+        assert_eq!(replacement.unwrap(), b"unrelated replacement");
+    }
+
+    #[test]
+    fn write_failure_does_not_retry_buffered_bytes_on_drop() {
+        let output = unique_temp_path("write-buffer");
+        let retained = unique_temp_path("write-buffer-retained");
+        assert!(!output.exists());
+        assert!(!retained.exists());
+        let error = write_private_output_with(&output, b"buffered content", |writer, content| {
+            fs::rename(
+                unique_temp_path("write-buffer"),
+                unique_temp_path("write-buffer-retained"),
+            )?;
+            writer.write_all(content)?;
+            Err(io::Error::new(io::ErrorKind::WriteZero, "injected failure"))
+        })
+        .unwrap_err();
+        let retained_bytes = fs::read(&retained).unwrap();
+        fs::remove_file(retained).unwrap();
+        assert_eq!(error.kind(), io::ErrorKind::WriteZero);
+        assert!(retained_bytes.is_empty());
+    }
+
+    #[test]
+    fn failed_private_output_is_preserved_and_requires_a_new_path() {
         let output = unique_temp_path("failed-output");
         let _ = fs::remove_file(&output);
         let error = write_private_output_with(&output, b"content", |_, _| {
@@ -208,7 +288,9 @@ mod tests {
         })
         .unwrap_err();
         assert_eq!(error.kind(), io::ErrorKind::WriteZero);
-        assert!(!output.exists());
+        assert_eq!(fs::metadata(&output).unwrap().len(), 0);
+        assert!(write_private_output(&output, b"retry").is_err());
+        fs::remove_file(&output).unwrap();
 
         write_private_output(&output, b"complete").unwrap();
         assert_eq!(fs::read(&output).unwrap(), b"complete");
@@ -230,10 +312,19 @@ mod tests {
         assert_eq!(
             validate_output_path(allowed.to_str().unwrap()).unwrap(),
             allowed
+                .parent()
+                .unwrap()
+                .canonicalize()
+                .unwrap()
+                .join(allowed.file_name().unwrap())
         );
 
         assert!(validate_output_path("relative.json").is_err());
         assert!(validate_output_path("/").is_err());
+        let missing_name =
+            validate_output_path(env::temp_dir().join("..").to_str().unwrap()).unwrap_err();
+        assert_eq!(missing_name.kind(), io::ErrorKind::InvalidInput);
+        assert_eq!(missing_name.to_string(), "report output has no file name");
         assert!(validate_output_path("/tmp/missing-directory/report.json").is_err());
         assert!(
             validate_output_path(
@@ -316,6 +407,59 @@ mod tests {
         })
         .unwrap_err();
         assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
-        assert!(!rejected.exists());
+        assert_eq!(fs::metadata(&rejected).unwrap().len(), 0);
+        fs::remove_file(rejected).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn permission_failure_preserves_a_replacement_at_the_output_path() {
+        use std::os::unix::fs::PermissionsExt;
+        let output = unique_temp_path("permission-replaced");
+        let retained = unique_temp_path("permission-original");
+        assert!(!output.exists());
+        assert!(!retained.exists());
+        let error = create_report_file_with(&output, |file| {
+            assert_eq!(file.metadata()?.permissions().mode() & 0o077, 0);
+            fs::rename(
+                unique_temp_path("permission-replaced"),
+                unique_temp_path("permission-original"),
+            )?;
+            let mut replacement = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(unique_temp_path("permission-replaced"))?;
+            replacement.write_all(b"unrelated replacement")?;
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "injected failure",
+            ))
+        })
+        .unwrap_err();
+        let preserved = fs::read(&output).ok();
+        let _ = fs::remove_file(&output);
+        fs::remove_file(retained).unwrap();
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(
+            preserved.as_deref(),
+            Some(b"unrelated replacement".as_slice())
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn report_output_returns_the_checked_canonical_parent() {
+        let output = Path::new("/tmp").join(format!(
+            "conceptweave-zotero-{}-canonical.json",
+            std::process::id()
+        ));
+        let expected = Path::new("/tmp")
+            .canonicalize()
+            .unwrap()
+            .join(output.file_name().unwrap());
+        assert_eq!(
+            validate_output_path(output.to_str().unwrap()).unwrap(),
+            expected
+        );
     }
 }
