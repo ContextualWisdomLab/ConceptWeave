@@ -16,6 +16,7 @@ All source artifacts, generated candidate payloads, external ontology files, mod
 - positive caller-selected metadata/runtime limits are structurally bounded requests, not effective policy; wider-than-policy schema-count/schema-byte/operation/statement/row/byte/concurrency ceilings fail before adapter/source/snapshot side effects;
 - schema and resource policy are evaluated against the same immutable `ResolvedSourceConnection`; stale key-to-binding mappings must fail before credential/source access;
 - one monotonic operation budget begins before local registry source/binding/schema/resource policy and continues through adapter connection/transaction/statements/cancellation; adapters receive only the remaining duration and may not restart the original timeout;
+- `AuthorizedObservationRequest` is a single-use operation capability: it is not cloneable, `SourceObservationPort::observe` consumes it, and cancellation/failure/completion requires fresh authorization before any retry so one grant cannot amplify row/byte/concurrency/source-access budgets through replay;
 - the synchronous source registry is bounded local policy only; remote credential or network resolution belongs after authorization in the adapter ACL;
 - prompt-injection text is source data, never tool or policy instruction;
 - LLM calls only through `contextual-orchestrator` with minimum necessary context;
@@ -42,11 +43,12 @@ All source artifacts, generated candidate payloads, external ontology files, mod
 8. external-source SSRF or credential leakage;
 9. caller-selected authorization metadata attempting pre-policy memory/resource exhaustion or caller-self-authorized schema/resource ceilings reaching a broadly privileged source credential;
 10. mutable source-key retargeting that reuses an old authorization for a different physical/policy source;
-11. model/provider compromise or unexpected retention;
-12. governance bypass from Proposed/Validated directly to Published;
-13. in-place mutation or overwrite of previously published semantic truth;
-14. consumer use of an incompatible, unpublished, non-authoritative, stale, or superseded release;
-15. false integrity claims caused by checking digest syntax without hashing the exact detached artifact bytes;
-16. manifest/artifact scope confusion that validates bytes other than the semantic artifact named by the release digest.
+11. replay of one authorized Source Observation capability to multiply policy-admitted source access or resource consumption;
+12. model/provider compromise or unexpected retention;
+13. governance bypass from Proposed/Validated directly to Published;
+14. in-place mutation or overwrite of previously published semantic truth;
+15. consumer use of an incompatible, unpublished, non-authoritative, stale, or superseded release;
+16. false integrity claims caused by checking digest syntax without hashing the exact detached artifact bytes;
+17. manifest/artifact scope confusion that validates bytes other than the semantic artifact named by the release digest.
 
 Security findings become tests before the related runtime capability can be marked release-ready.
