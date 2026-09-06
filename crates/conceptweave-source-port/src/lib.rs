@@ -15,6 +15,10 @@ use std::{
 
 const MAX_SOURCE_CONNECTION_KEY_BYTES: usize = 128;
 const MAX_CONNECTION_POLICY_BINDING_BYTES: usize = 128;
+/// Canonical product-level maximum number of exact schema identifiers retained before trusted source policy runs.
+pub const MAX_STRUCTURAL_SCHEMA_COUNT: usize = 4_096;
+/// Canonical product-level maximum UTF-8 bytes retained across exact schema identifiers before trusted source policy runs.
+pub const MAX_STRUCTURAL_SCHEMA_BYTES: usize = 1_048_576;
 
 /// Invalid zero-valued resource bounds for one source-observation request.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -132,21 +136,32 @@ impl ObservationLimits {
     }
 }
 
-/// Invalid zero-valued authorization-metadata bounds for one observation request.
+/// Invalid authorization-metadata bounds for one observation request.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ObservationRequestBudgetError {
     /// The maximum number of authorized schema identifiers was zero.
     ZeroSchemaCountLimit,
     /// The maximum retained UTF-8 bytes across authorized schema identifiers was zero.
     ZeroSchemaByteLimit,
+    /// The caller requested a schema-count structural ceiling above ConceptWeave's provider-independent hard cap.
+    SchemaCountLimitTooLarge {
+        /// Maximum structural schema-count ceiling accepted before trusted source policy runs.
+        maximum: usize,
+    },
+    /// The caller requested a schema-byte structural ceiling above ConceptWeave's provider-independent hard cap.
+    SchemaByteLimitTooLarge {
+        /// Maximum structural schema-byte ceiling accepted before trusted source policy runs.
+        maximum: usize,
+    },
 }
 
 /// Caller-selected positive bounds for authorization metadata retained by an observation request.
 ///
 /// These bounds are intentionally provider-independent. They limit how much exact schema-selection
 /// metadata ConceptWeave accepts before registry or database access without assuming PostgreSQL's
-/// build-time identifier length or normalizing source spelling. Positive values are only requested
-/// ceilings; trusted local policy must still admit them.
+/// build-time identifier length or normalizing source spelling. Callers may request only values at
+/// or below [`MAX_STRUCTURAL_SCHEMA_COUNT`] and [`MAX_STRUCTURAL_SCHEMA_BYTES`]; trusted local source
+/// policy must still admit an equal-or-narrower complete resource envelope afterward.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ObservationRequestBudget {
     max_schema_count: usize,
@@ -155,6 +170,10 @@ pub struct ObservationRequestBudget {
 
 impl ObservationRequestBudget {
     /// Creates explicit positive count and total UTF-8 byte bounds for the exact schema allowlist.
+    ///
+    /// The canonical structural caps are product-level denial-of-service guardrails, not PostgreSQL
+    /// identifier semantics or source-specific authorization. They prevent callers from minting an
+    /// effectively unbounded retained-metadata envelope before trusted registry policy can run.
     pub const fn new(
         max_schema_count: usize,
         max_schema_bytes: usize,
@@ -164,6 +183,16 @@ impl ObservationRequestBudget {
         }
         if max_schema_bytes == 0 {
             return Err(ObservationRequestBudgetError::ZeroSchemaByteLimit);
+        }
+        if max_schema_count > MAX_STRUCTURAL_SCHEMA_COUNT {
+            return Err(ObservationRequestBudgetError::SchemaCountLimitTooLarge {
+                maximum: MAX_STRUCTURAL_SCHEMA_COUNT,
+            });
+        }
+        if max_schema_bytes > MAX_STRUCTURAL_SCHEMA_BYTES {
+            return Err(ObservationRequestBudgetError::SchemaByteLimitTooLarge {
+                maximum: MAX_STRUCTURAL_SCHEMA_BYTES,
+            });
         }
         Ok(Self {
             max_schema_count,
