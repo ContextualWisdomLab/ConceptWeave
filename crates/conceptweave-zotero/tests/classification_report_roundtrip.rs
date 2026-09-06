@@ -74,7 +74,7 @@ fn owner_only_report_roundtrip_preserves_the_review_workload() {
         }
         let changed_report: ClassificationReport = serde_json::from_value(changed_json).unwrap();
         assert_eq!(changed_report.snapshot_digest, original.snapshot_digest);
-        assert_eq!(
+        assert_ne!(
             build_steward_review_worksheet(&changed_report).unwrap(),
             build_steward_review_worksheet(&original).unwrap()
         );
@@ -99,6 +99,64 @@ fn owner_only_report_roundtrip_preserves_the_review_workload() {
             Err(EvaluationError::SnapshotMismatch)
         );
         assert_eq!(verifier_calls.get(), 0);
+    }
+}
+
+#[test]
+fn shared_report_validation_binds_every_retained_parent_coordinate() {
+    for parent_key in ["A", "missing", "source", ""] {
+        let items = [("A", "book", ""), ("source", "attachment", parent_key)]
+            .into_iter()
+            .map(|(key, item_type, parent)| {
+                serde_json::from_value::<ZoteroItem>(serde_json::json!({
+                    "key": key, "version": 1,
+                    "data": {"itemType": item_type, "parentItem": parent, "title": "synthetic"}
+                }))
+                .unwrap()
+            })
+            .collect();
+        let mut report = classify_snapshot("9.0.6".into(), None, 42, items);
+        assert!(conceptweave_zotero::validate_classification_report(&report).is_ok());
+        report
+            .snapshot_items
+            .iter_mut()
+            .find(|item| item.item_key == "source")
+            .unwrap()
+            .parent_item_key = Some("different-parent".into());
+        assert_eq!(
+            conceptweave_zotero::validate_classification_report(&report),
+            Err(EvaluationError::InvalidReview)
+        );
+    }
+}
+
+#[test]
+fn pending_metadata_roundtrip_preserves_review_identity_not_raw_capture() {
+    for parent_key in ["missing", "source", ""] {
+        let item: ZoteroItem = serde_json::from_value(serde_json::json!({
+            "key": "source", "version": 1, "unknown_provider_field": "raw-only-sentinel",
+            "data": {"itemType": "attachment", "parentItem": parent_key, "title": "synthetic"}
+        }))
+        .unwrap();
+        let original = classify_snapshot("9.0.6".into(), None, 42, vec![item]);
+        let bytes = serde_json::to_vec(&original).unwrap();
+        assert!(
+            !String::from_utf8(bytes.clone())
+                .unwrap()
+                .contains("raw-only-sentinel")
+        );
+        let restored: ClassificationReport = serde_json::from_slice(&bytes).unwrap();
+        let restored_again: ClassificationReport =
+            serde_json::from_slice(&serde_json::to_vec(&restored).unwrap()).unwrap();
+        assert_eq!(serde_json::to_vec(&restored_again).unwrap(), bytes);
+        assert_eq!(
+            classification_proposal_digest(&original),
+            classification_proposal_digest(&restored_again)
+        );
+        assert_eq!(
+            build_steward_review_worksheet(&original).unwrap(),
+            build_steward_review_worksheet(&restored_again).unwrap()
+        );
     }
 }
 
