@@ -863,7 +863,7 @@ pub struct ClassificationWriteRequest {
     pub tags: Vec<ItemTag>,
 }
 
-/// A conditional inverse write created only after a verified successful write.
+/// Mutable inverse-write audit data; this value alone does not prove authority.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ClassificationRollbackOperation {
     /// Local API server identity that produced the state to undo.
@@ -1880,7 +1880,7 @@ pub fn execute_classification_write_plan_with_zotero10(
     )
 }
 
-/// Executes verified inverse operations in their existing safe receipt order.
+/// Executes caller-validated inverse operations; this primitive grants no authority.
 pub fn execute_classification_rollback<PreflightError, WriteError>(
     operations: &[ClassificationRollbackOperation],
     mut preflight: impl FnMut(&str) -> Result<ClassificationItemState, PreflightError>,
@@ -1959,7 +1959,7 @@ pub fn execute_classification_rollback<PreflightError, WriteError>(
     }
 }
 
-/// Executes rollback evidence through one server-bound Zotero 10 adapter.
+/// Executes caller-validated inverses through an adapter, without issuing approval.
 pub fn execute_classification_rollback_with_zotero10(
     operations: &[ClassificationRollbackOperation],
     adapter: &Zotero10LocalAdapter,
