@@ -101,7 +101,7 @@ impl ObservationLimits {
         self.operation_timeout_ms
     }
 
-    /// Returns the maximum time one PostgreSQL statement may execute, in milliseconds.
+    /// Returns the maximum time one source statement may execute, in milliseconds.
     #[must_use]
     pub const fn statement_timeout_ms(&self) -> u64 {
         self.statement_timeout_ms
@@ -184,6 +184,10 @@ pub enum ObservationRequestError {
     InvalidSourceConnectionKey,
     /// The syntactically valid key was absent from the caller's authorized source registry.
     UnknownSourceConnectionKey,
+    /// The known source did not expose an immutable connection-policy binding.
+    MissingConnectionPolicyBinding,
+    /// The registry returned a blank connection-policy binding that cannot identify a policy revision.
+    InvalidConnectionPolicyBinding,
     /// The source existed, but the registry did not authorize the exact requested schema scope.
     UnauthorizedSchemaScope,
     /// Registry authorization exhausted the request's end-to-end operation budget.
@@ -210,30 +214,46 @@ pub enum ObservationRequestError {
 }
 
 /// Read-only registry boundary used to authorize an opaque source connection and exact schema scope.
+///
+/// A source key is only a lookup coordinate. A successful registry implementation must also issue
+/// an opaque immutable connection-policy binding for the exact mapping it authorizes. Schema scope
+/// is then evaluated against that resolved key-and-binding pair, preventing a later key remap from
+/// silently inheriting an earlier authorization.
 pub trait SourceConnectionRegistry {
     /// Returns whether the exact key names a source the caller may observe.
     fn contains_source_connection(&self, source_connection_key: &str) -> bool;
 
-    /// Returns whether the exact requested schema scope is authorized for the exact source key.
+    /// Returns the opaque immutable policy revision for the exact registered source mapping.
+    ///
+    /// The default is fail-closed. The value is provider-independent evidence, not a DSN,
+    /// credential, token, connection object, or wall-clock timestamp.
+    fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
+        let _ = source_connection_key;
+        None
+    }
+
+    /// Returns whether the exact requested schema scope is authorized for the resolved source binding.
     ///
     /// The default is fail-closed so a registry that only recognizes a source key cannot silently
     /// turn caller-selected schema names into application authorization. Implementations that grant
-    /// schema access must do so explicitly and must preserve exact identifier spelling rather than
-    /// broadening access through case or Unicode normalization.
+    /// schema access must compare the supplied binding with the same policy revision that owns the
+    /// scope and must preserve exact identifier spelling rather than broadening access through case
+    /// or Unicode normalization.
     fn authorizes_schema_scope(
         &self,
-        source_connection_key: &str,
+        source_connection: &ResolvedSourceConnection,
         allowed_schema_names: &[String],
     ) -> bool {
-        let _ = (source_connection_key, allowed_schema_names);
+        let _ = (source_connection, allowed_schema_names);
         false
     }
 }
 
-/// Opaque proof that a source key was resolved by an authorized registry boundary.
+/// Opaque proof that an exact source key and immutable policy revision were resolved together.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ResolvedSourceConnection {
     source_connection_key: String,
+    connection_policy_binding: String,
 }
 
 impl ResolvedSourceConnection {
@@ -242,18 +262,24 @@ impl ResolvedSourceConnection {
     pub fn source_connection_key(&self) -> &str {
         &self.source_connection_key
     }
+
+    /// Returns the opaque immutable connection-policy revision authorized for this source.
+    #[must_use]
+    pub fn connection_policy_binding(&self) -> &str {
+        &self.connection_policy_binding
+    }
 }
 
 /// One fail-closed request to observe explicitly authorized source schemas.
 ///
 /// `source_connection_key` is a bounded opaque identifier, not source authority by itself. Before
 /// adapter execution, [`Self::authorize`] must resolve it through the caller's authorized
-/// [`SourceConnectionRegistry`], verify the exact requested schema scope through the same policy
-/// boundary, and bind the resulting capability into an [`AuthorizedObservationRequest`]. The
-/// adapter later maps that authorized opaque capability to credentials inside its own ACL. Schema
-/// identifiers retain exact source spelling and are sorted only to make request identity
-/// deterministic. Callers must also provide an explicit provider-independent authorization-metadata
-/// budget before the request can be constructed.
+/// [`SourceConnectionRegistry`], bind the registry's immutable connection-policy revision, verify
+/// the exact requested schema scope against that same resolved binding, and carry the capability
+/// into an [`AuthorizedObservationRequest`]. The adapter later maps only that exact authorized
+/// binding to credentials inside its own ACL. Schema identifiers retain exact source spelling and
+/// are sorted only to make request identity deterministic. Callers must also provide an explicit
+/// provider-independent authorization-metadata budget before the request can be constructed.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ObservationRequest {
     source_connection_key: String,
@@ -325,7 +351,7 @@ impl ObservationRequest {
         &self.source_connection_key
     }
 
-    /// Resolves this request's opaque key through the caller's authorized registry.
+    /// Resolves this request's opaque key and immutable policy revision through the registry.
     pub fn resolve_source_connection(
         &self,
         registry: &dyn SourceConnectionRegistry,
@@ -333,30 +359,35 @@ impl ObservationRequest {
         if !registry.contains_source_connection(&self.source_connection_key) {
             return Err(ObservationRequestError::UnknownSourceConnectionKey);
         }
+        let connection_policy_binding = registry
+            .connection_policy_binding(&self.source_connection_key)
+            .ok_or(ObservationRequestError::MissingConnectionPolicyBinding)?;
+        if connection_policy_binding.trim().is_empty() {
+            return Err(ObservationRequestError::InvalidConnectionPolicyBinding);
+        }
         Ok(ResolvedSourceConnection {
             source_connection_key: self.source_connection_key.clone(),
+            connection_policy_binding,
         })
     }
 
     /// Consumes this request after registry authorization and binds the resulting capability to it.
     ///
-    /// The operation budget starts before source-key and exact-schema-scope authorization. The
-    /// returned execution envelope is the only request type accepted by [`SourceObservationPort`]
-    /// and privately retains the monotonic start coordinate so adapter code can query the remaining
-    /// budget without receiving wall-clock provenance. If registry work consumes the budget,
-    /// timeout takes precedence over either authorization result so over-budget policy work never
-    /// leaks into adapter admission.
+    /// The operation budget starts before source-key, immutable policy-binding, and exact-schema
+    /// authorization. The returned execution envelope is the only request type accepted by
+    /// [`SourceObservationPort`] and privately retains the monotonic start coordinate so adapter
+    /// code can query the remaining budget without receiving wall-clock provenance. If registry
+    /// work consumes the budget, timeout takes precedence over either authorization result so
+    /// over-budget policy work never leaks into adapter admission.
     pub fn authorize(
         self,
         registry: &dyn SourceConnectionRegistry,
     ) -> Result<AuthorizedObservationRequest, ObservationRequestError> {
         let operation_started_at = Instant::now();
         let source_connection = self.resolve_source_connection(registry);
-        let schema_scope_authorized = source_connection.is_ok()
-            && registry.authorizes_schema_scope(
-                &self.source_connection_key,
-                &self.allowed_schema_names,
-            );
+        let schema_scope_authorized = source_connection
+            .as_ref()
+            .is_ok_and(|resolved| registry.authorizes_schema_scope(resolved, &self.allowed_schema_names));
         let elapsed = Instant::now().saturating_duration_since(operation_started_at);
         let operation_timeout = Duration::from_millis(self.limits.operation_timeout_ms);
         if elapsed >= operation_timeout {
@@ -396,10 +427,11 @@ impl ObservationRequest {
 ///
 /// This value can only be created by [`ObservationRequest::authorize`], which binds the exact
 /// request to the opaque [`ResolvedSourceConnection`] issued by the authorized registry after the
-/// same policy boundary has explicitly accepted the request's exact schema scope. It also retains a
-/// private monotonic operation-start coordinate so the adapter can cap connection, transaction,
-/// statement and cancellation work by the true remaining budget. It carries no connection string,
-/// credential, token, provider-specific connection object, or wall-clock time.
+/// same policy boundary has explicitly accepted the request's exact schema scope against the same
+/// immutable connection-policy revision. It also retains a private monotonic operation-start
+/// coordinate so the adapter can cap connection, transaction, statement and cancellation work by
+/// the true remaining budget. It carries no connection string, credential, token,
+/// provider-specific connection object, or wall-clock time.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AuthorizedObservationRequest {
     request: ObservationRequest,
@@ -414,7 +446,7 @@ impl AuthorizedObservationRequest {
         &self.request
     }
 
-    /// Returns the opaque authorized source capability used by the adapter ACL.
+    /// Returns the exact opaque source-and-policy capability used by the adapter ACL.
     #[must_use]
     pub const fn source_connection(&self) -> &ResolvedSourceConnection {
         &self.source_connection
@@ -502,13 +534,14 @@ pub enum SourceObservationFailure {
 /// Port implemented by a concrete read-only source adapter.
 ///
 /// Implementations receive only a registry-authorized request whose exact schema scope was accepted
-/// by the same local policy boundary, resolve credentials from its opaque source capability inside
-/// the adapter ACL, use only read-only source access, honor the exact schema allowlist, query
-/// [`AuthorizedObservationRequest::remaining_operation_budget`] before adapter-side blocking work,
-/// enforce every adapter-side [`ObservationLimits`] bound, check caller cancellation, and return a
-/// typed failure rather than a partial or invented snapshot when captured metadata cannot construct
-/// the immutable snapshot. Observation execution is awaitable so asynchronous database clients do
-/// not need to hide a nested executor or block an asynchronous web executor thread.
+/// against the same immutable connection-policy binding, resolve credentials from that exact opaque
+/// capability inside the adapter ACL, use only read-only source access, honor the exact schema
+/// allowlist, query [`AuthorizedObservationRequest::remaining_operation_budget`] before adapter-side
+/// blocking work, enforce every adapter-side [`ObservationLimits`] bound, check caller cancellation,
+/// and return a typed failure rather than a partial or invented snapshot when captured metadata
+/// cannot construct the immutable snapshot. Observation execution is awaitable so asynchronous
+/// database clients do not need to hide a nested executor or block an asynchronous web executor
+/// thread.
 pub trait SourceObservationPort: Sync {
     /// Immutable snapshot type produced only after a complete bounded observation.
     type Snapshot;
