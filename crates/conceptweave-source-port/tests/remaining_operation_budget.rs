@@ -11,8 +11,8 @@ use std::{
 
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, ObservationLimits, ObservationRequest,
-    ObservationRequestBudget, ObservationRequestError, SourceConnectionRegistry,
-    SourceObservationFailure, SourceObservationPort,
+    ObservationRequestBudget, ObservationRequestError, ResolvedSourceConnection,
+    SourceConnectionRegistry, SourceObservationFailure, SourceObservationPort,
 };
 
 fn request_with_key(source_connection_key: &str, operation_timeout_ms: u64) -> ObservationRequest {
@@ -40,12 +40,18 @@ impl SourceConnectionRegistry for DelayedRegistry {
         source_connection_key == "grc_readonly_connection"
     }
 
+    fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
+        (source_connection_key == "grc_readonly_connection")
+            .then(|| "policy_revision_a".to_owned())
+    }
+
     fn authorizes_schema_scope(
         &self,
-        source_connection_key: &str,
+        source_connection: &ResolvedSourceConnection,
         allowed_schema_names: &[String],
     ) -> bool {
-        source_connection_key == "grc_readonly_connection"
+        source_connection.source_connection_key() == "grc_readonly_connection"
+            && source_connection.connection_policy_binding() == "policy_revision_a"
             && allowed_schema_names.len() == 1
             && allowed_schema_names[0] == "governance_core"
     }
