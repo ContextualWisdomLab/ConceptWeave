@@ -293,10 +293,10 @@ mod tests {
         let content = br#"{"content":"synthetic full text","providerExtra":{"retained":true}}"#;
         let (api_root, server) = serve_responses(vec![
             wire_response(200, Some("2"), b"[]"),
-            wire_response(200, None, manifest),
+            wire_response(200, Some("2"), manifest),
             wire_response(200, Some("1"), metadata),
             wire_response(200, Some("7"), content),
-            wire_response(200, None, manifest),
+            wire_response(200, Some("2"), manifest),
             wire_response(200, Some("2"), b"[]"),
         ]);
         let report = report_fixture();
