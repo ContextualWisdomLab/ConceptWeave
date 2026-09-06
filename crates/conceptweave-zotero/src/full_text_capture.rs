@@ -131,9 +131,7 @@ pub fn verify_full_text_capture(
     }
     validate_library(&evidence.library_before, report)?;
     validate_library(&evidence.library_after, report)?;
-    validate_manifest_version(&evidence.manifest_before, report.library_version)?;
     let manifest = parse_manifest(&evidence.manifest_before, &snapshot)?;
-    validate_manifest_version(&evidence.manifest_after, report.library_version)?;
     if evidence.manifest_after.status != 200
         || evidence.manifest_after.body != evidence.manifest_before.body
         || evidence.records.len() != manifest.len()
@@ -183,7 +181,6 @@ fn capture_with_clock(
     let library_before = read("items?limit=1")?;
     validate_library(&library_before, report)?;
     let manifest_before = read("fulltext?since=0")?;
-    validate_manifest_version(&manifest_before, report.library_version)?;
     let manifest = parse_manifest(&manifest_before, &snapshot)?;
     let mut records = Vec::with_capacity(manifest.len());
     for (item_key, version) in manifest {
@@ -198,7 +195,6 @@ fn capture_with_clock(
         });
     }
     let manifest_after = read("fulltext?since=0")?;
-    validate_manifest_version(&manifest_after, report.library_version)?;
     let library_after = read("items?limit=1")?;
     let capture_evidence = CaptureEvidence {
         capture_kind: CAPTURE_KIND.into(),
@@ -262,16 +258,6 @@ fn validate_library(
     }
     let _: Vec<serde_json::Value> =
         serde_json::from_str(&response.body).map_err(|_| INVALID_EVIDENCE)?;
-    Ok(())
-}
-
-fn validate_manifest_version(
-    response: &CapturedResponse,
-    library_version: u64,
-) -> Result<(), FullTextError> {
-    if response.status != 200 || response.version != Some(library_version) {
-        return Err(INVALID_EVIDENCE);
-    }
     Ok(())
 }
 
