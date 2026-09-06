@@ -7,18 +7,63 @@ use conceptweave_observation::{
 
 mod support;
 
+#[test]
+fn unique_null_comparison_evidence_changes_observation_and_snapshot_identity() {
+    let unknown =
+        UniqueConstraintObservation::new("event_parent_uq", vec!["parent_key".to_owned()]).unwrap();
+    assert_eq!(unknown.nulls_not_distinct(), None);
+    let distinct = unknown.clone().with_nulls_not_distinct(false);
+    let not_distinct = unknown.clone().with_nulls_not_distinct(true);
+    assert_eq!(distinct.nulls_not_distinct(), Some(false));
+    assert_eq!(not_distinct.nulls_not_distinct(), Some(true));
+    assert_eq!(unknown.nulls_not_distinct(), None);
+    assert_ne!(unknown, distinct);
+    assert_ne!(unknown, not_distinct);
+    assert_ne!(distinct, not_distinct);
+
+    let snapshots = [unknown, distinct, not_distinct].map(|constraint| {
+        PostgresSchemaSnapshot::new(
+            &support::resolved_source("warehouse_primary"),
+            "postgres_introspector_v1",
+            "2026-09-05T03:30:00Z",
+            vec![
+                TableObservation::with_constraints(
+                    "public",
+                    "event_record",
+                    vec![ColumnObservation::new("parent_key", 1, "uuid", true, None).unwrap()],
+                    vec![TableConstraintObservation::Unique(constraint)],
+                )
+                .unwrap(),
+            ],
+        )
+        .unwrap()
+    });
+    for left in 0..snapshots.len() {
+        for right in left + 1..snapshots.len() {
+            assert_ne!(
+                snapshots[left].snapshot_digest(),
+                snapshots[right].snapshot_digest(),
+                "unknown, NULLS DISTINCT and NULLS NOT DISTINCT must not share content identity"
+            );
+        }
+        let receipt = snapshots[left]
+            .source_receipt(
+                ObservationLocation::constraint("public", "event_record", "event_parent_uq")
+                    .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(receipt.source_digest(), snapshots[left].snapshot_digest());
+    }
+}
+
 fn table(comment: &str) -> TableObservation {
     TableObservation::new(
         "public",
         "event_record",
-        vec![ColumnObservation::new(
-            "event_key",
-            1,
-            "uuid",
-            false,
-            Some(comment.to_owned()),
-        )
-        .expect("fixture column is valid")],
+        vec![
+            ColumnObservation::new("event_key", 1, "uuid", false, Some(comment.to_owned()))
+                .expect("fixture column is valid"),
+        ],
     )
     .expect("fixture table is valid")
 }
