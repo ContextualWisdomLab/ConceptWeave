@@ -413,7 +413,7 @@ fn read_snapshot_with_clock(
         if page
             .items
             .iter()
-            .any(|item| item.version > page.library_version)
+            .any(|item| item.key.trim().is_empty() || item.version > page.library_version)
         {
             return Err(ReadError::SnapshotChanged);
         }
