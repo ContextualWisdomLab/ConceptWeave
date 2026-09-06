@@ -84,7 +84,7 @@ fn complete_review_requires_one_steward_label_per_bibliographic_item() {
 fn complete_review_rejects_pending_sources_without_blocking_sampled_evaluation() {
     use std::cell::Cell;
 
-    for parent_key in ["", "missing", "A"] {
+    for parent_key in ["", "missing", "source", "A"] {
         let mut source_item = item("source", "synthetic attachment");
         source_item.data.item_type = "attachment".into();
         source_item.data.parent_item = parent_key.into();
@@ -114,6 +114,17 @@ fn complete_review_rejects_pending_sources_without_blocking_sampled_evaluation()
             assert_eq!(verifier_calls.get(), 1);
         } else {
             assert_eq!(result, Err(EvaluationError::IncompleteReview));
+            assert_eq!(verifier_calls.get(), 0);
+            let mut forged_report = report.clone();
+            forged_report.pending_source_item_keys.clear();
+            reviewed.approval.proposal_digest = classification_proposal_digest(&forged_report);
+            assert_eq!(
+                evaluate_complete_reviewed_classification(&forged_report, &reviewed, |_| {
+                    verifier_calls.set(verifier_calls.get() + 1);
+                    true
+                }),
+                Err(EvaluationError::InvalidReview)
+            );
             assert_eq!(verifier_calls.get(), 0);
         }
     }
