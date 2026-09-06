@@ -4,6 +4,10 @@ All notable changes to ConceptWeave are documented here.
 
 ## Unreleased
 
+### Fixed
+
+- Zotero research intake rejects incomplete or late results after a five-minute read budget, even when individual pages arrive within their request limits.
+
 ### Added
 
 - Private, replayable paper-text capture for later research review, preserving unavailable material and leaving earlier reports and approvals unchanged.
