@@ -75,6 +75,16 @@ GREEN source `f6735b585022aac1c8ceff86c150d9b64fd77ec2` passed 68 tests across 1
 
 ## Alternatives considered
 
+### September 6 duplicate source-scope admission (Proposed)
+
+PR #12 already binds exact candidate membership and complete item revisions in `ReviewedDuplicateMergeSet`; the prior audit-owner concern about unbound duplicate authority therefore does not describe this consumer. Its real remaining gap was that retained metadata and inventory were absent from its receipt, and external verification preceded local decision checks. RED `4656d6b` reproduced missing legacy scope binding, malformed inventory accepted, and altered standalone evidence reaching governance.
+
+We reused the existing shared report validator and v2 proposal digest. Duplicate receipts and resulting manifests require `proposal_digest`; original candidate membership binding remains separate and unchanged. Missing bindings fail deserialization, blank bindings fail admission, and locally rewritten bindings still require independently issued approval of the complete set. All component and decision checks precede the external verifier. No source mutation, new authority issuer, digest algorithm or dependency was added. Snapshot mismatch takes precedence over structural errors to preserve existing caller contracts; `fc0465e` restores this after the first implementation exposed two exact-error regressions.
+
+Rejected alternatives were another source validator, copying the source snapshot into each operation, mixing derived counters into source identity, or defaulting legacy receipts to a recomputed digest. Each duplicates responsibility or weakens review evidence. The cost is explicit reapproval of older duplicate receipts and rejection after changed retained evidence, even when candidate membership stays constant. `0c825d9` proves that rewriting the digest does not reuse approval and the manifest retains the verified binding. Subsequent restored-report/worksheet/write owners must adopt the required fields without granting authority by downcasting full-text evidence.
+
+The isolated baseline at `a4a7c2d` passed 68 tests/17 suites; normal integration `b758991` preserved it and parent `6dff8c2`, passing 83/17. Current runtime `fc0465e` plus tests `0c825d9` passed 87/17 including two doctests. Independent duplicate tests passed 12/12 with no actionable finding. Unchanged pinned coverage passed 153/153 functions, 1,294/1,294 normalized owned regions and 220/220 normalized branches; raw 1,649/1,658 lines, 2,516/2,536 regions and 200/220 branches remain below 100%. Rustdoc/release passed; strict Clippy found one test-only redundant borrow, corrected in `5fff9d0` without suppression. Hosted checks, protected merge, release and genuine reviewed reclassification remain unproven.
+
 ### September 6 derived audit repair (Proposed)
 
 Live PR #11 findings [3934799129](https://github.com/ContextualWisdomLab/ConceptWeave/pull/11#discussion_r3934799129) and [3934994550](https://github.com/ContextualWisdomLab/ConceptWeave/pull/11#discussion_r3934994550) were rechecked after source-scope integration. Source identity must not absorb derived audit fields, but accepting arbitrary audit values alongside a verified report can still misstate completeness. RED `ebdd852` proved both forged audit reaching governance and duplicate source keys counted as complete provenance.

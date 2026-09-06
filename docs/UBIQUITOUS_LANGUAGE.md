@@ -16,6 +16,6 @@
 | Dimension | Governed categorical or temporal axis used to group/filter analytical facts. |
 | Measure | Governed calculation with explicit expression, grain, units, null semantics, and evidence. |
 | Semantic Steward | Authorized reviewer responsible for accepting or rejecting semantic meaning. |
-| Reviewed Duplicate Merge Set | Complete steward decisions selecting one consistent canonical item across every overlapping duplicate group in a snapshot. |
+| Reviewed Duplicate Merge Set | Independently verified decisions selecting one canonical item per connected duplicate component, bound to exact source revisions, candidate membership, proposals and retained source scope. |
 | Authority Receipt | Opaque proof checked by the Governance & Publication boundary; it contains no reviewer identity or credential. |
 | Canonical-Key Operation | Reversible local mapping from every source in a connected duplicate component to one retained key, with complete reviewed revisions and the exact rollback mapping. |
