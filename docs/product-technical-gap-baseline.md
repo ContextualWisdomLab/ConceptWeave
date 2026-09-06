@@ -4,7 +4,15 @@
 
 This file records code-current product and technical gaps. Exact PR/check/run coordinates are evidence snapshots, not mutable-head dependencies. Live protected-branch, PR, issue and workflow state wins whenever it advances after this snapshot. Refresh the changed PR's metadata after each documentation commit; evidence from another PR or an earlier head does not transfer.
 
-## Latest live and visual source-scope checkpoint
+## Latest post-cooldown integration checkpoint
+
+The ordinary GraphQL audit succeeded at **2026-09-06 11:07:24 UTC**, after the conservative 11:06:12 retry boundary. Its paginated snapshot retained **33 open PRs, 32 Drafts and 36 unresolved threads**; the latest 30 reviews per PR contained no current-head approval (#6 has older reviews outside that window). Protected main remained `f4f440dd58c77d7cd90dff8a1eb2eeb9a9940425`. A fresh ruleset 18156473 read retained one independent approval, stale dismissal, resolved threads, seven central workflows and deletion/non-fast-forward protections. #35 now reports `REVIEW_REQUIRED`; the prior `CHANGES_REQUESTED` snapshot is historical.
+
+Normal pushes preserved both histories: #9 is `f8566408e6a3017cf775fadf2a2f7e50b2d20dc6`, and #39 is `55b1d91dcd299145239a62062ed504fcb6e7bfd1` over exact named parent #38 `e2c3a9fbbe36f44525833d4a94e164c6891a0f94`. Fresh pre-push tests passed **43 / 10 unfiltered suites / 2 doctests** for #9 and **258 / 41 / 7** for #39. Formatting, CI contract and diff checks passed. Root crates/Cargo/scripts remain unchanged from `e1407d64e67be3556088c36d334427b7de103378`; no fresh coverage run is implied. #9 and #39 remain OPEN Draft with zero exact-head Actions runs and only CodeRabbit's draft-review skip, not hosted GREEN.
+
+Updated #9/#38/#39 bodies matched independent exact-head readbacks; the previously pending #38 body refresh is complete. The [#9 source-repair reply](https://github.com/ContextualWisdomLab/ConceptWeave/pull/9#discussion_r3943775918) also matched its readback and leaves the review thread open. The new item-revision guard still requires forward propagation, and the newly measured standalone-source inventory/completion gate below is still unimplemented. Keep the four unresolved sources visible, repair their earliest owner coherently before repeating a full cascade, and retain mandatory actual Visual Inspection. No approval, readiness transition, protected merge, review resolution, closure or Zotero source write occurred. Earlier cooldown/local-only paragraphs below describe their own historical checkpoints, not the current pushed state.
+
+## Live and visual source-scope checkpoint
 
 The [September 6 live/visual audit](doctoring/zotero_metadata_visual_audit.md) ran the freshly built #9 owner executable at local `f8566408e6a3017cf775fadf2a2f7e50b2d20dc6` against the actual Zotero Local API. It completed in **26.29 seconds**, retained a private `0600` report, and verified **8,326 metadata records / 3,715 bibliographic proposals**, API 3, schema 44, Zotero 10.0.1 and library revision 2. All retained bibliographic revisions are zero and the new guard admits them unchanged. There are **3,658 abstentions**, 57 other deterministic proposals and 49 duplicate-candidate groups; no proposal is an approved label. No full text or model was invoked and no source was changed.
 
