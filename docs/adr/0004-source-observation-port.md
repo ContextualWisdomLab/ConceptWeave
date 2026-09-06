@@ -85,7 +85,7 @@ The same registry receives the resolved key-and-binding capability plus exact so
 
 Only after the exact schema scope is admitted does the same local policy evaluate `authorizes_resource_envelope(resolved_source, request.resource_envelope())`. The default resource policy is fail-closed. A registry that recognizes a source and schema but does not explicitly admit the requested metadata/runtime ceilings returns `ObservationRequestError::UnauthorizedResourceEnvelope`. Policy may accept an equal or narrower request and must reject a wider-than-policy request. The port does not hard-code PostgreSQL deployment ceilings or accept provider-specific settings in this value object.
 
-All local registry decisions are part of the same operation budget. Their results are captured before the elapsed-time check; if local policy work exhausts `operation_timeout_ms`, authorization returns `ObservationRequestError::OperationTimeout` before propagating a policy result or admitting an adapter. This preserves timeout precedence and zero adapter/source/snapshot side effects for over-budget authorization. Because `SourceConnectionRegistry` is synchronous, its implementation itself must remain bounded local work; the caller-requested timeout is not permission to hide remote I/O inside registry policy.
+All local registry decisions are part of the same operation budget. `authorize` checks the same monotonic deadline immediately after source lookup, immutable binding lookup, schema policy, and resource policy. If one stage exhausts `operation_timeout_ms`, `OperationTimeout` takes precedence over that stage's returned policy result and no later registry stage is started. This prevents post-deadline policy side effects while preserving zero adapter/source/snapshot side effects for over-budget authorization. Because `SourceConnectionRegistry` is synchronous, a single in-flight registry call cannot be preempted by this contract and must itself remain bounded local work; the caller-requested timeout is not permission to hide remote I/O inside registry policy.
 
 A successful authorization returns `AuthorizedObservationRequest`, which binds the validated request to `ResolvedSourceConnection { source_connection_key, connection_policy_binding }`, preserves the explicitly authorized schema scope and explicitly admitted resource envelope in the request, and privately carries the monotonic start coordinate. `remaining_operation_budget() -> Option<Duration>` is the only timing capability exposed to a concrete adapter. `None` means the end-to-end operation budget has expired. The start coordinate itself is not a public field, serialized timestamp, provider object, or credential.
 
@@ -99,7 +99,7 @@ The public immutable snapshot also retains the authorized opaque connection-poli
 
 The concrete adapter must read the remaining budget before potentially blocking connection/transaction/statement/cancellation work and cap each stage according to both the policy-admitted `ObservationLimits` and that remainder. It must not restart `operation_timeout_ms` at `observe`. A caller-side outer timeout may still bound waiting, but it is not a substitute for passing the remaining budget into driver/server limits.
 
-This ADR remains **Proposed**. The port can now represent source-key plus immutable-policy-binding authorization, exact schema-scope authorization, trusted complete resource-envelope admission, stale-binding rejection at the port seam, non-resetting budget, canonical snapshot scope binding, and binding-preserving public provenance. No production PostgreSQL adapter or exact-head runtime conformance has yet proved the full decision.
+This ADR remains **Proposed**. The port can now represent source-key plus immutable-policy-binding authorization, exact schema-scope authorization, trusted complete resource-envelope admission, stale-binding rejection at the port seam, non-resetting budget with post-stage cutoff, canonical snapshot scope binding, and binding-preserving public provenance. No production PostgreSQL adapter or exact-head runtime conformance has yet proved the full decision.
 
 ## Test and evidence contract
 
@@ -117,7 +117,9 @@ The Source Observation lineage includes:
 - `ca4446ff6fdae1f78491bbf5b9c149b9f936aa46` and ordinary forward successors: provider-independent key+policy binding capability, same-binding schema authorization, stale-binding port control, fixture propagation, and binding-preserving immutable snapshot/receipt provenance;
 - review `5123894287`: positive caller-selected metadata/runtime limits were identified as an authorization gap;
 - `5ba8cd6244a54359e98cb57c013cf5312153211a`: committed executable resource-envelope specification covering default deny, wider-than-policy denial and equal/narrower controls;
-- `3d32a933bc2bc27fa20c22ea48111ccf3f54d7da` and ordinary forward fixture successors: `ObservationResourceEnvelope`, default-denied `authorizes_resource_envelope`, typed `UnauthorizedResourceEnvelope`, same-binding policy admission and explicit fixture policies.
+- `3d32a933bc2bc27fa20c22ea48111ccf3f54d7da` and ordinary forward fixture successors: `ObservationResourceEnvelope`, default-denied `authorizes_resource_envelope`, typed `UnauthorizedResourceEnvelope`, same-binding policy admission and explicit fixture policies;
+- review `5124035774` and `3fb340e54d4f56c605e0b20941998d9aeb28ba79`: post-deadline registry-stage side effects identified and committed as executable specifications;
+- `9d17ab4698f5d89bf4e1cf3939b81f29a18168a1` → `04a63f321508a1bc64bc1c736c76d367cccf0e3c`: stage-boundary monotonic deadline enforcement plus binding-stage edge coverage.
 
 These are committed executable specifications and source repairs, not claimed observed RED→GREEN. The current execution environment has no Rust toolchain, and exact-head GitHub Product/Rust/coverage/rustdoc evidence is still required.
 
@@ -130,8 +132,8 @@ Required runtime acceptance before ADR status can become Accepted:
 5. Exact schema authorization is case-sensitive and normalization-free; a differently cased or Unicode-normalized identifier is not implicitly granted.
 6. A capability authorized for binding A and presented after the live mapping changes to B fails before credential/source access and snapshot construction; an unchanged A control performs each expected side effect exactly once.
 7. Immutable snapshot and public receipt provenance preserve binding A separately from source-content digest identity.
-8. A registry lookup and all schema/resource policy work that consume part of the operation budget leave the adapter only the remainder.
-9. Registry policy that exhausts the budget returns `OperationTimeout` before adapter/source/snapshot side effects, including denied-source, denied-scope or denied-resource cases.
+8. Registry work that consumes only part of the operation budget leaves the adapter only the remainder.
+9. If source lookup, binding lookup, schema policy, or resource policy exhausts the operation budget, authorization returns `OperationTimeout`; no later registry stage begins, and adapter/source/snapshot side effects remain zero.
 10. A request authorized only for one exact local schema cannot construct an immutable snapshot or receipt containing a different local schema; explicitly authorized multi-schema capture remains valid without case/Unicode normalization.
 11. Connection, `REPEATABLE READ READ ONLY` transaction, every catalog statement, cancellation cleanup, and immutable snapshot construction are capped by the same non-resetting remaining budget and admitted resource ceilings.
 12. Unknown keys, cancellation, source disappearance, malformed/partial metadata, and row/byte/concurrency exhaustion remain typed fail-closed outcomes.
@@ -142,7 +144,7 @@ Required runtime acceptance before ADR status can become Accepted:
 - **Caller-selected limits become self-authorization:** structural positive bounds are wrapped in `ObservationResourceEnvelope`; trusted local source policy must explicitly admit the complete envelope and defaults to deny.
 - **Mutable-key TOCTOU:** authorization captures an opaque immutable policy binding; schema/resource policy is evaluated against it; the adapter ACL must reject stale bindings before source access; public receipts retain the binding.
 - **Source-only authorization accidentally broadens schema scope:** schema-scope authorization defaults to deny and must be explicitly implemented by the registry. Snapshot construction independently rejects local table schemas outside the authorized request as defense in depth.
-- **Synchronous registry hangs:** the registry boundary is deliberately local and bounded; remote work is prohibited there. Runtime integration must keep that implementation property explicit and test it rather than silently using a network registry.
+- **Synchronous registry hangs:** the registry boundary is deliberately local and bounded; remote work is prohibited there. Runtime integration must keep that implementation property explicit and test it rather than silently using a network registry. Once one synchronous stage returns, an exhausted deadline prevents every later registry stage from starting.
 - **Deadline reset in adapter:** adapter conformance must use `remaining_operation_budget()` at each blocking stage; the original configured duration is an admitted ceiling, not a fresh per-stage allowance.
 - **Timing-coordinate leakage:** only remaining `Duration` is part of the adapter-facing API; no wall-clock timestamp or credential is carried.
 - **Partial evidence:** immutable snapshot identity is created only after complete construction; failures never return a nominal success snapshot.
