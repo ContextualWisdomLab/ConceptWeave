@@ -341,6 +341,8 @@ pub struct ReviewedClassificationWriteSet {
     pub rule_revision: String,
     /// Exact reviewed raw-snapshot digest.
     pub snapshot_digest: String,
+    /// Required content identity of the complete report reviewed by the steward.
+    pub proposal_digest: String,
     /// Exact item-key/item-version coordinates reviewed by the steward.
     pub snapshot_items: Vec<SnapshotItemRevision>,
     /// Reviewed item-level changes.
@@ -389,6 +391,8 @@ pub struct ClassificationWritePlan {
     pub rule_revision: String,
     /// Exact raw-snapshot digest.
     pub snapshot_digest: String,
+    /// Content identity retained from the independently verified review.
+    pub proposal_digest: String,
     /// Deterministically ordered item operations.
     pub operations: Vec<ClassificationWriteOperation>,
     /// Classification writes never delete source records or attachments.
@@ -1043,6 +1047,7 @@ where
         || reviewed.authority_receipt.trim().is_empty()
         || reviewed.rule_revision.trim().is_empty()
         || reviewed.snapshot_digest.trim().is_empty()
+        || reviewed.proposal_digest.trim().is_empty()
         || reviewed.changes.is_empty()
     {
         return Err(WritePlanError::InvalidReview);
@@ -1152,6 +1157,10 @@ where
         });
     }
     operations.sort_by(|left, right| left.item_key.cmp(&right.item_key));
+    validate_classification_report(report).map_err(|_| WritePlanError::InvalidReview)?;
+    if reviewed.proposal_digest != classification_proposal_digest(report) {
+        return Err(WritePlanError::SnapshotMismatch);
+    }
     if !verify_review(reviewed) {
         return Err(WritePlanError::UnverifiedApproval);
     }
@@ -1164,6 +1173,7 @@ where
         library_version: reviewed.library_version,
         rule_revision: reviewed.rule_revision.clone(),
         snapshot_digest: reviewed.snapshot_digest.clone(),
+        proposal_digest: reviewed.proposal_digest.clone(),
         operations,
         source_records_preserved: true,
     })

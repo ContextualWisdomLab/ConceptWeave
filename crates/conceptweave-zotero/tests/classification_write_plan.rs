@@ -1,6 +1,7 @@
 use conceptweave_zotero::{
     Disposition, ItemData, ItemTag, ReviewedClassificationChange, ReviewedClassificationWriteSet,
-    WriteMode, WritePlanError, ZoteroItem, build_classification_write_plan, classify_snapshot,
+    WriteMode, WritePlanError, ZoteroItem, build_classification_write_plan,
+    classification_proposal_digest, classify_snapshot,
 };
 
 #[test]
@@ -92,6 +93,7 @@ fn reviewed(report: &conceptweave_zotero::ClassificationReport) -> ReviewedClass
         library_version: report.library_version,
         rule_revision: report.rule_revision.into(),
         snapshot_digest: report.snapshot_digest.clone(),
+        proposal_digest: classification_proposal_digest(report),
         snapshot_items: report.snapshot_items.clone(),
         changes: vec![
             ReviewedClassificationChange {
@@ -321,6 +323,7 @@ fn write_plan_fails_closed_for_untrusted_stale_or_unsafe_changes() {
         library_version: no_server.library_version,
         rule_revision: no_server.rule_revision.into(),
         snapshot_digest: no_server.snapshot_digest.clone(),
+        proposal_digest: classification_proposal_digest(&no_server),
         snapshot_items: no_server.snapshot_items.clone(),
         changes: vec![ReviewedClassificationChange {
             item_key: "A".into(),
