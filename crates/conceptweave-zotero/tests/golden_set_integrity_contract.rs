@@ -552,6 +552,12 @@ fn source_metadata_mutations_invalidate_the_original_approval_before_verificatio
             "type" => source.data.item_type = "attachment".into(),
             "parent" => {
                 source.data.parent_item = "C".into();
+                report
+                    .snapshot_items
+                    .iter_mut()
+                    .find(|item| item.item_key == source.key)
+                    .unwrap()
+                    .parent_item_key = Some("C".into());
                 report.pending_source_item_keys = vec!["T".into()];
             }
             _ => unreachable!(),

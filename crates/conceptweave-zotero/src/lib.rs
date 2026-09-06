@@ -1584,18 +1584,6 @@ where
         .iter()
         .map(|item| (item.item_key.as_str(), item.proposed_disposition))
         .collect::<BTreeMap<_, _>>();
-    if classified.len() != report.classified_items.len()
-        || report.classified_items.iter().any(|item| {
-            item.item_key.trim().is_empty()
-                || !report_snapshot.contains(&SnapshotItemRevision {
-                    item_key: item.item_key.clone(),
-                    item_version: item.item_version,
-                    parent_item_key: None,
-                })
-        })
-    {
-        return Err(EvaluationError::InvalidReview);
-    }
     if golden.approval.proposal_digest != classification_proposal_digest(report) {
         return Err(EvaluationError::SnapshotMismatch);
     }
