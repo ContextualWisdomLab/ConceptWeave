@@ -435,6 +435,9 @@ fn rollback_rejects_each_unverified_restoration_response() {
         );
         assert_eq!(failed.indeterminate_item_key.as_deref(), Some("B"));
         assert!(failed.restored_item_keys.is_empty());
-        assert_eq!(failed.remaining_operations, receipt.rollback_operations[1..]);
+        assert_eq!(
+            failed.remaining_operations,
+            receipt.rollback_operations[1..]
+        );
     }
 }

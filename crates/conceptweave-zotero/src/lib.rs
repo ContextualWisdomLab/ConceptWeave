@@ -1995,17 +1995,8 @@ fn matches_rollback_current(
     state: &ClassificationItemState,
     operation: &ClassificationRollbackOperation,
 ) -> bool {
-    matches_rollback_current_at(state, state.library_version, operation)
-}
-
-fn matches_rollback_current_at(
-    state: &ClassificationItemState,
-    library_version: u64,
-    operation: &ClassificationRollbackOperation,
-) -> bool {
     normalized_metadata(&state.collection_keys, &state.tags).is_ok_and(|(collections, tags)| {
         state.server_id == operation.server_id
-            && state.library_version == library_version
             && state.item_key == operation.item_key
             && state.item_version == operation.item_version
             && collections == operation.expected_collection_keys
