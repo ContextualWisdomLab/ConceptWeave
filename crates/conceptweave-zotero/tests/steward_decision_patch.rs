@@ -32,6 +32,7 @@ fn report() -> conceptweave_zotero::ClassificationReport {
 fn patch(item_key: &str, item_version: u64, disposition: Disposition) -> StewardDecisionPatch {
     let report = report();
     StewardDecisionPatch {
+        proposal_digest: conceptweave_zotero::classification_proposal_digest(&report),
         library_version: report.library_version,
         rule_revision: report.rule_revision,
         snapshot_digest: report.snapshot_digest,

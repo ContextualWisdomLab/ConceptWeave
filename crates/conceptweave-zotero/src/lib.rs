@@ -1183,6 +1183,8 @@ pub struct StewardDecisionPatch {
     pub rule_revision: String,
     /// Canonical digest of the complete raw snapshot.
     pub snapshot_digest: String,
+    /// Required opaque identity of the proposals and retained metadata reviewed for this patch.
+    pub proposal_digest: String,
     /// Unique item-revision decisions to apply atomically.
     pub decisions: Vec<StewardDecisionUpdate>,
 }
@@ -1292,6 +1294,7 @@ pub fn apply_steward_decision_patch(
         || patch.library_version != expected.library_version
         || patch.rule_revision != expected.rule_revision
         || patch.snapshot_digest != expected.snapshot_digest
+        || patch.proposal_digest != expected.proposal_digest
         || patch.decisions.is_empty()
     {
         return Err(WorksheetError::InvalidReport);
