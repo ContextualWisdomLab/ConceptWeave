@@ -223,6 +223,8 @@ fn rollback_reconciles_failed_write_without_guessing() {
     ] {
         let receipt = applied_receipt();
         let mut reads = 0;
+        let mut submitted_request = None;
+        let mut observed_state = None;
         let result = execute_classification_rollback(
             &receipt.rollback_operations,
             |key| {
@@ -233,7 +235,7 @@ fn rollback_reconciles_failed_write_without_guessing() {
                     .find(|item| item.item_key == key)
                     .unwrap();
                 let reconciliation = reads > receipt.rollback_operations.len();
-                Ok::<_, ()>(ClassificationItemState {
+                let state = ClassificationItemState {
                     server_id: operation.server_id.clone(),
                     library_version: if reconciliation && current != "unchanged" {
                         45
@@ -255,9 +257,17 @@ fn rollback_reconciles_failed_write_without_guessing() {
                     } else {
                         operation.expected_tags.clone()
                     },
-                })
+                };
+                if reconciliation {
+                    observed_state = Some(state.clone());
+                }
+                Ok::<_, ()>(state)
             },
-            |_| Err::<ClassificationItemState, _>(()),
+            |request| {
+                assert!(submitted_request.is_none());
+                submitted_request = Some(request.clone());
+                Err::<ClassificationItemState, _>(())
+            },
         );
         assert_eq!(
             result.outcome,
@@ -274,6 +284,10 @@ fn rollback_reconciles_failed_write_without_guessing() {
             expected_outcome.1
         );
         assert_eq!(result.not_attempted_item_keys, ["A"]);
+        assert!(submitted_request.is_some());
+        assert!(observed_state.is_some());
+        assert_eq!(result.indeterminate_request, submitted_request);
+        assert_eq!(result.reconciliation_observation, observed_state);
         assert_eq!(result.remaining_operations.len(), 1);
     }
 }
