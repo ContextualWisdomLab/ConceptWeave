@@ -79,6 +79,10 @@ fn reviewed_duplicate_decision_has_exact_before_after_and_rollback_mappings() {
     assert_eq!(manifest.authority_receipt, "authority-receipt-1");
     assert_eq!(manifest.library_version, report.library_version);
     assert_eq!(manifest.rule_revision, report.rule_revision);
+    assert_eq!(
+        manifest.proposal_digest,
+        conceptweave_zotero::classification_proposal_digest(&report)
+    );
     assert_eq!(manifest.operations.len(), 2);
     assert_eq!(manifest.operations[0].identity_kind, "doi");
     assert_eq!(manifest.operations[1].identity_kind, "title");
@@ -155,6 +159,32 @@ fn duplicate_receipt_requires_explicit_source_scope_binding() {
     let mut legacy = serde_json::to_value(reviewed(&report())).unwrap();
     legacy.as_object_mut().unwrap().remove("proposal_digest");
     assert!(serde_json::from_value::<ReviewedDuplicateMergeSet>(legacy).is_err());
+}
+
+#[test]
+fn rewritten_duplicate_scope_receipt_cannot_reuse_independent_approval() {
+    let mut report = report();
+    let mut review = reviewed(&report);
+    let original_review = review.clone();
+    report.unclassified_items[0].data.title = "Changed retained evidence".into();
+    review.proposal_digest = conceptweave_zotero::classification_proposal_digest(&report);
+    let called = std::cell::Cell::new(0);
+    assert_eq!(
+        build_duplicate_merge_review_manifest(&report, &review, |candidate| {
+            called.set(called.get() + 1);
+            candidate == &original_review
+        }),
+        Err(DuplicateReviewError::UnverifiedApproval)
+    );
+    assert_eq!(called.get(), 1);
+
+    review.proposal_digest.clear();
+    assert_eq!(
+        build_duplicate_merge_review_manifest(&report, &review, |_| panic!(
+            "blank binding reached governance"
+        )),
+        Err(DuplicateReviewError::InvalidReview)
+    );
 }
 
 #[test]
