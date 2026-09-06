@@ -1148,13 +1148,18 @@ pub struct StewardReviewProgress {
     pub rule_revision: String,
     /// Opaque immutable snapshot identity.
     pub snapshot_digest: String,
+    /// Opaque binding to the proposals and retained metadata used for these counts.
+    pub proposal_digest: String,
     /// Number of bibliographic decisions required for completion.
     pub total_count: usize,
     /// Number of non-abstention decisions supplied by a steward.
     pub decided_count: usize,
     /// Number of decisions still blank.
     pub remaining_count: usize,
-    /// Whether every decision slot is filled; this does not confer approval.
+    /// Number of source records whose ancestry still requires resolution.
+    pub pending_source_count: usize,
+    /// Whether nonempty decision slots are filled and no source remains pending.
+    /// This is local preparation status, never independent approval or an applied write.
     pub complete: bool,
 }
 
@@ -1237,10 +1242,14 @@ pub fn assess_steward_review_progress(
         library_version: worksheet.library_version,
         rule_revision: worksheet.rule_revision.clone(),
         snapshot_digest: worksheet.snapshot_digest.clone(),
+        proposal_digest: worksheet.proposal_digest.clone(),
         total_count,
         decided_count,
         remaining_count,
-        complete: total_count > 0 && remaining_count == 0,
+        pending_source_count: report.pending_source_item_keys.len(),
+        complete: total_count > 0
+            && remaining_count == 0
+            && report.pending_source_item_keys.is_empty(),
     })
 }
 
@@ -1251,6 +1260,7 @@ fn validate_steward_review_worksheet_against(
     if worksheet.library_version != expected.library_version
         || worksheet.rule_revision != expected.rule_revision
         || worksheet.snapshot_digest != expected.snapshot_digest
+        || worksheet.proposal_digest != expected.proposal_digest
         || worksheet.snapshot_items != expected.snapshot_items
         || worksheet.decisions.len() != expected.decisions.len()
         || worksheet
