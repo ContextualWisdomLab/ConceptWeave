@@ -1241,7 +1241,7 @@ pub enum EvaluationError {
     UnknownItem,
     /// A reviewed key occurs more than once.
     DuplicateItem,
-    /// The reviewed labels do not cover every bibliographic item.
+    /// Bibliographic labels are incomplete or source records remain unresolved.
     IncompleteReview,
 }
 
@@ -1257,7 +1257,7 @@ impl fmt::Display for EvaluationError {
             Self::UnknownItem => "golden set contains an item absent from the report",
             Self::DuplicateItem => "golden set contains a duplicate item",
             Self::IncompleteReview => {
-                "complete review must label every bibliographic item exactly once"
+                "complete review must label every bibliographic item exactly once and resolve all pending sources"
             }
         })
     }

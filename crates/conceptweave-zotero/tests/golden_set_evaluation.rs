@@ -115,7 +115,7 @@ fn complete_review_rejects_pending_sources_without_blocking_sampled_evaluation()
         } else {
             assert_eq!(result, Err(EvaluationError::IncompleteReview));
             assert_eq!(verifier_calls.get(), 0);
-            let mut forged_report = report.clone();
+            let mut forged_report = report;
             forged_report.pending_source_item_keys.clear();
             reviewed.approval.proposal_digest = classification_proposal_digest(&forged_report);
             assert_eq!(
