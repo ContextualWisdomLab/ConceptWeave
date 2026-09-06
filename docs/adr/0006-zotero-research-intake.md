@@ -17,7 +17,7 @@ ConceptWeave owns a small read-only Anti-Corruption Layer from Zotero into resea
 
 The adapter links child records, emits exactly one deterministic proposed disposition per top-level bibliographic item, and abstains when evidence is weak or ambiguous. Every abstention preserves a deterministic reason distinguishing missing classification metadata, vocabulary outside the current deterministic rules, present-but-unmatched metadata, and conflicting specific disposition families. Specific rule families are evaluated together rather than by first-match priority. When evidence matches multiple families, the proposal becomes `NeedsStewardReview` and all matching evidence is retained.
 
-Matched metadata values are copied into the local-only evidence receipt for replay. This is necessary for abstract-only matches because a later Zotero revision cannot reconstruct the exact text used for an earlier proposal from item key/version alone. An abstention likewise retains its nonempty abstract so a steward can resolve unsupported or unmatched vocabulary from the same immutable report. If matched evidence already contains the abstract, the review-only field is omitted so sensitive text appears once; decided items also omit that extra copy. The report remains sensitive local material. DOI/title matches remain reversible duplicate candidates, including legacy `dx.doi.org` resolver forms.
+Matched metadata values are copied into the local-only evidence receipt for replay. This is necessary for abstract-only matches because a later Zotero revision cannot reconstruct the exact text used for an earlier proposal from item key/version alone. An abstention likewise retains its nonempty abstract so a steward can resolve unsupported or unmatched vocabulary from the same immutable report. If matched evidence already contains the abstract, the review-only field is omitted so sensitive text appears once; decided items also omit that extra copy. On supported Unix platforms, the sensitive local report is created with exact owner-only `0600` permissions after applying the process umask; other platforms fail closed. DOI/title matches remain reversible duplicate candidates, including legacy `dx.doi.org` resolver forms.
 
 Duplicate candidates become canonical references only through externally verified steward decisions bound to the raw digest, complete item-key/item-version snapshot, and exact candidate membership. Overlapping candidates form one connected component and must select one component-level canonical item. Every resulting operation retains all component source revisions and complete before/after/rollback key mappings. It changes downstream identity resolution only; classification does not merge, delete, or mutate Zotero source records.
 
@@ -35,6 +35,20 @@ Report output is restricted to a new direct child of the operating system tempor
 No dedicated utility repository or Zotero mutation path is created. A future Zotero 10+ write adapter is a separate decision and must use authenticated loopback access, server identity, optimistic version preconditions, reviewed item-level changes, before/after receipts, and rollback evidence.
 
 ## Consequences
+
+### Private output failure amendment (Proposed, 2026-09-06)
+
+The checked canonical parent is used to reconstruct the output path, reusing
+existing fix `86288cdf5959040a95221c2ca2d99e243d25dc27` as `25154b6` rather than
+introducing another path policy. The report is opened exclusively with mode
+`0600`, then permissions are enforced on its handle before any report bytes are
+serialized. If enforcement fails, `48d7068` returns the error without unlinking
+the pathname: it may now refer to an unrelated replacement. An inode comparison
+followed by unlink would still race, so that alternative is rejected. The downside
+is a possible empty private file requiring later deliberate cleanup; confidentiality
+and unrelated-file preservation take precedence over automatic cleanup. RED
+`7cfc7fb` demonstrates both raw-parent reuse and replacement deletion. This policy
+must also reach the later shared private-output writer before final adoption.
 
 ### 2026-09-05 integrity amendment (Proposed)
 

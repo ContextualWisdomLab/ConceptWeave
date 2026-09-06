@@ -8,7 +8,11 @@ With Zotero running locally:
 cargo +1.98.0 run --bin conceptweave-zotero -- /tmp/conceptweave-zotero-classification.json
 ```
 
-The command reads one stable library-version snapshot and creates a local, reviewable JSON report. Output is restricted to a new direct child of canonical `/tmp` or the system temporary directory, and the command never changes Zotero records.
+The command reads one stable library-version snapshot and creates a local, reviewable JSON report. On Unix, output is restricted to a new owner-only (`0600`) direct child of canonical `/tmp` or the system temporary directory; the CLI fails closed on other platforms. The command never changes Zotero records.
+
+If file-permission setup fails, the command stops before writing report content.
+An empty file may remain; inspect it before removing it. The command does not
+delete a pathname that another process may have replaced.
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ContextualWisdomLab/ConceptWeave)
 
