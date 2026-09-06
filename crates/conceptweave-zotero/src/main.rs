@@ -36,6 +36,15 @@ where
     Ok(request)
 }
 
+fn validate_output_request(
+    report_output: Option<&str>,
+    output: &str,
+) -> io::Result<(Option<PathBuf>, PathBuf)> {
+    let output = validate_output_path(output)?;
+    let report_output = report_output.map(validate_output_path).transpose()?;
+    Ok((report_output, output))
+}
+
 fn write_private_output(path: &Path, content: &[u8]) -> io::Result<()> {
     write_private_output_with(path, content, write_all_and_flush)
 }
@@ -150,11 +159,7 @@ fn create_report_file_with(
 /// Reads one Zotero snapshot and writes its sensitive local proposal report.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (report_output, output) = parse_output_request(env::args().skip(1))?;
-    let output = validate_output_path(&output)?;
-    let report_output = report_output
-        .as_deref()
-        .map(validate_output_path)
-        .transpose()?;
+    let (report_output, output) = validate_output_request(report_output.as_deref(), &output)?;
     let report = read_local_snapshot()?;
     if report.zotero_version.starts_with("9.") {
         eprintln!("Zotero 9 Local API is read-only; writing local proposal output only");
@@ -192,6 +197,28 @@ mod tests {
         assert!(parse_output_request(vec!["--worksheet", report]).is_err());
         assert!(parse_output_request(vec![report, "extra"]).is_err());
         assert!(parse_output_request(vec!["--worksheet", report, report]).is_err());
+    }
+
+    #[test]
+    fn canonical_output_aliases_are_rejected_without_creating_files() {
+        let output =
+            Path::new("/tmp").join(format!("conceptweave-alias-{}.json", std::process::id()));
+        let canonical = output
+            .parent()
+            .unwrap()
+            .canonicalize()
+            .unwrap()
+            .join(output.file_name().unwrap());
+        let result =
+            validate_output_request(Some(output.to_str().unwrap()), canonical.to_str().unwrap());
+        assert!(!output.exists());
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidInput);
+        let other = unique_temp_path("other-output");
+        assert!(
+            validate_output_request(Some(output.to_str().unwrap()), other.to_str().unwrap())
+                .is_ok()
+        );
+        assert!(validate_output_request(None, output.to_str().unwrap()).is_ok());
     }
 
     #[test]
