@@ -18,6 +18,7 @@ const PAGE_LIMIT: usize = 100;
 const MAX_PAGE_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_SNAPSHOT_ITEMS: usize = 50_000;
 const MAX_SNAPSHOT_BYTES: u64 = 256 * 1024 * 1024;
+const MAX_SNAPSHOT_ELAPSED: Duration = Duration::from_secs(300);
 const LOCAL_API: &str = "http://127.0.0.1:23119/api/users/0/items";
 
 #[cfg(test)]
@@ -225,6 +226,9 @@ struct FetchedPage {
 /// Snapshot consistency, resource budgets, API-version validation, pagination,
 /// and duplicate-key checks live in an injectable reader core. Only the narrow
 /// ureq transport shim is excluded from deterministic coverage.
+/// No page starts or completed report is accepted at or beyond five minutes.
+/// An in-flight request may finish later under its existing per-request limits;
+/// its late result is rejected, not returned as a partial snapshot.
 pub fn read_local_snapshot() -> Result<ClassificationReport, ReadError> {
     let config = ureq::Agent::config_builder()
         .proxy(None)
@@ -335,7 +339,7 @@ fn read_snapshot_with(
 
 fn read_snapshot_with_clock(
     fetch_page: &mut dyn FnMut(usize) -> Result<FetchedPage, ReadError>,
-    _elapsed: &mut dyn FnMut() -> Duration,
+    elapsed: &mut dyn FnMut() -> Duration,
 ) -> Result<ClassificationReport, ReadError> {
     let mut items = Vec::new();
     let mut snapshot_bytes = 0_u64;
@@ -346,6 +350,9 @@ fn read_snapshot_with_clock(
     let mut server_id = None;
 
     loop {
+        if elapsed() >= MAX_SNAPSHOT_ELAPSED {
+            return Err(ReadError::Budget("elapsed-time"));
+        }
         if expected_total.is_some_and(|total| items.len() < total)
             && snapshot_bytes >= MAX_SNAPSHOT_BYTES
         {
@@ -353,6 +360,9 @@ fn read_snapshot_with_clock(
         }
 
         let page = fetch_page(items.len())?;
+        if elapsed() >= MAX_SNAPSHOT_ELAPSED {
+            return Err(ReadError::Budget("elapsed-time"));
+        }
         if page.api_version != SUPPORTED_API_VERSION {
             return Err(ReadError::Contract("Zotero-API-Version"));
         }
@@ -414,6 +424,9 @@ fn read_snapshot_with_clock(
     );
     report.api_version = Some(SUPPORTED_API_VERSION);
     report.schema_version = schema_version;
+    if elapsed() >= MAX_SNAPSHOT_ELAPSED {
+        return Err(ReadError::Budget("elapsed-time"));
+    }
     Ok(report)
 }
 
