@@ -121,7 +121,7 @@ impl SourceObservationPort for CountedObservationPort {
 
     fn observe<'a>(
         &'a self,
-        request: &'a AuthorizedObservationRequest,
+        request: AuthorizedObservationRequest,
         _cancellation: &'a dyn ObservationCancellation,
     ) -> impl Future<Output = Result<Self::Snapshot, SourceObservationFailure>> + Send + 'a {
         async move {
@@ -175,16 +175,11 @@ fn wider_than_policy_resource_envelope_fails_before_adapter_source_or_snapshot_s
             .expect("caller-selected observation limits"),
     )
     .authorize(&CappedRegistry);
-    let denied_execution = authorization
-        .as_ref()
-        .ok()
-        .map(|authorized| port.observe(authorized, &Cancellation));
 
     assert_eq!(
         authorization,
         Err(ObservationRequestError::UnauthorizedResourceEnvelope)
     );
-    assert!(denied_execution.is_none());
     assert_eq!(port.adapter_invocations.load(Ordering::Relaxed), 0);
     assert_eq!(port.source_accesses.load(Ordering::Relaxed), 0);
     assert_eq!(port.snapshot_constructions.load(Ordering::Relaxed), 0);
@@ -212,7 +207,7 @@ fn equal_and_narrower_resource_envelopes_are_explicitly_admitted() {
 
     let port = CountedObservationPort::default();
     assert_eq!(
-        poll_ready(port.observe(&narrower, &Cancellation)),
+        poll_ready(port.observe(narrower, &Cancellation)),
         Ok(ObservationResourceEnvelope::new(
             narrower_budget,
             narrower_limits,
