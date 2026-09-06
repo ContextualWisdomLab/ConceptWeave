@@ -2,7 +2,58 @@ use conceptweave_zotero::{
     Disposition, EvaluationError, GoldenLabel, GoldenSetApproval, ItemData, ReviewedGoldenSet,
     SnapshotItemRevision, ZoteroItem, classification_proposal_digest,
     classification_snapshot_digest, classify_snapshot, evaluate_reviewed_golden_set,
+    validate_classification_report,
 };
+use sha2::{Digest, Sha256};
+
+#[test]
+fn legacy_proposal_receipt_is_rejected_without_calling_governance() {
+    let report = scope_report();
+    let mut golden = scope_golden(&report);
+    let mut proposals = report.classified_items.iter().collect::<Vec<_>>();
+    proposals.sort_by_key(|item| (&item.item_key, item.item_version));
+    let old_bytes =
+        serde_json::to_vec(&("conceptweave-classification-proposals-v1", proposals)).unwrap();
+    golden.approval.proposal_digest = format!("sha256:{:x}", Sha256::digest(old_bytes));
+    assert_eq!(
+        evaluate_reviewed_golden_set(&report, &golden, |_| panic!(
+            "legacy receipt reached governance"
+        )),
+        Err(EvaluationError::SnapshotMismatch)
+    );
+}
+
+#[test]
+fn empty_and_unresolved_scope_remain_valid_without_becoming_reviewed_papers() {
+    for (items, pending) in [
+        (vec![], vec![]),
+        (vec![child_note("S", 0, "")], vec!["S"]),
+        (vec![child_note("C", 1, "MISSING")], vec!["C"]),
+        (
+            vec![child_note("C", 1, "D"), child_note("D", 1, "C")],
+            vec!["C", "D"],
+        ),
+        (vec![child_note("C", 1, "C")], vec!["C"]),
+    ] {
+        let report = classify_snapshot("10.0.1".into(), None, 42, items);
+        assert_eq!(validate_classification_report(&report), Ok(()));
+        assert_eq!(report.pending_source_item_keys, pending);
+        assert!(report.classified_items.is_empty());
+    }
+}
+
+#[test]
+fn blank_snapshot_identity_is_rejected_before_governance() {
+    let mut report = scope_report();
+    report.snapshot_items[0].item_key = " \t\n".into();
+    let golden = scope_golden(&report);
+    assert_eq!(
+        evaluate_reviewed_golden_set(&report, &golden, |_| panic!(
+            "invalid identity reached governance"
+        )),
+        Err(EvaluationError::InvalidReview)
+    );
+}
 
 fn bibliographic(key: &str, version: u64, title: &str) -> ZoteroItem {
     ZoteroItem {
