@@ -4,6 +4,10 @@ All notable changes to ConceptWeave are documented here.
 
 ## Unreleased
 
+### Fixed
+
+- Zotero research intake rejects incomplete or late results after a five-minute read budget, even when individual pages arrive within their request limits.
+
 ### Added
 
 - Research inventory now separates message ancestry, data changes and work dependencies from reviewed semantic relationships, with release limits and owner follow-up evidence.
