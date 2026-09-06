@@ -1235,7 +1235,7 @@ mod tests {
         let retained = unique_temp_path("write-race-retained");
         assert!(!output.exists());
         assert!(!retained.exists());
-        let error = write_private_output_with(&output, b"content", |_, _| {
+        let error = write_private_output_with(&output, b"content", &mut |_, _| {
             let output = unique_temp_path("write-race");
             fs::rename(&output, unique_temp_path("write-race-retained"))?;
             let mut replacement = OpenOptions::new()
@@ -1259,15 +1259,16 @@ mod tests {
         let retained = unique_temp_path("write-buffer-retained");
         assert!(!output.exists());
         assert!(!retained.exists());
-        let error = write_private_output_with(&output, b"buffered content", |writer, content| {
-            fs::rename(
-                unique_temp_path("write-buffer"),
-                unique_temp_path("write-buffer-retained"),
-            )?;
-            writer.write_all(content)?;
-            Err(io::Error::new(io::ErrorKind::WriteZero, "injected failure"))
-        })
-        .unwrap_err();
+        let error =
+            write_private_output_with(&output, b"buffered content", &mut |writer, content| {
+                fs::rename(
+                    unique_temp_path("write-buffer"),
+                    unique_temp_path("write-buffer-retained"),
+                )?;
+                writer.write_all(content)?;
+                Err(io::Error::new(io::ErrorKind::WriteZero, "injected failure"))
+            })
+            .unwrap_err();
         let retained_bytes = fs::read(&retained).unwrap();
         fs::remove_file(retained).unwrap();
         assert_eq!(error.kind(), io::ErrorKind::WriteZero);
