@@ -1,9 +1,90 @@
 use conceptweave_zotero::{
     ClassificationItemState, ClassificationWriteOutcome, Disposition, ItemData, ItemTag,
     ReviewedClassificationChange, ReviewedClassificationWriteSet, WriteMode, WritePlanError,
-    ZoteroItem, build_classification_write_plan, classify_snapshot,
+    ZoteroItem, build_classification_write_plan, classification_proposal_digest, classify_snapshot,
     execute_classification_write_plan,
 };
+
+#[test]
+fn write_scope_rejects_changed_evidence_before_authority() {
+    let mut report = classification_report("10.0.1");
+    let review = reviewed(&report);
+    report.classified_items[0]
+        .title
+        .push_str(" changed evidence");
+    let called = std::cell::Cell::new(false);
+    let result = build_classification_write_plan(&report, &review, WriteMode::DryRun, |_| {
+        called.set(true);
+        true
+    });
+    assert_eq!(result, Err(WritePlanError::SnapshotMismatch));
+    assert!(!called.get());
+}
+
+#[test]
+fn write_scope_rejects_inconsistent_inventory_before_authority() {
+    for mutation in ["count", "pending", "audit"] {
+        let mut report = classification_report("10.0.1");
+        match mutation {
+            "count" => report.observed_item_count += 1,
+            "pending" => report.pending_source_item_keys.push("absent".into()),
+            "audit" => report.audit_summary.failure_count += 1,
+            _ => unreachable!(),
+        }
+        let review = reviewed(&report);
+        let called = std::cell::Cell::new(false);
+        let result = build_classification_write_plan(&report, &review, WriteMode::DryRun, |_| {
+            called.set(true);
+            true
+        });
+        assert_eq!(result, Err(WritePlanError::InvalidReview), "{mutation}");
+        assert!(!called.get(), "{mutation}");
+    }
+}
+
+#[test]
+fn write_scope_requires_binding_and_independent_approval() {
+    let mut report = classification_report("10.0.1");
+    let approved = reviewed(&report);
+    let mut serialized = serde_json::to_value(&approved).unwrap();
+    serialized
+        .as_object_mut()
+        .unwrap()
+        .remove("proposal_digest");
+    assert!(serde_json::from_value::<ReviewedClassificationWriteSet>(serialized).is_err());
+
+    let mut review = approved.clone();
+    review.proposal_digest = " ".into();
+    assert_eq!(
+        build_classification_write_plan(&report, &review, WriteMode::DryRun, |_| {
+            panic!("blank binding must not reach authority")
+        }),
+        Err(WritePlanError::InvalidReview)
+    );
+    let plan = build_classification_write_plan(&report, &approved, WriteMode::DryRun, |set| {
+        set == &approved
+    })
+    .unwrap();
+    assert_eq!(
+        serde_json::to_value(&plan).unwrap()["proposal_digest"],
+        approved.proposal_digest
+    );
+
+    report.classified_items[0]
+        .title
+        .push_str(" changed evidence");
+    review = approved.clone();
+    review.proposal_digest = classification_proposal_digest(&report);
+    let calls = std::cell::Cell::new(0);
+    assert_eq!(
+        build_classification_write_plan(&report, &review, WriteMode::DryRun, |set| {
+            calls.set(calls.get() + 1);
+            set == &approved
+        }),
+        Err(WritePlanError::UnverifiedApproval)
+    );
+    assert_eq!(calls.get(), 1);
+}
 
 fn tag(name: &str, tag_type: Option<u64>) -> ItemTag {
     ItemTag {
@@ -354,6 +435,7 @@ fn reviewed(report: &conceptweave_zotero::ClassificationReport) -> ReviewedClass
         library_version: report.library_version,
         rule_revision: report.rule_revision.into(),
         snapshot_digest: report.snapshot_digest.clone(),
+        proposal_digest: classification_proposal_digest(report),
         snapshot_items: report.snapshot_items.clone(),
         changes: vec![
             ReviewedClassificationChange {
@@ -583,6 +665,7 @@ fn write_plan_fails_closed_for_untrusted_stale_or_unsafe_changes() {
         library_version: no_server.library_version,
         rule_revision: no_server.rule_revision.into(),
         snapshot_digest: no_server.snapshot_digest.clone(),
+        proposal_digest: classification_proposal_digest(&no_server),
         snapshot_items: no_server.snapshot_items.clone(),
         changes: vec![ReviewedClassificationChange {
             item_key: "A".into(),
