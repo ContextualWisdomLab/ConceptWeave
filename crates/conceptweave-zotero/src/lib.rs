@@ -704,7 +704,6 @@ pub fn build_duplicate_merge_review_manifest<F>(
 where
     F: FnOnce(&ReviewedDuplicateMergeSet) -> bool,
 {
-    validate_classification_report(report).map_err(|_| DuplicateReviewError::InvalidReview)?;
     if reviewed.review_id.trim().is_empty()
         || reviewed.authority_receipt.trim().is_empty()
         || reviewed.snapshot_digest.trim().is_empty()
@@ -723,6 +722,7 @@ where
     {
         return Err(DuplicateReviewError::SnapshotMismatch);
     }
+    validate_classification_report(report).map_err(|_| DuplicateReviewError::InvalidReview)?;
     let item_revisions = report
         .snapshot_items
         .iter()
