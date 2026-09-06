@@ -4,7 +4,13 @@
 
 This file records code-current product and technical gaps. Exact PR/check/run coordinates are evidence snapshots, not mutable-head dependencies. Live protected-branch, PR, issue and workflow state wins whenever it advances after this snapshot. Because this documentation update creates a Foundation successor, the Foundation SHA below is the exact pre-refresh head; PR metadata must be refreshed to the resulting successor SHA.
 
-## Protected truth and active stack
+## September 6 source inventory checkpoint
+
+The existing #9 owner now retains every nonbibliographic metadata record and derives unresolved ancestry rather than silently discarding standalone sources. [Source-scope doctoring](doctoring/zotero_source_scope.md) binds committed REDs, final source `1e95d6eb979e66ecb7dae4f81f18a6b0a91b7624`, **47 tests / 10 unfiltered suites**, strict checks and the unchanged coverage gate. The earlier inventory executable at `48c3525` genuinely reads 8,326 records into 3,715 unchanged bibliographic proposals plus 4,611 other records, with exactly the four previously audited standalone identities pending. A later shared-reader guard also rejects blank identities; no actual final-guard executable replay is implied.
+
+The earlier source findings are repaired locally, not yet propagated into root #39. Required downstream restoration/identity accounting, pending-source reconciliation, approval binding and full-library completion gates remain open; neither zero pending keys nor successful classification grants semantic or write authority. Current native Visual Inspection was attempted but the Mac is locked, so no new screenshot was verified. Historical source scope, authentic worksheet decisions/independent approvals 0/3,715, plus four unresolved sources remain distinct. This checkpoint does not refresh every historical PR coordinate below or imply protected merge/release.
+
+## Historical protected truth and active stack
 
 Protected/default `main` remains `f4f440dd58c77d7cd90dff8a1eb2eeb9a9940425`; only the bootstrap state is shipped there and no immutable ConceptWeave release exists.
 
@@ -47,6 +53,14 @@ Protected central source is `.github/main@b5efbc2762e472e4a380b0503b1f050f76fbb0
 - The current central source includes queue/admission and changed-scope/review-runtime repairs already integrated through ordinary protected history.
 - `.github#1873@41935494aa234eb458f1cc08f006daaa278b9760` is closed/unmerged because repository dependency-graph initialization, not its retry/sleep source delta, was the verified root cause of the observed public-repository 403.
 - #35 remains an exact consumer canary for current runner admission and Dependency Review behavior. Its central workflows are queued, so no protected recovery or dependency-review success is inferred from repository settings alone.
+
+## September 6 source-scope admission checkpoint
+
+Follow-up runtime `8ccb0d5b3d7705786b6c40c3bcf5a10ff32046d9` adds explicit legacy receipt/empty/orphan/cycle/blank-identity regressions and removes only checks proven redundant after shared admission. Local workspace tests: 71/14 unfiltered suites including two doctests; strict Clippy, warnings-denied rustdoc, release build, format and diff checks passed. Independent read-only review reran 15 integrity tests and found no actionable defect. Unchanged pinned coverage gate passed: functions 136/136, normalized owned regions 1,037/1,037 and branches 174/174. Raw lines 1,448/1,451, regions 2,268/2,279 and branches 169/174 remain below 100%; no raw full-coverage claim is made. Logs: `/tmp/conceptweave-admission-coverage-baseline.log`, `/tmp/conceptweave-admission-coverage-green.log`, `/tmp/conceptweave-admission-boundary-tests.log`.
+
+PR #10 source `f6735b585022aac1c8ceff86c150d9b64fd77ec2` repairs evaluation admission and independently approved scope binding after normal integration of producer `51c7df6d03f072449422fd58ca24b2f9d6026f07`. RED `3f2cf55` failed three new integrity tests; GREEN passed 68 tests/14 unfiltered suites and strict Clippy. See the Proposed [ADR 0006 amendment](adr/0006-zotero-research-intake.md). This local result does not establish hosted GREEN, protection-compliant merge, release, downstream adoption or full coverage.
+
+Remaining work: mandatory adoption by restoration, worksheet, duplicate and write consumers without empty defaults or weakened full-text binding. Genuine reviewed decisions and approvals remain 0/3,715 bibliographic proposals, with four additional standalone sources unresolved. Native visual inspection remains unverified at this checkpoint because the Mac was locked. No UI change or new utility repository was needed.
 
 ## P0 product gaps
 
