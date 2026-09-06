@@ -9,8 +9,8 @@ use std::{
 
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, ObservationLimits, ObservationRequest,
-    ObservationRequestBudget, ResolvedSourceConnection, SourceConnectionRegistry,
-    SourceObservationFailure, SourceObservationPort,
+    ObservationRequestBudget, ObservationResourceEnvelope, ResolvedSourceConnection,
+    SourceConnectionRegistry, SourceObservationFailure, SourceObservationPort,
 };
 
 struct MutableRegistry {
@@ -36,6 +36,25 @@ impl SourceConnectionRegistry for MutableRegistry {
             && source_connection.connection_policy_binding()
                 == *self.active_binding.lock().expect("binding lock")
             && allowed_schema_names == ["governance_core"]
+    }
+
+    fn authorizes_resource_envelope(
+        &self,
+        source_connection: &ResolvedSourceConnection,
+        resource_envelope: ObservationResourceEnvelope,
+    ) -> bool {
+        let request_budget = resource_envelope.request_budget();
+        let limits = resource_envelope.limits();
+        source_connection.source_connection_key() == "grc_readonly_connection"
+            && source_connection.connection_policy_binding()
+                == *self.active_binding.lock().expect("binding lock")
+            && request_budget.max_schema_count() <= 4
+            && request_budget.max_schema_bytes() <= 256
+            && limits.operation_timeout_ms() <= 1_000
+            && limits.statement_timeout_ms() <= 1_000
+            && limits.max_rows() <= 10
+            && limits.max_bytes() <= 1_024
+            && limits.max_concurrent_queries() <= 1
     }
 }
 
@@ -112,7 +131,7 @@ fn stale_connection_policy_binding_fails_before_source_or_snapshot_side_effects(
     };
     let authorized = request()
         .authorize(&registry)
-        .expect("revision A source and exact schema scope are authorized");
+        .expect("revision A source, exact schema scope and resource envelope are authorized");
     assert_eq!(
         authorized.source_connection().connection_policy_binding(),
         "policy_revision_a"
@@ -142,7 +161,7 @@ fn unchanged_connection_policy_binding_executes_exactly_once() {
     };
     let authorized = request()
         .authorize(&registry)
-        .expect("revision A source and exact schema scope are authorized");
+        .expect("revision A source, exact schema scope and resource envelope are authorized");
     let adapter = RetargetableAdapter {
         active_binding,
         source_accesses: AtomicUsize::new(0),
