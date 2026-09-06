@@ -1,6 +1,6 @@
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationLimits, ObservationRequest, ObservationRequestBudget,
-    ResolvedSourceConnection, SourceConnectionRegistry,
+    ObservationResourceEnvelope, ResolvedSourceConnection, SourceConnectionRegistry,
 };
 
 const TEST_POLICY_BINDING: &str = "fixture_policy_revision_a";
@@ -32,6 +32,24 @@ impl SourceConnectionRegistry for ExactRegistry<'_> {
                     .iter()
                     .any(|allowed| *allowed == schema_name.as_str())
             })
+    }
+
+    fn authorizes_resource_envelope(
+        &self,
+        source_connection: &ResolvedSourceConnection,
+        resource_envelope: ObservationResourceEnvelope,
+    ) -> bool {
+        let request_budget = resource_envelope.request_budget();
+        let limits = resource_envelope.limits();
+        source_connection.source_connection_key() == self.source_connection_key
+            && source_connection.connection_policy_binding() == TEST_POLICY_BINDING
+            && request_budget.max_schema_count() <= 8
+            && request_budget.max_schema_bytes() <= 512
+            && limits.operation_timeout_ms() <= 1_000
+            && limits.statement_timeout_ms() <= 1_000
+            && limits.max_rows() <= 10
+            && limits.max_bytes() <= 1_024
+            && limits.max_concurrent_queries() <= 1
     }
 }
 
