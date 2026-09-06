@@ -66,6 +66,8 @@ Read a complete Zotero Local API observation with one consistent library version
 
 Evaluate classifier quality only against a steward-reviewed local golden set whose governance receipt is externally verified and binds both the complete source/classifier-input snapshot and every current proposal field, in addition to the item-key/item-version coordinates. Same-version changes to unmodeled provider metadata, absent/default fields, classifier inputs, predictions or supporting evidence must invalidate the corresponding binding. Evaluation recomputes proposal identity before contacting governance; a locally changed digest cannot renew an approval. Legacy unbound approvals require reissuance, never automatic backfill. Abstention is a prediction outcome, never an approved truth label. Evaluation emits the verified library revision, rule revision, opaque snapshot and proposal digests, and aggregate counts for exact matches, abstentions, and per-disposition true-positive/predicted/expected totals; it must not copy Zotero keys, reviewer identity, or bibliographic text into the result.
 
+Every successful classification report includes aggregate evidence for snapshot coverage, proposal coverage, provenance completeness, abstentions, duplicate candidates, disposition totals, and zero unreported failures.
+
 ## 6. First vertical slice
 
 Relational schema snapshot -> observed tables/columns/foreign keys -> concept/relation/dimension/measure/mapping candidates -> evidence-bound validation report -> reviewable proposal package.

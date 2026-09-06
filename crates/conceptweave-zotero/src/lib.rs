@@ -223,6 +223,29 @@ pub struct ClassificationReport {
     pub pending_source_item_keys: Vec<String>,
     /// Reversible DOI/title duplicate candidates.
     pub duplicate_candidates: Vec<DuplicateCandidate>,
+    /// Aggregate completeness evidence for this successful snapshot.
+    pub audit_summary: ClassificationAudit,
+}
+
+/// Aggregate-only evidence that a successful report covers its input and proposals.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ClassificationAudit {
+    /// Records captured from the immutable snapshot.
+    pub snapshot_item_count: usize,
+    /// Top-level bibliographic records eligible for classification.
+    pub bibliographic_item_count: usize,
+    /// Eligible records with exactly one proposed disposition.
+    pub proposed_disposition_count: usize,
+    /// Proposals retaining required item and classifier provenance.
+    pub provenance_complete_count: usize,
+    /// Proposals routed to steward review.
+    pub abstention_count: usize,
+    /// Reversible duplicate identity groups.
+    pub duplicate_candidate_count: usize,
+    /// Reader or classifier failures; successful reports always record zero.
+    pub failure_count: usize,
+    /// Proposal totals by disposition.
+    pub disposition_counts: BTreeMap<Disposition, usize>,
 }
 
 /// One steward-reviewed expected disposition in a local golden set.
@@ -432,6 +455,15 @@ pub fn validate_classification_report(
         {
             return Err(invalid);
         }
+    }
+    if report.audit_summary
+        != classification_audit(
+            &report.snapshot_items,
+            &report.classified_items,
+            report.duplicate_candidates.len(),
+        )
+    {
+        return Err(invalid);
     }
     let mut reported_pending = report.pending_source_item_keys.clone();
     reported_pending.sort();
@@ -847,7 +879,7 @@ pub fn classify_snapshot(
     mut items: Vec<ZoteroItem>,
 ) -> ClassificationReport {
     items.sort_by(|left, right| left.key.cmp(&right.key));
-    let snapshot_items = items
+    let snapshot_items: Vec<_> = items
         .iter()
         .map(|item| SnapshotItemRevision {
             item_key: item.key.clone(),
@@ -865,7 +897,7 @@ pub fn classify_snapshot(
     let bibliographic: Vec<&ZoteroItem> =
         items.iter().filter(|item| is_bibliographic(item)).collect();
     let duplicate_candidates = duplicate_candidates(&bibliographic);
-    let classified_items: Vec<_> = bibliographic
+    let classified_items: Vec<ClassifiedItem> = bibliographic
         .into_iter()
         .map(|item| classify_item(item, children.get(&item.key).cloned().unwrap_or_default()))
         .collect();
@@ -876,6 +908,12 @@ pub fn classify_snapshot(
         .collect();
     let pending_source_item_keys =
         pending_source_keys(&classified_items, &unclassified_items, children);
+
+    let audit_summary = classification_audit(
+        &snapshot_items,
+        &classified_items,
+        duplicate_candidates.len(),
+    );
 
     ClassificationReport {
         zotero_version,
@@ -891,6 +929,49 @@ pub fn classify_snapshot(
         unclassified_items,
         pending_source_item_keys,
         duplicate_candidates,
+        audit_summary,
+    }
+}
+
+fn classification_audit(
+    snapshot_items: &[SnapshotItemRevision],
+    classified_items: &[ClassifiedItem],
+    duplicate_candidate_count: usize,
+) -> ClassificationAudit {
+    let mut identity_counts = BTreeMap::new();
+    for item in snapshot_items {
+        *identity_counts
+            .entry(item.item_key.as_str())
+            .or_insert(0usize) += 1;
+    }
+    let mut disposition_counts = BTreeMap::new();
+    for item in classified_items {
+        *disposition_counts
+            .entry(item.proposed_disposition)
+            .or_insert(0) += 1;
+    }
+    ClassificationAudit {
+        snapshot_item_count: snapshot_items.len(),
+        bibliographic_item_count: classified_items.len(),
+        proposed_disposition_count: classified_items.len(),
+        provenance_complete_count: classified_items
+            .iter()
+            .filter(|item| {
+                !item.item_key.trim().is_empty()
+                    && identity_counts.get(item.item_key.as_str()) == Some(&1)
+                    && item.child_item_keys.iter().all(|child_key| {
+                        !child_key.trim().is_empty()
+                            && identity_counts.get(child_key.as_str()) == Some(&1)
+                    })
+            })
+            .count(),
+        abstention_count: classified_items
+            .iter()
+            .filter(|item| item.proposed_disposition == Disposition::NeedsStewardReview)
+            .count(),
+        duplicate_candidate_count,
+        failure_count: 0,
+        disposition_counts,
     }
 }
 

@@ -63,6 +63,20 @@ fn verify_synthetic_approval(golden: &ReviewedGoldenSet) -> bool {
 #[test]
 fn reviewed_golden_set_reports_count_based_precision_and_recall_evidence() {
     let report = report();
+    assert_eq!(report.audit_summary.snapshot_item_count, 3);
+    assert_eq!(report.audit_summary.bibliographic_item_count, 3);
+    assert_eq!(report.audit_summary.proposed_disposition_count, 3);
+    assert_eq!(report.audit_summary.provenance_complete_count, 3);
+    assert_eq!(report.audit_summary.abstention_count, 1);
+    assert_eq!(report.audit_summary.failure_count, 0);
+    assert_eq!(
+        report
+            .audit_summary
+            .disposition_counts
+            .values()
+            .sum::<usize>(),
+        3
+    );
     let evaluation = evaluate_reviewed_golden_set(
         &report,
         &golden(vec![
@@ -225,4 +239,12 @@ fn reviewed_golden_set_rejects_stale_unknown_and_duplicate_labels() {
     ] {
         assert!(error.to_string().contains(fragment));
     }
+
+    let blank_key_report = classify_snapshot(
+        "9.0.6".into(),
+        None,
+        42,
+        vec![item(" ", "ontology learning")],
+    );
+    assert_eq!(blank_key_report.audit_summary.provenance_complete_count, 0);
 }
