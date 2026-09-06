@@ -139,6 +139,10 @@ mod tests {
 
         assert!(validate_output_path("relative.json").is_err());
         assert!(validate_output_path("/").is_err());
+        let missing_name =
+            validate_output_path(env::temp_dir().join("..").to_str().unwrap()).unwrap_err();
+        assert_eq!(missing_name.kind(), io::ErrorKind::InvalidInput);
+        assert_eq!(missing_name.to_string(), "report output has no file name");
         assert!(validate_output_path("/tmp/missing-directory/report.json").is_err());
         assert!(
             validate_output_path(
@@ -231,7 +235,8 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
         let output = unique_temp_path("permission-replaced");
         let retained = unique_temp_path("permission-original");
-        assert!(!output.exists() && !retained.exists());
+        assert!(!output.exists());
+        assert!(!retained.exists());
         let error = create_report_file_with(&output, |file| {
             assert_eq!(file.metadata()?.permissions().mode() & 0o077, 0);
             fs::rename(
@@ -250,9 +255,7 @@ mod tests {
         })
         .unwrap_err();
         let preserved = fs::read(&output).ok();
-        if output.exists() {
-            fs::remove_file(&output).unwrap();
-        }
+        let _ = fs::remove_file(&output);
         fs::remove_file(retained).unwrap();
         assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
         assert_eq!(
