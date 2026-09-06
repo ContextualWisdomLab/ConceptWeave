@@ -18,6 +18,10 @@ cargo +1.98.0 run --bin conceptweave-zotero -- --apply-decision-patch /tmp/repor
 
 All three inputs must be separate owner-only files from the same immutable snapshot. The output is create-new and owner-only; this offline step neither changes Zotero nor grants governance approval.
 
+If file-permission setup fails, the command stops before writing report content.
+An empty file may remain; inspect it before removing it. The command does not
+delete a pathname that another process may have replaced.
+
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ContextualWisdomLab/ConceptWeave)
 
 **Automatic, evidence-bound ontology and semantic-layer engineering for governed enterprise meaning.**

@@ -31,6 +31,7 @@ fn decision_patch_cli_writes_one_owner_only_updated_worksheet() {
     );
     let worksheet = build_steward_review_worksheet(&report).unwrap();
     let patch = StewardDecisionPatch {
+        proposal_digest: worksheet.proposal_digest.clone(),
         library_version: report.library_version,
         rule_revision: report.rule_revision.clone(),
         snapshot_digest: report.snapshot_digest.clone(),
@@ -122,6 +123,7 @@ fn decision_patch_cli_never_overwrites_or_emits_invalid_work() {
     );
     let worksheet = build_steward_review_worksheet(&report).unwrap();
     let invalid_patch = StewardDecisionPatch {
+        proposal_digest: worksheet.proposal_digest.clone(),
         library_version: report.library_version + 1,
         rule_revision: report.rule_revision.clone(),
         snapshot_digest: report.snapshot_digest.clone(),
