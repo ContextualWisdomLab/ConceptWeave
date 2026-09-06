@@ -19,6 +19,7 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
+- Full-library research-source audit separating available text, incomplete indexing and missing material from reviewed classification; no paper is excluded because its abstract or text is unavailable.
 - Initial ConceptWeave product, DDD, security, test, and operability baselines.
 - Rust 1.98.0 `conceptweave-domain` foundation with evidence-bound semantic candidate contracts.
 - Fail-closed Draft -> Proposed -> Validated -> Reviewed -> Published lifecycle with explicit rejection and supersession.
@@ -32,6 +33,7 @@ All notable changes to ConceptWeave are documented here.
 - An explicit `--worksheet` CLI mode that writes the live worksheet with owner-only report protections.
 - Fail-closed conversion from a fully decided worksheet to the existing externally verified golden-set boundary.
 - Lossless owner-only classification-report deserialization for offline review finalization.
+- Context-bound validation and owner-only application of completed steward review batches.
 
 ### Security
 

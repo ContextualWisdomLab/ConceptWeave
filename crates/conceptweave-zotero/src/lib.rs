@@ -102,6 +102,7 @@ pub struct ItemData {
 
 /// A Zotero item tag.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ItemTag {
     /// Tag text.
     pub tag: String,
@@ -146,6 +147,7 @@ pub enum AbstentionReason {
 
 /// Evidence for a deterministic proposed disposition.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ClassificationEvidence {
     /// Metadata fields whose values matched.
     pub fields: Vec<String>,
@@ -1176,6 +1178,7 @@ pub struct StewardDecisionUpdate {
 
 /// A bounded set of local steward decisions for one immutable classification snapshot.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct StewardDecisionPatch {
     /// Zotero library revision shared with the report and worksheet.
     pub library_version: u64,
@@ -1193,7 +1196,8 @@ pub struct StewardDecisionPatch {
 pub const MAX_REVIEW_BATCH_ITEMS: usize = 100;
 
 /// One pending decision with the report context required for human review.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct StewardReviewBatchDecision {
     /// Stable Zotero item key used to apply the completed decision.
     pub item_key: String,
@@ -1220,7 +1224,8 @@ pub struct StewardReviewBatchDecision {
 }
 
 /// Deterministic owner-only view of the next pending steward decisions.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct StewardReviewBatch {
     /// Zotero library revision shared with the report and worksheet.
     pub library_version: u64,
@@ -1453,6 +1458,43 @@ pub fn apply_steward_decision_patch(
         return Err(WorksheetError::InvalidReport);
     }
     Ok(updated)
+}
+
+/// Converts a completed review batch only when its presented context is unchanged.
+pub fn decision_patch_from_review_batch(
+    report: &ClassificationReport,
+    worksheet: &StewardReviewWorksheet,
+    batch: &StewardReviewBatch,
+) -> Result<StewardDecisionPatch, WorksheetError> {
+    if batch.decisions.is_empty() {
+        return Err(WorksheetError::InvalidReport);
+    }
+    let expected = build_steward_review_batch(report, worksheet, batch.decisions.len())?;
+    let mut reviewed_context = batch.clone();
+    let mut decisions = Vec::with_capacity(reviewed_context.decisions.len());
+    for decision in &mut reviewed_context.decisions {
+        let Some(reviewed_disposition) = decision.reviewed_disposition.take() else {
+            return Err(WorksheetError::InvalidReport);
+        };
+        if reviewed_disposition == Disposition::NeedsStewardReview {
+            return Err(WorksheetError::InvalidReport);
+        }
+        decisions.push(StewardDecisionUpdate {
+            item_key: decision.item_key.clone(),
+            item_version: decision.item_version,
+            reviewed_disposition,
+        });
+    }
+    if reviewed_context != expected {
+        return Err(WorksheetError::InvalidReport);
+    }
+    Ok(StewardDecisionPatch {
+        library_version: expected.library_version,
+        rule_revision: expected.rule_revision,
+        snapshot_digest: expected.snapshot_digest,
+        proposal_digest: expected.proposal_digest,
+        decisions,
+    })
 }
 
 fn validate_steward_review_worksheet_against(
