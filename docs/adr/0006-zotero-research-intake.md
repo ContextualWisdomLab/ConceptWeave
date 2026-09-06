@@ -176,6 +176,14 @@ PR30 exposes incremental local progress and extracts shared worksheet comparison
 
 We reject snapshot-only identity because restored proposal and retained metadata can change under that coordinate. We reject treating nonbibliographic sources as paper decisions because their disposition is not inferred truth. We report both scopes, require zero pending sources for local completion, and retain separate approval and write gates. No new digest, source-text export or authority mechanism is added. Existing early finalization checks preserve error precedence. The stricter completion meaning corrects consumers that equated filled slots with complete source scope; later consumers must inherit it before claiming preparation completion. Protected review and release remain pending.
 
+### September 7 pending full-text view source scope (Proposed)
+
+PR37's read-only evidence view must preserve the source scope inherited from PR36 without turning viewing into a decision or approval. Normal merge `c4d40f7` preserves the child view and private-reader refactor together with complete retained-source validation, nonblocking opens and failure-safe buffered output. The PRD conflict is resolved by retaining both view requirements and duplicate-governance requirements.
+
+The existing view builder first validates the worksheet through the shared batch builder and then verifies the capture against the complete report. We retain this sequence and its existing digests. A new validator or hash would duplicate the owner boundary without adding authority. Tests `cd830ff` check nested proposal identity, unresolved source count and exclusion of standalone text from paper rows. A fresh worksheet for changed retained metadata must still reject an old capture even when the raw snapshot identity is unchanged. Blank worksheet binding also fails closed.
+
+The consequence is that unresolved sources remain visible as a count but cannot be silently classified as papers. View generation remains read-only and does not resolve their relationships. Full-text application and finalization must retain the outer evidence envelope; metadata-only downcasting is not full-text review. This local repair is proposed pending downstream adoption, independent review, hosted verification and protected merge. It neither issues approval nor writes Zotero.
+
 ### September 6 duplicate source-scope admission (Proposed)
 
 PR #12 already binds exact candidate membership and complete item revisions in `ReviewedDuplicateMergeSet`; the prior audit-owner concern about unbound duplicate authority therefore does not describe this consumer. Its real remaining gap was that retained metadata and inventory were absent from its receipt, and external verification preceded local decision checks. RED `4656d6b` reproduced missing legacy scope binding, malformed inventory accepted, and altered standalone evidence reaching governance.
