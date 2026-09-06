@@ -50,10 +50,13 @@ sequenceDiagram
 
     loop bounded pages
         Intake->>Zotero: read items at one library version
-        Zotero-->>Intake: items + immutable version headers
+        Zotero-->>Intake: items + observed library version
+        Intake->>Intake: validate page consistency and every item revision; fail entire read on mismatch
     end
     Intake->>Intake: classify or abstain; link children; find duplicate candidates
-    Intake->>Report: write proposals and evidence
+    Intake->>Intake: retain excluded metadata; traverse parent links from bibliographic roots
+    Intake->>Report: write proposals, complete inventory and unresolved source keys
+    Note over Report,Steward: Pending sources prevent a whole-library completion claim; inventory is not approval
     Intake->>Report: derive snapshot-bound decision worksheet without bibliographic text
     Report->>Steward: review dispositions and merge candidates
     Steward->>Intake: save partially completed worksheet
@@ -61,11 +64,18 @@ sequenceDiagram
     Steward->>Intake: completed worksheet + approval receipt
     Intake->>Report: offline finalization against the original saved report
     Report-->>Steward: reviewed golden set or fail-closed validation error
-    Intake-->>Steward: aggregate completion evidence or incomplete-review failure
+    Steward->>Intake: reviewed labels and independently issued receipt
+    Intake->>Intake: validate complete partitions and recompute pending ancestry
+    Intake->>Intake: verify v2 proposal and retained-source binding
+    Note over Intake,Steward: Only locally valid reports reach independent governance verification
+    Intake-->>Steward: aggregate bibliographic review evidence or incomplete-review failure
     Steward->>Intake: verified canonical-item decisions
     Intake->>Report: before/after/rollback identity manifest
     Report-->>Steward: reversible local mapping; source records preserved
-    Steward->>Intake: verified collection/tag changes
+    Steward->>Intake: reviewed collection/tag changes and receipt
+    Intake->>Intake: existing item/metadata gates; shared inventory/audit validation; v2 binding
+    Intake->>Steward: independently verify complete reviewed set
+    Steward-->>Intake: authority result, not a replacement digest
     Intake->>Report: dry-run write plan with exact rollback state
     Intake-->>Zotero: Zotero 9 execute rejected
     opt caller supplies authenticated Zotero 10+ adapter
@@ -76,5 +86,6 @@ sequenceDiagram
             Zotero-->>Intake: post-write revision and complete state
         end
         Intake->>Report: applied/failed/untouched receipt + reverse rollback operations
+        Note over Intake,Report: Failed response stays unknown; retain exact request and observation, no inferred inverse
     end
 ```

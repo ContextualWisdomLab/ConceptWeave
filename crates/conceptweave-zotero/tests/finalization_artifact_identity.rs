@@ -35,6 +35,7 @@ fn artifact_commands_reject_distinct_path_spellings_for_one_input_file() {
         library_version: worksheet.library_version,
         rule_revision: worksheet.rule_revision.clone(),
         snapshot_digest: worksheet.snapshot_digest.clone(),
+        proposal_digest: worksheet.proposal_digest.clone(),
         proposal_digest: conceptweave_zotero::classification_proposal_digest(&report),
         snapshot_items: worksheet.snapshot_items.clone(),
     };

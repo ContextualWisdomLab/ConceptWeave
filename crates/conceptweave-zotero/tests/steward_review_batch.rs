@@ -149,6 +149,35 @@ fn review_batch_rejects_invalid_or_complete_workloads() {
 }
 
 #[test]
+fn batch_keeps_pending_scope_separate_from_bibliographic_slots() {
+    let mut source = item("PRIVATE_SOURCE", "unresolved source", "");
+    source.data.item_type = "attachment".into();
+    let report = classify_snapshot(
+        "9.0.6".into(),
+        None,
+        42,
+        vec![item("A", "unmatched", "context"), source],
+    );
+    let mut worksheet = build_steward_review_worksheet(&report).unwrap();
+    let batch = build_steward_review_batch(&report, &worksheet, 1).unwrap();
+    let value = serde_json::to_value(&batch).unwrap();
+    assert_eq!(value["pending_source_count"], 1);
+    assert_eq!(value["proposal_digest"], worksheet.proposal_digest);
+    assert_eq!(batch.remaining_count, 1);
+    assert!(!value.to_string().contains("PRIVATE_SOURCE"));
+    worksheet.decisions[0].reviewed_disposition = Some(Disposition::OutOfScope);
+    assert_eq!(
+        build_steward_review_batch(&report, &worksheet, 1),
+        Err(WorksheetError::NoPendingDecisions)
+    );
+    assert!(
+        !conceptweave_zotero::assess_steward_review_progress(&report, &worksheet)
+            .unwrap()
+            .complete
+    );
+}
+
+#[test]
 fn completed_review_batch_must_preserve_the_context_shown_to_the_steward() {
     let report = classify_snapshot(
         "9.0.6".into(),
