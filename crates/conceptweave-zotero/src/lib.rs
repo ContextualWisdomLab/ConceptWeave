@@ -711,11 +711,15 @@ fn classify_abstention_reason(fields: &[(&'static str, &str, &str)]) -> Abstenti
     {
         return AbstentionReason::MissingClassificationMetadata;
     }
-    if fields.iter().any(|(_, _, original)| {
+    let has_alphabetic = fields.iter().any(|(_, _, original)| {
+        original.chars().any(|character| character.is_alphabetic())
+    });
+    let has_ascii_alphabetic = fields.iter().any(|(_, _, original)| {
         original
             .chars()
-            .any(|character| character.is_alphabetic() && !character.is_ascii())
-    }) {
+            .any(|character| character.is_ascii_alphabetic())
+    });
+    if has_alphabetic && !has_ascii_alphabetic {
         return AbstentionReason::UnsupportedRuleVocabulary;
     }
     AbstentionReason::NoDeterministicRuleMatch
