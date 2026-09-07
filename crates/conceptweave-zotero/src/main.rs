@@ -65,6 +65,17 @@ fn open_new_output(path: &Path) -> io::Result<fs::File> {
     options.open(path)
 }
 
+fn write_report<T: serde::Serialize>(
+    output: &Path,
+    report: &T,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let file = open_new_output(output)?;
+    let mut writer = BufWriter::new(file);
+    serde_json::to_writer_pretty(&mut writer, report)?;
+    writer.flush()?;
+    Ok(())
+}
+
 #[cfg_attr(coverage_nightly, coverage(off))]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
@@ -75,11 +86,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if report.zotero_version.starts_with("9.") {
         eprintln!("Zotero 9 Local API is read-only; writing a local proposal report only");
     }
-    let file = open_new_output(&output)?;
-    let mut writer = BufWriter::new(file);
-    serde_json::to_writer_pretty(&mut writer, &report)?;
-    writer.flush()?;
-    Ok(())
+    write_report(&output, &report)
 }
 
 #[cfg(test)]
