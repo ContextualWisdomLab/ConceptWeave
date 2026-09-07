@@ -146,6 +146,16 @@ Research Intake remains the existing owner. A new utility repository has no demo
 
 ## KPI and next actions
 
+### Veilpick ontology-planning depth audit (2026-09-07)
+
+This deepens an existing candidate; audited coverage remains 37/76. Fresh protected `develop@8fd6931092ccc2076b10e9eb23ac99b404a9880e` still contains only LICENSE in a complete tree, and no GitHub release was returned. Open [PR1](https://github.com/ContextualWisdomLab/Veilpick/pull/1) at `24ee7474f02457418b120018f4c6ba6c99de66b9` contains proposed architecture, not protected implementation. Its fully read [ADR0002](https://github.com/ContextualWisdomLab/Veilpick/blob/24ee7474f02457418b120018f4c6ba6c99de66b9/docs/adr/0002-ontology-based-autonomous-rust-engine.md) and [ADR0003](https://github.com/ContextualWisdomLab/Veilpick/blob/24ee7474f02457418b120018f4c6ba6c99de66b9/docs/adr/0003-stealth-and-ecosystem-composition.md) label product decisions Accepted while explicitly withholding implementation acceptance. This inventory treats those open-PR documents as proposed dependency evidence, not an accepted protected or released contract.
+
+The proposal separates task-local inferred working models from ConceptWeave's reviewed/published semantic truth, delegates browser authority to OriginWeave and provider routing to CO, and retains shared assertion semantics. It distinguishes observed occurrence, normalization, inference and validation; a chosen OWL/SHACL profile, serialization, reasoner and Rust library are still subsequent decisions. No standards conformance or live adapter was verified here.
+
+Draft [PR2](https://github.com/ContextualWisdomLab/Veilpick/pull/2) at `30bb16417c42f0478200b9ce2dade2bcd0d53c64` targets PR1's branch. Its complete [frontier module](https://github.com/ContextualWisdomLab/Veilpick/blob/30bb16417c42f0478200b9ce2dade2bcd0d53c64/src/frontier.rs) and [contract tests](https://github.com/ContextualWisdomLab/Veilpick/blob/30bb16417c42f0478200b9ce2dade2bcd0d53c64/tests/frontier_contract.rs) were inspected, not executed. The bounded queue treats identifiers as opaque, validates declared concept membership, deduplicates lifetime target identities, orders by distinct supplied hint count then admission order, and preserves exhausted work. `Drained` is explicitly not collection success. No URL authorization, network I/O, ontology induction, reasoner or empirical ranking model is implemented by this module. A candidate with more caller-provided hints is scheduled sooner; that is not observed relevance, calibrated confidence or a justified weight for Zotero classification.
+
+Cultivation should stay in Veilpick's existing stack: establish the supported semantic profile and evidence-bound extraction contract, prove goal-to-result correctness with fixed failures/unsupported cases, and consume released owner adapters before claiming usable ontology-guided acquisition. Do not import mutable frontier source or reinterpret queue completion as an approved semantic release. This inspection performs no website acquisition or challenge-resolution operation and does not evaluate those product claims. DeepWiki had no repository index; exact GitHub sources supplied the bounded findings.
+
 ### Noema release-admission boundary (2026-09-07)
 
 | Candidate | Responsibility and exact source | Release and cultivation gate |
@@ -199,6 +209,10 @@ Cultivation belongs in that existing owner stack: establish licensed, protected 
 Review the repaired current snapshot, including missing-abstract and unsupported-vocabulary records, while obtaining exact-head protected Foundation/review evidence. Do not replace the full denominator with a hand-picked success sample or heuristic relevance threshold. Maturity observations select the owner for future work, not the labels to silently assign to papers.
 
 ## References
+
+ContextualWisdomLab. (2026). *Veilpick proposed ecosystem architecture* (Commit 24ee7474f02457418b120018f4c6ba6c99de66b9) [Unmerged source proposal]. GitHub. https://github.com/ContextualWisdomLab/Veilpick/tree/24ee7474f02457418b120018f4c6ba6c99de66b9
+
+ContextualWisdomLab. (2026). *Veilpick bounded frontier proposal* (Commit 30bb16417c42f0478200b9ce2dade2bcd0d53c64) [Unmerged source proposal]. GitHub. https://github.com/ContextualWisdomLab/Veilpick/tree/30bb16417c42f0478200b9ce2dade2bcd0d53c64
 
 ContextualWisdomLab. (2026). *Learning Content Studio* (Commit b796e049409e14deb3939985721ff07b5ef62623) [Source repository]. GitHub. https://github.com/ContextualWisdomLab/learning-content-studio/tree/b796e049409e14deb3939985721ff07b5ef62623
 
