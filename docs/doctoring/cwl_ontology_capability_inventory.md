@@ -2,7 +2,7 @@
 
 Evidence snapshot: 2026-09-07. Status: research inventory, not dependency-adoption approval.
 
-September 7 adds noema's bounded release-admission audit: **34/76** of the September 6 census are now audited, leaving **42** in that historical denominator. Release-bearing candidates remain **7/34**; verified adoption remains zero. The earlier 33-candidate checkpoints below retain their observation dates. This increment does not recensus the organization or classify papers.
+September 7 adds noema's bounded release-admission audit and EgressWeave's outbound-policy audit: **35/76** of the September 6 census are now audited, leaving **41** in that historical denominator. Candidates with resolved GitHub releases remain **7/35**; registry-only observations are separate and verified adoption remains zero. Earlier checkpoints below retain their observation dates. This increment does not recensus the organization or classify papers.
 
 ## Scope and evidence limits
 
@@ -156,11 +156,21 @@ The source requires immutable version/tag agreement, source/provenance commit ag
 
 Cultivation stays with existing owners: noema must expose a released, independently authenticated exact-revision evidence contract; context-graph-contracts owns the assertion envelope; ConceptWeave owns semantic review and publication. Consumer conformance must reject stale revisions and preserve authority/evidence distinctions before adoption. The [library boundary decision](https://github.com/ContextualWisdomLab/noema/blob/0dec8d84b1e4744e7a9c6a77e2e2631a183ee2ab/docs/library-boundary-decision.md) defers a separate package until a real independent consumer contract warrants it. Existing internal module separation does not itself establish a second distribution. No utility repository is justified by this audit. DeepWiki structure/question lookup reported the repository unavailable; the exact GitHub sources above supply the audit evidence.
 
+### EgressWeave acquisition boundary (2026-09-07)
+
+EgressWeave owns outbound HTTP safety infrastructure, not ontology generation, bibliographic classification or semantic approval. Protected `main@bd0339bf43cf5041e861bac86a84cb6e7e32637e` returned a complete tree (`truncated=false`), Apache-2.0 metadata and nonfork/nonarchived status. The complete [Accepted ADR0001](https://github.com/ContextualWisdomLab/EgressWeave/blob/bd0339bf43cf5041e861bac86a84cb6e7e32637e/docs/adr/0001-security-boundaries-and-modular-integration.md), [package declaration](https://github.com/ContextualWisdomLab/EgressWeave/blob/bd0339bf43cf5041e861bac86a84cb6e7e32637e/pyproject.toml), [public exports](https://github.com/ContextualWisdomLab/EgressWeave/blob/bd0339bf43cf5041e861bac86a84cb6e7e32637e/src/egressweave/__init__.py), [pool policy](https://github.com/ContextualWisdomLab/EgressWeave/blob/bd0339bf43cf5041e861bac86a84cb6e7e32637e/src/egressweave/connection_pool_policy.py) and [regression definitions](https://github.com/ContextualWisdomLab/EgressWeave/blob/bd0339bf43cf5041e861bac86a84cb6e7e32637e/tests/test_connection_pool_policy.py) were inspected. The boundary separates DNS/TLS/resource enforcement from caller credentials, tenants, provider discovery, persistence and domain truth. Source version0.3.0 pins HTTPX0.28.1 and HTTPCore1.0.9; no dependencies were installed and no tests executed here.
+
+The frozen pool policy rejects boolean/noninteger/non-ASCII counts, nonpositive total capacity, contradictory idle capacity and nonfinite/negative idle expiry. Tests define both sync/async pool injection, zero idle retention, immutability and policy-fingerprint drift rejection using substituted pools and a synthetic validated URL. These definitions do not establish live transport safety. A research fetch, for example, must not infer provider or semantic authority from a successful connection-policy check.
+
+No GitHub releases were returned. [PyPI metadata](https://pypi.org/pypi/egressweave/json) instead reports nonyanked0.1.0: wheel SHA-256 `6bcb07109bdee25a6d49e5516f4c99ecd172ffe8536455d2cac860c44a4492f6` uploaded2026-07-12T03:57:40.989592Z and sdist `e1e3a6dbabd4084fb03f19a95931ab96e4beeef96bc8fc7cf0d8e5b91e266057` uploaded2026-07-12T03:57:42.218039Z. This registry-only observation is not one of the seven resolved GitHub releases. Artifacts were not downloaded; source0.3.0 versus distribution0.1.0 equivalence, attestations, installed behavior and consumer conformance remain unverified.
+
+Cultivation remains at EgressWeave: publish an immutable needed contract with source/artifact provenance and validate ConceptWeave's released ACL before adoption. Do not copy the Python implementation into the Rust domain or create another transport utility. Historical direct-NIM automation wording in the ADR must be reconciled with current CO/free organization policy; no live workflow audit here establishes an active bypass. The initial test-source request hit the ordinary GitHub5000-request quota; after its2026-09-07T00:39:43Z reset, the same API successfully returned the full test file. No alternate credentials/routes were used. DeepWiki was unavailable; exact primary sources supply this bounded audit.
+
 | Measure | Observation | Required next evidence |
 | --- | --- | --- |
-| Metadata census / bounded capability audit | September 6 census76; 34/34 selected candidates have exact default-head documentation/source/tree and release-query evidence | Audit actual contracts/consumers; 42 repositories in the historical census remain unaudited at that depth. |
-| GitHub release with resolved source commit | 7/34 selected candidates, including proprietary naruon, product-domain four-pillars, release-diverged newsdom-api and inkspan's historical release without the relevant current contracts | License, artifact/provenance and consumer conformance; a release count is not permissive-library or adoption evidence. |
-| Additional registry-only publication observation | ThreadWeave 0.1.0 on PyPI; not counted in the seven resolved GitHub releases | Bind the needed API and distribution to reviewed source and attestations; no package-registry completeness claim. |
+| Metadata census / bounded capability audit | September 6 census76; 35/35 selected candidates have exact default-head documentation/source/tree and release-query evidence | Audit actual contracts/consumers; 41 repositories in the historical census remain unaudited at that depth. |
+| GitHub release with resolved source commit | 7/35 selected candidates, including proprietary naruon, product-domain four-pillars, release-diverged newsdom-api and inkspan's historical release without the relevant current contracts | License, artifact/provenance and consumer conformance; a release count is not permissive-library or adoption evidence. |
+| Additional registry-only publication observation | ThreadWeave0.1.0 and EgressWeave0.1.0 on PyPI; not counted in the seven resolved GitHub releases | Bind the needed API and distribution to reviewed source and attestations; no package-registry completeness claim. |
 | Verified ConceptWeave adoption | 0 demonstrated in this audit | Released owner contract, exact consumer revision and passing contract/runtime evidence. |
 | Privately retained nonempty full text | 3,203/3,715 parents in the separate [capture evidence](zotero_fulltext_capture_evidence.json); 512 remain without demonstrated nonempty text | New content-bound proposals and authentic review with partial/unknown indexing. The earlier sweep's 800/1,000 abstract-missing subgroup is availability evidence, not a remeasured retained-capture subgroup. |
 | Unverified steward decisions | 0/3,715 on the repaired snapshot; first pending batch has 0/25 decisions | Authentic snapshot-bound decisions; batch generation is not review progress. |
@@ -169,6 +179,10 @@ Cultivation stays with existing owners: noema must expose a released, independen
 Review the repaired current snapshot, including missing-abstract and unsupported-vocabulary records, while obtaining exact-head protected Foundation/review evidence. Do not replace the full denominator with a hand-picked success sample or heuristic relevance threshold. Maturity observations select the owner for future work, not the labels to silently assign to papers.
 
 ## References
+
+ContextualWisdomLab. (2026). *EgressWeave* (Commit bd0339bf43cf5041e861bac86a84cb6e7e32637e) [Computer software]. GitHub. https://github.com/ContextualWisdomLab/EgressWeave/tree/bd0339bf43cf5041e861bac86a84cb6e7e32637e
+
+Python Package Index. (n.d.). *egressweave 0.1.0* [Package metadata]. Retrieved September 7, 2026, from https://pypi.org/pypi/egressweave/json
 
 ContextualWisdomLab. (2026). *noema* (Commit 0dec8d84b1e4744e7a9c6a77e2e2631a183ee2ab) [Computer software]. GitHub. https://github.com/ContextualWisdomLab/noema/tree/0dec8d84b1e4744e7a9c6a77e2e2631a183ee2ab
 
