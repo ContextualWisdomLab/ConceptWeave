@@ -12,6 +12,8 @@ use std::time::{Duration, Instant};
 /// Classification rule revision recorded in every report.
 pub const RULE_REVISION: &str = "ontology-research-v2";
 
+const PROPOSAL_TRUTH_STATUS: &str = "proposed";
+const PROPOSAL_PUBLICATION_STATE: &str = "proposed";
 const SUPPORTED_API_VERSION: u64 = 3;
 const SUPPORTED_API_VERSION_HEADER: &str = "3";
 const PAGE_LIMIT: usize = 100;
@@ -128,6 +130,10 @@ pub struct ClassifiedItem {
     pub collection_keys: Vec<String>,
     /// Tag text observed with the item.
     pub tags: Vec<String>,
+    /// Epistemic status projected from ConceptWeave's canonical lifecycle.
+    pub truth_status: &'static str,
+    /// Governance publication state projected from ConceptWeave's canonical lifecycle.
+    pub publication_state: &'static str,
     /// Proposed disposition; never an authoritative governance decision.
     pub proposed_disposition: Disposition,
     /// Deterministic reason for abstention, absent when a rule proposes a disposition.
@@ -684,6 +690,8 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
         title: item.data.title.clone(),
         collection_keys: item.data.collections.clone(),
         tags: item.data.tags.iter().map(|tag| tag.tag.clone()).collect(),
+        truth_status: PROPOSAL_TRUTH_STATUS,
+        publication_state: PROPOSAL_PUBLICATION_STATE,
         proposed_disposition,
         abstention_reason,
         evidence: ClassificationEvidence {
