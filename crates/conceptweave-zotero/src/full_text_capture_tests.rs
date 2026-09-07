@@ -45,6 +45,24 @@ fn response_fixture(request_path: &str) -> CapturedResponse {
 }
 
 #[test]
+fn restored_capture_verifier_enforces_exact_persisted_byte_boundary() {
+    let report = report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let persisted_bytes = serde_json::to_vec(&capture).unwrap().len() as u64;
+    assert_eq!(
+        verify_capture_with_persisted_limit(&capture, &report, persisted_bytes),
+        Ok(())
+    );
+    assert_eq!(
+        verify_capture_with_persisted_limit(&capture, &report, persisted_bytes - 1),
+        Err(BUDGET_EXCEEDED)
+    );
+}
+
+#[test]
 fn capture_retains_exact_text_missing_results_and_full_parent_denominator() {
     let report = report_fixture();
     let old_digest = report.snapshot_digest.clone();
