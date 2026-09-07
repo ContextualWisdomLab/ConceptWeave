@@ -148,6 +148,18 @@ Research Intake remains the existing owner. A new utility repository has no demo
 
 ### Billing contract follow-up: incomplete audit (2026-09-07)
 
+#### Executed in-process HTTP regression
+
+Checkout `ebeed33f98b34afc232eed980f41d6af9a7a445c` reproduced the missing method through its existing `tests/test_http_app.py` WSGI harness. Only tenant resolution and active-credential lookup were mocked to avoid database access; the real HTTP application, receipt service and PostgreSQL adapter were retained:
+
+```sh
+uv run --no-project --python 3.13 python -c 'import sys; sys.path.insert(0, "tests"); from types import SimpleNamespace; from uuid import UUID; from unittest.mock import patch; from test_http_app import invoke_http; from metering_billing.http_app import create_http_app; from metering_billing.postgres_usage_ledger import PostgresUsageLedger; ledger = PostgresUsageLedger(object()); tenant = SimpleNamespace(tenant_account_id=UUID(int=1)); app = create_http_app(ledger); patch.object(ledger, "resolve_tenant", return_value=(tenant, None)).start(); patch.object(ledger, "list_active_tenant_api_credentials", return_value=()).start(); invoke_http(app, "GET", "/v1/posting-receipt-observations/test-key", query={"tenant_reference":"urn:cwl:test_tenant"})'
+```
+
+Observed exit 1: `invoke_http` → HTTP application → receipt service → `AttributeError` for `PostgresUsageLedger.find_posting_receipt_observation`. This is in-process route evidence, not a deployed HTTP request, authentication test, real PostgreSQL transaction or persistence test. An earlier attempt without the credential-lookup mock failed on the inert connection's missing transaction method; that harness limitation is not the reported product defect.
+
+The reproduction was recorded on existing [issue 84](https://github.com/ContextualWisdomLab/metering-billing-platform/issues/84#issuecomment-5565087952) and [PR 145](https://github.com/ContextualWisdomLab/metering-billing-platform/pull/145#issuecomment-5565086345). These records establish handoff, not writer acceptance or a completed repair. Preserve the existing owner stack and require actual PostgreSQL-backed route, replay and concurrency verification before adoption. The candidate audit and reclassification KPIs remain unchanged.
+
 #### Executed repository-surface regression
 
 At exact revision `ebeed33f98b34afc232eed980f41d6af9a7a445c`, the following diagnostic imported the real PostgreSQL class and failed with all three method names missing (`AssertionError`, exit 1). Run from a checkout of that revision. The injected inert object is not a database connection; this proves a missing runtime method surface, not a live HTTP failure, transaction behavior or persistence correctness.
