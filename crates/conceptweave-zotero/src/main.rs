@@ -6,6 +6,7 @@ use std::env;
 use std::fs::{self, OpenOptions};
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 fn allowed_output_parents() -> Vec<PathBuf> {
@@ -65,14 +66,54 @@ fn open_new_output(path: &Path) -> io::Result<fs::File> {
     options.open(path)
 }
 
+fn temporary_output_path(output: &Path) -> io::Result<PathBuf> {
+    static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    let file_name = output.file_name().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidInput, "report output has no file name")
+    })?;
+    let nonce = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    Ok(output.with_file_name(format!(
+        ".{}.{}.{}.tmp",
+        file_name.to_string_lossy(),
+        std::process::id(),
+        nonce
+    )))
+}
+
 fn write_report<T: serde::Serialize>(
     output: &Path,
     report: &T,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let file = open_new_output(output)?;
+    let temporary = temporary_output_path(output)?;
+    let file = open_new_output(&temporary)?;
     let mut writer = BufWriter::new(file);
-    serde_json::to_writer_pretty(&mut writer, report)?;
-    writer.flush()?;
+
+    if let Err(error) = serde_json::to_writer_pretty(&mut writer, report) {
+        drop(writer);
+        let _ = fs::remove_file(&temporary);
+        return Err(error.into());
+    }
+    if let Err(error) = writer.flush() {
+        drop(writer);
+        let _ = fs::remove_file(&temporary);
+        return Err(error.into());
+    }
+    drop(writer);
+
+    if let Err(error) = fs::hard_link(&temporary, output) {
+        let _ = fs::remove_file(&temporary);
+        return Err(error.into());
+    }
+    if let Err(cleanup_error) = fs::remove_file(&temporary) {
+        if let Err(rollback_error) = fs::remove_file(output) {
+            return Err(io::Error::other(format!(
+                "report published but temporary cleanup failed ({cleanup_error}); rollback also failed ({rollback_error})"
+            ))
+            .into());
+        }
+        return Err(cleanup_error.into());
+    }
     Ok(())
 }
 
@@ -126,6 +167,27 @@ mod tests {
 
         assert!(write_report(&output, &FailingReport).is_err());
         assert!(!output.exists());
+    }
+
+    #[test]
+    fn complete_report_is_published_once() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let output = unique_temp_path(&format!("atomic-success-{nonce}"));
+        let _ = fs::remove_file(&output);
+        let report = serde_json::json!({"state": "complete"});
+
+        write_report(&output, &report).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&fs::read(&output).unwrap()).unwrap(),
+            report
+        );
+        assert!(write_report(&output, &report).is_err());
+        fs::remove_file(output).unwrap();
     }
 
     #[test]
