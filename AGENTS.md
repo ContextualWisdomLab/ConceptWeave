@@ -27,3 +27,13 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - Owned production coverage target is 100% line/function/region/branch where tooling exposes it.
 - Never suppress deprecation warnings; fix causes.
 - Never force-push shared branches, self-approve, fabricate checks, or weaken branch protection.
+
+## Operational lessons to maintain
+
+- Update this section when work establishes a reusable, verified lesson. Keep transient run IDs, counts and incidents in the Gap baseline or doctoring evidence; never record credentials or private research content here.
+- Automate publication when the protected release path permits it. Reuse the organization's canonical release workflow through a thin caller; verify its contract before wiring credentials. A configured registry secret is not evidence of package readiness, registry ownership, successful publication or deployment.
+- Publish only the verified, protected source revision with an immutable version and artifact provenance. Do not release a draft stack to bypass its missing foundation, checks or independent review. Serialize release/deploy operations without cancelling an in-flight publication, and verify the registry artifact after publication before claiming delivery.
+- Query secret names/access metadata only when needed; never retrieve or print values. An empty repository secret listing does not establish whether organization or environment secrets are available. Do not introduce a Python package merely because a PyPI credential exists.
+- Perform actual screenshot-based Visual Inspection alongside accessibility inspection for affected user journeys. Record the inspected revision, view and state, distinguish untested states, and keep private library screenshots out of public evidence. Accessibility text alone does not establish layout correctness.
+- A Zotero full-text response can report equal indexed/total page counters while containing no text. Check content availability and completeness separately, preserve unresolved sources, and require the bound capture/review path before counting a classification as reviewed.
+- Re-query the same CI run after an interrupted or truncated observation. A queued run is neither a failure nor proof of execution; a superseded cancelled run must not be presented as current evidence. Unit fixtures that manufacture a receipt and its expected digest do not prove independent producer authentication or live publication integration.
