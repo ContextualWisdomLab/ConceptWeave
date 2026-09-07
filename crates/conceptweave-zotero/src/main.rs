@@ -275,6 +275,32 @@ mod tests {
     }
 
     #[test]
+    fn production_runner_does_not_overwrite_a_path_created_during_the_read() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let output = unique_temp_path(&format!("runner-publication-race-{nonce}"));
+        let _ = fs::remove_file(&output);
+        let args = vec![
+            "conceptweave-zotero".to_owned(),
+            output.to_string_lossy().into_owned(),
+        ];
+        let output_during_read = output.clone();
+
+        let result = run_with(args, || {
+            fs::write(&output_during_read, b"competitor").unwrap();
+            Ok(sample_report("10.0.1"))
+        });
+
+        assert!(result.is_err());
+        assert_eq!(fs::read(&output).unwrap(), b"competitor");
+        fs::remove_file(output).unwrap();
+    }
+
+    #[test]
     fn failed_serialization_never_exposes_the_final_report_path() {
         use std::time::{SystemTime, UNIX_EPOCH};
 
