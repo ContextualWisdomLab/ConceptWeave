@@ -242,10 +242,16 @@ Existing [PR1](https://github.com/ContextualWisdomLab/learning-content-studio/pu
 
 Cultivation belongs in that existing owner stack: establish licensed, protected authoring/publication contracts and tests, then immutable release and consumer conformance. Learning content meaning remains product-owned; shared ontology generation and catalog consumption must not acquire authoring truth. For example, a future extracted learning-object concept may reference a released content revision, but a bootstrap README or proposed receipt does not authorize publication of that content. No implementation is copied, no generic ontology utility is justified by this source absence, and no runtime or package-registry claim follows. DeepWiki was unavailable; the exact protected tree and GitHub PR/release metadata supply this availability audit.
 
+### Learning Management Platform availability audit (2026-09-07)
+
+The public, nonfork, nonarchived repository has protected default `develop@1b89a16bbbd6c4b7c6ee4e8b81e2c8c651d1ce2c`. Its complete recursive tree (`truncated=false`) contains only [README.md](https://github.com/ContextualWisdomLab/learning-management-platform/blob/1b89a16bbbd6c4b7c6ee4e8b81e2c8c651d1ce2c/README.md), read in full: it identifies a bootstrap anchor and proposed development through develop. No implementation, contract, tests, package declaration, accepted ADR or license file exists in that exact tree; repository license metadata is null. The paginated GitHub release query returned no entries. No package registry, proposed PR, runtime or private learning records were inspected.
+
+Do not infer implemented learning-domain or ontology authority from the repository name. Cultivation starts with explicit product responsibilities, licensing, versioned domain contracts and conformance in the existing owner. Any later ConceptWeave observation must preserve product meaning and consume a released contract rather than copy source or invent an ontology utility. This availability audit adds one candidate to the historical census coverage: 39/76 audited, 37 remaining; seven resolved GitHub-release candidates and zero verified adoptions. It creates no paper decisions or approvals.
+
 | Measure | Observation | Required next evidence |
 | --- | --- | --- |
-| Metadata census / bounded capability audit | September 6 census76; 38/38 selected candidates have exact default-head documentation, available source, tree and release-query evidence | Audit actual contracts/consumers; 38 repositories in the historical census remain unaudited at that depth. |
-| GitHub release with resolved source commit | 7/38 selected candidates, including proprietary naruon, product-domain four-pillars, release-diverged newsdom-api and inkspan's historical release without the relevant current contracts | License, artifact/provenance and consumer conformance; a release count is not permissive-library or adoption evidence. |
+| Metadata census / bounded capability audit | September 6 census76; 39/39 selected candidates have exact default-head documentation, available source, tree and release-query evidence | Audit actual contracts/consumers; 37 repositories in the historical census remain unaudited at that depth. |
+| GitHub release with resolved source commit | 7/39 selected candidates, including proprietary naruon, product-domain four-pillars, release-diverged newsdom-api and inkspan's historical release without the relevant current contracts | License, artifact/provenance and consumer conformance; a release count is not permissive-library or adoption evidence. |
 | Additional registry-only publication observation | ThreadWeave0.1.0 and EgressWeave0.1.0 on PyPI; not counted in the seven resolved GitHub releases | Bind the needed API and distribution to reviewed source and attestations; no package-registry completeness claim. |
 | Verified ConceptWeave adoption | 0 demonstrated in this audit | Released owner contract, exact consumer revision and passing contract/runtime evidence. |
 | Privately retained nonempty full text | 3,203/3,715 parents in the separate [capture evidence](zotero_fulltext_capture_evidence.json); 512 remain without demonstrated nonempty text | New content-bound proposals and authentic review with partial/unknown indexing. The earlier sweep's 800/1,000 abstract-missing subgroup is availability evidence, not a remeasured retained-capture subgroup. |
@@ -255,6 +261,8 @@ Cultivation belongs in that existing owner stack: establish licensed, protected 
 Review the repaired current snapshot, including missing-abstract and unsupported-vocabulary records, while obtaining exact-head protected Foundation/review evidence. Do not replace the full denominator with a hand-picked success sample or heuristic relevance threshold. Maturity observations select the owner for future work, not the labels to silently assign to papers.
 
 ## References
+
+ContextualWisdomLab. (2026). *Learning Management Platform* (Commit 1b89a16bbbd6c4b7c6ee4e8b81e2c8c651d1ce2c) [Source repository]. GitHub. https://github.com/ContextualWisdomLab/learning-management-platform/tree/1b89a16bbbd6c4b7c6ee4e8b81e2c8c651d1ce2c
 
 ContextualWisdomLab. (2026). *Metering billing platform* (Commit ebeed33f98b34afc232eed980f41d6af9a7a445c) [Computer software]. GitHub. https://github.com/ContextualWisdomLab/metering-billing-platform/tree/ebeed33f98b34afc232eed980f41d6af9a7a445c
 
