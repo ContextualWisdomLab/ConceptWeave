@@ -1,6 +1,10 @@
 use super::*;
 use crate::StewardReviewWorksheet;
 
+#[path = "full_text_write.rs"]
+mod full_text_write;
+pub use full_text_write::*;
+
 /// Independently issued approval input for one full-text review context.
 /// The issuer must bind the complete reviewed labels as well as this capture.
 #[derive(Deserialize, Serialize)]
@@ -168,17 +172,29 @@ pub fn evaluate_full_text_review<F>(
 where
     F: FnOnce(&FullTextReviewedGoldenSet) -> bool,
 {
-    validate_review_capture(report, capture, &reviewed.capture_digest)?;
-    let review_evaluation = crate::evaluate_complete_reviewed_classification(
-        report,
-        &reviewed.reviewed_golden_set,
-        |_| verify_approval(reviewed),
-    )
-    .map_err(|_| FullTextError("full-text review is invalid or unverified"))?;
+    let review_evaluation = prepare_full_text_review(report, capture, reviewed)?;
+    if !verify_approval(reviewed) {
+        return Err(FullTextError("full-text review is invalid or unverified"));
+    }
     Ok(FullTextReviewEvaluation {
         capture_digest: reviewed.capture_digest.clone(),
         review_evaluation,
     })
+}
+
+fn prepare_full_text_review(
+    report: &ClassificationReport,
+    capture: &FullTextCapture,
+    reviewed: &FullTextReviewedGoldenSet,
+) -> Result<crate::GoldenSetEvaluation, FullTextError> {
+    validate_review_capture(report, capture, &reviewed.capture_digest)?;
+    if reviewed.reviewed_golden_set.labels.len() != report.classified_items.len()
+        || !report.pending_source_item_keys.is_empty()
+    {
+        return Err(FullTextError("full-text review is invalid or unverified"));
+    }
+    crate::prepare_reviewed_golden_set(report, &reviewed.reviewed_golden_set)
+        .map_err(|_| FullTextError("full-text review is invalid or unverified"))
 }
 
 fn validate_review_capture(

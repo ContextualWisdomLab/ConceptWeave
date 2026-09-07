@@ -6,13 +6,47 @@
 
 ## Context
 
-The installed-version and runtime-availability statements in this original context
-and its original alternatives describe 2026-09-04, not current host state. Later
-local evidence records Zotero 10.0.1; that alone establishes no write approval.
+Issue #8 requires classification changes to default to dry-run, preserve complete collection and tag state, reject stale review input, and make rollback reconstructable. At initial planning the installed Zotero 9.0.6 Local API could not write; the later Zotero 10.0.1 audit is recorded separately in the current Gap baseline. Zotero 10+ writes additionally require a runtime-granted key, the same server identity, and fresh library/item versions. A planner establishes the review and recovery contract without inventing authority or adding an unsafe Zotero 9 mutation path.
 
-Issue #8 requires classification changes to default to dry-run, preserve complete collection and tag state, reject stale review input, and make rollback reconstructable. The installed Zotero 9.0.6 Local API cannot write. Zotero 10+ writes additionally require a runtime-granted key, the same server identity, and fresh library/item versions. A planner can establish the review and recovery contract now without inventing authority or adding an unsafe Zotero 9 mutation path.
+The installed-version and runtime-availability statements in the original alternatives describe 2026-09-04, not current host state. Later local evidence records Zotero 10.0.1; that alone establishes no write approval.
 
 ## Decision
+
+### Complete-source and recovery-envelope integration (2026-09-07, Proposed)
+
+PR39 normal merge `4e856c5` retains its typed full-text write scope and PR38's
+complete inventory validation. An extracted preparation helper had bypassed the
+pending-source completion gate: a completed paper worksheet could reach meaning
+approval while standalone evidence remained unresolved. The inherited mixed-source
+test fails at that boundary. The guard belongs in shared full-text preparation,
+which both evaluation and write admission call, not only in the public evaluator.
+Write preparation also retains the parent's proposal binding and inventory checks
+before either real authority callback. Starting and locally finalizing review
+remain distinct from complete admission; no paper or pending source is dropped.
+
+The delayed rollback wrapper had copied an operation tail and binding but omitted
+the preceding receipt's verified outcomes, exact failed request and observation.
+Committed test `75b9de7` fails because that preceding envelope is absent. Repair
+`9fcc8bb` borrows the opaque prior receipt using the existing original-observation
+pattern, while preserving existing serialized binding, observation and tail fields.
+An observation cannot outlive its source receipt or deserialize into executable
+authority. The executor reuses the core's exact failed request instead of tracking
+the last request a second time. Follow-up tests include an earlier verified inverse
+before a later failure, as well as matching, changed and unavailable observations.
+
+An operation-only reconstruction was rejected because it loses prior evidence;
+duplicating the whole receipt into a new owned authority type was unnecessary for
+this in-process read-only view. The borrowed lifetime requires callers to retain
+the earlier receipt; durable restart admission remains separate unfinished work.
+Matching metadata never proves causal completion or permits a retry. These local
+changes supply neither independent governance approval nor live-write permission.
+
+Independent follow-up traced every public reconciliation constructor: each emits
+indeterminate status, so the wrapper's success branch was unreachable. Preserve
+the public function signature but reject every observation-only retry before I/O;
+remove dead execution code instead of fabricating resolved private receipts in
+tests. A future successful retry requires a separately designed and independently
+verified causal-resolution contract, not another metadata observation.
 
 ConceptWeave builds a local-only `ClassificationWritePlan` from an externally verified complete review set. Dry-run is the default. The review must match the exact Zotero version, server identity, library version, classifier revision, raw-snapshot digest, complete item-key/item-version coordinates, and observed collection/tag state. The plan retains the reviewed Zotero version used for execute eligibility, while private fields and read-only accessors prevent external callers from mutating validated execution state. Write-execution receipts copy the plan's review and snapshot coordinates. Legacy rollback receipts retain conditional restoration evidence but do not carry those review/authority coordinates; they must not be advertised as full-text-bound approval evidence. It rejects unknown or duplicate items, detached item revisions, blank or duplicate metadata, unsupported tag types, no-op changes, and `NeedsStewardReview` as a write decision. Operations are deterministic and retain complete before, after, and rollback states. Manual tag markers `None` and `0` are canonicalized to `None`; automatic tag type `1` is preserved.
 
@@ -32,13 +66,39 @@ The exact repaired #13 head passed 72 tests across 18 unfiltered suites, includi
 
 Rejected alternatives were per-caller guards, which duplicate validation and miss sibling callers, and accepting invalid input before approval as harmless, which ignores caller-owned receipt consumption. The remaining limit is explicit: this planner validates its existing metadata-write contract, not the complete full-text review envelope, authority revocation, or live execution.
 
-## Required full-text write admission (not implemented)
+## Full-text write admission contract
 
-A full-text-reviewed golden set and its aggregate evaluation are not authority to replace Zotero collections or tags. The next increment must combine the complete capture-bound golden set, a separately approved explicit write set, and the requested mode in a required, non-flattened input. Every changed item's disposition must match its approved golden label. All local capture/report/proposal/full-denominator and write-state checks must finish before either external authority verifier runs. Reuse the existing full-text evaluator and repaired planner; do not insert a permissive verifier bridge, derive destinations from disposition names, backfill receipts or convert aggregate evaluation into approval.
+A full-text-reviewed golden set and its aggregate evaluation are not authority to replace Zotero collections or tags. Admission must combine the complete capture-bound golden set, a separately approved explicit write set, and the requested mode in a required, non-flattened input. Every changed item's disposition must match its approved golden label. All local capture/report/proposal/full-denominator and write-state checks must finish before either external authority verifier runs. Reuse the existing full-text evaluator and repaired planner; do not insert a permissive verifier bridge, derive destinations from disposition names, backfill receipts or convert aggregate evaluation into approval.
 
 The returned opaque, serialize-only plan must retain a versioned binding for the complete labels, capture/proposal coordinates, approvals, destinations and mode. Write execution, partial failure, rollback, retry and delayed reconciliation must preserve that same binding. No executable legacy-plan downcast or freely mixed rollback operations may detach it. Existing legacy write DTOs accept unknown nested JSON fields, so strict outer deserialization alone is insufficient. Begin with typed-only admission, or separately document and test an intentional owned-DTO compatibility change before claiming strict persisted JSON admission.
 
 The failure analysis must cover relabeling, destination/mode substitution under old authority, denial by either verifier, missing full-denominator labels, stale preflight, mixed receipts and indeterminate outcomes. Dry-run must make no reads or writes. Paper text and authority secrets must stay out of errors and receipts. This is a bounded extension of ConceptWeave's existing intake context, not a new Utility Repository, transport, approval issuer or live-write CLI. Published owner contracts, authentic decisions, independently verified authority and approved live write/rollback evidence remain separate prerequisites.
+
+## Local typed implementation (2026-09-06; still Proposed)
+
+In the context of applying complete full-text-reviewed research classifications, facing loss of capture provenance and destination authority at the legacy planner boundary, we decided for private validation preparation followed by two real whole-scope verifiers and opaque bound recovery, and against allow-all verifier bridges, metadata downcasts and a second executor, to achieve exact approved-input continuity across local write attempts, accepting typed-only admission and unresolved durable-recovery and original-write-reconciliation gaps.
+
+The owning Research Intake library now requires `FullTextWriteScope`. It includes every full-text golden label, capture-bound approval input, complete reviewed metadata changes and mode. The existing golden and write validators were moved into private preparation functions; their public legacy entry points still invoke their original verifiers after local validation. New admission runs both preparation paths and checks each changed disposition against its golden label before invoking either callback. An invalid later write cannot redeem a valid earlier approval. A meaning denial stops before write verification; an accepted meaning review does not itself authorize a destination. The two external verifiers are not a distributed atomic redemption protocol: a locally valid request may consume meaning verification before the independent write verifier denies it. Revocation, expiration and issuer policy belong to external governance.
+
+The admitted plan retains the complete typed scope. The versioned binding hashes the compact serde JSON tuple `("conceptweave-full-text-write-v1", scope)` with SHA-256 and separately retains capture/proposal/snapshot coordinates and mode. Exact array order and receipt inputs are part of this identity; this is not a cross-language canonical-JSON claim. Every bound outcome carries the same commitment. Write receipt serialization omits the legacy review ID and authority input rather than exposing them; original owner-only scope must be retained to verify the commitment. The plan has no public legacy-plan projection; recovery accepts an opaque receipt, never caller-assembled operation slices.
+
+Execution delegates to the existing complete-preflight and conditional replacement core. Known applied work can be rolled back from its one bound receipt. Unknown original-write state, dry-run or empty inverse work is rejected before reads or writes, avoiding a false restored outcome. A rollback failure retains known pending work; its retry refuses to ignore an indeterminate operation. Delayed rollback reconciliation observes that operation once and keeps the untouched tail. An unchanged observation retries that operation plus the tail; a restored observation skips its already restored operation; an indeterminate observation cannot write. Subsequent attempts still run complete preflight. Each receipt is per-attempt evidence and earlier receipts remain necessary for the full history.
+
+The first committed RED `47d4e89` names the absent admission APIs; local GREEN `d36dad8` passed seven invalid-input scenarios and all eight mode/authority combinations across three test functions. Recovery RED `79e1c22` names the missing bound recovery APIs; initial local GREEN `425fb8c` passed seven combined admission/recovery test functions. Final full-suite and coverage measurements belong in the current Gap checkpoint, not this intermediate evidence. All inputs are synthetic unit fixtures; no actual review, authority issuance, capture read, authorization prompt or Zotero mutation occurred.
+
+Positive consequences are one validation source per contract, explicit destination authorization and retained recovery scope. Costs are retained full-scope audit storage, per-attempt receipt history and exact-representation digest ordering. Rejected alternatives include copying the validation or transport loops, which would drift, and deserializing the new scope around permissive legacy nested DTOs, which would silently ignore input. Executable persistence after restart, delayed reconciliation of an unknown original write, independent deployed issuers and approved live write/rollback remain unfinished. Local success does not make this ADR Accepted.
+
+Implementation references: Serde Project. (n.d.). *Field attributes*. Retrieved September 6, 2026, from https://serde.rs/field-attrs.html; Serde Project. (n.d.). *Implementing Serialize*. Retrieved September 6, 2026, from https://serde.rs/impl-serialize.html. Existing dependency APIs only; Context7 returned its monthly quota limit, so these official references were checked directly. DeepWiki has no indexed ConceptWeave repository. The owner source and tests are the implementation evidence.
+
+## Original-write observation follow-up (2026-09-06; still Proposed)
+
+In the context of inspecting an original write after its immediate verification failed, facing loss of the actual submitted precondition and the risk of treating later matching values as completion, we decided for one read-only observation attached to the unchanged opaque attempt and against automatic replay or equality-based recovery admission, to achieve auditable inspection without expanding authority, accepting that durable resolution and approved recovery remain unfinished.
+
+For example, the first item can advance the library revision before the second write loses its response. The plan's initial library revision cannot identify that second request's precondition. Runtime `dcc36310394c68fca74251ae85fe72d942be32ba` retains the exact last submitted request only when the existing executor reports it indeterminate. It neither reconstructs that version from inverse work nor creates a second executor. The later observation borrows the complete original receipt, preserving earlier inverse operations, the failed item, untouched items and the same scope commitment. Failed reads omit adapter errors; foreign or malformed returned state remains explicitly unverified evidence. Dry-run, preflight failure, successful and known-failure receipts cannot invoke this read path. The unknown outcome is never cleared and the existing rollback guard still refuses it.
+
+Rejected alternatives include a before/after classifier that would suggest causal completion without proving the earlier request has stopped, and a write-token retry engine. Official Zotero documentation makes tokens redundant for versioned requests; local token caches are memory-only and forgotten on restart. Neither a cached token nor matching metadata supplies governance, durable history or peer authentication. This additive inspection improves operator evidence while leaving the resolution gate closed; it does not complete original-write recovery. Retain the owner-only original scope to verify its commitment and earlier observation files to reconstruct history.
+
+RED `e300eb8` failed with the absent observation API. The candidate passed eleven focused functions and 255 workspace tests in 41 unfiltered suites, including seven compile-fail doctests, plus the unchanged static and coverage gates recorded in the Gap baseline. Tests exercise unknown first/second writes, before/after/foreign/malformed/failed observations, exact advanced preconditions, preserved original receipt serialization, redacted authority inputs and continued zero-I/O recovery refusal. These are synthetic unit cases, not live request or approval evidence. Research references and the scope limits are recorded in the full-text audit. No ADR number, Accepted status or protected branch rule changes.
 
 ## Consequences
 

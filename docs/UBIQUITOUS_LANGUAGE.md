@@ -8,6 +8,7 @@
 | Full-Text Review Worksheet | Separate private work that starts with blank decisions for every bibliographic item and retains one verified capture identity through decision application; not authenticated history or approval. |
 | Capture-Bound Reviewed Set | Complete non-abstention labels and a capture-bound approval input, all presented together for independent governance verification; never a classification-write authorization. |
 | Observation | Deterministically extracted fact from a Source Snapshot. |
+| Relationship Evidence | Source-bound support retaining its original kind, extraction method and limitations; message ancestry, row changes and work dependencies are not interchangeable semantic assertions. |
 | Evidence Reference | Stable source identity, digest, and location supporting a candidate. |
 | Semantic Candidate | Evidence-bound proposal for a concept, relation, constraint, dimension, measure, or physical mapping. |
 | Semantic Model Proposal | Versioned collection of candidates presented for validation/review. |
@@ -23,6 +24,7 @@
 | Reviewed Classification Change | Authorized complete replacement of one paper's collection and tag state, bound to its observed revision. |
 | Classification Write Plan | Local deterministic artifact retaining the verified proposal/source-scope binding, exact preconditions and before/after/rollback metadata; dry-run by default, never proof of execution. |
 | Classification Write Receipt | Secret-free, reviewed-plan-bound result that distinguishes dry-run, verified completion, preflight failure, and partial failure while retaining applied, failed, untouched, and safely reversible coordinates. |
+| Original Write Observation | Later unverified item state attached to the complete unresolved write receipt and exact submitted request; not proof of causal completion or recovery authority. |
 | Classification Rollback Operation | Reverse-ordered complete-state restoration bound to the post-write item revision returned by the Local API. |
 | Indeterminate Request | Exact submitted write whose completion cannot be proven; its optional later observation does not grant completion, retry or inverse authority. |
 | Reviewed Duplicate Merge Set | Independently verified decisions selecting one canonical item per connected duplicate component, bound to exact source revisions, candidate membership, proposals and retained source scope. |
