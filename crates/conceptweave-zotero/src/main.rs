@@ -93,11 +93,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 mod tests {
     use super::*;
 
+    struct FailingReport;
+
+    impl serde::Serialize for FailingReport {
+        fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            Err(<S::Error as serde::ser::Error>::custom(
+                "intentional serialization failure",
+            ))
+        }
+    }
+
     fn unique_temp_path(suffix: &str) -> PathBuf {
         env::temp_dir().join(format!(
             "conceptweave-zotero-{}-{suffix}.json",
             std::process::id()
         ))
+    }
+
+    #[test]
+    fn failed_serialization_never_exposes_the_final_report_path() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let output = unique_temp_path(&format!("serialization-failure-{nonce}"));
+        let _ = fs::remove_file(&output);
+
+        assert!(write_report(&output, &FailingReport).is_err());
+        assert!(!output.exists());
     }
 
     #[test]
