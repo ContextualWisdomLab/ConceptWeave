@@ -1,5 +1,13 @@
 # Product / Technical Gap Baseline
 
+## September 7 persisted-capture prerequisite follow-up
+
+After PR39 source-scope repair was normally pushed at `9c84cc1bc06b2de83d88e28f422eda788353aa93`, fresh remote inventory found PR36 `e517fc0a2ef268a5f80ff8e8f90ac24c36a170f3` and PR37 `9d72bbf02199dfc7b668bca33b891307f8278d7f` had advanced. The producer adds a streaming exact serialized-size check against the512MiB restore ceiling, tests outer JSON expansion at a scaled exact boundary, and corrects partial-write/no-unlink operability documentation. It does not change the256MiB observed-body budget or infer complete evidence from matching counters. The change is preserved, not treated as a competing writer or discarded.
+
+PR38 normal merge `21c3b88` retains the previously verified `76d3df5` (295 stable tests/41 suites) and new PR37 prerequisite without conflict. Integration verification session21594 is running in `/private/tmp/conceptweave-scope-audit.ChGg6Z` on `codex/zotero-fulltext-decision-source-scope`; logs `/tmp/conceptweave-pr38-capture-limit-{tests,clippy,rustdoc,coverage}.log`. No current-source terminal gate or push is claimed yet. After verified normal push, integrate into the existing PR39 branch; do not copy source or drop its write-scope repair.
+
+Fresh PR35 audit retains `a31ae0c2df920f2794f7ddb456795b04797ab472`, OPEN non-Draft with independent review required and zero unresolved threads. Bounded audit reports terminal required-run failures CodeQL33938445642, OpenCode33938445067 and Strix33938445050, concerning terminal verdict delivery or provider availability rather than established product-code vulnerabilities. The Noema request to remove `cargo generate-lockfile --locked` contradicts installed Cargo1.98.0 help and the already posted correction [review5120921180](https://github.com/ContextualWisdomLab/ConceptWeave/pull/35#pullrequestreview-5120921180). Do not remove the valid option, self-dismiss the review or manufacture a passing verdict. The existing central coordinator received these exact references for canonical review/dispatch/backend repair. Active ruleset18156473 still requires one independent approval, resolved threads and seven central workflows, with force-push/deletion protections. No protection change or merge occurred.
+
 **Snapshot:** 2026-09-06
 
 This file records code-current product and technical gaps. Exact PR/check/run coordinates are evidence snapshots, not mutable-head dependencies. Live protected-branch, PR, issue and workflow state wins whenever it advances after this snapshot. Refresh the changed PR's metadata after each documentation commit; evidence from another PR or an earlier head does not transfer.
