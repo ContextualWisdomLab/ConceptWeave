@@ -155,10 +155,14 @@ mod tests {
             std::process::id()
         ));
         symlink(&allowed_parent, &alias).unwrap();
-        let output = alias.join("report.json");
+        let leaf = format!(
+            "conceptweave-zotero-{}-{nonce}-canonical.json",
+            std::process::id()
+        );
+        let output = alias.join(&leaf);
 
         let validated = validate_output_path(output.to_str().unwrap()).unwrap();
-        assert_eq!(validated, allowed_parent.join("report.json"));
+        assert_eq!(validated, allowed_parent.join(&leaf));
 
         fs::remove_file(alias).unwrap();
     }
