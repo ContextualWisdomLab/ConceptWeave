@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-use conceptweave_zotero::read_local_snapshot;
+use conceptweave_zotero::{read_local_snapshot, ClassificationReport, ReadError};
 use std::env;
 use std::fs::{self, OpenOptions};
 use std::io::{self, BufWriter, Write};
@@ -117,17 +117,22 @@ fn write_report<T: serde::Serialize>(
     Ok(())
 }
 
+fn run_with<I, F>(
+    args: I,
+    read_snapshot: F,
+) -> Result<(), Box<dyn std::error::Error>>
+where
+    I: IntoIterator<Item = String>,
+    F: FnOnce() -> Result<ClassificationReport, ReadError>,
+{
+    let _ = args;
+    let _ = read_snapshot;
+    Err("CLI orchestration seam not implemented".into())
+}
+
 #[cfg_attr(coverage_nightly, coverage(off))]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let output = env::args()
-        .nth(1)
-        .ok_or("usage: conceptweave-zotero /tmp/OUTPUT.json")?;
-    let output = validate_output_path(&output)?;
-    let report = read_local_snapshot()?;
-    if report.zotero_version.starts_with("9.") {
-        eprintln!("Zotero 9 Local API is read-only; writing a local proposal report only");
-    }
-    write_report(&output, &report)
+    run_with(env::args(), read_local_snapshot)
 }
 
 #[cfg(test)]
@@ -152,6 +157,44 @@ mod tests {
             "conceptweave-zotero-{}-{suffix}.json",
             std::process::id()
         ))
+    }
+
+    fn sample_report(zotero_version: &str) -> ClassificationReport {
+        ClassificationReport {
+            zotero_version: zotero_version.to_owned(),
+            api_version: Some(3),
+            schema_version: Some(44),
+            server_id: Some("test-server".to_owned()),
+            library_version: 2,
+            rule_revision: conceptweave_zotero::RULE_REVISION,
+            observed_item_count: 0,
+            classified_items: Vec::new(),
+            unclassified_items: Vec::new(),
+            pending_source_item_keys: Vec::new(),
+            duplicate_candidates: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn production_runner_publishes_a_complete_report() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let output = unique_temp_path(&format!("runner-success-{nonce}"));
+        let _ = fs::remove_file(&output);
+        let args = vec![
+            "conceptweave-zotero".to_owned(),
+            output.to_string_lossy().into_owned(),
+        ];
+
+        run_with(args, || Ok(sample_report("10.0.1"))).unwrap();
+        let saved: serde_json::Value =
+            serde_json::from_slice(&fs::read(&output).unwrap()).unwrap();
+        assert_eq!(saved["zotero_version"], "10.0.1");
+        fs::remove_file(output).unwrap();
     }
 
     #[test]
