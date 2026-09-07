@@ -862,9 +862,18 @@ mod tests {
 
         let server = thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
-            let mut request = vec![0_u8; 4096];
-            let read = stream.read(&mut request).unwrap();
-            let request = String::from_utf8_lossy(&request[..read]).to_lowercase();
+            let mut request = Vec::new();
+            let mut chunk = [0_u8; 1];
+            while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+                let read = stream.read(&mut chunk).unwrap();
+                assert!(read > 0, "client closed before complete HTTP headers");
+                request.extend_from_slice(&chunk[..read]);
+                assert!(
+                    request.len() <= 16 * 1024,
+                    "HTTP request headers exceeded test bound"
+                );
+            }
+            let request = String::from_utf8_lossy(&request).to_lowercase();
             assert!(request.contains("zotero-api-version: 3"));
             let body = r#"[{"key":"A","version":1,"data":{"itemType":"book","title":"ontology evaluation"}}]"#;
             write!(
