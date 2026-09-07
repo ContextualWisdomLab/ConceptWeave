@@ -463,6 +463,63 @@ fn full_text_write_and_rollback_preserve_binding_and_conditional_state() {
 }
 
 #[test]
+fn full_text_write_retries_only_unattempted_rollback_after_failed_preflight() {
+    let report = report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let mut scope = write_scope_fixture(&report, &capture);
+    scope.mode = WriteMode::Execute;
+    let plan = build_full_text_write_plan(&report, &capture, scope, |_| true, |_| true).unwrap();
+    let store = WriteStore::from_report(&report);
+    let written = execute_full_text_write_plan(
+        &plan,
+        |item_key| store.read_item(item_key),
+        |request| store.write_item(request),
+    );
+    let failed = crate::execute_full_text_rollback(
+        &written,
+        |_| -> Result<crate::ClassificationItemState, ()> { Err(()) },
+        |_| -> Result<crate::ClassificationItemState, ()> {
+            panic!("failed preflight cannot write")
+        },
+    )
+    .unwrap();
+    let prior = serde_json::to_value(&failed).unwrap();
+    assert_eq!(prior["rollback_result"]["outcome"], "preflight_failure");
+    assert!(prior["rollback_result"]["indeterminate_request"].is_null());
+    assert_eq!(
+        prior["rollback_result"]["not_attempted_item_keys"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(store.write_count.get(), 2);
+    store.read_count.set(0);
+    let restored = crate::retry_full_text_rollback(
+        &failed,
+        |item_key| store.read_item(item_key),
+        |request| store.write_item(request),
+    )
+    .unwrap();
+    let result = serde_json::to_value(&restored).unwrap();
+    assert_eq!(result["full_text_write_v1"], prior["full_text_write_v1"]);
+    assert_eq!(result["rollback_result"]["outcome"], "restored");
+    assert_eq!(
+        result["rollback_result"]["restored_item_keys"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(store.read_count.get(), 2);
+    assert_eq!(store.write_count.get(), 4);
+    assert_eq!(serde_json::to_value(&failed).unwrap(), prior);
+}
+
+#[test]
 fn full_text_write_stale_preflight_and_unknown_writes_never_grant_empty_restoration() {
     for unknown_write in [false, true] {
         let report = report_fixture();
