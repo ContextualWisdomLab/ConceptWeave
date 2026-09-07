@@ -2,7 +2,7 @@
 
 Evidence snapshot: 2026-09-07. Status: research inventory, not dependency-adoption approval.
 
-September 7 adds noema's bounded release-admission audit and EgressWeave's outbound-policy audit: **35/76** of the September 6 census are now audited, leaving **41** in that historical denominator. Candidates with resolved GitHub releases remain **7/35**; registry-only observations are separate and verified adoption remains zero. Earlier checkpoints below retain their observation dates. This increment does not recensus the organization or classify papers.
+September 7 adds bounded audits of noema's release admission, EgressWeave's outbound policy and OriginWeave's provenance records: **36/76** of the September 6 census are now audited, leaving **40** in that historical denominator. Candidates with resolved GitHub releases remain **7/36**; registry-only observations are separate and verified adoption remains zero. Earlier checkpoints below retain their observation dates. This increment does not recensus the organization or classify papers.
 
 ## Scope and evidence limits
 
@@ -166,10 +166,20 @@ No GitHub releases were returned. [PyPI metadata](https://pypi.org/pypi/egresswe
 
 Cultivation remains at EgressWeave: publish an immutable needed contract with source/artifact provenance and validate ConceptWeave's released ACL before adoption. Do not copy the Python implementation into the Rust domain or create another transport utility. Historical direct-NIM automation wording in the ADR must be reconciled with current CO/free organization policy; no live workflow audit here establishes an active bypass. The initial test-source request hit the ordinary GitHub5000-request quota; after its2026-09-07T00:39:43Z reset, the same API successfully returned the full test file. No alternate credentials/routes were used. DeepWiki was unavailable; exact primary sources supply this bounded audit.
 
+### OriginWeave provenance boundary (2026-09-07)
+
+OriginWeave is the governed browser-acquisition owner, not an ontology publisher. The observed protected `main@87c4daa1830bac5a5228b6036752ad5633232085` is nonfork/nonarchived, Apache-2.0, with a complete tree (`truncated=false`). Its [Accepted ADR0003](https://github.com/ContextualWisdomLab/OriginWeave/blob/87c4daa1830bac5a5228b6036752ad5633232085/docs/adr/0003-provenance-native-observation.md) prefers typed tools and structured metadata, then network/accessibility/DOM/layout observations, with visual fallback. WARC persistence and PROV-compatible storage are described as future work, not verified adapters.
+
+The fully inspected [evidence module](https://github.com/ContextualWisdomLab/OriginWeave/blob/87c4daa1830bac5a5228b6036752ad5633232085/crates/originweave-evidence/src/lib.rs) retains bounded method/origin/path and metadata field names while replacing every header/query value with a redaction marker. It rejects ambiguous paths, malformed escapes, encoded separators and dot segments. Provenance construction validates bounded source URL/locator and lowercase SHA-256 syntax, and retains network, DOM, accessibility, visual or structured-data channel identity. The [test definitions](https://github.com/ContextualWisdomLab/OriginWeave/blob/87c4daa1830bac5a5228b6036752ad5633232085/crates/originweave-evidence/tests/evidence.rs) cover value redaction regardless of field-name case, unsafe paths/URLs, missing locator and invalid hashes. They were read completely, not executed here; other modules and end-to-end browser behavior were not audited.
+
+The constructor accepts the verification enum from its caller. A caller-supplied `Verified` record validates representation, not the referenced bytes, independent verifier identity or semantic truth. For example, a DOM locator and well-formed digest cannot approve a paper label without separately authenticated source and review evidence. This is a consumer trust-boundary requirement, not a demonstrated end-to-end authorization bypass. Generic network evidence also deliberately excludes response bodies; full text requires the ADR's separate schema-specific authorization, MIME, size and retention contract.
+
+The [workspace](https://github.com/ContextualWisdomLab/OriginWeave/blob/87c4daa1830bac5a5228b6036752ad5633232085/Cargo.toml) declares version 0.1.0, Rust edition 2024 and minimum Rust 1.97. The [evidence package](https://github.com/ContextualWisdomLab/OriginWeave/blob/87c4daa1830bac5a5228b6036752ad5633232085/crates/originweave-evidence/Cargo.toml) has `publish = false` and a workspace-local core dependency. No GitHub releases were returned; package registries, artifacts, attestations and deployed browser were not verified. Existing OriginWeave must release the needed observation contract and prove consumer conformance before adoption; do not copy workspace code or create another browser utility. DeepWiki structure/question lookup was unavailable, so the exact primary sources above supply this bounded audit.
+
 | Measure | Observation | Required next evidence |
 | --- | --- | --- |
-| Metadata census / bounded capability audit | September 6 census76; 35/35 selected candidates have exact default-head documentation/source/tree and release-query evidence | Audit actual contracts/consumers; 41 repositories in the historical census remain unaudited at that depth. |
-| GitHub release with resolved source commit | 7/35 selected candidates, including proprietary naruon, product-domain four-pillars, release-diverged newsdom-api and inkspan's historical release without the relevant current contracts | License, artifact/provenance and consumer conformance; a release count is not permissive-library or adoption evidence. |
+| Metadata census / bounded capability audit | September 6 census76; 36/36 selected candidates have exact default-head documentation/source/tree and release-query evidence | Audit actual contracts/consumers; 40 repositories in the historical census remain unaudited at that depth. |
+| GitHub release with resolved source commit | 7/36 selected candidates, including proprietary naruon, product-domain four-pillars, release-diverged newsdom-api and inkspan's historical release without the relevant current contracts | License, artifact/provenance and consumer conformance; a release count is not permissive-library or adoption evidence. |
 | Additional registry-only publication observation | ThreadWeave0.1.0 and EgressWeave0.1.0 on PyPI; not counted in the seven resolved GitHub releases | Bind the needed API and distribution to reviewed source and attestations; no package-registry completeness claim. |
 | Verified ConceptWeave adoption | 0 demonstrated in this audit | Released owner contract, exact consumer revision and passing contract/runtime evidence. |
 | Privately retained nonempty full text | 3,203/3,715 parents in the separate [capture evidence](zotero_fulltext_capture_evidence.json); 512 remain without demonstrated nonempty text | New content-bound proposals and authentic review with partial/unknown indexing. The earlier sweep's 800/1,000 abstract-missing subgroup is availability evidence, not a remeasured retained-capture subgroup. |
@@ -179,6 +189,8 @@ Cultivation remains at EgressWeave: publish an immutable needed contract with so
 Review the repaired current snapshot, including missing-abstract and unsupported-vocabulary records, while obtaining exact-head protected Foundation/review evidence. Do not replace the full denominator with a hand-picked success sample or heuristic relevance threshold. Maturity observations select the owner for future work, not the labels to silently assign to papers.
 
 ## References
+
+ContextualWisdomLab. (2026). *OriginWeave* (Commit 87c4daa1830bac5a5228b6036752ad5633232085) [Computer software]. GitHub. https://github.com/ContextualWisdomLab/OriginWeave/tree/87c4daa1830bac5a5228b6036752ad5633232085
 
 ContextualWisdomLab. (2026). *EgressWeave* (Commit bd0339bf43cf5041e861bac86a84cb6e7e32637e) [Computer software]. GitHub. https://github.com/ContextualWisdomLab/EgressWeave/tree/bd0339bf43cf5041e861bac86a84cb6e7e32637e
 
