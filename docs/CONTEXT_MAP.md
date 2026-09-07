@@ -10,7 +10,7 @@
 
 Research Intake also owns the optional private Full-Text Capture bound to a metadata report. It preserves provider observations while rejecting mixed-origin counters as a reliable incremental cursor. This is an adapter responsibility, not a new bounded context, shared catalog or approval owner; downstream proposal adoption remains a separate evidence/review transition.
 
-The Full-Text Review View is an in-context read projection over that verified capture and the current pending worksheet. It introduces no new aggregate or authority owner. Governance cannot accept it through the existing metadata-only patch path; full-text decision provenance needs a subsequent explicit contract.
+The Full-Text Review View is an in-context read projection over that verified capture and the current pending worksheet. It introduces no new aggregate or authority owner. The separate Full-Text Review Worksheet carries one verified capture through atomic completed-view application and finalization. Governance receives the complete capture-bound reviewed set for independent verification; no metadata-only downcast or approval renewal is provided. The classification-write review remains a separate authority contract, with no full-text evaluation-to-write conversion.
 
 ## External relationships
 
@@ -25,3 +25,7 @@ full-text decisions retain their separate contracts; no new owner is introduced.
 - context-graph-contracts <-> Interoperability: **Shared Kernel only for versioned public contracts**, kept minimal.
 - semantic-data-portal <- Interoperability: **Published Language**. SDP consumes releases; ConceptWeave does not read SDP application tables.
 - Keyverse -> future delivery layer: **Anti-Corruption Layer** for verified identity/tenant context.
+- governance-risk-compliance -> Source Observation / Client Consumption: **Proposed Anti-Corruption Layer**, pending a released contract and exact-consumer proof. External requirements, internal controls, evidence links and effectiveness remain distinct GRC-owned meanings; ConceptWeave cannot infer assurance from evidence presence.
+- Orgmetra -> Source Observation: **Proposed Anti-Corruption Layer**, pending a released evidence contract. Job/Task/KSAO relationships remain product-owned; tenant, source version and review status must survive observation without moving employment authority or ordinal scoring into ConceptWeave.
+- DiagramWeave -> future model-review delivery: **Proposed Anti-Corruption Layer**, pending a released edit contract and consumer conformance. Diagram revisions, scope expansion and host persistence remain distinct from ConceptWeave's semantic review/publication authority.
+- newsdom-api -> Source Observation: **Proposed Anti-Corruption Layer**, pending release/default reconciliation and a bounded source-digest/parser-version contract. Parsed pages and sections remain observations; parser status, filenames and extracted relationships do not authorize semantic publication or private-data upload.

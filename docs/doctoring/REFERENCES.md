@@ -2,6 +2,12 @@
 
 This file records the evidence basis for ConceptWeave architecture decisions. Stable Recommendations and in-progress specifications are deliberately distinguished. The current paper-by-paper capability, rejection/adoption, owner, limitation, and benchmark mapping is maintained in `docs/doctoring/RESEARCH_CAPABILITY_TRACEABILITY.md`; bibliography alone does not count as product use.
 
+## Implementation contract references
+
+Bray, T. (Ed.). (2017). *The JavaScript Object Notation (JSON) data interchange format* (RFC 8259, Section 4). Internet Engineering Task Force. https://www.rfc-editor.org/rfc/rfc8259#section-4
+
+Serde contributors. (n.d.). *Container attributes*. Serde. Retrieved September 5, 2026, from https://serde.rs/container-attrs.html
+
 ## Stable standards / recommendations
 
 Corporation for Digital Scholarship. (2026). *Zotero Local API*. Zotero Documentation. https://www.zotero.org/support/dev/web_api/v3/local_api

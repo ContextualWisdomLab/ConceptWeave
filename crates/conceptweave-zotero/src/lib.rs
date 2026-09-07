@@ -15,6 +15,11 @@ pub use full_text_capture::{
     FullTextCapture, FullTextError, build_full_text_review_json, read_local_full_text,
     verify_full_text_capture,
 };
+pub use full_text_capture::{
+    FullTextReviewApproval, FullTextReviewEvaluation, FullTextReviewWorksheet,
+    FullTextReviewedGoldenSet, apply_full_text_review_view, build_bound_full_text_review_json,
+    build_full_text_review_worksheet, evaluate_full_text_review, finalize_full_text_review,
+};
 
 /// Classification rule revision recorded in every report.
 pub const RULE_REVISION: &str = "ontology-research-v2";
@@ -1116,6 +1121,7 @@ pub struct ClassificationAudit {
 
 /// One editable local steward decision without duplicated bibliographic text.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct StewardReviewDecision {
     /// Stable Zotero item key used to join the sensitive classification report.
     pub item_key: String,
@@ -1131,6 +1137,7 @@ pub struct StewardReviewDecision {
 
 /// Snapshot-bound local worksheet for one decision per bibliographic item.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct StewardReviewWorksheet {
     /// Zotero library revision observed with the source snapshot.
     pub library_version: u64,
@@ -1173,6 +1180,7 @@ pub struct StewardReviewProgress {
 
 /// One snapshot-bound steward decision supplied without rewriting a worksheet by hand.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct StewardDecisionUpdate {
     /// Stable Zotero item key of the reviewed bibliographic item.
     pub item_key: String,
@@ -1531,6 +1539,7 @@ fn validate_steward_review_worksheet_against(
 
 /// One steward-reviewed expected disposition in a local golden set.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct GoldenLabel {
     /// Zotero item key used only to join the local report and local review set.
     pub item_key: String,
@@ -1550,6 +1559,7 @@ impl GoldenLabel {
 
 /// Version-bound steward labels that remain outside the repository.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ReviewedGoldenSet {
     /// Approval receipt verified by the caller's governance boundary.
     pub approval: GoldenSetApproval,
@@ -1559,6 +1569,7 @@ pub struct ReviewedGoldenSet {
 
 /// One item revision in the exact reviewed classification snapshot.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct SnapshotItemRevision {
     /// Stable Zotero item key.
     pub item_key: String,
@@ -1570,6 +1581,7 @@ pub struct SnapshotItemRevision {
 
 /// Governance receipt binding a steward approval to exact input and proposals.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct GoldenSetApproval {
     /// Opaque receipt identifier.
     pub receipt_id: String,
