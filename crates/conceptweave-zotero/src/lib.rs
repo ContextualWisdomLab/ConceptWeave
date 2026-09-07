@@ -550,23 +550,27 @@ fn child_index(items: &[ZoteroItem]) -> BTreeMap<String, Vec<String>> {
 fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedItem {
     let title_normalized = item.data.title.to_lowercase();
     let abstract_normalized = item.data.abstract_note.to_lowercase();
-    let tags_original = item
+    let tags_normalized = item
         .data
         .tags
         .iter()
-        .map(|tag| tag.tag.as_str())
-        .collect::<Vec<_>>()
-        .join(" ");
-    let tags_normalized = tags_original.to_lowercase();
-    let fields = [
+        .map(|tag| tag.tag.to_lowercase())
+        .collect::<Vec<_>>();
+    let mut fields = vec![
         ("title", title_normalized.as_str(), item.data.title.as_str()),
         (
             "abstract_note",
             abstract_normalized.as_str(),
             item.data.abstract_note.as_str(),
         ),
-        ("tags", tags_normalized.as_str(), tags_original.as_str()),
     ];
+    fields.extend(
+        item.data
+            .tags
+            .iter()
+            .zip(tags_normalized.iter())
+            .map(|(tag, normalized)| ("tags", normalized.as_str(), tag.tag.as_str())),
+    );
 
     let specific_rules = [
         (
@@ -627,7 +631,7 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
 
     for (candidate, phrases) in specific_rules {
         let mut family_matched = false;
-        for (field, normalized, original) in fields {
+        for &(field, normalized, original) in &fields {
             for phrase in phrases {
                 if contains_phrase(normalized, phrase) {
                     family_matched = true;
@@ -646,7 +650,7 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
 
     let (proposed_disposition, abstention_reason) = match matched_dispositions.as_slice() {
         [] => {
-            for (field, normalized, original) in fields {
+            for &(field, normalized, original) in &fields {
                 for phrase in adjacent_phrases {
                     if contains_phrase(normalized, phrase) {
                         matched_fields.insert(field);
