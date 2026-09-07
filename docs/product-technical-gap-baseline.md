@@ -1,8 +1,16 @@
 # Product / Technical Gap Baseline
 
-**Snapshot:** 2026-09-05
+**Snapshot:** 2026-09-08 (current top checkpoint; older exact coordinates below are retained as dated evidence)
 
-This file records code-current product and technical gaps. Exact PR/check/run coordinates are evidence snapshots, not mutable-head dependencies. Live protected-branch, PR, issue and workflow state wins whenever it advances after this snapshot. Because this documentation update creates a Foundation successor, the Foundation SHA below is the exact pre-refresh head; PR metadata must be refreshed to the resulting successor SHA.
+This file records code-current product and technical gaps. Exact PR/check/run coordinates are evidence snapshots, not mutable-head dependencies. Live protected-branch, PR, issue and workflow state wins whenever it advances after a dated checkpoint.
+
+## September 8 research lifecycle checkpoint
+
+Research Intake PR #9 remains the canonical Zotero/read-only research-classification owner lane on Foundation `b538470c963e6524ddc0c3f652a46a4fc8265150`. The current source lineage includes the per-tag phrase-boundary repair and repeated supported DOI-wrapper normalization, but those predecessor source repairs do not inherit executable GREEN after later head changes. The immediately preceding exact head `0a2d63a32fa782c15eb79970213433efba17f0cd` is a committed reality RED for lifecycle state: `proposal_lifecycle_state.rs` requires every serialized research proposal to expose separate `truth_status="proposed"` and `publication_state="proposed"` fields and explicitly rejects `authoritative` / `published`; production `ClassifiedItem` still serializes neither field.
+
+The minimal causal repair is a proposal-only projection of ConceptWeave's canonical truth/publication separation. Research Intake may report proposed epistemic/governance state but must not acquire validation, review or publication authority, duplicate a second lifecycle state machine, or promote deterministic/LLM output beyond proposal status. Exact-head Rust 1.98 workspace tests, fmt, all-target Clippy, warnings-denied rustdoc/release, owned-production 100% function/normalized-region/branch coverage and applicable hosted checks remain mandatory after the source repair. No pull-request-triggered workflow run existed for `0a2d63a...`; Draft status is not executable GREEN.
+
+Independent evidence-integrity gaps remain separate: unmatched abstentions still need replayable original abstract evidence; DOI duplicate candidates need original DOI snapshot evidence; non-ASCII text must not be equated mechanically with unsupported vocabulary; the production CLI/source repairs still require successor-head executable coverage; and the three standalone PDFs plus one standalone note remain governed pending sources until exact-snapshot restoration/identity/digest reconciliation. Zero pending keys, deterministic classification, or local report serialization never grants semantic or write authority.
 
 ## September 6 source inventory checkpoint
 
