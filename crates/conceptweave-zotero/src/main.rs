@@ -55,10 +55,14 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
 }
 
 fn open_new_output(path: &Path) -> io::Result<fs::File> {
-    OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(path)
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    options.open(path)
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
