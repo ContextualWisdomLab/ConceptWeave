@@ -751,16 +751,21 @@ fn duplicate_candidates(items: &[&ZoteroItem]) -> Vec<DuplicateCandidate> {
 }
 
 fn normalize_doi(value: &str) -> Option<String> {
-    let normalized = value.trim().to_lowercase();
-    let normalized = normalized
-        .strip_prefix("https://doi.org/")
-        .or_else(|| normalized.strip_prefix("http://doi.org/"))
-        .or_else(|| normalized.strip_prefix("https://dx.doi.org/"))
-        .or_else(|| normalized.strip_prefix("http://dx.doi.org/"))
-        .or_else(|| normalized.strip_prefix("doi:"))
-        .unwrap_or(&normalized)
-        .trim();
-    (!normalized.is_empty()).then(|| normalized.to_owned())
+    let mut normalized = value.trim().to_lowercase();
+    loop {
+        let next = match normalized
+            .strip_prefix("https://doi.org/")
+            .or_else(|| normalized.strip_prefix("http://doi.org/"))
+            .or_else(|| normalized.strip_prefix("https://dx.doi.org/"))
+            .or_else(|| normalized.strip_prefix("http://dx.doi.org/"))
+            .or_else(|| normalized.strip_prefix("doi:"))
+        {
+            Some(stripped) => stripped.trim().to_owned(),
+            None => break,
+        };
+        normalized = next;
+    }
+    (!normalized.is_empty()).then_some(normalized)
 }
 
 fn normalize_title(value: &str) -> Option<String> {
