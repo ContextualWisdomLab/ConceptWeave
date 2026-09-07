@@ -8,13 +8,17 @@ use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 #[cfg_attr(coverage_nightly, coverage(off))]
-fn allowed_output_parents() -> [PathBuf; 2] {
-    [
-        env::temp_dir()
-            .canonicalize()
-            .expect("system temporary directory must exist"),
-        Path::new("/tmp").canonicalize().expect("/tmp must exist"),
-    ]
+fn allowed_output_parents() -> Vec<PathBuf> {
+    let system_temp = env::temp_dir()
+        .canonicalize()
+        .expect("system temporary directory must exist");
+    let mut parents = vec![system_temp];
+    if let Ok(conventional_tmp) = Path::new("/tmp").canonicalize() {
+        if !parents.contains(&conventional_tmp) {
+            parents.push(conventional_tmp);
+        }
+    }
+    parents
 }
 
 fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
@@ -104,12 +108,14 @@ mod tests {
             .is_err()
         );
 
-        let conventional = Path::new("/tmp").join(format!(
-            "conceptweave-zotero-{}-conventional.json",
-            std::process::id()
-        ));
-        let _ = fs::remove_file(&conventional);
-        assert!(validate_output_path(conventional.to_str().unwrap()).is_ok());
+        if Path::new("/tmp").is_dir() {
+            let conventional = Path::new("/tmp").join(format!(
+                "conceptweave-zotero-{}-conventional.json",
+                std::process::id()
+            ));
+            let _ = fs::remove_file(&conventional);
+            assert!(validate_output_path(conventional.to_str().unwrap()).is_ok());
+        }
 
         let nested_dir =
             env::temp_dir().join(format!("conceptweave-zotero-{}-nested", std::process::id()));
@@ -121,6 +127,13 @@ mod tests {
         fs::write(&existing, b"existing").unwrap();
         assert!(validate_output_path(existing.to_str().unwrap()).is_err());
         fs::remove_file(existing).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn allowed_output_parents_does_not_require_posix_tmp() {
+        let system_temp = env::temp_dir().canonicalize().unwrap();
+        assert!(allowed_output_parents().contains(&system_temp));
     }
 
     #[cfg(unix)]
