@@ -54,6 +54,13 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
     Ok(resolved_path)
 }
 
+fn open_new_output(path: &Path) -> io::Result<fs::File> {
+    OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+}
+
 #[cfg_attr(coverage_nightly, coverage(off))]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
@@ -64,10 +71,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if report.zotero_version.starts_with("9.") {
         eprintln!("Zotero 9 Local API is read-only; writing a local proposal report only");
     }
-    let file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(output)?;
+    let file = open_new_output(&output)?;
     let mut writer = BufWriter::new(file);
     serde_json::to_writer_pretty(&mut writer, &report)?;
     writer.flush()?;
