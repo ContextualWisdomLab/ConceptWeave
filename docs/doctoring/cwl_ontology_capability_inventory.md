@@ -146,6 +146,14 @@ Research Intake remains the existing owner. A new utility repository has no demo
 
 ## KPI and next actions
 
+### Billing contract follow-up: incomplete audit (2026-09-07)
+
+This follow-up is not added to the38/76 completed candidate count. Metering-billing-platform reports nonfork/nonarchived status, Apache-2.0 and protected default `develop@ebeed33f98b34afc232eed980f41d6af9a7a445c`. Both inspected recursive trees were complete. Its [v0.2.0 release](https://github.com/ContextualWisdomLab/metering-billing-platform/releases/tag/v0.2.0), published2026-08-26, resolves to `c90a0d40fe222ed236fe17c8d49ccdc435ecebee` and lists no uploaded assets. This does not exclude GitHub-generated source archives or prove absence from other registries. The two revisions share the journal-proposal schema blob `ced9197ad631e2d7b784399971df53fbbe7854d0` and consumed posting-receipt schema blob `b330b15e76144fcb01dc66840705cc9585b53c5b`; matching source blobs do not establish installed artifact provenance or consumer conformance.
+
+Fully read [ADR0002](https://github.com/ContextualWisdomLab/metering-billing-platform/blob/ebeed33f98b34afc232eed980f41d6af9a7a445c/docs/adr/0002-accounting-boundary.md) and [ADR0006](https://github.com/ContextualWisdomLab/metering-billing-platform/blob/ebeed33f98b34afc232eed980f41d6af9a7a445c/docs/adr/0006-journal-proposal-from-invoice-draft.md) are Accepted and retain commercial meaning in Billing while reserving posted journals, book/chart authority and accounting correction rules for AIS. The inspected [proposal schema](https://github.com/ContextualWisdomLab/metering-billing-platform/blob/ebeed33f98b34afc232eed980f41d6af9a7a445c/schemas/accounting-journal-proposal.schema.json) excludes posted from its lifecycle and defines decimal-string, debit-XOR-credit lines; its balanced-proposal description is not proof of cross-line arithmetic enforcement. Implementation and test execution remain unaudited.
+
+The [consumed-contract README](https://github.com/ContextualWisdomLab/metering-billing-platform/blob/ebeed33f98b34afc232eed980f41d6af9a7a445c/schemas/consumed/README.md) explicitly describes an AIS consumer copy retaining the original authority annotation. This source-copy approach requires repair against the user's released-owner-contract/no-copy requirement; retaining an authority field alone is not release authentication. The fully read [project declaration](https://github.com/ContextualWisdomLab/metering-billing-platform/blob/ebeed33f98b34afc232eed980f41d6af9a7a445c/pyproject.toml) declares0.2.0, Python>=3.13, psycopg and `tool.uv.package=false`. It does not establish a packaged contract or Rust production implementation. Inspect the actual validation/packaging path and its tests before completing the audit; obtain owner-released contract provenance and consumer verification rather than copying more schema files into ConceptWeave. No billing data, provider call or runtime mutation was performed.
+
 ### Accounting proposal and reporting boundaries (2026-09-07)
 
 The public, nonfork/nonarchived accounting-information-platform repository reports Apache-2.0 and protected default `develop@239008c4edc7d305c97704c5102b593c6622b36f`, with a complete tree (`truncated=false`). Its fully inspected [Accepted ADR0002](https://github.com/ContextualWisdomLab/accounting-information-platform/blob/239008c4edc7d305c97704c5102b593c6622b36f/docs/adr/0002-proposal-receipt-boundary.md) separates Billing-owned journal proposals from AIS-owned posting receipts. Commercial account roles are not chart-of-accounts authority; retained earnings belongs to AIS period close. This is product-owned meaning, not a generic ontology service to relocate into ConceptWeave.
@@ -221,6 +229,8 @@ Cultivation belongs in that existing owner stack: establish licensed, protected 
 Review the repaired current snapshot, including missing-abstract and unsupported-vocabulary records, while obtaining exact-head protected Foundation/review evidence. Do not replace the full denominator with a hand-picked success sample or heuristic relevance threshold. Maturity observations select the owner for future work, not the labels to silently assign to papers.
 
 ## References
+
+ContextualWisdomLab. (2026). *Metering billing platform* (Commit ebeed33f98b34afc232eed980f41d6af9a7a445c) [Computer software]. GitHub. https://github.com/ContextualWisdomLab/metering-billing-platform/tree/ebeed33f98b34afc232eed980f41d6af9a7a445c
 
 ContextualWisdomLab. (2026). *Accounting information platform* (Commit 239008c4edc7d305c97704c5102b593c6622b36f) [Computer software]. GitHub. https://github.com/ContextualWisdomLab/accounting-information-platform/tree/239008c4edc7d305c97704c5102b593c6622b36f
 
