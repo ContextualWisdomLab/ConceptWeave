@@ -138,6 +138,9 @@ pub struct ClassifiedItem {
     pub proposed_disposition: Disposition,
     /// Deterministic reason for abstention, absent when a rule proposes a disposition.
     pub abstention_reason: Option<AbstentionReason>,
+    /// Original nonblank abstract retained only when a steward must replay an abstention.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_abstract_note: Option<String>,
     /// Deterministic supporting evidence.
     pub evidence: ClassificationEvidence,
     /// Child note and attachment keys linked to the top-level item.
@@ -682,6 +685,9 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
             Some(AbstentionReason::ConflictingDispositionEvidence),
         ),
     };
+    let review_abstract_note = (proposed_disposition == Disposition::NeedsStewardReview
+        && !item.data.abstract_note.trim().is_empty())
+    .then(|| item.data.abstract_note.clone());
 
     ClassifiedItem {
         item_key: item.key.clone(),
@@ -694,6 +700,7 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
         publication_state: PROPOSAL_PUBLICATION_STATE,
         proposed_disposition,
         abstention_reason,
+        review_abstract_note,
         evidence: ClassificationEvidence {
             fields: matched_fields.into_iter().collect(),
             field_values,
