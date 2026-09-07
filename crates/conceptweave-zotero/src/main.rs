@@ -142,6 +142,26 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn new_report_files_are_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let output = unique_temp_path(&format!("private-{nonce}"));
+        let _ = fs::remove_file(&output);
+        let file = open_new_output(&output).unwrap();
+        drop(file);
+
+        let mode = fs::metadata(&output).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        fs::remove_file(output).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn output_path_rejects_symlinks_before_open() {
         use std::os::unix::fs::symlink;
 
