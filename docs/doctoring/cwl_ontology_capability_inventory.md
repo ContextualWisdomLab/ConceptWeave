@@ -2,7 +2,7 @@
 
 Evidence snapshot: 2026-09-07. Status: research inventory, not dependency-adoption approval.
 
-September 7 adds bounded audits of noema's release admission, EgressWeave's outbound policy, OriginWeave's provenance records, Learning Content Studio's protected-source availability and accounting-information-platform's proposal/reporting boundaries: **38/76** of the September 6 census are now audited, leaving **38** in that historical denominator. Candidates with resolved GitHub releases remain **7/38**; registry-only observations are separate and verified adoption remains zero. Earlier checkpoints below retain their observation dates. A bootstrap-only finding is not an implemented library or a classified paper.
+September 7 adds bounded audits of noema's release admission, EgressWeave's outbound policy, OriginWeave's provenance records, Learning Content Studio's protected-source availability, accounting-information-platform's proposal/reporting boundaries and Learning Management Platform's bootstrap availability: **39/76** of the September 6 census are now audited, leaving **37** in that historical denominator. Candidates with resolved GitHub releases remain **7/39**; registry-only observations are separate and verified adoption remains zero. Earlier checkpoints below retain their observation dates. A bootstrap-only finding is not an implemented library or a classified paper.
 
 ## Scope and evidence limits
 
