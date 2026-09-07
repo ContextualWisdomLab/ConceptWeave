@@ -183,8 +183,16 @@ pub fn verify_full_text_capture(
     capture: &FullTextCapture,
     report: &ClassificationReport,
 ) -> Result<(), FullTextError> {
+    verify_capture_with_persisted_limit(capture, report, MAX_PERSISTED_CAPTURE_BYTES)
+}
+
+fn verify_capture_with_persisted_limit(
+    capture: &FullTextCapture,
+    report: &ClassificationReport,
+    max_persisted_bytes: u64,
+) -> Result<(), FullTextError> {
     let snapshot = validate_report(report)?;
-    validate_persisted_capture_size(capture, MAX_PERSISTED_CAPTURE_BYTES)?;
+    validate_persisted_capture_size(capture, max_persisted_bytes)?;
     let evidence = &capture.capture_evidence;
     if evidence.records.len() > snapshot.len() {
         return Err(INVALID_EVIDENCE);
