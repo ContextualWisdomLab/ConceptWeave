@@ -1,6 +1,292 @@
 use super::*;
 use crate::{ZoteroItem, classify_snapshot};
 
+#[test]
+fn review_view_binds_exact_capture_and_keeps_missing_parents_without_decisions() {
+    let report = report_fixture();
+    let worksheet = build_steward_review_worksheet(&report).unwrap();
+    let before_report = serde_json::to_vec(&report).unwrap();
+    let before_worksheet = worksheet.clone();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let bytes = build_full_text_review_json(&report, &worksheet, &capture, 2).unwrap();
+    let view: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(view["view_kind"], "full_text_review_view_v1");
+    assert_eq!(view["capture_digest"], capture.capture_digest);
+    assert_eq!(
+        view["proposal_digest"],
+        crate::classification_proposal_digest(&report)
+    );
+    assert_eq!(
+        view["metadata_report_digest"],
+        capture.capture_evidence.metadata_report_digest
+    );
+    assert_eq!(view["bibliographic_item_count"], 2);
+    assert_eq!(view["review_batch"]["remaining_count"], 2);
+    assert_eq!(
+        view["review_batch"]["decisions"].as_array().unwrap().len(),
+        2
+    );
+    assert_eq!(
+        view["attachment_evidence"]["ABCD2345"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        view["attachment_evidence"]["DEFG5678"],
+        serde_json::json!([])
+    );
+    assert_eq!(
+        view["attachment_evidence"]["ABCD2345"][0]["item_key"],
+        "BCDE3456"
+    );
+    assert_eq!(
+        view["attachment_evidence"]["ABCD2345"][0]["metadata_version"],
+        1
+    );
+    assert_eq!(
+        view["attachment_evidence"]["ABCD2345"][0]["content_response"]["version"],
+        12403
+    );
+    assert_eq!(
+        view["attachment_evidence"]["ABCD2345"][1]["metadata_version"],
+        0
+    );
+    assert!(view["attachment_evidence"]["ABCD2345"][1]["content_response"]["version"].is_null());
+    assert_eq!(
+        view["attachment_evidence"]["ABCD2345"][0]["content_response"]["body"],
+        r#"{"content":"fixture text 한글","indexedPages":2,"totalPages":2,"providerExtra":{"retained":true}}"#
+    );
+    assert_eq!(
+        view["attachment_evidence"]["ABCD2345"][1]["content_response"]["status"],
+        404
+    );
+    assert!(
+        view["review_batch"]["decisions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|row| row["reviewed_disposition"].is_null())
+    );
+    assert!(serde_json::from_slice::<crate::StewardReviewBatch>(&bytes).is_err());
+    assert!(serde_json::from_slice::<crate::StewardDecisionPatch>(&bytes).is_err());
+    assert_eq!(serde_json::to_vec(&report).unwrap(), before_report);
+    assert_eq!(worksheet, before_worksheet);
+    assert_eq!(
+        build_full_text_review_json(&report, &worksheet, &capture, 2).unwrap(),
+        bytes
+    );
+}
+
+#[test]
+fn review_view_selects_only_pending_parents_and_never_copies_unrelated_text() {
+    let report = report_fixture();
+    let mut worksheet = build_steward_review_worksheet(&report).unwrap();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let first: serde_json::Value = serde_json::from_slice(
+        &build_full_text_review_json(&report, &worksheet, &capture, 1).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        first["review_batch"]["decisions"].as_array().unwrap().len(),
+        1
+    );
+    assert!(first["attachment_evidence"].get("DEFG5678").is_none());
+    worksheet.decisions[0].reviewed_disposition = Some(crate::Disposition::OutOfScope);
+    let next = build_full_text_review_json(&report, &worksheet, &capture, 2).unwrap();
+    let view: serde_json::Value = serde_json::from_slice(&next).unwrap();
+    assert_eq!(view["review_batch"]["remaining_count"], 1);
+    assert_eq!(view["bibliographic_item_count"], 2);
+    assert_eq!(
+        view["attachment_evidence"],
+        serde_json::json!({"DEFG5678":[]})
+    );
+    assert!(!String::from_utf8(next).unwrap().contains("fixture text"));
+}
+
+#[test]
+fn review_view_separates_two_text_parents_and_excludes_standalone_attachments() {
+    let source: Vec<ZoteroItem> = serde_json::from_value(serde_json::json!([
+        {"key":"ABCD2345","version":2,"data":{"itemType":"book","title":"first paper"}},
+        {"key":"BCDE3456","version":1,"data":{"itemType":"attachment","parentItem":"ABCD2345"}},
+        {"key":"DEFG5678","version":2,"data":{"itemType":"book","title":"second paper"}},
+        {"key":"EFGH6789","version":1,"data":{"itemType":"attachment","parentItem":"DEFG5678"}},
+        {"key":"FGHI789A","version":1,"data":{"itemType":"attachment"}}
+    ]))
+    .unwrap();
+    let mut report = classify_snapshot("10.0.1".into(), Some("fixture-server".into()), 2, source);
+    report.api_version = Some(3);
+    report.schema_version = Some(44);
+    let mut worksheet = build_steward_review_worksheet(&report).unwrap();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(match request_path {
+            "fulltext?since=0" => CapturedResponse {status:200,version:None,
+                body:r#"{"BCDE3456":12403,"EFGH6789":9,"FGHI789A":0}"#.into()},
+            "items/EFGH6789" => CapturedResponse {status:200,version:Some(1),
+                body:r#"{"key":"EFGH6789","version":1,"data":{"itemType":"attachment","parentItem":"DEFG5678"}}"#.into()},
+            "items/EFGH6789/fulltext" => CapturedResponse {status:200,version:Some(9),
+                body:r#"{"content":"second parent evidence"}"#.into()},
+            "items/FGHI789A" => CapturedResponse {status:200,version:Some(1),
+                body:r#"{"key":"FGHI789A","version":1,"data":{"itemType":"attachment"}}"#.into()},
+            "items/FGHI789A/fulltext" => CapturedResponse {status:200,version:Some(0),
+                body:r#"{"content":"standalone evidence"}"#.into()},
+            _ => response_fixture(request_path),
+        })
+    }).unwrap();
+    let both: serde_json::Value = serde_json::from_slice(
+        &build_full_text_review_json(&report, &worksheet, &capture, 2).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(both["bibliographic_item_count"], 2);
+    assert_eq!(both["review_batch"]["pending_source_count"], 1);
+    assert_eq!(
+        both["review_batch"]["proposal_digest"],
+        both["proposal_digest"]
+    );
+    assert_eq!(both["proposal_digest"], worksheet.proposal_digest);
+    assert_eq!(report.pending_source_item_keys, ["FGHI789A"]);
+    assert!(!both.to_string().contains("standalone evidence"));
+    assert!(!both.to_string().contains("FGHI789A"));
+    assert_eq!(
+        both["attachment_evidence"]["ABCD2345"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        both["attachment_evidence"]["DEFG5678"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        both["attachment_evidence"]["DEFG5678"][0]["item_key"],
+        "EFGH6789"
+    );
+    assert_eq!(
+        both["attachment_evidence"]["DEFG5678"][0]["content_response"]["version"],
+        9
+    );
+    let first =
+        String::from_utf8(build_full_text_review_json(&report, &worksheet, &capture, 1).unwrap())
+            .unwrap();
+    assert!(first.contains("fixture text"));
+    assert!(!first.contains("second parent evidence"));
+    assert!(!first.contains("standalone evidence"));
+    worksheet.decisions[0].reviewed_disposition = Some(crate::Disposition::OutOfScope);
+    let second =
+        String::from_utf8(build_full_text_review_json(&report, &worksheet, &capture, 1).unwrap())
+            .unwrap();
+    assert!(second.contains("second parent evidence"));
+    assert!(!second.contains("fixture text"));
+    assert!(!second.contains("standalone evidence"));
+    assert_eq!(report.pending_source_item_keys, ["FGHI789A"]);
+}
+
+#[test]
+fn review_view_rejects_changed_capture_report_and_invalid_pending_work() {
+    let report = report_fixture();
+    let worksheet = build_steward_review_worksheet(&report).unwrap();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    for field in ["body", "status", "version"] {
+        let mut saved = serde_json::to_value(&capture).unwrap();
+        saved["capture_evidence"]["records"][0]["content_response"][field] = if field == "body" {
+            serde_json::json!("private changed text")
+        } else {
+            serde_json::json!(999)
+        };
+        let changed: FullTextCapture = serde_json::from_value(saved).unwrap();
+        assert!(build_full_text_review_json(&report, &worksheet, &changed, 2).is_err());
+    }
+    let mut changed_report = report_fixture();
+    changed_report.classified_items[0].title = "different report evidence".into();
+    assert!(build_full_text_review_json(&changed_report, &worksheet, &capture, 2).is_err());
+    let mut changed_report = report_fixture();
+    changed_report.unclassified_items[0].data.title = "changed retained source".into();
+    let fresh_worksheet = build_steward_review_worksheet(&changed_report).unwrap();
+    assert_eq!(fresh_worksheet.snapshot_digest, worksheet.snapshot_digest);
+    assert_ne!(fresh_worksheet.proposal_digest, worksheet.proposal_digest);
+    assert!(build_full_text_review_json(&changed_report, &fresh_worksheet, &capture, 2).is_err());
+    let mut unbound = worksheet.clone();
+    unbound.proposal_digest.clear();
+    assert!(build_full_text_review_json(&report, &unbound, &capture, 2).is_err());
+    for limit in [0, 101] {
+        assert!(build_full_text_review_json(&report, &worksheet, &capture, limit).is_err());
+    }
+    let mut invalid = worksheet.clone();
+    invalid.decisions[0].reviewed_disposition = Some(crate::Disposition::NeedsStewardReview);
+    assert!(build_full_text_review_json(&report, &invalid, &capture, 2).is_err());
+    for decision in &mut invalid.decisions {
+        decision.reviewed_disposition = Some(crate::Disposition::OutOfScope);
+    }
+    assert!(build_full_text_review_json(&report, &invalid, &capture, 2).is_err());
+}
+
+#[test]
+fn review_view_retains_empty_partial_and_unknown_provider_evidence() {
+    for body in [
+        r#"{"content":""}"#,
+        r#"{"content":"partial text","indexedPages":1,"totalPages":2}"#,
+        r#"{"content":"unknown completeness","providerExtra":{"original":true}}"#,
+    ] {
+        let report = report_fixture();
+        let worksheet = build_steward_review_worksheet(&report).unwrap();
+        let capture = capture_with(&report, 4096, &mut |request_path, _| {
+            let mut response = response_fixture(request_path);
+            if request_path == "items/BCDE3456/fulltext" {
+                response.body = body.into();
+            }
+            Ok(response)
+        })
+        .unwrap();
+        let view: serde_json::Value = serde_json::from_slice(
+            &build_full_text_review_json(&report, &worksheet, &capture, 2).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            view["attachment_evidence"]["ABCD2345"][0]["content_response"]["body"],
+            body
+        );
+        assert_eq!(view["bibliographic_item_count"], 2);
+    }
+}
+
+#[test]
+fn review_view_rejects_json_expansion_without_truncating_valid_captured_text() {
+    let report = report_fixture();
+    let worksheet = build_steward_review_worksheet(&report).unwrap();
+    let capture = capture_with(&report, MAX_SNAPSHOT_BYTES, &mut |request_path, _| {
+        let mut response = response_fixture(request_path);
+        if request_path.ends_with("/fulltext") {
+            response.status = 200;
+            response.version = Some(if request_path.contains("BCDE3456") {
+                12403
+            } else {
+                0
+            });
+            response.body = serde_json::json!({"content":"\"".repeat(3 * 1024 * 1024)}).to_string();
+        }
+        Ok(response)
+    })
+    .unwrap();
+    verify_full_text_capture(&capture, &report).unwrap();
+    let error = build_full_text_review_json(&report, &worksheet, &capture, 1).unwrap_err();
+    assert!(error.to_string().contains("16 MiB output limit"));
+    assert_eq!(worksheet.decisions.len(), 2);
+}
+
 fn report_fixture() -> ClassificationReport {
     let items: Vec<ZoteroItem> = serde_json::from_value(serde_json::json!([
         {"key":"ABCD2345","version":2,"data":{"itemType":"journalArticle","title":"fixture paper"}},
