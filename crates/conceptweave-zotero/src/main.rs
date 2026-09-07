@@ -125,9 +125,16 @@ where
     I: IntoIterator<Item = String>,
     F: FnOnce() -> Result<ClassificationReport, ReadError>,
 {
-    let _ = args;
-    let _ = read_snapshot;
-    Err("CLI orchestration seam not implemented".into())
+    let output = args
+        .into_iter()
+        .nth(1)
+        .ok_or("usage: conceptweave-zotero /tmp/OUTPUT.json")?;
+    let output = validate_output_path(&output)?;
+    let report = read_snapshot()?;
+    if report.zotero_version.starts_with("9.") {
+        eprintln!("Zotero 9 Local API is read-only; writing a local proposal report only");
+    }
+    write_report(&output, &report)
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -138,6 +145,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::Cell;
 
     struct FailingReport;
 
@@ -195,6 +203,75 @@ mod tests {
             serde_json::from_slice(&fs::read(&output).unwrap()).unwrap();
         assert_eq!(saved["zotero_version"], "10.0.1");
         fs::remove_file(output).unwrap();
+    }
+
+    #[test]
+    fn production_runner_preserves_the_zotero_9_read_only_path() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let output = unique_temp_path(&format!("runner-zotero9-{nonce}"));
+        let _ = fs::remove_file(&output);
+        let args = vec![
+            "conceptweave-zotero".to_owned(),
+            output.to_string_lossy().into_owned(),
+        ];
+
+        run_with(args, || Ok(sample_report("9.0.6"))).unwrap();
+        let saved: serde_json::Value =
+            serde_json::from_slice(&fs::read(&output).unwrap()).unwrap();
+        assert_eq!(saved["zotero_version"], "9.0.6");
+        fs::remove_file(output).unwrap();
+    }
+
+    #[test]
+    fn production_runner_rejects_missing_output_before_reading() {
+        let called = Cell::new(false);
+        let result = run_with(vec!["conceptweave-zotero".to_owned()], || {
+            called.set(true);
+            Ok(sample_report("10.0.1"))
+        });
+
+        assert!(result.is_err());
+        assert!(!called.get());
+    }
+
+    #[test]
+    fn production_runner_rejects_invalid_output_before_reading() {
+        let called = Cell::new(false);
+        let result = run_with(
+            vec!["conceptweave-zotero".to_owned(), "relative.json".to_owned()],
+            || {
+                called.set(true);
+                Ok(sample_report("10.0.1"))
+            },
+        );
+
+        assert!(result.is_err());
+        assert!(!called.get());
+    }
+
+    #[test]
+    fn production_runner_propagates_snapshot_failure_without_publishing() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let output = unique_temp_path(&format!("runner-read-failure-{nonce}"));
+        let _ = fs::remove_file(&output);
+        let args = vec![
+            "conceptweave-zotero".to_owned(),
+            output.to_string_lossy().into_owned(),
+        ];
+
+        let result = run_with(args, || Err(ReadError::Budget("test-reader")));
+        assert!(result.is_err());
+        assert!(!output.exists());
     }
 
     #[test]
