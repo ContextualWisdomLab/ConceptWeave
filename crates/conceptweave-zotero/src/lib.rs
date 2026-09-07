@@ -158,6 +158,8 @@ pub struct DuplicateCandidate {
     pub normalized_identity: String,
     /// Zotero item keys sharing the identity.
     pub item_keys: Vec<String>,
+    /// Exact source identity value observed for each item in the immutable snapshot.
+    pub source_identity_values: BTreeMap<String, String>,
 }
 
 /// Complete local classification report for one immutable library version.
@@ -742,30 +744,35 @@ fn contains_phrase(value: &str, phrase: &str) -> bool {
 }
 
 fn duplicate_candidates(items: &[&ZoteroItem]) -> Vec<DuplicateCandidate> {
-    let mut identities: BTreeMap<(&'static str, String), Vec<String>> = BTreeMap::new();
+    let mut identities: BTreeMap<
+        (&'static str, String),
+        (Vec<String>, BTreeMap<String, String>),
+    > = BTreeMap::new();
     for item in items {
         if let Some(doi) = normalize_doi(&item.data.doi) {
-            identities
-                .entry(("doi", doi))
-                .or_default()
-                .push(item.key.clone());
+            let (item_keys, source_identity_values) = identities.entry(("doi", doi)).or_default();
+            item_keys.push(item.key.clone());
+            source_identity_values.insert(item.key.clone(), item.data.doi.clone());
         }
         if let Some(title) = normalize_title(&item.data.title) {
-            identities
-                .entry(("title", title))
-                .or_default()
-                .push(item.key.clone());
+            let (item_keys, source_identity_values) =
+                identities.entry(("title", title)).or_default();
+            item_keys.push(item.key.clone());
+            source_identity_values.insert(item.key.clone(), item.data.title.clone());
         }
     }
     identities
         .into_iter()
-        .filter_map(|((identity_kind, normalized_identity), item_keys)| {
-            (item_keys.len() > 1).then_some(DuplicateCandidate {
-                identity_kind,
-                normalized_identity,
-                item_keys,
-            })
-        })
+        .filter_map(
+            |((identity_kind, normalized_identity), (item_keys, source_identity_values))| {
+                (item_keys.len() > 1).then_some(DuplicateCandidate {
+                    identity_kind,
+                    normalized_identity,
+                    item_keys,
+                    source_identity_values,
+                })
+            },
+        )
         .collect()
 }
 
