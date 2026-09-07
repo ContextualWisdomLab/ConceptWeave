@@ -134,4 +134,28 @@ mod tests {
         fs::remove_file(link).unwrap();
         fs::remove_file(target).unwrap();
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn output_path_uses_the_validated_parent_not_a_swappable_symlink() {
+        use std::os::unix::fs::symlink;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let allowed_parent = env::temp_dir().canonicalize().unwrap();
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let alias = allowed_parent.join(format!(
+            "conceptweave-zotero-{}-{nonce}-parent-link",
+            std::process::id()
+        ));
+        symlink(&allowed_parent, &alias).unwrap();
+        let output = alias.join("report.json");
+
+        let validated = validate_output_path(output.to_str().unwrap()).unwrap();
+        assert_eq!(validated, allowed_parent.join("report.json"));
+
+        fs::remove_file(alias).unwrap();
+    }
 }
