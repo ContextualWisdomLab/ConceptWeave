@@ -5,7 +5,8 @@ use conceptweave_zotero::{
     ClassificationReport, GoldenSetApproval, MAX_REVIEW_BATCH_ITEMS, StewardDecisionPatch,
     StewardReviewBatch, StewardReviewWorksheet, apply_steward_decision_patch,
     assess_steward_review_progress, build_steward_review_batch, build_steward_review_worksheet,
-    decision_patch_from_review_batch, read_local_snapshot, reviewed_golden_set_from_worksheet,
+    decision_patch_from_review_batch, read_local_full_text, read_local_snapshot,
+    reviewed_golden_set_from_worksheet,
 };
 use serde::de::DeserializeOwned;
 use std::collections::BTreeSet;
@@ -14,12 +15,16 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
-const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --review-progress /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/PROGRESS.json | --review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json LIMIT /tmp/BATCH.json | --apply-review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/COMPLETED_BATCH.json /tmp/UPDATED_WORKSHEET.json | --apply-decision-patch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/PATCH.json /tmp/UPDATED_WORKSHEET.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
+const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --capture-full-text /tmp/REPORT.json /tmp/CAPTURE.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --review-progress /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/PROGRESS.json | --review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json LIMIT /tmp/BATCH.json | --apply-review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/COMPLETED_BATCH.json /tmp/UPDATED_WORKSHEET.json | --apply-decision-patch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/PATCH.json /tmp/UPDATED_WORKSHEET.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
 const MAX_ARTIFACT_BYTES: u64 = 16 * 1024 * 1024;
 
 #[derive(Debug, PartialEq, Eq)]
 enum OutputRequest {
     Report(String),
+    FullTextCapture {
+        report: String,
+        output: String,
+    },
     Worksheet {
         report: String,
         worksheet: String,
@@ -63,7 +68,18 @@ where
 {
     let mut args = args.into_iter().map(Into::into);
     let first = args.next().ok_or(USAGE)?;
-    let request = if first == "--worksheet" {
+    let request = if first == "--capture-full-text" {
+        let report = args
+            .next()
+            .ok_or("--capture-full-text requires report and output paths")?;
+        let output = args
+            .next()
+            .ok_or("--capture-full-text requires report and output paths")?;
+        if report == output {
+            return Err("full-text report and output paths must differ");
+        }
+        OutputRequest::FullTextCapture { report, output }
+    } else if first == "--worksheet" {
         let report = args
             .next()
             .ok_or("--worksheet requires report and worksheet output paths")?;
@@ -366,7 +382,7 @@ fn write_private_output(path: &Path, content: &[u8]) -> io::Result<()> {
             "metadata output exceeds the artifact size limit",
         ));
     }
-    write_private_output_with(path, content, write_all_and_flush)
+    write_private_output_with(path, content, &mut write_all_and_flush)
 }
 
 /// Writes and flushes the complete serialized artifact.
@@ -376,10 +392,13 @@ fn write_all_and_flush(writer: &mut BufWriter<File>, content: &[u8]) -> io::Resu
 }
 
 /// Runs the private-output boundary with an injectable writer for failure testing.
+type PrivateOutputWriter<'writer> =
+    dyn FnMut(&mut BufWriter<File>, &[u8]) -> io::Result<()> + 'writer;
+
 fn write_private_output_with(
     path: &Path,
     content: &[u8],
-    write: fn(&mut BufWriter<File>, &[u8]) -> io::Result<()>,
+    write: &mut PrivateOutputWriter<'_>,
 ) -> io::Result<()> {
     let file = create_report_file(path)?;
     let mut writer = BufWriter::new(file);
@@ -479,6 +498,16 @@ fn create_report_file_with(
 /// Reads one Zotero snapshot and writes its sensitive local proposal report.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     match parse_output_request(env::args().skip(1))? {
+        OutputRequest::FullTextCapture { report, output } => {
+            let output = validate_output_path(&output)?;
+            let (report, _): (ClassificationReport, _) =
+                read_private_json(&report).map_err(|error| label_input("report", error))?;
+            let capture = read_local_full_text(&report)?;
+            write_private_output_with(&output, &[], &mut |writer, _| {
+                serde_json::to_writer(&mut *writer, &capture).map_err(io::Error::other)?;
+                writer.flush()
+            })?;
+        }
         OutputRequest::Report(output) => {
             let output = validate_output_path(&output)?;
             let report = read_local_snapshot()?;
@@ -621,6 +650,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn full_text_mode_requires_two_distinct_artifact_paths() {
+        let report = "/tmp/report.json";
+        let output = "/tmp/full-text.json";
+        assert_eq!(
+            parse_output_request(["--capture-full-text", report, output]),
+            Ok(OutputRequest::FullTextCapture {
+                report: report.into(),
+                output: output.into(),
+            })
+        );
+        assert!(parse_output_request(["--capture-full-text"]).is_err());
+        assert!(parse_output_request(["--capture-full-text", report]).is_err());
+        assert!(parse_output_request(["--capture-full-text", report, report]).is_err());
+        assert!(parse_output_request(["--capture-full-text", report, output, "extra"]).is_err());
+    }
 
     #[test]
     #[cfg(unix)]
@@ -1189,7 +1235,7 @@ mod tests {
         let retained = unique_temp_path("write-race-retained");
         assert!(!output.exists());
         assert!(!retained.exists());
-        let error = write_private_output_with(&output, b"content", |_, _| {
+        let error = write_private_output_with(&output, b"content", &mut |_, _| {
             let output = unique_temp_path("write-race");
             fs::rename(&output, unique_temp_path("write-race-retained"))?;
             let mut replacement = OpenOptions::new()
@@ -1213,15 +1259,16 @@ mod tests {
         let retained = unique_temp_path("write-buffer-retained");
         assert!(!output.exists());
         assert!(!retained.exists());
-        let error = write_private_output_with(&output, b"buffered content", |writer, content| {
-            fs::rename(
-                unique_temp_path("write-buffer"),
-                unique_temp_path("write-buffer-retained"),
-            )?;
-            writer.write_all(content)?;
-            Err(io::Error::new(io::ErrorKind::WriteZero, "injected failure"))
-        })
-        .unwrap_err();
+        let error =
+            write_private_output_with(&output, b"buffered content", &mut |writer, content| {
+                fs::rename(
+                    unique_temp_path("write-buffer"),
+                    unique_temp_path("write-buffer-retained"),
+                )?;
+                writer.write_all(content)?;
+                Err(io::Error::new(io::ErrorKind::WriteZero, "injected failure"))
+            })
+            .unwrap_err();
         let retained_bytes = fs::read(&retained).unwrap();
         fs::remove_file(retained).unwrap();
         assert_eq!(error.kind(), io::ErrorKind::WriteZero);
@@ -1232,7 +1279,7 @@ mod tests {
     fn failed_private_output_is_preserved_and_requires_a_new_path() {
         let output = unique_temp_path("failed-output");
         let _ = fs::remove_file(&output);
-        let error = write_private_output_with(&output, b"content", |_, _| {
+        let error = write_private_output_with(&output, b"content", &mut |_, _| {
             Err(io::Error::new(
                 io::ErrorKind::WriteZero,
                 "injected write failure",

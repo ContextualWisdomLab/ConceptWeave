@@ -8,6 +8,8 @@
 - Governance & Publication -> Interoperability: **Published Language**; adapters consume immutable release contracts.
 - Research Intake -> Governance & Publication: **Anti-Corruption Layer**; Governance verifies complete duplicate and classification-write review sets before Intake emits canonical-key operations or write plans. Duplicate admission includes source inventory, audit, candidate membership and retained-source bindings. Opaque authority receipts and local plans are not proof of source mutation.
 
+Research Intake also owns the optional private Full-Text Capture bound to a metadata report. It preserves provider observations while rejecting mixed-origin counters as a reliable incremental cursor. This is an adapter responsibility, not a new bounded context, shared catalog or approval owner; downstream proposal adoption remains a separate evidence/review transition.
+
 ## External relationships
 
 Classification-write admission reuses the same complete inventory/audit validator

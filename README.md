@@ -121,6 +121,14 @@ cargo doc --workspace --no-deps
 
 The repository CI also validates the JSON Schema, lock/toolchain freshness, documentation contracts, and coverage expectations defined by the current source.
 
+For the proposed local research intake, preserve available paper text separately from an existing private report:
+
+```bash
+cargo +1.98.0 run --locked -p conceptweave-zotero -- --capture-full-text /tmp/REPORT.json /tmp/CAPTURE.json
+```
+
+Zotero 10+ must be running. The report must be an unchanged owner-only file from that library; the capture path must be a new file directly in the system temp directory. Missing or partial text stays visible, and the command does not classify papers, approve decisions or modify Zotero. Keep both files private; see [operation and retry limits](OPERABILITY.md).
+
 ## Core contract
 
 A semantic candidate is not the same thing as published semantic truth.

@@ -6,6 +6,8 @@ All source artifacts, generated candidate payloads, external ontology files, mod
 
 Local Zotero classification reports can contain bibliographic titles, tags, matched values, and abstention abstracts. They are sensitive review material, remain outside the repository, and are not publication artifacts.
 
+Full-text captures additionally retain exact paper text and attachment metadata. They use new `0600` local files, static transport errors and no content logging. Both local HTTP agents explicitly disable inherited proxies; redirects remain disabled. Replay limits record and response sizes before parsing/hash work, and unchanged hashes do not authenticate a replaced local artifact or the provider. Full-text source strings remain untrusted data, never instructions. Metadata approval cannot authorize newly captured text.
+
 ## Required controls
 
 - source size, type, nesting, archive/decompression, and parser-time bounds;
