@@ -24,3 +24,15 @@ Within the 137-signal queue, deterministic dispositions are adjacent evidence
 abstentions split into no deterministic rule match 101 and unsupported rule
 vocabulary 6. This split prioritizes rule/ontology vocabulary work without
 silently promoting any paper.
+
+## Replay confirmation (2026-09-09 00:47 KST)
+
+The same aggregate was recomputed from the exact private report
+`/tmp/conceptweave-zotero-live-20260909-004718.json` (SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`). The
+signal union remains 137 proposals: 29 adjacent evidence, one semantic
+consumption bridge and 107 steward-review abstentions (101 no deterministic
+rule match, six unsupported rule vocabulary). Matching policy is explicit:
+`ontology`, `semantic`, `taxonomy`, `knowledge graph` and the `vocab` stem are
+case-insensitive; exact uppercase `OWL` and `RDF` counts are separate discovery
+signals. These counts do not create decisions, approvals or Zotero writes.
