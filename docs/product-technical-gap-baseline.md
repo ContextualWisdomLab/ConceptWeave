@@ -13,15 +13,16 @@ repeatability evidence only; it does not establish review, approval or a
 Zotero write.
 
 PR39 is `0511e7dc29811fb26ef3e3fa39be5ff779299869` (OPEN/Draft/CLEAN); PR40 is
-`1a4b3335d4afd77f687ba05b2638c5bc892a7f74` (OPEN/Draft/CLEAN). The latest
+`bb735815082dd799ac8290be900277851de02908` (OPEN/Draft/CLEAN). The latest
 Local API replay remains stable at 8,326 observed records, 3,715 proposals,
 4,611 unclassified records, four pending sources and 49 duplicate candidates,
 with zero failures and private report digest
 `8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`.
 PR40's report-bound restoration passes local focused/workspace gates. Its
 trusted-restoration branch metric is 200/200 (100%); the owned lib.rs function
-coverage is 100% and normalized regions are 99.44%. The remaining gaps are
-two 64-bit integer-conversion error arms. Hosted checks and independent review
+coverage is 100% and normalized regions are 99.44%. Page-count and body-byte
+conversion now use target-width helpers; only their non-instrumented cast
+expressions remain visible to the tool. Hosted checks and independent review
 remain outstanding.
 
 ## September 8 acquisition and consolidation checkpoint
@@ -123,7 +124,7 @@ source against the immutable report before any authority callback. Missing and
 stale source-resolution regressions pass in the locked Rust 1.98 workspace;
 Clippy, warnings-denied rustdoc and diff checks also pass. GitHub reports OPEN
 Draft/CLEAN with CodeRabbit skipped because the PR remains a draft. PR #40's
- current exact head is `1a4b3335d4afd77f687ba05b2638c5bc892a7f74`; the latest
+ current exact head is `bb735815082dd799ac8290be900277851de02908`; the latest
 successor records the report-bound restoration repair and its unchanged-head
 evidence. Direct trusted-type deserialization is removed, and coordinated
 rewrites fail closed against the immutable `ClassificationReport`. The trusted
@@ -146,10 +147,10 @@ the next engineering gap before protected merge.
 The write-envelope mismatch regression now exercises four stored identity
 mismatch forms and raises normalized branch coverage to 781/782 (99.87%) in
 the pinned nightly run with 115 tests. On PR40 repair head
-`1a4b3335d4afd77f687ba05b2638c5bc892a7f74`, the trusted-restoration coverage
+`bb735815082dd799ac8290be900277851de02908`, the trusted-restoration coverage
 rerun reports 200/200 branches (100%); lib.rs function coverage is 100% and
 normalized regions are 99.44%. Remaining gaps are two 64-bit
-integer-conversion error arms. The formerly environment-dependent
+cast expressions from target-width conversion helpers. The formerly environment-dependent
 `/tmp` test branch is now deterministic; broader normalized region gaps remain
 and no exclusions or threshold changes were introduced.
 
