@@ -1257,10 +1257,11 @@ remain open; no local evidence is transferred to a remote or later head.
 - Consuming products retain tenant/purpose authorization and physical query execution.
 - Published semantic truth is immutable; corrections create a new release plus supersession evidence rather than in-place overwrite.
 
-PR40 owner head `d9c5d58568351f1129b9b95278f239d54444d2a4` adds a regression assertion for the
-`InvalidPendingKeySet` error contract. Rust 1.98 targeted test and formatting pass; the
-workspace raw replay remains below the 100% production target (branches 200/204,
-functions 207/210, lines 1872/1891, regions 2968/3009). This is local owner evidence only;
+PR40 owner head `7f057efad7bfa0da672635a46394f9e65e7a076a` adds a regression assertion for the
+`InvalidPendingKeySet` error contract and encodes the validated output-path invariant without
+changing admission policy. Rust 1.98 all-target tests and formatting pass; the workspace raw
+replay remains below the 100% production target (branches 200/204, functions 207/209,
+lines 1874/1888, regions 2969/3005). This is local owner evidence only;
 hosted required checks, independent approval and protected merge remain unverified.
 
 ### Downstream source-resolution envelope gap (2026-09-09)
