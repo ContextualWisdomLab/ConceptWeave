@@ -374,12 +374,8 @@ pub fn restore_source_resolution_review(
     {
         return Err(SourceResolutionRestoreError::UnboundReport);
     }
-    let review = prepare_source_resolution_review(report, wire.resolved_sources.clone())
-        .map_err(SourceResolutionRestoreError::SourceResolution)?;
-    if wire.expected_source_identities != review.expected_source_identities {
-        return Err(SourceResolutionRestoreError::UnboundReport);
-    }
-    Ok(review)
+    prepare_source_resolution_review(report, wire.resolved_sources)
+        .map_err(SourceResolutionRestoreError::SourceResolution)
 }
 
 /// Failure raised when source resolutions do not exactly match a report.
