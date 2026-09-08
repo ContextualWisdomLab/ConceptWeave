@@ -1444,6 +1444,17 @@ Per-file line/region gaps remain in the full-text and CLI modules, so the owned
 100% line/function/region target is not yet met; no threshold or exclusion was
 changed.
 
+### September 9 PR38 protected adoption and PR37 successor
+
+PR38 was externally merged into its stacked base at merge commit
+`ad35015bc15dac99114d820c6c4392d75014f6c6`. Its full-text review/view and
+private-artifact boundary are now part of the canonical PR37 branch. The
+resulting PR37 exact head is `9e2e3d5513a796153ed8d5f6bff8d3ad97e113d0`, based
+on PR36's `c51330e61bf5b3d2b18a561830151ba874b17a4c`; the Rust 1.98 workspace
+and doc-test run remained green after the merge. This confirms ordinary stack
+inheritance only, not independent approval, protected-main acceptance, paper
+decisions, Zotero writes or release evidence.
+
 ### September 9 PR36→PR37 persisted-capture contract adoption
 
 PR36 was externally merged at exact `c062845da8268089f09d7313dd1fb9604adfa178`.
