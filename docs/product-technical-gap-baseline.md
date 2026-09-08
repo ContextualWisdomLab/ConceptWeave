@@ -1363,6 +1363,12 @@ source-normalized gates remain 4,752/4,752 regions and 784/784 branches. The
 per-file line/region gaps in the full-text and CLI modules remain, so the owned
 100% line/function/region target is still open.
 
+PR40's exact head `19c4d5a43234b6290233f3e8b1475c9746d94dda` was independently
+tested in a detached worktree with Rust 1.98.0: the complete workspace suite and
+doc-tests passed (all observed tests green). This is current local owner evidence
+only; PR40 remains Draft, its base is stacked, and no hosted workflow or
+independent approval was produced.
+
 The latest report retains four pending source records: one standalone note and
 three standalone attachments without parent links. Their file bytes, content type
 and link mode remain outside the metadata projection and require the separate
