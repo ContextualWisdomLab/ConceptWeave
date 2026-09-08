@@ -4,6 +4,12 @@
 
 ## September 8 acquisition and consolidation checkpoint
 
+At current PR #39 head `c91a1bd82c3aa4031e65de2ae15abc042f2f0add`, Rust 1.98
+workspace tests, all-target strict Clippy, warnings-denied rustdoc and diff
+checks were rerun after the evidence-only capture update and passed. This
+revalidates local code health only; the owned 100% coverage gate, hosted
+required workflows, independent approval and protected merge remain open.
+
 Fresh release-mode Local API replay at 21:09 KST reproduced the current
 aggregate without mutation: 8,326 snapshot records, 3,715 bibliographic
 proposals, 4,611 nonbibliographic records, four pending sources, 3,658
