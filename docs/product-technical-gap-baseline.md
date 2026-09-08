@@ -101,9 +101,9 @@ source against the immutable report before any authority callback. Missing and
 stale source-resolution regressions pass in the locked Rust 1.98 workspace;
 Clippy, warnings-denied rustdoc and diff checks also pass. GitHub reports OPEN
 Draft/CLEAN with CodeRabbit skipped because the PR remains a draft. PR #40's
-current exact head is `40a908c14af52a0470e1068772f5c4c4f3eff7d0`; the latest
-successor records stored source-item identity RED/repair evidence while
-retaining the stored-completeness invariant. It remains OPEN Draft/CLEAN with
+current exact head is `dde53e0a3412ca2f0641ee326488d39cf642970b`; the latest
+successor records stored source-item identity RED evidence while retaining the
+stored-completeness invariant. It remains OPEN Draft/CLEAN with
 only the draft-review skip visible, so fresh exact-head checks, independent
 review and protected acceptance are still outstanding. This is not
 protected-merge, release or Zotero-write evidence.
