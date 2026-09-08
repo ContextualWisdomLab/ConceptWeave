@@ -40,6 +40,41 @@ fn read_fixture(
     (result, server)
 }
 
+fn read_raw_response(response: Vec<u8>) -> Result<ClassificationReport, ReadError> {
+    let _guard = LOCAL_API_TEST_LOCK.lock().unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    *TEST_LOCAL_API.lock().unwrap() = Some(format!(
+        "http://{}/api/users/0/items",
+        listener.local_addr().unwrap()
+    ));
+    let server = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut request = Vec::new();
+        while !request.windows(4).any(|part| part == b"\r\n\r\n") {
+            let mut buffer = [0; 4096];
+            let length = stream.read(&mut buffer).unwrap();
+            assert_ne!(length, 0);
+            request.extend_from_slice(&buffer[..length]);
+        }
+        stream.write_all(&response).unwrap();
+    });
+    let result = read_local_snapshot();
+    *TEST_LOCAL_API.lock().unwrap() = None;
+    server.join().unwrap();
+    result
+}
+
+fn successful_response(extra_headers: &str, body: &[u8]) -> Vec<u8> {
+    format!(
+        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nTotal-Results: 0\r\nLast-Modified-Version: 42\r\nX-Zotero-Version: 9.0.6\r\nZotero-API-Version: 3\r\nZotero-Schema-Version: 42\r\n{extra_headers}Connection: close\r\n\r\n",
+        body.len()
+    )
+    .into_bytes()
+    .into_iter()
+    .chain(body.iter().copied())
+    .collect()
+}
+
 fn source_item_body(key: &str) -> Vec<u8> {
     serde_json::to_vec(&vec![item(key, "attachment", "", "", "")]).unwrap()
 }
@@ -173,6 +208,64 @@ fn snapshot_rejects_oversized_invalid_utf8_and_truncated_bodies() {
         server.join().unwrap();
         assert!(matches!(result, Err(ReadError::Body(_))));
     }
+}
+
+#[test]
+fn production_transport_rejects_missing_and_malformed_required_headers() {
+    let missing_total = b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nLast-Modified-Version: 42\r\nX-Zotero-Version: 9.0.6\r\nZotero-API-Version: 3\r\nZotero-Schema-Version: 42\r\nConnection: close\r\n\r\n[]".to_vec();
+    assert!(matches!(
+        read_raw_response(missing_total),
+        Err(ReadError::Header("Total-Results"))
+    ));
+
+    let malformed_total = b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nTotal-Results: many\r\nLast-Modified-Version: 42\r\nX-Zotero-Version: 9.0.6\r\nZotero-API-Version: 3\r\nZotero-Schema-Version: 42\r\nConnection: close\r\n\r\n[]".to_vec();
+    assert!(matches!(
+        read_raw_response(malformed_total),
+        Err(ReadError::Header("Total-Results"))
+    ));
+}
+
+#[test]
+fn production_transport_accepts_absent_optional_server_id_and_rejects_bad_json() {
+    let report = read_raw_response(successful_response("", b"[]")).unwrap();
+    assert_eq!(report.server_id, None);
+
+    assert!(matches!(
+        read_raw_response(successful_response("Zotero-Server-ID: synthetic\r\n", b"{")),
+        Err(ReadError::Json(_))
+    ));
+}
+
+#[test]
+fn header_helpers_cover_optional_and_numeric_boundaries() {
+    let mut headers = ureq::http::HeaderMap::new();
+    headers.insert("X-Count", ureq::http::HeaderValue::from_static("42"));
+    headers.insert(
+        "X-Text",
+        ureq::http::HeaderValue::from_static("synthetic-server"),
+    );
+    headers.insert(
+        "X-Opaque",
+        ureq::http::HeaderValue::from_bytes(&[0x80]).unwrap(),
+    );
+
+    assert_eq!(header_u64(&headers, "X-Count").unwrap(), 42);
+    assert_eq!(
+        header_string(&headers, "X-Text").unwrap(),
+        "synthetic-server"
+    );
+    assert_eq!(optional_header(&headers, "X-Missing"), None);
+    assert_eq!(optional_header(&headers, "X-Opaque"), None);
+
+    headers.insert("X-Bad-Count", ureq::http::HeaderValue::from_static("many"));
+    assert!(matches!(
+        header_u64(&headers, "X-Bad-Count"),
+        Err(ReadError::Header("X-Bad-Count"))
+    ));
+    assert!(matches!(
+        header_string(&headers, "X-Missing"),
+        Err(ReadError::Header("X-Missing"))
+    ));
 }
 
 #[test]
