@@ -6,6 +6,13 @@ This file records code-current product and technical gaps. Exact PR/check/run co
 
 ## September 8 research lifecycle, abstention, and replay-evidence checkpoint
 
+PR #40 exact head `0202f6551ad8a36bdda10225149d0225043b7888` now rejects
+stored source-resolution JSON whose nested `library_version` differs from the
+envelope revision. The regression was reproduced at `b2f05085` before the
+minimal deserializer repair. Full workspace tests, focused source-resolution
+tests, strict Clippy and diff checks pass locally; the PR remains Draft/Open
+with no protected hosted workflow evidence.
+
 The `0d4d677ddad471a0634cdaeed99d8e1afec66043` repair checkpoint additionally binds source-resolution decisions to the Local API `server_id` whenever the provider exposes one; this is dated evidence, not a mutable-head claim.
 
 PR #40 exact-head repair `a87ee2d4d92f97fe61639696ae5e06f8f20c84d6` now rejects missing or blank Local API server identity before evaluating pending resolutions, including the empty-pending case; focused Zotero tests, locked workspace tests, strict Clippy, warnings-denied rustdoc, and formatting pass locally. Hosted protected checks remain unavailable while the PR is Draft.

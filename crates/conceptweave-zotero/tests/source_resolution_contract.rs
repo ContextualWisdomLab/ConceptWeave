@@ -206,6 +206,49 @@ fn source_resolution_review_json_rejects_nested_library_version_mismatch() {
 }
 
 #[test]
+fn source_resolution_review_json_rejects_duplicate_unsorted_or_blank_decisions() {
+    let report = classify_snapshot(
+        "10.0.1".into(),
+        Some("local-server".into()),
+        42,
+        vec![
+            item("SOURCE", 41, "attachment", ""),
+            item("NOTE", 42, "note", ""),
+        ],
+    );
+    let review = prepare_source_resolution_review(
+        &report,
+        vec![
+            resolution("SOURCE", 41, "attachment", "", 42, Some("local-server")),
+            resolution("NOTE", 42, "note", "", 42, Some("local-server")),
+        ],
+    )
+    .expect("both pending sources are resolved");
+    let serialized = serde_json::to_value(review).expect("review must serialize");
+
+    let mut duplicate = serialized.clone();
+    duplicate["resolved_sources"][1]["item_key"] = serde_json::json!("NOTE");
+    assert!(
+        serde_json::from_value::<conceptweave_zotero::SourceResolutionReview>(duplicate).is_err()
+    );
+
+    let mut unsorted = serialized.clone();
+    unsorted["resolved_sources"]
+        .as_array_mut()
+        .expect("resolved sources are an array")
+        .swap(0, 1);
+    assert!(
+        serde_json::from_value::<conceptweave_zotero::SourceResolutionReview>(unsorted).is_err()
+    );
+
+    let mut blank = serialized;
+    blank["resolved_sources"][0]["reason"] = serde_json::json!(" \t\n");
+    assert!(
+        serde_json::from_value::<conceptweave_zotero::SourceResolutionReview>(blank).is_err()
+    );
+}
+
+#[test]
 fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
     let report = classify_snapshot(
         "10.0.1".into(),
