@@ -103,11 +103,11 @@ fn source_resolution_review_round_trips_owned_json() {
 fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
     let report = classify_snapshot(
         "10.0.1".into(),
-        None,
+        Some("local-server".into()),
         7,
         vec![item("SOURCE", 3, "attachment", "")],
     );
-    let exact = resolution("SOURCE", 3, "attachment", "", 7, None);
+    let exact = resolution("SOURCE", 3, "attachment", "", 7, Some("local-server"));
 
     let mut duplicate = exact.clone();
     duplicate.reason = "second decision".into();
@@ -119,7 +119,7 @@ fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
     assert!(matches!(
         prepare_source_resolution_review(
             &report,
-            vec![resolution("OTHER", 3, "attachment", "", 7, None)]
+            vec![resolution("OTHER", 3, "attachment", "", 7, Some("local-server"))]
         ),
         Err(SourceResolutionError::Unknown(key)) if key == "OTHER"
     ));
@@ -127,7 +127,7 @@ fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
     assert!(matches!(
         prepare_source_resolution_review(
             &report,
-            vec![resolution("SOURCE", 2, "attachment", "", 7, None)]
+            vec![resolution("SOURCE", 2, "attachment", "", 7, Some("local-server"))]
         ),
         Err(SourceResolutionError::Stale(key)) if key == "SOURCE"
     ));
@@ -135,7 +135,7 @@ fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
     assert!(matches!(
         prepare_source_resolution_review(
             &report,
-            vec![resolution("SOURCE", 3, "note", "", 7, None)]
+            vec![resolution("SOURCE", 3, "note", "", 7, Some("local-server"))]
         ),
         Err(SourceResolutionError::Stale(key)) if key == "SOURCE"
     ));
@@ -143,7 +143,7 @@ fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
     assert!(matches!(
         prepare_source_resolution_review(
             &report,
-            vec![resolution("SOURCE", 3, "attachment", "PARENT", 7, None)]
+            vec![resolution("SOURCE", 3, "attachment", "PARENT", 7, Some("local-server"))]
         ),
         Err(SourceResolutionError::Stale(key)) if key == "SOURCE"
     ));
@@ -151,7 +151,7 @@ fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
     assert!(matches!(
         prepare_source_resolution_review(
             &report,
-            vec![resolution("SOURCE", 3, "attachment", "", 8, None)]
+            vec![resolution("SOURCE", 3, "attachment", "", 8, Some("local-server"))]
         ),
         Err(SourceResolutionError::Stale(key)) if key == "SOURCE"
     ));
@@ -168,7 +168,7 @@ fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
 fn source_resolution_rejects_pending_keys_missing_from_retained_inventory() {
     let mut report = classify_snapshot(
         "10.0.1".into(),
-        None,
+        Some("local-server".into()),
         7,
         vec![item("SOURCE", 3, "attachment", "")],
     );
@@ -177,7 +177,7 @@ fn source_resolution_rejects_pending_keys_missing_from_retained_inventory() {
     assert!(matches!(
         prepare_source_resolution_review(
             &report,
-            vec![resolution("SOURCE", 3, "attachment", "", 7, None)]
+            vec![resolution("SOURCE", 3, "attachment", "", 7, Some("local-server"))]
         ),
         Err(SourceResolutionError::MissingInventory(key)) if key == "SOURCE"
     ));
