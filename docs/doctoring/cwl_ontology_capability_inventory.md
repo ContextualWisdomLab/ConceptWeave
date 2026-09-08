@@ -25,6 +25,24 @@ audit observation is joined to a repository identity and default revision.
 
 ## Scope and evidence limits
 
+## External Rust ontology-library cultivation candidates (2026-09-09)
+
+The bounded upstream scan identified three reusable Rust candidates. This is
+capability evidence only; no dependency, source copy, registry artifact or
+semantic decision was adopted.
+
+| Candidate | Upstream capability evidence | Cultivation gate before any ConceptWeave port/ACL |
+| --- | --- | --- |
+| Oxigraph | [Official repository](https://github.com/oxigraph/oxigraph) describes a Rust RDF/SPARQL graph database and toolkit, including parsing, serialization, canonicalization and SPARQL protocol support. | Pin an immutable release, verify license and provenance, run RDF/SPARQL conformance and performance fixtures, and expose it only behind a versioned port. Its store/query semantics must not become ConceptWeave publication authority. |
+| Sophia | [Official repository](https://github.com/pchampin/sophia_rs) provides Rust RDF 1.2/Linked Data traits and implementations for terms, triples/quads, graphs/datasets, parsers and serializers; its changelog records the 0.10.0 RDF 1.2 release. | Verify the exact crate release and transitive license set, then test round-trip/canonicalization and language-tag/IRI edge cases against ConceptWeave contracts. Keep RDF data-model truth separate from semantic-model review and release truth. |
+| Rudof | [Official repository](https://github.com/rudof-project/rudof) and [project documentation](https://rudof-project.github.io/rudof/) describe Rust RDF data-shape tooling for SHACL, ShEx and DCTAP, with validation and conversion commands. | Select the supported SHACL profile explicitly, pin a release, and run W3C/negative-shape fixtures plus bounded-resource tests. Validation output is proposal evidence; it cannot approve or publish an ontology release. |
+
+The next cultivation experiment is a read-only compatibility matrix (format,
+RDF version, SHACL profile, canonicalization, license, release provenance,
+latency and failure behavior) generated from immutable upstream revisions. A
+matrix pass may justify an ACL or utility-repository proposal; it does not
+justify adding a dependency or creating a new repository by itself.
+
 The September 7 metadata refresh again returned 76 repositories, one archived repository and 11 forks. Matching counts do not prove unchanged repository contents; every capability observation retains its own exact source revision.
 
 The paginated organization metadata census returned 76 repositories, including one archived repository and 11 forks; the September 6 follow-up refresh confirmed the same counts. Name/description screening for ontology, semantic, knowledge graph, schema, RDF, SHACL, provenance and lineage was combined with the existing Context Map; metadata matches alone miss owners whose descriptions do not use those words. This expanded the original eight-candidate audit to 12 selected candidates. The organization product-goal directive then identified DiskSage's actual OWL use, expanding the audit to 13. naruon and pg-erd-cloud brought the count to 15. Five domain/interoperability audits brought coverage to 20; three further domain and two document-contract audits brought it to 25/76. Keyverse and inkspan brought it to 27/76; three statistical-library audits brought it to 30/76. The threading, CDC and work-dependency audits below are a historical **33/76** checkpoint, leaving **43** at that point; subsequent bounded audits advance the current historical inventory to **39/76**, leaving **37**. This does not prove that all relevant implementations have been found.

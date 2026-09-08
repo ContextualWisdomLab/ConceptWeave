@@ -53,3 +53,14 @@ attachment-evidence entries. None of those titles contains the literal
 `ontology` or `semantic` signal, so this first page is not an ontology-priority
 queue. It remains a steward batch selected by worksheet order; no rows were
 auto-promoted or skipped.
+
+## External implementation-candidate checkpoint (2026-09-09)
+
+An upstream-only scan recorded three Rust candidates for a later compatibility
+matrix: [Oxigraph](https://github.com/oxigraph/oxigraph) (RDF/SPARQL storage and
+tooling), [Sophia](https://github.com/pchampin/sophia_rs) (RDF/Linked Data data
+model and parsers) and [Rudof](https://github.com/rudof-project/rudof) (RDF
+shapes validation, including SHACL and ShEx). The scan did not install, copy,
+publish or adopt any candidate. Release/license/provenance, conformance,
+performance and ACL-boundary checks remain prerequisites; these libraries do
+not supply ConceptWeave semantic authority or Zotero steward decisions.
