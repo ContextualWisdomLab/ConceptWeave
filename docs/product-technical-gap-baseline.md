@@ -1337,6 +1337,10 @@ gaps remain. PR40 remains the trusted-restoration owner at exact head
 unmerged prerequisite work. Neither exact head has independent approval or central
 required workflow evidence, so no protected merge or release is claimed.
 
+The same PR39 exact head passed `RUSTDOCFLAGS='-D warnings' rustup run 1.98.0
+cargo doc --workspace --no-deps --locked`; this is local documentation evidence
+only and does not substitute for hosted gates.
+
 The latest report retains four pending source records: one standalone note and
 three standalone attachments without parent links. Their file bytes, content type
 and link mode remain outside the metadata projection and require the separate
