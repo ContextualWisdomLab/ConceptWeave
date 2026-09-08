@@ -29,8 +29,8 @@ aggregate with report digest
 signals remained 27 `ontology`, 23 `OWL` and 20 `RDF`; this is repeatability and
 discovery evidence only, not review, approval or write authority.
 
-PR39 is `d61b79e5de0f0d6a8f860cf1ade7458ebf8223db` (OPEN/Draft/CLEAN); PR40 is
-`fc6083de58fbe4fb1c5bcdefee8e28671fa034e8` (OPEN/Draft/CLEAN). The latest
+PR39 is `c0bdc7fa81bf416fe9768dc0e753bb4281d24e5f` (OPEN/Draft/CLEAN); PR40 is
+`5397c0afca9c966b16547ee813df78e08149e97b` (OPEN/Draft/CLEAN). The latest
 Local API replay remains stable at 8,326 observed records, 3,715 proposals,
 4,611 unclassified records, four pending sources and 49 duplicate candidates,
 with zero failures and private report digest
