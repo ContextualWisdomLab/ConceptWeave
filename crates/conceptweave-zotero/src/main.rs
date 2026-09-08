@@ -432,7 +432,8 @@ mod tests {
             .is_err()
         );
 
-        if Path::new("/tmp").is_dir() {
+        #[cfg(unix)]
+        {
             let conventional = Path::new("/tmp").join(format!(
                 "conceptweave-zotero-{}-conventional.json",
                 std::process::id()
