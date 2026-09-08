@@ -1331,6 +1331,11 @@ The classifier evidence fields in the same replay separately matched `ontology`
 matched-phrase counts are not title-only discovery counts and are not additive
 coverage or steward decisions.
 
+The first 25-item bound review view is fully blank (25/25 decisions) and has
+25 attachment-evidence entries; its titles contain zero literal `ontology` and
+zero literal `semantic` signals. This is a queue-order observation only, not a
+semantic exclusion or automatic prioritization decision.
+
 Manual `@coderabbitai review` requests were issued on PR39 and PR40 at their exact
 heads, but GitHub continued to report “reviews are disabled for this base branch”
 and produced no independent review or required workflow run. The request itself is

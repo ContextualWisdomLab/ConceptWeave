@@ -45,3 +45,11 @@ matched-phrase counts of `ontology` 32, `owl` 24, `rdf` 20, `knowledge graph`
 2 and `linked data` 1. These are classifier-evidence signals, not the separate
 title-only discovery counts above; they must not be summed into a new KPI or
 treated as steward decisions.
+
+## Bound batch priority checkpoint (2026-09-09 03:25 KST)
+
+The first 25-item capture-bound review view contains 25 blank decisions and 25
+attachment-evidence entries. None of those titles contains the literal
+`ontology` or `semantic` signal, so this first page is not an ontology-priority
+queue. It remains a steward batch selected by worksheet order; no rows were
+auto-promoted or skipped.
