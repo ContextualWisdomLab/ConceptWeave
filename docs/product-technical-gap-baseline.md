@@ -193,6 +193,19 @@ and two unbound nonempty records. This is acquisition/availability evidence
 only; it does not create steward decisions, approval, semantic authority or
 Zotero write permission.
 
+### September 9 06:38 capture-bound worksheet/view preparation
+
+The same report/capture pair produced a new owner-only `0600` full-text
+worksheet (1,776,452 bytes; SHA-256
+`4e4a315a70de961ee95b90b74a12ceb8ee7b209e55d5fe4477f7aabad13f2cd6`) with
+3,715 blank decisions. A separate `0600` capture-bound review view (1,590,859
+bytes; SHA-256
+`32fed8eb28a6c3e1d1d4c4b36e15c4c039581682f670fbd25fd17241aba5c167`) contains
+the first 25 decisions and 25 attachment-evidence entries, preserves the
+report/capture/proposal digests, and leaves `remaining_count=3715` and
+`pending_source_count=4`. This prepares human review only; the view is not an
+approval, a metadata patch, or Zotero write authority.
+
 The pinned release executable was rerun against the live Local API on 2026-09-09.
 The private `0600` report `/tmp/conceptweave-zotero-live-20260909-latest.json`
 is 8,132,756 bytes with SHA-256

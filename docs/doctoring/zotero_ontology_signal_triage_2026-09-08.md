@@ -115,6 +115,18 @@ pending source keys and 49 duplicate candidates. This is snapshot/report
 continuity evidence only; it does not advance steward review or Zotero write
 authority.
 
+## Capture-bound worksheet/view preparation (2026-09-09 06:38 KST)
+
+The live report/capture pair produced a private `0600` blank full-text
+worksheet (1,776,452 bytes; SHA-256
+`4e4a315a70de961ee95b90b74a12ceb8ee7b209e55d5fe4477f7aabad13f2cd6`) with
+3,715 blank decisions. The bound review view is also private `0600` (1,590,859
+bytes; SHA-256
+`32fed8eb28a6c3e1d1d4c4b36e15c4c039581682f670fbd25fd17241aba5c167`) and
+contains 25 decisions plus 25 attachment-evidence entries, while retaining
+four pending source keys and 3,715 remaining decisions. It is a read-only
+human-review input, not an approval or Zotero write authorization.
+
 ## Capture-bound availability replay (2026-09-09 06:36 KST)
 
 The pinned Rust 1.98 optimized CLI captured the full report-bound text set
