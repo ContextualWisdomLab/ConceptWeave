@@ -1,6 +1,6 @@
 use conceptweave_zotero::{
-    ItemData, PendingSourceResolution, SourceResolutionDisposition, ZoteroItem, classify_snapshot,
-    prepare_source_resolution_review,
+    ItemData, PendingSourceResolution, SourceResolutionDisposition, SourceResolutionError,
+    ZoteroItem, classify_snapshot, prepare_source_resolution_review,
 };
 
 fn item(key: &str, version: u64) -> ZoteroItem {
@@ -40,8 +40,14 @@ fn source_resolution_rejects_ambiguous_retained_inventory_identity() {
         reason: "Retain the exact source as independent evidence.".into(),
     };
 
-    assert!(
-        prepare_source_resolution_review(&report, vec![resolution]).is_err(),
-        "an exact-snapshot review must not choose the first of duplicate retained inventory records"
+    let error = prepare_source_resolution_review(&report, vec![resolution])
+        .expect_err("duplicate retained records must not select an arbitrary source identity");
+    assert_eq!(
+        error,
+        SourceResolutionError::AmbiguousInventory("SOURCE".into())
+    );
+    assert_eq!(
+        error.to_string(),
+        "pending source has ambiguous report inventory identity: SOURCE"
     );
 }
