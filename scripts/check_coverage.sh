@@ -2,7 +2,7 @@
 set -euo pipefail
 
 coverage_toolchain="${COVERAGE_TOOLCHAIN:-nightly-2026-08-20}"
-trap 'rm -f coverage.json source-branches.json source-regions.json' EXIT
+trap 'rm -f coverage.json source-functions.json source-branches.json source-regions.json' EXIT
 
 cargo "+${coverage_toolchain}" llvm-cov \
   --workspace \
@@ -21,11 +21,63 @@ jq -r '
   | "COVERAGE_GAP file=\(.filename) lines=\(.summary.lines.percent) functions=\(.summary.functions.percent) regions=\(.summary.regions.percent)"
 ' coverage.json
 
+# Preserve every raw zero-count LLVM function as diagnostic evidence. Raw totals include
+# unit/integration-test functions and test-only generic instantiations, so they are not
+# the acceptance denominator for owned production function coverage.
 jq -r '
   .data[0].functions[]
   | select(.count == 0)
-  | "FUNCTION_GAP name=\(.name) files=\(.filenames | join(","))"
+  | "RAW_FUNCTION_GAP name=\(.name) files=\(.filenames | join(","))"
 ' coverage.json
+
+jq '
+  [
+    .data[0].functions[]
+    | select(.name | contains("5tests") | not)
+    | . as $function
+    | [
+        .regions[]
+        | . as $region
+        | {
+            file: $function.filenames[$region[5]],
+            line_start: $region[0],
+            column_start: $region[1],
+            line_end: $region[2],
+            column_end: $region[3]
+          }
+        | select(.file | contains("/tests/") | not)
+      ] as $source_regions
+    | select($source_regions | length > 0)
+    | {
+        source_regions: ($source_regions | sort_by(.file, .line_start, .column_start, .line_end, .column_end)),
+        raw_name: .name,
+        count: .count
+      }
+  ]
+  | sort_by(.source_regions)
+  | group_by(.source_regions)
+  | map({
+      source_regions: .[0].source_regions,
+      raw_names: (map(.raw_name) | unique),
+      count: (map(.count) | add)
+    })
+' coverage.json > source-functions.json
+
+jq '
+  {
+    count: length,
+    covered: ([.[] | select(.count > 0)] | length),
+    notcovered: ([.[] | select(.count == 0)] | length)
+  }
+  | .percent = (if .count == 0 then 100 else (.covered * 100 / .count) end)
+' source-functions.json
+
+jq -r '
+  .[]
+  | select(.count == 0)
+  | .source_regions[0] as $origin
+  | "FUNCTION_GAP file=\($origin.file) start=\($origin.line_start):\($origin.column_start) names=\(.raw_names | join(","))"
+' source-functions.json
 
 jq '
   [
@@ -113,9 +165,6 @@ jq -r '
   | "BRANCH_GAP file=\(.file) start=\(.line_start):\(.column_start) end=\(.line_end):\(.column_end) true_count=\(.true_count) false_count=\(.false_count)"
 ' source-branches.json
 
-jq -e '
-  .data[0].totals.functions.percent == 100
-' coverage.json >/dev/null
-
+jq -e 'all(.[]; .count > 0)' source-functions.json >/dev/null
 jq -e 'all(.[]; .count > 0)' source-regions.json >/dev/null
 jq -e 'all(.[]; .true_count > 0 and .false_count > 0)' source-branches.json >/dev/null
