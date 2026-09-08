@@ -221,6 +221,8 @@ pub struct PendingSourceResolution {
     pub item_version: u64,
     /// Library revision that contained this item.
     pub library_version: u64,
+    /// Local API server identity that supplied the item, when present.
+    pub server_id: Option<String>,
     /// Item type observed in the report.
     pub item_type: String,
     /// Parent key observed in the report, if any.
@@ -309,6 +311,7 @@ pub fn prepare_source_resolution_review(
             return Err(SourceResolutionError::BlankReason(resolution.item_key.clone()));
         }
         if resolution.library_version != report.library_version
+            || resolution.server_id != report.server_id
             || resolution.item_version != source.version
             || resolution.item_type != source.data.item_type
             || resolution.parent_item_key != source.data.parent_item

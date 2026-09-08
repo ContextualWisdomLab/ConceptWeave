@@ -351,11 +351,17 @@ mod tests {
 
     #[test]
     fn report_write_removes_temporary_file_when_hard_link_fails() {
-        let output = env::temp_dir().join(format!("conceptweave-zotero-{}-directory", std::process::id()));
+        let output_name = format!("conceptweave-zotero-{}-directory", std::process::id());
+        let output = env::temp_dir().join(&output_name);
         let _ = fs::remove_dir(&output);
         fs::create_dir(&output).unwrap();
         assert!(write_report(&output, &serde_json::json!({"state": "complete"})).is_err());
         assert!(output.is_dir());
+        let temporary_prefix = format!(".{output_name}.{}.", std::process::id());
+        assert!(!fs::read_dir(env::temp_dir())
+            .unwrap()
+            .flatten()
+            .any(|entry| entry.file_name().to_string_lossy().starts_with(&temporary_prefix)));
         fs::remove_dir(output).unwrap();
     }
 

@@ -25,11 +25,13 @@ fn resolution(
     item_type: &str,
     parent_item: &str,
     library_version: u64,
+    server_id: Option<&str>,
 ) -> PendingSourceResolution {
     PendingSourceResolution {
         item_key: key.into(),
         item_version: version,
         library_version,
+        server_id: server_id.map(str::to_owned),
         item_type: item_type.into(),
         parent_item_key: parent_item.into(),
         disposition: SourceResolutionDisposition::RetainStandaloneEvidence,
@@ -58,8 +60,8 @@ fn source_resolution_review_requires_the_exact_pending_snapshot_set() {
     let review = prepare_source_resolution_review(
         &report,
         vec![
-            resolution("SOURCE", 41, "attachment", "", 42),
-            resolution("NOTE", 42, "note", "SOURCE", 42),
+            resolution("SOURCE", 41, "attachment", "", 42, Some("local-server")),
+            resolution("NOTE", 42, "note", "SOURCE", 42, Some("local-server")),
         ],
     )
     .expect("every pending source has one exact-snapshot resolution");
@@ -86,7 +88,7 @@ fn source_resolution_review_round_trips_owned_json() {
     );
     let review = prepare_source_resolution_review(
         &report,
-        vec![resolution("SOURCE", 41, "attachment", "", 42)],
+        vec![resolution("SOURCE", 41, "attachment", "", 42, Some("local-server"))],
     )
     .expect("the exact pending source is resolvable");
 
@@ -105,7 +107,7 @@ fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
         7,
         vec![item("SOURCE", 3, "attachment", "")],
     );
-    let exact = resolution("SOURCE", 3, "attachment", "", 7);
+    let exact = resolution("SOURCE", 3, "attachment", "", 7, None);
 
     let mut duplicate = exact.clone();
     duplicate.reason = "second decision".into();
@@ -117,7 +119,7 @@ fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
     assert!(matches!(
         prepare_source_resolution_review(
             &report,
-            vec![resolution("OTHER", 3, "attachment", "", 7)]
+            vec![resolution("OTHER", 3, "attachment", "", 7, None)]
         ),
         Err(SourceResolutionError::Unknown(key)) if key == "OTHER"
     ));
@@ -125,7 +127,7 @@ fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
     assert!(matches!(
         prepare_source_resolution_review(
             &report,
-            vec![resolution("SOURCE", 2, "attachment", "", 7)]
+            vec![resolution("SOURCE", 2, "attachment", "", 7, None)]
         ),
         Err(SourceResolutionError::Stale(key)) if key == "SOURCE"
     ));
@@ -133,7 +135,7 @@ fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
     assert!(matches!(
         prepare_source_resolution_review(
             &report,
-            vec![resolution("SOURCE", 3, "note", "", 7)]
+            vec![resolution("SOURCE", 3, "note", "", 7, None)]
         ),
         Err(SourceResolutionError::Stale(key)) if key == "SOURCE"
     ));
@@ -141,7 +143,7 @@ fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
     assert!(matches!(
         prepare_source_resolution_review(
             &report,
-            vec![resolution("SOURCE", 3, "attachment", "PARENT", 7)]
+            vec![resolution("SOURCE", 3, "attachment", "PARENT", 7, None)]
         ),
         Err(SourceResolutionError::Stale(key)) if key == "SOURCE"
     ));
@@ -149,7 +151,7 @@ fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
     assert!(matches!(
         prepare_source_resolution_review(
             &report,
-            vec![resolution("SOURCE", 3, "attachment", "", 8)]
+            vec![resolution("SOURCE", 3, "attachment", "", 8, None)]
         ),
         Err(SourceResolutionError::Stale(key)) if key == "SOURCE"
     ));
@@ -175,7 +177,7 @@ fn source_resolution_rejects_pending_keys_missing_from_retained_inventory() {
     assert!(matches!(
         prepare_source_resolution_review(
             &report,
-            vec![resolution("SOURCE", 3, "attachment", "", 7)]
+            vec![resolution("SOURCE", 3, "attachment", "", 7, None)]
         ),
         Err(SourceResolutionError::MissingInventory(key)) if key == "SOURCE"
     ));

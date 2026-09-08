@@ -24,6 +24,7 @@ fn resolution_for_library(library_version: u64) -> PendingSourceResolution {
         "item_key": "SOURCE",
         "item_version": 3,
         "library_version": library_version,
+        "server_id": "local-server",
         "item_type": "attachment",
         "parent_item_key": "",
         "disposition": "retain_standalone_evidence",
@@ -50,6 +51,13 @@ fn source_resolution_cannot_be_rebound_to_a_different_library_snapshot() {
     assert!(prepare_source_resolution_review(&report_v7, vec![resolution_for_library(7)]).is_ok());
     assert!(matches!(
         prepare_source_resolution_review(&report_v8, vec![resolution_for_library(7)]),
+        Err(SourceResolutionError::Stale(key)) if key == "SOURCE"
+    ));
+
+    let mut foreign_server = resolution_for_library(7);
+    foreign_server.server_id = Some("other-server".into());
+    assert!(matches!(
+        prepare_source_resolution_review(&report_v7, vec![foreign_server]),
         Err(SourceResolutionError::Stale(key)) if key == "SOURCE"
     ));
 }
