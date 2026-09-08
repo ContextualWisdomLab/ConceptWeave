@@ -1382,6 +1382,10 @@ reported total 3,715, decided 0, remaining 3,715, pending source count 4 and
 `complete=false`. The worksheet/progress path therefore remains ready for
 steward input without inventing semantic decisions or granting write authority.
 
+At PR39 exact head `be9ebf8`, pinned Rust formatting and all-target strict
+Clippy (`-D warnings`) passed locally after the command-boundary documentation
+update. This local gate does not establish hosted workflow or approval evidence.
+
 At exact source/test head `78d40c3` (documentation head `e16a28d`), the repository coverage gate was rerun with the
 pinned nightly toolchain after adding a two-source regression for noncanonical
 report-bound resolution order. The workspace suite passed; normalized source
