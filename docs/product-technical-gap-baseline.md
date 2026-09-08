@@ -77,6 +77,13 @@ The unchanged PR40 coverage script was also rerun locally. Its raw aggregate is
 94.8905%/91.1111%/94.9772%. These gaps remain acceptance work; normalized or
 test-only success must not be promoted to the required 100% owned coverage.
 
+PR40 owner advanced normally to `4b601dacf2a2201cd3525243b40930b51eb1d43e`
+with a contract test covering all seven immutable source-resolution accessors.
+On that exact head, locked Rust 1.98 tests, formatting and strict Clippy pass;
+raw coverage is 204/208 functions (98.0769%), 1,849/1,873 lines (98.7186%),
+2,920/2,966 regions (98.4491%) and 200/204 branches (98.0392%). The improvement
+does not establish hosted GREEN, independent approval or protected readiness.
+
 At 01:17 KST on 2026-09-09, a fresh release-mode Local API replay produced the
 same private report SHA
 `8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc` and
