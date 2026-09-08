@@ -1328,7 +1328,8 @@ coordination evidence only, not approval.
 
 ### Exact-head loop checkpoint (2026-09-09)
 
-PR39 is now `11016b40e55a2f75a74b35514c63f8269586cb4d` and remains OPEN,
+PR39 source/test head remains `78d40c3`; this checkpoint was authored at
+documentation head `5c2ed01ea1a71b993c7f2648ed48ff5216ec2a29`, and PR39 remains OPEN,
 MERGEABLE and CLEAN. Its source/test successor `78d40c3` closes the report-bound
 resolution-order coverage branch; the latest documentation head records that the
 normalized source-region and branch gates are both 100%, while per-file line/region
