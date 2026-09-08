@@ -25,6 +25,8 @@ Ordinary merge `c849cb2e9bc5d26f647a0b9381fb064b2d54a98e` preserves the source r
 
 The existing classifier remains responsible for producing the canonical sorted unique set. Source-resolution admission independently verifies that invariant because it crosses a public trust boundary.
 
+Exact successor `c0907676727ec914bb2c41a0610dc49e11203314` extends the same fail-closed boundary to blank or whitespace pending keys. Its regression supplies an otherwise valid empty-key source and confirms that no trusted review is produced. The successor also replaces the output-path root panic with an `InvalidInput` result and asserts that contract. Local Rust 1.98 workspace tests, formatting, strict Clippy and warnings-denied rustdoc pass; raw coverage and hosted protection gates remain incomplete.
+
 ## Unchanged authority boundary
 
 The repair does not change classification, source inventory derivation, resolution dispositions, Zotero read/write behavior, semantic publication, steward approval or release authority. It only prevents malformed report evidence from being promoted to the trusted source-resolution aggregate.
