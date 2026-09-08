@@ -1380,6 +1380,12 @@ in a detached Rust 1.98.0 worktree. Its complete workspace suite and doc-tests
 passed; the result remains local evidence because the stacked base reports no
 hosted required workflow and no independent approval.
 
+PR37's exact head `3bf0b319029ee225ef809f4c30275aaf29fcf374` was tested in the
+same detached Rust 1.98.0 manner. Its complete workspace suite and doc-tests
+passed, confirming the capture-bound review-view owner at that revision. This
+does not establish hosted checks, independent approval, protected merge or
+published capture behavior.
+
 The latest report retains four pending source records: one standalone note and
 three standalone attachments without parent links. Their file bytes, content type
 and link mode remain outside the metadata projection and require the separate
