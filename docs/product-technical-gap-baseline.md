@@ -44,6 +44,14 @@ conversion now use target-width helpers; only their non-instrumented cast
 expressions remain visible to the tool. Hosted checks and independent review
 remain outstanding.
 
+At the subsequent read-only gate audit, PR40 exact head
+`5397c0afca9c966b16547ee813df78e08149e97b` remained OPEN/Draft/CLEAN with zero
+approval reviews and zero check-runs; its sole CodeRabbit status is the Draft
+review skip. Active ruleset `18156473` still requires one independent approval,
+resolved review threads and seven central workflows, while prohibiting deletion
+and non-fast-forward updates. No Ready transition, protected merge or release
+is authorized by this observation.
+
 ## September 8 acquisition and consolidation checkpoint
 
 Nightly `2026-08-20` coverage was rerun at PR #39 exact head
