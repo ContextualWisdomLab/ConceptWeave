@@ -174,3 +174,22 @@ fn snapshot_rejects_oversized_invalid_utf8_and_truncated_bodies() {
         assert!(matches!(result, Err(ReadError::Body(_))));
     }
 }
+
+#[test]
+fn production_transport_helpers_remain_in_owned_coverage() {
+    let source = include_str!("../lib.rs");
+    for function in [
+        "fetch_local_page",
+        "header_u64",
+        "header_string",
+        "optional_header",
+    ] {
+        let excluded = format!(
+            "#[cfg_attr(coverage_nightly, coverage(off))]\nfn {function}"
+        );
+        assert!(
+            !source.contains(&excluded),
+            "production Local API helper {function} is still excluded from owned coverage"
+        );
+    }
+}
