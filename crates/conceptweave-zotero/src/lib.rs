@@ -688,7 +688,8 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
         ),
     };
     let review_abstract_note = (proposed_disposition == Disposition::NeedsStewardReview
-        && !item.data.abstract_note.trim().is_empty())
+        && !item.data.abstract_note.trim().is_empty()
+        && !field_values.contains_key("abstract_note"))
     .then(|| item.data.abstract_note.clone());
 
     ClassifiedItem {
