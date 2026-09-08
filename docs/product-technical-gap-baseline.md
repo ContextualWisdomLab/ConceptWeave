@@ -70,6 +70,15 @@ all-target Clippy and warnings-denied workspace rustdoc completed successfully.
 These local checks strengthen source evidence but do not satisfy the active
 ruleset's hosted-workflow or independent-review gates.
 
+At 01:17 KST on 2026-09-09, a fresh release-mode Local API replay produced the
+same private report SHA
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc` and
+aggregate 8,326 observed, 3,715 classified, 4,611 unclassified, four pending,
+49 duplicates and zero failures. Discovery signals were ontology 27, semantic
+36, taxonomy 2, knowledge graph 1, vocabulary stem 81, with exact uppercase
+`OWL` 23 and `RDF` 20. The replay is read-only repeatability evidence, not
+steward review, approval or Zotero write authority.
+
 ## September 8 acquisition and consolidation checkpoint
 
 Nightly `2026-08-20` coverage was rerun at PR #39 exact head

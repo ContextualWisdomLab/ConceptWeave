@@ -64,3 +64,16 @@ Aggregate totals remain 8,326 observed records, 3,715 classified proposals,
 zero failures. Title-only discovery counts remain 27 `ontology`, 23 `OWL` and
 20 `RDF` matches under the established matching rules; they overlap and remain
 discovery evidence only. No review, approval or Zotero write occurred.
+
+## Fresh replay checkpoint (2026-09-09 01:17 KST)
+
+The release-mode read-only Local API replay completed again at
+`/tmp/conceptweave-zotero-live-20260909-011756.json`. The owner-only file is
+`0600`, 8,132,756 bytes, and retains SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`.
+Aggregate totals remain 8,326 observed records, 3,715 classified proposals,
+4,611 unclassified records, four pending sources, 49 duplicate candidates and
+zero failures. Case-insensitive title signals are ontology 27, semantic 36,
+taxonomy 2, knowledge graph 1 and vocabulary stem 81; exact uppercase `OWL`
+and `RDF` counts are 23 and 20. These are discovery/repeatability metrics only;
+no review, approval or Zotero write occurred.
