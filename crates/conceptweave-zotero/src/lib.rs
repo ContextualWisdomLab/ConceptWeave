@@ -234,7 +234,7 @@ pub struct PendingSourceResolution {
 }
 
 /// Complete source-resolution aggregate bound to one classification snapshot.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SourceResolutionReview {
     /// Zotero desktop version that served the snapshot.
     pub zotero_version: String,
@@ -246,6 +246,40 @@ pub struct SourceResolutionReview {
     pub rule_revision: String,
     /// One resolution for every pending source, sorted by item key.
     pub resolved_sources: Vec<PendingSourceResolution>,
+}
+
+impl<'de> Deserialize<'de> for SourceResolutionReview {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Wire {
+            zotero_version: String,
+            server_id: Option<String>,
+            library_version: u64,
+            rule_revision: String,
+            resolved_sources: Vec<PendingSourceResolution>,
+        }
+
+        let wire = Wire::deserialize(deserializer)?;
+        if wire
+            .server_id
+            .as_deref()
+            .is_none_or(|server_id| server_id.trim().is_empty())
+        {
+            return Err(serde::de::Error::custom(
+                "source-resolution review lacks a non-blank Zotero server identity",
+            ));
+        }
+        Ok(Self {
+            zotero_version: wire.zotero_version,
+            server_id: wire.server_id,
+            library_version: wire.library_version,
+            rule_revision: wire.rule_revision,
+            resolved_sources: wire.resolved_sources,
+        })
+    }
 }
 
 /// Failure raised when source resolutions do not exactly match a report.
