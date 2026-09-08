@@ -16,6 +16,7 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - No direct cross-service application-table SQL.
 - New database objects, when introduced, use descriptive two-or-more-word `snake_case` names and 3NF by default.
 - Preserve source evidence, truth status, and publication state separately.
+- Pending Zotero ancestry is resolved only through the typed source-resolution aggregate bound to the exact report item key/version/type/parent identity; never infer a parent, rewrite the report, or treat a resolution as write or approval authority.
 - Published semantic truth is immutable; correction uses supersession/new release.
 - Public Rust APIs require beginner-readable documentation.
 - Owned production coverage target is 100% line/function/region/branch where tooling exposes it.

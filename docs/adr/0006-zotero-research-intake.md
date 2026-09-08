@@ -37,6 +37,10 @@ In the context of a genuine 8,326-record library observation and a native 3,719-
 
 This change does not reconcile a source, validate arbitrary offline input, retain full note/file contents or grant review/write authority. Consumers must require and validate the new inventory, recompute pending keys and distinguish bibliographic progress from full-library completion before adoption. Direct evaluation, duplicate and write routes must not bypass that validation. Existing proposal-only approval digests do not bind this added scope; incompatible full-text captures must fail their whole-report binding. The schema and governance integration remain pending in dependent owners; no backward-compatible empty default, capture rewrite or approved-label backfill is accepted. The original Zotero 9.0.6 observation above is historical; this amendment was tested against Zotero 10.0.1 while retaining read-only behavior.
 
+### September 8 source-resolution amendment (Proposed)
+
+In the context of four standalone records preventing an honest whole-library completion claim, we decided to add a typed, report-bound source-resolution aggregate and rejected silent reparenting, deletion, and an implicit empty default. The aggregate checks each pending item's exact key, version, type, parent identity, library version, and reason, then records a non-authoritative retain, separately authorized rebind requirement, or scoped exclusion outcome. It remains read-only and does not replace bibliographic review, full-text verification, independent approval, or any future Zotero write precondition. The [source-resolution contract tests](../../crates/conceptweave-zotero/tests/source_resolution_contract.rs) cover incomplete, duplicate, unknown, stale, and blank-reason decisions.
+
 - A complete snapshot can be audited and replayed without changing the research library.
 - Rule evidence and explicit abstention reasons are visible; automated classification is not governance approval.
 - Cross-cutting papers cannot be silently forced into whichever rule family happens to be evaluated first.
