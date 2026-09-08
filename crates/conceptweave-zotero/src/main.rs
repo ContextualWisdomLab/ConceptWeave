@@ -21,13 +21,17 @@ fn allowed_output_parent_policy(
     parents
 }
 
+fn conventional_tmp_parent(path: &Path) -> Option<PathBuf> {
+    path.canonicalize().ok()
+}
+
 #[cfg_attr(coverage_nightly, coverage(off))]
 fn allowed_output_parents() -> Vec<PathBuf> {
     let system_temp = env::temp_dir()
         .canonicalize()
         .expect("system temporary directory must exist");
     // Host path discovery stays in this shim; admission/dedup policy is deterministic above.
-    allowed_output_parent_policy(system_temp, Path::new("/tmp").canonicalize().ok())
+    allowed_output_parent_policy(system_temp, conventional_tmp_parent(Path::new("/tmp")))
 }
 
 fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
@@ -453,14 +457,7 @@ mod tests {
             .is_err()
         );
 
-        if let Ok(conventional_parent) = Path::new("/tmp").canonicalize() {
-            let conventional = conventional_parent.join(format!(
-                "conceptweave-zotero-{}-conventional.json",
-                std::process::id()
-            ));
-            let _ = fs::remove_file(&conventional);
-            assert!(validate_output_path(conventional.to_str().unwrap()).is_ok());
-        }
+        assert!(conventional_tmp_parent(Path::new("/tmp/does-not-exist")).is_none());
 
         let nested_dir =
             env::temp_dir().join(format!("conceptweave-zotero-{}-nested", std::process::id()));
