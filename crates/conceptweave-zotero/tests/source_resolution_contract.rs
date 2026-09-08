@@ -116,6 +116,20 @@ fn source_resolution_review_round_trips_owned_json() {
 }
 
 #[test]
+fn source_resolution_restore_rejects_malformed_json() {
+    let report = classify_snapshot(
+        "10.0.1".into(),
+        Some("local-server".into()),
+        42,
+        vec![item("SOURCE", 41, "attachment", "")],
+    );
+    assert!(matches!(
+        restore_source_resolution_review(&report, b"not-json"),
+        Err(SourceResolutionRestoreError::InvalidStoredArtifact)
+    ));
+}
+
+#[test]
 fn source_resolution_review_json_rejects_missing_or_blank_server_identity() {
     let report = classify_snapshot(
         "10.0.1".into(),
