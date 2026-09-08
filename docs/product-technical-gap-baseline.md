@@ -1443,3 +1443,16 @@ regions and branches are now both fully covered (4,752/4,752 and 784/784).
 Per-file line/region gaps remain in the full-text and CLI modules, so the owned
 100% line/function/region target is not yet met; no threshold or exclusion was
 changed.
+
+### September 9 PR36→PR37 persisted-capture contract adoption
+
+PR36 was externally merged at exact `c062845da8268089f09d7313dd1fb9604adfa178`.
+The earliest-owner follow-up `c51330e61bf5b3d2b18a561830151ba874b17a4c`
+exports the documented `MAX_PERSISTED_CAPTURE_BYTES` contract without changing
+the 512 MiB value or the separate 256 MiB raw-response budget. PR37 then
+adopted that base normally at exact `4e9d6c04a7a890c69b4dbf964f7579e32b1843ee`
+and removed its duplicate restore limit. Rust 1.98 formatting and the complete
+workspace test/doc-test suite passed (85 library tests, 30 CLI tests, all
+integration suites). This is source/test evidence only: hosted protected
+acceptance and independent approval remain outstanding, and no paper decision,
+Zotero write or release is inferred.
