@@ -490,6 +490,9 @@ pub fn prepare_source_resolution_review(
     canonical_pending_keys.dedup();
     if canonical_pending_keys.len() != report.pending_source_item_keys.len()
         || canonical_pending_keys != report.pending_source_item_keys
+        || canonical_pending_keys
+            .iter()
+            .any(|key| key.trim().is_empty())
     {
         return Err(SourceResolutionError::InvalidPendingKeySet);
     }

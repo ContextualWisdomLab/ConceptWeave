@@ -1,6 +1,6 @@
 use conceptweave_zotero::{
-    ItemData, PendingSourceResolution, SourceResolutionDisposition, ZoteroItem, classify_snapshot,
-    prepare_source_resolution_review,
+    ItemData, PendingSourceResolution, SourceResolutionDisposition, SourceResolutionError,
+    ZoteroItem, classify_snapshot, prepare_source_resolution_review,
 };
 
 fn source_item(key: &str, version: u64) -> ZoteroItem {
@@ -66,4 +66,20 @@ fn source_resolution_rejects_noncanonical_report_pending_key_order() {
         .is_err(),
         "a noncanonical report pending-key sequence must fail before a trusted review is returned"
     );
+}
+
+#[test]
+fn source_resolution_rejects_empty_report_pending_key_before_typed_review() {
+    let mut report = classify_snapshot(
+        "10.0.1".into(),
+        Some("local-server".into()),
+        42,
+        vec![source_item("", 41)],
+    );
+    report.pending_source_item_keys = vec![String::new()];
+
+    assert!(matches!(
+        prepare_source_resolution_review(&report, vec![resolution("", 41)]),
+        Err(SourceResolutionError::InvalidPendingKeySet)
+    ));
 }
