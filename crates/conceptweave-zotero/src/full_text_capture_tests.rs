@@ -1429,6 +1429,7 @@ fn availability_summary_separates_unmanifested_and_captured_empty_attachments() 
     assert_eq!(summary.papers_with_unmanifested_attachment, 1);
     assert_eq!(summary.papers_with_captured_no_text, 0);
     assert_eq!(summary.papers_without_attachment, 0);
+    assert_eq!(summary.papers_needing_review_without_text, 0);
 
     let captured_empty = capture_with(&report, 4096, &mut |request_path, _| {
         let response = match request_path {
@@ -1514,7 +1515,7 @@ fn availability_report_fixture() -> ClassificationReport {
         {"key":"ABCD2345","version":2,"data":{"itemType":"journalArticle","title":"fixture paper"}},
         {"key":"BCDE3456","version":1,"data":{"itemType":"attachment","parentItem":"ABCD2345"}},
         {"key":"CDEF4567","version":0,"data":{"itemType":"attachment","parentItem":"ABCD2345"}},
-        {"key":"DEFG5678","version":2,"data":{"itemType":"book","title":"second paper"}},
+        {"key":"DEFG5678","version":2,"data":{"itemType":"book","title":"semantic web"}},
         {"key":"EFGH6789","version":2,"data":{"itemType":"attachment","parentItem":"DEFG5678"}}
     ]))
     .unwrap();

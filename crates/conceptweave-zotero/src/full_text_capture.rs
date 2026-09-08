@@ -243,7 +243,9 @@ pub fn assess_full_text_availability(
         if let Some(paper_key) = paper_key {
             captured_papers.insert(paper_key);
         }
-        if captured_content_is_nonempty(&record.content_response)? {
+        if captured_content_is_nonempty(&record.content_response)
+            .expect("the complete full-text capture was verified before aggregation")
+        {
             if let Some(paper_key) = paper_key {
                 nonempty_papers.insert(paper_key);
             } else {
@@ -541,14 +543,7 @@ fn validate_content(response: &CapturedResponse, version: u64) -> Result<(), Ful
     match response.status {
         404 => Ok(()),
         200 if response.version == Some(version) => {
-            #[derive(Deserialize)]
-            struct ContentProjection {
-                content: String,
-            }
-            let content: ContentProjection =
-                serde_json::from_str(&response.body).map_err(|_| INVALID_EVIDENCE)?;
-            let _ = content.content;
-            Ok(())
+            captured_content_is_nonempty(response).map(|_| ())
         }
         _ => Err(INVALID_EVIDENCE),
     }
