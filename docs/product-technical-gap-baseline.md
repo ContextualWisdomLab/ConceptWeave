@@ -6,7 +6,7 @@ This file records code-current product and technical gaps. Exact PR/check/run co
 
 ## September 8 research lifecycle, abstention, and replay-evidence checkpoint
 
-PR #40 current exact head is `8019c624a417cb4b4fdca15cdd3751d2956aba32` (Draft/open/UNSTABLE), based on Research Intake head `ff2e78aaa4ce75c7eb5f41bc9612b8dcf3bb7d38`. Its source-resolution aggregate and visual/API population-boundary lesson are pushed, while independent approval and protected workflow evidence remain absent; no merge or release is claimed.
+PR #40 current exact head is `1308ac6e4403a67c61b84f47c9d0142286da3c64` (Draft/open/CLEAN), based on Research Intake head `ff2e78aaa4ce75c7eb5f41bc9612b8dcf3bb7d38`. Its source-resolution aggregate, ontology discovery signal, and visual/API population-boundary lesson are pushed, while independent approval and protected workflow evidence remain absent; no merge or release is claimed.
 
 PR #39 review adds a downstream repair finding: `FullTextWriteScope` still lacks the source-resolution aggregate and exact snapshot binding, so its successor must consume PR #40 without clearing or inferring the four pending sources.
 
