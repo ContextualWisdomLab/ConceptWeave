@@ -75,11 +75,11 @@ fn source_resolution_review_requires_the_exact_pending_snapshot_set() {
     )
     .expect("every pending source has one exact-snapshot resolution");
 
-    assert_eq!(review.library_version, 42);
-    assert_eq!(review.resolved_sources.len(), 2);
+    assert_eq!(review.library_version(), 42);
+    assert_eq!(review.resolved_sources().len(), 2);
     assert_eq!(
         review
-            .resolved_sources
+            .resolved_sources()
             .iter()
             .map(|resolution| resolution.item_key.as_str())
             .collect::<Vec<_>>(),

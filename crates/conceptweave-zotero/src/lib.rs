@@ -252,19 +252,56 @@ pub struct PendingSourceIdentity {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SourceResolutionReview {
     /// Zotero desktop version that served the snapshot.
-    pub zotero_version: String,
+    zotero_version: String,
     /// Local API server identity, when supplied by the snapshot.
-    pub server_id: Option<String>,
+    server_id: Option<String>,
     /// Library version shared by the snapshot.
-    pub library_version: u64,
+    library_version: u64,
     /// Rule revision used for the associated classification report.
-    pub rule_revision: String,
+    rule_revision: String,
     /// Complete pending-source key set captured with this review.
-    pub pending_source_item_keys: Vec<String>,
+    pending_source_item_keys: Vec<String>,
     /// Constructor-bound item coordinates, independent of steward decisions.
-    pub expected_source_identities: Vec<PendingSourceIdentity>,
+    expected_source_identities: Vec<PendingSourceIdentity>,
     /// One resolution for every pending source, sorted by item key.
-    pub resolved_sources: Vec<PendingSourceResolution>,
+    resolved_sources: Vec<PendingSourceResolution>,
+}
+
+impl SourceResolutionReview {
+    /// Returns the Zotero desktop version bound to this review.
+    pub fn zotero_version(&self) -> &str {
+        &self.zotero_version
+    }
+
+    /// Returns the Local API server identity bound to this review.
+    pub fn server_id(&self) -> Option<&str> {
+        self.server_id.as_deref()
+    }
+
+    /// Returns the library revision bound to this review.
+    pub fn library_version(&self) -> u64 {
+        self.library_version
+    }
+
+    /// Returns the classifier rule revision bound to this review.
+    pub fn rule_revision(&self) -> &str {
+        &self.rule_revision
+    }
+
+    /// Returns the complete pending-source key sequence.
+    pub fn pending_source_item_keys(&self) -> &[String] {
+        &self.pending_source_item_keys
+    }
+
+    /// Returns constructor-bound source identities.
+    pub fn expected_source_identities(&self) -> &[PendingSourceIdentity] {
+        &self.expected_source_identities
+    }
+
+    /// Returns the sorted, constructor-bound source decisions.
+    pub fn resolved_sources(&self) -> &[PendingSourceResolution] {
+        &self.resolved_sources
+    }
 }
 
 #[derive(Debug, Deserialize)]
