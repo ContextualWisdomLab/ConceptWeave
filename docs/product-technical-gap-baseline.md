@@ -1369,6 +1369,11 @@ doc-tests passed (all observed tests green). This is current local owner evidenc
 only; PR40 remains Draft, its base is stacked, and no hosted workflow or
 independent approval was produced.
 
+PR38's exact head `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9` was likewise tested
+in a detached Rust 1.98.0 worktree. Its complete workspace suite and doc-tests
+passed; the result remains local evidence because the stacked base reports no
+hosted required workflow and no independent approval.
+
 The latest report retains four pending source records: one standalone note and
 three standalone attachments without parent links. Their file bytes, content type
 and link mode remain outside the metadata projection and require the separate
