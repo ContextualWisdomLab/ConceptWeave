@@ -175,6 +175,18 @@ mod tests {
         }
     }
 
+    struct FlushFailWriter;
+
+    impl Write for FlushFailWriter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Err(io::Error::other("intentional flush failure"))
+        }
+    }
+
     fn unique_temp_path(suffix: &str) -> PathBuf {
         env::temp_dir().join(format!(
             "conceptweave-zotero-{}-{suffix}.json",
@@ -217,6 +229,12 @@ mod tests {
         let saved: serde_json::Value = serde_json::from_slice(&fs::read(&output).unwrap()).unwrap();
         assert_eq!(saved["zotero_version"], "10.0.1");
         fs::remove_file(output).unwrap();
+    }
+
+    #[test]
+    fn report_serialization_propagates_flush_failures() {
+        let mut writer = FlushFailWriter;
+        assert!(serialize_report(&mut writer, &serde_json::json!({"state": "complete"})).is_err());
     }
 
     #[test]
