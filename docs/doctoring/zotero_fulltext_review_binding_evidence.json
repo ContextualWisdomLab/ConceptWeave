@@ -1,0 +1,43 @@
+{
+  "evidence_kind": "private_blank_fulltext_review_initialization_v1",
+  "observed_at_utc": "2026-09-05T11:35:47Z",
+  "independently_audited_at_utc": "2026-09-05T11:36:18.331Z",
+  "source_commit": "da406cf6110888808fa530592bbce2b774b73f33",
+  "output": {
+    "bytes": 1776354,
+    "mode": "0600",
+    "link_count": 1,
+    "file_sha256": "36bcf0679de068a744fd4ae8709cd192d99cb556591420d7a43c2b5f0e633a46",
+    "capture_digest": "sha256:429d98dc90e172b4f0bb4e3e1c493feb33b61664793d02a53d8183fb76f76a50"
+  },
+  "input_file_sha256": {
+    "metadata_report": "bf45248413f433a537fe8fc62c02b93eef3c7e47ff6245f31610e9ba72031d8d",
+    "original_blank_metadata_worksheet": "2093aeffd3907e71d310715889b87e3fbc189cfba620338bf9a81b53ced26f87",
+    "fulltext_capture": "56d385398c8da559aa597a4e3783d946638855bba19ac808ce81d917bf06f94d"
+  },
+  "measures": {
+    "bibliographic_denominator": 3715,
+    "capture_bound_blank_decisions": 3715,
+    "authentic_steward_decisions": 0,
+    "independently_approved_labels": 0,
+    "new_text_bound_proposals": 0,
+    "zotero_requests": 0,
+    "model_requests": 0,
+    "command_elapsed_seconds": 1.50,
+    "maximum_resident_bytes": 286375936,
+    "peak_memory_footprint_bytes": 285344320
+  },
+  "independent_read_only_checks": {
+    "all_input_hashes_unchanged": true,
+    "all_artifacts_private_single_link_regular_files": true,
+    "required_outer_keys_only": true,
+    "capture_marker_matches_saved_capture_identity": true,
+    "nested_worksheet_exactly_matches_prior_blank_worksheet": true
+  },
+  "limits": [
+    "One observed offline initialization, not a load or latency SLO.",
+    "No completed real review, independent approval, release, or write admission.",
+    "Application, finalization and evaluation remain library APIs; CLI only initializes blank work.",
+    "This JSON is aggregate evidence, not the sensitive worksheet or a governance receipt."
+  ]
+}

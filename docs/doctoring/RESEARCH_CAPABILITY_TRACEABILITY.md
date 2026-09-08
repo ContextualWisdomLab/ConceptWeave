@@ -49,11 +49,21 @@ This register turns the accepted research set into product decisions. A paper is
 
 ## GRC reference flow
 
+The [2026-09-05 exact-default-source audit](cwl_ontology_capability_inventory.md#further-domain-contract-audits-2026-09-05) found GRC evidence-to-requirement binding and a Proposed internal-control mapping design, not a released semantic round trip. NIST IR 8477 and the OSCAL mapping documentation distinguish relationship semantics and source/target context; use these to test subset direction, explicit no-relationship versus missing mapping, and source-edition drift. Evidence presence must never satisfy an effectiveness assertion. These are future evaluation requirements, not executed conformance or steward-approved labels.
+
+Orgmetra's inspected Task–KSAO contract is a second domain-specific observation candidate. A future consumer test must preserve Job versus Position/Assignment, tenant and source-version boundaries, reject LLM-origin material presented as validated, and avoid treating an ordinal relationship rating as calibrated ontology confidence. No Orgmetra package or application table is imported. Its absence of a release keeps this a cultivation hypothesis.
+
 `ContextualWisdomLab/governance-risk-compliance` is the first enterprise golden/reference scenario, not a special-case algorithm. The same immutable GRC fixture must exercise both tracks:
 
 `GRC source contract -> observed facts -> generation candidates -> validation/steward review -> semantic_release -> client validation/resolution/diff/query-plan -> GRC deterministic calculation`.
 
 Acceptance must prove that ConceptWeave never becomes the GRC system of record, that proposed/inferred relations do not mutate authoritative GRC records, that release validation works offline, and that release upgrades identify affected GRC queries explicitly. Public OAEI/RODI/LLMs4OL-style benchmarks remain necessary because one enterprise fixture cannot establish general matching or learning performance.
+
+## Adjacent evidence and edit contracts
+
+The [learning/measurement audit](cwl_ontology_capability_inventory.md#further-learning-and-measurement-contracts-2026-09-05) adds Psychometrics Commons as an unreleased product-domain evidence candidate. Future conformance must preserve construct/instrument/item versions, locale, consent, evidence validity and distinct observation clocks. Caller-supplied membership shares are not estimated weights, and reference checks cannot authenticate a reviewer or scientifically validate an instrument. README-only supply-chain and learning-record-store owners remain prerequisites rather than implementations to copy.
+
+The [document-contract audit](cwl_ontology_capability_inventory.md#adjacent-document-contract-audits-2026-09-05) identifies two additional cultivation hypotheses. Future DiagramWeave conformance should reject stale source revisions, a mismatched caller document and unapproved scope expansion while keeping diagram source and semantic approval separate. Future NewsDOM observation conformance should bind original bytes and parser version, retain missing coordinates/warnings, and reject an incompatible or unauthenticated parser before private upload. Neither an editable diagram nor parsed section text establishes an ontology relation. These are unimplemented consumer evaluation families, not authentic paper labels or tested integrations; no source or service is copied into ConceptWeave.
 
 ## Consensus records used in the prior accepted set
 

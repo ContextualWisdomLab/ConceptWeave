@@ -7,3 +7,7 @@ ConceptWeave's core invariant is: **inference is not authority**. Every generate
 Keep domain logic in bounded domain modules, LLM/provider logic behind ports/adapters, and source/consumer systems independent. Prefer deterministic validation and explicit abstention over plausible unsupported output.
 
 Zotero source capture must not alter the metadata report or renew its approval. Preserve private-file protections and the full bibliographic denominator, including missing and partial text.
+
+The separate full-text review view does not authorize decisions or writes. Keep its evidence binding intact; existing metadata-only apply/finalization cannot establish full-text-reviewed approval.
+
+Use the capture-bound blank-start worksheet for full-text decision work. Only the dedicated atomic view path may apply completed slots; finalization/evaluation reverify capture/report bindings and require whole-envelope external approval. Offline CLI view/application/finalization preserve that envelope and earlier files. They do not supply a reviewer, authenticate approval, or admit Zotero writes.
