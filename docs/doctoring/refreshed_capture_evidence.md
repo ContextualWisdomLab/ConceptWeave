@@ -1,5 +1,18 @@
 # Refreshed private capture evidence
 
+## Fresh capture replay (21:13 KST)
+
+The release-mode bounded capture was rerun against the fresh report without
+mutation. The private `0600` capture is
+`/tmp/conceptweave-fulltext-live-20260908-211310.json` (235,602,798 bytes,
+SHA-256 `043e10f117fa8050fa85c2013c1fa5343a247629d533bc6fa0ce11266c165166`).
+Bound availability recheck reports 3,203/3,715 papers with nonempty text, 440
+without attachment, 34 with unmanifested attachment, 38 captured-without-text,
+471 review-needing papers without text, and two unbound nonempty records. Its
+private summary digest is
+`433b1c78bad304f46ad8a6056e225b9b1b8ad6377fe52c7d4c6b0d82914550c3`.
+These are acquisition observations only.
+
 ## Current bound availability replay (21:11 KST)
 
 Using the fresh report and unchanged capture, the release CLI revalidated the

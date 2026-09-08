@@ -19,6 +19,12 @@ private summary digest is
 `sha256:2168d1856188ad6aee50454c50401d4096cace74485e4b1b6c5ffbcbf99a0364`;
 these counts are acquisition evidence only.
 
+At 21:13 KST a fresh bounded capture also completed without mutation. The
+235,602,798-byte private artifact digest is
+`sha256:043e10f117fa8050fa85c2013c1fa5343a247629d533bc6fa0ce11266c165166`;
+the repeated availability counts are unchanged and remain non-authoritative
+for semantic review or Zotero writes.
+
 ### PR #39 full-text write source binding checkpoint (2026-09-08)
 
 The release-mode Rust CLI also produced a fresh read-only Local API report at
