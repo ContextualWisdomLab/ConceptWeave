@@ -7,6 +7,7 @@ const PROXY_CHILD_CASE: &str = "CONCEPTWEAVE_METADATA_PROXY_CASE";
 fn read_fixture(
     body: Vec<u8>,
     declared_bytes: usize,
+    total_results: usize,
 ) -> (
     Result<ClassificationReport, ReadError>,
     thread::JoinHandle<String>,
@@ -27,7 +28,7 @@ fn read_fixture(
             request.extend_from_slice(&buffer[..length]);
         }
         let headers = format!(
-            "HTTP/1.1 200 OK\r\nContent-Length: {declared_bytes}\r\nTotal-Results: 0\r\nLast-Modified-Version: 42\r\nX-Zotero-Version: 9.0.6\r\nZotero-API-Version: 3\r\nZotero-Schema-Version: 42\r\nZotero-Server-ID: synthetic-server\r\nConnection: close\r\n\r\n"
+            "HTTP/1.1 200 OK\r\nContent-Length: {declared_bytes}\r\nTotal-Results: {total_results}\r\nLast-Modified-Version: 42\r\nX-Zotero-Version: 9.0.6\r\nZotero-API-Version: 3\r\nZotero-Schema-Version: 42\r\nZotero-Server-ID: synthetic-server\r\nConnection: close\r\n\r\n"
         );
         stream.write_all(headers.as_bytes()).unwrap();
         // An invalid or oversized body can make the client close before all bytes arrive.
@@ -37,6 +38,10 @@ fn read_fixture(
     let result = read_local_snapshot();
     *TEST_LOCAL_API.lock().unwrap() = None;
     (result, server)
+}
+
+fn source_item_body(key: &str) -> Vec<u8> {
+    serde_json::to_vec(&vec![item(key, "attachment", "", "", "")]).unwrap()
 }
 
 #[test]
@@ -49,25 +54,21 @@ fn snapshot_rejects_noncanonical_zotero_object_keys() {
         "abcdefgh",
         "ABC-DEF2",
     ] {
-        let result = read_snapshot_with(&mut |_| {
-            Ok(fetched_page(
-                1,
-                vec![item(invalid_key, "attachment", "", "", "")],
-            ))
-        });
+        let body = source_item_body(invalid_key);
+        let body_len = body.len();
+        let (result, server) = read_fixture(body, body_len, 1);
+        server.join().unwrap();
         assert!(
             matches!(result, Err(ReadError::SnapshotChanged)),
             "noncanonical Zotero object key was admitted: {invalid_key}"
         );
     }
 
-    let valid = read_snapshot_with(&mut |_| {
-        Ok(fetched_page(
-            1,
-            vec![item("2A3B4C5D", "attachment", "", "", "")],
-        ))
-    })
-    .unwrap();
+    let body = source_item_body("2A3B4C5D");
+    let body_len = body.len();
+    let (result, server) = read_fixture(body, body_len, 1);
+    server.join().unwrap();
+    let valid = result.unwrap();
     assert_eq!(valid.observed_item_count, 1);
 }
 
@@ -136,7 +137,7 @@ fn metadata_routing_child() {
     if std::env::var_os(PROXY_CHILD_CASE).is_none() {
         return;
     }
-    let (result, server) = read_fixture(b"[]".to_vec(), 2);
+    let (result, server) = read_fixture(b"[]".to_vec(), 2, 0);
     let report = result.unwrap();
     assert_eq!(report.library_version, 42);
     assert!(report.classified_items.is_empty());
@@ -152,7 +153,7 @@ fn metadata_routing_child() {
 fn snapshot_accepts_a_response_exactly_at_the_byte_limit() {
     let mut body = b"[]".to_vec();
     body.resize(MAX_PAGE_BYTES as usize, b' ');
-    let (result, server) = read_fixture(body, MAX_PAGE_BYTES as usize);
+    let (result, server) = read_fixture(body, MAX_PAGE_BYTES as usize, 0);
     server.join().unwrap();
     let report = result.expect("exact-limit synthetic JSON must be accepted");
     assert_eq!(report.library_version, 42);
@@ -168,7 +169,7 @@ fn snapshot_rejects_oversized_invalid_utf8_and_truncated_bodies() {
         (vec![0xff], 1),
         (b"[]".to_vec(), 3),
     ] {
-        let (result, server) = read_fixture(body, declared_bytes);
+        let (result, server) = read_fixture(body, declared_bytes, 0);
         server.join().unwrap();
         assert!(matches!(result, Err(ReadError::Body(_))));
     }
