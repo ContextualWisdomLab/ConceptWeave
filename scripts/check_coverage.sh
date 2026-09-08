@@ -21,9 +21,11 @@ jq -r '
   | "COVERAGE_GAP file=\(.filename) lines=\(.summary.lines.percent) functions=\(.summary.functions.percent) regions=\(.summary.regions.percent)"
 ' coverage.json
 
-# Preserve every raw zero-count LLVM function as diagnostic evidence. Raw totals include
-# unit/integration-test functions and test-only generic instantiations, so they are not
-# the acceptance denominator for owned production function coverage.
+# Preserve every zero-count LLVM function record as diagnostic evidence. LLVM's
+# native function summary already considers a function covered when any
+# instantiation executes; instantiation coverage is a separate metric. The
+# repository-normalized source-function view below is therefore an additional
+# owned-production scope check, not a replacement for the native function gate.
 jq -r '
   .data[0].functions[]
   | select(.count == 0)
@@ -165,6 +167,10 @@ jq -r '
   | "BRANCH_GAP file=\(.file) start=\(.line_start):\(.column_start) end=\(.line_end):\(.column_end) true_count=\(.true_count) false_count=\(.false_count)"
 ' source-branches.json
 
+# Fail closed on LLVM's native function coverage as well as the repository's
+# additional owned-production normalization. Do not infer that a native miss is
+# test-only or duplicate codegen until exact symbol/source evidence proves it.
+jq -e '.data | all(.totals.functions.percent == 100)' coverage.json >/dev/null
 jq -e 'all(.[]; .count > 0)' source-functions.json >/dev/null
 jq -e 'all(.[]; .count > 0)' source-regions.json >/dev/null
 jq -e 'all(.[]; .true_count > 0 and .false_count > 0)' source-branches.json >/dev/null
