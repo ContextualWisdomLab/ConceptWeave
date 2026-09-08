@@ -21,6 +21,7 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - Source-resolution admission is fail-closed when the report has no `server_id`; optional identity is acceptable for lower-authority classification, not for a typed resolution review.
 - Missing or blank Local API `server_id` remains an admission error even when a report has no pending items; an empty resolution set must not yield a typed review without provider identity.
 - Public review aggregates that cross a JSON artifact boundary must use owned fields and have a round-trip test; borrowed `&'static str` metadata is not an artifact contract.
+- Derived deserialization must enforce the same non-blank provider identity invariant as the constructor path; JSON omission or `null` must not bypass admission checks.
 - Coverage reports must distinguish raw LLVM instantiations from the repository's normalized owner function/region/branch gate; never report raw gaps as green or suppress them to manufacture 100%.
 - A pinned coverage run can expose duplicate generic instantiations and newly added owner branches even when the ordinary workspace suite is green; record the exact denominator and add deterministic contract tests before claiming coverage recovery.
 - Visual Zotero item counts are presentation evidence only; reconcile them with the Local API snapshot and classify attachments before claiming a complete research population.
