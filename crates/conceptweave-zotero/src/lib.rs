@@ -382,7 +382,8 @@ struct FetchedPage {
 ///
 /// Snapshot consistency, resource budgets, API-version validation, pagination,
 /// and duplicate-key checks live in an injectable reader core. Only the narrow
-/// ureq transport shim is excluded from deterministic coverage.
+/// Local API request/header/body path are exercised through the deterministic
+/// loopback transport regressions.
 /// No page starts or completed report is accepted at or beyond five minutes.
 /// An in-flight request may finish later under its existing per-request limits;
 /// its late result is rejected, not returned as a partial snapshot.
