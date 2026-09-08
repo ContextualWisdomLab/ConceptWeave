@@ -13,7 +13,7 @@ counts were retained in [the readiness record](doctoring/zotero_local_api_readin
 no item JSON was copied. This is endpoint readiness, not an atomic capture,
 decision, approval, write, release or deployment.
 
-PR #39 now points to exact head `950d8d8782f2ee418586993ee28c75a7b065504e`
+PR #39 now points to exact head `f2784ee39b4c9790c7b28bbe2d0479be5207c8b3`
 over stacked base `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`. The write scope
 requires a complete source-resolution aggregate and revalidates every pending
 source against the immutable report before any authority callback. Missing and
