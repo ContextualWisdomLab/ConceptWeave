@@ -83,3 +83,4 @@ When a coverage gate exposes test-only branches, remove unreachable platform gua
 
 - Upstream repository license metadata and Cargo package license declarations are separate evidence. Record both at immutable head/release coordinates and resolve any divergence before proposing a dependency or utility repository.
 - Discovery KPIs must name their denominator: the 142/3,715 ontology queue rate is steward workload screening only, never precision, recall, approval coverage or semantic authority.
+- A byte-identical Local API replay proves deterministic snapshot/report continuity only; it never substitutes for steward decisions, publication authority or a Zotero write receipt.

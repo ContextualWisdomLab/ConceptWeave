@@ -1551,6 +1551,14 @@ Case-insensitive title/phrase counts were `ontology` 27/32, `semantic` 36/0,
 Signals overlap and are not additive classifications; this remains discovery
 evidence without steward disposition or Zotero write authority.
 
+### September 9 deterministic replay verification
+
+An independent release-mode Local API execution reproduced report SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc` with the
+same 8,326 observed, 3,715 classified, 4,611 retained, four pending and 49
+duplicate-candidate counts. This is replay continuity evidence only and does
+not establish paper decisions or write authority.
+
 ### September 9 ontology discovery KPI
 
 The current Local API replay observes 3,715 bibliographic items and projects

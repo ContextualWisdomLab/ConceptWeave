@@ -209,3 +209,13 @@ the aggregate is unchanged: 3,715 papers, 3,203 with nonempty text, 440
 without attachment, 34 with unmanifested attachment, 38 captured-empty, 471
 needing review without text and two unbound nonempty records. This is capture
 integrity/availability evidence only, not reviewed meaning or approval.
+
+## Deterministic replay checkpoint (2026-09-09)
+
+An independent release-mode Local API run reproduced the same report SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`.
+The counts remain 8,326 observed items, 3,715 classified items, 4,611
+unclassified items, four pending source keys and 49 duplicate candidates, with
+Zotero 10.0.1, Local API 3, library version 2 and server identity
+`WhpFHMbvJmrJ`. This confirms deterministic replay continuity only; it does not
+create steward decisions, publication authority or Zotero writes.
