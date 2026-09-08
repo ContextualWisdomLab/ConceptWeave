@@ -79,6 +79,14 @@ aggregate 8,326 observed, 3,715 classified, 4,611 unclassified, four pending,
 `OWL` 23 and `RDF` 20. The replay is read-only repeatability evidence, not
 steward review, approval or Zotero write authority.
 
+An isolated non-force merge rehearsal of PR40 `5397c0afca9c966b16547ee813df78e08149e97b`
+into the PR39 successor tree reproduced contract conflicts in `lib.rs`,
+`main.rs`, metadata transport tests, documentation and several modify/delete
+test paths. The merge was aborted immediately in the temporary worktree; no
+shared branch or protected ref changed. This confirms that the next step is an
+owner-integrated successor preserving both full-text and source-resolution
+contracts, not a blind cherry-pick or duplicate downstream API.
+
 ## September 8 acquisition and consolidation checkpoint
 
 Nightly `2026-08-20` coverage was rerun at PR #39 exact head
