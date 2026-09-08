@@ -251,7 +251,8 @@ struct FetchedPage {
 ///
 /// Snapshot consistency, resource budgets, API-version validation, pagination,
 /// and duplicate-key checks live in an injectable reader core. Only the narrow
-/// ureq transport shim is excluded from deterministic coverage.
+/// Local API request/header/body path are exercised through the deterministic
+/// loopback transport regressions.
 /// No page starts or completed report is accepted at or beyond five minutes.
 /// An in-flight request may finish later under its existing per-request limits;
 /// its late result is rejected, not returned as a partial snapshot.
@@ -720,11 +721,11 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
         .data
         .tags
         .iter()
-        .filter_map(|tag| {
-            (matched_tag_value_set.contains(&tag.tag)
-                && seen_matched_tag_values.insert(tag.tag.clone()))
-            .then(|| tag.tag.clone())
+        .filter(|tag| {
+            matched_tag_value_set.contains(&tag.tag)
+                && seen_matched_tag_values.insert(tag.tag.clone())
         })
+        .map(|tag| tag.tag.clone())
         .collect();
 
     ClassifiedItem {
@@ -780,11 +781,10 @@ fn contains_phrase(value: &str, phrase: &str) -> bool {
     })
 }
 
+type DuplicateIdentity = (Vec<String>, BTreeMap<String, String>);
+
 fn duplicate_candidates(items: &[&ZoteroItem]) -> Vec<DuplicateCandidate> {
-    let mut identities: BTreeMap<
-        (&'static str, String),
-        (Vec<String>, BTreeMap<String, String>),
-    > = BTreeMap::new();
+    let mut identities: BTreeMap<(&'static str, String), DuplicateIdentity> = BTreeMap::new();
     for item in items {
         if let Some(doi) = normalize_doi(&item.data.doi) {
             let (item_keys, source_identity_values) = identities.entry(("doi", doi)).or_default();
@@ -815,18 +815,14 @@ fn duplicate_candidates(items: &[&ZoteroItem]) -> Vec<DuplicateCandidate> {
 
 fn normalize_doi(value: &str) -> Option<String> {
     let mut normalized = value.trim().to_lowercase();
-    loop {
-        let next = match normalized
+    while let Some(stripped) = normalized
             .strip_prefix("https://doi.org/")
             .or_else(|| normalized.strip_prefix("http://doi.org/"))
             .or_else(|| normalized.strip_prefix("https://dx.doi.org/"))
             .or_else(|| normalized.strip_prefix("http://dx.doi.org/"))
             .or_else(|| normalized.strip_prefix("doi:"))
-        {
-            Some(stripped) => stripped.trim().to_owned(),
-            None => break,
-        };
-        normalized = next;
+    {
+        normalized = stripped.trim().to_owned();
     }
     (!normalized.is_empty()).then_some(normalized)
 }
