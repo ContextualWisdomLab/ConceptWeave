@@ -30,7 +30,6 @@ issued.
 Read-only title-signal triage over the fresh report yields a 137-paper discovery
 queue (ontology 27, semantic 36, taxonomy 2, knowledge graph 1, vocabulary
 stem 81). The [triage record](doctoring/zotero_ontology_signal_triage_2026-09-08.md)
-retains counts only; this heuristic is not a semantic verdict and does not
 retains counts only; 29 are adjacent evidence, one is a semantic-consumption
 bridge and 107 need steward review (101 no-rule-match, 6 unsupported-vocabulary).
 This heuristic is not a semantic verdict and does not change the 3,658
@@ -43,7 +42,7 @@ counts were retained in [the readiness record](doctoring/zotero_local_api_readin
 no item JSON was copied. This is endpoint readiness, not an atomic capture,
 decision, approval, write, release or deployment.
 
-PR #39 now points to exact head `f2784ee39b4c9790c7b28bbe2d0479be5207c8b3`
+PR #39 now points to exact head `fe32a691b96761f886d06207ed7f4df0faa63bfd`
 over stacked base `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`. The write scope
 requires a complete source-resolution aggregate and revalidates every pending
 source against the immutable report before any authority callback. Missing and
