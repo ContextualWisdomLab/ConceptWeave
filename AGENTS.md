@@ -18,6 +18,7 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - Preserve source evidence, truth status, and publication state separately.
 - Pending Zotero ancestry is resolved only through the typed source-resolution aggregate bound to the exact report item key/version/type/parent identity; never infer a parent, rewrite the report, or treat a resolution as write or approval authority.
 - When the Local API exposes a server identity, source-resolution decisions must also match that `server_id`; a matching library version alone cannot prove the same Zotero source.
+- Source-resolution admission is fail-closed when the report has no `server_id`; optional identity is acceptable for lower-authority classification, not for a typed resolution review.
 - Public review aggregates that cross a JSON artifact boundary must use owned fields and have a round-trip test; borrowed `&'static str` metadata is not an artifact contract.
 - Coverage reports must distinguish raw LLVM instantiations from the repository's normalized owner function/region/branch gate; never report raw gaps as green or suppress them to manufacture 100%.
 - Visual Zotero item counts are presentation evidence only; reconcile them with the Local API snapshot and classify attachments before claiming a complete research population.
