@@ -1257,14 +1257,14 @@ remain open; no local evidence is transferred to a remote or later head.
 - Consuming products retain tenant/purpose authorization and physical query execution.
 - Published semantic truth is immutable; corrections create a new release plus supersession evidence rather than in-place overwrite.
 
-PR40 owner head `7f057efad7bfa0da672635a46394f9e65e7a076a` adds a regression assertion for the
+PR40 owner head `3d63989c113e1bd2bd44c98d133ea8aae8a08318` adds a regression assertion for the
 `InvalidPendingKeySet` error contract and encodes the validated output-path invariant without
 changing admission policy. Rust 1.98 all-target tests and formatting pass; the workspace raw
 replay remains below the 100% production target (branches 200/204, functions 207/209,
 lines 1874/1888, regions 2969/3005). This is local owner evidence only;
 hosted required checks, independent approval and protected merge remain unverified.
 
-PR39 head `1a4ec68a31d123aa274c834fe85c7d17b5504367` closes the downstream source-resolution
+PR39 head `ec33927122ca433947b5bb3bce610cc8812c8f90` closes the downstream source-resolution
 gap in the write-plan boundary: ordinary full-text evaluation remains fail-closed for pending
 sources, while write admission now permits them only after the exact report-bound
 `SourceResolutionReview` is revalidated. A standalone pending-source fixture proves both
@@ -1276,4 +1276,19 @@ Zotero authority callback or live write was issued.
 
 ### Downstream source-resolution envelope gap (2026-09-09)
 
-PR40's trusted source-resolution restoration remains an owner prerequisite for PR39. PR39 currently rejects pending reports before an exact `SourceResolutionReview` can travel from worksheet through finalization, evaluation and write admission. A non-force local merge attempt with PR40 produced conflicts in the shared library, CLI, transport tests and governance documents; it was aborted without shared-branch changes. After protected owner integration, the successor must add a positive exact-resolution contract while keeping missing, stale and mismatched envelopes fail-closed before any authority verifier.
+PR40's trusted source-resolution restoration remains an owner prerequisite for protected PR39
+integration. The PR39 source path now carries an exact `SourceResolutionReview` through write
+admission; missing, stale and mismatched envelopes remain fail-closed. A non-force local merge
+attempt with PR40 produced conflicts in the shared library, CLI, transport tests and governance
+documents; it was aborted without shared-branch changes. After protected owner integration,
+re-run the positive exact-resolution contract on the merged head before any authority verifier.
+
+### Protected delivery gate revalidation (2026-09-09)
+
+The live repository ruleset `CWL Central required workflows` (active, id `18156473`)
+requires one approving review, resolved review threads, and the central OpenCode,
+merge-scheduler, security, Strix, Semgrep, Noema and CodeQL workflows. It also forbids
+deletion and non-fast-forward updates; only merge and squash are allowed. The legacy
+`branches/main/protection` endpoint returns 404, which is distinct from the active ruleset
+and cannot be treated as an absent protection gate. PR39 and PR40 remain Draft with no
+independent approval, so neither is protected-merge or release-ready.
