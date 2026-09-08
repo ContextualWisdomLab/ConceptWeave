@@ -30,6 +30,8 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 
 ## Operational lessons to maintain
 
+- Validate cited commits against the named repository before counting source evidence. A syntactically valid SHA or a successful lookup in another repository does not establish the citation; reject a repository-scoped 404/422 and quarantine dependent audit claims until rebound and reverified.
+
 - Count repository audit coverage by canonical repository identity, not audit sections or visits. Search the existing inventory before adding a candidate; repeated inspection of the same owner or revision updates evidence without increasing the unique denominator. Withdraw an unsupported KPI until the complete identity reconciliation is verified.
 
 - Update this section when work establishes a reusable, verified lesson. Keep transient run IDs, counts and incidents in the Gap baseline or doctoring evidence; never record credentials or private research content here.
