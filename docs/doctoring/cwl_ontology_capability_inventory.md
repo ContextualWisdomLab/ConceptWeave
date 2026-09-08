@@ -76,6 +76,15 @@ The September 7 metadata refresh again returned 76 repositories, one archived re
 
 The paginated organization metadata census returned 76 repositories, including one archived repository and 11 forks; the September 6 follow-up refresh confirmed the same counts. Name/description screening for ontology, semantic, knowledge graph, schema, RDF, SHACL, provenance and lineage was combined with the existing Context Map; metadata matches alone miss owners whose descriptions do not use those words. This expanded the original eight-candidate audit to 12 selected candidates. The organization product-goal directive then identified DiskSage's actual OWL use, expanding the audit to 13. naruon and pg-erd-cloud brought the count to 15. Five domain/interoperability audits brought coverage to 20; three further domain and two document-contract audits brought it to 25/76. Keyverse and inkspan brought it to 27/76; three statistical-library audits brought it to 30/76. The threading, CDC and work-dependency audits below are a historical **33/76** checkpoint, leaving **43** at that point; subsequent bounded audits advance the current historical inventory to **39/76**, leaving **37**. This does not prove that all relevant implementations have been found.
 
+The September 9 live organization census returned 77 repositories, one archived
+repository and 12 forks. The new `litellm` repository was created on September
+8 as a fork with default branch `litellm_internal_staging` at
+`13df85cceb85c85f990ac2a25214f43f03fdfb4f`; its gateway description is outside
+ConceptWeave's ontology-library responsibility and it has no repository license
+metadata. It is retained in the organization census but excluded from the
+ontology capability denominator, which remains 39 audited candidates out of the
+76-repository historical scope until the broader census is reconciled.
+
 Each row separates responsibility, exact default-head documentation or tree evidence, and published GitHub release evidence. A name, open PR or protected branch alone does not prove a usable released API. This is not a complete package-registry, deployment, attestation or consumer-conformance audit; bounded follow-up attempts and their limitations are recorded below. CalendarWeave and four-pillars were initially screened from metadata only; their subsequent source audits now distinguish a bootstrap owner from an implemented product-domain model without excluding either by description alone.
 
 The following “All 33 selected default branches” sentence is a historical

@@ -1682,6 +1682,17 @@ unit, integration and documentation tests. This is local evidence only: the
 exact head still has no hosted central-workflow run or independent approval,
 so protected merge, release and deployment remain unverified.
 
+### September 9 organization census drift
+
+The live GitHub organization census now returns 77 repositories, one archived
+repository and 12 forks, versus the prior 76/1/11 observation. The increment is
+the non-ontology `ContextualWisdomLab/litellm` fork, created September 8, at
+default branch `litellm_internal_staging` commit
+`13df85cceb85c85f990ac2a25214f43f03fdfb4f`; it has no repository license
+metadata. It remains in the organization inventory but is excluded from the
+ontology capability denominator pending full census reconciliation. No package
+or source dependency was added.
+
 ### September 9 07:24 live Local API replay continuity
 
 The pinned Rust 1.98 optimized CLI completed another read-only replay against
