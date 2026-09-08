@@ -94,7 +94,7 @@ counts were retained in [the readiness record](doctoring/zotero_local_api_readin
 no item JSON was copied. This is endpoint readiness, not an atomic capture,
 decision, approval, write, release or deployment.
 
-PR #39 now points to exact head `b0c4e4cbed4a4f4c9f2fde877efa47effde57cae`
+PR #39 now points to exact head `7fd89bccffcaa46f5fbdaf64b4252ac3cce7438c`
 over stacked base `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`. The write scope
 requires a complete source-resolution aggregate and revalidates every pending
 source against the immutable report before any authority callback. Missing and
@@ -123,10 +123,11 @@ the next engineering gap before protected merge.
 
 The write-envelope mismatch regression now exercises four stored identity
 mismatch forms and raises normalized branch coverage to 781/782 (99.87%) in
-the pinned nightly run with 115 tests. PR40's prior repair-specific coverage
-rerun reported 189/192 branches (98.44%), 1,807/1,848 lines (97.78%), and
-192/196 functions (97.96%); the new coordinated-identity test is currently
-failing and therefore supersedes that local GREEN claim until repaired.
+the pinned nightly run with 115 tests. On PR40 exact head `e72fb40`, the
+trusted-restoration coverage rerun reports 191/204 branches (93.63%),
+1,812/1,843 lines (98.32%), 193/198 functions (97.47%), and 2,872/2,934
+regions (97.89%). Remaining branch and CLI/error regions stay recorded without
+exclusions or threshold changes.
 
 The [refreshed capture checkpoint](doctoring/refreshed_capture_evidence.md) now records successful optimized full-library capture, verified 3,715-row blank worksheet, a 25-row bound view, and full workspace tests at `b0f7d5b8bb139d627cec37b598331464c14b60ab` (terminal exit 0). Actual decisions and approvals remain zero. The CO owner freshly reports no GitHub release or PyPI package, unmerged release PR #1030 and unmerged diagnostic PR #1105. Its stated prerequisites are protected exact-head checks/independent review, fast-mlsirm publication, immutable CO client/schema release, and verified classification serving. This is owner-reported release status, not locally verified registry evidence. Available secret metadata is not the blocker. Do not send private paper contents or substitute a direct provider while these conditions remain unmet.
 
