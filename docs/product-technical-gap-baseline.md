@@ -84,6 +84,13 @@ raw coverage is 204/208 functions (98.0769%), 1,849/1,873 lines (98.7186%),
 2,920/2,966 regions (98.4491%) and 200/204 branches (98.0392%). The improvement
 does not establish hosted GREEN, independent approval or protected readiness.
 
+PR40 then advanced normally to `e896e4f118e5b0078a002cd5ebf9fafd646de954`
+with deterministic output-path helper contract coverage. Its exact-head local
+coverage replay reports 206/209 functions (98.5646%), 1,868/1,887 lines
+(98.9931%), 2,963/3,004 regions (98.6352%) and 200/204 branches (98.0392%).
+The branch and remaining raw gaps are still acceptance work; no hosted or
+protected readiness is inferred.
+
 At 01:17 KST on 2026-09-09, a fresh release-mode Local API replay produced the
 same private report SHA
 `8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc` and
