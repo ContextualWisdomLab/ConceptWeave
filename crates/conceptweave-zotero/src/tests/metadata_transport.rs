@@ -286,3 +286,16 @@ fn production_transport_helpers_remain_in_owned_coverage() {
         );
     }
 }
+
+#[test]
+fn transport_rustdoc_tracks_the_owned_coverage_boundary() {
+    let source = include_str!("../lib.rs");
+    assert!(
+        !source.contains("ureq transport shim is excluded from deterministic coverage"),
+        "read_local_snapshot rustdoc still claims the now-covered transport seam is excluded"
+    );
+    assert!(
+        source.contains("Local API request/header/body path are exercised"),
+        "read_local_snapshot rustdoc must describe the loopback-covered production seam"
+    );
+}
