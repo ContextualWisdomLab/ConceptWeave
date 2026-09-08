@@ -40,3 +40,15 @@ Observed totals remain 8,326 records, 3,715 proposals, 4,611 unclassified
 records, four pending source keys, 49 duplicate candidates and zero failures.
 This repeatability is evidence of a stable observation, not steward review,
 approval, semantic publication or write authority.
+
+## Fresh replay checkpoint (2026-09-09 00:24 KST)
+
+The release-mode read-only Local API replay completed without mutation at
+`/tmp/conceptweave-zotero-live-20260909-002410.json`. The owner-only file is
+`0600`, 8,132,756 bytes, and retains SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`.
+Aggregate totals remain 8,326 observed records, 3,715 classified proposals,
+4,611 unclassified records, four pending sources, 49 duplicate candidates and
+zero failures. Title-only discovery counts were 27 `ontology`, 23 `OWL` and
+20 `RDF` matches; they overlap and remain discovery evidence only. No review,
+approval or Zotero write occurred.

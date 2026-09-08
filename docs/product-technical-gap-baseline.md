@@ -17,6 +17,11 @@ the same aggregate (8,326 observed, 3,715 proposals, 4,611 unclassified,
 four pending, 49 duplicate candidates, zero failures). This confirms
 repeatable observation without changing review, approval or write state.
 
+At 00:24 KST on 2026-09-09 a third release-mode replay completed read-only with
+the same private `0600` report digest and aggregate. Title-only discovery
+counts were 27 `ontology`, 23 `OWL` and 20 `RDF` matches; these overlap and do
+not alter deterministic classification, review, approval or Zotero write state.
+
 PR39 is `d61b79e5de0f0d6a8f860cf1ade7458ebf8223db` (OPEN/Draft/CLEAN); PR40 is
 `fc6083de58fbe4fb1c5bcdefee8e28671fa034e8` (OPEN/Draft/CLEAN). The latest
 Local API replay remains stable at 8,326 observed records, 3,715 proposals,
