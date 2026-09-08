@@ -2,11 +2,11 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 use conceptweave_zotero::{
-    ClassificationReport, FullTextCapture, GoldenSetApproval, MAX_REVIEW_BATCH_ITEMS,
-    StewardDecisionPatch, StewardReviewBatch, StewardReviewWorksheet, apply_steward_decision_patch,
-    assess_steward_review_progress, build_full_text_review_json, build_steward_review_batch,
-    build_steward_review_worksheet, decision_patch_from_review_batch, read_local_full_text,
-    read_local_snapshot, reviewed_golden_set_from_worksheet,
+    ClassificationReport, FullTextCapture, GoldenSetApproval, MAX_PERSISTED_CAPTURE_BYTES,
+    MAX_REVIEW_BATCH_ITEMS, StewardDecisionPatch, StewardReviewBatch, StewardReviewWorksheet,
+    apply_steward_decision_patch, assess_steward_review_progress, build_full_text_review_json,
+    build_steward_review_batch, build_steward_review_worksheet, decision_patch_from_review_batch,
+    read_local_full_text, read_local_snapshot, reviewed_golden_set_from_worksheet,
 };
 use serde::de::DeserializeOwned;
 use std::collections::BTreeSet;
@@ -17,8 +17,6 @@ use std::path::{Path, PathBuf};
 
 const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --capture-full-text /tmp/REPORT.json /tmp/CAPTURE.json | --full-text-review /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/CAPTURE.json LIMIT /tmp/VIEW.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --review-progress /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/PROGRESS.json | --review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json LIMIT /tmp/BATCH.json | --apply-review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/COMPLETED_BATCH.json /tmp/UPDATED_WORKSHEET.json | --apply-decision-patch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/PATCH.json /tmp/UPDATED_WORKSHEET.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
 const MAX_ARTIFACT_BYTES: u64 = 16 * 1024 * 1024;
-// JSON escaping and envelope bytes are separate from the capture's raw-body budget.
-const MAX_CAPTURE_FILE_BYTES: u64 = 512 * 1024 * 1024;
 
 #[derive(Debug, PartialEq, Eq)]
 enum OutputRequest {
@@ -296,7 +294,7 @@ fn read_private_json<T: DeserializeOwned>(raw: &str) -> io::Result<(T, ArtifactI
 /// Restores a private capture without allocating a second full-file byte buffer.
 fn read_private_capture(raw: &str) -> io::Result<(FullTextCapture, ArtifactIdentity)> {
     read_private_input(raw, |file, length| {
-        read_bounded_capture(file, length, MAX_CAPTURE_FILE_BYTES)
+        read_bounded_capture(file, length, MAX_PERSISTED_CAPTURE_BYTES)
     })
 }
 
