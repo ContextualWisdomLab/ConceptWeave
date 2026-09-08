@@ -111,6 +111,8 @@ pub struct ClassificationEvidence {
     pub fields: Vec<&'static str>,
     /// Exact snapshot values for matched fields, retained only in the local report.
     pub field_values: BTreeMap<&'static str, String>,
+    /// Exact matching source tag values in source order, deduplicated by value.
+    pub matched_tag_values: Vec<String>,
     /// Rule phrases found in those fields.
     pub matched_phrases: Vec<&'static str>,
 }
@@ -638,6 +640,7 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
     let mut matched_dispositions = Vec::new();
     let mut matched_fields = BTreeSet::new();
     let mut field_values = BTreeMap::new();
+    let mut matched_tag_value_set = BTreeSet::new();
     let mut matched_phrases = BTreeSet::new();
 
     for (candidate, phrases) in specific_rules {
@@ -650,6 +653,9 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
                     field_values
                         .entry(field)
                         .or_insert_with(|| original.to_owned());
+                    if field == "tags" {
+                        matched_tag_value_set.insert(original.to_owned());
+                    }
                     matched_phrases.insert(*phrase);
                 }
             }
@@ -668,6 +674,9 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
                         field_values
                             .entry(field)
                             .or_insert_with(|| original.to_owned());
+                        if field == "tags" {
+                            matched_tag_value_set.insert(original.to_owned());
+                        }
                         matched_phrases.insert(phrase);
                     }
                 }
@@ -691,6 +700,17 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
         && !item.data.abstract_note.trim().is_empty()
         && !field_values.contains_key("abstract_note"))
     .then(|| item.data.abstract_note.clone());
+    let mut seen_matched_tag_values = BTreeSet::new();
+    let matched_tag_values = item
+        .data
+        .tags
+        .iter()
+        .filter_map(|tag| {
+            (matched_tag_value_set.contains(&tag.tag)
+                && seen_matched_tag_values.insert(tag.tag.clone()))
+            .then(|| tag.tag.clone())
+        })
+        .collect();
 
     ClassifiedItem {
         item_key: item.key.clone(),
@@ -707,6 +727,7 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
         evidence: ClassificationEvidence {
             fields: matched_fields.into_iter().collect(),
             field_values,
+            matched_tag_values,
             matched_phrases: matched_phrases.into_iter().collect(),
         },
         child_item_keys,
@@ -919,8 +940,6 @@ mod tests {
 
     #[test]
     fn reader_deadline_rejects_expired_admission_page_and_report() {
-        // Expired before first I/O, after a page, before next I/O, and after
-        // classifying the final page; no partial or late report may escape.
         for (ticks, total, expected_calls) in [
             (vec![300], 1, 0),
             (vec![0, 301], 1, 1),
