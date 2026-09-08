@@ -87,15 +87,15 @@ counts were retained in [the readiness record](doctoring/zotero_local_api_readin
 no item JSON was copied. This is endpoint readiness, not an atomic capture,
 decision, approval, write, release or deployment.
 
-PR #39 now points to exact head `41c2f236450092ae29199891e926747a8b75cc13`
+PR #39 now points to exact head `055f755758e8c05f542d38a79ecfb247153af54b`
 over stacked base `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`. The write scope
 requires a complete source-resolution aggregate and revalidates every pending
 source against the immutable report before any authority callback. Missing and
 stale source-resolution regressions pass in the locked Rust 1.98 workspace;
 Clippy, warnings-denied rustdoc and diff checks also pass. GitHub reports OPEN
 Draft/CLEAN with CodeRabbit skipped because the PR remains a draft. PR #40's
-current baseline-only successor is `e557ebca0d7e6c70dc8ea45c9b7616c1f85f18c4`;
-its causal rule-revision repair remains in ancestry and needs fresh exact-head
+current baseline-only successor is `60aa890e919a0bbd65d55ab339b93b30d7987710`;
+its stored-completeness repair remains in ancestry and needs fresh exact-head
 verification. This is not protected-merge, release or Zotero-write evidence.
 
 Pinned `cargo +1.98.0 llvm-cov --workspace --all-features --locked
