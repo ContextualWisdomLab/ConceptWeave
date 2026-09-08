@@ -12,7 +12,7 @@ pending sources, 49 duplicate candidates and zero failures. Equal output is
 repeatability evidence only; it does not establish review, approval or a
 Zotero write.
 
-PR39 is `e10bb738345a53f83d488076890b56735c604533` (OPEN/Draft/CLEAN); PR40 is
+PR39 is `d85dae3aed6412d84aab02aeb5a0e7e31725b019` (OPEN/Draft/CLEAN); PR40 is
 `fc6083de58fbe4fb1c5bcdefee8e28671fa034e8` (OPEN/Draft/CLEAN). The latest
 Local API replay remains stable at 8,326 observed records, 3,715 proposals,
 4,611 unclassified records, four pending sources and 49 duplicate candidates,
@@ -117,7 +117,7 @@ counts were retained in [the readiness record](doctoring/zotero_local_api_readin
 no item JSON was copied. This is endpoint readiness, not an atomic capture,
 decision, approval, write, release or deployment.
 
-PR #39 now points to exact head `e4f048f78ec992a61b4786404c8b9174b3118557`
+PR #39 now points to exact head `d85dae3aed6412d84aab02aeb5a0e7e31725b019`
 over stacked base `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`. The write scope
 requires a complete source-resolution aggregate and revalidates every pending
 source against the immutable report before any authority callback. Missing and
