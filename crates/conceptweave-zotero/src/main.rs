@@ -436,12 +436,14 @@ mod tests {
             .is_err()
         );
 
-        let conventional = Path::new("/tmp").join(format!(
-            "conceptweave-zotero-{}-conventional.json",
-            std::process::id()
-        ));
-        let _ = fs::remove_file(&conventional);
-        assert!(validate_output_path(conventional.to_str().unwrap()).is_ok());
+        if let Ok(conventional_parent) = Path::new("/tmp").canonicalize() {
+            let conventional = conventional_parent.join(format!(
+                "conceptweave-zotero-{}-conventional.json",
+                std::process::id()
+            ));
+            let _ = fs::remove_file(&conventional);
+            assert!(validate_output_path(conventional.to_str().unwrap()).is_ok());
+        }
 
         let nested_dir =
             env::temp_dir().join(format!("conceptweave-zotero-{}-nested", std::process::id()));
