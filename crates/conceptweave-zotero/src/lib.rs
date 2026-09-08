@@ -614,7 +614,7 @@ fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, Re
         .map_err(|error| ReadError::Http(error.to_string()))?;
     let headers = response.headers();
     let total = header_u64(headers, "Total-Results")?;
-    let total = usize::try_from(total).map_err(|_| ReadError::Budget("item-count"))?;
+    let total = page_total(total)?;
     let library_version = header_u64(headers, "Last-Modified-Version")?;
     let zotero_version = header_string(headers, "X-Zotero-Version")?;
     let api_version = header_u64(headers, "Zotero-API-Version")?;
@@ -623,7 +623,7 @@ fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, Re
 
     let body = read_bounded_response_text(&mut response, MAX_PAGE_BYTES)
         .map_err(|error| ReadError::Body(error.to_string()))?;
-    let body_bytes = u64::try_from(body.len()).map_err(|_| ReadError::Budget("byte-count"))?;
+    let body_bytes = page_body_bytes(body.len())?;
     let items: Vec<ZoteroItem> = serde_json::from_str(&body).map_err(ReadError::Json)?;
     validate_source_item_keys(&items)?;
 
@@ -637,6 +637,26 @@ fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, Re
         body_bytes,
         items,
     })
+}
+
+#[cfg(target_pointer_width = "64")]
+fn page_total(value: u64) -> Result<usize, ReadError> {
+    Ok(value as usize)
+}
+
+#[cfg(not(target_pointer_width = "64"))]
+fn page_total(value: u64) -> Result<usize, ReadError> {
+    usize::try_from(value).map_err(|_| ReadError::Budget("item-count"))
+}
+
+#[cfg(target_pointer_width = "64")]
+fn page_body_bytes(value: usize) -> Result<u64, ReadError> {
+    Ok(value as u64)
+}
+
+#[cfg(not(target_pointer_width = "64"))]
+fn page_body_bytes(value: usize) -> Result<u64, ReadError> {
+    u64::try_from(value).map_err(|_| ReadError::Budget("byte-count"))
 }
 
 /// Reads strict UTF-8 with an inclusive byte limit and one byte of overrun evidence.
