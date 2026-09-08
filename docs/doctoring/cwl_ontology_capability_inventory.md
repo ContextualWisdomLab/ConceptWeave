@@ -2,7 +2,7 @@
 
 Evidence snapshot: 2026-09-07. Status: research inventory, not dependency-adoption approval.
 
-September 7–8 adds bounded audits of noema's release admission, EgressWeave's outbound policy, OriginWeave's provenance records, Learning Content Studio's protected-source availability, accounting-information-platform's proposal/reporting boundaries, Learning Management Platform's bootstrap availability, saju-caldav's calendar service boundary, J Planner's static app, ELUNVERA's CRM bootstrap, PolicyWeave's privacy-policy app, supply-chain-control-plane's bootstrap boundary, governance-risk-compliance's control-catalog boundary, psychometrics-commons' measurement-product boundary and learning-record-store's bootstrap boundary: **48/76** of the September 6 census are now audited, leaving **28** in that historical denominator. Candidates with resolved GitHub releases remain **8/48**; registry-only observations are separate and verified adoption remains zero. Earlier checkpoints below retain their observation dates. A bootstrap-only finding is not an implemented library or a classified paper.
+September 7–8 adds bounded audits of noema's release admission, EgressWeave's outbound policy, OriginWeave's provenance records, Learning Content Studio's protected-source availability, accounting-information-platform's proposal/reporting boundaries, Learning Management Platform's bootstrap availability, saju-caldav's calendar service boundary, J Planner's static app, ELUNVERA's CRM bootstrap, PolicyWeave's privacy-policy app, supply-chain-control-plane's bootstrap boundary, governance-risk-compliance's control-catalog boundary, psychometrics-commons' measurement-product boundary, learning-record-store's bootstrap boundary and learning-interoperability-contracts' bootstrap boundary: **49/76** of the September 6 census are now audited, leaving **27** in that historical denominator. Candidates with resolved GitHub releases remain **8/49**; registry-only observations are separate and verified adoption remains zero. Earlier checkpoints below retain their observation dates. A bootstrap-only finding is not an implemented library or a classified paper.
 
 ## Scope and evidence limits
 
@@ -302,10 +302,16 @@ The public, nonfork, nonarchived repository has default `develop@6c888a30152dc9e
 
 Learning-record persistence and xAPI meaning remain the Learning Platform product boundary, not a released shared ontology library. No implementation, schema, contract, tests, runtime, private data or Zotero mutation was accessed. Require a licensed, versioned xAPI/interoperability contract and conformance before any ConceptWeave relationship. This audit advances coverage to 48/76, leaving 28; resolved GitHub-release candidates remain 8/48 and verified adoption remains zero. No paper decision or approval follows.
 
+### learning-interoperability-contracts bootstrap boundary audit (2026-09-08)
+
+The public, nonfork, nonarchived repository has default `develop@ba2948de245448eab739329f1131a36b4e59a54d`, with a complete non-truncated tree containing only [README.md](https://github.com/ContextualWisdomLab/learning-interoperability-contracts/blob/ba2948de245448eab739329f1131a36b4e59a54d/README.md). The README calls it a bootstrap anchor and says product development is proposed through `develop`; repository license metadata is null and the paginated release query returned no entries.
+
+This repository has no released learning interoperability contract to consume. Learning event and record semantics remain Learning Platform-owned; do not treat the repository name as evidence of a shared ontology authority. No implementation, schema, tests, runtime, private data or Zotero mutation was accessed. Require a licensed versioned contract, provenance and conformance before any ConceptWeave relationship. This audit advances coverage to 49/76, leaving 27; resolved GitHub-release candidates remain 8/49 and verified adoption remains zero. No paper decision or approval follows.
+
 | Measure | Observation | Required next evidence |
 | --- | --- | --- |
-| Metadata census / bounded capability audit | September 6 census76; 48/48 selected candidates have exact default-head documentation, available source, tree and release-query evidence | Audit actual contracts/consumers; 28 repositories in the historical census remain unaudited at that depth. |
-| GitHub release with resolved source commit | 8/48 selected candidates, including proprietary naruon, product-domain four-pillars, Saju CalDAV and inkspan's historical release without the relevant current contracts | License, artifact/provenance and consumer conformance; a release count is not permissive-library or adoption evidence. |
+| Metadata census / bounded capability audit | September 6 census76; 49/49 selected candidates have exact default-head documentation, available source, tree and release-query evidence | Audit actual contracts/consumers; 27 repositories in the historical census remain unaudited at that depth. |
+| GitHub release with resolved source commit | 8/49 selected candidates, including proprietary naruon, product-domain four-pillars, Saju CalDAV and inkspan's historical release without the relevant current contracts | License, artifact/provenance and consumer conformance; a release count is not permissive-library or adoption evidence. |
 | Additional registry-only publication observation | ThreadWeave0.1.0 and EgressWeave0.1.0 on PyPI; not counted in the seven resolved GitHub releases | Bind the needed API and distribution to reviewed source and attestations; no package-registry completeness claim. |
 | Verified ConceptWeave adoption | 0 demonstrated in this audit | Released owner contract, exact consumer revision and passing contract/runtime evidence. |
 | Privately retained nonempty full text | 3,203/3,715 parents in the separate [capture evidence](zotero_fulltext_capture_evidence.json); 512 remain without demonstrated nonempty text | New content-bound proposals and authentic review with partial/unknown indexing. The earlier sweep's 800/1,000 abstract-missing subgroup is availability evidence, not a remeasured retained-capture subgroup. |
@@ -337,6 +343,8 @@ ContextualWisdomLab. (2026). *governance-risk-compliance* (Commit 529cf321f134e2
 ContextualWisdomLab. (2026). *psychometrics-commons* (Commit e81441ce70c676992470afe2be469dd891ad3eb5) [Source repository]. GitHub. https://github.com/ContextualWisdomLab/psychometrics-commons/tree/e81441ce70c676992470afe2be469dd891ad3eb5
 
 ContextualWisdomLab. (2026). *learning-record-store* (Commit 6c888a30152dc9e258a9338397e2cb064096b370) [Source repository]. GitHub. https://github.com/ContextualWisdomLab/learning-record-store/tree/6c888a30152dc9e258a9338397e2cb064096b370
+
+ContextualWisdomLab. (2026). *learning-interoperability-contracts* (Commit ba2948de245448eab739329f1131a36b4e59a54d) [Source repository]. GitHub. https://github.com/ContextualWisdomLab/learning-interoperability-contracts/tree/ba2948de245448eab739329f1131a36b4e59a54d
 
 ContextualWisdomLab. (2026). *Metering billing platform* (Commit ebeed33f98b34afc232eed980f41d6af9a7a445c) [Computer software]. GitHub. https://github.com/ContextualWisdomLab/metering-billing-platform/tree/ebeed33f98b34afc232eed980f41d6af9a7a445c
 
