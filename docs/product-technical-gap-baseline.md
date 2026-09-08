@@ -15,6 +15,16 @@ Clippy, warnings-denied rustdoc and diff checks also pass. GitHub reports OPEN
 Draft/CLEAN with CodeRabbit queued and no required hosted check yet. This is
 not protected-merge, release or Zotero-write evidence.
 
+Pinned `cargo +1.98.0 llvm-cov --workspace --all-features --locked
+--summary-only` at this successor passes all tests but remains below the owned
+100% target: 9,302 regions / 396 missed (95.74%), 495 functions / 22 missed
+(95.56%), and 6,084 lines / 165 missed (97.29%). The new write-binding paths
+have all 10 regions and all 10 functions executed; remaining RED is in
+pre-existing full-text review (2 regions), shared report validation (81
+regions, 3 functions), and CLI error/edge paths (303 regions, 19 functions).
+No exclusions or threshold weakening were introduced; coverage repair remains
+the next engineering gap before protected merge.
+
 The [refreshed capture checkpoint](doctoring/refreshed_capture_evidence.md) now records successful optimized full-library capture, verified 3,715-row blank worksheet, a 25-row bound view, and full workspace tests at `b0f7d5b8bb139d627cec37b598331464c14b60ab` (terminal exit 0). Actual decisions and approvals remain zero. The CO owner freshly reports no GitHub release or PyPI package, unmerged release PR #1030 and unmerged diagnostic PR #1105. Its stated prerequisites are protected exact-head checks/independent review, fast-mlsirm publication, immutable CO client/schema release, and verified classification serving. This is owner-reported release status, not locally verified registry evidence. Available secret metadata is not the blocker. Do not send private paper contents or substitute a direct provider while these conditions remain unmet.
 
 This checkpoint supplements the historical snapshots below, not their unverified incremental KPIs. The [acquisition register](doctoring/missing_full_text_acquisition.md) now identifies public source locations for the four unattached rows in the first 25-row review view. Only TRINITY HTML and the anxiety-study PDF were successfully retrieved; the IRT full text remains unverified. None was added to the bound capture or counted as an approved decision.
