@@ -15,3 +15,7 @@ Private artifacts use the `/private/tmp/conceptweave-live-refresh-u4T9cx-` prefi
 The diagnostic follow-up separates deadline failure from byte-budget failure without changing either limit. Existing exact-boundary test first failed (12870), then passed after the one-line fix (18940); the clock-failure/late-result test passed (51963). Full-suite and independent-review evidence must be collected before claiming complete verification.
 
 Follow-up verification completed: release library suite 18076 exited 0, 108 passed, zero failed/ignored/measured/filtered, 7.45 seconds after compilation. Independent read-only review found no concrete defect and confirmed byte-exhaustion precedence remains unchanged. Formatting and diff checks pass. This verifies the Zotero library suite, not all workspace integration tests, hosted required checks or release admission.
+
+Full workspace verification subsequently completed at `b0f7d5b8bb139d627cec37b598331464c14b60ab`: `rustup run 1.98.0 cargo test --release --workspace --locked --quiet`, session 10400, terminal exit 0. This includes CLI/integration suites and doctests; no aggregate count is asserted because intermediate displayed output was truncated. Hosted required checks, approval and deployment remain separate.
+
+The new 25-row bound review view also completed (session 19376, exit 0), retaining the new capture digest and all 3,715 remaining decisions. The 1,590,859-byte output is mode 0600. No decision was supplied or applied.
