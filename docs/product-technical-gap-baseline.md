@@ -10,7 +10,7 @@ PR #40 current exact head is `90c4ace6c7cbe9f537272665269a51693583fe87` (Draft/o
 
 PR #39 review adds a downstream repair finding: `FullTextWriteScope` still lacks the source-resolution aggregate and exact snapshot binding, so its successor must consume PR #40 without clearing or inferring the four pending sources.
 
-PR #40's publication cleanup repair (`1b9b096` RED → `da867a2` GREEN) now preserves an already-linked final report when temporary-file cleanup fails; rollback no longer deletes the customer-visible artifact. The exact-head test and normalized coverage evidence are current to `da867a2`.
+PR #40's publication cleanup repair (`1b9b096` RED → `da867a2` GREEN) now preserves an already-linked final report when temporary-file cleanup fails; rollback no longer deletes the customer-visible artifact. Follow-up RED `1ce4dee` and GREEN `4ee2116` preserve the original I/O kind while identifying the post-publication cleanup state.
 
 The current executable also completed a fresh read-only Local API replay: 8,326 records, 3,715 proposals, 4,611 nonbibliographic records, and four pending sources (Zotero 10.0.1/API 3/schema 44, library version 2). The private 0600 report digest is `sha256:5b2d81bddf09475de76ce18efa9fb5b486c44b794c9db6b697d183da5c268b48`; decisions and independent approvals remain 0/3,715.
 
