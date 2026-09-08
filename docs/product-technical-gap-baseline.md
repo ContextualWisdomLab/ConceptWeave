@@ -178,6 +178,18 @@ interval are recorded in [the private capture record](doctoring/zotero_live_full
 Content remains private evidence; no decision, approval or Zotero write was
 performed.
 
+### September 9 PR35 central workflow failure revalidation
+
+PR35 exact head `22709ec9b4d969bf67ec74db402813e74d11f7ca` remains blocked by
+central control-plane evidence, not a ConceptWeave leaf-test failure. The
+Noema job (`34204377844`, job `101993751408`) failed closed after the
+contextual-orchestrator gateway returned HTTP 429 from the selected free-pool
+model. OpenCode (`34204377900`, job `101997363729`) found no authenticated
+current-head verdict, and CodeQL actions (`34204381235`, job `101996716449`)
+had only a pending dispatch receipt, so both correctly rejected publication.
+The exact logs are retained as failure evidence; no stale rerun or bypass is
+authorized.
+
 ### September 9 PR40 current-head coverage revalidation
 
 The current PR40 successor head `26d088f948ebef01dad112313391b80cda7a0a71`
