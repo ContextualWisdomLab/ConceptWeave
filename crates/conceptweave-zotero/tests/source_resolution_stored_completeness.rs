@@ -96,3 +96,25 @@ fn stored_source_resolution_review_rejects_item_identity_drift() {
         );
     }
 }
+
+#[test]
+fn stored_source_resolution_review_rejects_coordinated_identity_rewrite() {
+    let report = classify_snapshot(
+        "10.0.1".into(),
+        Some("local-server".into()),
+        42,
+        vec![item("SOURCE", 41, "attachment")],
+    );
+    let review =
+        prepare_source_resolution_review(&report, vec![resolution("SOURCE", 41, "attachment")])
+            .expect("constructor binds the decision to the exact source item identity");
+    let mut stored = serde_json::to_value(review).expect("review must serialize");
+
+    stored["expected_source_identities"][0]["item_version"] = serde_json::json!(40);
+    stored["resolved_sources"][0]["item_version"] = serde_json::json!(40);
+
+    assert!(
+        serde_json::from_value::<SourceResolutionReview>(stored).is_err(),
+        "stored review must not regain exact-snapshot typed status when both the expected and decision identity are rewritten together"
+    );
+}
