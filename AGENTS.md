@@ -38,6 +38,8 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 
 - Use the pinned optimized build for full-library capture on this host; preserve the same byte/time limits and report binding. A debug capture exceeded its budget while the optimized run completed. Do not infer which budget failed from legacy shared error text, or infer unchanged evidence from equal item counts/snapshot identifiers alone.
 
+- Full-library report output must be a new direct child of the system temp directory. A nested temporary directory is intentionally rejected by the private-file boundary; choose a unique direct-child filename without weakening canonical-parent or `0600` checks.
+
 - A sampled hashing hotspot does not prove buffering improves end-to-end performance. Keep realistic escaped-text inputs unchanged, record terminal results, and discard an optimization without demonstrated benefit. Shared-host elapsed times are observations, not controlled causal benchmarks.
 
 - Validate cited commits against the named repository before counting source evidence. A syntactically valid SHA or a successful lookup in another repository does not establish the citation; reject a repository-scoped 404/422 and quarantine dependent audit claims until rebound and reverified.
