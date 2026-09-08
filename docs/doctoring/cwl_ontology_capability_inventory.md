@@ -2,7 +2,7 @@
 
 Evidence snapshot: 2026-09-07. Status: research inventory, not dependency-adoption approval.
 
-September 7–8 adds bounded audits of noema's release admission, EgressWeave's outbound policy, OriginWeave's provenance records, Learning Content Studio's protected-source availability, accounting-information-platform's proposal/reporting boundaries, Learning Management Platform's bootstrap availability, saju-caldav's calendar service boundary, J Planner's static app, ELUNVERA's CRM bootstrap, PolicyWeave's privacy-policy app, supply-chain-control-plane's bootstrap boundary, governance-risk-compliance's control-catalog boundary, psychometrics-commons' measurement-product boundary, learning-record-store's bootstrap boundary, learning-interoperability-contracts' bootstrap boundary, Gyeot's measurement/wellness boundary, Orgmetra's HRIS boundary and Clearfolio's document-viewer boundary: **52/76** of the September 6 census are now audited, leaving **24** in that historical denominator. Candidates with resolved GitHub releases remain **8/52**; registry-only observations are separate and verified adoption remains zero. Earlier checkpoints below retain their observation dates. A bootstrap-only finding is not an implemented library or a classified paper.
+September 7–8 adds bounded audits of noema's release admission, EgressWeave's outbound policy, OriginWeave's provenance records, Learning Content Studio's protected-source availability, accounting-information-platform's proposal/reporting boundaries, Learning Management Platform's bootstrap availability, saju-caldav's calendar service boundary, J Planner's static app, ELUNVERA's CRM bootstrap, PolicyWeave's privacy-policy app, supply-chain-control-plane's bootstrap boundary, governance-risk-compliance's control-catalog boundary, psychometrics-commons' measurement-product boundary, learning-record-store's bootstrap boundary, learning-interoperability-contracts' bootstrap boundary, Gyeot's measurement/wellness boundary, Orgmetra's HRIS boundary, Clearfolio's document-viewer boundary and aFIPC's legacy measurement-kernel boundary: **53/76** of the September 6 census are now audited, leaving **23** in that historical denominator. Candidates with resolved GitHub releases remain **8/53**; registry-only observations are separate and verified adoption remains zero. Earlier checkpoints below retain their observation dates. A bootstrap-only finding is not an implemented library or a classified paper.
 
 ## Scope and evidence limits
 
@@ -326,10 +326,16 @@ The public, nonfork, nonarchived repository has default `main@06633a25109c62e24a
 
 Clearfolio is a document-viewer product, not a shared ontology library. No build, runtime, package installation, private data or Zotero mutation was performed. Require an explicit released semantic contract before any relationship. This audit advances coverage to 52/76, leaving 24; resolved GitHub-release candidates remain 8/52 and verified adoption remains zero. No paper decision or approval follows.
 
+### aFIPC legacy measurement-kernel boundary audit (2026-09-08)
+
+The public, nonfork, nonarchived repository has default `master@f87c2324f1686135e57d8730c1b0b9420874f300`, `NOASSERTION` license metadata, and a complete non-truncated tree containing an R package, legacy packrat dependencies, documentation and CI/security workflows. Its README defines automated fixed-item-parameter calibration for IRT test linking and prioritizes numerical compatibility; no ontology or semantic-catalog authority is claimed. The paginated release query returned no entries.
+
+aFIPC is a measurement kernel, not a shared ontology library. Preserve it as a legacy numerical dependency candidate only after license, reproducibility and contract review; do not use its factor/linking outputs as semantic truth. No R runtime, package installation, private data or Zotero mutation was performed. This audit advances coverage to 53/76, leaving 23; resolved GitHub-release candidates remain 8/53 and verified adoption remains zero. No paper decision or approval follows.
+
 | Measure | Observation | Required next evidence |
 | --- | --- | --- |
-| Metadata census / bounded capability audit | September 6 census76; 52/52 selected candidates have exact default-head documentation, available source, tree and release-query evidence | Audit actual contracts/consumers; 24 repositories in the historical census remain unaudited at that depth. |
-| GitHub release with resolved source commit | 8/52 selected candidates, including proprietary naruon, product-domain four-pillars, Saju CalDAV and inkspan's historical release without the relevant current contracts | License, artifact/provenance and consumer conformance; a release count is not permissive-library or adoption evidence. |
+| Metadata census / bounded capability audit | September 6 census76; 53/53 selected candidates have exact default-head documentation, available source, tree and release-query evidence | Audit actual contracts/consumers; 23 repositories in the historical census remain unaudited at that depth. |
+| GitHub release with resolved source commit | 8/53 selected candidates, including proprietary naruon, product-domain four-pillars, Saju CalDAV and inkspan's historical release without the relevant current contracts | License, artifact/provenance and consumer conformance; a release count is not permissive-library or adoption evidence. |
 | Additional registry-only publication observation | ThreadWeave0.1.0 and EgressWeave0.1.0 on PyPI; not counted in the seven resolved GitHub releases | Bind the needed API and distribution to reviewed source and attestations; no package-registry completeness claim. |
 | Verified ConceptWeave adoption | 0 demonstrated in this audit | Released owner contract, exact consumer revision and passing contract/runtime evidence. |
 | Privately retained nonempty full text | 3,203/3,715 parents in the separate [capture evidence](zotero_fulltext_capture_evidence.json); 512 remain without demonstrated nonempty text | New content-bound proposals and authentic review with partial/unknown indexing. The earlier sweep's 800/1,000 abstract-missing subgroup is availability evidence, not a remeasured retained-capture subgroup. |
@@ -369,6 +375,8 @@ ContextualWisdomLab. (2026). *Gyeot* (Commit 4aa02cc83fcf16725118c228137b21dccca
 ContextualWisdomLab. (2026). *Orgmetra* (Commit eb9757f8649aaad026a9865508d9aad50c1a7a4f) [Source repository]. GitHub. https://github.com/ContextualWisdomLab/Orgmetra/tree/eb9757f8649aaad026a9865508d9aad50c1a7a4f
 
 ContextualWisdomLab. (2026). *Clearfolio* (Commit 06633a25109c62e24a7015ae04fb9f6e0a246f7e) [Source repository]. GitHub. https://github.com/ContextualWisdomLab/clearfolio/tree/06633a25109c62e24a7015ae04fb9f6e0a246f7e
+
+ContextualWisdomLab. (2026). *aFIPC* (Commit f87c2324f1686135e57d8730c1b0b9420874f300) [Source repository]. GitHub. https://github.com/ContextualWisdomLab/aFIPC/tree/f87c2324f1686135e57d8730c1b0b9420874f300
 
 ContextualWisdomLab. (2026). *Metering billing platform* (Commit ebeed33f98b34afc232eed980f41d6af9a7a445c) [Computer software]. GitHub. https://github.com/ContextualWisdomLab/metering-billing-platform/tree/ebeed33f98b34afc232eed980f41d6af9a7a445c
 
