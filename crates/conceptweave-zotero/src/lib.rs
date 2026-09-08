@@ -272,6 +272,15 @@ impl<'de> Deserialize<'de> for SourceResolutionReview {
                 "source-resolution review lacks a non-blank Zotero server identity",
             ));
         }
+        if wire
+            .resolved_sources
+            .iter()
+            .any(|resolution| resolution.server_id.as_deref() != wire.server_id.as_deref())
+        {
+            return Err(serde::de::Error::custom(
+                "source-resolution decision server identity differs from the review identity",
+            ));
+        }
         Ok(Self {
             zotero_version: wire.zotero_version,
             server_id: wire.server_id,
