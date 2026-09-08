@@ -1,6 +1,6 @@
 use conceptweave_zotero::{
-    ItemData, PendingSourceResolution, SourceResolutionDisposition, SourceResolutionReview, ZoteroItem,
-    classify_snapshot, prepare_source_resolution_review,
+    ItemData, PendingSourceResolution, SourceResolutionDisposition, SourceResolutionReview,
+    ZoteroItem, classify_snapshot, prepare_source_resolution_review,
 };
 
 fn item(key: &str, version: u64, item_type: &str) -> ZoteroItem {
@@ -38,10 +38,7 @@ fn stored_source_resolution_review_rejects_a_removed_pending_decision() {
         "10.0.1".into(),
         Some("local-server".into()),
         42,
-        vec![
-            item("NOTE", 42, "note"),
-            item("SOURCE", 41, "attachment"),
-        ],
+        vec![item("NOTE", 42, "note"), item("SOURCE", 41, "attachment")],
     );
     let review = prepare_source_resolution_review(
         &report,

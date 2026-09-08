@@ -249,9 +249,7 @@ fn source_resolution_review_json_rejects_duplicate_unsorted_or_blank_decisions()
 
     let mut blank = serialized;
     blank["resolved_sources"][0]["reason"] = serde_json::json!(" \t\n");
-    assert!(
-        serde_json::from_value::<conceptweave_zotero::SourceResolutionReview>(blank).is_err()
-    );
+    assert!(serde_json::from_value::<conceptweave_zotero::SourceResolutionReview>(blank).is_err());
 }
 
 #[test]
