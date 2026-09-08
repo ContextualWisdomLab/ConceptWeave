@@ -213,7 +213,9 @@ mod tests {
             vec![system_temp, alternate]
         );
         assert!(conventional_tmp_parent(Path::new("/definitely-missing-parent")).is_none());
-        assert!(conventional_tmp_parent(Path::new("/tmp")).is_some());
+        if Path::new("/tmp").exists() {
+            assert!(conventional_tmp_parent(Path::new("/tmp")).is_some());
+        }
         assert!(temporary_output_path(Path::new("relative")).is_ok());
         assert!(temporary_output_path(Path::new("/")).is_err());
     }
