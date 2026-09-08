@@ -348,9 +348,15 @@ mod tests {
     fn output_path_must_be_a_new_direct_temp_child() {
         let allowed = unique_temp_path("allowed");
         let _ = fs::remove_file(&allowed);
+        let expected = allowed
+            .parent()
+            .unwrap()
+            .canonicalize()
+            .unwrap()
+            .join(allowed.file_name().unwrap());
         assert_eq!(
             validate_output_path(allowed.to_str().unwrap()).unwrap(),
-            allowed
+            expected
         );
 
         assert!(validate_output_path("relative.json").is_err());
