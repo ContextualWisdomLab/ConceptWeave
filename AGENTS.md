@@ -22,6 +22,7 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - Offline full-text commands reuse the private-file boundary and pass completed-view bytes unchanged into atomic validation. Finalized files await external approval verification; no CLI command issues approval or writes Zotero.
 - Full-text writes require a complete typed review, explicit destinations and mode; finish both local validation paths before real authority verification. Keep scope bindings through opaque execution/recovery receipts. Unknown original writes cannot become empty successful rollbacks, and serialized audit files are not executable authority.
 - Persisted source-resolution wire DTOs must reject undeclared fields at every object boundary; silently discarding newer fields can turn an untrusted artifact into a falsely trusted review.
+- Source-resolution review coordinates are constructor-bound and exposed through read-only accessors; callers must not mutate aggregate fields after admission.
 - Delayed original-write observations retain the exact submitted request and complete earlier receipt; matching metadata does not prove causal completion or authorize retry/rollback.
 - Published semantic truth is immutable; correction uses supersession/new release.
 - Public Rust APIs require beginner-readable documentation.

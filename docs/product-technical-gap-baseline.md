@@ -24,7 +24,7 @@ Local API replay remains stable at 8,326 observed records, 3,715 proposals,
 with zero failures and private report digest
 `8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`.
 PR40's report-bound restoration at latest local repair head
-`d7f750644fd254a4977f137cae7cfa3b179d46a9` passes focused/all-target gates. Its
+`d7ebef510df2481a55550eed76571589c04b3ede` passes focused/all-target gates. Its
 trusted-restoration branch metric is 200/200 (100%); the owned lib.rs function
 coverage is 100% and normalized regions are 99.44%. Page-count and body-byte
 conversion now use target-width helpers; only their non-instrumented cast
@@ -153,7 +153,7 @@ the next engineering gap before protected merge.
 The write-envelope mismatch regression now exercises four stored identity
 mismatch forms and raises normalized branch coverage to 781/782 (99.87%) in
 the pinned nightly run with 115 tests. On PR40 repair head
-`d7f750644fd254a4977f137cae7cfa3b179d46a9`, the trusted-restoration coverage
+`d7ebef510df2481a55550eed76571589c04b3ede`, the trusted-restoration coverage
 rerun reports 200/200 branches (100%); lib.rs function coverage is 100% and
 normalized regions are 99.44%. Remaining gaps are two 64-bit
 cast expressions from target-width conversion helpers. The formerly environment-dependent
