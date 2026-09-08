@@ -19,7 +19,8 @@ const CAPTURE_KIND: &str = "non_atomic_fulltext_sweep_v1";
 const INVALID_EVIDENCE: FullTextError = FullTextError("full-text capture evidence is invalid");
 const BUDGET_EXCEEDED: FullTextError = FullTextError("full-text capture budget exceeded");
 const CAPTURE_DEADLINE: Duration = Duration::from_secs(300);
-const MAX_PERSISTED_CAPTURE_BYTES: u64 = 512 * 1024 * 1024;
+/// Maximum serialized size of a persisted full-text capture artifact.
+pub const MAX_PERSISTED_CAPTURE_BYTES: u64 = 512 * 1024 * 1024;
 
 /// A bounded full-text observation artifact, not an atomic snapshot or approval.
 ///
