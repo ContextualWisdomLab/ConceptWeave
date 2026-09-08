@@ -1,6 +1,6 @@
 # Product / Technical Gap Baseline
 
-**Snapshot:** 2026-09-08. Live protected-branch, PR, issue, workflow, and exact-head state overrides dated evidence. Historical detail remains traceable in Git history and the `docs/doctoring/` evidence records; this baseline keeps the current product/technical gaps and active acceptance coordinates code-current.
+**Snapshot:** 2026-09-08. Live protected-branch, PR, issue, workflow, and exact-head state overrides dated evidence. Historical detail remains traceable in Git history and the `docs/doctoring/` evidence records; this baseline keeps the current product/technical gaps and active acceptance coordinates code-current. A baseline-only commit does not self-record its own SHA because doing so would create recursive documentation churn; the live PR ref is authoritative for the exact docs successor.
 
 ## Current protected truth and active stack
 
@@ -10,8 +10,8 @@
 - Client Consumption #5: `fcf36c8a99f015b963c9f812787df127ac2e2f9e`, Draft/open. It owns provider-independent released semantic-contract admission, integrity, compatibility, diff/resolution, and supersession consumption.
 - Source Observation #6: `331f8edcd7cebb1719e5cea3187f3848ce7b9e71`, Draft/open on #5. It remains read-only source-observation evidence; source-system business truth stays with its owner.
 - Research Intake #9: live branch `feat/zotero-research-classification@b98ba39f9efa4c18c1bcdc3bcae4a8ef4f0abd41`, OPEN Draft/mergeable on Foundation. It is the canonical owner for the read-only Zotero snapshot, deterministic research classification, source inventory, and report-publication safety seams.
-- Pending-source resolution #40: `4c05fcd59aa31b70b1054c4d8b53697628530d27`, OPEN Draft/mergeable on #9. It owns the typed read-only exact-snapshot resolution aggregate and does not gain Zotero write, semantic publication, or approval authority.
-- Full-text/write/recovery terminal #39: live `8f751e71fb8e1b6c6233ff7c7e1306a92fbae43c`, OPEN Draft/mergeable on #38 `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`. Previously reported unique-repository coverage counts were withdrawn after duplicate audits and are not current KPIs.
+- Pending-source resolution #40: latest source/test checkpoint `4c05fcd59aa31b70b1054c4d8b53697628530d27`, OPEN Draft/mergeable on #9. The live #40 branch may contain only later baseline/PR-documentation descendants; PR metadata is authoritative for that exact head. #40 owns the typed read-only exact-snapshot resolution aggregate and does not gain Zotero write, semantic publication, or approval authority.
+- Full-text/write/recovery terminal #39: fresh snapshot observation `8f751e71fb8e1b6c6233ff7c7e1306a92fbae43c`, OPEN Draft/mergeable on #38 `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`. Previously reported unique-repository coverage counts were withdrawn after duplicate audits and are not current KPIs; live PR metadata wins if this independent writer advances.
 
 Predecessor review/check evidence never transfers automatically to a changed head. A queued or failed external-owner lane blocks only that acceptance lane; it is not a reason for no-op pushes, fabricated receipts, manual-dispatch-as-GREEN, self-approval, review dismissal, or gate weakening.
 
@@ -33,7 +33,7 @@ Three standalone PDFs plus one standalone note remain governed pending sources. 
 - Ordinary merge `fa8ba9c27718bc290b3c2c2c5738c3033f9f063c` preserves the concurrent RED and production repair. Local evidence recorded at that code checkpoint includes workspace/focused source-resolution tests, strict Clippy, and diff checks; owned coverage remained RED.
 - Docs checkpoint `f5b05f50696be72c85646be85d30de43ff5e34b0` records the repair. Exact test-only successor `4c05fcd59aa31b70b1054c4d8b53697628530d27` adds the direct whitespace-only stored `item_key` regression required to exercise the newly introduced deserialization branch. Production code is unchanged by that successor.
 
-Current #40 status is therefore **SOURCE_TEST_REPAIRED_PENDING_CI**, not GREEN. Exact `4c05fcd...` has no pull-request workflow run, and prior local execution cannot be transferred across the later docs/test heads. Keep the canonical review thread unresolved until one unchanged exact successor has the full Rust/coverage/hosted/independent-review evidence.
+Current #40 status is therefore **SOURCE_TEST_REPAIRED_PENDING_CI**, not GREEN. The latest source/test checkpoint `4c05fcd...` had no pull-request workflow run when checked, and prior local execution cannot be transferred across later test/docs heads. Keep the canonical review thread unresolved until one unchanged exact live successor has the full Rust/coverage/hosted/independent-review evidence.
 
 ## Quality and release gates
 
