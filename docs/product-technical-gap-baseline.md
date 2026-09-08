@@ -13,6 +13,13 @@ The report hash and exact contract metadata are recorded in [the live snapshot
 record](doctoring/zotero_live_classification_2026-09-08.md). No decisions,
 approvals or Zotero writes occurred.
 
+The bounded release-mode full-text capture then completed against that report:
+3,473 records attempted, with 3,432 HTTP 200 and 41 HTTP 404 responses. The
+235,602,798-byte `0600` artifact, capture digest, report digest and elapsed
+interval are recorded in [the private capture record](doctoring/zotero_live_fulltext_capture_2026-09-08.md).
+Content remains private evidence; no decision, approval or Zotero write was
+performed.
+
 The local Zotero endpoint is currently reachable read-only: HTTP 200, Zotero
 10.0.1, Connector/API v3, schema 44, 8,326 reported records, last-modified
 version 2, and an opaque server identity present. Only headers and aggregate
