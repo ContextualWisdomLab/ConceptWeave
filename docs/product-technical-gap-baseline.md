@@ -2,6 +2,17 @@
 
 **Snapshot:** 2026-09-08
 
+## Current exact-head checkpoint
+
+PR39 is `83851b33996cb272f21ed39f0b21b71bfdd1ef27` (OPEN/Draft/CLEAN); PR40 is
+`8a7b4a9577cf7bf62a75ba19b679c2441632c8e4` (OPEN/Draft/CLEAN). The latest
+Local API replay remains stable at 8,326 observed records, 3,715 proposals,
+4,611 unclassified records, four pending sources and 49 duplicate candidates,
+with zero failures and private report digest
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`.
+PR40's report-bound restoration passes local focused/workspace gates; hosted
+checks, owned 100% coverage and independent review remain outstanding.
+
 ## September 8 acquisition and consolidation checkpoint
 
 Nightly `2026-08-20` coverage was rerun at PR #39 exact head
