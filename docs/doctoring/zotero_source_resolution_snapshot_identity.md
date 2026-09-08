@@ -8,15 +8,19 @@ Status: `SOURCE_TEST_REPAIRED_PENDING_CI`
 
 Those fields are part of the review's immutable snapshot identity and are serialized into `SourceResolutionReview`. Accepting blank values therefore permitted a trusted review to be constructed without enough provenance to identify the Zotero/classifier snapshot that produced it.
 
-## Reality RED
+## Reality RED and evidence correction
 
-Commit `938a9154be617e2d51f724a9447208e715d0e1a2` adds `source_resolution_rejects_blank_snapshot_identity_coordinates`. On the predecessor implementation, both blank-Zotero-version and blank-rule-revision cases reach successful review construction, so the assertions are behavioral RED rather than compile-only checks.
+Commit `938a9154be617e2d51f724a9447208e715d0e1a2` was the first RED attempt, but it called `ClassificationReport::clone()` even though that type is not `Clone`. It is therefore compile-invalid evidence and must not be cited as a valid behavioral RED.
+
+To preserve TDD provenance without rebasing or force-pushing, corrected RED commit `995837726b448d13c1b88576e2124c5c4809e1a9` was created directly from the pre-repair predecessor `70e8c2e89b077c388aa3e24e5a01deb50f7f16b3`. It constructs two independent reports, mutates only `zotero_version` or `rule_revision`, and requires constructor rejection. On that predecessor, `prepare_source_resolution_review` has no admission check for either coordinate, so both assertions reach successful trusted construction and fail behaviorally.
+
+Current-tree test correction `1d2564b0f891a2340e4fe7c04eab2f715bbf887b` removes the accidental `clone()` dependency while retaining typed post-repair assertions. Ordinary two-parent integration `e5575a64f52c9ba0ae4b9b08e86c151ea99a3056` preserves corrected RED `9958377...` in ancestry while keeping the repaired current tree. No force push or destructive rebase was used.
 
 ## Causal repair
 
 Commit `7c3280ef7b8223ed685377d3861a7a22a933d2e5` adds the typed `SourceResolutionError::InvalidSnapshotIdentity` admission failure and rejects a report when either `zotero_version.trim()` or `rule_revision.trim()` is empty. No disposition, Zotero transport, publication, mutation, or approval semantics are widened.
 
-Commit `19380afd18d148d0a435849136e29afc159ca58f` pins both cases to the typed error rather than generic failure. The internal formatter branch is also covered by a dedicated unit assertion.
+Commit `19380afd18d148d0a435849136e29afc159ca58f` introduced typed assertions but still inherited the compile-invalid `clone()` setup; it is not standalone executable evidence. `1d2564b...` is the corrected current test tree. The internal formatter branch is covered by a dedicated unit assertion in the production module.
 
 ## Acceptance contract
 
