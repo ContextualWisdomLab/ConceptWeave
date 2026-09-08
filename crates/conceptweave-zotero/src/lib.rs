@@ -214,6 +214,7 @@ pub enum SourceResolutionDisposition {
 
 /// One exact-snapshot decision for a record in `pending_source_item_keys`.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct PendingSourceResolution {
     /// Stable Zotero item key.
     pub item_key: String,
@@ -235,6 +236,7 @@ pub struct PendingSourceResolution {
 
 /// Constructor-bound identity coordinates retained separately from decisions.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct PendingSourceIdentity {
     /// Stable Zotero item key.
     pub item_key: String,
@@ -266,6 +268,7 @@ pub struct SourceResolutionReview {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct StoredSourceResolutionWire {
     zotero_version: String,
     server_id: Option<String>,

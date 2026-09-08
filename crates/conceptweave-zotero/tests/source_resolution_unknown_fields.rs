@@ -1,6 +1,7 @@
 use conceptweave_zotero::{
     ItemData, PendingSourceResolution, SourceResolutionDisposition, SourceResolutionRestoreError,
-    ZoteroItem, classify_snapshot, prepare_source_resolution_review, restore_source_resolution_review,
+    ZoteroItem, classify_snapshot, prepare_source_resolution_review,
+    restore_source_resolution_review,
 };
 
 fn pending_item() -> ZoteroItem {
@@ -19,10 +20,7 @@ fn pending_item() -> ZoteroItem {
     }
 }
 
-fn valid_review_json() -> (
-    conceptweave_zotero::ClassificationReport,
-    serde_json::Value,
-) {
+fn valid_review_json() -> (conceptweave_zotero::ClassificationReport, serde_json::Value) {
     let report = classify_snapshot(
         "10.0.1".into(),
         Some("local-server".into()),
@@ -49,10 +47,7 @@ fn valid_review_json() -> (
     )
 }
 
-fn assert_invalid(
-    report: &conceptweave_zotero::ClassificationReport,
-    value: serde_json::Value,
-) {
+fn assert_invalid(report: &conceptweave_zotero::ClassificationReport, value: serde_json::Value) {
     let stored = serde_json::to_vec(&value).expect("stored value must serialize");
     assert!(matches!(
         restore_source_resolution_review(report, &stored),
