@@ -433,6 +433,8 @@ pub enum SourceResolutionError {
     BlankReason(String),
     /// The report's pending key is absent from its retained inventory.
     MissingInventory(String),
+    /// The report pending-key sequence is not unique and canonical.
+    InvalidPendingKeySet,
     /// The report does not carry a non-blank Local API server identity.
     MissingServerIdentity,
 }
@@ -456,6 +458,12 @@ impl fmt::Display for SourceResolutionError {
                 formatter,
                 "pending source is absent from report inventory: {key}"
             ),
+            Self::InvalidPendingKeySet => {
+                write!(
+                    formatter,
+                    "report pending source keys are not unique and canonical"
+                )
+            }
             Self::MissingServerIdentity => {
                 write!(formatter, "report lacks a non-blank Zotero server identity")
             }
@@ -476,6 +484,14 @@ pub fn prepare_source_resolution_review(
         .is_none_or(|server_id| server_id.trim().is_empty())
     {
         return Err(SourceResolutionError::MissingServerIdentity);
+    }
+    let mut canonical_pending_keys = report.pending_source_item_keys.clone();
+    canonical_pending_keys.sort();
+    canonical_pending_keys.dedup();
+    if canonical_pending_keys.len() != report.pending_source_item_keys.len()
+        || canonical_pending_keys != report.pending_source_item_keys
+    {
+        return Err(SourceResolutionError::InvalidPendingKeySet);
     }
     let pending: BTreeMap<_, _> = report
         .pending_source_item_keys
