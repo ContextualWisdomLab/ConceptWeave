@@ -21,6 +21,7 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - Coverage reports must distinguish raw LLVM instantiations from the repository's normalized owner function/region/branch gate; never report raw gaps as green or suppress them to manufacture 100%.
 - Visual Zotero item counts are presentation evidence only; reconcile them with the Local API snapshot and classify attachments before claiming a complete research population.
 - Once a report is atomically published, cleanup failure must preserve the final artifact; never roll back by deleting a successfully published path.
+- Post-publication cleanup errors must retain the original I/O kind while adding enough context to distinguish an already-published report from a pre-publication failure.
 - Published semantic truth is immutable; correction uses supersession/new release.
 - Public Rust APIs require beginner-readable documentation.
 - Owned production coverage target is 100% line/function/region/branch where tooling exposes it.
