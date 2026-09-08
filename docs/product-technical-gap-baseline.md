@@ -178,6 +178,17 @@ interval are recorded in [the private capture record](doctoring/zotero_live_full
 Content remains private evidence; no decision, approval or Zotero write was
 performed.
 
+### September 9 07:31 live worksheet preparation
+
+The release-mode `--worksheet` command read the same live Local API snapshot and
+created separate owner-only report and steward-worksheet artifacts. The report
+digest remained `8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`;
+the worksheet artifact digest was
+`b6774b8a6b3202c1ed627f00066939377aa1df543947ad82d63e206f8785290e`.
+Both temporary private artifacts were removed after aggregate verification.
+This prepares the steward campaign but adds no decision, approval or Zotero
+write authority.
+
 ### September 9 PR35 central workflow failure revalidation
 
 PR35 exact head `22709ec9b4d969bf67ec74db402813e74d11f7ca` remains blocked by
