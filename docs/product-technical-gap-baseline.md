@@ -1,6 +1,6 @@
 # Product / Technical Gap Baseline
 
-**Snapshot:** 2026-09-07
+**Snapshot:** 2026-09-08
 
 ## September 8 acquisition and consolidation checkpoint
 
@@ -22,7 +22,7 @@ identity branches at source line 147-150. The subsequent nightly run executes
 `resolved_sources` equality arm, while raw generic instantiation gaps remain
 separately visible. The 100% gate is still RED.
 
-At current PR #39 head `c91a1bd82c3aa4031e65de2ae15abc042f2f0add`, Rust 1.98
+At current PR #39 head `89fb6c48e1208a9fa272a7c9313e0cca0a2493ae`, Rust 1.98
 workspace tests, all-target strict Clippy, warnings-denied rustdoc and diff
 checks were rerun after the evidence-only capture update and passed. This
 revalidates local code health only; the owned 100% coverage gate, hosted
@@ -48,6 +48,13 @@ At 21:13 KST a fresh bounded capture also completed without mutation. The
 `sha256:043e10f117fa8050fa85c2013c1fa5343a247629d533bc6fa0ce11266c165166`;
 the repeated availability counts are unchanged and remain non-authoritative
 for semantic review or Zotero writes.
+
+At 22:13 KST a second release-mode replay produced the same private report
+digest and aggregate counts; this confirms repeatable observation, not review
+or authority. The latest PR35 CodeQL dispatch run `34208633449` is terminal
+failure for the exact PR head after the shared queue completed; Noema remains
+HTTP 429 and OpenCode still lacks an authenticated current-head verdict. These
+are central control-plane gates, not leaf ontology or Zotero defects.
 
 ### PR #39 full-text write source binding checkpoint (2026-09-08)
 
