@@ -782,6 +782,30 @@ fn full_text_write_rejects_invalid_nested_source_resolution_before_authority() {
 }
 
 #[test]
+fn full_text_write_rejects_each_stored_source_resolution_envelope_mismatch() {
+    for mismatch in 0..4 {
+        let report = report_fixture();
+        let capture = capture_with(&report, 4096, &mut |request_path, _| {
+            Ok(response_fixture(request_path))
+        })
+        .unwrap();
+        let mut scope = write_scope_fixture(&report, &capture);
+        let review = scope.source_resolution_review.as_mut().unwrap();
+        match mismatch {
+            0 => review.zotero_version.push_str("-other"),
+            1 => review.server_id = Some("other-server".into()),
+            2 => review.library_version += 1,
+            3 => review.rule_revision.push_str("-other"),
+            _ => unreachable!(),
+        }
+        assert!(
+            build_full_text_write_plan(&report, &capture, scope, |_| true, |_| true).is_err(),
+            "mismatch {mismatch} was accepted"
+        );
+    }
+}
+
+#[test]
 fn full_text_write_validates_both_inputs_before_either_authority() {
     for scenario in 0..7 {
         let report = report_fixture();

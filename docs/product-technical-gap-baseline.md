@@ -15,6 +15,13 @@ weakening were applied. The earlier stable-toolchain attempt failed before
 measurement because branch coverage requires nightly and is not evidence for
 the gate.
 
+The focused write-envelope mismatch successor exercises the four top-level
+identity branches at source line 147-150. The subsequent nightly run executes
+115 tests and raises normalized branch coverage to 4,718/4,739 regions and
+781/782 branches (99.87%); the remaining normalized branch is the reordered
+`resolved_sources` equality arm, while raw generic instantiation gaps remain
+separately visible. The 100% gate is still RED.
+
 At current PR #39 head `c91a1bd82c3aa4031e65de2ae15abc042f2f0add`, Rust 1.98
 workspace tests, all-target strict Clippy, warnings-denied rustdoc and diff
 checks were rerun after the evidence-only capture update and passed. This
