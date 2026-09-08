@@ -52,6 +52,13 @@ resolved review threads and seven central workflows, while prohibiting deletion
 and non-fast-forward updates. No Ready transition, protected merge or release
 is authorized by this observation.
 
+The CodeRabbit temporary-cleanup P2 was independently replayed against that same
+PR40 tree with `cargo +1.98.0 test -p conceptweave-zotero
+report_write_removes_temporary_file_when_hard_link_fails`; the targeted test
+passed. It asserts the operation-specific temporary prefix is absent after the
+induced link failure, so deleting the cleanup would fail the test. The finding
+is stale; no source change or authority expansion is warranted.
+
 ## September 8 acquisition and consolidation checkpoint
 
 Nightly `2026-08-20` coverage was rerun at PR #39 exact head
