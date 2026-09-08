@@ -76,3 +76,13 @@ shapes validation, including SHACL and ShEx). The scan did not install, copy,
 publish or adopt any candidate. Release/license/provenance, conformance,
 performance and ACL-boundary checks remain prerequisites; these libraries do
 not supply ConceptWeave semantic authority or Zotero steward decisions.
+
+## Signal breakdown continuity checkpoint (2026-09-09)
+
+The same release-mode replay (`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`)
+was projected into a separate private aggregate (`0600`, SHA-256
+`2edc6d86f9d4ea7ae745340754d7d28aaf9925551803bc2390ad2b23e31d4a0c`).
+Case-insensitive title/phrase counts are: `ontology` 27/32, `semantic` 36/0,
+`taxonomy` 2/0, `knowledge graph` 1/2, `linked data` 1/1 and `vocab` 81/0.
+These are overlapping discovery signals, not additive paper counts or
+dispositions; no full-text decision, authority or Zotero mutation occurred.

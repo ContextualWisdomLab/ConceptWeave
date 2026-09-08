@@ -1541,3 +1541,12 @@ and Rudof `master@275d01ffc29c89656f3bcb61d66e9bba86671f6d` and
 repository metadata differ in scope or declared license, so no adoption or
 utility repository is authorized. Conformance, performance, security and
 exact-consumer tests remain open gates.
+
+### September 9 ontology signal breakdown
+
+The byte-identical release replay was also projected into a private aggregate
+(`2edc6d86f9d4ea7ae745340754d7d28aaf9925551803bc2390ad2b23e31d4a0c`).
+Case-insensitive title/phrase counts were `ontology` 27/32, `semantic` 36/0,
+`taxonomy` 2/0, `knowledge graph` 1/2, `linked data` 1/1 and `vocab` 81/0.
+Signals overlap and are not additive classifications; this remains discovery
+evidence without steward disposition or Zotero write authority.
