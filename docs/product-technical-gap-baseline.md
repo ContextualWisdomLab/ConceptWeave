@@ -1526,3 +1526,6 @@ capture identity remains `sha256:106ca65ab62151f303c5807ecceb271c0bec953f091426f
 38 captured-empty, 471 needing-review-without-text and two unbound-nonempty
 records. This verifies the capture envelope and availability denominator only;
 it does not supply steward decisions or write authority.
+### September 9 PR40 coverage repair checkpoint
+
+At PR40 exact head `a860938`, the two test-only branch gaps in `crates/conceptweave-zotero/src/main.rs` were removed without changing production behavior: the platform `/tmp` existence guard became a direct assertion, and the `matches!` error-kind guard became an `unwrap_err().kind()` assertion. Rust 1.98 formatting and the complete locked workspace test/doc-test suite passed. The normalized branch aggregate is now 208/208 (100%), while the raw owned gate remains RED at functions 208/211, lines 1884/1903, regions 2984/3025, and branches 204/208; source-region gaps remain in `lib.rs` and `main.rs`. PR40 therefore remains Draft pending the remaining owned coverage repair and protected hosted evidence.

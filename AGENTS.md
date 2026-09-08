@@ -77,3 +77,6 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - Automated review comments are evidence tied to their reviewed commit, not evergreen instructions; re-read the current exact head before fixing or closing a finding, and record stale-finding corrections without claiming approval.
 - Pending-source admission must reject ambiguous retained inventory rather than silently taking the first match; preserve the typed failure and regression before any trusted review aggregate is built.
 - A green workspace test run does not satisfy the owned coverage gate; retain raw and normalized per-file/branch deficits as RED evidence and repair tests or documented platform seams without lowering thresholds.
+### Reusable coverage lesson
+
+When a coverage gate exposes test-only branches, remove unreachable platform guards or branchy assertion wrappers only when the behavioral assertion remains equivalent. Re-run both the full locked suite and the frozen coverage script; normalized branch recovery does not satisfy the raw repository gate when source functions, lines, or regions remain uncovered.
