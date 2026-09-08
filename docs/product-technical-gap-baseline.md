@@ -5,15 +5,15 @@
 ## Current exact-head checkpoint
 
 PR39 is `7a713020012dc92c2cdbc2a9e6a09c9d2a17fe64` (OPEN/Draft/CLEAN); PR40 is
-`8445cbb6ce5fc6988ab4609d290685ddb2fd3f01` (OPEN/Draft/CLEAN). The latest
+`75f69c4c4ca950151d95682b7e75b31c7293ce97` (OPEN/Draft/CLEAN). The latest
 Local API replay remains stable at 8,326 observed records, 3,715 proposals,
 4,611 unclassified records, four pending sources and 49 duplicate candidates,
 with zero failures and private report digest
 `8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`.
 PR40's report-bound restoration passes local focused/workspace gates. Its
-owner branch coverage is 201/202 (99.50%); the only remaining branch is an
-environment-dependent `/tmp` canonicalization failure. Hosted checks, the
-owned 100% coverage target and independent review remain outstanding.
+trusted-restoration branch metric is 200/200 (100%); the broader normalized
+region target remains below 100%. Hosted checks, the owned region target and
+independent review remain outstanding.
 
 ## September 8 acquisition and consolidation checkpoint
 
@@ -114,7 +114,7 @@ source against the immutable report before any authority callback. Missing and
 stale source-resolution regressions pass in the locked Rust 1.98 workspace;
 Clippy, warnings-denied rustdoc and diff checks also pass. GitHub reports OPEN
 Draft/CLEAN with CodeRabbit skipped because the PR remains a draft. PR #40's
- current exact head is `8445cbb6ce5fc6988ab4609d290685ddb2fd3f01`; the latest
+ current exact head is `75f69c4c4ca950151d95682b7e75b31c7293ce97`; the latest
 successor records the report-bound restoration repair and its unchanged-head
 evidence. Direct trusted-type deserialization is removed, and coordinated
 rewrites fail closed against the immutable `ClassificationReport`. The trusted
@@ -137,11 +137,10 @@ the next engineering gap before protected merge.
 The write-envelope mismatch regression now exercises four stored identity
 mismatch forms and raises normalized branch coverage to 781/782 (99.87%) in
 the pinned nightly run with 115 tests. On PR40 repair head
-`8445cbb6ce5fc6988ab4609d290685ddb2fd3f01`, the trusted-restoration coverage
-rerun reports 201/202 branches (99.50%); one
-remaining branch is the environment-dependent `/tmp` canonicalization
-failure; the other formerly reported branch was removed as unreachable after
-prior wire checks. No exclusions or threshold changes were introduced.
+`75f69c4c4ca950151d95682b7e75b31c7293ce97`, the trusted-restoration coverage
+rerun reports 200/200 branches (100%). The formerly environment-dependent
+`/tmp` test branch is now deterministic; broader normalized region gaps remain
+and no exclusions or threshold changes were introduced.
 
 The [refreshed capture checkpoint](doctoring/refreshed_capture_evidence.md) now records successful optimized full-library capture, verified 3,715-row blank worksheet, a 25-row bound view, and full workspace tests at `b0f7d5b8bb139d627cec37b598331464c14b60ab` (terminal exit 0). Actual decisions and approvals remain zero. The CO owner freshly reports no GitHub release or PyPI package, unmerged release PR #1030 and unmerged diagnostic PR #1105. Its stated prerequisites are protected exact-head checks/independent review, fast-mlsirm publication, immutable CO client/schema release, and verified classification serving. This is owner-reported release status, not locally verified registry evidence. Available secret metadata is not the blocker. Do not send private paper contents or substitute a direct provider while these conditions remain unmet.
 
