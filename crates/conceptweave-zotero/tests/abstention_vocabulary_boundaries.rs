@@ -48,3 +48,11 @@ fn wholly_non_ascii_alphabetic_metadata_remains_explicitly_unsupported() {
         Some(AbstentionReason::UnsupportedRuleVocabulary)
     );
 }
+
+#[test]
+fn punctuation_only_metadata_is_not_unsupported_vocabulary() {
+    assert_eq!(
+        abstention_reason("---", "!!!"),
+        Some(AbstentionReason::NoDeterministicRuleMatch)
+    );
+}
