@@ -4,6 +4,8 @@
 
 ## September 7 remaining execution and acquisition gates
 
+The [Orgmetra HRIS boundary audit](doctoring/cwl_ontology_capability_inventory.md#orgmetra-hris-boundary-audit-2026-09-08) advances bounded candidate coverage to 51/76, leaving 25. Protected default `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f` is Apache-2.0 with substantial HRIS packages and contracts, but explicitly assigns occupation/skill/ability ontology to Semantic Data Portal; no release exists. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
 The [Gyeot measurement/wellness boundary audit](doctoring/cwl_ontology_capability_inventory.md#gyeot-measurementwellness-boundary-audit-2026-09-08) advances bounded candidate coverage to 50/76, leaving 26. Protected default `develop@4aa02cc83fcf16725118c228137b21dcccae8900` is MIT with an implemented Expo/TypeScript app and research notes, but it owns loneliness/wellness meaning and has no release; research notes are not shared semantic authority. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
 
 The [learning-interoperability-contracts bootstrap boundary audit](doctoring/cwl_ontology_capability_inventory.md#learning-interoperability-contracts-bootstrap-boundary-audit-2026-09-08) advances bounded candidate coverage to 49/76, leaving 27. Protected default `develop@ba2948de245448eab739329f1131a36b4e59a54d` contains only a bootstrap README; no released learning interoperability contract exists. Learning event/record semantics remain Learning Platform-owned, not shared ontology authority. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
