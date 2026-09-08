@@ -19,3 +19,17 @@ Follow-up verification completed: release library suite 18076 exited 0, 108 pass
 Full workspace verification subsequently completed at `b0f7d5b8bb139d627cec37b598331464c14b60ab`: `rustup run 1.98.0 cargo test --release --workspace --locked --quiet`, session 10400, terminal exit 0. This includes CLI/integration suites and doctests; no aggregate count is asserted because intermediate displayed output was truncated. Hosted required checks, approval and deployment remain separate.
 
 The new 25-row bound review view also completed (session 19376, exit 0), retaining the new capture digest and all 3,715 remaining decisions. The 1,590,859-byte output is mode 0600. No decision was supplied or applied.
+
+## Acquisition denominator
+
+Read-only aggregation of this exact report/capture pair found 3,473 captured records: 3,432 HTTP 200 (3,428 nonempty and four empty content values) and 41 HTTP 404. Traversing `snapshot_items` parent links to paper proposals, with cycle/missing-parent rejection, associates nonempty text with 3,203 distinct papers; two nonempty records have no paper ancestor. These are availability counts, not completeness or review claims.
+
+The 512 papers without demonstrated nonempty captured text split into mutually exclusive acquisition queues:
+
+| Queue | Papers | Next investigation |
+| --- | ---: | --- |
+| No attachment ancestor linkage in report | 440 | Resolve authoritative full-text source and attachment acquisition rights |
+| Attachment exists, no linked capture record | 34 | Inspect attachment type and Local API full-text manifest eligibility; do not assume missing files |
+| Capture record exists, no nonempty content | 38 | Inspect empty/failure response and indexing state without inferring completion from page counters |
+
+Checks: 440 + 34 + 38 = 512; 512 + 3,203 = 3,715. Captured response counts do not substitute for unique paper counts. Queries ran locally and emitted aggregates only; no item or capture was modified. The capture is a bounded sweep, not a newly authenticated or atomic provider snapshot.
