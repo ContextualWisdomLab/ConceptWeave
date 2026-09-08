@@ -178,6 +178,15 @@ interval are recorded in [the private capture record](doctoring/zotero_live_full
 Content remains private evidence; no decision, approval or Zotero write was
 performed.
 
+The pinned release executable was rerun against the live Local API on 2026-09-09.
+The private `0600` report `/tmp/conceptweave-zotero-live-20260909-latest.json`
+is 8,132,756 bytes with SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc` and repeats
+8,326 observed records, 3,715 classified proposals, 4,611 unclassified records,
+four pending source keys and 49 duplicate candidates under Zotero 10.0.1/API 3,
+schema 44 and library version 2. This is read-only proposal evidence; no review,
+approval or Zotero write occurred.
+
 From the unchanged private pair, the release-mode CLI created a blank
 capture-bound worksheet and a 25-row `full_text_review_view_v1` without another
 provider request. Their private hashes, sizes and exact report/capture binding

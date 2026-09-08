@@ -77,3 +77,15 @@ zero failures. Case-insensitive title signals are ontology 27, semantic 36,
 taxonomy 2, knowledge graph 1 and vocabulary stem 81; exact uppercase `OWL`
 and `RDF` counts are 23 and 20. These are discovery/repeatability metrics only;
 no review, approval or Zotero write occurred.
+
+## Fresh replay checkpoint (2026-09-09 latest local verification)
+
+The pinned release executable was rerun against the live loopback Local API in
+read-only mode. It wrote `/tmp/conceptweave-zotero-live-20260909-latest.json`
+with mode `0600` and size 8,132,756 bytes; SHA-256 remains
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`.
+The report observed 8,326 records, classified 3,715 proposals, retained 4,611
+unclassified records, four pending source keys and 49 duplicate candidates.
+The bound contract is Zotero 10.0.1, Local API 3, schema 44 and library version
+2. This is repeatable local proposal evidence only; no review, approval or
+Zotero write occurred.
