@@ -11,6 +11,14 @@ abstentions, 49 duplicate candidates and zero failures. The private `0600`
 report digest is `sha256:8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`;
 equal aggregates are not review, approval or Zotero-write evidence.
 
+At 21:11 KST the same report/capture pair passed the bound availability
+recheck: 3,203/3,715 papers have nonempty text; 440 lack attachments, 34 have
+unmanifested attachments, 38 have captured records with no text, and 471
+review-needing papers lack text. Two nonempty records remain unbound. The
+private summary digest is
+`sha256:2168d1856188ad6aee50454c50401d4096cace74485e4b1b6c5ffbcbf99a0364`;
+these counts are acquisition evidence only.
+
 ### PR #39 full-text write source binding checkpoint (2026-09-08)
 
 The release-mode Rust CLI also produced a fresh read-only Local API report at

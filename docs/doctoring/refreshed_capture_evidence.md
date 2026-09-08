@@ -1,5 +1,16 @@
 # Refreshed private capture evidence
 
+## Current bound availability replay (21:11 KST)
+
+Using the fresh report and unchanged capture, the release CLI revalidated the
+bound availability summary without mutation. Of 3,715 papers, 3,203 have
+nonempty text; 440 have no attachment, 34 have an unmanifested attachment and
+38 have captured records with no text. 471 papers needing review lack text,
+and two nonempty records remain unbound. The private `0600` summary is
+`/tmp/conceptweave-fulltext-availability-20260908-211118.json` with SHA-256
+`2168d1856188ad6aee50454c50401d4096cace74485e4b1b6c5ffbcbf99a0364`.
+These are acquisition denominators, not review or semantic-authority results.
+
 September 8, 2026; source `4324400733f262a0d575e3bd6d5c40258fc44f18`. No Zotero writes, labels or approvals were issued.
 
 The complete metadata read (session 70446, exit 0) produced 8,326 observed records, 3,715 paper proposals and four pending sources. Report SHA-256: `8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`. The owner-only report is 8,132,756 bytes, outside the repository. Its snapshot digest is `sha256:0666dbebfb0c5aa99deb5a6dda1fc02d84bc46d08aaaddf25f5526a18eceef6d`.
