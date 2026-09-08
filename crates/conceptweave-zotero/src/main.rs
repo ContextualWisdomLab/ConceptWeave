@@ -97,15 +97,10 @@ fn write_report<T: serde::Serialize>(
     let file = open_new_output(&temporary)?;
     let mut writer = BufWriter::new(file);
 
-    if let Err(error) = serde_json::to_writer_pretty(&mut writer, report) {
+    if let Err(error) = serialize_report(&mut writer, report) {
         drop(writer);
         let _ = fs::remove_file(&temporary);
-        return Err(error.into());
-    }
-    if let Err(error) = writer.flush() {
-        drop(writer);
-        let _ = fs::remove_file(&temporary);
-        return Err(error.into());
+        return Err(error);
     }
     drop(writer);
 
@@ -113,16 +108,36 @@ fn write_report<T: serde::Serialize>(
         let _ = fs::remove_file(&temporary);
         return Err(error.into());
     }
-    if let Err(cleanup_error) = fs::remove_file(&temporary) {
-        if let Err(rollback_error) = fs::remove_file(output) {
-            return Err(io::Error::other(format!(
-                "report published but temporary cleanup failed ({cleanup_error}); rollback also failed ({rollback_error})"
-            ))
-            .into());
-        }
-        return Err(cleanup_error.into());
-    }
+    cleanup_published_report(&temporary, output, |path| fs::remove_file(path)).map_err(Into::into)
+}
+
+fn serialize_report<W: Write, T: serde::Serialize>(
+    writer: &mut W,
+    report: &T,
+) -> Result<(), Box<dyn std::error::Error>> {
+    serde_json::to_writer_pretty(&mut *writer, report)?;
+    writer.flush()?;
     Ok(())
+}
+
+fn cleanup_published_report<F>(
+    temporary: &Path,
+    output: &Path,
+    mut remove_file: F,
+) -> io::Result<()>
+where
+    F: FnMut(&Path) -> io::Result<()>,
+{
+    let cleanup_error = match remove_file(temporary) {
+        Ok(()) => return Ok(()),
+        Err(error) => error,
+    };
+    if let Err(rollback_error) = remove_file(output) {
+        return Err(io::Error::other(format!(
+            "report published but temporary cleanup failed ({cleanup_error}); rollback also failed ({rollback_error})"
+        )));
+    }
+    Err(cleanup_error)
 }
 
 fn run_with<I, F>(
@@ -165,6 +180,18 @@ mod tests {
             Err(<S::Error as serde::ser::Error>::custom(
                 "intentional serialization failure",
             ))
+        }
+    }
+
+    struct FlushFailWriter;
+
+    impl Write for FlushFailWriter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Err(io::Error::other("intentional flush failure"))
         }
     }
 
@@ -324,6 +351,52 @@ mod tests {
     }
 
     #[test]
+    fn report_serialization_propagates_flush_failures() {
+        let mut writer = FlushFailWriter;
+        assert!(serialize_report(&mut writer, &serde_json::json!({"state": "complete"})).is_err());
+    }
+
+    #[test]
+    fn report_write_removes_temporary_file_when_hard_link_fails() {
+        let output = env::temp_dir().join(format!("conceptweave-zotero-{}-directory", std::process::id()));
+        let _ = fs::remove_dir(&output);
+        fs::create_dir(&output).unwrap();
+        assert!(write_report(&output, &serde_json::json!({"state": "complete"})).is_err());
+        assert!(output.is_dir());
+        fs::remove_dir(output).unwrap();
+    }
+
+    #[test]
+    fn published_report_cleanup_rolls_back_and_reports_both_failures() {
+        let temporary = Path::new("temporary.json");
+        let output = Path::new("output.json");
+        let mut calls = 0;
+        let result = cleanup_published_report(temporary, output, |_| {
+            calls += 1;
+            Err(io::Error::other(format!("failure {calls}")))
+        });
+        assert!(result.unwrap_err().to_string().contains("rollback also failed"));
+        assert_eq!(calls, 2);
+    }
+
+    #[test]
+    fn published_report_cleanup_reports_the_original_error_after_successful_rollback() {
+        let temporary = Path::new("temporary.json");
+        let output = Path::new("output.json");
+        let mut calls = 0;
+        let result = cleanup_published_report(temporary, output, |_| {
+            calls += 1;
+            if calls == 1 {
+                Err(io::Error::other("cleanup failure"))
+            } else {
+                Ok(())
+            }
+        });
+        assert_eq!(result.unwrap_err().to_string(), "cleanup failure");
+        assert_eq!(calls, 2);
+    }
+
+    #[test]
     fn complete_report_is_published_once() {
         use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -373,14 +446,12 @@ mod tests {
             .is_err()
         );
 
-        if Path::new("/tmp").is_dir() {
-            let conventional = Path::new("/tmp").join(format!(
-                "conceptweave-zotero-{}-conventional.json",
-                std::process::id()
-            ));
-            let _ = fs::remove_file(&conventional);
-            assert!(validate_output_path(conventional.to_str().unwrap()).is_ok());
-        }
+        let conventional = Path::new("/tmp").join(format!(
+            "conceptweave-zotero-{}-conventional.json",
+            std::process::id()
+        ));
+        let _ = fs::remove_file(&conventional);
+        assert!(validate_output_path(conventional.to_str().unwrap()).is_ok());
 
         let nested_dir =
             env::temp_dir().join(format!("conceptweave-zotero-{}-nested", std::process::id()));
