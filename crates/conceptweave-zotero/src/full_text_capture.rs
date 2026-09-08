@@ -445,7 +445,7 @@ fn check_admission(remaining: u64, elapsed: Duration) -> Result<(), FullTextErro
 
 fn check_deadline(elapsed: Duration) -> Result<(), FullTextError> {
     if elapsed >= CAPTURE_DEADLINE {
-        Err(BUDGET_EXCEEDED)
+        Err(FullTextError("full-text capture deadline exceeded"))
     } else {
         Ok(())
     }
