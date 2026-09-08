@@ -1606,6 +1606,16 @@ The current Local API replay observes 3,715 bibliographic items and projects
 This measures triage workload only; it does not estimate ontology precision or
 recall and does not imply full-text review, approval or publication authority.
 
+### September 9 live Local API contract probe
+
+A secret-safe read-only probe against `http://127.0.0.1:23119/api/users/0/items`
+with `Zotero-API-Version: 3` returned HTTP 200 and contract headers for Zotero
+10.0.1, Connector API 3, schema 44, total results 8,326 and
+`Last-Modified-Version: 2`. The server-instance identifier was deliberately
+not recorded. The response contained one bounded item and no mutation; these
+headers confirm transport continuity only, not review, approval or write
+authority.
+
 ### September 9 06:31 live Local API replay
 
 Zotero 10.0.1 was observed listening on loopback port 23119. The pinned Rust

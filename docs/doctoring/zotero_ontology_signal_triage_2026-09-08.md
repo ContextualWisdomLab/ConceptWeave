@@ -138,3 +138,11 @@ separate `0600` availability summary (359 bytes; SHA-256
 38 captured-empty, 471 needing-review-without-text and two unbound-nonempty
 records. This confirms the capture envelope and acquisition denominator only;
 no steward decision, approval or Zotero write occurred.
+
+## Live Local API contract probe (2026-09-09)
+
+A secret-safe read-only loopback probe using API v3 returned HTTP 200 with
+Zotero 10.0.1, Connector API 3, schema 44, total results 8,326 and library
+version 2. The server-instance identifier was not retained. The bounded
+response contained one item and no mutation; this verifies provider contract
+continuity only, not classification or write authority.
