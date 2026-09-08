@@ -4,7 +4,15 @@
 
 ## Current exact-head checkpoint
 
-PR39 is `7a713020012dc92c2cdbc2a9e6a09c9d2a17fe64` (OPEN/Draft/CLEAN); PR40 is
+At 23:17 KST a fresh release-mode Local API replay completed read-only with
+the same private `0600` digest
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`:
+8,326 observed records, 3,715 proposals, 4,611 unclassified records, four
+pending sources, 49 duplicate candidates and zero failures. Equal output is
+repeatability evidence only; it does not establish review, approval or a
+Zotero write.
+
+PR39 is `0511e7dc29811fb26ef3e3fa39be5ff779299869` (OPEN/Draft/CLEAN); PR40 is
 `ab382c30bd11d66b5f26fb445e344f12f8953883` (OPEN/Draft/CLEAN). The latest
 Local API replay remains stable at 8,326 observed records, 3,715 proposals,
 4,611 unclassified records, four pending sources and 49 duplicate candidates,
@@ -107,7 +115,7 @@ counts were retained in [the readiness record](doctoring/zotero_local_api_readin
 no item JSON was copied. This is endpoint readiness, not an atomic capture,
 decision, approval, write, release or deployment.
 
-PR #39 now points to exact head `7a713020012dc92c2cdbc2a9e6a09c9d2a17fe64`
+PR #39 now points to exact head `0511e7dc29811fb26ef3e3fa39be5ff779299869`
 over stacked base `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`. The write scope
 requires a complete source-resolution aggregate and revalidates every pending
 source against the immutable report before any authority callback. Missing and
