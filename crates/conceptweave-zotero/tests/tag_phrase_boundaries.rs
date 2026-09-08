@@ -14,9 +14,7 @@ fn item_with_tags(tags: &[&str]) -> ZoteroItem {
             collections: vec![],
             tags: tags
                 .iter()
-                .map(|tag| ItemTag {
-                    tag: (*tag).into(),
-                })
+                .map(|tag| ItemTag { tag: (*tag).into() })
                 .collect(),
         },
     }
@@ -32,8 +30,16 @@ fn separate_tags_do_not_synthesize_a_multiword_rule_phrase() {
     );
 
     let classified = &report.classified_items[0];
-    assert_eq!(classified.proposed_disposition, Disposition::AdjacentEvidence);
-    assert!(!classified.evidence.matched_phrases.contains(&"ontology alignment"));
+    assert_eq!(
+        classified.proposed_disposition,
+        Disposition::AdjacentEvidence
+    );
+    assert!(
+        !classified
+            .evidence
+            .matched_phrases
+            .contains(&"ontology alignment")
+    );
 }
 
 #[test]
@@ -51,10 +57,19 @@ fn one_tag_containing_the_complete_phrase_still_matches_exactly() {
         Disposition::AlignmentVersioning
     );
     assert_eq!(
-        classified.evidence.field_values.get("tags").map(String::as_str),
+        classified
+            .evidence
+            .field_values
+            .get("tags")
+            .map(String::as_str),
         Some("ontology alignment")
     );
-    assert!(classified.evidence.matched_phrases.contains(&"ontology alignment"));
+    assert!(
+        classified
+            .evidence
+            .matched_phrases
+            .contains(&"ontology alignment")
+    );
 }
 
 #[test]

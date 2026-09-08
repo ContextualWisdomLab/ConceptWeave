@@ -277,9 +277,7 @@ fn production_transport_helpers_remain_in_owned_coverage() {
         "header_string",
         "optional_header",
     ] {
-        let excluded = format!(
-            "#[cfg_attr(coverage_nightly, coverage(off))]\nfn {function}"
-        );
+        let excluded = format!("#[cfg_attr(coverage_nightly, coverage(off))]\nfn {function}");
         assert!(
             !source.contains(&excluded),
             "production Local API helper {function} is still excluded from owned coverage"

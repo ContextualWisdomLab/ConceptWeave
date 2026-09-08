@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-use conceptweave_zotero::{read_local_snapshot, ClassificationReport, ReadError};
+use conceptweave_zotero::{ClassificationReport, ReadError, read_local_snapshot};
 use std::env;
 use std::fs::{self, OpenOptions};
 use std::io::{self, BufWriter, Write};
@@ -51,7 +51,10 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
         ));
     }
     let file_name = path.file_name().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidInput, "report output has no file name")
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "report output has no file name",
+        )
     })?;
     let resolved_path = resolved_parent.join(file_name);
     if fs::symlink_metadata(&resolved_path).is_ok() {
@@ -78,7 +81,10 @@ fn temporary_output_path(output: &Path) -> io::Result<PathBuf> {
     static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     let file_name = output.file_name().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidInput, "report output has no file name")
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "report output has no file name",
+        )
     })?;
     let nonce = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
     Ok(output.with_file_name(format!(
@@ -133,10 +139,7 @@ where
     })
 }
 
-fn run_with<I, F>(
-    args: I,
-    read_snapshot: F,
-) -> Result<(), Box<dyn std::error::Error>>
+fn run_with<I, F>(args: I, read_snapshot: F) -> Result<(), Box<dyn std::error::Error>>
 where
     I: IntoIterator<Item = String>,
     F: FnOnce() -> Result<ClassificationReport, ReadError>,
@@ -227,8 +230,7 @@ mod tests {
         ];
 
         run_with(args, || Ok(sample_report("10.0.1"))).unwrap();
-        let saved: serde_json::Value =
-            serde_json::from_slice(&fs::read(&output).unwrap()).unwrap();
+        let saved: serde_json::Value = serde_json::from_slice(&fs::read(&output).unwrap()).unwrap();
         assert_eq!(saved["zotero_version"], "10.0.1");
         fs::remove_file(output).unwrap();
     }
@@ -249,8 +251,7 @@ mod tests {
         ];
 
         run_with(args, || Ok(sample_report("9.0.6"))).unwrap();
-        let saved: serde_json::Value =
-            serde_json::from_slice(&fs::read(&output).unwrap()).unwrap();
+        let saved: serde_json::Value = serde_json::from_slice(&fs::read(&output).unwrap()).unwrap();
         assert_eq!(saved["zotero_version"], "9.0.6");
         fs::remove_file(output).unwrap();
     }
@@ -382,14 +383,19 @@ mod tests {
     fn published_report_cleanup_error_identifies_post_publication_state() {
         let temporary = Path::new("temporary.json");
         let error = cleanup_published_report(temporary, |_| {
-            Err(io::Error::new(io::ErrorKind::PermissionDenied, "cleanup failure"))
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "cleanup failure",
+            ))
         })
         .unwrap_err();
 
         assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
-        assert!(error
-            .to_string()
-            .contains("report published but temporary cleanup failed"));
+        assert!(
+            error
+                .to_string()
+                .contains("report published but temporary cleanup failed")
+        );
     }
 
     #[test]
