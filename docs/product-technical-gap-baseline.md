@@ -4,8 +4,8 @@
 
 ## Current exact-head checkpoint
 
-PR39 is `83851b33996cb272f21ed39f0b21b71bfdd1ef27` (OPEN/Draft/CLEAN); PR40 is
-`8a7b4a9577cf7bf62a75ba19b679c2441632c8e4` (OPEN/Draft/CLEAN). The latest
+PR39 is `2ead764cbf013f7d876842868322da69ed20bf59` (OPEN/Draft/CLEAN); PR40 is
+`85dbb698d702c75ddf4cfaee2dd781919adde5c6` (OPEN/Draft/CLEAN). The latest
 Local API replay remains stable at 8,326 observed records, 3,715 proposals,
 4,611 unclassified records, four pending sources and 49 duplicate candidates,
 with zero failures and private report digest
@@ -112,7 +112,7 @@ source against the immutable report before any authority callback. Missing and
 stale source-resolution regressions pass in the locked Rust 1.98 workspace;
 Clippy, warnings-denied rustdoc and diff checks also pass. GitHub reports OPEN
 Draft/CLEAN with CodeRabbit skipped because the PR remains a draft. PR #40's
-current exact head is `8a7b4a9577cf7bf62a75ba19b679c2441632c8e4`; the latest
+current exact head is `85dbb698d702c75ddf4cfaee2dd781919adde5c6`; the latest
 successor records the report-bound restoration repair and its unchanged-head
 evidence. Direct trusted-type deserialization is removed, and coordinated
 rewrites fail closed against the immutable `ClassificationReport`. The trusted
