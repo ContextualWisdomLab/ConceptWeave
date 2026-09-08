@@ -202,6 +202,24 @@ mod tests {
         ))
     }
 
+    #[test]
+    fn output_path_helpers_keep_parent_policy_and_temp_names_bounded() {
+        let system_temp = env::temp_dir();
+        assert_eq!(
+            allowed_output_parent_policy(system_temp.clone(), Some(system_temp.clone())),
+            vec![system_temp.clone()]
+        );
+        let alternate = system_temp.join("conceptweave-zotero-alternate-parent");
+        assert_eq!(
+            allowed_output_parent_policy(system_temp.clone(), Some(alternate.clone())),
+            vec![system_temp, alternate]
+        );
+        assert!(conventional_tmp_parent(Path::new("/definitely-missing-parent")).is_none());
+        assert!(conventional_tmp_parent(Path::new("/tmp")).is_some());
+        assert!(temporary_output_path(Path::new("relative")).is_ok());
+        assert!(temporary_output_path(Path::new("/")).is_err());
+    }
+
     fn sample_report(zotero_version: &str) -> ClassificationReport {
         ClassificationReport {
             zotero_version: zotero_version.to_owned(),
