@@ -1293,4 +1293,7 @@ deletion and non-fast-forward updates; only merge and squash are allowed. The le
 and cannot be treated as an absent protection gate. PR39 and PR40 are now Ready for review,
 but neither has an independent approval; PR40 reports that reviews are disabled for its base
 branch and no Actions run exists for either exact head, so neither is protected-merge or
-release-ready.
+release-ready. Both PRs target stacked feature bases rather than the default branch
+(`codex/zotero-fulltext-review-approval` and `feat/zotero-research-classification`), so
+the default-branch ruleset does not itself create the required workflow runs on these
+intermediate bases; this is a stack topology fact, not a hosted GREEN result.
