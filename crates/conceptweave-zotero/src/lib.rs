@@ -336,8 +336,7 @@ pub fn prepare_source_resolution_review(
                 resolution.item_key.clone(),
             ));
         }
-        if report.server_id.is_none()
-            || resolution.library_version != report.library_version
+        if resolution.library_version != report.library_version
             || resolution.server_id != report.server_id
             || resolution.item_version != source.version
             || resolution.item_type != source.data.item_type
