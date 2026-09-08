@@ -275,10 +275,13 @@ impl<'de> Deserialize<'de> for SourceResolutionReview {
         if wire
             .resolved_sources
             .iter()
-            .any(|resolution| resolution.server_id.as_deref() != wire.server_id.as_deref())
+            .any(|resolution| {
+                resolution.server_id.as_deref() != wire.server_id.as_deref()
+                    || resolution.library_version != wire.library_version
+            })
         {
             return Err(serde::de::Error::custom(
-                "source-resolution decision server identity differs from the review identity",
+                "source-resolution decision identity differs from the review identity",
             ));
         }
         Ok(Self {
