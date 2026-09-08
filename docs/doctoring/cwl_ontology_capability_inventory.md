@@ -2,7 +2,7 @@
 
 Evidence snapshot: 2026-09-07. Status: research inventory, not dependency-adoption approval.
 
-September 7–8 adds bounded audits of noema's release admission, EgressWeave's outbound policy, OriginWeave's provenance records, Learning Content Studio's protected-source availability, accounting-information-platform's proposal/reporting boundaries, Learning Management Platform's bootstrap availability, saju-caldav's calendar service boundary, J Planner's static app and ELUNVERA's CRM bootstrap: **43/76** of the September 6 census are now audited, leaving **33** in that historical denominator. Candidates with resolved GitHub releases remain **8/43**; registry-only observations are separate and verified adoption remains zero. Earlier checkpoints below retain their observation dates. A bootstrap-only finding is not an implemented library or a classified paper.
+September 7–8 adds bounded audits of noema's release admission, EgressWeave's outbound policy, OriginWeave's provenance records, Learning Content Studio's protected-source availability, accounting-information-platform's proposal/reporting boundaries, Learning Management Platform's bootstrap availability, saju-caldav's calendar service boundary, J Planner's static app, ELUNVERA's CRM bootstrap and PolicyWeave's privacy-policy app: **44/76** of the September 6 census are now audited, leaving **32** in that historical denominator. Candidates with resolved GitHub releases remain **8/44**; registry-only observations are separate and verified adoption remains zero. Earlier checkpoints below retain their observation dates. A bootstrap-only finding is not an implemented library or a classified paper.
 
 ## Scope and evidence limits
 
@@ -272,10 +272,16 @@ The public, nonfork, nonarchived repository has protected default `main@1975f50e
 
 This bootstrap anchor provides no implemented CRM or ontology contract. Preserve CRM/customer meaning in its owner and require licensing, versioned contracts and conformance before any ConceptWeave relationship. No runtime, tests, private customer data or model calls were accessed. This bounded audit advances coverage to 43/76, leaving 33; resolved GitHub-release candidates remain 8/43 and verified adoption remains zero. No paper decision or approval follows.
 
+### PolicyWeave privacy-policy app availability audit (2026-09-08)
+
+The public, nonfork, nonarchived repository has protected default `main@52f4fd6bb68f870d0519cf11dd471573a2f197c0`. Its complete recursive tree (`truncated=false`) contains only [README.md](https://github.com/ContextualWisdomLab/PolicyWeave/blob/52f4fd6bb68f870d0519cf11dd471573a2f197c0/README.md), read in full. The README describes a local-first web app that turns entered personal-data flows into a privacy-policy draft, flags omissions and contradictions, and requires legal or privacy-officer review before publication. It names npm-based development and lint/test/build commands, but no implementation, schema, accepted ADR or test files are present in the exact tree. Repository license metadata is null and the paginated release query returned no entries.
+
+PolicyWeave is a policy-drafting product, not a general ontology generator or legal authority. Privacy requirements and legal interpretation remain owner-owned; do not treat generated drafts or “legal basis” labels as reviewed semantic truth. Before any relationship, require licensing, versioned contracts, evidence provenance and consumer conformance. No runtime, private data, model call or package installation was performed. This audit advances coverage to 44/76, leaving 32; resolved GitHub-release candidates remain 8/44 and verified adoption remains zero. No paper decision or approval follows.
+
 | Measure | Observation | Required next evidence |
 | --- | --- | --- |
-| Metadata census / bounded capability audit | September 6 census76; 43/43 selected candidates have exact default-head documentation, available source, tree and release-query evidence | Audit actual contracts/consumers; 33 repositories in the historical census remain unaudited at that depth. |
-| GitHub release with resolved source commit | 8/43 selected candidates, including proprietary naruon, product-domain four-pillars, Saju CalDAV and inkspan's historical release without the relevant current contracts | License, artifact/provenance and consumer conformance; a release count is not permissive-library or adoption evidence. |
+| Metadata census / bounded capability audit | September 6 census76; 44/44 selected candidates have exact default-head documentation, available source, tree and release-query evidence | Audit actual contracts/consumers; 32 repositories in the historical census remain unaudited at that depth. |
+| GitHub release with resolved source commit | 8/44 selected candidates, including proprietary naruon, product-domain four-pillars, Saju CalDAV and inkspan's historical release without the relevant current contracts | License, artifact/provenance and consumer conformance; a release count is not permissive-library or adoption evidence. |
 | Additional registry-only publication observation | ThreadWeave0.1.0 and EgressWeave0.1.0 on PyPI; not counted in the seven resolved GitHub releases | Bind the needed API and distribution to reviewed source and attestations; no package-registry completeness claim. |
 | Verified ConceptWeave adoption | 0 demonstrated in this audit | Released owner contract, exact consumer revision and passing contract/runtime evidence. |
 | Privately retained nonempty full text | 3,203/3,715 parents in the separate [capture evidence](zotero_fulltext_capture_evidence.json); 512 remain without demonstrated nonempty text | New content-bound proposals and authentic review with partial/unknown indexing. The earlier sweep's 800/1,000 abstract-missing subgroup is availability evidence, not a remeasured retained-capture subgroup. |
@@ -297,6 +303,8 @@ ContextualWisdomLab. (2026). *J Planner* (Commit ec030872a0762af8af54d359c88e4c9
 ContextualWisdomLab. (2026). *LifeOS* (Commit 193a87ef54c3fe6dcda4755bce4d6bc81e3a0297) [Computer software]. GitHub. https://github.com/ContextualWisdomLab/life-os/tree/193a87ef54c3fe6dcda4755bce4d6bc81e3a0297
 
 ContextualWisdomLab. (2026). *ELUNVERA* (Commit 1975f50ebe3da751097e015bdfa909ce80fc6ba2) [Source repository]. GitHub. https://github.com/ContextualWisdomLab/ELUNVERA/tree/1975f50ebe3da751097e015bdfa909ce80fc6ba2
+
+ContextualWisdomLab. (2026). *PolicyWeave* (Commit 52f4fd6bb68f870d0519cf11dd471573a2f197c0) [Source repository]. GitHub. https://github.com/ContextualWisdomLab/PolicyWeave/tree/52f4fd6bb68f870d0519cf11dd471573a2f197c0
 
 ContextualWisdomLab. (2026). *Metering billing platform* (Commit ebeed33f98b34afc232eed980f41d6af9a7a445c) [Computer software]. GitHub. https://github.com/ContextualWisdomLab/metering-billing-platform/tree/ebeed33f98b34afc232eed980f41d6af9a7a445c
 
