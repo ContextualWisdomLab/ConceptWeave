@@ -5,7 +5,7 @@
 ## Current exact-head checkpoint
 
 PR39 is `2ead764cbf013f7d876842868322da69ed20bf59` (OPEN/Draft/CLEAN); PR40 is
-`85dbb698d702c75ddf4cfaee2dd781919adde5c6` (OPEN/Draft/CLEAN). The latest
+`2dba92261b3c6262d8b1d7975928f0f2b0add74b` (OPEN/Draft/CLEAN). The latest
 Local API replay remains stable at 8,326 observed records, 3,715 proposals,
 4,611 unclassified records, four pending sources and 49 duplicate candidates,
 with zero failures and private report digest
@@ -112,7 +112,7 @@ source against the immutable report before any authority callback. Missing and
 stale source-resolution regressions pass in the locked Rust 1.98 workspace;
 Clippy, warnings-denied rustdoc and diff checks also pass. GitHub reports OPEN
 Draft/CLEAN with CodeRabbit skipped because the PR remains a draft. PR #40's
-current exact head is `85dbb698d702c75ddf4cfaee2dd781919adde5c6`; the latest
+current exact head is `2dba92261b3c6262d8b1d7975928f0f2b0add74b`; the latest
 successor records the report-bound restoration repair and its unchanged-head
 evidence. Direct trusted-type deserialization is removed, and coordinated
 rewrites fail closed against the immutable `ClassificationReport`. The trusted
@@ -134,11 +134,11 @@ the next engineering gap before protected merge.
 
 The write-envelope mismatch regression now exercises four stored identity
 mismatch forms and raises normalized branch coverage to 781/782 (99.87%) in
-the pinned nightly run with 115 tests. On PR40 exact head `e72fb40`, the
-trusted-restoration coverage rerun reports 191/204 branches (93.63%),
-1,812/1,843 lines (98.32%), 193/198 functions (97.47%), and 2,872/2,934
-regions (97.89%). Remaining branch and CLI/error regions stay recorded without
-exclusions or threshold changes.
+the pinned nightly run with 115 tests. On PR40 repair head `f660c3a`, the
+trusted-restoration coverage rerun reports 202/204 branches (99.02%); the two
+remaining branches are unreachable after prior wire checks or environment-
+dependent `/tmp` canonicalization. No exclusions or threshold changes were
+introduced.
 
 The [refreshed capture checkpoint](doctoring/refreshed_capture_evidence.md) now records successful optimized full-library capture, verified 3,715-row blank worksheet, a 25-row bound view, and full workspace tests at `b0f7d5b8bb139d627cec37b598331464c14b60ab` (terminal exit 0). Actual decisions and approvals remain zero. The CO owner freshly reports no GitHub release or PyPI package, unmerged release PR #1030 and unmerged diagnostic PR #1105. Its stated prerequisites are protected exact-head checks/independent review, fast-mlsirm publication, immutable CO client/schema release, and verified classification serving. This is owner-reported release status, not locally verified registry evidence. Available secret metadata is not the blocker. Do not send private paper contents or substitute a direct provider while these conditions remain unmet.
 
