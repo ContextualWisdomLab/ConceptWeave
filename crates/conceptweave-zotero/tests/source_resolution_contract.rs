@@ -241,6 +241,12 @@ fn source_resolution_review_json_rejects_duplicate_unsorted_or_blank_decisions()
         serde_json::from_value::<conceptweave_zotero::SourceResolutionReview>(unsorted).is_err()
     );
 
+    let mut blank_key = serialized.clone();
+    blank_key["resolved_sources"][0]["item_key"] = serde_json::json!(" \t\n");
+    assert!(
+        serde_json::from_value::<conceptweave_zotero::SourceResolutionReview>(blank_key).is_err()
+    );
+
     let mut blank = serialized;
     blank["resolved_sources"][0]["reason"] = serde_json::json!(" \t\n");
     assert!(
