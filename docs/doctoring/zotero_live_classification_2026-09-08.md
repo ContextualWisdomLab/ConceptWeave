@@ -104,3 +104,13 @@ records retain only the metadata projection in this report; their file bytes,
 content type and link mode remain outside the classification artifact and must
 be inspected through the separate capture-bound evidence path. No pending source
 was cleared or converted into a bibliographic proposal.
+
+## Fresh replay checkpoint (2026-09-09 02:31 KST)
+
+Another pinned release replay completed read-only against the Local API. The
+0600 report was 8,132,756 bytes with the same SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc` and the
+same aggregate: 8,326 observed, 3,715 classified proposals, 4,611 retained
+nonbibliographic records, four pending sources and 49 duplicate candidates.
+This is repeatability evidence only; it does not establish approval, full-text
+review, Zotero mutation or immutable release.

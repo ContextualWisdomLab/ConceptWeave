@@ -1330,3 +1330,9 @@ The latest report retains four pending source records: one standalone note and
 three standalone attachments without parent links. Their file bytes, content type
 and link mode remain outside the metadata projection and require the separate
 capture-bound evidence path; none was cleared or promoted to a bibliographic proposal.
+
+At 02:31 KST on 2026-09-09, a fresh replay in this turn reproduced the same
+0600 report digest `8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`,
+8,326 observed records, 3,715 classified proposals, 4,611 retained records,
+four pending sources and 49 duplicate candidates. Stable output is repeatability
+evidence, not semantic approval, full-text review, Zotero mutation or release proof.
