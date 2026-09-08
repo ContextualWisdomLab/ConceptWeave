@@ -103,12 +103,7 @@ fn write_report<T: serde::Serialize>(
     let file = open_new_output(&temporary)?;
     let mut writer = BufWriter::new(file);
 
-    if let Err(error) = serde_json::to_writer_pretty(&mut writer, report) {
-        drop(writer);
-        let _ = fs::remove_file(&temporary);
-        return Err(error.into());
-    }
-    if let Err(error) = writer.flush() {
+    if let Err(error) = serialize_report(&mut writer, report) {
         drop(writer);
         let _ = fs::remove_file(&temporary);
         return Err(error.into());
@@ -120,6 +115,15 @@ fn write_report<T: serde::Serialize>(
         return Err(error.into());
     }
     cleanup_published_report(&temporary, |path| fs::remove_file(path)).map_err(Into::into)
+}
+
+fn serialize_report<W: Write, T: serde::Serialize>(
+    writer: &mut W,
+    report: &T,
+) -> Result<(), Box<dyn std::error::Error>> {
+    serde_json::to_writer_pretty(&mut *writer, report)?;
+    writer.flush()?;
+    Ok(())
 }
 
 fn cleanup_published_report<F>(temporary: &Path, mut remove_file: F) -> io::Result<()>
