@@ -60,3 +60,32 @@ fn stored_source_resolution_review_rejects_a_removed_pending_decision() {
         "stored review must not regain typed status after one pending decision is removed"
     );
 }
+
+#[test]
+fn stored_source_resolution_review_rejects_item_identity_drift() {
+    let report = classify_snapshot(
+        "10.0.1".into(),
+        Some("local-server".into()),
+        42,
+        vec![item("SOURCE", 41, "attachment")],
+    );
+    let review = prepare_source_resolution_review(
+        &report,
+        vec![resolution("SOURCE", 41, "attachment")],
+    )
+    .expect("constructor binds the decision to the exact source item identity");
+    let stored = serde_json::to_value(review).expect("review must serialize");
+
+    for (field, replacement) in [
+        ("item_version", serde_json::json!(40)),
+        ("item_type", serde_json::json!("note")),
+        ("parent_item_key", serde_json::json!("PARENT")),
+    ] {
+        let mut candidate = stored.clone();
+        candidate["resolved_sources"][0][field] = replacement;
+        assert!(
+            serde_json::from_value::<SourceResolutionReview>(candidate).is_err(),
+            "stored review must reject {field} drift from the constructor-bound snapshot"
+        );
+    }
+}
