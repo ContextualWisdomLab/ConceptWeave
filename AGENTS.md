@@ -76,3 +76,4 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - When a stacked PR is merged externally, re-query both PR `headRefName` and `baseRefName` before pushing a successor; a branch name may now represent the merged successor, and only an exact fast-forward/non-force update preserves the intended delta.
 - Automated review comments are evidence tied to their reviewed commit, not evergreen instructions; re-read the current exact head before fixing or closing a finding, and record stale-finding corrections without claiming approval.
 - Pending-source admission must reject ambiguous retained inventory rather than silently taking the first match; preserve the typed failure and regression before any trusted review aggregate is built.
+- A green workspace test run does not satisfy the owned coverage gate; retain raw and normalized per-file/branch deficits as RED evidence and repair tests or documented platform seams without lowering thresholds.

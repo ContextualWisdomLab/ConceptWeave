@@ -1507,6 +1507,15 @@ case-insensitive title or matched-phrase signals (`ontology`, `semantic`,
 a steward triage queue, not a classification decision, full-text approval,
 pending-source resolution or write authorization.
 
+### September 9 PR40 owned-coverage RED
+
+The exact PR40 head `bb9d7b691cf5601f3a60ff2a786e123f1d552704` completed its
+workspace suite but `scripts/check_coverage.sh` reported functions 208/211,
+lines 1886/1906, regions 2989/3031 and branches 206/212. Normalized coverage
+was 1,284/1,328 regions and 210/212 branches; per-file gaps remain in the
+Zotero library and CLI modules. This is a genuine owned-coverage gap, not a
+reason to lower thresholds or claim protected readiness.
+
 ### September 9 04:16 capture-bound availability revalidation
 
 The current release verifier revalidated the report-bound private capture and
