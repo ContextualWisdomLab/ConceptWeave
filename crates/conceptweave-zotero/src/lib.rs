@@ -263,17 +263,32 @@ pub enum SourceResolutionError {
     BlankReason(String),
     /// The report's pending key is absent from its retained inventory.
     MissingInventory(String),
+    /// The report does not carry a non-blank Local API server identity.
+    MissingServerIdentity,
 }
 
 impl fmt::Display for SourceResolutionError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Missing(key) => write!(formatter, "pending source lacks resolution: {key}"),
-            Self::Unknown(key) => write!(formatter, "resolution is not pending in the report: {key}"),
-            Self::Duplicate(key) => write!(formatter, "pending source has duplicate resolutions: {key}"),
-            Self::Stale(key) => write!(formatter, "resolution does not match report source identity: {key}"),
+            Self::Unknown(key) => {
+                write!(formatter, "resolution is not pending in the report: {key}")
+            }
+            Self::Duplicate(key) => {
+                write!(formatter, "pending source has duplicate resolutions: {key}")
+            }
+            Self::Stale(key) => write!(
+                formatter,
+                "resolution does not match report source identity: {key}"
+            ),
             Self::BlankReason(key) => write!(formatter, "source resolution reason is blank: {key}"),
-            Self::MissingInventory(key) => write!(formatter, "pending source is absent from report inventory: {key}"),
+            Self::MissingInventory(key) => write!(
+                formatter,
+                "pending source is absent from report inventory: {key}"
+            ),
+            Self::MissingServerIdentity => {
+                write!(formatter, "report lacks a non-blank Zotero server identity")
+            }
         }
     }
 }
@@ -285,6 +300,13 @@ pub fn prepare_source_resolution_review(
     report: &ClassificationReport,
     mut resolutions: Vec<PendingSourceResolution>,
 ) -> Result<SourceResolutionReview, SourceResolutionError> {
+    if report
+        .server_id
+        .as_deref()
+        .is_none_or(|server_id| server_id.trim().is_empty())
+    {
+        return Err(SourceResolutionError::MissingServerIdentity);
+    }
     let pending: BTreeMap<_, _> = report
         .pending_source_item_keys
         .iter()
@@ -302,13 +324,17 @@ pub fn prepare_source_resolution_review(
     let mut seen = BTreeSet::new();
     for resolution in &resolutions {
         if !seen.insert(resolution.item_key.as_str()) {
-            return Err(SourceResolutionError::Duplicate(resolution.item_key.clone()));
+            return Err(SourceResolutionError::Duplicate(
+                resolution.item_key.clone(),
+            ));
         }
         let Some(source) = pending.get(&resolution.item_key) else {
             return Err(SourceResolutionError::Unknown(resolution.item_key.clone()));
         };
         if resolution.reason.trim().is_empty() {
-            return Err(SourceResolutionError::BlankReason(resolution.item_key.clone()));
+            return Err(SourceResolutionError::BlankReason(
+                resolution.item_key.clone(),
+            ));
         }
         if report.server_id.is_none()
             || resolution.library_version != report.library_version
@@ -857,7 +883,8 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
         .tags
         .iter()
         .filter(|tag| {
-            matched_tag_value_set.contains(&tag.tag) && seen_matched_tag_values.insert(tag.tag.clone())
+            matched_tag_value_set.contains(&tag.tag)
+                && seen_matched_tag_values.insert(tag.tag.clone())
         })
         .map(|tag| tag.tag.clone())
         .collect();
@@ -892,9 +919,9 @@ fn classify_abstention_reason(fields: &[(&'static str, &str, &str)]) -> Abstenti
     {
         return AbstentionReason::MissingClassificationMetadata;
     }
-    let has_alphabetic = fields.iter().any(|(_, _, original)| {
-        original.chars().any(|character| character.is_alphabetic())
-    });
+    let has_alphabetic = fields
+        .iter()
+        .any(|(_, _, original)| original.chars().any(|character| character.is_alphabetic()));
     let has_ascii_alphabetic = fields.iter().any(|(_, _, original)| {
         original
             .chars()

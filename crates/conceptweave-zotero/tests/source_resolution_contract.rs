@@ -88,7 +88,14 @@ fn source_resolution_review_round_trips_owned_json() {
     );
     let review = prepare_source_resolution_review(
         &report,
-        vec![resolution("SOURCE", 41, "attachment", "", 42, Some("local-server"))],
+        vec![resolution(
+            "SOURCE",
+            41,
+            "attachment",
+            "",
+            42,
+            Some("local-server"),
+        )],
     )
     .expect("the exact pending source is resolvable");
 
@@ -209,6 +216,10 @@ fn source_resolution_errors_explain_each_rejection() {
         (
             SourceResolutionError::MissingInventory("SOURCE".into()),
             "pending source is absent from report inventory: SOURCE",
+        ),
+        (
+            SourceResolutionError::MissingServerIdentity,
+            "report lacks a non-blank Zotero server identity",
         ),
     ];
     for (error, expected) in cases {

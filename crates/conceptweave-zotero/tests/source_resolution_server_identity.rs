@@ -43,6 +43,16 @@ fn source_resolution_fails_closed_when_snapshot_has_no_server_identity() {
 
     assert!(matches!(
         prepare_source_resolution_review(&report, vec![resolution]),
-        Err(SourceResolutionError::Stale(key)) if key == "SOURCE"
+        Err(SourceResolutionError::MissingServerIdentity)
+    ));
+}
+
+#[test]
+fn source_resolution_rejects_blank_server_identity_even_without_pending_sources() {
+    let report = classify_snapshot("10.0.1".into(), Some(" \t".into()), 42, vec![]);
+
+    assert!(matches!(
+        prepare_source_resolution_review(&report, vec![]),
+        Err(SourceResolutionError::MissingServerIdentity)
     ));
 }
