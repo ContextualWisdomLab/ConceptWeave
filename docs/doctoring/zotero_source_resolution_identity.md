@@ -1,24 +1,22 @@
 # Zotero source-resolution identity
 
-Status: `REALITY_RED_SOURCE_FIX_PENDING` on PR #40 at exact head `669a44e61de225964f2b599772daa8e409a351e9`. Constructor-side provider identity is source/test repaired, but a fresh JSON artifact-boundary RED remains. This note is not executable GREEN, semantic approval, protected integration, or Zotero write authority.
+Status: `SOURCE_TEST_REPAIRED_PENDING_CI` on PR #40. Constructor-side provider identity and the nested JSON artifact boundary are causally source/test repaired. This note is not executable GREEN, semantic approval, protected integration, or Zotero write authority.
 
 ## Problem boundary
 
-`PendingSourceResolution` carries the report `library_version` and Local API `server_id`, and `prepare_source_resolution_review` compares those values with the classification report before accepting item version/type/parent identity. Admission now fails closed when the report server identity is missing or blank and rejects cross-library/cross-server reuse when decisions are prepared from the live report.
+`PendingSourceResolution` carries the report `library_version` and Local API `server_id`, and `prepare_source_resolution_review` compares those values with the classification report before accepting item version/type/parent identity. Admission fails closed when the report server identity is missing or blank and rejects cross-library/cross-server reuse when decisions are prepared from the live report.
 
 The earlier optional-identity defect was fixed by RED `25fa3bfe03365cf1893bfc46f9eb758c31e1a53c` and source repair `82a392cde56e54ef22169107ca1bdc89f112dfff`: a typed review cannot be constructed from a report that lacks a stable provider identity. Later tests cover the empty-pending and blank-identity paths, and the public `SourceResolutionReview` projection owns its JSON fields.
 
-A separate artifact-boundary defect remains after those constructor repairs. `SourceResolutionReview` has a custom JSON deserializer that verifies only the aggregate `server_id` and then accepts `resolved_sources` as deserialized. A persisted or hand-edited review can therefore carry top-level `server_id = "local-server"` while a nested decision carries `null`, blank text, or another server identity. Such an artifact would deserialize as the typed exact-snapshot review even though `prepare_source_resolution_review` would reject the same decision.
+A separate artifact-boundary defect remained after those constructor repairs. `SourceResolutionReview` had a custom JSON deserializer that verified only the aggregate `server_id` and then accepted `resolved_sources` unchanged. A persisted or hand-edited review could therefore carry top-level `server_id = "local-server"` while a nested decision carried `null`, blank text, or another server identity. Such an artifact deserialized as the typed exact-snapshot review even though `prepare_source_resolution_review` would reject the same decision.
 
-Reality RED `5718e4f62122454c3a989814d80bf5e62edcc073` adds `source_resolution_review_json_rejects_nested_server_identity_mismatch`. It starts from a valid prepared review, mutates only `resolved_sources[0].server_id` to `null`, whitespace, and `other-server`, and requires all three JSON artifacts to fail deserialization. Current production accepts them, so this is intentionally RED.
+Reality RED `5718e4f62122454c3a989814d80bf5e62edcc073` added `source_resolution_review_json_rejects_nested_server_identity_mismatch`. It starts from a valid prepared review, mutates only `resolved_sources[0].server_id` to `null`, whitespace, and `other-server`, and requires all three JSON artifacts to fail deserialization.
 
-## Current integration state
+## Causal repair
 
-Research Intake #9 advanced from `e8f7f83ee0d7f7ca3d2bb0b655040974786c1e6c` to test-only successor `28fb662ee754e9820d9eb8ad9e8cec4de6cdec85` on the same `source_resolution_contract.rs` path. PR #40 temporarily conflicted. Ordinary two-parent integration `669a44e61de225964f2b599772daa8e409a351e9` preserves the #9 commit while retaining #40's stricter superset fixture, including exact server identity, owned JSON round-trip, library binding, missing-inventory/error rendering, and the new nested-artifact RED. No force push or destructive rebase was used.
+Source repair `665e1bbf896fba3f1eec766f2e3651cae5f124e2` adds the least-widening deserialization invariant: after the aggregate server identity has passed the existing nonblank check, every nested resolution must carry exactly the same identity. Mismatch, `None`, and blank nested values therefore fail because none equals the validated nonblank aggregate identity. The change adds no inferred identity, Zotero mutation authority, classification change, or semantic publication authority.
 
-## Minimal causal repair
-
-After validating that the aggregate `server_id` is nonblank, `SourceResolutionReview` deserialization must require every `resolved_sources[*].server_id` to be present, nonblank, and exactly equal to the aggregate identity. The least-widening implementation can use exact equality with the already-validated aggregate value. It must not infer provider identity from numeric library/item coordinates, broaden Zotero mutation authority, reinterpret classification, or promote the review artifact to semantic publication authority.
+The concurrent repair branch and the already-pushed RED/docs ancestry were reconciled by ordinary merge `5c566826c0bd4a5675d715c1bff83b10e959173f`; no force push or destructive rebase was used. Research Intake #9 subsequently advanced from `28fb662ee754e9820d9eb8ad9e8cec4de6cdec85` to `ea204ae970ef7639927ee0ab4c60e00ad0fd156b` with a punctuation-only abstention regression. PR #40 adopted that valid base delta while preserving its existing numeric-only control and source-resolution work, so both abstention boundary cases remain in the dependent tree.
 
 A future canonical report digest may strengthen this binding only through an explicit versioned contract; it must not silently replace or reinterpret existing evidence.
 
@@ -36,4 +34,4 @@ Required GREEN is one unchanged exact PR #40 successor passing:
 - owned production function / normalized-region / branch coverage at 100%;
 - applicable hosted checks and independent review evidence.
 
-Predecessor execution does not transfer. Keep the new artifact-boundary review finding unresolved until the causal source repair and one unchanged exact successor supply the executable and hosted evidence above.
+Predecessor execution does not transfer. Keep the canonical artifact-boundary review finding unresolved until one unchanged exact successor supplies the executable and hosted evidence above.
