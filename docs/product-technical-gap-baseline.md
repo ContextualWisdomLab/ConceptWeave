@@ -1343,8 +1343,7 @@ coordination evidence only, not approval.
 
 ### Exact-head loop checkpoint (2026-09-09)
 
-PR39 source/test head remains `78d40c3`; this checkpoint was authored at
-documentation head `5c2ed01ea1a71b993c7f2648ed48ff5216ec2a29`, and PR39 remains OPEN,
+PR39 exact head is `13bd5a3600ed68dc0c4611093114e61ce86bb525`, and PR39 remains OPEN,
 MERGEABLE and CLEAN. Its source/test successor `78d40c3` closes the report-bound
 resolution-order coverage branch; the latest documentation head records that the
 normalized source-region and branch gates are both 100%, while per-file line/region
@@ -1356,6 +1355,13 @@ required workflow evidence, so no protected merge or release is claimed.
 The same PR39 exact head passed `RUSTDOCFLAGS='-D warnings' rustup run 1.98.0
 cargo doc --workspace --no-deps --locked`; this is local documentation evidence
 only and does not substitute for hosted gates.
+
+At exact head `13bd5a3600ed68dc0c4611093114e61ce86bb525`, the pinned coverage
+script reran all workspace tests successfully. It measured 451/451 functions,
+5,692/5,752 lines, 8,345/8,477 regions and 730/784 raw branches; the
+source-normalized gates remain 4,752/4,752 regions and 784/784 branches. The
+per-file line/region gaps in the full-text and CLI modules remain, so the owned
+100% line/function/region target is still open.
 
 The latest report retains four pending source records: one standalone note and
 three standalone attachments without parent links. Their file bytes, content type
