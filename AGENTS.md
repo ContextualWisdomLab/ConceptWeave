@@ -24,6 +24,7 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - Stored source-resolution wire DTOs must deny undeclared fields at every persisted object boundary; silently discarding a newer field can turn an untrusted artifact into a falsely trusted review.
 - Source-resolution admission is fail-closed when the report has no `server_id`; optional identity is acceptable for lower-authority classification, not for a typed resolution review.
 - Missing or blank Local API `server_id` remains an admission error even when a report has no pending items; an empty resolution set must not yield a typed review without provider identity.
+- Trusted source-resolution construction must also reject blank `zotero_version` or blank `rule_revision`; caller-supplied or mutated report metadata cannot manufacture an exact-snapshot review with incomplete provenance.
 - Public review aggregates that cross a JSON artifact boundary must use owned fields and have a round-trip test; borrowed `&'static str` metadata is not an artifact contract.
 - Derived deserialization must enforce the same non-blank provider identity invariant as the constructor path; JSON omission or `null` must not bypass admission checks.
 - Coverage reports must distinguish raw LLVM instantiations from the repository's normalized owner function/region/branch gate; never report raw gaps as green or suppress them to manufacture 100%.
