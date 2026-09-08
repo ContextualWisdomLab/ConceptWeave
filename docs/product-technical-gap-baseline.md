@@ -4,6 +4,8 @@
 
 ## September 7 remaining execution and acquisition gates
 
+The [kaefa exploratory-factor-analysis boundary audit](doctoring/cwl_ontology_capability_inventory.md#kaefa-exploratory-factor-analysis-boundary-audit-2026-09-08) advances bounded candidate coverage to 54/76, leaving 22. Protected default `develop@5128d4867e24b5db73e6e3c8652a8dbeabd70aa0` is GPL-3.0 with an R psychometric/model-selection package and no release; it is not ontology authority. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
 The [aFIPC legacy measurement-kernel boundary audit](doctoring/cwl_ontology_capability_inventory.md#afipc-legacy-measurement-kernel-boundary-audit-2026-09-08) advances bounded candidate coverage to 53/76, leaving 23. Protected default `master@f87c2324f1686135e57d8730c1b0b9420874f300` is an R IRT-linking package with NOASSERTION license metadata and no release; it is not ontology authority. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
 
 ConceptWeave PR #39 currently resolves to `8cc8b0d5b63f73778d5a53fdfa19c24ae7ed59a6` over stacked base `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`; GitHub reports OPEN Draft, `CLEAN`, no review decision, and an empty current status rollup. “CLEAN” is not required-check or protected-merge evidence, so keep the PR open and do not publish or deploy.
