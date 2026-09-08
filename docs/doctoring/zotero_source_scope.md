@@ -35,6 +35,8 @@ The private new report `/private/tmp/conceptweave-source-scope-live-C98C52A4-1D9
 
 This is one elapsed-time observation, not a controlled performance improvement claim. No full text was recaptured, no old capture was rewritten, and no bibliographic proposal was promoted to an authentic decision. Existing worksheet decisions and independently approved labels remain 0/3,715, with four unresolved sources additionally visible.
 
+A fresh read-only replay from the current owner executable completed successfully on September 8: 8,326 observed records, 3,715 classified proposals, 4,611 retained nonbibliographic records, and four pending source keys; Zotero 10.0.1/API 3/schema 44 and library version 2 were reported. The private 0600 report was 7,161,599 bytes with SHA-256 `5b2d81bddf09475de76ce18efa9fb5b486c44b794c9db6b697d183da5c268b48`. This is aggregate evidence only and does not alter the 0/3,715 decision or approval counts.
+
 ## Visual Inspection and adoption gates
 
 This turn attempted native Zotero inspection; the computer-use tool reported that the Mac was locked and automatic unlock failed. No lock bypass, fresh screenshot or new visual pass is claimed. The previous actual screenshot of 3,719 selected items and a retraction warning remains historical evidence; the previous one-item retracted view was accessibility-only because later frames were stale. Unlocking is required for another current visual inspection. API and unit success do not substitute for it.
