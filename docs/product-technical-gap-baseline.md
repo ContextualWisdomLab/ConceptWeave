@@ -1358,6 +1358,15 @@ with the same owner-only 0600 report size and digest and the same 8,326/3,715/
 4,611/four/49 aggregate. This is repeatability evidence only; no pending source
 was cleared and no Zotero write or approval was issued.
 
+At 03:08 KST, the same report passed the capture-bound full-text and availability
+commands. The private capture was `0600`, 235,602,798 bytes; its availability
+summary was `0600`, 359 bytes, with capture digest
+`sha256:106ca65ab62151f303c5807ecceb271c0bec953f091426fb1e74ec808913f9b8`.
+The 3,715-paper workload partitions into 3,203 papers with nonempty text, 440
+without attachment, 34 with an unmanifested attachment, 38 with captured-empty
+text and 471 needing review without text; two nonempty records are unbound.
+This is an acquisition/review baseline, not semantic approval or write authority.
+
 At exact source/test head `78d40c3` (documentation head `e16a28d`), the repository coverage gate was rerun with the
 pinned nightly toolchain after adding a two-source regression for noncanonical
 report-bound resolution order. The workspace suite passed; normalized source

@@ -123,3 +123,16 @@ owner-only report was `0600`, 8,132,756 bytes, and retained the same SHA-256
 observed records, 3,715 classified proposals, 4,611 retained records, four
 pending sources and 49 duplicate candidates. This confirms repeatability only;
 it does not clear pending sources or grant review, write or release authority.
+
+## Capture-bound availability checkpoint (2026-09-09 03:08 KST)
+
+Using the same report, the optimized release binary completed the read-only
+`--capture-full-text` path and then `--full-text-availability`. The capture is
+owner-only (`0600`, 235,602,798 bytes); the separate availability summary is
+also `0600` (359 bytes) with capture digest
+`sha256:106ca65ab62151f303c5807ecceb271c0bec953f091426fb1e74ec808913f9b8`.
+Across 3,715 bibliographic papers, 3,203 have nonempty text, 440 have no
+attachment, 34 have an unmanifested attachment, 38 have captured-but-empty
+text, and 471 need review without text. Two nonempty records are unbound.
+These are acquisition and review-workload measures only; no paper decision,
+approval, pending-source resolution or Zotero write follows.
