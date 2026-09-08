@@ -20,6 +20,13 @@ interval are recorded in [the private capture record](doctoring/zotero_live_full
 Content remains private evidence; no decision, approval or Zotero write was
 performed.
 
+From the unchanged private pair, the release-mode CLI created a blank
+capture-bound worksheet and a 25-row `full_text_review_view_v1` without another
+provider request. Their private hashes, sizes and exact report/capture binding
+are recorded in [the review-view record](doctoring/zotero_live_fulltext_review_view_2026-09-08.md).
+The view contains evidence only; no decision, approval or Zotero write was
+issued.
+
 The local Zotero endpoint is currently reachable read-only: HTTP 200, Zotero
 10.0.1, Connector/API v3, schema 44, 8,326 reported records, last-modified
 version 2, and an opaque server identity present. Only headers and aggregate
