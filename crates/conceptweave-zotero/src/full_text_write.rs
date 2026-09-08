@@ -141,8 +141,9 @@ pub fn build_full_text_write_plan(
     let Some(review) = scope.source_resolution_review.as_ref() else {
         return Err(INVALID_WRITE_SCOPE);
     };
-    let source_resolution = prepare_source_resolution_review(report, review.resolved_sources.clone())
-        .map_err(|_| INVALID_WRITE_SCOPE)?;
+    let source_resolution =
+        prepare_source_resolution_review(report, review.resolved_sources.clone())
+            .map_err(|_| INVALID_WRITE_SCOPE)?;
     if source_resolution.zotero_version != review.zotero_version
         || source_resolution.server_id != review.server_id
         || source_resolution.library_version != review.library_version

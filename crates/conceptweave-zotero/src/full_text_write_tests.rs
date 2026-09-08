@@ -757,6 +757,31 @@ fn full_text_write_rejects_stale_source_resolution_before_authority() {
 }
 
 #[test]
+fn full_text_write_rejects_invalid_nested_source_resolution_before_authority() {
+    let report = report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let mut scope = write_scope_fixture(&report, &capture);
+    scope
+        .source_resolution_review
+        .as_mut()
+        .unwrap()
+        .resolved_sources
+        .push(crate::PendingSourceResolution {
+            item_key: "missing-source".into(),
+            item_version: 1,
+            library_version: report.library_version,
+            item_type: "journalArticle".into(),
+            parent_item_key: String::new(),
+            disposition: crate::SourceResolutionDisposition::RetainStandaloneEvidence,
+            reason: "invalid nested source".into(),
+        });
+    assert!(build_full_text_write_plan(&report, &capture, scope, |_| true, |_| true).is_err());
+}
+
+#[test]
 fn full_text_write_validates_both_inputs_before_either_authority() {
     for scenario in 0..7 {
         let report = report_fixture();
