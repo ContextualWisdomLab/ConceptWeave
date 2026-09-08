@@ -237,6 +237,16 @@ fn production_transport_accepts_absent_optional_server_id_and_rejects_bad_json()
 }
 
 #[test]
+fn production_transport_surfaces_http_errors() {
+    let response = b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_vec();
+
+    assert!(matches!(
+        read_raw_response(response),
+        Err(ReadError::Http(_))
+    ));
+}
+
+#[test]
 fn header_helpers_cover_optional_and_numeric_boundaries() {
     let mut headers = ureq::http::HeaderMap::new();
     headers.insert("X-Count", ureq::http::HeaderValue::from_static("42"));
