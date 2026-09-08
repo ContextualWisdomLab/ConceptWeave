@@ -272,6 +272,11 @@ impl<'de> Deserialize<'de> for SourceResolutionReview {
                 "source-resolution review lacks a non-blank Zotero server identity",
             ));
         }
+        if wire.rule_revision.trim().is_empty() {
+            return Err(serde::de::Error::custom(
+                "source-resolution review lacks a non-blank rule revision",
+            ));
+        }
         if wire
             .resolved_sources
             .iter()

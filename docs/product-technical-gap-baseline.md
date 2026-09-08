@@ -17,6 +17,12 @@ Predecessor review/check evidence never transfers automatically to a changed hea
 
 ## Current Research Intake / source-resolution integrity
 
+PR #40 exact head `d6867f916b00948586a53129da9b0cf17cf2bbad` added a RED test
+for blank stored `rule_revision`; the owner repair now rejects whitespace-only
+revisions during deserialization. Focused source-resolution tests and strict
+Clippy pass locally. The repair remains pending unchanged-head hosted checks,
+owned coverage and independent review.
+
 Research Intake #9 retains the earlier source/test repairs for proposal-only truth/publication projection, multilingual abstention classification, replayable abstention evidence, DOI duplicate provenance, fragmented HTTP-header testing, matched tag provenance, provider-shaped Zotero object-key admission, Local API transport coverage, bounded/private report publication, and post-publication cleanup safety. These are owner-local repairs; no later #40 or #39 evidence can reverse-prove #9 GREEN.
 
 The current #9 owner coverage checkpoint remains RED rather than being hidden by exclusions. At `b98ba39f9efa4c18c1bcdc3bcae4a8ef4f0abd41`, the platform-explicit fixture removes the final runtime-only normalized branch while normalized regions/raw generic instantiations remain incomplete. Exact-head Rust 1.98 workspace tests, fmt, all-target Clippy, warnings-denied rustdoc/release, owned production function/normalized-region/branch 100% coverage, hosted checks, and independent review remain the acceptance gate.
