@@ -65,6 +65,10 @@ The paginated organization metadata census returned 76 repositories, including o
 
 Each row separates responsibility, exact default-head documentation or tree evidence, and published GitHub release evidence. A name, open PR or protected branch alone does not prove a usable released API. This is not a complete package-registry, deployment, attestation or consumer-conformance audit; bounded follow-up attempts and their limitations are recorded below. CalendarWeave and four-pillars were initially screened from metadata only; their subsequent source audits now distinguish a bootstrap owner from an implemented product-domain model without excluding either by description alone.
 
+The following “All 33 selected default branches” sentence is a historical
+33/76 checkpoint. Later additions retain their own dated protection evidence and
+must not be mechanically folded into that sentence.
+
 GitHub repository, branch, README-at-SHA, complete-tree and release endpoints supplied these observations. All 33 selected default branches reported protected at their recorded observations. Several use `develop` or `master`; do not substitute a branch named `main` for the actual default shown in each row. For the original 13 candidates, GitHub detected MIT for semantic-data-portal, TEPP, LineageWeave, fast-mlsirm and disksage; Apache-2.0 for RankWeave, graphify, Veilpick and mhtml-etl-gateway; and no SPDX identifier for the other four. An undetected license is unresolved evidence, not permission to adopt. The naruon audit read an explicitly proprietary license despite public visibility and NOASSERTION metadata; pg-erd-cloud's exact license contains Apache-2.0 without an appended noncommercial restriction. DeepWiki had no indexed evidence for graphify, Veilpick, disksage, pg-erd-cloud or the further candidates below, so exact GitHub source/tree was used instead.
 
 ## Owner and maturity evidence
