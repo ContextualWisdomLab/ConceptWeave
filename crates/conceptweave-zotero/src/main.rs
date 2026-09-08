@@ -108,7 +108,7 @@ fn write_report<T: serde::Serialize>(
         let _ = fs::remove_file(&temporary);
         return Err(error.into());
     }
-    cleanup_published_report(&temporary, output, |path| fs::remove_file(path)).map_err(Into::into)
+    cleanup_published_report(&temporary, |path| fs::remove_file(path)).map_err(Into::into)
 }
 
 fn serialize_report<W: Write, T: serde::Serialize>(
@@ -120,24 +120,11 @@ fn serialize_report<W: Write, T: serde::Serialize>(
     Ok(())
 }
 
-fn cleanup_published_report<F>(
-    temporary: &Path,
-    output: &Path,
-    mut remove_file: F,
-) -> io::Result<()>
+fn cleanup_published_report<F>(temporary: &Path, mut remove_file: F) -> io::Result<()>
 where
     F: FnMut(&Path) -> io::Result<()>,
 {
-    let cleanup_error = match remove_file(temporary) {
-        Ok(()) => return Ok(()),
-        Err(error) => error,
-    };
-    if let Err(rollback_error) = remove_file(output) {
-        return Err(io::Error::other(format!(
-            "report published but temporary cleanup failed ({cleanup_error}); rollback also failed ({rollback_error})"
-        )));
-    }
-    Err(cleanup_error)
+    remove_file(temporary)
 }
 
 fn run_with<I, F>(
@@ -367,41 +354,10 @@ mod tests {
     }
 
     #[test]
-    fn published_report_cleanup_rolls_back_and_reports_both_failures() {
+    fn published_report_cleanup_reports_the_temp_failure_without_path_rollback() {
         let temporary = Path::new("temporary.json");
-        let output = Path::new("output.json");
-        let mut calls = 0;
-        let result = cleanup_published_report(temporary, output, |_| {
-            calls += 1;
-            Err(io::Error::other(format!("failure {calls}")))
-        });
-        assert!(result.unwrap_err().to_string().contains("rollback also failed"));
-        assert_eq!(calls, 2);
-    }
-
-    #[test]
-    fn published_report_cleanup_reports_the_original_error_after_successful_rollback() {
-        let temporary = Path::new("temporary.json");
-        let output = Path::new("output.json");
-        let mut calls = 0;
-        let result = cleanup_published_report(temporary, output, |_| {
-            calls += 1;
-            if calls == 1 {
-                Err(io::Error::other("cleanup failure"))
-            } else {
-                Ok(())
-            }
-        });
-        assert_eq!(result.unwrap_err().to_string(), "cleanup failure");
-        assert_eq!(calls, 2);
-    }
-
-    #[test]
-    fn published_report_cleanup_never_unlinks_the_final_path_after_temp_failure() {
-        let temporary = Path::new("temporary.json");
-        let output = Path::new("output.json");
         let mut attempted_paths = Vec::new();
-        let result = cleanup_published_report(temporary, output, |path| {
+        let result = cleanup_published_report(temporary, |path| {
             attempted_paths.push(path.to_path_buf());
             Err(io::Error::other("cleanup failure"))
         });
