@@ -18,6 +18,8 @@ Successful web retrieval is not a retained Zotero capture: none of these sources
 
 ## Follow-up: source and duplicate scope
 
+Subsequent live metadata comparison found all 21 candidate collection/tag/relation sets empty. One record has a DOI, six creators, an 88-character abstract, date 2025-12-05 and no children. The other twenty have no DOI, one creator and a 149-character abstract with date 2026; three have a PDF child and seventeen do not. Creator contents and edition identity still require bibliographic verification. Preserve both richer bibliography and attached evidence rather than automatically keeping the record with a PDF. No merge plan was executed.
+
 de Beurs, E., Beekman, A. T. F., van Balkom, A. J. L. M., Deeg, D. J. H., van Dyck, R., & van Tilburg, W. (1999). Consequences of anxiety in older persons: Its effect on disability, well-being and use of health services. *Psychological Medicine, 29*(3), 583–593. https://doi.org/10.1017/S0033291799008351
 
 The [university-hosted PDF](https://research.vu.nl/ws/files/1662005/125683.pdf) was retrieved as 12 pages including the repository cover. Its cover identifies the version of record and permits private research copies while restricting redistribution/commercial reuse. Retain a link in public evidence, not the PDF. Screenshot attempts for pages 0 and 1 timed out; textual retrieval is verified, visual inspection is not.

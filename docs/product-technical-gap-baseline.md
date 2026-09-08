@@ -2,6 +2,14 @@
 
 **Snapshot:** 2026-09-07
 
+## September 8 acquisition and consolidation checkpoint
+
+This checkpoint supplements the historical snapshots below, not their unverified incremental KPIs. The [acquisition register](doctoring/missing_full_text_acquisition.md) now identifies public source locations for the four unattached rows in the first 25-row review view. Only TRINITY HTML and the anxiety-study PDF were successfully retrieved; the IRT full text remains unverified. None was added to the bound capture or counted as an approved decision.
+
+Read-only Local API inspection returned 21 TRINITY same-URL candidates. All have empty collections, tags and relations, but one has a DOI/six creators/no child while twenty have no DOI/one creator; three of the latter have PDF children. Three observed extracted texts match, but PDF bytes and edition identity remain unverified. Consolidation must preserve the richer bibliography and children together, and must not choose a survivor by title or attachment presence alone. This is a candidate-specific observation, not a fresh atomic campaign snapshot or write approval.
+
+Next acceptance evidence: verify bibliographic edition and PDF identity, preserve all child/source provenance in a reversible plan, then execute only through the existing whole-envelope authorization boundary. Do not convert source availability or matching text into reviewed labels. [Strix request correlation](doctoring/strix_request_correlation.md) remains an owner-side prerequisite; the reported CO repair PR #1105 is not released serving evidence.
+
 ## September 7 remaining execution and acquisition gates
 
 KPI correction: the inventory's reported 54/76 unique candidate coverage is withdrawn. At least eight later audits duplicate repositories already counted in earlier tables, including identical source revisions. Reconcile canonical repository identities before publishing a replacement coverage or release fraction; the historical incremental counts below are superseded by this correction. The next inventory action is deduplication, not another unverified increment.
