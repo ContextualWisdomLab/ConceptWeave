@@ -12,8 +12,8 @@ use std::time::{Duration, Instant};
 
 mod full_text_capture;
 pub use full_text_capture::{
-    FullTextCapture, FullTextError, build_full_text_review_json, read_local_full_text,
-    verify_full_text_capture,
+    FullTextAvailabilitySummary, FullTextCapture, FullTextError, assess_full_text_availability,
+    build_full_text_review_json, read_local_full_text, verify_full_text_capture,
 };
 pub use full_text_capture::{
     FullTextReviewApproval, FullTextReviewEvaluation, FullTextReviewWorksheet,

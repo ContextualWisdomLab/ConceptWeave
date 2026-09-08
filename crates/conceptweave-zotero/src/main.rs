@@ -5,7 +5,8 @@ use conceptweave_zotero::{
     ClassificationReport, FullTextCapture, FullTextReviewApproval, FullTextReviewWorksheet,
     GoldenSetApproval, MAX_REVIEW_BATCH_ITEMS, StewardDecisionPatch, StewardReviewBatch,
     StewardReviewWorksheet, apply_full_text_review_view, apply_steward_decision_patch,
-    assess_steward_review_progress, build_bound_full_text_review_json, build_full_text_review_json,
+    assess_full_text_availability, assess_steward_review_progress,
+    build_bound_full_text_review_json, build_full_text_review_json,
     build_full_text_review_worksheet, build_steward_review_batch, build_steward_review_worksheet,
     decision_patch_from_review_batch, finalize_full_text_review, read_local_full_text,
     read_local_snapshot, reviewed_golden_set_from_worksheet,
@@ -17,7 +18,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
-const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --capture-full-text /tmp/REPORT.json /tmp/CAPTURE.json | --full-text-worksheet /tmp/REPORT.json /tmp/CAPTURE.json /tmp/WORKSHEET.json | --bound-full-text-review /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/CAPTURE.json LIMIT /tmp/VIEW.json | --apply-full-text-review /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/CAPTURE.json /tmp/COMPLETED_VIEW.json /tmp/UPDATED.json | --finalize-full-text-review /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/CAPTURE.json /tmp/APPROVAL.json /tmp/GOLDEN.json | --full-text-review /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/CAPTURE.json LIMIT /tmp/VIEW.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --review-progress /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/PROGRESS.json | --review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json LIMIT /tmp/BATCH.json | --apply-review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/COMPLETED_BATCH.json /tmp/UPDATED_WORKSHEET.json | --apply-decision-patch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/PATCH.json /tmp/UPDATED_WORKSHEET.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
+const USAGE: &str = "usage: conceptweave-zotero /tmp/REPORT.json | --capture-full-text /tmp/REPORT.json /tmp/CAPTURE.json | --full-text-availability /tmp/REPORT.json /tmp/CAPTURE.json /tmp/SUMMARY.json | --full-text-worksheet /tmp/REPORT.json /tmp/CAPTURE.json /tmp/WORKSHEET.json | --bound-full-text-review /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/CAPTURE.json LIMIT /tmp/VIEW.json | --apply-full-text-review /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/CAPTURE.json /tmp/COMPLETED_VIEW.json /tmp/UPDATED.json | --finalize-full-text-review /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/CAPTURE.json /tmp/APPROVAL.json /tmp/GOLDEN.json | --full-text-review /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/CAPTURE.json LIMIT /tmp/VIEW.json | --worksheet /tmp/REPORT.json /tmp/WORKSHEET.json | --review-progress /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/PROGRESS.json | --review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json LIMIT /tmp/BATCH.json | --apply-review-batch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/COMPLETED_BATCH.json /tmp/UPDATED_WORKSHEET.json | --apply-decision-patch /tmp/REPORT.json /tmp/CURRENT_WORKSHEET.json /tmp/PATCH.json /tmp/UPDATED_WORKSHEET.json | --finalize /tmp/REPORT.json /tmp/WORKSHEET.json /tmp/APPROVAL.json /tmp/GOLDEN.json";
 const MAX_ARTIFACT_BYTES: u64 = 16 * 1024 * 1024;
 // JSON escaping and envelope bytes are separate from the capture's raw-body budget.
 const MAX_CAPTURE_FILE_BYTES: u64 = 512 * 1024 * 1024;
@@ -27,6 +28,11 @@ enum OutputRequest {
     Report(String),
     FullTextCapture {
         report: String,
+        output: String,
+    },
+    FullTextAvailability {
+        report: String,
+        capture: String,
         output: String,
     },
     FullTextWorksheet {
@@ -116,23 +122,31 @@ where
             return Err("full-text report and output paths must differ");
         }
         OutputRequest::FullTextCapture { report, output }
-    } else if first == "--full-text-worksheet" {
+    } else if first == "--full-text-availability" || first == "--full-text-worksheet" {
         let report = args
             .next()
-            .ok_or("--full-text-worksheet requires report, capture, and output paths")?;
+            .ok_or("full-text availability and worksheet require three paths")?;
         let capture = args
             .next()
-            .ok_or("--full-text-worksheet requires report, capture, and output paths")?;
+            .ok_or("full-text availability and worksheet require three paths")?;
         let output = args
             .next()
-            .ok_or("--full-text-worksheet requires report, capture, and output paths")?;
+            .ok_or("full-text availability and worksheet require three paths")?;
         if BTreeSet::from([&report, &capture, &output]).len() != 3 {
-            return Err("full-text worksheet paths must be distinct");
+            return Err("full-text availability and worksheet paths must be distinct");
         }
-        OutputRequest::FullTextWorksheet {
-            report,
-            capture,
-            output,
+        if first == "--full-text-availability" {
+            OutputRequest::FullTextAvailability {
+                report,
+                capture,
+                output,
+            }
+        } else {
+            OutputRequest::FullTextWorksheet {
+                report,
+                capture,
+                output,
+            }
         }
     } else if first == "--apply-full-text-review" || first == "--finalize-full-text-review" {
         let report = args
@@ -776,6 +790,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let golden = finalize_full_text_review(&report, &worksheet, &capture, approval)?;
             write_private_output(&output_path, &serde_json::to_vec_pretty(&golden)?)?;
         }
+        OutputRequest::FullTextAvailability {
+            report,
+            capture,
+            output,
+        } => {
+            let output_path = validate_output_path(&output)?;
+            let (report, report_identity): (ClassificationReport, _) =
+                read_private_json(&report).map_err(|error| label_input("report", error))?;
+            let (capture, capture_identity) =
+                read_private_capture(&capture).map_err(|error| label_input("capture", error))?;
+            if report_identity == capture_identity {
+                return Err("full-text availability inputs must be distinct files".into());
+            }
+            let summary = assess_full_text_availability(&report, &capture)?;
+            write_private_output(&output_path, &serde_json::to_vec_pretty(&summary)?)?;
+        }
         OutputRequest::FullTextWorksheet {
             report,
             capture,
@@ -1030,6 +1060,32 @@ mod tests {
         assert!(
             parse_output_request(["--full-text-worksheet", "r", "c", "o", "metadata-worksheet"])
                 .is_err()
+        );
+    }
+
+    #[test]
+    fn full_text_availability_mode_requires_three_distinct_paths() {
+        assert!(
+            parse_output_request([
+                "--full-text-availability",
+                "/tmp/report.json",
+                "/tmp/capture.json",
+                "/tmp/summary.json",
+            ])
+            .is_ok()
+        );
+        for length in 1..4 {
+            let arguments = ["--full-text-availability", "r", "c", "o"];
+            assert!(parse_output_request(arguments[..length].iter().copied()).is_err());
+        }
+        for paths in [["r", "r", "o"], ["r", "c", "r"], ["r", "c", "c"]] {
+            assert!(
+                parse_output_request(["--full-text-availability", paths[0], paths[1], paths[2]])
+                    .is_err()
+            );
+        }
+        assert!(
+            parse_output_request(["--full-text-availability", "r", "c", "o", "extra"]).is_err()
         );
     }
 

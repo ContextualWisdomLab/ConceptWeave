@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 mod full_text_review;
 pub use full_text_review::*;
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::io::{self, Write};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -31,6 +31,27 @@ const MAX_PERSISTED_CAPTURE_BYTES: u64 = 512 * 1024 * 1024;
 pub struct FullTextCapture {
     capture_digest: String,
     capture_evidence: CaptureEvidence,
+}
+
+/// Privacy-safe paper-level availability counts for one verified capture.
+#[derive(Debug, PartialEq, Eq, Serialize)]
+pub struct FullTextAvailabilitySummary {
+    /// Digest of the complete verified capture used for these counts.
+    pub capture_digest: String,
+    /// Total bibliographic proposals in the bound report.
+    pub paper_count: usize,
+    /// Papers with at least one nonempty captured full-text response.
+    pub papers_with_nonempty_text: usize,
+    /// Papers without an attachment descendant in the report.
+    pub papers_without_attachment: usize,
+    /// Papers with attachment descendants but no full-text manifest record.
+    pub papers_with_unmanifested_attachment: usize,
+    /// Papers with captured records but no nonempty full text.
+    pub papers_with_captured_no_text: usize,
+    /// Missing-text papers whose metadata classifier abstained.
+    pub papers_needing_review_without_text: usize,
+    /// Nonempty captured records that do not resolve to a paper proposal.
+    pub unbound_nonempty_record_count: usize,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -184,6 +205,112 @@ pub fn verify_full_text_capture(
     report: &ClassificationReport,
 ) -> Result<(), FullTextError> {
     verify_capture_with_persisted_limit(capture, report, MAX_PERSISTED_CAPTURE_BYTES)
+}
+
+/// Counts paper-level full-text availability without returning item identities.
+///
+/// The complete capture is verified against the report before aggregation. A
+/// response count is never treated as a paper count, and an empty or missing
+/// response never becomes a semantic decision or approval.
+pub fn assess_full_text_availability(
+    report: &ClassificationReport,
+    capture: &FullTextCapture,
+) -> Result<FullTextAvailabilitySummary, FullTextError> {
+    verify_full_text_capture(capture, report)?;
+    let paper_keys: BTreeSet<_> = report
+        .classified_items
+        .iter()
+        .map(|item| item.item_key.as_str())
+        .collect();
+    let parent_by_key: BTreeMap<_, _> = report
+        .snapshot_items
+        .iter()
+        .map(|item| (item.item_key.as_str(), item.parent_item_key.as_deref()))
+        .collect();
+    let resolve_paper = |item_key| paper_ancestor(item_key, &parent_by_key, &paper_keys);
+
+    let attachment_papers: BTreeSet<_> = report
+        .unclassified_items
+        .iter()
+        .filter(|item| item.data.item_type == "attachment")
+        .filter_map(|item| resolve_paper(item.key.as_str()))
+        .collect();
+    let mut captured_papers = BTreeSet::new();
+    let mut nonempty_papers = BTreeSet::new();
+    let mut unbound_nonempty_record_count = 0;
+    for record in &capture.capture_evidence.records {
+        let paper_key = resolve_paper(record.item_key.as_str());
+        if let Some(paper_key) = paper_key {
+            captured_papers.insert(paper_key);
+        }
+        if captured_content_is_nonempty(&record.content_response)? {
+            if let Some(paper_key) = paper_key {
+                nonempty_papers.insert(paper_key);
+            } else {
+                unbound_nonempty_record_count += 1;
+            }
+        }
+    }
+
+    let mut papers_without_attachment = 0;
+    let mut papers_with_unmanifested_attachment = 0;
+    let mut papers_with_captured_no_text = 0;
+    let mut papers_needing_review_without_text = 0;
+    for item in &report.classified_items {
+        let item_key = item.item_key.as_str();
+        if nonempty_papers.contains(item_key) {
+            continue;
+        }
+        if item.proposed_disposition == crate::Disposition::NeedsStewardReview {
+            papers_needing_review_without_text += 1;
+        }
+        if captured_papers.contains(item_key) {
+            papers_with_captured_no_text += 1;
+        } else if attachment_papers.contains(item_key) {
+            papers_with_unmanifested_attachment += 1;
+        } else {
+            papers_without_attachment += 1;
+        }
+    }
+
+    Ok(FullTextAvailabilitySummary {
+        capture_digest: capture.capture_digest.clone(),
+        paper_count: paper_keys.len(),
+        papers_with_nonempty_text: nonempty_papers.len(),
+        papers_without_attachment,
+        papers_with_unmanifested_attachment,
+        papers_with_captured_no_text,
+        papers_needing_review_without_text,
+        unbound_nonempty_record_count,
+    })
+}
+
+fn paper_ancestor<'item>(
+    item_key: &'item str,
+    parent_by_key: &BTreeMap<&'item str, Option<&'item str>>,
+    paper_keys: &BTreeSet<&str>,
+) -> Option<&'item str> {
+    let mut current_key = item_key;
+    for _ in 0..=parent_by_key.len() {
+        if paper_keys.contains(current_key) {
+            return Some(current_key);
+        }
+        current_key = parent_by_key.get(current_key).copied().flatten()?;
+    }
+    None
+}
+
+fn captured_content_is_nonempty(response: &CapturedResponse) -> Result<bool, FullTextError> {
+    if response.status != 200 {
+        return Ok(false);
+    }
+    #[derive(Deserialize)]
+    struct ContentProjection {
+        content: String,
+    }
+    let content: ContentProjection =
+        serde_json::from_str(&response.body).map_err(|_| INVALID_EVIDENCE)?;
+    Ok(!content.content.is_empty())
 }
 
 fn verify_capture_with_persisted_limit(
