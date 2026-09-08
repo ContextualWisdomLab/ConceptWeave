@@ -113,16 +113,20 @@ fn write_report<T: serde::Serialize>(
         let _ = fs::remove_file(&temporary);
         return Err(error.into());
     }
-    if let Err(cleanup_error) = fs::remove_file(&temporary) {
-        if let Err(rollback_error) = fs::remove_file(output) {
-            return Err(io::Error::other(format!(
-                "report published but temporary cleanup failed ({cleanup_error}); rollback also failed ({rollback_error})"
-            ))
-            .into());
-        }
-        return Err(cleanup_error.into());
-    }
-    Ok(())
+    cleanup_published_report(&temporary, |path| fs::remove_file(path)).map_err(Into::into)
+}
+
+fn cleanup_published_report<F>(temporary: &Path, mut remove_file: F) -> io::Result<()>
+where
+    F: FnMut(&Path) -> io::Result<()>,
+{
+    remove_file(temporary).map_err(|error| {
+        let kind = error.kind();
+        io::Error::new(
+            kind,
+            format!("report published but temporary cleanup failed: {error}"),
+        )
+    })
 }
 
 fn run_with<I, F>(
@@ -321,6 +325,33 @@ mod tests {
 
         assert!(write_report(&output, &FailingReport).is_err());
         assert!(!output.exists());
+    }
+
+    #[test]
+    fn published_report_cleanup_reports_temp_failure_without_final_path_rollback() {
+        let temporary = Path::new("temporary.json");
+        let mut attempted_paths = Vec::new();
+        let result = cleanup_published_report(temporary, |path| {
+            attempted_paths.push(path.to_path_buf());
+            Err(io::Error::other("cleanup failure"))
+        });
+
+        assert!(result.unwrap_err().to_string().contains("cleanup failure"));
+        assert_eq!(attempted_paths, vec![temporary.to_path_buf()]);
+    }
+
+    #[test]
+    fn published_report_cleanup_error_identifies_post_publication_state() {
+        let temporary = Path::new("temporary.json");
+        let error = cleanup_published_report(temporary, |_| {
+            Err(io::Error::new(io::ErrorKind::PermissionDenied, "cleanup failure"))
+        })
+        .unwrap_err();
+
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+        assert!(error
+            .to_string()
+            .contains("report published but temporary cleanup failed"));
     }
 
     #[test]
