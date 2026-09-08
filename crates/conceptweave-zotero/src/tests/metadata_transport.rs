@@ -223,6 +223,32 @@ fn production_transport_rejects_missing_and_malformed_required_headers() {
         read_raw_response(malformed_total),
         Err(ReadError::Header("Total-Results"))
     ));
+
+    for omitted in [
+        "Last-Modified-Version",
+        "X-Zotero-Version",
+        "Zotero-API-Version",
+        "Zotero-Schema-Version",
+    ] {
+        let headers = [
+            ("Total-Results", "0"),
+            ("Last-Modified-Version", "42"),
+            ("X-Zotero-Version", "9.0.6"),
+            ("Zotero-API-Version", "3"),
+            ("Zotero-Schema-Version", "42"),
+        ]
+        .into_iter()
+        .filter(|(name, _)| *name != omitted)
+        .map(|(name, value)| format!("{name}: {value}\r\n"))
+        .collect::<String>();
+        let response =
+            format!("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n{headers}Connection: close\r\n\r\n[]")
+                .into_bytes();
+        assert!(matches!(
+            read_raw_response(response),
+            Err(ReadError::Header(name)) if name == omitted
+        ));
+    }
 }
 
 #[test]
