@@ -8,6 +8,8 @@ This file records code-current product and technical gaps. Exact PR/check/run co
 
 The `0d4d677ddad471a0634cdaeed99d8e1afec66043` repair checkpoint additionally binds source-resolution decisions to the Local API `server_id` whenever the provider exposes one; this is dated evidence, not a mutable-head claim.
 
+Owner coverage checkpoint `f71286e` (before documentation-only `60d01f8`) improved after the source-resolution error-contract test to 180/185 functions, 2,766/2,818 normalized regions, and 159/164 normalized branch outcomes; the gate remains RED and no exclusion or threshold weakening is accepted.
+
 PR #40 executable checkpoint `1308ac6e4403a67c61b84f47c9d0142286da3c64` is recorded as a dated Draft/open/CLEAN evidence point, based on Research Intake head `ff2e78aaa4ce75c7eb5f41bc9612b8dcf3bb7d38`. Its source-resolution aggregate, ontology discovery signal, and visual/API population-boundary lesson are pushed, while independent approval and protected workflow evidence remain absent; the live PR head is authoritative for later documentation-only descendants and no merge or release is claimed.
 
 PR #39 review adds a downstream repair finding: `FullTextWriteScope` still lacks the source-resolution aggregate and exact snapshot binding, so its successor must consume PR #40 without clearing or inferring the four pending sources.
