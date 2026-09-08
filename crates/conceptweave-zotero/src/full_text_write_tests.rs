@@ -728,6 +728,21 @@ pub(super) fn write_scope_fixture(
     }
 }
 
+fn pending_report_fixture() -> ClassificationReport {
+    let items: Vec<ZoteroItem> = serde_json::from_value(serde_json::json!([
+        {"key":"ABCD2345","version":2,"data":{"itemType":"journalArticle","title":"fixture paper"}},
+        {"key":"BCDE3456","version":1,"data":{"itemType":"attachment","parentItem":"ABCD2345"}},
+        {"key":"CDEF4567","version":0,"data":{"itemType":"attachment","parentItem":"ABCD2345"}},
+        {"key":"DEFG5678","version":2,"data":{"itemType":"book","title":"no attachment fixture"}},
+        {"key":"EFGH6789","version":1,"data":{"itemType":"note","title":"standalone source"}}
+    ]))
+    .unwrap();
+    let mut report = classify_snapshot("10.0.1".into(), Some("fixture-server".into()), 2, items);
+    report.api_version = Some(3);
+    report.schema_version = Some(44);
+    report
+}
+
 #[test]
 fn full_text_write_rejects_missing_source_resolution_before_authority() {
     let report = report_fixture();
@@ -738,6 +753,29 @@ fn full_text_write_rejects_missing_source_resolution_before_authority() {
     let mut scope = write_scope_fixture(&report, &capture);
     scope.source_resolution_review = None;
     assert!(build_full_text_write_plan(&report, &capture, scope, |_| true, |_| true).is_err());
+}
+
+#[test]
+fn full_text_write_accepts_an_exact_resolution_for_pending_sources() {
+    let report = pending_report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let pending_item = report
+        .unclassified_items
+        .iter()
+        .find(|item| item.key == "EFGH6789")
+        .unwrap();
+    let scope = write_scope_fixture(&report, &capture);
+
+    let plan = build_full_text_write_plan(&report, &capture, scope, |_| true, |_| true)
+        .expect("an exact report-bound source resolution should admit the write plan");
+    let serialized = serde_json::to_value(plan).unwrap();
+    assert_eq!(
+        serialized["approved_scope"]["source_resolution_review"]["resolved_sources"][0]["item_key"],
+        pending_item.key
+    );
 }
 
 #[test]

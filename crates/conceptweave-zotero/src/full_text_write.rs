@@ -137,7 +137,11 @@ pub fn build_full_text_write_plan(
     verify_meaning: impl FnOnce(&FullTextReviewedGoldenSet) -> bool,
     verify_writes: impl FnOnce(&FullTextWriteScope) -> bool,
 ) -> Result<FullTextWritePlan, FullTextError> {
-    let evaluation = prepare_full_text_review(report, capture, &scope.full_text_review)?;
+    let evaluation = crate::full_text_capture::prepare_full_text_review_with_source_resolution(
+        report,
+        capture,
+        &scope.full_text_review,
+    )?;
     let Some(review) = scope.source_resolution_review.as_ref() else {
         return Err(INVALID_WRITE_SCOPE);
     };

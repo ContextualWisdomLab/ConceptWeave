@@ -187,9 +187,26 @@ fn prepare_full_text_review(
     capture: &FullTextCapture,
     reviewed: &FullTextReviewedGoldenSet,
 ) -> Result<crate::GoldenSetEvaluation, FullTextError> {
+    prepare_full_text_review_internal(report, capture, reviewed, false)
+}
+
+pub(crate) fn prepare_full_text_review_with_source_resolution(
+    report: &ClassificationReport,
+    capture: &FullTextCapture,
+    reviewed: &FullTextReviewedGoldenSet,
+) -> Result<crate::GoldenSetEvaluation, FullTextError> {
+    prepare_full_text_review_internal(report, capture, reviewed, true)
+}
+
+fn prepare_full_text_review_internal(
+    report: &ClassificationReport,
+    capture: &FullTextCapture,
+    reviewed: &FullTextReviewedGoldenSet,
+    allow_resolved_pending_sources: bool,
+) -> Result<crate::GoldenSetEvaluation, FullTextError> {
     validate_review_capture(report, capture, &reviewed.capture_digest)?;
     if reviewed.reviewed_golden_set.labels.len() != report.classified_items.len()
-        || !report.pending_source_item_keys.is_empty()
+        || (!allow_resolved_pending_sources && !report.pending_source_item_keys.is_empty())
     {
         return Err(FullTextError("full-text review is invalid or unverified"));
     }

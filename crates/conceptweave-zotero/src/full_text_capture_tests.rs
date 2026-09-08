@@ -741,9 +741,9 @@ fn review_view_separates_two_text_parents_and_excludes_standalone_attachments() 
                 true
             },
         )
-        .is_err()
+        .is_ok()
     );
-    assert_eq!(write_calls.get(), 0);
+    assert_eq!(write_calls.get(), 2);
     assert_eq!(report.pending_source_item_keys, ["FGHI789A"]);
 }
 
