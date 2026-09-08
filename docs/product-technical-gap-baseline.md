@@ -10,6 +10,8 @@ The `0d4d677ddad471a0634cdaeed99d8e1afec66043` repair checkpoint additionally bi
 
 PR #40 exact-head repair `a87ee2d4d92f97fe61639696ae5e06f8f20c84d6` now rejects missing or blank Local API server identity before evaluating pending resolutions, including the empty-pending case; focused Zotero tests, locked workspace tests, strict Clippy, warnings-denied rustdoc, and formatting pass locally. Hosted protected checks remain unavailable while the PR is Draft.
 
+Pinned coverage rerun at merged exact head `d8560e8870f4419c73dc7530af7fdd1d0f238658` is RED at 181/186 functions, 2,773/2,825 normalized regions, and 160/166 normalized branches; no exclusions or threshold weakening are accepted. The remaining gaps are concentrated in generic/transport and CLI error paths and require targeted owner tests before any GREEN claim.
+
 Owner coverage checkpoint `f71286e` (before documentation-only `60d01f8`) improved after the source-resolution error-contract test to 180/185 functions, 2,766/2,818 normalized regions, and 159/164 normalized branch outcomes; the gate remains RED and no exclusion or threshold weakening is accepted.
 
 PR #40 executable checkpoint `1308ac6e4403a67c61b84f47c9d0142286da3c64` is recorded as a dated Draft/open/CLEAN evidence point, based on Research Intake head `ff2e78aaa4ce75c7eb5f41bc9612b8dcf3bb7d38`. Its source-resolution aggregate, ontology discovery signal, and visual/API population-boundary lesson are pushed, while independent approval and protected workflow evidence remain absent; the live PR head is authoritative for later documentation-only descendants and no merge or release is claimed.
