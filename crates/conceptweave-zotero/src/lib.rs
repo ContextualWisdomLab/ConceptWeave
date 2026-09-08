@@ -239,7 +239,7 @@ pub struct SourceResolutionReview {
     /// Library version shared by the snapshot.
     pub library_version: u64,
     /// Rule revision used for the associated classification report.
-    pub rule_revision: &'static str,
+    pub rule_revision: String,
     /// One resolution for every pending source, sorted by item key.
     pub resolved_sources: Vec<PendingSourceResolution>,
 }
@@ -323,7 +323,7 @@ pub fn prepare_source_resolution_review(
         zotero_version: report.zotero_version.clone(),
         server_id: report.server_id.clone(),
         library_version: report.library_version,
-        rule_revision: report.rule_revision,
+        rule_revision: report.rule_revision.to_owned(),
         resolved_sources: resolutions,
     })
 }
