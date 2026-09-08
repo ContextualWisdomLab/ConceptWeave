@@ -1337,9 +1337,9 @@ At 02:31 KST on 2026-09-09, a fresh replay in this turn reproduced the same
 four pending sources and 49 duplicate candidates. Stable output is repeatability
 evidence, not semantic approval, full-text review, Zotero mutation or release proof.
 
-At exact root head `67e8ec0`, the repository coverage gate was rerun with the
-pinned nightly toolchain after the replay documentation update. The workspace
-suite passed, while normalized coverage reported 4,731/4,752 lines, 4,731/4,752
-regions, 449/450 functions and 783/784 branches. The remaining normalized branch
-is in the report-bound full-text write equality check; this is an explicit RED
-acceptance gap, not a threshold or exclusion change.
+At exact root head `b73c984`, the repository coverage gate was rerun with the
+pinned nightly toolchain after adding a regression test for every
+`SourceResolutionError` display variant. The workspace suite passed; normalized
+source regions are now 4,752/4,752 and normalized branches are 783/784 covered.
+The remaining branch is in the report-bound full-text write equality check; this
+is an explicit RED acceptance gap, not a threshold or exclusion change.
