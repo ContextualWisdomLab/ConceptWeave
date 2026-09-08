@@ -1264,14 +1264,15 @@ replay remains below the 100% production target (branches 200/204, functions 207
 lines 1874/1888, regions 2969/3005). This is local owner evidence only;
 hosted required checks, independent approval and protected merge remain unverified.
 
-PR39 head `7b957ffb46c44fedaa2faa5687bcd1382d09795c` closes the downstream source-resolution
+PR39 head `1a4ec68a31d123aa274c834fe85c7d17b5504367` closes the downstream source-resolution
 gap in the write-plan boundary: ordinary full-text evaluation remains fail-closed for pending
 sources, while write admission now permits them only after the exact report-bound
 `SourceResolutionReview` is revalidated. A standalone pending-source fixture proves both
 verifiers are reached only after that envelope succeeds; the prior rejection test now proves
 the positive path without granting Zotero authority. Rust 1.98 all-target tests, Clippy,
 rustdoc and formatting pass locally. Hosted checks, independent approval and protected merge
-remain unverified.
+remain unverified. The subsequent full workspace all-target test replay is GREEN; no
+Zotero authority callback or live write was issued.
 
 ### Downstream source-resolution envelope gap (2026-09-09)
 
