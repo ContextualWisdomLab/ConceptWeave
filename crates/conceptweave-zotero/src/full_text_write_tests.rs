@@ -734,7 +734,8 @@ fn pending_report_fixture() -> ClassificationReport {
         {"key":"BCDE3456","version":1,"data":{"itemType":"attachment","parentItem":"ABCD2345"}},
         {"key":"CDEF4567","version":0,"data":{"itemType":"attachment","parentItem":"ABCD2345"}},
         {"key":"DEFG5678","version":2,"data":{"itemType":"book","title":"no attachment fixture"}},
-        {"key":"EFGH6789","version":1,"data":{"itemType":"note","title":"standalone source"}}
+        {"key":"EFGH6789","version":1,"data":{"itemType":"note","title":"standalone source"}},
+        {"key":"ZZZZ9999","version":1,"data":{"itemType":"note","title":"second standalone source"}}
     ]))
     .unwrap();
     let mut report = classify_snapshot("10.0.1".into(), Some("fixture-server".into()), 2, items);
@@ -775,6 +776,33 @@ fn full_text_write_accepts_an_exact_resolution_for_pending_sources() {
     assert_eq!(
         serialized["approved_scope"]["source_resolution_review"]["resolved_sources"][0]["item_key"],
         pending_item.key
+    );
+}
+
+#[test]
+fn full_text_write_rejects_noncanonical_resolution_order_before_authority() {
+    let report = pending_report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let mut scope = write_scope_fixture(&report, &capture);
+    scope
+        .source_resolution_review
+        .as_mut()
+        .unwrap()
+        .resolved_sources
+        .reverse();
+
+    assert!(
+        build_full_text_write_plan(
+            &report,
+            &capture,
+            scope,
+            |_| panic!("meaning authority"),
+            |_| panic!("write authority")
+        )
+        .is_err()
     );
 }
 
