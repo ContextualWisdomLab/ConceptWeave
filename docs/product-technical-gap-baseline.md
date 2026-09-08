@@ -1268,9 +1268,10 @@ remain open; no local evidence is transferred to a remote or later head.
 
 PR40 owner head `3d63989c113e1bd2bd44c98d133ea8aae8a08318` adds a regression assertion for the
 `InvalidPendingKeySet` error contract and encodes the validated output-path invariant without
-changing admission policy. Rust 1.98 all-target tests and formatting pass; the workspace raw
-replay remains below the 100% production target (branches 200/204, functions 207/209,
-lines 1874/1888, regions 2969/3005). This is local owner evidence only;
+changing admission policy. Rust 1.98 all-target tests, formatting, strict Clippy and
+warnings-denied rustdoc pass; the workspace raw replay remains below the 100% production
+target (branches 201/206, functions 207/209, lines 1875/1890, regions 2971/3008). This
+is local owner evidence only;
 hosted required checks, independent approval and protected merge remain unverified.
 
 PR39 head `ec33927122ca433947b5bb3bce610cc8812c8f90` closes the downstream source-resolution
