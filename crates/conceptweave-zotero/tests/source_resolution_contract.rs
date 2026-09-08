@@ -75,7 +75,12 @@ fn source_resolution_review_requires_the_exact_pending_snapshot_set() {
     )
     .expect("every pending source has one exact-snapshot resolution");
 
+    assert_eq!(review.zotero_version(), "10.0.1");
+    assert_eq!(review.server_id(), Some("local-server"));
     assert_eq!(review.library_version(), 42);
+    assert_eq!(review.rule_revision(), "ontology-research-v2");
+    assert_eq!(review.pending_source_item_keys(), ["NOTE", "SOURCE"]);
+    assert_eq!(review.expected_source_identities().len(), 2);
     assert_eq!(review.resolved_sources().len(), 2);
     assert_eq!(
         review
