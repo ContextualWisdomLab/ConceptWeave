@@ -182,3 +182,36 @@ fn source_resolution_rejects_pending_keys_missing_from_retained_inventory() {
         Err(SourceResolutionError::MissingInventory(key)) if key == "SOURCE"
     ));
 }
+
+#[test]
+fn source_resolution_errors_explain_each_rejection() {
+    let cases = [
+        (
+            SourceResolutionError::Missing("SOURCE".into()),
+            "pending source lacks resolution: SOURCE",
+        ),
+        (
+            SourceResolutionError::Unknown("SOURCE".into()),
+            "resolution is not pending in the report: SOURCE",
+        ),
+        (
+            SourceResolutionError::Duplicate("SOURCE".into()),
+            "pending source has duplicate resolutions: SOURCE",
+        ),
+        (
+            SourceResolutionError::Stale("SOURCE".into()),
+            "resolution does not match report source identity: SOURCE",
+        ),
+        (
+            SourceResolutionError::BlankReason("SOURCE".into()),
+            "source resolution reason is blank: SOURCE",
+        ),
+        (
+            SourceResolutionError::MissingInventory("SOURCE".into()),
+            "pending source is absent from report inventory: SOURCE",
+        ),
+    ];
+    for (error, expected) in cases {
+        assert_eq!(error.to_string(), expected);
+    }
+}
