@@ -87,14 +87,16 @@ counts were retained in [the readiness record](doctoring/zotero_local_api_readin
 no item JSON was copied. This is endpoint readiness, not an atomic capture,
 decision, approval, write, release or deployment.
 
-PR #39 now points to exact head `fe32a691b96761f886d06207ed7f4df0faa63bfd`
+PR #39 now points to exact head `41c2f236450092ae29199891e926747a8b75cc13`
 over stacked base `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`. The write scope
 requires a complete source-resolution aggregate and revalidates every pending
 source against the immutable report before any authority callback. Missing and
 stale source-resolution regressions pass in the locked Rust 1.98 workspace;
 Clippy, warnings-denied rustdoc and diff checks also pass. GitHub reports OPEN
-Draft/CLEAN with CodeRabbit queued and no required hosted check yet. This is
-not protected-merge, release or Zotero-write evidence.
+Draft/CLEAN with CodeRabbit skipped because the PR remains a draft. PR #40's
+current baseline-only successor is `e557ebca0d7e6c70dc8ea45c9b7616c1f85f18c4`;
+its causal rule-revision repair remains in ancestry and needs fresh exact-head
+verification. This is not protected-merge, release or Zotero-write evidence.
 
 Pinned `cargo +1.98.0 llvm-cov --workspace --all-features --locked
 --summary-only` at this successor passes all tests but remains below the owned
@@ -105,6 +107,12 @@ pre-existing full-text review (2 regions), shared report validation (81
 regions, 3 functions), and CLI error/edge paths (303 regions, 19 functions).
 No exclusions or threshold weakening were introduced; coverage repair remains
 the next engineering gap before protected merge.
+
+The write-envelope mismatch regression now exercises four stored identity
+mismatch forms and raises normalized branch coverage to 781/782 (99.87%) in
+the pinned nightly run with 115 tests. One reordered `resolved_sources`
+equality arm remains unexecuted; it is recorded as the next bounded fixture
+gap rather than hidden with an exclusion or threshold change.
 
 The [refreshed capture checkpoint](doctoring/refreshed_capture_evidence.md) now records successful optimized full-library capture, verified 3,715-row blank worksheet, a 25-row bound view, and full workspace tests at `b0f7d5b8bb139d627cec37b598331464c14b60ab` (terminal exit 0). Actual decisions and approvals remain zero. The CO owner freshly reports no GitHub release or PyPI package, unmerged release PR #1030 and unmerged diagnostic PR #1105. Its stated prerequisites are protected exact-head checks/independent review, fast-mlsirm publication, immutable CO client/schema release, and verified classification serving. This is owner-reported release status, not locally verified registry evidence. Available secret metadata is not the blocker. Do not send private paper contents or substitute a direct provider while these conditions remain unmet.
 
