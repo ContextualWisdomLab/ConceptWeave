@@ -65,6 +65,11 @@ source-resolution contracts and publication-cleanup regressions. This is
 current local evidence only; no hosted workflow, independent approval or
 protected merge is inferred.
 
+On the same unchanged PR40 head, `cargo +1.98.0 fmt --all -- --check`, strict
+all-target Clippy and warnings-denied workspace rustdoc completed successfully.
+These local checks strengthen source evidence but do not satisfy the active
+ruleset's hosted-workflow or independent-review gates.
+
 ## September 8 acquisition and consolidation checkpoint
 
 Nightly `2026-08-20` coverage was rerun at PR #39 exact head
