@@ -1326,6 +1326,17 @@ heads, but GitHub continued to report “reviews are disabled for this base bran
 and produced no independent review or required workflow run. The request itself is
 coordination evidence only, not approval.
 
+### Exact-head loop checkpoint (2026-09-09)
+
+PR39 is now `11016b40e55a2f75a74b35514c63f8269586cb4d` and remains OPEN,
+MERGEABLE and CLEAN. Its source/test successor `78d40c3` closes the report-bound
+resolution-order coverage branch; the latest documentation head records that the
+normalized source-region and branch gates are both 100%, while per-file line/region
+gaps remain. PR40 remains the trusted-restoration owner at exact head
+`19c4d5a43234b6290233f3e8b1475c9746d94dda`; its source repairs are retained as
+unmerged prerequisite work. Neither exact head has independent approval or central
+required workflow evidence, so no protected merge or release is claimed.
+
 The latest report retains four pending source records: one standalone note and
 three standalone attachments without parent links. Their file bytes, content type
 and link mode remain outside the metadata projection and require the separate
