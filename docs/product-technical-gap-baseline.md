@@ -6,7 +6,9 @@ This file records code-current product and technical gaps. Exact PR/check/run co
 
 ## September 8 research lifecycle, abstention, and replay-evidence checkpoint
 
-PR #40 current exact head is `a34f1e95afa069e19562745c1380959593e01237` (Draft/open/CLEAN). Its source-resolution aggregate and visual/API population-boundary lesson are pushed, while independent approval and protected workflow evidence remain absent; no merge or release is claimed.
+PR #40 current exact head is `90c4ace6c7cbe9f537272665269a51693583fe87` (Draft/open/CLEAN). Its source-resolution aggregate and visual/API population-boundary lesson are pushed, while independent approval and protected workflow evidence remain absent; no merge or release is claimed.
+
+PR #39 review adds a downstream repair finding: `FullTextWriteScope` still lacks the source-resolution aggregate and exact snapshot binding, so its successor must consume PR #40 without clearing or inferring the four pending sources.
 
 Research Intake source-resolution P1 is now addressed at its owner seam by RED `520a9bf` and GREEN `416e35a`. `prepare_source_resolution_review` produces a typed aggregate only when decisions exactly cover `pending_source_item_keys` and match each retained source's key, version, type, parent, and report library coordinates. Outcomes are explicit and non-authoritative (`retain_standalone_evidence`, `rebind_requires_separate_authorization`, `exclude_from_research_scope`); missing, unknown, duplicate, stale, and blank-reason inputs fail closed. Successor tests `e636624`, `3d2c2e7`, and `3d17622` cover identity rejection, owned JSON round-trip, and cross-library snapshot binding; `e2a5355` changes the serialized rule revision to owned data after review finding, and `4ce83e8` covers the nonalphabetic abstention branch. This closes the producer contract but not downstream paper-review/full-text/approval integration, protected checks, or Zotero writes.
 
