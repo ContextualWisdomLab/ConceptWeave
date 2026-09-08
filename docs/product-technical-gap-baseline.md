@@ -1299,7 +1299,8 @@ the default-branch ruleset does not itself create the required workflow runs on 
 intermediate bases; this is a stack topology fact, not a hosted GREEN result.
 
 On 2026-09-09 the two preceding stack PRs (#37 and #38) were also moved from Draft to
-Ready for review to remove the review-suppression state. #38 remains CLEAN; #37 reports
-`UNSTABLE` while still `MERGEABLE`, with an empty status-check rollup. All four stack PRs
-therefore still require independent review and exact hosted workflow evidence before any
-protected merge claim.
+Ready for review to remove the review-suppression state. #37 and #38 are currently
+`CLEAN` and `MERGEABLE`; the commit status API contains only the CodeRabbit success note
+that reviews are disabled for the intermediate base. All four stack PRs therefore still
+require independent review and exact hosted workflow evidence before any protected merge
+claim.
