@@ -73,15 +73,15 @@ fn source_resolution_rejects_blank_snapshot_identity_coordinates() {
 
     let mut blank_zotero_version = report.clone();
     blank_zotero_version.zotero_version = " \t\n".into();
-    assert!(
-        prepare_source_resolution_review(&blank_zotero_version, vec![resolution_for_library(7)])
-            .is_err()
-    );
+    assert!(matches!(
+        prepare_source_resolution_review(&blank_zotero_version, vec![resolution_for_library(7)]),
+        Err(SourceResolutionError::InvalidSnapshotIdentity)
+    ));
 
     let mut blank_rule_revision = report;
     blank_rule_revision.rule_revision = " \t\n";
-    assert!(
-        prepare_source_resolution_review(&blank_rule_revision, vec![resolution_for_library(7)])
-            .is_err()
-    );
+    assert!(matches!(
+        prepare_source_resolution_review(&blank_rule_revision, vec![resolution_for_library(7)]),
+        Err(SourceResolutionError::InvalidSnapshotIdentity)
+    ));
 }
