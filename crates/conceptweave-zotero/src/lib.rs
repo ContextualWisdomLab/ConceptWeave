@@ -282,6 +282,24 @@ fn local_api_base() -> String {
     LOCAL_API.to_owned()
 }
 
+fn is_valid_zotero_object_key(value: &str) -> bool {
+    value.len() == 8
+        && value
+            .bytes()
+            .all(|byte| matches!(byte, b'2'..=b'9' | b'A'..=b'N' | b'P'..=b'Z'))
+}
+
+fn validate_source_item_keys(items: &[ZoteroItem]) -> Result<(), ReadError> {
+    if items
+        .iter()
+        .all(|item| is_valid_zotero_object_key(&item.key))
+    {
+        Ok(())
+    } else {
+        Err(ReadError::SnapshotChanged)
+    }
+}
+
 #[cfg_attr(coverage_nightly, coverage(off))]
 fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, ReadError> {
     let url = format!(
@@ -305,7 +323,8 @@ fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, Re
     let body = read_bounded_response_text(&mut response, MAX_PAGE_BYTES)
         .map_err(|error| ReadError::Body(error.to_string()))?;
     let body_bytes = u64::try_from(body.len()).map_err(|_| ReadError::Budget("byte-count"))?;
-    let items = serde_json::from_str(&body).map_err(ReadError::Json)?;
+    let items: Vec<ZoteroItem> = serde_json::from_str(&body).map_err(ReadError::Json)?;
+    validate_source_item_keys(&items)?;
 
     Ok(FetchedPage {
         total,
@@ -897,7 +916,7 @@ mod tests {
             }
             let request = String::from_utf8_lossy(&request).to_lowercase();
             assert!(request.contains("zotero-api-version: 3"));
-            let body = r#"[{"key":"A","version":1,"data":{"itemType":"book","title":"ontology evaluation"}}]"#;
+            let body = r#"[{"key":"2A3B4C5D","version":1,"data":{"itemType":"book","title":"ontology evaluation"}}]"#;
             write!(
                 stream,
                 "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nTotal-Results: 1\r\nLast-Modified-Version: 42\r\nX-Zotero-Version: 9.0.6\r\nZotero-API-Version: 3\r\nZotero-Schema-Version: 42\r\nZotero-Server-ID: server\r\nConnection: close\r\n\r\n{}",
@@ -940,8 +959,6 @@ mod tests {
 
     #[test]
     fn reader_deadline_rejects_expired_admission_page_and_report() {
-        // Expired before first I/O, after a page, before next I/O, and after
-        // classifying the final page; no partial or late report may escape.
         for (ticks, total, expected_calls) in [
             (vec![300], 1, 0),
             (vec![0, 301], 1, 1),
