@@ -1394,3 +1394,21 @@ fn every_failed_request_and_invalid_replay_input_fails_closed() {
     capture.capture_evidence.manifest_before.body = "null".into();
     assert!(verify_full_text_capture(&capture, &report).is_err());
 }
+
+#[test]
+fn availability_summary_partitions_every_paper_without_exposing_item_identity() {
+    let report = report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+
+    let summary = assess_full_text_availability(&report, &capture).unwrap();
+
+    assert_eq!(summary.paper_count, 2);
+    assert_eq!(summary.papers_with_nonempty_text, 1);
+    assert_eq!(summary.papers_without_attachment, 1);
+    assert_eq!(summary.papers_with_unmanifested_attachment, 0);
+    assert_eq!(summary.papers_with_captured_no_text, 0);
+    assert_eq!(summary.unbound_nonempty_record_count, 0);
+}
