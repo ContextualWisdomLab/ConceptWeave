@@ -1662,3 +1662,11 @@ four pending source-resolution keys and 49 duplicate candidates. The existing
 142-row ontology discovery projection therefore remains byte-continuous with
 the prior replay; no title, abstract, decision, approval or Zotero write was
 performed.
+
+### September 9 PR39 exact-head local verification
+
+At exact PR39 head `c88c5f07c27e033ea54f71ede1cc23bfa4fa419`,
+`rustup run 1.98.0 cargo test --locked --workspace` completed GREEN across
+unit, integration and documentation tests. This is local evidence only: the
+exact head still has no hosted central-workflow run or independent approval,
+so protected merge, release and deployment remain unverified.
