@@ -174,3 +174,14 @@ separate `--review-progress` artifact was `0600`, 383 bytes (SHA-256
 reported total 3,715, decided 0, remaining 3,715, pending sources 4,
 `complete=false`. This is an honest review-workload baseline; no decision,
 approval or Zotero write was issued.
+
+## Bound review regeneration checkpoint (2026-09-09 03:35 KST)
+
+Re-running `--bound-full-text-review` against the 03:30 report, blank worksheet
+and retained capture produced `/tmp/conceptweave-zotero-fulltext-view-20260909-0335.json`.
+The owner-only view is 1,590,859 bytes (`0600`) and byte-identical to the prior
+view (`5ec82fa82017c83bc281134a2d96f6a45040f432829a9c61124a9f639ea3460e`). It
+contains 25 blank decisions and 25 parent evidence-map keys; those maps contain
+21 actual attachment records, all with nonempty captured text, while four
+parents have no attachment record. Capture, report and proposal digests are
+unchanged. This is reproducible steward input, not review progress or approval.

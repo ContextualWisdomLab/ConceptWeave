@@ -1342,6 +1342,12 @@ duplicates, with SHA-256
 `8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`. This is a
 repeatability checkpoint, not evidence of steward decisions or Zotero mutation.
 
+The 03:35 KST bound-view regeneration was byte-identical to the prior 25-row
+view. It preserves 25 blank decisions and 25 parent evidence-map keys, with 21
+actual nonempty attachment records and four empty parent maps. Map-key count and
+attachment-record count are separate workload metrics; neither represents a
+steward decision or approval.
+
 Manual `@coderabbitai review` requests were issued on PR39 and PR40 at their exact
 heads, but GitHub continued to report “reviews are disabled for this base branch”
 and produced no independent review or required workflow run. The request itself is
