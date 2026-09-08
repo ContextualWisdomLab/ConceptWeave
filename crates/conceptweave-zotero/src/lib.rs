@@ -300,7 +300,6 @@ fn validate_source_item_keys(items: &[ZoteroItem]) -> Result<(), ReadError> {
     }
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
 fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, ReadError> {
     let url = format!(
         "{}?format=json&include=data&limit={PAGE_LIMIT}&start={start}",
@@ -358,19 +357,16 @@ fn read_bounded_response_text(
     Ok(body)
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
 fn header_u64(headers: &ureq::http::HeaderMap, name: &'static str) -> Result<u64, ReadError> {
     header_string(headers, name)?
         .parse()
         .map_err(|_| ReadError::Header(name))
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
 fn header_string(headers: &ureq::http::HeaderMap, name: &'static str) -> Result<String, ReadError> {
     optional_header(headers, name).ok_or(ReadError::Header(name))
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
 fn optional_header(headers: &ureq::http::HeaderMap, name: &'static str) -> Option<String> {
     headers.get(name)?.to_str().ok().map(str::to_owned)
 }
