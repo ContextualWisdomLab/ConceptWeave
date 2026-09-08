@@ -1577,3 +1577,15 @@ The current Local API replay observes 3,715 bibliographic items and projects
 142 into the ontology discovery queue, a screening rate of `3.8223%`.
 This measures triage workload only; it does not estimate ontology precision or
 recall and does not imply full-text review, approval or publication authority.
+
+### September 9 06:31 live Local API replay
+
+Zotero 10.0.1 was observed listening on loopback port 23119. The pinned Rust
+1.98 optimized CLI completed a read-only full-library replay to a new owner-only
+`0600` file at `/tmp` (8,132,756 bytes). The report SHA-256 is
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`, with
+8,326 observed items, 3,715 classified proposals, 4,611 unclassified items,
+four pending source-resolution keys and 49 duplicate candidates. The existing
+142-row ontology discovery projection therefore remains byte-continuous with
+the prior replay; no title, abstract, decision, approval or Zotero write was
+performed.

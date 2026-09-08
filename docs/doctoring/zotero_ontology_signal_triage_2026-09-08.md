@@ -103,3 +103,14 @@ and the queue remains SHA-256
 The 142 queue keys are non-blank, unique and lexicographically sorted; the
 source report still has 8,326 observed and 3,715 classified items. This proves
 input integrity only, not paper decisions or write authority.
+
+## Live replay continuity checkpoint (2026-09-09 06:31 KST)
+
+Zotero 10.0.1 was observed on loopback port 23119. The pinned Rust 1.98
+optimized CLI completed another read-only full-library replay to a new private
+`0600` `/tmp` report. Its SHA-256 remains
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`, and the
+aggregate remains 8,326 observed, 3,715 classified, 4,611 unclassified, four
+pending source keys and 49 duplicate candidates. This is snapshot/report
+continuity evidence only; it does not advance steward review or Zotero write
+authority.
