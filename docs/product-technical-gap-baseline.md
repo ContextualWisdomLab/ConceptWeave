@@ -1353,6 +1353,11 @@ At 02:31 KST on 2026-09-09, a fresh replay in this turn reproduced the same
 four pending sources and 49 duplicate candidates. Stable output is repeatability
 evidence, not semantic approval, full-text review, Zotero mutation or release proof.
 
+At 03:04 KST, the optimized release binary completed a third read-only replay
+with the same owner-only 0600 report size and digest and the same 8,326/3,715/
+4,611/four/49 aggregate. This is repeatability evidence only; no pending source
+was cleared and no Zotero write or approval was issued.
+
 At exact source/test head `78d40c3` (documentation head `e16a28d`), the repository coverage gate was rerun with the
 pinned nightly toolchain after adding a two-source regression for noncanonical
 report-bound resolution order. The workspace suite passed; normalized source

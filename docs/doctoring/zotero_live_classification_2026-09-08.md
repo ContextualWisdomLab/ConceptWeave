@@ -114,3 +114,12 @@ same aggregate: 8,326 observed, 3,715 classified proposals, 4,611 retained
 nonbibliographic records, four pending sources and 49 duplicate candidates.
 This is repeatability evidence only; it does not establish approval, full-text
 review, Zotero mutation or immutable release.
+
+## Fresh replay checkpoint (2026-09-09 03:04 KST)
+
+The optimized release binary completed another read-only Local API replay. The
+owner-only report was `0600`, 8,132,756 bytes, and retained the same SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`: 8,326
+observed records, 3,715 classified proposals, 4,611 retained records, four
+pending sources and 49 duplicate candidates. This confirms repeatability only;
+it does not clear pending sources or grant review, write or release authority.
