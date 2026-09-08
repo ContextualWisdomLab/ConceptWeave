@@ -1367,6 +1367,14 @@ without attachment, 34 with an unmanifested attachment, 38 with captured-empty
 text and 471 needing review without text; two nonempty records are unbound.
 This is an acquisition/review baseline, not semantic approval or write authority.
 
+At 03:12 KST, the report/capture generated a private `0600` worksheet of
+1,776,452 bytes (SHA-256 `87a35820097e6b858e47f251c23f8b64dd7eb6941a55fbcdcada4296c4124af6`)
+with 3,715 blank decision slots and all 8,326 snapshot items. A separate bound
+review view was generated as a `0600`, 1,590,859-byte artifact (SHA-256
+`5ec82fa82017c83bc281134a2d96f6a45040f432829a9c61124a9f639ea3460e`) containing
+the first 25 blank review decisions with the same capture/report/proposal
+bindings. These are steward-review inputs, not decisions, approvals or writes.
+
 At exact source/test head `78d40c3` (documentation head `e16a28d`), the repository coverage gate was rerun with the
 pinned nightly toolchain after adding a two-source regression for noncanonical
 report-bound resolution order. The workspace suite passed; normalized source

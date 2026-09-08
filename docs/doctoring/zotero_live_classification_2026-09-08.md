@@ -136,3 +136,17 @@ attachment, 34 have an unmanifested attachment, 38 have captured-but-empty
 text, and 471 need review without text. Two nonempty records are unbound.
 These are acquisition and review-workload measures only; no paper decision,
 approval, pending-source resolution or Zotero write follows.
+
+## Blank worksheet and bound review view checkpoint (2026-09-09 03:12 KST)
+
+The same private report/capture produced a `0600` full-text worksheet of
+1,776,452 bytes (SHA-256
+`87a35820097e6b858e47f251c23f8b64dd7eb6941a55fbcdcada4296c4124af6`). It has
+3,715 blank decision slots, preserves 8,326 snapshot items and carries proposal
+digest `sha256:32cb83fd8a66b3fea50831f952c254e96e20b1b8da78d18acad465ac2c4dff0d`.
+The bound full-text review view then emitted a separate `0600`, 1,590,859-byte
+artifact (SHA-256
+`5ec82fa82017c83bc281134a2d96f6a45040f432829a9c61124a9f639ea3460e`) with a
+25-item blank review batch and the same capture/report/proposal bindings. These
+artifacts are prepared for steward review only; no decision or approval was
+issued.
