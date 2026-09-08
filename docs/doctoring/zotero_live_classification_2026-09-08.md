@@ -185,3 +185,15 @@ contains 25 blank decisions and 25 parent evidence-map keys; those maps contain
 21 actual attachment records, all with nonempty captured text, while four
 parents have no attachment record. Capture, report and proposal digests are
 unchanged. This is reproducible steward input, not review progress or approval.
+
+## Live replay continuity checkpoint (2026-09-09 04:03 KST)
+
+The pinned release binary reread the live Local API without mutation and wrote
+an owner-only (`0600`) report at `/tmp/conceptweave-live-replay.XXXXXX.json`.
+The report is byte-identical to the prior replay at SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc` and is
+8,132,756 bytes. It observed 8,326 items, 3,715 classified papers, 4,611
+retained nonbibliographic items, four pending source records and 49 duplicate
+candidates on Zotero 10.0.1 / Local API 3 / library version 2. This confirms
+replay continuity only; it does not create steward decisions, approval or write
+authority.

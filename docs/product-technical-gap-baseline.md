@@ -1478,6 +1478,16 @@ Rust 1.98 formatting and the complete workspace test/doc-test suite passed.
 PR40 remains Draft with no independent approval or protected hosted acceptance;
 this evidence does not advance paper decisions or Zotero write authority.
 
+### September 9 04:03 live Local API replay continuity
+
+The pinned release binary performed a read-only live Local API replay into an
+owner-only report. Its SHA-256 is
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`, byte size
+8,132,756, matching the prior replay. The aggregate remains 8,326 observed,
+3,715 classified, 4,611 retained, four pending sources and 49 duplicate
+candidates. This proves reproducibility of the snapshot/classifier boundary,
+not steward review completion, approval, Zotero mutation or publication.
+
 ### September 9 PR40 retained-inventory ambiguity verification
 
 PR40 successor `bb9d7b691cf5601f3a60ff2a786e123f1d552704` now rejects more than
