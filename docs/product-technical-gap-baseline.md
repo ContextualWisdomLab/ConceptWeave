@@ -10,7 +10,7 @@
 - Client Consumption #5: `fcf36c8a99f015b963c9f812787df127ac2e2f9e`, Draft/open; owner of provider-independent released semantic-contract admission, integrity, compatibility, diff/resolution and supersession consumption.
 - Source Observation #6: `331f8edcd7cebb1719e5cea3187f3848ce7b9e71`, Draft/open on #5; source-system business truth stays with its owner.
 - Research Intake #9: `b98ba39f9efa4c18c1bcdc3bcae4a8ef4f0abd41`, OPEN Draft/mergeable on Foundation; canonical owner of the read-only Zotero snapshot, deterministic research classification, source inventory and report-publication safety seams.
-- Pending-source resolution #40: current exact head `8d469af4e4e46c84c34b823a6651d26609997e3b` before this baseline-only successor, OPEN Draft/mergeable on #9. Reality RED `6b28fc38afaae455a70901c57b28116b0b88510d` is causally repaired by source commit `c19c787cd9153ed39f3c34370d2f9fa18fef7c8a`; `d774c5b6382e71c78a32359cdef2c75c7f80a04d` is formatting-only and `8d469af...` is docs-only. #40 owns only the typed read-only exact-snapshot resolution aggregate; it has no Zotero write, semantic publication or approval authority.
+- Pending-source resolution #40: current exact head `66076e2553f68974ecd0420753eb4643935a1391`, OPEN Draft/CLEAN on #9. Reality RED `6b28fc38afaae455a70901c57b28116b0b88510d` is causally repaired by persisting the canonical pending-key set and rejecting truncated stored decisions. #40 owns only the typed read-only exact-snapshot resolution aggregate; it has no Zotero write, semantic publication or approval authority.
 - Full-text/write/recovery #39: `6f8075b46afe480e2f0c14a1ede41f18905559ff`, OPEN Draft/mergeable on #38 `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`. This independent writer may advance normally; live PR metadata wins. Historical repository-count KPIs remain withdrawn.
 
 Predecessor checks and reviews never transfer automatically to a changed head. A queued or failed external-owner lane blocks only that acceptance lane; it does not justify no-op pushes, fabricated receipts, manual-dispatch-as-GREEN, self-approval, review dismissal or gate weakening.
@@ -33,7 +33,7 @@ Three standalone PDFs plus one standalone note remain governed pending sources. 
 - Style successor `d774c5b6382e71c78a32359cdef2c75c7f80a04d` changes only formatting in the affected regressions. Docs successor `8d469af4e4e46c84c34b823a6651d26609997e3b` refreshes the recorded coordinate. Neither changes the source semantics introduced by `c19c787...`.
 - No predecessor execution transfers to these successors. Exact-head Rust/coverage/hosted/independent-review evidence remains required before GREEN or thread resolution.
 
-Current #40 status is **SOURCE_TEST_REPAIRED_PENDING_CI**, not GREEN. Keep Draft and keep valid review findings unresolved until one unchanged exact successor completes the full Rust/coverage/hosted/independent-review gate.
+Current #40 status is **SOURCE_TEST_REPAIRED_PENDING_CI**, not GREEN. The latest pinned coverage run reports 173/182 branches (95.05%), 1,773/1,808 lines (98.06%), and 188/192 functions (97.92%); remaining gaps are recorded without exclusions. Keep Draft and keep valid review findings unresolved until one unchanged exact successor completes the full Rust/coverage/hosted/independent-review gate.
 
 ## Quality and release gates
 
