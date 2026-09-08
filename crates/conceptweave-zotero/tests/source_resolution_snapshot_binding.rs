@@ -26,7 +26,6 @@ fn resolution_for_library(library_version: u64) -> PendingSourceResolution {
         "library_version": library_version,
         "item_type": "attachment",
         "parent_item_key": "",
-        "library_version": library_version,
         "disposition": "retain_standalone_evidence",
         "reason": "The source remains useful independent evidence."
     }))
