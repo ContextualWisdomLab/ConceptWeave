@@ -1,68 +1,54 @@
-# Owned production function coverage normalization
+# Function-coverage denominator integrity
 
-Status: `COVERAGE_GATE_SCOPE_REPAIRED_PENDING_EXECUTION`
+Status: `REALITY_RED_NATIVE_FUNCTION_GATE_REPAIR_PENDING`
 
 ## Problem
 
-Exact-head local revalidation on PR #40 at `26d088f948ebef01dad112313391b80cda7a0a71` completed the frozen Rust/nightly coverage run with raw LLVM totals of 3039 regions / 38 missed, 211 functions / 2 missed, 1913 lines / 15 missed and 212 branches / 0 missed. The repository-normalized owner source-region and branch gates were 100%.
+PR #40 exact head `0327a77759ecedb3786d8d7bbc1c4cad652ea85b` inherits a coverage-gate change that stopped requiring LLVM's native function total to be 100% and instead accepts a repository-derived `source-functions.json` denominator grouped by identical source-region sets. Historical frozen execution at `26d088f948ebef01dad112313391b80cda7a0a71` reported 211 LLVM functions / 2 missed, while the repository-normalized source-region and branch gates were 100%.
 
-The remaining failure came from `scripts/check_coverage.sh` asserting `.data[0].totals.functions.percent == 100`. That value is the raw LLVM function total, not the repository's owned-production source-function denominator. This contradicted `AGENTS.md`, which requires a normalized owner function/region/branch gate and 100% owned production coverage.
+The prior doctoring described `.data[0].totals.functions` as a raw instantiation count. That description is not consistent with LLVM's documented coverage semantics. LLVM/Clang and rustc both define **function coverage** as the percentage of functions executed at least once, with a function considered executed when any instantiation executes. **Instantiation coverage** is a separate statistic. LLVM also implements instantiation grouping explicitly in `CoverageMapping::getInstantiationGroups`; the JSON exporter emits both `functions` and `instantiations` summaries.
 
-The distinction matters for Rust coverage. `cargo-llvm-cov` excludes integration-test paths such as `tests/` from reports by default but does not automatically exclude unit-test functions inside production source files; its documented workaround for unit-test code is a coverage attribute. LLVM coverage mapping is also emitted per instrumented function, so multiple compiled instantiations can map back to the same source function. ConceptWeave already avoids using raw region multiplicity as its acceptance denominator by filtering test-only mappings and grouping regions by source coordinates. Keeping a raw global function percentage as the only function gate made the three coverage dimensions inconsistent.
+Therefore the two missed native functions cannot be dismissed as duplicate monomorphized records merely because individual `functions[]` entries can contain codegen/instantiation detail. They may still prove to be test-only functions, instrumentation artifacts, or a Rust coverage defect, but that requires exact symbol/source evidence. Replacing the native function gate before establishing that evidence creates a possible false-GREEN path and violates the repository rule against weakening a gate to obtain 100%.
 
-Primary references:
+Primary references checked on 2026-09-09:
 
-- `cargo-llvm-cov` README, “Exclude file from coverage” / “Exclude code from coverage”: https://github.com/taiki-e/cargo-llvm-cov/blob/main/README.md
-- LLVM, *Code Coverage Mapping Format*, “Advanced Concepts” and “Mapping Region”: https://llvm.org/docs/CoverageMappingFormat.html
+- LLVM Project. *Source-based Code Coverage*. Function coverage counts a function as executed when any instantiation executes; instantiation coverage is reported separately: https://clang.llvm.org/docs/SourceBasedCodeCoverage.html
+- Rust Project. *Instrument-based Code Coverage*. Rust documents the same function-versus-instantiation distinction: https://github.com/rust-lang/rust/blob/main/src/doc/rustc/src/instrument-coverage.md
+- LLVM Project. `CoverageMapping::getInstantiationGroups` / `FunctionInstantiationSetCollector`. LLVM groups records belonging to the same source function before producing function-level coverage summaries: https://github.com/llvm/llvm-project/blob/main/llvm/lib/ProfileData/Coverage/CoverageMapping.cpp
+- LLVM Project. `CoverageExporterJson.cpp`. The JSON summary exposes distinct `functions` and `instantiations` metrics: https://github.com/llvm/llvm-project/blob/main/llvm/tools/llvm-cov/CoverageExporterJson.cpp
+- rust-lang/rust issue #137524. Rust coverage currently has known cross-instantiation region-reporting defects, reinforcing the need to preserve raw/native evidence rather than infer the missing-function cause from aggregate percentages alone: https://github.com/rust-lang/rust/issues/137524
 
-## Rejected alternatives
+## Reality RED
 
-- Lower the 100% threshold — rejected; the owned production threshold remains 100%.
-- Add or broaden `coverage(off)` on unit-test modules or production helpers — rejected; the gate should identify the correct denominator rather than manufacture coverage through suppression.
-- Omit targets, reduce the test sample, or ignore raw misses — rejected; raw LLVM totals and every zero-count raw function remain visible diagnostic evidence.
-- Guess which two raw functions are harmless from aggregate percentages — rejected; exact raw names remain diagnostic data and any normalized production gap still fails closed.
+The current `scripts/check_coverage.sh` prints every zero-count raw record as `RAW_FUNCTION_GAP`, derives a normalized source-function view, and fails on normalized source-function/region/branch gaps. It no longer fails when `.data[0].totals.functions.percent < 100` so long as the custom source-region grouping is positive.
 
-## Decision
+That is a real acceptance-path RED against the stated 100% function requirement: a native function miss can pass the final shell predicates before its identity has been shown to be outside owned production. The existing synthetic fixture is insufficient to justify this replacement because it assumes that identical source-region sets are necessarily duplicate instantiations of one source function; LLVM has its own instantiation-group semantics and the fixture does not prove equivalence to them.
 
-Commit `922804492d581bcdd50a6ae47c5e33ab51420d05` repairs the acceptance denominator without changing production source or the 100% requirement.
+## Least-widening repair
 
-`scripts/check_coverage.sh` now:
+Fail closed while preserving the useful diagnostics:
 
-1. prints every raw zero-count LLVM function as `RAW_FUNCTION_GAP`;
-2. derives `source-functions.json` from non-test mappings using the same `5tests` and `/tests/` ownership boundary already used for normalized regions;
-3. groups compiled function records by their source-region identity and sums execution counts, so repeated codegen/monomorphized records for one owned source function do not create a second source-function obligation;
-4. reports a zero-count normalized owner function as `FUNCTION_GAP` with source location and contributing raw names; and
-5. requires every normalized owner source function to have a positive execution count.
+1. keep `RAW_FUNCTION_GAP` output and the repository-normalized `source-functions.json` view;
+2. keep normalized owner source-function, source-region, and branch gates at 100%;
+3. restore LLVM native function coverage `== 100%` as an additional acceptance predicate until the two exact native misses are identified and a principled owned-production filter is demonstrated;
+4. do not add `coverage(off)`, omit targets, reduce the test sample, lower thresholds, or relabel a native miss as test-only from its aggregate count alone; and
+5. on the next frozen run, capture the exact missed function names/source attribution and distinguish unit-test-only code, a genuine production function, and an upstream instrumentation/reporting defect before changing the denominator again.
 
-Raw totals therefore remain observable and auditable, but test harness functions or duplicate codegen records no longer substitute for the owned-production acceptance denominator. A genuine owned production source function with zero execution still fails the gate.
+This is intentionally stricter than the preceding head. It cannot manufacture GREEN by reclassifying evidence.
 
-## Verification performed in this repair
+## Verification boundary
 
-The changed shell script passes `bash -n` locally. The normalization jq expression was also executed against a synthetic LLVM-shaped JSON fixture containing:
-
-- two raw instantiations with the same production source regions, one executed and one zero-count;
-- a distinct zero-count production source function;
-- a zero-count unit-test function whose mangled identity contains `5tests`; and
-- a zero-count integration-test function attributed only to `/tests/`.
-
-The two production instantiations collapsed to one covered source function, test-only entries were excluded from the owned denominator, and the separate zero-count production function remained a failing `FUNCTION_GAP`. This verifies the scope transformation itself; it is not an exact-head Rust coverage GREEN claim.
-
-## Evidence boundary
-
-The exact `26d088...` run remains historical evidence for the original raw/function-scope discrepancy. It does not transfer to `922804...`, whose coverage script changed. The new exact successor still needs a frozen nightly coverage execution. If `FUNCTION_GAP` is emitted, repair the named owned behavior with a deterministic test or the least-widening production/test refactor. If only `RAW_FUNCTION_GAP` remains while normalized owner functions, regions and branches are all covered, preserve the raw diagnostics but do not relabel test/codegen multiplicity as uncovered production behavior.
-
-## Acceptance
-
-On one unchanged exact successor, require:
+This doctoring commit is the RED/decision record, not executable GREEN. The source repair must be a normal successor. After the repair, one unchanged exact successor still needs:
 
 - locked Rust 1.98 workspace tests;
 - `cargo fmt --all -- --check`;
 - all-target strict Clippy;
 - warnings-denied rustdoc and release build;
-- normalized owned production function coverage 100%;
-- normalized owned production source-region coverage 100%;
-- normalized owned production branch coverage 100%;
+- LLVM native function coverage 100% while this conservative gate is in force;
+- normalized owned-production source-function coverage 100%;
+- normalized owned-production source-region coverage 100%;
+- normalized owned-production branch coverage 100%;
 - applicable hosted checks; and
 - qualifying independent review.
 
-No protected merge, immutable release, Zotero mutation, semantic publication, or approval authority follows from this tooling repair alone.
+No protected merge, immutable release, Zotero mutation, semantic publication, or approval authority follows from this tooling finding.
