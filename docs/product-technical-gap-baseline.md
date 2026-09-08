@@ -101,11 +101,12 @@ source against the immutable report before any authority callback. Missing and
 stale source-resolution regressions pass in the locked Rust 1.98 workspace;
 Clippy, warnings-denied rustdoc and diff checks also pass. GitHub reports OPEN
 Draft/CLEAN with CodeRabbit skipped because the PR remains a draft. PR #40's
-current exact head is `610582a70f66503a694d4f1e72d34183a6652cdb`; the latest
-successor persists constructor-bound pending item key/version/type/parent
-coordinates and rejects stored identity drift. Local workspace tests, Clippy,
-fmt, rustdoc and release build pass, but hosted checks and independent review
-are still absent. It remains OPEN Draft/CLEAN, so protected acceptance is still
+current exact head is `a3cd9b0d68b4ecc28322860d04a23867412d611f`; the latest
+successor adds a coordinated-identity regression, but that test is RED because
+restoring a jointly rewritten expected identity and decision still succeeds.
+The prior independent-coordinate repair remains valid, yet an authenticated
+binding to the immutable report/snapshot is still required. It remains OPEN
+Draft/UNSTABLE with hosted checks pending, so protected acceptance is still
 outstanding. This is not
 protected-merge, release or Zotero-write evidence.
 
@@ -121,10 +122,10 @@ the next engineering gap before protected merge.
 
 The write-envelope mismatch regression now exercises four stored identity
 mismatch forms and raises normalized branch coverage to 781/782 (99.87%) in
-the pinned nightly run with 115 tests. PR40's repair-specific coverage rerun
-reports 189/192 branches (98.44%), 1,807/1,848 lines (97.78%), and 192/196
-functions (97.96%); three bounded branch gaps and existing CLI/error regions
-remain recorded without exclusions or threshold changes.
+the pinned nightly run with 115 tests. PR40's prior repair-specific coverage
+rerun reported 189/192 branches (98.44%), 1,807/1,848 lines (97.78%), and
+192/196 functions (97.96%); the new coordinated-identity test is currently
+failing and therefore supersedes that local GREEN claim until repaired.
 
 The [refreshed capture checkpoint](doctoring/refreshed_capture_evidence.md) now records successful optimized full-library capture, verified 3,715-row blank worksheet, a 25-row bound view, and full workspace tests at `b0f7d5b8bb139d627cec37b598331464c14b60ab` (terminal exit 0). Actual decisions and approvals remain zero. The CO owner freshly reports no GitHub release or PyPI package, unmerged release PR #1030 and unmerged diagnostic PR #1105. Its stated prerequisites are protected exact-head checks/independent review, fast-mlsirm publication, immutable CO client/schema release, and verified classification serving. This is owner-reported release status, not locally verified registry evidence. Available secret metadata is not the blocker. Do not send private paper contents or substitute a direct provider while these conditions remain unmet.
 
