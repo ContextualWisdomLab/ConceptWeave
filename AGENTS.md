@@ -19,6 +19,7 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - Pending Zotero ancestry is resolved only through the typed source-resolution aggregate bound to the exact report item key/version/type/parent identity; never infer a parent, rewrite the report, or treat a resolution as write or approval authority.
 - When the Local API exposes a server identity, source-resolution decisions must also match that `server_id`; a matching library version alone cannot prove the same Zotero source.
 - Source-resolution admission is fail-closed when the report has no `server_id`; optional identity is acceptable for lower-authority classification, not for a typed resolution review.
+- Missing or blank Local API `server_id` remains an admission error even when a report has no pending items; an empty resolution set must not yield a typed review without provider identity.
 - Public review aggregates that cross a JSON artifact boundary must use owned fields and have a round-trip test; borrowed `&'static str` metadata is not an artifact contract.
 - Coverage reports must distinguish raw LLVM instantiations from the repository's normalized owner function/region/branch gate; never report raw gaps as green or suppress them to manufacture 100%.
 - A pinned coverage run can expose duplicate generic instantiations and newly added owner branches even when the ordinary workspace suite is green; record the exact denominator and add deterministic contract tests before claiming coverage recovery.
