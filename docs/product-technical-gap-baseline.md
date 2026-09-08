@@ -52,6 +52,8 @@ The earlier source findings are repaired locally, not yet propagated into root #
 
 PR #9 exact owner verification checkpoint: `e8f7f83ee0d7f7ca3d2bb0b655040974786c1e6c` (locked Rust 1.98 tests, strict Clippy, warnings-denied rustdoc, fmt and diff checks passed locally).
 
+The same exact owner run also executed `./scripts/check_coverage.sh` with `nightly-2026-08-20`: all tests passed, but the owned gate is RED at 168/179 functions, 1,007/1,149 normalized regions, and 143/162 normalized branch outcomes. Uncovered paths include source-resolution admission and CLI/error branches; no coverage exclusion or threshold change is accepted.
+
 Protected/default `main` remains `f4f440dd58c77d7cd90dff8a1eb2eeb9a9940425`; only the bootstrap state is shipped there and no immutable ConceptWeave release exists.
 
 Fresh September 8 active roots:
