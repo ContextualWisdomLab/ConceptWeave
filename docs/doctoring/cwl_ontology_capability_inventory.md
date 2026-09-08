@@ -64,6 +64,14 @@ consumer adoption or ConceptWeave semantic authority.
 Read-only `git ls-remote` revalidation matched every coordinate recorded above:
 Oxigraph `HEAD@7ce152a1d910d5662027a5bcbe7c32cee0a4e059` and `v0.5.11@df37a5c98e2497135cdd4cfce01a049b78ca6740`; Sophia `HEAD@e9d4a4b0b3e65a17319c54b7d92f53bdb60baaa5` and `v0.10.0@56e9461880d3fb7e700b3ec7dc430c12733fcb85`; Rudof `HEAD@275d01ffc29c89656f3bcb61d66e9bba86671f6d` and `0.3.18@f4abfcb6a797ebe4d8bac1d29d3b5c3c764c7ef1`. This confirms revision continuity only; it does not establish compatibility, conformance, license resolution, release safety or adoption.
 
+The same read-only check returned GitHub repository license metadata
+`Apache-2.0` for all three candidates and release-tag `Cargo.toml` blob
+coordinates Oxigraph `v0.5.11@da114a939d4f51ca4163cf90c540e87c813d8eaf`,
+Sophia `v0.10.0@e5644875002a881224cc4719f43b86f508633d1b`, and Rudof
+`0.3.18@7abb9578bd3721fe202a202e986a6af530b7a31d`. These are source and
+repository metadata observations; package declarations, transitive licenses,
+conformance and legal approval remain separate gates.
+
 The September 7 metadata refresh again returned 76 repositories, one archived repository and 11 forks. Matching counts do not prove unchanged repository contents; every capability observation retains its own exact source revision.
 
 The paginated organization metadata census returned 76 repositories, including one archived repository and 11 forks; the September 6 follow-up refresh confirmed the same counts. Name/description screening for ontology, semantic, knowledge graph, schema, RDF, SHACL, provenance and lineage was combined with the existing Context Map; metadata matches alone miss owners whose descriptions do not use those words. This expanded the original eight-candidate audit to 12 selected candidates. The organization product-goal directive then identified DiskSage's actual OWL use, expanding the audit to 13. naruon and pg-erd-cloud brought the count to 15. Five domain/interoperability audits brought coverage to 20; three further domain and two document-contract audits brought it to 25/76. Keyverse and inkspan brought it to 27/76; three statistical-library audits brought it to 30/76. The threading, CDC and work-dependency audits below are a historical **33/76** checkpoint, leaving **43** at that point; subsequent bounded audits advance the current historical inventory to **39/76**, leaving **37**. This does not prove that all relevant implementations have been found.
