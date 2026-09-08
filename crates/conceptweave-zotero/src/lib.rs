@@ -940,6 +940,8 @@ mod tests {
 
     #[test]
     fn reader_deadline_rejects_expired_admission_page_and_report() {
+        // Expired before first I/O, after a page, before next I/O, and after
+        // classifying the final page; no partial or late report may escape.
         for (ticks, total, expected_calls) in [
             (vec![300], 1, 0),
             (vec![0, 301], 1, 1),
