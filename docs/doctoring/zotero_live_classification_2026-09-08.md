@@ -98,6 +98,18 @@ of 23/20. Applying the same predicates to all 8,326 titles yields 30/36/2/2/81/2
 which is intentionally not the research KPI. The denominator boundary is part of
 the evidence contract; these signals remain discovery queues, not decisions.
 
+## Fresh replay checkpoint (2026-09-09 03:30 KST)
+
+The pinned release executable completed another read-only Local API replay at
+`/tmp/conceptweave-zotero-live-20260909-0330.json`. The owner-only artifact is
+`0600`, 8,132,756 bytes, and has SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`, identical
+to the prior replay. It contains 8,326 observed records, 3,715 classified
+proposals, 4,611 retained nonbibliographic records, four pending sources and 49
+duplicate candidates under Zotero 10.0.1 / Local API 3 / schema 44 / library
+version 2. This confirms repeatability only; no review, approval or Zotero write
+occurred.
+
 The same report's four pending source keys resolve to one standalone note and
 three standalone attachment records, each without a parent link. The attachment
 records retain only the metadata projection in this report; their file bytes,

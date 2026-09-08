@@ -1336,6 +1336,12 @@ The first 25-item bound review view is fully blank (25/25 decisions) and has
 zero literal `semantic` signals. This is a queue-order observation only, not a
 semantic exclusion or automatic prioritization decision.
 
+The 03:30 KST read-only replay reproduced the same owner-only report byte-for-byte:
+8,326 observed, 3,715 classified, 4,611 retained, four pending sources and 49
+duplicates, with SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`. This is a
+repeatability checkpoint, not evidence of steward decisions or Zotero mutation.
+
 Manual `@coderabbitai review` requests were issued on PR39 and PR40 at their exact
 heads, but GitHub continued to report “reviews are disabled for this base branch”
 and produced no independent review or required workflow run. The request itself is
