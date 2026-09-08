@@ -89,3 +89,11 @@ unclassified records, four pending source keys and 49 duplicate candidates.
 The bound contract is Zotero 10.0.1, Local API 3, schema 44 and library version
 2. This is repeatable local proposal evidence only; no review, approval or
 Zotero write occurred.
+
+The discovery KPI was independently recomputed from the latest report using only
+the 3,715 classified proposal titles, not the 4,611 retained nonbibliographic
+records. It yields 27 case-insensitive `ontology`, 36 `semantic`, 2 `taxonomy`,
+1 `knowledge graph`, 81 vocabulary-stem, and exact-uppercase `OWL`/`RDF` counts
+of 23/20. Applying the same predicates to all 8,326 titles yields 30/36/2/2/81/26/23,
+which is intentionally not the research KPI. The denominator boundary is part of
+the evidence contract; these signals remain discovery queues, not decisions.

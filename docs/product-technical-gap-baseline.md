@@ -1313,3 +1313,9 @@ Ready for review to remove the review-suppression state. #37 and #38 are current
 that reviews are disabled for the intermediate base. All four stack PRs therefore still
 require independent review and exact hosted workflow evidence before any protected merge
 claim.
+
+The latest report's discovery signals were independently recomputed over the
+3,715 classified titles only: ontology 27, semantic 36, taxonomy 2, knowledge
+graph 1, vocabulary stem 81, exact uppercase `OWL` 23 and `RDF` 20. Including
+nonbibliographic titles would overcount the KPI; the denominator boundary is
+explicitly preserved in the doctoring record.
