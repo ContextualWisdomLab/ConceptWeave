@@ -1,5 +1,15 @@
 # Live Zotero classification snapshot (2026-09-08)
 
+## Fresh replay checkpoint (21:09 KST)
+
+The release-mode read-only replay was rerun without mutation. It again observed
+8,326 records, 3,715 bibliographic proposals, 4,611 nonbibliographic records,
+four pending source keys, 3,658 abstentions, 49 duplicate candidates and zero
+failures. The fresh private `0600` report is
+`/tmp/conceptweave-zotero-live-20260908-210911.json` with SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`.
+Equal aggregates do not grant review, approval or Zotero write authority.
+
 The existing Rust CLI completed a release-mode, read-only Local API run against
 the running Zotero instance and wrote the report to a private `/tmp` file with
 mode `0600`. The report is not committed or published.

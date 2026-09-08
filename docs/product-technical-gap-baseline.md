@@ -4,6 +4,13 @@
 
 ## September 8 acquisition and consolidation checkpoint
 
+Fresh release-mode Local API replay at 21:09 KST reproduced the current
+aggregate without mutation: 8,326 snapshot records, 3,715 bibliographic
+proposals, 4,611 nonbibliographic records, four pending sources, 3,658
+abstentions, 49 duplicate candidates and zero failures. The private `0600`
+report digest is `sha256:8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`;
+equal aggregates are not review, approval or Zotero-write evidence.
+
 ### PR #39 full-text write source binding checkpoint (2026-09-08)
 
 The release-mode Rust CLI also produced a fresh read-only Local API report at
