@@ -64,6 +64,27 @@ fn source_resolution_review_requires_the_exact_pending_snapshot_set() {
 }
 
 #[test]
+fn source_resolution_review_round_trips_owned_json() {
+    let report = classify_snapshot(
+        "10.0.1".into(),
+        Some("local-server".into()),
+        42,
+        vec![item("SOURCE", 41, "attachment", "")],
+    );
+    let review = prepare_source_resolution_review(
+        &report,
+        vec![resolution("SOURCE", 41, "attachment", "")],
+    )
+    .expect("the exact pending source is resolvable");
+
+    let serialized = serde_json::to_string(&review).expect("review must serialize");
+    let decoded: conceptweave_zotero::SourceResolutionReview =
+        serde_json::from_str(&serialized).expect("owned JSON must deserialize");
+
+    assert_eq!(decoded, review);
+}
+
+#[test]
 fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
     let report = classify_snapshot(
         "10.0.1".into(),
