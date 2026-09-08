@@ -3568,6 +3568,21 @@ mod tests {
 
     static LOCAL_API_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
+    #[test]
+    fn source_resolution_errors_render_each_variant() {
+        let errors = [
+            SourceResolutionError::Missing("MISSING".into()),
+            SourceResolutionError::Unknown("UNKNOWN".into()),
+            SourceResolutionError::Duplicate("DUPLICATE".into()),
+            SourceResolutionError::Stale("STALE".into()),
+            SourceResolutionError::BlankReason("BLANK".into()),
+            SourceResolutionError::MissingInventory("INVENTORY".into()),
+        ];
+        for error in errors {
+            assert!(!error.to_string().is_empty());
+        }
+    }
+
     #[cfg_attr(coverage_nightly, coverage(off))]
     fn serve(responses: Vec<&'static str>) -> (String, std::thread::JoinHandle<Vec<String>>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
