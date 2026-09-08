@@ -1,32 +1,36 @@
 # Zotero source-resolution stored item identity
 
-Status: **SOURCE_REPAIRED — exact-head checks pending**.
+Status: **REALITY_RED — trusted report binding pending**.
 
 ## Problem
 
-`prepare_source_resolution_review` admits each pending-source decision only when its `item_key`, `item_version`, `item_type`, and `parent_item_key` match the retained source in the immutable classification report. The stored `SourceResolutionReview` envelope now retains an independent expected identity vector containing those coordinates.
+`prepare_source_resolution_review` admits each pending-source decision only when its `item_key`, `item_version`, `item_type`, and `parent_item_key` match the retained source in the immutable classification report.
 
-JSON restoration rejects a constructor-valid review after `resolved_sources[*].item_version`, `item_type`, or `parent_item_key` has been changed. The custom deserializer compares each mutable decision to the separately persisted constructor-bound identity before the artifact regains typed review status.
+Commit `610582a70f66503a694d4f1e72d34183a6652cdb` repairs unilateral decision drift by persisting `expected_source_identities` separately from `resolved_sources` and comparing version/type/parent during deserialization. That is a valid repair for an altered decision payload when the expected vector remains intact.
 
-This conflicts with the repository invariant that pending Zotero ancestry is resolved only through a typed aggregate bound to the exact report item key/version/type/parent identity.
+It does not yet prove constructor provenance after a coordinated stored-artifact rewrite. Both vectors are mutable fields in the same JSON document. If a stored artifact changes `expected_source_identities[0].item_version` and `resolved_sources[0].item_version` from `41` to `40` together, all current envelope, ordering, completeness, server/library and expected-vs-decision comparisons still agree. Direct deserialization can therefore return the trusted `SourceResolutionReview` type even though the restored coordinates were never admitted against the original classification report.
 
-## Regression and repair
+The typed review is described as exact-snapshot bound. Internal agreement between two mutable copies is not equivalent to revalidation against the immutable report that supplied those coordinates.
 
-Commit `6fa6c667e1f936f505ed6eae69e637b9e89dab71` adds `stored_source_resolution_review_rejects_item_identity_drift` in `crates/conceptweave-zotero/tests/source_resolution_stored_completeness.rs`.
+## RED → partial repair → remaining RED
 
-The regression starts from a real `ClassificationReport`, constructs a valid review, serializes it, then mutates exactly one nested coordinate at a time:
+Commit `6fa6c667e1f936f505ed6eae69e637b9e89dab71` adds `stored_source_resolution_review_rejects_item_identity_drift`. It starts from a real report and a constructor-valid review, then changes only one decision coordinate at a time:
 
 - `item_version`: `41 -> 40`
 - `item_type`: `attachment -> note`
 - `parent_item_key`: empty -> `PARENT`
 
-Each restored artifact must be rejected. The regression is now GREEN locally after adding the independent identity vector and exact deserializer comparison.
+Source repair `610582a70f66503a694d4f1e72d34183a6652cdb` adds `PendingSourceIdentity`, persists the expected identity vector, requires its keys to equal the canonical pending-key sequence, and rejects unilateral version/type/parent drift. The earlier RED is therefore causally repaired in source, subject to unchanged-head execution.
 
-## Least-widening repair
+Commit `a3cd9b0d68b4ecc28322860d04a23867412d611f` adds the next reality RED, `stored_source_resolution_review_rejects_coordinated_identity_rewrite`. It changes the expected and decision `item_version` together. Current source accepts that coordinated rewrite by direct inspection because every comparison is internal to the altered JSON artifact.
 
-Persist constructor-bound expected pending-source coordinates separately from steward decisions and require exact equality during deserialization. The expected record contains the item key, item version, item type, and parent key. Server identity and library version remain envelope coordinates and keep their existing exact nested equality checks. Stored artifacts without the new field fail closed because no migration contract exists.
+## Least-widening causal repair
 
-Do not derive the expected identity from `resolved_sources`, because that merely compares a mutable decision array to itself. Do not infer a parent, rewrite the classification report, add Zotero mutation, or treat the review as semantic publication/approval authority. Existing artifacts that lack the new independent evidence must fail closed unless an explicit versioned migration contract is introduced.
+Do not add a third mutable copy or a self-declared digest and call it provenance. A hash stored in the same unauthenticated artifact can be rewritten together with its payload.
+
+Treat stored JSON as an untrusted wire representation and require a trusted external binding before it regains the exact-snapshot review type. The narrowest existing authority is the immutable `ClassificationReport` (or a separately authenticated immutable report receipt derived from it). Restoration must revalidate the stored pending-key set and every decision key/version/type/parent against that trusted report, while retaining the existing exact server/library checks. One sound type-state shape is a deserializable stored/wire type plus an explicit report-bound restoration function that returns `SourceResolutionReview`; direct `Deserialize` into the trusted review type must not bypass that validation.
+
+This repair must not infer parents, rewrite report evidence, mutate Zotero, add semantic approval/publication authority, or treat a self-contained unauthenticated digest as a trust root. If an authenticated receipt/signature contract is introduced instead, its canonical owner and immutable verification contract must be explicit.
 
 ## Acceptance
 
@@ -40,4 +44,4 @@ RUSTDOCFLAGS="-D warnings" cargo +1.98.0 doc --locked --workspace --no-deps
 cargo +1.98.0 build --locked --workspace --release
 ```
 
-Owned production function/normalized-region/branch coverage must reach 100% under the repository's pinned coverage procedure, followed by applicable hosted checks and independent review. No predecessor execution transfers to a changed head.
+Owned production function/normalized-region/branch coverage must reach 100% under the repository's pinned coverage procedure, followed by applicable hosted checks and independent review. No predecessor execution transfers to a changed head. The coordinated-rewrite RED stays open until restoration is externally report-bound or equivalently authenticated.
