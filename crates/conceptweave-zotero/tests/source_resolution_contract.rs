@@ -90,6 +90,16 @@ fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
         Err(conceptweave_zotero::SourceResolutionError::Stale(key)) if key == "SOURCE"
     ));
 
+    assert!(matches!(
+        prepare_source_resolution_review(&report, vec![resolution("SOURCE", 3, "note", "")]),
+        Err(conceptweave_zotero::SourceResolutionError::Stale(key)) if key == "SOURCE"
+    ));
+
+    assert!(matches!(
+        prepare_source_resolution_review(&report, vec![resolution("SOURCE", 3, "attachment", "PARENT")]),
+        Err(conceptweave_zotero::SourceResolutionError::Stale(key)) if key == "SOURCE"
+    ));
+
     let mut blank = exact;
     blank.reason.clear();
     assert!(matches!(
