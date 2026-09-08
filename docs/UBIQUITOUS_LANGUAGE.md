@@ -3,6 +3,7 @@
 | Term | Meaning |
 | --- | --- |
 | Source Snapshot | Immutable revision of source evidence observed by ConceptWeave. |
+| Full-Text Capture | Separate private record of exact text/metadata responses, missing results and read interval, bound to an earlier metadata report; not an atomic Source Snapshot or an Authority Receipt. |
 | Observation | Deterministically extracted fact from a Source Snapshot. |
 | Evidence Reference | Stable source identity, digest, and location supporting a candidate. |
 | Semantic Candidate | Evidence-bound proposal for a concept, relation, constraint, dimension, measure, or physical mapping. |

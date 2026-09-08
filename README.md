@@ -28,7 +28,11 @@ Create a small deterministic view of the next pending records for human review:
 cargo +1.98.0 run --bin conceptweave-zotero -- --review-batch /tmp/report.json /tmp/current-worksheet.json 25 /tmp/review-batch.json
 ```
 
-The batch repeats on unchanged input and is not a reservation or assignment. It contains sensitive bibliographic context, must remain owner-only, and becomes a decision patch only after a steward fills every `reviewed_disposition`.
+The batch repeats on unchanged input and is not a reservation or assignment. It contains sensitive bibliographic context and must remain owner-only. After a steward fills every `reviewed_disposition`, validate the complete displayed context and create a new worksheet:
+
+```sh
+cargo +1.98.0 run --bin conceptweave-zotero -- --apply-review-batch /tmp/report.json /tmp/current-worksheet.json /tmp/review-batch.json /tmp/updated-worksheet.json
+```
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ContextualWisdomLab/ConceptWeave)
 
@@ -116,6 +120,14 @@ cargo doc --workspace --no-deps
 ```
 
 The repository CI also validates the JSON Schema, lock/toolchain freshness, documentation contracts, and coverage expectations defined by the current source.
+
+For the proposed local research intake, preserve available paper text separately from an existing private report:
+
+```bash
+cargo +1.98.0 run --locked -p conceptweave-zotero -- --capture-full-text /tmp/REPORT.json /tmp/CAPTURE.json
+```
+
+Zotero 10+ must be running. The report must be an unchanged owner-only file from that library; the capture path must be a new file directly in the system temp directory. Missing or partial text stays visible, and the command does not classify papers, approve decisions or modify Zotero. Keep both files private; see [operation and retry limits](OPERABILITY.md).
 
 ## Core contract
 
