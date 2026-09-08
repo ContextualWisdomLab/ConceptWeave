@@ -178,6 +178,21 @@ interval are recorded in [the private capture record](doctoring/zotero_live_full
 Content remains private evidence; no decision, approval or Zotero write was
 performed.
 
+### September 9 06:36 capture-bound availability replay
+
+Using the same private report, the pinned Rust 1.98 optimized CLI completed a
+full read-only text capture to a new owner-only `0600` `/tmp` artifact
+(235,602,798 bytes; capture SHA-256
+`2a9b9be5e0f69bc460daeca05a7056d5fb5bc037ddd08e1958d842fb8f06a632`). The
+bound availability summary was also `0600` (359 bytes; SHA-256
+`0826d20281ba2fb793bd726d90aed5886006d00fb0963c388a2b28ad54fe1182`) and
+reported capture digest `sha256:2c668744e69ec44a14843d3acb7c83a39e73575702321b2c98ee171873d841ab`:
+3,715 papers, 3,203 with nonempty text, 440 without attachment, 34 with an
+unmanifested attachment, 38 captured-empty, 471 needing review without text,
+and two unbound nonempty records. This is acquisition/availability evidence
+only; it does not create steward decisions, approval, semantic authority or
+Zotero write permission.
+
 The pinned release executable was rerun against the live Local API on 2026-09-09.
 The private `0600` report `/tmp/conceptweave-zotero-live-20260909-latest.json`
 is 8,132,756 bytes with SHA-256

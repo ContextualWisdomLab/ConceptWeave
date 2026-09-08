@@ -114,3 +114,15 @@ aggregate remains 8,326 observed, 3,715 classified, 4,611 unclassified, four
 pending source keys and 49 duplicate candidates. This is snapshot/report
 continuity evidence only; it does not advance steward review or Zotero write
 authority.
+
+## Capture-bound availability replay (2026-09-09 06:36 KST)
+
+The pinned Rust 1.98 optimized CLI captured the full report-bound text set
+read-only into a new private `0600` artifact (235,602,798 bytes; SHA-256
+`2a9b9be5e0f69bc460daeca05a7056d5fb5bc037ddd08e1958d842fb8f06a632`). The
+separate `0600` availability summary (359 bytes; SHA-256
+`0826d20281ba2fb793bd726d90aed5886006d00fb0963c388a2b28ad54fe1182`) reports
+3,715 papers, 3,203 nonempty-text, 440 no-attachment, 34 unmanifested,
+38 captured-empty, 471 needing-review-without-text and two unbound-nonempty
+records. This confirms the capture envelope and acquisition denominator only;
+no steward decision, approval or Zotero write occurred.
