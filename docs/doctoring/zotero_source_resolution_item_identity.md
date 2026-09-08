@@ -1,16 +1,16 @@
 # Zotero source-resolution stored item identity
 
-Status: **REALITY_RED_SOURCE_FIX_PENDING**.
+Status: **SOURCE_REPAIRED — exact-head checks pending**.
 
 ## Problem
 
-`prepare_source_resolution_review` admits each pending-source decision only when its `item_key`, `item_version`, `item_type`, and `parent_item_key` match the retained source in the immutable classification report. The stored `SourceResolutionReview` envelope currently retains an independent expected pending-key set, but it does not retain independent expected version/type/parent coordinates.
+`prepare_source_resolution_review` admits each pending-source decision only when its `item_key`, `item_version`, `item_type`, and `parent_item_key` match the retained source in the immutable classification report. The stored `SourceResolutionReview` envelope now retains an independent expected identity vector containing those coordinates.
 
-As a result, JSON restoration can accept a constructor-valid review after `resolved_sources[*].item_version`, `item_type`, or `parent_item_key` has been changed. The custom deserializer still sees a matching aggregate/nested `server_id`, matching `library_version`, nonblank key/reason, strict key order, and a complete decision-key set, so the altered item identity regains typed review status without proof that it is the identity admitted by the constructor.
+JSON restoration rejects a constructor-valid review after `resolved_sources[*].item_version`, `item_type`, or `parent_item_key` has been changed. The custom deserializer compares each mutable decision to the separately persisted constructor-bound identity before the artifact regains typed review status.
 
 This conflicts with the repository invariant that pending Zotero ancestry is resolved only through a typed aggregate bound to the exact report item key/version/type/parent identity.
 
-## Reality RED
+## Regression and repair
 
 Commit `6fa6c667e1f936f505ed6eae69e637b9e89dab71` adds `stored_source_resolution_review_rejects_item_identity_drift` in `crates/conceptweave-zotero/tests/source_resolution_stored_completeness.rs`.
 
@@ -20,11 +20,11 @@ The regression starts from a real `ClassificationReport`, constructs a valid rev
 - `item_type`: `attachment -> note`
 - `parent_item_key`: empty -> `PARENT`
 
-Each restored artifact must be rejected. Current source does not independently retain the expected values needed to reject those mutations, so the test is intentionally RED by direct source inspection.
+Each restored artifact must be rejected. The regression is now GREEN locally after adding the independent identity vector and exact deserializer comparison.
 
 ## Least-widening repair
 
-Persist constructor-bound expected pending-source coordinates separately from steward decisions and require exact equality during deserialization. The expected record needs only the item identity not already supplied by the aggregate envelope: key, item version, item type, and parent key. Server identity and library version remain envelope coordinates and keep their existing exact nested equality checks.
+Persist constructor-bound expected pending-source coordinates separately from steward decisions and require exact equality during deserialization. The expected record contains the item key, item version, item type, and parent key. Server identity and library version remain envelope coordinates and keep their existing exact nested equality checks. Stored artifacts without the new field fail closed because no migration contract exists.
 
 Do not derive the expected identity from `resolved_sources`, because that merely compares a mutable decision array to itself. Do not infer a parent, rewrite the classification report, add Zotero mutation, or treat the review as semantic publication/approval authority. Existing artifacts that lack the new independent evidence must fail closed unless an explicit versioned migration contract is introduced.
 

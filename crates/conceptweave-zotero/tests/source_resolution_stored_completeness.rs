@@ -69,12 +69,19 @@ fn stored_source_resolution_review_rejects_item_identity_drift() {
         42,
         vec![item("SOURCE", 41, "attachment")],
     );
-    let review = prepare_source_resolution_review(
-        &report,
-        vec![resolution("SOURCE", 41, "attachment")],
-    )
-    .expect("constructor binds the decision to the exact source item identity");
+    let review =
+        prepare_source_resolution_review(&report, vec![resolution("SOURCE", 41, "attachment")])
+            .expect("constructor binds the decision to the exact source item identity");
     let stored = serde_json::to_value(review).expect("review must serialize");
+    assert_eq!(
+        stored["expected_source_identities"][0],
+        serde_json::json!({
+            "item_key": "SOURCE",
+            "item_version": 41,
+            "item_type": "attachment",
+            "parent_item_key": ""
+        })
+    );
 
     for (field, replacement) in [
         ("item_version", serde_json::json!(40)),

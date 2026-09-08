@@ -233,6 +233,19 @@ pub struct PendingSourceResolution {
     pub reason: String,
 }
 
+/// Constructor-bound identity coordinates retained separately from decisions.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct PendingSourceIdentity {
+    /// Stable Zotero item key.
+    pub item_key: String,
+    /// Item revision observed in the report.
+    pub item_version: u64,
+    /// Item type observed in the report.
+    pub item_type: String,
+    /// Parent key observed in the report, if any.
+    pub parent_item_key: String,
+}
+
 /// Complete source-resolution aggregate bound to one classification snapshot.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SourceResolutionReview {
@@ -246,6 +259,8 @@ pub struct SourceResolutionReview {
     pub rule_revision: String,
     /// Complete pending-source key set captured with this review.
     pub pending_source_item_keys: Vec<String>,
+    /// Constructor-bound item coordinates, independent of steward decisions.
+    pub expected_source_identities: Vec<PendingSourceIdentity>,
     /// One resolution for every pending source, sorted by item key.
     pub resolved_sources: Vec<PendingSourceResolution>,
 }
@@ -262,6 +277,7 @@ impl<'de> Deserialize<'de> for SourceResolutionReview {
             library_version: u64,
             rule_revision: String,
             pending_source_item_keys: Vec<String>,
+            expected_source_identities: Vec<PendingSourceIdentity>,
             resolved_sources: Vec<PendingSourceResolution>,
         }
 
@@ -289,6 +305,20 @@ impl<'de> Deserialize<'de> for SourceResolutionReview {
                 "source-resolution pending keys are not strictly ordered",
             ));
         }
+        if wire
+            .expected_source_identities
+            .windows(2)
+            .any(|pair| pair[0].item_key >= pair[1].item_key)
+            || wire
+                .expected_source_identities
+                .iter()
+                .map(|identity| identity.item_key.as_str())
+                .ne(wire.pending_source_item_keys.iter().map(String::as_str))
+        {
+            return Err(serde::de::Error::custom(
+                "source-resolution expected identities are incomplete or unordered",
+            ));
+        }
         if wire.resolved_sources.iter().any(|resolution| {
             resolution.server_id.as_deref() != wire.server_id.as_deref()
                 || resolution.library_version != wire.library_version
@@ -308,12 +338,27 @@ impl<'de> Deserialize<'de> for SourceResolutionReview {
                 "source-resolution decisions violate their stored identity or ordering",
             ));
         }
+        if wire
+            .expected_source_identities
+            .iter()
+            .zip(&wire.resolved_sources)
+            .any(|(identity, resolution)| {
+                identity.item_version != resolution.item_version
+                    || identity.item_type != resolution.item_type
+                    || identity.parent_item_key != resolution.parent_item_key
+            })
+        {
+            return Err(serde::de::Error::custom(
+                "source-resolution decisions drift from constructor-bound identities",
+            ));
+        }
         Ok(Self {
             zotero_version: wire.zotero_version,
             server_id: wire.server_id,
             library_version: wire.library_version,
             rule_revision: wire.rule_revision,
             pending_source_item_keys: wire.pending_source_item_keys,
+            expected_source_identities: wire.expected_source_identities,
             resolved_sources: wire.resolved_sources,
         })
     }
@@ -422,12 +467,22 @@ pub fn prepare_source_resolution_review(
         }
     }
     resolutions.sort_by(|left, right| left.item_key.cmp(&right.item_key));
+    let expected_source_identities = pending
+        .iter()
+        .map(|(item_key, source)| PendingSourceIdentity {
+            item_key: (*item_key).clone(),
+            item_version: source.version,
+            item_type: source.data.item_type.clone(),
+            parent_item_key: source.data.parent_item.clone(),
+        })
+        .collect();
     Ok(SourceResolutionReview {
         zotero_version: report.zotero_version.clone(),
         server_id: report.server_id.clone(),
         library_version: report.library_version,
         rule_revision: report.rule_revision.to_owned(),
         pending_source_item_keys: report.pending_source_item_keys.clone(),
+        expected_source_identities,
         resolved_sources: resolutions,
     })
 }
