@@ -1,6 +1,6 @@
 use conceptweave_zotero::{
     ItemData, PendingSourceResolution, SourceResolutionDisposition, SourceResolutionError,
-    ZoteroItem, classify_snapshot, prepare_source_resolution_review,
+    SourceResolutionRestoreError, ZoteroItem, classify_snapshot, prepare_source_resolution_review,
     restore_source_resolution_review,
 };
 
@@ -452,6 +452,29 @@ fn source_resolution_errors_explain_each_rejection() {
         (
             SourceResolutionError::MissingServerIdentity,
             "report lacks a non-blank Zotero server identity",
+        ),
+    ];
+    for (error, expected) in cases {
+        assert_eq!(error.to_string(), expected);
+    }
+}
+
+#[test]
+fn source_resolution_restore_errors_explain_each_rejection() {
+    let cases = [
+        (
+            SourceResolutionRestoreError::InvalidStoredArtifact,
+            "stored source-resolution artifact is invalid",
+        ),
+        (
+            SourceResolutionRestoreError::UnboundReport,
+            "stored source-resolution artifact is not bound to the report",
+        ),
+        (
+            SourceResolutionRestoreError::SourceResolution(SourceResolutionError::Missing(
+                "SOURCE".into(),
+            )),
+            "pending source lacks resolution: SOURCE",
         ),
     ];
     for (error, expected) in cases {
