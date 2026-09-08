@@ -1,10 +1,10 @@
 # Zotero source-resolution construction boundary
 
-Status: **REALITY_RED_SOURCE_FIX_PENDING**
+Status: **SOURCE_TEST_REPAIRED_PENDING_CI**
 
 ## Problem
 
-`SourceResolutionReview` is the typed, report-bound review aggregate returned only after `prepare_source_resolution_review` or `restore_source_resolution_review` validates the immutable Zotero snapshot coordinates. At reviewed head `d7f750644fd254a4977f137cae7cfa3b179d46a9`, the type itself and all seven fields are public. An external crate can therefore construct a `SourceResolutionReview` literal or mutate a returned value without passing either validation path. That makes the trusted type stronger than its construction boundary.
+`SourceResolutionReview` is the typed, report-bound review aggregate returned only after `prepare_source_resolution_review` or `restore_source_resolution_review` validates the immutable Zotero snapshot coordinates. At reviewed head `d7f750644fd254a4977f137cae7cfa3b179d46a9`, the type itself and all seven fields were public. An external crate could therefore construct a `SourceResolutionReview` literal or mutate a returned value without passing either validation path. That made the trusted type stronger than its construction boundary.
 
 This is separate from stored-wire validation. `deny_unknown_fields`, envelope checks, and report-bound restoration protect persisted JSON, but they do not protect direct Rust construction or post-construction mutation.
 
@@ -12,11 +12,11 @@ This is separate from stored-wire validation. `deny_unknown_fields`, envelope ch
 
 Commit `cefc2e084f0a746d6a8a40880eef0fdfef417472` adds `source_resolution_review_does_not_expose_mutable_construction_fields`. The public-contract regression requires the seven constructor-bound fields to stop being externally writable while keeping the review type itself available to consumers.
 
-The RED is intentionally source-shape based because the defect is a Rust visibility/API-surface property: the current declaration exposes `pub` fields and therefore fails the contract before runtime validation can participate.
+The RED is intentionally source-shape based because the defect is a Rust visibility/API-surface property: the reviewed declaration exposed `pub` fields and therefore failed the contract before runtime validation could participate.
 
-## Least-widening repair
+## Causal source repair
 
-Keep `SourceResolutionReview` public and serializable, but make its fields private. Expose only immutable accessors needed by consumers:
+Commit `f39fc7f874e01ae2fc043d6211ce24fd863930b8` performs the least-widening repair. `SourceResolutionReview` remains public, cloneable, comparable and serializable, while all seven constructor-bound fields become private. Read access is preserved only through immutable, documented accessors:
 
 - `zotero_version() -> &str`
 - `server_id() -> Option<&str>`
@@ -26,12 +26,12 @@ Keep `SourceResolutionReview` public and serializable, but make its fields priva
 - `expected_source_identities() -> &[PendingSourceIdentity]`
 - `resolved_sources() -> &[PendingSourceResolution]`
 
-Migrate repository-local external field reads to these accessors. Do not add setters, mutable slice access, public constructors, `Default`, unchecked deserialization, or any path that bypasses `prepare_source_resolution_review` / `restore_source_resolution_review`.
+Repository-local integration-test reads are migrated to accessors. No setter, mutable slice, public unchecked constructor, `Default`, or direct trusted deserialization is introduced. The ordinary two-parent integration `d7ebef510df2481a55550eed76571589c04b3ede` preserves both this repair and the committed RED/doctoring/baseline lineage without force or destructive rebase.
 
 ## Unchanged authority boundary
 
-This repair must not change source-resolution disposition semantics, Zotero read/write behavior, classification, publication, steward approval, or semantic authority. The aggregate remains read-only evidence for a steward workflow.
+The repair does not change source-resolution disposition semantics, Zotero read/write behavior, classification, publication, steward approval, or semantic authority. The aggregate remains read-only evidence for a steward workflow.
 
 ## Acceptance
 
-A single unchanged exact successor must pass the new visibility regression, locked Rust 1.98 workspace tests, `cargo fmt --all -- --check`, all-target Clippy, warnings-denied rustdoc/release, owned production function/normalized-region/branch 100% coverage, applicable hosted checks, and independent review. Predecessor execution does not transfer.
+The source defect is repaired, but no executable GREEN is transferred to the changed head. A single unchanged exact successor must pass the visibility regression, locked Rust 1.98 workspace tests, `cargo fmt --all -- --check`, all-target Clippy, warnings-denied rustdoc/release, owned production function/normalized-region/branch 100% coverage, applicable hosted checks, and independent review. Predecessor execution does not transfer.
