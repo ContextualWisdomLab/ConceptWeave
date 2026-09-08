@@ -97,3 +97,10 @@ records. It yields 27 case-insensitive `ontology`, 36 `semantic`, 2 `taxonomy`,
 of 23/20. Applying the same predicates to all 8,326 titles yields 30/36/2/2/81/26/23,
 which is intentionally not the research KPI. The denominator boundary is part of
 the evidence contract; these signals remain discovery queues, not decisions.
+
+The same report's four pending source keys resolve to one standalone note and
+three standalone attachment records, each without a parent link. The attachment
+records retain only the metadata projection in this report; their file bytes,
+content type and link mode remain outside the classification artifact and must
+be inspected through the separate capture-bound evidence path. No pending source
+was cleared or converted into a bibliographic proposal.

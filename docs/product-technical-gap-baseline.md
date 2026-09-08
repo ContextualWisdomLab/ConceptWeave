@@ -1324,3 +1324,8 @@ Manual `@coderabbitai review` requests were issued on PR39 and PR40 at their exa
 heads, but GitHub continued to report “reviews are disabled for this base branch”
 and produced no independent review or required workflow run. The request itself is
 coordination evidence only, not approval.
+
+The latest report retains four pending source records: one standalone note and
+three standalone attachments without parent links. Their file bytes, content type
+and link mode remain outside the metadata projection and require the separate
+capture-bound evidence path; none was cleared or promoted to a bibliographic proposal.
