@@ -4,14 +4,14 @@
 
 ## Current protected truth and active stack
 
-- Default `main`: `f4f440dd58c77d7cd90dff8a1eb2eeb9a9940425`. No immutable ConceptWeave release exists.
+- Default `main`: `f4f440dd58c77d7cd90dff8a1eb2eeb9a9940425`. No immutable ConceptWeave release exists. Organization ruleset `CWL Central required workflows` is active for this repository; classic branch status-check fields alone are not the complete protection authority.
 - Foundation #1: `b538470c963e6524ddc0c3f652a46a4fc8265150`, OPEN Draft/mergeable, still behind Product-CI bootstrap #35.
-- Product-CI bootstrap #35: `22709ec9b4d969bf67ec74db402813e74d11f7ca`, OPEN/non-Draft/mergeable. Security Scan `34204381232` and SAST `34204381260` are success; CodeQL PR `34204381235` is terminal failure. Protected central `.github/main` is `7fd571dbcdbae6acf29d8f4ee704d7ba6297e4db`. Central dispatch recovery does not retroactively make the leaf CodeQL GREEN.
+- Product-CI bootstrap #35: `22709ec9b4d969bf67ec74db402813e74d11f7ca`, OPEN/non-Draft/mergeable. Security Scan `34204381232` and SAST `34204381260` are success; CodeQL PR `34204381235` is terminal failure after a successful current-head dispatch job. Protected central `.github/main` is `7fd571dbcdbae6acf29d8f4ee704d7ba6297e4db`; central owner `.github#2040@d93a78ab4262c5228af7eda258ee0af58b880de7` is the current non-Draft repair lane for the nested rerun-envelope and sibling-wake race. Neither dispatch success nor an unmerged owner repair retroactively makes the #35 leaf CodeQL GREEN.
 - Client Consumption #5: `fcf36c8a99f015b963c9f812787df127ac2e2f9e`, Draft/open; owner of provider-independent released semantic-contract admission, integrity, compatibility, diff/resolution and supersession consumption.
 - Source Observation #6: `331f8edcd7cebb1719e5cea3187f3848ce7b9e71`, Draft/open on #5; source-system business truth stays with its owner.
 - Research Intake #9: `b98ba39f9efa4c18c1bcdc3bcae4a8ef4f0abd41`, OPEN Draft/mergeable on Foundation; canonical owner of the read-only Zotero snapshot, deterministic research classification, source inventory and report-publication safety seams.
-- Pending-source resolution #40: current exact head `d774c5b6382e71c78a32359cdef2c75c7f80a04d`, OPEN Draft/CLEAN on #9. It owns only the typed read-only exact-snapshot resolution aggregate; it has no Zotero write, semantic publication or approval authority.
-- Full-text/write/recovery #39: `808e1b9e663c140716d416d62c5db64d9c18bbab`, OPEN Draft/mergeable on #38 `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`. This independent writer may advance normally; live PR metadata wins. Historical repository-count KPIs remain withdrawn.
+- Pending-source resolution #40: current exact head `8d469af4e4e46c84c34b823a6651d26609997e3b` before this baseline-only successor, OPEN Draft/mergeable on #9. Reality RED `6b28fc38afaae455a70901c57b28116b0b88510d` is causally repaired by source commit `c19c787cd9153ed39f3c34370d2f9fa18fef7c8a`; `d774c5b6382e71c78a32359cdef2c75c7f80a04d` is formatting-only and `8d469af...` is docs-only. #40 owns only the typed read-only exact-snapshot resolution aggregate; it has no Zotero write, semantic publication or approval authority.
+- Full-text/write/recovery #39: `6f8075b46afe480e2f0c14a1ede41f18905559ff`, OPEN Draft/mergeable on #38 `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`. This independent writer may advance normally; live PR metadata wins. Historical repository-count KPIs remain withdrawn.
 
 Predecessor checks and reviews never transfer automatically to a changed head. A queued or failed external-owner lane blocks only that acceptance lane; it does not justify no-op pushes, fabricated receipts, manual-dispatch-as-GREEN, self-approval, review dismissal or gate weakening.
 
@@ -25,12 +25,13 @@ Three standalone PDFs plus one standalone note remain governed pending sources. 
 
 ### Stored source-resolution artifact integrity
 
-`SourceResolutionReview` constructor admission rejects missing/blank report server identity, wrong server/library/item identity, duplicate/unknown decisions, missing decisions, blank reasons and missing retained inventory. Stored JSON must revalidate the invariants that remain provable from the artifact itself.
+`SourceResolutionReview` constructor admission rejects missing/blank report server identity, wrong server/library/item identity, duplicate/unknown decisions, missing decisions, blank reasons and missing retained inventory. Stored JSON must retain independent completeness evidence and revalidate the same identity boundary rather than validating only whichever decisions happen to remain in the artifact.
 
 - Earlier source repairs reject nested provider/library drift, blank stored item keys/reasons and duplicate/unsorted decision sets. RED `99d36562a7f101c3e1c2db39f9d493d228b2b133` and repair `fdee1fb4d70481bdb31a604e5235470653925b23` remain in ancestry; `4c05fcd59aa31b70b1054c4d8b53697628530d27` directly covers the blank stored-key branch.
-- The stored-completeness RED `6b28fc38afaae455a70901c57b28116b0b88510d` removed one pending decision after serialization. Repair `d774c5b6382e71c78a32359cdef2c75c7f80a04d` persists and validates the canonical pending-key set, so the regression is green locally while hosted acceptance remains pending.
 - Minimal repair `6dbc013d81a4cff1e46fbe43f4d920d968c425c0` rejects blank/whitespace stored `rule_revision` without hard-pinning to the current revision value. Future nonblank revisions remain representable; semantic authority and Zotero behavior are unchanged. AGENTS records the same invariant.
-- Focused source-resolution tests and strict Clippy are recorded as locally passing at `6dbc013...`, but exact-head pull-request workflow evidence is absent and owned coverage/hosted/independent review remain outstanding.
+- Stored-completeness RED `6b28fc38afaae455a70901c57b28116b0b88510d` starts from a constructor-valid two-pending-source review, serializes it, removes one decision and requires deserialization rejection. Source repair `c19c787cd9153ed39f3c34370d2f9fa18fef7c8a` adds `pending_source_item_keys` to the review/wire envelope, copies the report's canonical pending-key sequence into constructor output, rejects non-strictly-ordered expected keys and requires exact equality between expected keys and restored decision keys. The new field has no serde default, so an older artifact lacking this evidence fails closed rather than silently regaining typed completeness.
+- Style successor `d774c5b6382e71c78a32359cdef2c75c7f80a04d` changes only formatting in the affected regressions. Docs successor `8d469af4e4e46c84c34b823a6651d26609997e3b` refreshes the recorded coordinate. Neither changes the source semantics introduced by `c19c787...`.
+- No predecessor execution transfers to these successors. Exact-head Rust/coverage/hosted/independent-review evidence remains required before GREEN or thread resolution.
 
 Current #40 status is **SOURCE_TEST_REPAIRED_PENDING_CI**, not GREEN. Keep Draft and keep valid review findings unresolved until one unchanged exact successor completes the full Rust/coverage/hosted/independent-review gate.
 
@@ -49,10 +50,10 @@ A release begins only from an exact protected release-ready head. Version, CHANG
 | Product boundary | ACTIVE_PR | PRD/TRD/ADR/context map keep ConceptWeave responsible for `observe -> discover -> propose -> align -> validate -> review -> publish`, governed immutable semantic releases and stable client contracts. Foreign domain truth remains behind released/versioned ports and ACLs. |
 | Research lifecycle | SOURCE_REPAIRED_PENDING_CI | Proposal truth and publication state remain separate and proposal-only until steward validation/review/publication. Current-head execution remains required. |
 | Research evidence integrity | SOURCE_REPAIRED_PENDING_CI | Abstention replay, DOI provenance, matched-tag source order/deduplication, provider key validation, transport and publication durability have causal repairs; exact current-head owned coverage/hosted evidence remains incomplete. |
-| Pending-source resolution | SOURCE_TEST_REPAIRED_PENDING_CI | #40 rejects missing provider identity, nested server/library drift, duplicate/unsorted/blank stored decisions, blank stored rule revision and truncated stored decision sets. Full unchanged-head acceptance remains outstanding. |
+| Pending-source resolution | SOURCE_TEST_REPAIRED_PENDING_CI | #40 now rejects missing provider identity, nested server/library drift, duplicate/unsorted/blank stored decisions, blank stored rule revision and truncated stored decision sets. Full unchanged-head acceptance remains outstanding. |
 | Source Observation | ACTIVE_CHILD | Concrete bounded read-only PostgreSQL adapter/conformance remains outstanding. No source-system domain truth may be imported into ConceptWeave. |
 | Client Consumption | ACTIVE_CHILD | Released semantic-contract admission/integrity/compatibility exists as a child lane; protected exact-head evidence and prerequisite integration remain outstanding. |
-| Product CI bootstrap | BLOCKED_OWNER | #35 has Security/SAST success but terminal CodeQL failure. Central owner must provide authenticated terminal exact-head verdict; leaf no-op reruns are prohibited. |
+| Product CI bootstrap | BLOCKED_OWNER | #35 has Security/SAST success but terminal CodeQL failure. Central `.github#2040` owns the active rerun-settlement repair; the leaf remains stable until authenticated terminal exact-head evidence exists. |
 | Full-text/write terminal | ACTIVE_DOWNSTREAM | #39 remains downstream and must consume governed exact pending-source resolution before clearing or inferring pending sources. Historical repository-count KPIs are withdrawn. |
 | Release | NOT_STARTED | No protected immutable ConceptWeave release exists. |
 
