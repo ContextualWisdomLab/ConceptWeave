@@ -4,6 +4,17 @@
 
 ## September 8 acquisition and consolidation checkpoint
 
+Nightly `2026-08-20` coverage was rerun at PR #39 exact head
+`ae572879524a15944d1a9df6e46deb4b154059ba` with `RUSTUP_TOOLCHAIN` cleared.
+All instrumented tests passed, but the owned gate remains RED: raw totals are
+447/448 functions, 8,298/8,451 regions and 728/782 branches; the normalized
+source gate is 4,718/4,739 regions (99.56%) and 778/782 branches (99.49%).
+Remaining source gaps are concentrated in `full_text_review.rs`,
+`full_text_write.rs`, `lib.rs` and `main.rs`; no exclusions or threshold
+weakening were applied. The earlier stable-toolchain attempt failed before
+measurement because branch coverage requires nightly and is not evidence for
+the gate.
+
 At current PR #39 head `c91a1bd82c3aa4031e65de2ae15abc042f2f0add`, Rust 1.98
 workspace tests, all-target strict Clippy, warnings-denied rustdoc and diff
 checks were rerun after the evidence-only capture update and passed. This
