@@ -13,6 +13,16 @@ reconciled unique-repository KPI. Duplicate audits identified in the correction
 section keep current unique coverage unresolved until canonical repository
 identity is recomputed.
 
+## Reconciliation probe (2026-09-09)
+
+A read-only parser over the candidate-table first column found 34 table-visible
+candidate labels after excluding table headings and KPI rows. This is a lower
+bound on currently tabulated labels, not a replacement unique-repository KPI:
+some audited repositories appear only in prose, aliases such as `DiskSage`
+(`disksage`) still require URL-level normalization, and repeated audits may
+share one canonical repository. No 34/76 coverage claim is admitted until every
+audit observation is joined to a repository identity and default revision.
+
 ## Scope and evidence limits
 
 The September 7 metadata refresh again returned 76 repositories, one archived repository and 11 forks. Matching counts do not prove unchanged repository contents; every capability observation retains its own exact source revision.

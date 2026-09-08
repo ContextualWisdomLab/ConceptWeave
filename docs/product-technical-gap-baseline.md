@@ -260,6 +260,11 @@ The refreshed acquisition denominator is now an owned, repeatable contract at `3
 
 KPI correction: the inventory's reported 54/76 unique candidate coverage is withdrawn. At least eight later audits duplicate repositories already counted in earlier tables, including identical source revisions. Reconcile canonical repository identities before publishing a replacement coverage or release fraction; the historical incremental counts below are superseded by this correction. The next inventory action is deduplication, not another unverified increment.
 
+A read-only candidate-table probe found 34 table-visible labels after excluding
+headings and KPI rows. This is only a reconciliation lower bound: prose-only
+audits, aliases and repeated revisions still require URL-level repository joins.
+It does not replace the withdrawn 54/76 KPI.
+
 The [kaefa exploratory-factor-analysis boundary audit](doctoring/cwl_ontology_capability_inventory.md#kaefa-exploratory-factor-analysis-boundary-audit-2026-09-08) advances bounded candidate coverage to 54/76, leaving 22. Protected default `develop@5128d4867e24b5db73e6e3c8652a8dbeabd70aa0` is GPL-3.0 with an R psychometric/model-selection package and no release; it is not ontology authority. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
 
 The [aFIPC legacy measurement-kernel boundary audit](doctoring/cwl_ontology_capability_inventory.md#afipc-legacy-measurement-kernel-boundary-audit-2026-09-08) advances bounded candidate coverage to 53/76, leaving 23. Protected default `master@f87c2324f1686135e57d8730c1b0b9420874f300` is an R IRT-linking package with NOASSERTION license metadata and no release; it is not ontology authority. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
