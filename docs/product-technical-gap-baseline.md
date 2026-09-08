@@ -101,11 +101,12 @@ source against the immutable report before any authority callback. Missing and
 stale source-resolution regressions pass in the locked Rust 1.98 workspace;
 Clippy, warnings-denied rustdoc and diff checks also pass. GitHub reports OPEN
 Draft/CLEAN with CodeRabbit skipped because the PR remains a draft. PR #40's
-current exact head is `dde53e0a3412ca2f0641ee326488d39cf642970b`; the latest
-successor records stored source-item identity RED evidence while retaining the
-stored-completeness invariant. It remains OPEN Draft/CLEAN with
-only the draft-review skip visible, so fresh exact-head checks, independent
-review and protected acceptance are still outstanding. This is not
+current exact head is `610582a70f66503a694d4f1e72d34183a6652cdb`; the latest
+successor persists constructor-bound pending item key/version/type/parent
+coordinates and rejects stored identity drift. Local workspace tests, Clippy,
+fmt, rustdoc and release build pass, but hosted checks and independent review
+are still absent. It remains OPEN Draft/CLEAN, so protected acceptance is still
+outstanding. This is not
 protected-merge, release or Zotero-write evidence.
 
 Pinned `cargo +1.98.0 llvm-cov --workspace --all-features --locked
