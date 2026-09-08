@@ -1555,6 +1555,14 @@ Case-insensitive title/phrase counts were `ontology` 27/32, `semantic` 36/0,
 Signals overlap and are not additive classifications; this remains discovery
 evidence without steward disposition or Zotero write authority.
 
+### September 9 ontology queue integrity
+
+The private 142-row discovery queue was revalidated against replay SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`; its own
+SHA-256 remains `a096e2a92bdd17f2f426fd058c619ea45b6397c54004641f40af366b08de2dd7`.
+All queue keys are non-blank, unique and sorted. This is steward-input
+integrity evidence only, not classification approval or Zotero write authority.
+
 ### September 9 deterministic replay verification
 
 An independent release-mode Local API execution reproduced report SHA-256

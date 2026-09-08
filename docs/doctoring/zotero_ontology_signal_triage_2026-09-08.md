@@ -93,3 +93,13 @@ The queue rate is `142 / 3,715 = 3.8223%` of observed bibliographic items.
 This is a reproducible screening KPI for steward workload, not ontology
 precision, recall or approval coverage. The denominator includes every observed
 item, while the queue remains an overlapping title/phrase discovery projection.
+
+## Queue integrity checkpoint (2026-09-09)
+
+The private queue was revalidated against the replay envelope: the source report
+remains SHA-256 `8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`
+and the queue remains SHA-256
+`a096e2a92bdd17f2f426fd058c619ea45b6397c54004641f40af366b08de2dd7`.
+The 142 queue keys are non-blank, unique and lexicographically sorted; the
+source report still has 8,326 observed and 3,715 classified items. This proves
+input integrity only, not paper decisions or write authority.
