@@ -1529,3 +1529,15 @@ it does not supply steward decisions or write authority.
 ### September 9 PR40 coverage repair checkpoint
 
 At PR40 exact head `a860938`, the two test-only branch gaps in `crates/conceptweave-zotero/src/main.rs` were removed without changing production behavior: the platform `/tmp` existence guard became a direct assertion, and the `matches!` error-kind guard became an `unwrap_err().kind()` assertion. Rust 1.98 formatting and the complete locked workspace test/doc-test suite passed. The normalized branch aggregate is now 208/208 (100%), while the raw owned gate remains RED at functions 208/211, lines 1884/1903, regions 2984/3025, and branches 204/208; source-region gaps remain in `lib.rs` and `main.rs`. PR40 therefore remains Draft pending the remaining owned coverage repair and protected hosted evidence.
+
+### September 9 Rust candidate metadata reconciliation
+
+The read-only compatibility pass pinned official upstream coordinates before any
+dependency installation: Oxigraph `main@7ce152a1d910d5662027a5bcbe7c32cee0a4e059`
+and `v0.5.11@df37a5c98e2497135cdd4cfce01a049b78ca6740`, Sophia
+`main@e9d4a4b0b3e65a17319c54b7d92f53bdb60baaa5` and `v0.10.0@56e9461880d3fb7e700b3ec7dc430c12733fcb85`,
+and Rudof `master@275d01ffc29c89656f3bcb61d66e9bba86671f6d` and
+`0.3.18@f4abfcb6a797ebe4d8bac1d29d3b5c3c764c7ef1`. Cargo manifests and
+repository metadata differ in scope or declared license, so no adoption or
+utility repository is authorized. Conformance, performance, security and
+exact-consumer tests remain open gates.

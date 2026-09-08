@@ -80,3 +80,5 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 ### Reusable coverage lesson
 
 When a coverage gate exposes test-only branches, remove unreachable platform guards or branchy assertion wrappers only when the behavioral assertion remains equivalent. Re-run both the full locked suite and the frozen coverage script; normalized branch recovery does not satisfy the raw repository gate when source functions, lines, or regions remain uncovered.
+
+- Upstream repository license metadata and Cargo package license declarations are separate evidence. Record both at immutable head/release coordinates and resolve any divergence before proposing a dependency or utility repository.

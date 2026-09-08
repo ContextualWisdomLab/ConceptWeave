@@ -43,6 +43,22 @@ latency and failure behavior) generated from immutable upstream revisions. A
 matrix pass may justify an ACL or utility-repository proposal; it does not
 justify adding a dependency or creating a new repository by itself.
 
+### Read-only Rust candidate compatibility checkpoint (2026-09-09)
+
+The first bounded matrix pass compared the official default head, latest
+release tag and package manifest without installing any dependency or executing
+third-party code:
+
+| Candidate | Default head / latest release | Package metadata observed | Decision boundary |
+| --- | --- | --- | --- |
+| Oxigraph | `main@7ce152a1d910d5662027a5bcbe7c32cee0a4e059`; `v0.5.11@df37a5c98e2497135cdd4cfce01a049b78ca6740` | Head `Cargo.toml` declares `0.6.0-dev`, Rust `1.87`, `MIT OR Apache-2.0`; repository metadata reports Apache-2.0. | Release and head are different coordinates. Pin one immutable release, reconcile license metadata, then run RDF/SPARQL conformance and bounded resource fixtures behind an ACL. |
+| Sophia | `main@e9d4a4b0b3e65a17319c54b7d92f53bdb60baaa5`; latest tag `v0.10.0@56e9461880d3fb7e700b3ec7dc430c12733fcb85` | Head `Cargo.toml` declares `0.10.0`, edition 2024, `Apache-2.0 / CECILL-B`; repository metadata reports Apache-2.0. | The dual package license must be reviewed as a transitive distribution obligation. Verify RDF 1.2, IRI/language-tag and canonicalization behavior at the pinned tag before any port. |
+| Rudof | `master@275d01ffc29c89656f3bcb61d66e9bba86671f6d`; `0.3.18@f4abfcb6a797ebe4d8bac1d29d3b5c3c764c7ef1` | Head `Cargo.toml` declares `0.3.18`, edition 2024, `MIT OR Apache-2.0`; repository metadata reports Apache-2.0. | Select the supported SHACL/ShEx/DCTAP profile and test negative shapes, conversion and resource limits at the release commit; validation remains proposal evidence. |
+
+This checkpoint establishes release/provenance and license questions only. It
+does not establish API compatibility, performance, conformance, security,
+consumer adoption or ConceptWeave semantic authority.
+
 The September 7 metadata refresh again returned 76 repositories, one archived repository and 11 forks. Matching counts do not prove unchanged repository contents; every capability observation retains its own exact source revision.
 
 The paginated organization metadata census returned 76 repositories, including one archived repository and 11 forks; the September 6 follow-up refresh confirmed the same counts. Name/description screening for ontology, semantic, knowledge graph, schema, RDF, SHACL, provenance and lineage was combined with the existing Context Map; metadata matches alone miss owners whose descriptions do not use those words. This expanded the original eight-candidate audit to 12 selected candidates. The organization product-goal directive then identified DiskSage's actual OWL use, expanding the audit to 13. naruon and pg-erd-cloud brought the count to 15. Five domain/interoperability audits brought coverage to 20; three further domain and two document-contract audits brought it to 25/76. Keyverse and inkspan brought it to 27/76; three statistical-library audits brought it to 30/76. The threading, CDC and work-dependency audits below are a historical **33/76** checkpoint, leaving **43** at that point; subsequent bounded audits advance the current historical inventory to **39/76**, leaving **37**. This does not prove that all relevant implementations have been found.
