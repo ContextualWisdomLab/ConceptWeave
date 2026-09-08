@@ -54,6 +54,18 @@ attachment-evidence entries. None of those titles contains the literal
 queue. It remains a steward batch selected by worksheet order; no rows were
 auto-promoted or skipped.
 
+## Read-only ontology discovery queue checkpoint (2026-09-09 04:08 KST)
+
+From the byte-identical live replay, a private queue was projected for steward
+triage at `/tmp/conceptweave-ontology-discovery-queue.XXXXXX.json` (`0600`).
+The filter is an OR of case-insensitive title or matched-phrase signals for
+`ontology`, `semantic`, `taxonomy`, `knowledge graph`, `linked data` and
+`vocab`; it produced 142 candidate rows (137 title-signal rows and 35 rows with
+at least one matched phrase). Its SHA-256 is
+`a096e2a92bdd17f2f426fd058c619ea45b6397c54004641f40af366b08de2dd7`. The
+queue is discovery input only: it does not change dispositions, fill blank
+full-text decisions, clear pending sources or authorize Zotero writes.
+
 ## External implementation-candidate checkpoint (2026-09-09)
 
 An upstream-only scan recorded three Rust candidates for a later compatibility

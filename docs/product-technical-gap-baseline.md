@@ -1496,3 +1496,13 @@ one retained inventory record for a pending source with the typed
 Rust 1.98 formatting and the complete workspace test/doc-test suite passed on
 this head. PR40 remains Draft and its local success is not independent review,
 protected hosted acceptance, paper classification or Zotero write authority.
+
+### September 9 04:08 ontology discovery queue
+
+Using the byte-identical replay, a private read-only queue was projected from
+case-insensitive title or matched-phrase signals (`ontology`, `semantic`,
+`taxonomy`, `knowledge graph`, `linked data`, `vocab`). It contains 142 rows
+(137 title-signal rows; 35 with matched phrases) and has SHA-256
+`a096e2a92bdd17f2f426fd058c619ea45b6397c54004641f40af366b08de2dd7`. This is
+a steward triage queue, not a classification decision, full-text approval,
+pending-source resolution or write authorization.
