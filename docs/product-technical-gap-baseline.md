@@ -14,6 +14,8 @@ Pinned coverage rerun at merged exact head `d8560e8870f4419c73dc7530af7fdd1d0f23
 
 After removing the now-unreachable identity sub-branch behind the early fail-closed guard, exact head `66501eafc21aed967d20750dd2a5e621bafd760d` measures 181/186 functions, 2,771/2,823 normalized regions, and 159/164 normalized branches. The gate remains RED; the change removes duplicate control flow and does not exclude uncovered behavior.
 
+The HTTP-error regression at exact code head `a9b67f6300fcd2edf21cb447ff0ee54ea1898586` raises normalized coverage to 182/186 functions, 2,774/2,823 regions, and 159/164 branches. One platform-gated CLI branch remains uncovered; transport and generic gaps remain explicit rather than excluded.
+
 Owner coverage checkpoint `f71286e` (before documentation-only `60d01f8`) improved after the source-resolution error-contract test to 180/185 functions, 2,766/2,818 normalized regions, and 159/164 normalized branch outcomes; the gate remains RED and no exclusion or threshold weakening is accepted.
 
 PR #40 executable checkpoint `1308ac6e4403a67c61b84f47c9d0142286da3c64` is recorded as a dated Draft/open/CLEAN evidence point, based on Research Intake head `ff2e78aaa4ce75c7eb5f41bc9612b8dcf3bb7d38`. Its source-resolution aggregate, ontology discovery signal, and visual/API population-boundary lesson are pushed, while independent approval and protected workflow evidence remain absent; the live PR head is authoritative for later documentation-only descendants and no merge or release is claimed.
