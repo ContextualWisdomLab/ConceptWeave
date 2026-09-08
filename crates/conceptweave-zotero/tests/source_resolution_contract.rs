@@ -1,7 +1,16 @@
 use conceptweave_zotero::{
     ItemData, PendingSourceResolution, SourceResolutionDisposition, SourceResolutionError,
     ZoteroItem, classify_snapshot, prepare_source_resolution_review,
+    restore_source_resolution_review,
 };
+
+fn restored_is_err(
+    report: &conceptweave_zotero::ClassificationReport,
+    value: serde_json::Value,
+) -> bool {
+    let bytes = serde_json::to_vec(&value).expect("stored value must serialize");
+    restore_source_resolution_review(report, &bytes).is_err()
+}
 
 fn item(key: &str, version: u64, item_type: &str, parent_item: &str) -> ZoteroItem {
     ZoteroItem {
@@ -100,8 +109,8 @@ fn source_resolution_review_round_trips_owned_json() {
     .expect("the exact pending source is resolvable");
 
     let serialized = serde_json::to_string(&review).expect("review must serialize");
-    let decoded: conceptweave_zotero::SourceResolutionReview =
-        serde_json::from_str(&serialized).expect("owned JSON must deserialize");
+    let decoded = restore_source_resolution_review(&report, serialized.as_bytes())
+        .expect("report-bound owned JSON must restore");
 
     assert_eq!(decoded, review);
 }
@@ -134,10 +143,7 @@ fn source_resolution_review_json_rejects_missing_or_blank_server_identity() {
     ] {
         let mut candidate = serialized.clone();
         candidate["server_id"] = server_id;
-        assert!(
-            serde_json::from_value::<conceptweave_zotero::SourceResolutionReview>(candidate)
-                .is_err()
-        );
+        assert!(restored_is_err(&report, candidate));
     }
 }
 
@@ -170,10 +176,7 @@ fn source_resolution_review_json_rejects_nested_server_identity_mismatch() {
     ] {
         let mut candidate = serialized.clone();
         candidate["resolved_sources"][0]["server_id"] = server_id;
-        assert!(
-            serde_json::from_value::<conceptweave_zotero::SourceResolutionReview>(candidate)
-                .is_err()
-        );
+        assert!(restored_is_err(&report, candidate));
     }
 }
 
@@ -200,9 +203,7 @@ fn source_resolution_review_json_rejects_nested_library_version_mismatch() {
     let mut serialized = serde_json::to_value(review).expect("review must serialize");
     serialized["resolved_sources"][0]["library_version"] = serde_json::json!(43);
 
-    assert!(
-        serde_json::from_value::<conceptweave_zotero::SourceResolutionReview>(serialized).is_err()
-    );
+    assert!(restored_is_err(&report, serialized));
 }
 
 #[test]
@@ -228,38 +229,29 @@ fn source_resolution_review_json_rejects_duplicate_unsorted_or_blank_decisions()
 
     let mut duplicate = serialized.clone();
     duplicate["resolved_sources"][1]["item_key"] = serde_json::json!("NOTE");
-    assert!(
-        serde_json::from_value::<conceptweave_zotero::SourceResolutionReview>(duplicate).is_err()
-    );
+    assert!(restored_is_err(&report, duplicate));
 
     let mut unsorted = serialized.clone();
     unsorted["resolved_sources"]
         .as_array_mut()
         .expect("resolved sources are an array")
         .swap(0, 1);
-    assert!(
-        serde_json::from_value::<conceptweave_zotero::SourceResolutionReview>(unsorted).is_err()
-    );
+    assert!(restored_is_err(&report, unsorted));
 
     let mut unsorted_pending = serialized.clone();
     unsorted_pending["pending_source_item_keys"]
         .as_array_mut()
         .expect("pending source keys are an array")
         .swap(0, 1);
-    assert!(
-        serde_json::from_value::<conceptweave_zotero::SourceResolutionReview>(unsorted_pending)
-            .is_err()
-    );
+    assert!(restored_is_err(&report, unsorted_pending));
 
     let mut blank_key = serialized.clone();
     blank_key["resolved_sources"][0]["item_key"] = serde_json::json!(" \t\n");
-    assert!(
-        serde_json::from_value::<conceptweave_zotero::SourceResolutionReview>(blank_key).is_err()
-    );
+    assert!(restored_is_err(&report, blank_key));
 
     let mut blank = serialized;
     blank["resolved_sources"][0]["reason"] = serde_json::json!(" \t\n");
-    assert!(serde_json::from_value::<conceptweave_zotero::SourceResolutionReview>(blank).is_err());
+    assert!(restored_is_err(&report, blank));
 }
 
 #[test]

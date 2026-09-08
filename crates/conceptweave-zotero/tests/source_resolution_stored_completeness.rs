@@ -1,6 +1,6 @@
 use conceptweave_zotero::{
-    ItemData, PendingSourceResolution, SourceResolutionDisposition, SourceResolutionReview,
-    ZoteroItem, classify_snapshot, prepare_source_resolution_review,
+    ItemData, PendingSourceResolution, SourceResolutionDisposition, ZoteroItem, classify_snapshot,
+    prepare_source_resolution_review, restore_source_resolution_review,
 };
 
 fn item(key: &str, version: u64, item_type: &str) -> ZoteroItem {
@@ -56,7 +56,11 @@ fn stored_source_resolution_review_rejects_a_removed_pending_decision() {
         .remove(0);
 
     assert!(
-        serde_json::from_value::<SourceResolutionReview>(stored).is_err(),
+        restore_source_resolution_review(
+            &report,
+            &serde_json::to_vec(&stored).expect("stored value must serialize"),
+        )
+        .is_err(),
         "stored review must not regain typed status after one pending decision is removed"
     );
 }
@@ -91,7 +95,11 @@ fn stored_source_resolution_review_rejects_item_identity_drift() {
         let mut candidate = stored.clone();
         candidate["resolved_sources"][0][field] = replacement;
         assert!(
-            serde_json::from_value::<SourceResolutionReview>(candidate).is_err(),
+            restore_source_resolution_review(
+                &report,
+                &serde_json::to_vec(&candidate).expect("stored value must serialize"),
+            )
+            .is_err(),
             "stored review must reject {field} drift from the constructor-bound snapshot"
         );
     }
@@ -114,7 +122,11 @@ fn stored_source_resolution_review_rejects_coordinated_identity_rewrite() {
     stored["resolved_sources"][0]["item_version"] = serde_json::json!(40);
 
     assert!(
-        serde_json::from_value::<SourceResolutionReview>(stored).is_err(),
+        restore_source_resolution_review(
+            &report,
+            &serde_json::to_vec(&stored).expect("stored value must serialize"),
+        )
+        .is_err(),
         "stored review must not regain exact-snapshot typed status when both the expected and decision identity are rewritten together"
     );
 }

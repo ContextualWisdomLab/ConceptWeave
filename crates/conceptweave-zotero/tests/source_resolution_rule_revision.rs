@@ -1,6 +1,6 @@
 use conceptweave_zotero::{
-    ItemData, PendingSourceResolution, SourceResolutionDisposition, SourceResolutionReview,
-    ZoteroItem, classify_snapshot, prepare_source_resolution_review,
+    ItemData, PendingSourceResolution, SourceResolutionDisposition, ZoteroItem, classify_snapshot,
+    prepare_source_resolution_review, restore_source_resolution_review,
 };
 
 fn source_item() -> ZoteroItem {
@@ -45,5 +45,11 @@ fn stored_source_resolution_rejects_blank_rule_revision() {
     let mut stored = serde_json::to_value(review).expect("review must serialize");
     stored["rule_revision"] = serde_json::json!(" \t\n");
 
-    assert!(serde_json::from_value::<SourceResolutionReview>(stored).is_err());
+    assert!(
+        restore_source_resolution_review(
+            &report,
+            &serde_json::to_vec(&stored).expect("stored value must serialize"),
+        )
+        .is_err()
+    );
 }

@@ -265,80 +265,82 @@ pub struct SourceResolutionReview {
     pub resolved_sources: Vec<PendingSourceResolution>,
 }
 
-impl<'de> Deserialize<'de> for SourceResolutionReview {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        struct Wire {
-            zotero_version: String,
-            server_id: Option<String>,
-            library_version: u64,
-            rule_revision: String,
-            pending_source_item_keys: Vec<String>,
-            expected_source_identities: Vec<PendingSourceIdentity>,
-            resolved_sources: Vec<PendingSourceResolution>,
-        }
+#[derive(Debug, Deserialize)]
+struct StoredSourceResolutionWire {
+    zotero_version: String,
+    server_id: Option<String>,
+    library_version: u64,
+    rule_revision: String,
+    pending_source_item_keys: Vec<String>,
+    expected_source_identities: Vec<PendingSourceIdentity>,
+    resolved_sources: Vec<PendingSourceResolution>,
+}
 
-        let wire = Wire::deserialize(deserializer)?;
-        if wire
-            .server_id
-            .as_deref()
-            .is_none_or(|server_id| server_id.trim().is_empty())
-        {
-            return Err(serde::de::Error::custom(
-                "source-resolution review lacks a non-blank Zotero server identity",
-            ));
+/// Failure while restoring an untrusted stored source-resolution artifact.
+#[derive(Debug)]
+pub enum SourceResolutionRestoreError {
+    /// The stored JSON is malformed or violates its internal wire contract.
+    InvalidStoredArtifact,
+    /// The stored decisions fail the normal source-resolution constructor.
+    SourceResolution(SourceResolutionError),
+    /// The stored artifact does not match the immutable report supplied by the caller.
+    UnboundReport,
+}
+
+impl fmt::Display for SourceResolutionRestoreError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidStoredArtifact => {
+                write!(formatter, "stored source-resolution artifact is invalid")
+            }
+            Self::SourceResolution(error) => error.fmt(formatter),
+            Self::UnboundReport => write!(
+                formatter,
+                "stored source-resolution artifact is not bound to the report"
+            ),
         }
-        if wire.rule_revision.trim().is_empty() {
-            return Err(serde::de::Error::custom(
-                "source-resolution review lacks a non-blank rule revision",
-            ));
-        }
-        if wire
+    }
+}
+
+impl std::error::Error for SourceResolutionRestoreError {}
+
+fn validate_stored_source_resolution_wire(
+    wire: &StoredSourceResolutionWire,
+) -> Result<(), SourceResolutionRestoreError> {
+    if wire
+        .server_id
+        .as_deref()
+        .is_none_or(|server_id| server_id.trim().is_empty())
+        || wire.rule_revision.trim().is_empty()
+        || wire
             .pending_source_item_keys
             .windows(2)
             .any(|pair| pair[0] >= pair[1])
-        {
-            return Err(serde::de::Error::custom(
-                "source-resolution pending keys are not strictly ordered",
-            ));
-        }
-        if wire
+        || wire
             .expected_source_identities
             .windows(2)
             .any(|pair| pair[0].item_key >= pair[1].item_key)
-            || wire
-                .expected_source_identities
-                .iter()
-                .map(|identity| identity.item_key.as_str())
-                .ne(wire.pending_source_item_keys.iter().map(String::as_str))
-        {
-            return Err(serde::de::Error::custom(
-                "source-resolution expected identities are incomplete or unordered",
-            ));
-        }
-        if wire.resolved_sources.iter().any(|resolution| {
+        || wire
+            .expected_source_identities
+            .iter()
+            .map(|identity| identity.item_key.as_str())
+            .ne(wire.pending_source_item_keys.iter().map(String::as_str))
+        || wire.resolved_sources.iter().any(|resolution| {
             resolution.server_id.as_deref() != wire.server_id.as_deref()
                 || resolution.library_version != wire.library_version
                 || resolution.item_key.trim().is_empty()
                 || resolution.reason.trim().is_empty()
-        }) || wire
+        })
+        || wire
             .resolved_sources
             .windows(2)
             .any(|pair| pair[0].item_key >= pair[1].item_key)
-            || wire
-                .resolved_sources
-                .iter()
-                .map(|resolution| resolution.item_key.as_str())
-                .ne(wire.pending_source_item_keys.iter().map(String::as_str))
-        {
-            return Err(serde::de::Error::custom(
-                "source-resolution decisions violate their stored identity or ordering",
-            ));
-        }
-        if wire
+        || wire
+            .resolved_sources
+            .iter()
+            .map(|resolution| resolution.item_key.as_str())
+            .ne(wire.pending_source_item_keys.iter().map(String::as_str))
+        || wire
             .expected_source_identities
             .iter()
             .zip(&wire.resolved_sources)
@@ -347,21 +349,35 @@ impl<'de> Deserialize<'de> for SourceResolutionReview {
                     || identity.item_type != resolution.item_type
                     || identity.parent_item_key != resolution.parent_item_key
             })
-        {
-            return Err(serde::de::Error::custom(
-                "source-resolution decisions drift from constructor-bound identities",
-            ));
-        }
-        Ok(Self {
-            zotero_version: wire.zotero_version,
-            server_id: wire.server_id,
-            library_version: wire.library_version,
-            rule_revision: wire.rule_revision,
-            pending_source_item_keys: wire.pending_source_item_keys,
-            expected_source_identities: wire.expected_source_identities,
-            resolved_sources: wire.resolved_sources,
-        })
+    {
+        return Err(SourceResolutionRestoreError::InvalidStoredArtifact);
     }
+    Ok(())
+}
+
+/// Restores a stored review only after binding every coordinate to an immutable report.
+///
+/// The JSON is an untrusted wire artifact. Callers must provide the original report;
+/// direct deserialization into [`SourceResolutionReview`] is intentionally unavailable.
+pub fn restore_source_resolution_review(
+    report: &ClassificationReport,
+    stored_json: &[u8],
+) -> Result<SourceResolutionReview, SourceResolutionRestoreError> {
+    let wire: StoredSourceResolutionWire = serde_json::from_slice(stored_json)
+        .map_err(|_| SourceResolutionRestoreError::InvalidStoredArtifact)?;
+    validate_stored_source_resolution_wire(&wire)?;
+    let review = prepare_source_resolution_review(report, wire.resolved_sources.clone())
+        .map_err(SourceResolutionRestoreError::SourceResolution)?;
+    if wire.zotero_version != review.zotero_version
+        || wire.server_id != review.server_id
+        || wire.library_version != review.library_version
+        || wire.rule_revision != review.rule_revision
+        || wire.pending_source_item_keys != review.pending_source_item_keys
+        || wire.expected_source_identities != review.expected_source_identities
+    {
+        return Err(SourceResolutionRestoreError::UnboundReport);
+    }
+    Ok(review)
 }
 
 /// Failure raised when source resolutions do not exactly match a report.
