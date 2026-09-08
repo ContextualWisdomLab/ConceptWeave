@@ -12,6 +12,8 @@ Read-only Local API inspection returned 21 TRINITY same-URL candidates. All have
 
 Next acceptance evidence: verify bibliographic edition and PDF identity, preserve all child/source provenance in a reversible plan, then execute only through the existing whole-envelope authorization boundary. Do not convert source availability or matching text into reviewed labels. [Strix request correlation](doctoring/strix_request_correlation.md) remains an owner-side prerequisite; the reported CO repair PR #1105 is not released serving evidence.
 
+The refreshed acquisition denominator is now actionable: 440 papers lack attachment ancestry, 34 have attachment records omitted from the full-text manifest, and 38 have captured records but no nonempty text. The last group resolves to 36 all-404 papers and two all-empty-200 papers. The 452 omitted attachments are predominantly linked URLs (417), plus 34 imported URLs with blank content type and one octet-stream imported file; this does not justify raising capture budgets or changing manifest semantics. Source acquisition and indexing repair remain separate queues, while semantic decisions stay 0/3,715.
+
 ## September 7 remaining execution and acquisition gates
 
 KPI correction: the inventory's reported 54/76 unique candidate coverage is withdrawn. At least eight later audits duplicate repositories already counted in earlier tables, including identical source revisions. Reconcile canonical repository identities before publishing a replacement coverage or release fraction; the historical incremental counts below are superseded by this correction. The next inventory action is deduplication, not another unverified increment.

@@ -30,6 +30,8 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 
 ## Operational lessons to maintain
 
+- The classification report intentionally projects only classifier metadata, so it cannot diagnose attachment `contentType`, `linkMode`, path or URL state. When acquisition triage needs those fields, query the exact report-bound attachment set read-only and emit aggregate counts only; never infer attachment availability from missing projected fields.
+
 - Use the pinned optimized build for full-library capture on this host; preserve the same byte/time limits and report binding. A debug capture exceeded its budget while the optimized run completed. Do not infer which budget failed from legacy shared error text, or infer unchanged evidence from equal item counts/snapshot identifiers alone.
 
 - A sampled hashing hotspot does not prove buffering improves end-to-end performance. Keep realistic escaped-text inputs unchanged, record terminal results, and discard an optimization without demonstrated benefit. Shared-host elapsed times are observations, not controlled causal benchmarks.
