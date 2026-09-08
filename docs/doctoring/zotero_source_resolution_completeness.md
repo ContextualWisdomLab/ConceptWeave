@@ -1,6 +1,6 @@
 # Zotero stored source-resolution completeness
 
-Status: `REALITY_RED_SOURCE_FIX_PENDING`
+Status: `SOURCE_FIX_GREEN_PENDING_EXACT_HEAD_ACCEPTANCE`
 
 ## Problem
 
@@ -8,11 +8,11 @@ Status: `REALITY_RED_SOURCE_FIX_PENDING`
 
 A restored `SourceResolutionReview` is a typed review aggregate. Accepting a truncated decision array contradicts its public contract of one resolution for every pending source and can let a downstream consumer mistake incomplete review evidence for a complete exact-snapshot resolution.
 
-## Reality RED
+## Reality RED → source repair
 
 Commit `6b28fc38afaae455a70901c57b28116b0b88510d` adds `crates/conceptweave-zotero/tests/source_resolution_stored_completeness.rs`.
 
-The test builds a real classification report with two pending records, constructs a valid complete review, serializes it, removes exactly one `resolved_sources` entry, and requires deserialization to fail. Current production deserialization accepts the remaining sorted, nonblank, server/library-consistent entry, so the regression is intentionally RED pending the causal source repair.
+The test builds a real classification report with two pending records, constructs a valid complete review, serializes it, removes exactly one `resolved_sources` entry, and requires deserialization to fail. The causal repair persists the canonical pending-key set in the envelope and rejects any restored decision-key mismatch.
 
 ## Least-widening repair contract
 

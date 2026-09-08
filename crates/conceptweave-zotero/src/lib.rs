@@ -244,6 +244,8 @@ pub struct SourceResolutionReview {
     pub library_version: u64,
     /// Rule revision used for the associated classification report.
     pub rule_revision: String,
+    /// Complete pending-source key set captured with this review.
+    pub pending_source_item_keys: Vec<String>,
     /// One resolution for every pending source, sorted by item key.
     pub resolved_sources: Vec<PendingSourceResolution>,
 }
@@ -259,6 +261,7 @@ impl<'de> Deserialize<'de> for SourceResolutionReview {
             server_id: Option<String>,
             library_version: u64,
             rule_revision: String,
+            pending_source_item_keys: Vec<String>,
             resolved_sources: Vec<PendingSourceResolution>,
         }
 
@@ -278,18 +281,28 @@ impl<'de> Deserialize<'de> for SourceResolutionReview {
             ));
         }
         if wire
+            .pending_source_item_keys
+            .windows(2)
+            .any(|pair| pair[0] >= pair[1])
+        {
+            return Err(serde::de::Error::custom(
+                "source-resolution pending keys are not strictly ordered",
+            ));
+        }
+        if wire.resolved_sources.iter().any(|resolution| {
+            resolution.server_id.as_deref() != wire.server_id.as_deref()
+                || resolution.library_version != wire.library_version
+                || resolution.item_key.trim().is_empty()
+                || resolution.reason.trim().is_empty()
+        }) || wire
             .resolved_sources
-            .iter()
-            .any(|resolution| {
-                resolution.server_id.as_deref() != wire.server_id.as_deref()
-                    || resolution.library_version != wire.library_version
-                    || resolution.item_key.trim().is_empty()
-                    || resolution.reason.trim().is_empty()
-            })
+            .windows(2)
+            .any(|pair| pair[0].item_key >= pair[1].item_key)
             || wire
                 .resolved_sources
-                .windows(2)
-                .any(|pair| pair[0].item_key >= pair[1].item_key)
+                .iter()
+                .map(|resolution| resolution.item_key.as_str())
+                .ne(wire.pending_source_item_keys.iter().map(String::as_str))
         {
             return Err(serde::de::Error::custom(
                 "source-resolution decisions violate their stored identity or ordering",
@@ -300,6 +313,7 @@ impl<'de> Deserialize<'de> for SourceResolutionReview {
             server_id: wire.server_id,
             library_version: wire.library_version,
             rule_revision: wire.rule_revision,
+            pending_source_item_keys: wire.pending_source_item_keys,
             resolved_sources: wire.resolved_sources,
         })
     }
@@ -413,6 +427,7 @@ pub fn prepare_source_resolution_review(
         server_id: report.server_id.clone(),
         library_version: report.library_version,
         rule_revision: report.rule_revision.to_owned(),
+        pending_source_item_keys: report.pending_source_item_keys.clone(),
         resolved_sources: resolutions,
     })
 }
