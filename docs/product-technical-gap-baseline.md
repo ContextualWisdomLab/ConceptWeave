@@ -16,6 +16,8 @@ After removing the now-unreachable identity sub-branch behind the early fail-clo
 
 The HTTP-error regression at exact code head `a9b67f6300fcd2edf21cb447ff0ee54ea1898586` raises normalized coverage to 182/186 functions, 2,774/2,823 regions, and 159/164 branches. One platform-gated CLI branch remains uncovered; transport and generic gaps remain explicit rather than excluded.
 
+Exact code head `7d922896f0afb848a0cb879563b5f3a3db1e5313` adds the required artifact-boundary check that rejects missing or blank `server_id` during `SourceResolutionReview` JSON deserialization. Its full pinned run passes tests but is RED at 184/188 functions, 2,789/2,840 regions, and 160/166 branches because the custom deserializer adds exercised and generic paths; this is a security repair, not a reason to weaken coverage.
+
 Owner coverage checkpoint `f71286e` (before documentation-only `60d01f8`) improved after the source-resolution error-contract test to 180/185 functions, 2,766/2,818 normalized regions, and 159/164 normalized branch outcomes; the gate remains RED and no exclusion or threshold weakening is accepted.
 
 PR #40 executable checkpoint `1308ac6e4403a67c61b84f47c9d0142286da3c64` is recorded as a dated Draft/open/CLEAN evidence point, based on Research Intake head `ff2e78aaa4ce75c7eb5f41bc9612b8dcf3bb7d38`. Its source-resolution aggregate, ontology discovery signal, and visual/API population-boundary lesson are pushed, while independent approval and protected workflow evidence remain absent; the live PR head is authoritative for later documentation-only descendants and no merge or release is claimed.
