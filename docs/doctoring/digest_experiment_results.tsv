@@ -1,0 +1,3 @@
+experiment	commit	metric	status	description
+0	6180a3cc9f19c24de05d0ed1205fac3eb545d9f0	859.77	baseline	Zotero library 108 tests; shared-host elapsed seconds
+1	uncommitted-on-f3099c4	988.78	discard	8 KiB digest buffer; 109 tests passed; no demonstrated improvement; not a controlled comparison
