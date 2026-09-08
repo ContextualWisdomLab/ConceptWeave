@@ -1337,7 +1337,7 @@ At 02:31 KST on 2026-09-09, a fresh replay in this turn reproduced the same
 four pending sources and 49 duplicate candidates. Stable output is repeatability
 evidence, not semantic approval, full-text review, Zotero mutation or release proof.
 
-At exact root head `78d40c3`, the repository coverage gate was rerun with the
+At exact source/test head `78d40c3` (documentation head `e16a28d`), the repository coverage gate was rerun with the
 pinned nightly toolchain after adding a two-source regression for noncanonical
 report-bound resolution order. The workspace suite passed; normalized source
 regions and branches are now both fully covered (4,752/4,752 and 784/784).
