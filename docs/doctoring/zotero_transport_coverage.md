@@ -1,12 +1,13 @@
 # Zotero Local API transport coverage
 
-Status: **Source/test repaired; rustdoc reality RED pending source wording repair and exact-head execution**  
+Status: **Source/test/rustdoc repaired — exact-head execution pending**  
 Owner lane: Research Intake PR #9  
 Pre-RED source: `943d7495b89c330df109414b547bb097d24ec6ee`  
 Reality RED: `2e0be0902d48034cf130efb1b1bab27705a7f06b`  
 Minimal source repair: `c47947579c947f3426d89601eee93c80ca9ce018`  
 Coverage-branch test successor: `b9db5557fecae9b4998dc006b3ebf297f5e6da77`  
-Rustdoc-currentness RED: `6e711d7c501b23eed88b375a09797318a26c384f`
+Rustdoc-currentness RED: `6e711d7c501b23eed88b375a09797318a26c384f`  
+Rustdoc-currentness source repair: `e46eb3b509bb2d65c5de7ea6ef382eb27906ee6e`
 
 ## Problem
 
@@ -19,7 +20,7 @@ ConceptWeave's owned-production coverage contract requires the Local API admissi
 
 Those helpers do more than an unavoidable raw socket syscall. They build the version-pinned Local API request, parse required and optional contract headers, read the bounded body, deserialize provider JSON and perform provider-shaped Zotero object-key admission before a page enters the immutable snapshot reader. Excluding the whole seam allowed the owned 100% gate to ignore provider-contract parsing regressions.
 
-After the source/test coverage repair, `read_local_snapshot()` rustdoc still says that the narrow ureq transport shim "is excluded from deterministic coverage". That statement is now false: the four production helpers are no longer coverage-excluded and the real production adapter is exercised through loopback success/error regressions. Public rustdoc therefore understates the tested production boundary and contradicts the code-current coverage contract.
+After the source/test coverage repair, `read_local_snapshot()` rustdoc still said that the narrow ureq transport shim "is excluded from deterministic coverage". That statement was false: the four production helpers were no longer coverage-excluded and the real production adapter was exercised through loopback success/error regressions. Public rustdoc therefore understated the tested production boundary and contradicted the code-current coverage contract.
 
 ## RED and causal repair
 
@@ -34,9 +35,11 @@ Commit `b9db5557fecae9b4998dc006b3ebf297f5e6da77` follows with executable branch
 - malformed JSON rejection through `read_local_snapshot()`;
 - direct present/missing/malformed/opaque header-helper boundaries, including a non-text header value that `optional_header` must reject.
 
-Commit `6e711d7c501b23eed88b375a09797318a26c384f` adds `transport_rustdoc_tracks_the_owned_coverage_boundary`. It is an intentional documentation reality RED: the test rejects the stale exclusion sentence and requires the `read_local_snapshot()` docs to state that the Local API request/header/body path is exercised. The minimal causal fix is wording-only in `lib.rs`; it must not reintroduce a coverage exclusion or change transport, classification, snapshot, provider, or governance behavior.
+Commit `6e711d7c501b23eed88b375a09797318a26c384f` adds `transport_rustdoc_tracks_the_owned_coverage_boundary`. It is the documentation reality RED: the test rejects the stale exclusion sentence and requires the `read_local_snapshot()` docs to state that the Local API request/header/body path is exercised.
 
-The coverage source contract already has a causal source repair and exposed-branch tests in ordinary ancestry. The new rustdoc-currentness RED remains source-fix pending. Neither sequence is executable GREEN on the current successor until the Rust/LLVM coverage and rustdoc gates run on one unchanged exact head.
+Minimal owner repair `e46eb3b509bb2d65c5de7ea6ef382eb27906ee6e` changes only that public rustdoc. It removes the false exclusion claim and states that the Local API request/header/body path is exercised by deterministic loopback transport regressions. No coverage attribute, transport behavior, classification, snapshot, provider contract or governance behavior changes. A dependent branch had independently reached the same wording while integrating #9; the canonical repair is now present on #9 itself, so dependent reconciliation must preserve owner ancestry rather than use the child as reverse authority.
+
+The source/test/rustdoc sequence is now repaired by ordinary owner ancestry, but it is not executable GREEN until the Rust/LLVM coverage and rustdoc gates run on one unchanged exact successor.
 
 ## Preserved boundary
 
@@ -66,4 +69,5 @@ If coverage reports a remaining transport branch, repair the missing determinist
 | Minimal production repair | `crates/conceptweave-zotero/src/lib.rs` at `c47947579c947f3426d89601eee93c80ca9ce018` |
 | Exposed-branch regressions | `crates/conceptweave-zotero/src/tests/metadata_transport.rs` at `b9db5557fecae9b4998dc006b3ebf297f5e6da77` |
 | Rustdoc-currentness RED | `crates/conceptweave-zotero/src/tests/metadata_transport.rs` at `6e711d7c501b23eed88b375a09797318a26c384f` |
+| Rustdoc-currentness source repair | `crates/conceptweave-zotero/src/lib.rs` at `e46eb3b509bb2d65c5de7ea6ef382eb27906ee6e` |
 | Review owner | PR #9 thread `PRRT_kwDOUKg5E86fSz80`, reopened on 2026-09-08; documentation-currentness review `5138572393` remains unresolved |
