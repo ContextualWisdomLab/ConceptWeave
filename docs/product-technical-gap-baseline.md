@@ -1506,3 +1506,14 @@ case-insensitive title or matched-phrase signals (`ontology`, `semantic`,
 `a096e2a92bdd17f2f426fd058c619ea45b6397c54004641f40af366b08de2dd7`. This is
 a steward triage queue, not a classification decision, full-text approval,
 pending-source resolution or write authorization.
+
+### September 9 04:16 capture-bound availability revalidation
+
+The current release verifier revalidated the report-bound private capture and
+regenerated an availability aggregate (`0600`, digest
+`b81ebc2bae02404303eab3922b45b998444c88ffe5888baa8a9b55b92e5daf90`). The
+capture identity remains `sha256:106ca65ab62151f303c5807ecceb271c0bec953f091426fb1e74ec808913f9b8`;
+3,715 papers include 3,203 nonempty-text, 440 no-attachment, 34 unmanifested,
+38 captured-empty, 471 needing-review-without-text and two unbound-nonempty
+records. This verifies the capture envelope and availability denominator only;
+it does not supply steward decisions or write authority.

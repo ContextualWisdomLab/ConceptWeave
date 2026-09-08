@@ -197,3 +197,15 @@ retained nonbibliographic items, four pending source records and 49 duplicate
 candidates on Zotero 10.0.1 / Local API 3 / library version 2. This confirms
 replay continuity only; it does not create steward decisions, approval or write
 authority.
+
+## Capture-bound availability revalidation (2026-09-09 04:16 KST)
+
+The release verifier revalidated the existing report-bound capture and wrote a
+fresh owner-only availability aggregate at
+`/tmp/conceptweave-fulltext-availability.XXXXXX.json` (`0600`, 359 bytes).
+Its digest is `b81ebc2bae02404303eab3922b45b998444c88ffe5888baa8a9b55b92e5daf90`.
+The capture identity is `sha256:106ca65ab62151f303c5807ecceb271c0bec953f091426fb1e74ec808913f9b8`;
+the aggregate is unchanged: 3,715 papers, 3,203 with nonempty text, 440
+without attachment, 34 with unmanifested attachment, 38 captured-empty, 471
+needing review without text and two unbound nonempty records. This is capture
+integrity/availability evidence only, not reviewed meaning or approval.
