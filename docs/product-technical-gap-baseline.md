@@ -10,7 +10,7 @@
 - Client Consumption #5: `fcf36c8a99f015b963c9f812787df127ac2e2f9e`, Draft/open; owner of provider-independent released semantic-contract admission, integrity, compatibility, diff/resolution and supersession consumption.
 - Source Observation #6: `331f8edcd7cebb1719e5cea3187f3848ce7b9e71`, Draft/open on #5; source-system business truth stays with its owner.
 - Research Intake #9: `b98ba39f9efa4c18c1bcdc3bcae4a8ef4f0abd41`, OPEN Draft/mergeable on Foundation; canonical owner of the read-only Zotero snapshot, deterministic research classification, source inventory and report-publication safety seams.
-- Pending-source resolution #40: current exact head `db1152b310db86a1780b13378323779e536945e1`, OPEN Draft/CLEAN on #9. It owns only the typed read-only exact-snapshot resolution aggregate; it has no Zotero write, semantic publication or approval authority.
+- Pending-source resolution #40: current exact head `d774c5b6382e71c78a32359cdef2c75c7f80a04d`, OPEN Draft/CLEAN on #9. It owns only the typed read-only exact-snapshot resolution aggregate; it has no Zotero write, semantic publication or approval authority.
 - Full-text/write/recovery #39: `808e1b9e663c140716d416d62c5db64d9c18bbab`, OPEN Draft/mergeable on #38 `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`. This independent writer may advance normally; live PR metadata wins. Historical repository-count KPIs remain withdrawn.
 
 Predecessor checks and reviews never transfer automatically to a changed head. A queued or failed external-owner lane blocks only that acceptance lane; it does not justify no-op pushes, fabricated receipts, manual-dispatch-as-GREEN, self-approval, review dismissal or gate weakening.
@@ -28,7 +28,7 @@ Three standalone PDFs plus one standalone note remain governed pending sources. 
 `SourceResolutionReview` constructor admission rejects missing/blank report server identity, wrong server/library/item identity, duplicate/unknown decisions, missing decisions, blank reasons and missing retained inventory. Stored JSON must revalidate the invariants that remain provable from the artifact itself.
 
 - Earlier source repairs reject nested provider/library drift, blank stored item keys/reasons and duplicate/unsorted decision sets. RED `99d36562a7f101c3e1c2db39f9d493d228b2b133` and repair `fdee1fb4d70481bdb31a604e5235470653925b23` remain in ancestry; `4c05fcd59aa31b70b1054c4d8b53697628530d27` directly covers the blank stored-key branch.
-- The stored-completeness RED `6b28fc38afaae455a70901c57b28116b0b88510d` removed one pending decision after serialization. Repair `db1152b310db86a1780b13378323779e536945e1` persists and validates the canonical pending-key set, so the regression is green locally while hosted acceptance remains pending.
+- The stored-completeness RED `6b28fc38afaae455a70901c57b28116b0b88510d` removed one pending decision after serialization. Repair `d774c5b6382e71c78a32359cdef2c75c7f80a04d` persists and validates the canonical pending-key set, so the regression is green locally while hosted acceptance remains pending.
 - Minimal repair `6dbc013d81a4cff1e46fbe43f4d920d968c425c0` rejects blank/whitespace stored `rule_revision` without hard-pinning to the current revision value. Future nonblank revisions remain representable; semantic authority and Zotero behavior are unchanged. AGENTS records the same invariant.
 - Focused source-resolution tests and strict Clippy are recorded as locally passing at `6dbc013...`, but exact-head pull-request workflow evidence is absent and owned coverage/hosted/independent review remain outstanding.
 
