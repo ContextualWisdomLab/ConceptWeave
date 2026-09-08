@@ -439,6 +439,8 @@ pub enum SourceResolutionError {
     InvalidPendingKeySet,
     /// The report does not carry a non-blank Local API server identity.
     MissingServerIdentity,
+    /// The report lacks a non-blank Zotero or rule-version identity coordinate.
+    InvalidSnapshotIdentity,
 }
 
 impl fmt::Display for SourceResolutionError {
@@ -473,6 +475,9 @@ impl fmt::Display for SourceResolutionError {
             Self::MissingServerIdentity => {
                 write!(formatter, "report lacks a non-blank Zotero server identity")
             }
+            Self::InvalidSnapshotIdentity => {
+                write!(formatter, "report snapshot identity is incomplete")
+            }
         }
     }
 }
@@ -484,6 +489,9 @@ pub fn prepare_source_resolution_review(
     report: &ClassificationReport,
     mut resolutions: Vec<PendingSourceResolution>,
 ) -> Result<SourceResolutionReview, SourceResolutionError> {
+    if report.zotero_version.trim().is_empty() || report.rule_revision.trim().is_empty() {
+        return Err(SourceResolutionError::InvalidSnapshotIdentity);
+    }
     if report
         .server_id
         .as_deref()
@@ -1511,6 +1519,14 @@ mod tests {
         assert_eq!(
             SourceResolutionError::InvalidPendingKeySet.to_string(),
             "report pending source keys are not unique and canonical"
+        );
+    }
+
+    #[test]
+    fn source_resolution_error_formats_invalid_snapshot_identity() {
+        assert_eq!(
+            SourceResolutionError::InvalidSnapshotIdentity.to_string(),
+            "report snapshot identity is incomplete"
         );
     }
 
