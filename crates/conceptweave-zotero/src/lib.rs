@@ -12,7 +12,8 @@ use std::time::{Duration, Instant};
 
 mod full_text_capture;
 pub use full_text_capture::{
-    FullTextCapture, FullTextError, build_full_text_review_json, read_local_full_text,
+    FullTextCapture, FullTextError, MAX_PERSISTED_CAPTURE_BYTES, build_full_text_review_json,
+    read_local_full_text,
     verify_full_text_capture,
 };
 
