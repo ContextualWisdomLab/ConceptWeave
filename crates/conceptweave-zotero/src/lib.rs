@@ -433,6 +433,8 @@ pub enum SourceResolutionError {
     BlankReason(String),
     /// The report's pending key is absent from its retained inventory.
     MissingInventory(String),
+    /// The report contains more than one retained record for a pending key.
+    AmbiguousInventory(String),
     /// The report pending-key sequence is not unique and canonical.
     InvalidPendingKeySet,
     /// The report does not carry a non-blank Local API server identity.
@@ -457,6 +459,10 @@ impl fmt::Display for SourceResolutionError {
             Self::MissingInventory(key) => write!(
                 formatter,
                 "pending source is absent from report inventory: {key}"
+            ),
+            Self::AmbiguousInventory(key) => write!(
+                formatter,
+                "pending source has ambiguous report inventory identity: {key}"
             ),
             Self::InvalidPendingKeySet => {
                 write!(
@@ -500,14 +506,17 @@ pub fn prepare_source_resolution_review(
         .pending_source_item_keys
         .iter()
         .map(|key| {
-            Ok((
-                key,
-                report
-                    .unclassified_items
-                    .iter()
-                    .find(|item| &item.key == key)
-                    .ok_or_else(|| SourceResolutionError::MissingInventory(key.clone()))?,
-            ))
+            let mut matching_sources = report
+                .unclassified_items
+                .iter()
+                .filter(|item| &item.key == key);
+            let source = matching_sources
+                .next()
+                .ok_or_else(|| SourceResolutionError::MissingInventory(key.clone()))?;
+            if matching_sources.next().is_some() {
+                return Err(SourceResolutionError::AmbiguousInventory(key.clone()));
+            }
+            Ok((key, source))
         })
         .collect::<Result<BTreeMap<_, _>, SourceResolutionError>>()?;
     let mut seen = BTreeSet::new();
