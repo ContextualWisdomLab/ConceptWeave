@@ -18,3 +18,9 @@ miss relevant work and can include irrelevant uses. Existing deterministic
 classification remains authoritative for its stated dispositions; all 3,658
 abstentions and four pending source-resolution keys remain in scope for
 steward review. No model call, decision, approval or Zotero write occurred.
+
+Within the 137-signal queue, deterministic dispositions are adjacent evidence
+29, semantic consumption bridge 1, and needs steward review 107. The 107
+abstentions split into no deterministic rule match 101 and unsupported rule
+vocabulary 6. This split prioritizes rule/ontology vocabulary work without
+silently promoting any paper.

@@ -31,7 +31,10 @@ Read-only title-signal triage over the fresh report yields a 137-paper discovery
 queue (ontology 27, semantic 36, taxonomy 2, knowledge graph 1, vocabulary
 stem 81). The [triage record](doctoring/zotero_ontology_signal_triage_2026-09-08.md)
 retains counts only; this heuristic is not a semantic verdict and does not
-change the 3,658 abstentions, four pending source keys, or approval state.
+retains counts only; 29 are adjacent evidence, one is a semantic-consumption
+bridge and 107 need steward review (101 no-rule-match, 6 unsupported-vocabulary).
+This heuristic is not a semantic verdict and does not change the 3,658
+abstentions, four pending source keys, or approval state.
 
 The local Zotero endpoint is currently reachable read-only: HTTP 200, Zotero
 10.0.1, Connector/API v3, schema 44, 8,326 reported records, last-modified
