@@ -1477,3 +1477,12 @@ review findings were rechecked against this head and no longer apply. Pinned
 Rust 1.98 formatting and the complete workspace test/doc-test suite passed.
 PR40 remains Draft with no independent approval or protected hosted acceptance;
 this evidence does not advance paper decisions or Zotero write authority.
+
+### September 9 PR40 retained-inventory ambiguity verification
+
+PR40 successor `bb9d7b691cf5601f3a60ff2a786e123f1d552704` now rejects more than
+one retained inventory record for a pending source with the typed
+`AmbiguousInventory` error; the regression covers that exact collision. Pinned
+Rust 1.98 formatting and the complete workspace test/doc-test suite passed on
+this head. PR40 remains Draft and its local success is not independent review,
+protected hosted acceptance, paper classification or Zotero write authority.
