@@ -14,4 +14,12 @@ Observed September 8, 2026 against the private first 25-row bound review view, c
 
 ## Remaining acquisition and admission
 
-The fourth unattached row concerns anxiety outcomes in older persons; no source resolution was attempted here. Successful web retrieval is not a retained Zotero capture: none of these sources was inserted into the library or spliced into the existing immutable capture. Next steps are source-identity/version validation, authorized attachment ingestion through the owner boundary, and a fresh report-bound capture before exact-view review. Original records and both same-title rows remain unchanged. Retained-text coverage, completed decisions and approvals are not incremented.
+Successful web retrieval is not a retained Zotero capture: none of these sources was inserted into the library or spliced into the existing immutable capture. Next steps are source-identity/version validation, authorized attachment ingestion through the owner boundary, and a fresh report-bound capture before exact-view review. Original records remain unchanged. Retained-text coverage, completed decisions and approvals are not incremented.
+
+## Follow-up: source and duplicate scope
+
+de Beurs, E., Beekman, A. T. F., van Balkom, A. J. L. M., Deeg, D. J. H., van Dyck, R., & van Tilburg, W. (1999). Consequences of anxiety in older persons: Its effect on disability, well-being and use of health services. *Psychological Medicine, 29*(3), 583–593. https://doi.org/10.1017/S0033291799008351
+
+The [university-hosted PDF](https://research.vu.nl/ws/files/1662005/125683.pdf) was retrieved as 12 pages including the repository cover. Its cover identifies the version of record and permits private research copies while restricting redistribution/commercial reuse. Retain a link in public evidence, not the PDF. Screenshot attempts for pages 0 and 1 timed out; textual retrieval is verified, visual inspection is not.
+
+A fresh read-only Zotero Local API title search (`items/top`, limit 100) returned 21 TRINITY records, all pointing to `https://arxiv.org/abs/2512.04695`; three report children and one supplies the arXiv DOI. This was repeated with aggregate-only output. It is a query result, not proof of complete duplicate membership or safe consolidation. The earlier two-row statement referred only to unattached rows in the first review batch; that batch also contains another same-title row with attachment evidence. Compare child contents, notes, collections and version identity across the complete candidate set before choosing a survivor. Do not merge or delete from title/URL equality alone.
