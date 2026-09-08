@@ -101,13 +101,13 @@ source against the immutable report before any authority callback. Missing and
 stale source-resolution regressions pass in the locked Rust 1.98 workspace;
 Clippy, warnings-denied rustdoc and diff checks also pass. GitHub reports OPEN
 Draft/CLEAN with CodeRabbit skipped because the PR remains a draft. PR #40's
-current exact head is `e72fb404375e7a29489a855069fa0150026888e8`; the latest
-successor removes direct trusted-type deserialization and restores only through
-an immutable `ClassificationReport`-bound API. The coordinated rewrite now
-fails closed in focused and workspace tests. The trusted restoration repair is
-locally GREEN on focused/workspace
+current exact head is `8a7b4a9577cf7bf62a75ba19b679c2441632c8e4`; the latest
+successor records the report-bound restoration repair and its unchanged-head
+evidence. Direct trusted-type deserialization is removed, and coordinated
+rewrites fail closed against the immutable `ClassificationReport`. The trusted
+restoration repair is locally GREEN on focused/workspace
 Rust gates, but hosted checks, owned coverage and independent review remain
-outstanding. It remains OPEN Draft/UNSTABLE, so protected acceptance is still
+outstanding. It remains OPEN Draft/CLEAN, so protected acceptance is still
 outstanding. This is not
 protected-merge, release or Zotero-write evidence.
 
