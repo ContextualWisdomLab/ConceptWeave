@@ -6,6 +6,13 @@
 
 ### PR #39 full-text write source binding checkpoint (2026-09-08)
 
+The release-mode Rust CLI also produced a fresh read-only Local API report at
+private `/tmp` path (mode `0600`): 8,326 snapshot items, 3,715 classified
+proposals, 4,611 unclassified metadata records, and four pending source keys.
+The report hash and exact contract metadata are recorded in [the live snapshot
+record](doctoring/zotero_live_classification_2026-09-08.md). No decisions,
+approvals or Zotero writes occurred.
+
 The local Zotero endpoint is currently reachable read-only: HTTP 200, Zotero
 10.0.1, Connector/API v3, schema 44, 8,326 reported records, last-modified
 version 2, and an opaque server identity present. Only headers and aggregate
