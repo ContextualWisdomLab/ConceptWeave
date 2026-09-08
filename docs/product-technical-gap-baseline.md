@@ -1257,6 +1257,12 @@ remain open; no local evidence is transferred to a remote or later head.
 - Consuming products retain tenant/purpose authorization and physical query execution.
 - Published semantic truth is immutable; corrections create a new release plus supersession evidence rather than in-place overwrite.
 
+PR40 owner head `d9c5d58568351f1129b9b95278f239d54444d2a4` adds a regression assertion for the
+`InvalidPendingKeySet` error contract. Rust 1.98 targeted test and formatting pass; the
+workspace raw replay remains below the 100% production target (branches 200/204,
+functions 207/210, lines 1872/1891, regions 2968/3009). This is local owner evidence only;
+hosted required checks, independent approval and protected merge remain unverified.
+
 ### Downstream source-resolution envelope gap (2026-09-09)
 
 PR40's trusted source-resolution restoration remains an owner prerequisite for PR39. PR39 currently rejects pending reports before an exact `SourceResolutionReview` can travel from worksheet through finalization, evaluation and write admission. A non-force local merge attempt with PR40 produced conflicts in the shared library, CLI, transport tests and governance documents; it was aborted without shared-branch changes. After protected owner integration, the successor must add a positive exact-resolution contract while keeping missing, stale and mismatched envelopes fail-closed before any authority verifier.
