@@ -11,6 +11,11 @@
 | Relationship Evidence | Source-bound support retaining its original kind, extraction method and limitations; message ancestry, row changes and work dependencies are not interchangeable semantic assertions. |
 | Evidence Reference | Stable source identity, digest, and location supporting a candidate. |
 | Semantic Candidate | Evidence-bound proposal for a concept, relation, constraint, dimension, measure, or physical mapping. |
+| Research Intake Report | Local, snapshot-bound evidence artifact produced from research-source observation; it contains proposals and unresolved source scope, never a governance decision or semantic authority. |
+| Proposed Disposition | Deterministic, non-authoritative research-routing proposal assigned to one bibliographic item for steward review. |
+| Abstention Reason | Deterministic reason that research intake cannot assign a narrower Proposed Disposition; it preserves why the item remains in steward review rather than implying rejection or approval. |
+| Conflicting Disposition Evidence | Evidence that supports more than one specific disposition family for the same item; it requires abstention and steward review instead of first-match classification. |
+| Pending Source | Observed nonbibliographic source whose parent chain is not reconciled to a bibliographic proposal in the same Source Snapshot; it is unresolved scope, not an additional paper or an approval state. |
 | Semantic Model Proposal | Versioned collection of candidates presented for validation/review. |
 | Validation Report | Deterministic result describing structural or semantic contract validity; not a review decision. |
 | Review Decision | Authorized accept/reject decision over validated candidates or a model proposal. |

@@ -696,11 +696,64 @@ pub(super) fn write_scope_fixture(
             })
             .collect(),
     };
+    let source_resolution_review = crate::prepare_source_resolution_review(
+        report,
+        report
+            .pending_source_item_keys
+            .iter()
+            .map(|item_key| {
+                let item = report
+                    .unclassified_items
+                    .iter()
+                    .find(|item| &item.key == item_key)
+                    .unwrap();
+                crate::PendingSourceResolution {
+                    item_key: item.key.clone(),
+                    item_version: item.version,
+                    library_version: report.library_version,
+                    item_type: item.data.item_type.clone(),
+                    parent_item_key: item.data.parent_item.clone(),
+                    disposition: crate::SourceResolutionDisposition::RetainStandaloneEvidence,
+                    reason: "fixture evidence boundary".into(),
+                }
+            })
+            .collect(),
+    )
+    .unwrap();
     FullTextWriteScope {
         full_text_review,
         reviewed_writes,
+        source_resolution_review: Some(source_resolution_review),
         mode: WriteMode::DryRun,
     }
+}
+
+#[test]
+fn full_text_write_rejects_missing_source_resolution_before_authority() {
+    let report = report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let mut scope = write_scope_fixture(&report, &capture);
+    scope.source_resolution_review = None;
+    assert!(build_full_text_write_plan(&report, &capture, scope, |_| true, |_| true).is_err());
+}
+
+#[test]
+fn full_text_write_rejects_stale_source_resolution_before_authority() {
+    let report = report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let mut scope = write_scope_fixture(&report, &capture);
+    scope
+        .source_resolution_review
+        .as_mut()
+        .unwrap()
+        .library_version += 1;
+    assert!(build_full_text_write_plan(&report, &capture, scope, |_| true, |_| true).is_err());
 }
 
 #[test]

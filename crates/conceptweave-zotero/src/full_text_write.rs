@@ -1,7 +1,8 @@
 use super::*;
 use crate::{
     ClassificationItemState, ClassificationWritePlan, ClassificationWriteReceipt,
-    ClassificationWriteRequest, ReviewedClassificationWriteSet, WriteMode,
+    ClassificationWriteRequest, ReviewedClassificationWriteSet, SourceResolutionReview, WriteMode,
+    prepare_source_resolution_review,
 };
 
 const INVALID_WRITE_SCOPE: FullTextError =
@@ -19,6 +20,8 @@ pub struct FullTextWriteScope {
     pub full_text_review: FullTextReviewedGoldenSet,
     /// Explicit complete before/after metadata, separately authorized for writing.
     pub reviewed_writes: ReviewedClassificationWriteSet,
+    /// Exact, read-only resolution of every pending source in the report.
+    pub source_resolution_review: Option<SourceResolutionReview>,
     /// Behavior authenticated by the write verifier; meaning does not select it.
     pub mode: WriteMode,
 }
@@ -135,6 +138,19 @@ pub fn build_full_text_write_plan(
     verify_writes: impl FnOnce(&FullTextWriteScope) -> bool,
 ) -> Result<FullTextWritePlan, FullTextError> {
     let evaluation = prepare_full_text_review(report, capture, &scope.full_text_review)?;
+    let Some(review) = scope.source_resolution_review.as_ref() else {
+        return Err(INVALID_WRITE_SCOPE);
+    };
+    let source_resolution = prepare_source_resolution_review(report, review.resolved_sources.clone())
+        .map_err(|_| INVALID_WRITE_SCOPE)?;
+    if source_resolution.zotero_version != review.zotero_version
+        || source_resolution.server_id != review.server_id
+        || source_resolution.library_version != review.library_version
+        || source_resolution.rule_revision != review.rule_revision
+        || source_resolution.resolved_sources != review.resolved_sources
+    {
+        return Err(INVALID_WRITE_SCOPE);
+    }
     let write_plan =
         crate::prepare_classification_write_plan(report, &scope.reviewed_writes, scope.mode)
             .map_err(|_| INVALID_WRITE_SCOPE)?;

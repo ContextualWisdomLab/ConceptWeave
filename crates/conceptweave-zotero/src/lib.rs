@@ -150,6 +150,151 @@ pub enum Disposition {
     NeedsStewardReview,
 }
 
+/// An explicit, non-authoritative outcome for one pending source record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceResolutionDisposition {
+    /// Keep the source as independent evidence without changing Zotero.
+    RetainStandaloneEvidence,
+    /// Record that a separately authorized rebind is required.
+    RebindRequiresSeparateAuthorization,
+    /// Exclude the source from the research scope with the recorded reason.
+    ExcludeFromResearchScope,
+}
+
+/// One exact-snapshot decision for a record in `pending_source_item_keys`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct PendingSourceResolution {
+    /// Stable Zotero item key.
+    pub item_key: String,
+    /// Item revision observed in the report.
+    pub item_version: u64,
+    /// Library revision that contained this item.
+    pub library_version: u64,
+    /// Item type observed in the report.
+    pub item_type: String,
+    /// Parent key observed in the report, if any.
+    pub parent_item_key: String,
+    /// Explicit steward disposition; it never writes or rebinds a source.
+    pub disposition: SourceResolutionDisposition,
+    /// Human-readable reason required for every disposition.
+    pub reason: String,
+}
+
+/// Complete source-resolution aggregate bound to one classification snapshot.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct SourceResolutionReview {
+    /// Zotero desktop version that served the snapshot.
+    pub zotero_version: String,
+    /// Local API server identity, when supplied by the snapshot.
+    pub server_id: Option<String>,
+    /// Library version shared by the snapshot.
+    pub library_version: u64,
+    /// Rule revision used for the associated classification report.
+    pub rule_revision: String,
+    /// One resolution for every pending source, sorted by item key.
+    pub resolved_sources: Vec<PendingSourceResolution>,
+}
+
+/// Failure raised when source resolutions do not exactly match a report.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SourceResolutionError {
+    /// A pending source has no decision.
+    Missing(String),
+    /// A decision refers to a record outside the pending set.
+    Unknown(String),
+    /// More than one decision was supplied for one source key.
+    Duplicate(String),
+    /// A decision's source identity differs from the immutable report.
+    Stale(String),
+    /// A decision has no explanatory reason.
+    BlankReason(String),
+    /// The report's pending key is absent from its retained inventory.
+    MissingInventory(String),
+}
+
+impl fmt::Display for SourceResolutionError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Missing(key) => write!(formatter, "pending source lacks resolution: {key}"),
+            Self::Unknown(key) => {
+                write!(formatter, "resolution is not pending in the report: {key}")
+            }
+            Self::Duplicate(key) => {
+                write!(formatter, "pending source has duplicate resolutions: {key}")
+            }
+            Self::Stale(key) => write!(
+                formatter,
+                "resolution does not match report source identity: {key}"
+            ),
+            Self::BlankReason(key) => write!(formatter, "source resolution reason is blank: {key}"),
+            Self::MissingInventory(key) => write!(
+                formatter,
+                "pending source is absent from report inventory: {key}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for SourceResolutionError {}
+
+/// Builds a complete source-resolution aggregate without mutating Zotero.
+pub fn prepare_source_resolution_review(
+    report: &ClassificationReport,
+    mut resolutions: Vec<PendingSourceResolution>,
+) -> Result<SourceResolutionReview, SourceResolutionError> {
+    let pending: BTreeMap<_, _> = report
+        .pending_source_item_keys
+        .iter()
+        .map(|key| {
+            Ok((
+                key,
+                report
+                    .unclassified_items
+                    .iter()
+                    .find(|item| &item.key == key)
+                    .ok_or_else(|| SourceResolutionError::MissingInventory(key.clone()))?,
+            ))
+        })
+        .collect::<Result<BTreeMap<_, _>, SourceResolutionError>>()?;
+    let mut seen = BTreeSet::new();
+    for resolution in &resolutions {
+        if !seen.insert(resolution.item_key.as_str()) {
+            return Err(SourceResolutionError::Duplicate(
+                resolution.item_key.clone(),
+            ));
+        }
+        let Some(source) = pending.get(&resolution.item_key) else {
+            return Err(SourceResolutionError::Unknown(resolution.item_key.clone()));
+        };
+        if resolution.reason.trim().is_empty() {
+            return Err(SourceResolutionError::BlankReason(
+                resolution.item_key.clone(),
+            ));
+        }
+        if resolution.library_version != report.library_version
+            || resolution.item_version != source.version
+            || resolution.item_type != source.data.item_type
+            || resolution.parent_item_key != source.data.parent_item
+        {
+            return Err(SourceResolutionError::Stale(resolution.item_key.clone()));
+        }
+    }
+    for key in pending.keys() {
+        if !seen.contains(key.as_str()) {
+            return Err(SourceResolutionError::Missing((*key).clone()));
+        }
+    }
+    resolutions.sort_by(|left, right| left.item_key.cmp(&right.item_key));
+    Ok(SourceResolutionReview {
+        zotero_version: report.zotero_version.clone(),
+        server_id: report.server_id.clone(),
+        library_version: report.library_version,
+        rule_revision: report.rule_revision.clone(),
+        resolved_sources: resolutions,
+    })
+}
+
 /// Deterministic reason that a bibliographic item requires steward review.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
