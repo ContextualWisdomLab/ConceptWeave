@@ -61,3 +61,30 @@ fn source_resolution_cannot_be_rebound_to_a_different_library_snapshot() {
         Err(SourceResolutionError::Stale(key)) if key == "SOURCE"
     ));
 }
+
+#[test]
+fn source_resolution_rejects_blank_snapshot_identity_coordinates() {
+    let mut blank_zotero_version = classify_snapshot(
+        "10.0.1".into(),
+        Some("local-server".into()),
+        7,
+        vec![source_item()],
+    );
+    blank_zotero_version.zotero_version = " \t\n".into();
+    assert!(
+        prepare_source_resolution_review(&blank_zotero_version, vec![resolution_for_library(7)])
+            .is_err()
+    );
+
+    let mut blank_rule_revision = classify_snapshot(
+        "10.0.1".into(),
+        Some("local-server".into()),
+        7,
+        vec![source_item()],
+    );
+    blank_rule_revision.rule_revision = " \t\n";
+    assert!(
+        prepare_source_resolution_review(&blank_rule_revision, vec![resolution_for_library(7)])
+            .is_err()
+    );
+}
