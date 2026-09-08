@@ -12,8 +12,8 @@ pending sources, 49 duplicate candidates and zero failures. Equal output is
 repeatability evidence only; it does not establish review, approval or a
 Zotero write.
 
-PR39 is `8943fda265dc135a5955aad2de2a6402c4033576` (OPEN/Draft/CLEAN); PR40 is
-`bb735815082dd799ac8290be900277851de02908` (OPEN/Draft/CLEAN). The latest
+PR39 is `e10bb738345a53f83d488076890b56735c604533` (OPEN/Draft/CLEAN); PR40 is
+`fc6083de58fbe4fb1c5bcdefee8e28671fa034e8` (OPEN/Draft/CLEAN). The latest
 Local API replay remains stable at 8,326 observed records, 3,715 proposals,
 4,611 unclassified records, four pending sources and 49 duplicate candidates,
 with zero failures and private report digest
@@ -124,7 +124,7 @@ source against the immutable report before any authority callback. Missing and
 stale source-resolution regressions pass in the locked Rust 1.98 workspace;
 Clippy, warnings-denied rustdoc and diff checks also pass. GitHub reports OPEN
 Draft/CLEAN with CodeRabbit skipped because the PR remains a draft. PR #40's
- current exact head is `bb735815082dd799ac8290be900277851de02908`; the latest
+ current exact head is `fc6083de58fbe4fb1c5bcdefee8e28671fa034e8`; the latest
 successor records the report-bound restoration repair and its unchanged-head
 evidence. Direct trusted-type deserialization is removed, and coordinated
 rewrites fail closed against the immutable `ClassificationReport`. The trusted
@@ -147,7 +147,7 @@ the next engineering gap before protected merge.
 The write-envelope mismatch regression now exercises four stored identity
 mismatch forms and raises normalized branch coverage to 781/782 (99.87%) in
 the pinned nightly run with 115 tests. On PR40 repair head
-`bb735815082dd799ac8290be900277851de02908`, the trusted-restoration coverage
+`fc6083de58fbe4fb1c5bcdefee8e28671fa034e8`, the trusted-restoration coverage
 rerun reports 200/200 branches (100%); lib.rs function coverage is 100% and
 normalized regions are 99.44%. Remaining gaps are two 64-bit
 cast expressions from target-width conversion helpers. The formerly environment-dependent
