@@ -4,6 +4,8 @@
 
 ## September 7 remaining execution and acquisition gates
 
+The [governance-risk-compliance control-catalog boundary audit](doctoring/cwl_ontology_capability_inventory.md#governance-risk-compliance-control-catalog-boundary-audit-2026-09-08) advances bounded candidate coverage to 46/76, leaving 30. Its protected default `develop@529cf321f134e26c0cd379ee53c06ab5297363b6` contains a substantive Python developer preview, but the repository explicitly owns control/evidence truth and consumes ontology elsewhere; no release or license evidence exists. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
 The [supply-chain-control-plane bootstrap boundary audit](doctoring/cwl_ontology_capability_inventory.md#supply-chain-control-plane-bootstrap-boundary-audit-2026-09-08) advances bounded candidate coverage to 45/76, leaving 31. Protected `main@11f3e0f191d7f5a30e1bb0512d26e0db323f38e2` contains only a bootstrap README; license, implementation and release evidence are absent. Supply-chain event/evidence meaning remains product-owned, not shared ontology authority. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
 
 The [PolicyWeave privacy-policy app availability audit](doctoring/cwl_ontology_capability_inventory.md#policyweave-privacy-policy-app-availability-audit-2026-09-08) advances bounded candidate coverage to 44/76, leaving 32. Protected `main@52f4fd6bb68f870d0519cf11dd471573a2f197c0` contains only a README describing a local-first policy-drafting app; implementation, license and release evidence are absent. Generated legal-policy drafts are not semantic authority. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.

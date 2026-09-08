@@ -2,7 +2,7 @@
 
 Evidence snapshot: 2026-09-07. Status: research inventory, not dependency-adoption approval.
 
-September 7–8 adds bounded audits of noema's release admission, EgressWeave's outbound policy, OriginWeave's provenance records, Learning Content Studio's protected-source availability, accounting-information-platform's proposal/reporting boundaries, Learning Management Platform's bootstrap availability, saju-caldav's calendar service boundary, J Planner's static app, ELUNVERA's CRM bootstrap, PolicyWeave's privacy-policy app and supply-chain-control-plane's bootstrap boundary: **45/76** of the September 6 census are now audited, leaving **31** in that historical denominator. Candidates with resolved GitHub releases remain **8/45**; registry-only observations are separate and verified adoption remains zero. Earlier checkpoints below retain their observation dates. A bootstrap-only finding is not an implemented library or a classified paper.
+September 7–8 adds bounded audits of noema's release admission, EgressWeave's outbound policy, OriginWeave's provenance records, Learning Content Studio's protected-source availability, accounting-information-platform's proposal/reporting boundaries, Learning Management Platform's bootstrap availability, saju-caldav's calendar service boundary, J Planner's static app, ELUNVERA's CRM bootstrap, PolicyWeave's privacy-policy app, supply-chain-control-plane's bootstrap boundary and governance-risk-compliance's control-catalog boundary: **46/76** of the September 6 census are now audited, leaving **30** in that historical denominator. Candidates with resolved GitHub releases remain **8/46**; registry-only observations are separate and verified adoption remains zero. Earlier checkpoints below retain their observation dates. A bootstrap-only finding is not an implemented library or a classified paper.
 
 ## Scope and evidence limits
 
@@ -284,10 +284,16 @@ The public, nonfork, nonarchived repository has protected default `main@11f3e0f1
 
 The supply-chain event/evidence graph remains a product-owned domain boundary, not a released shared ontology library. No implementation, schema, contract, tests, runtime, private data, model call or package installation was accessed. Before any ConceptWeave relationship, require a released versioned contract, provenance, licensing and consumer conformance. This audit advances coverage to 45/76, leaving 31; resolved GitHub-release candidates remain 8/45 and verified adoption remains zero. No paper decision or approval follows.
 
+### governance-risk-compliance control-catalog boundary audit (2026-09-08)
+
+The public, nonfork, nonarchived repository's actual default is `develop@529cf321f134e26c0cd379ee53c06ab5297363b6`; its complete recursive tree is not truncated and includes a Python developer-preview service, tests, ADRs and product documentation. The README explicitly assigns policy, control, risk, evidence and audit truth to this product, while stating that ontology is consumed from another CWL home. Repository license metadata is null and the paginated release query returned no entries.
+
+Governance-risk-compliance owns control-catalog and evidence semantics, not ConceptWeave's shared ontology. Its unauthenticated loopback preview and declared actor headers are not production identity evidence. No package installation, runtime test, private data or Zotero mutation was performed. Before any relationship, require an explicit versioned interoperability contract, authenticated deployment evidence, licensing and conformance. This audit advances coverage to 46/76, leaving 30; resolved GitHub-release candidates remain 8/46 and verified adoption remains zero. No paper decision or approval follows.
+
 | Measure | Observation | Required next evidence |
 | --- | --- | --- |
-| Metadata census / bounded capability audit | September 6 census76; 45/45 selected candidates have exact default-head documentation, available source, tree and release-query evidence | Audit actual contracts/consumers; 31 repositories in the historical census remain unaudited at that depth. |
-| GitHub release with resolved source commit | 8/45 selected candidates, including proprietary naruon, product-domain four-pillars, Saju CalDAV and inkspan's historical release without the relevant current contracts | License, artifact/provenance and consumer conformance; a release count is not permissive-library or adoption evidence. |
+| Metadata census / bounded capability audit | September 6 census76; 46/46 selected candidates have exact default-head documentation, available source, tree and release-query evidence | Audit actual contracts/consumers; 30 repositories in the historical census remain unaudited at that depth. |
+| GitHub release with resolved source commit | 8/46 selected candidates, including proprietary naruon, product-domain four-pillars, Saju CalDAV and inkspan's historical release without the relevant current contracts | License, artifact/provenance and consumer conformance; a release count is not permissive-library or adoption evidence. |
 | Additional registry-only publication observation | ThreadWeave0.1.0 and EgressWeave0.1.0 on PyPI; not counted in the seven resolved GitHub releases | Bind the needed API and distribution to reviewed source and attestations; no package-registry completeness claim. |
 | Verified ConceptWeave adoption | 0 demonstrated in this audit | Released owner contract, exact consumer revision and passing contract/runtime evidence. |
 | Privately retained nonempty full text | 3,203/3,715 parents in the separate [capture evidence](zotero_fulltext_capture_evidence.json); 512 remain without demonstrated nonempty text | New content-bound proposals and authentic review with partial/unknown indexing. The earlier sweep's 800/1,000 abstract-missing subgroup is availability evidence, not a remeasured retained-capture subgroup. |
@@ -313,6 +319,8 @@ ContextualWisdomLab. (2026). *ELUNVERA* (Commit 1975f50ebe3da751097e015bdfa909ce
 ContextualWisdomLab. (2026). *PolicyWeave* (Commit 52f4fd6bb68f870d0519cf11dd471573a2f197c0) [Source repository]. GitHub. https://github.com/ContextualWisdomLab/PolicyWeave/tree/52f4fd6bb68f870d0519cf11dd471573a2f197c0
 
 ContextualWisdomLab. (2026). *supply-chain-control-plane* (Commit 11f3e0f191d7f5a30e1bb0512d26e0db323f38e2) [Source repository]. GitHub. https://github.com/ContextualWisdomLab/supply-chain-control-plane/tree/11f3e0f191d7f5a30e1bb0512d26e0db323f38e2
+
+ContextualWisdomLab. (2026). *governance-risk-compliance* (Commit 529cf321f134e26c0cd379ee53c06ab5297363b6) [Source repository]. GitHub. https://github.com/ContextualWisdomLab/governance-risk-compliance/tree/529cf321f134e26c0cd379ee53c06ab5297363b6
 
 ContextualWisdomLab. (2026). *Metering billing platform* (Commit ebeed33f98b34afc232eed980f41d6af9a7a445c) [Computer software]. GitHub. https://github.com/ContextualWisdomLab/metering-billing-platform/tree/ebeed33f98b34afc232eed980f41d6af9a7a445c
 
