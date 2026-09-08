@@ -41,3 +41,4 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - Owned production coverage target is 100% line/function/region/branch where tooling exposes it.
 - Never suppress deprecation warnings; fix causes.
 - Never force-push shared branches, self-approve, fabricate checks, or weaken branch protection.
+- Coverage assertions should inspect an already-returned error with direct kind comparisons; `matches!` guards create test-only branch obligations and can obscure the production coverage deficit.
