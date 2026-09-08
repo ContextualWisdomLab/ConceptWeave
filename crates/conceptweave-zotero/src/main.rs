@@ -367,6 +367,20 @@ mod tests {
     }
 
     #[test]
+    fn published_report_cleanup_error_identifies_post_publication_state() {
+        let temporary = Path::new("temporary.json");
+        let error = cleanup_published_report(temporary, |_| {
+            Err(io::Error::new(io::ErrorKind::PermissionDenied, "cleanup failure"))
+        })
+        .unwrap_err();
+
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+        assert!(error
+            .to_string()
+            .contains("report published but temporary cleanup failed"));
+    }
+
+    #[test]
     fn complete_report_is_published_once() {
         use std::time::{SystemTime, UNIX_EPOCH};
 
