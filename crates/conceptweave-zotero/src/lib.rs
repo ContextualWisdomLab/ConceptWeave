@@ -1495,6 +1495,14 @@ mod tests {
     }
 
     #[test]
+    fn source_resolution_error_formats_invalid_pending_key_set() {
+        assert_eq!(
+            SourceResolutionError::InvalidPendingKeySet.to_string(),
+            "report pending source keys are not unique and canonical"
+        );
+    }
+
+    #[test]
     fn reader_core_rejects_total_and_between_request_resource_exhaustion() {
         let too_many = fetched_page(MAX_SNAPSHOT_ITEMS + 1, vec![]);
         assert!(matches!(
