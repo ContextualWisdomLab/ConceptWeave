@@ -61,3 +61,23 @@ fn review_abstract_is_omitted_when_no_steward_replay_context_is_needed() {
     let empty_abstention = serialized_item("Unmatched calibration study", "");
     assert!(empty_abstention.get("review_abstract_note").is_none());
 }
+
+#[test]
+fn conflicting_evidence_reuses_the_matched_abstract_instead_of_copying_it_twice() {
+    let abstract_note = "Ontology learning evidence from a generation study.";
+    let proposal = serialized_item("Ontology alignment evidence", abstract_note);
+
+    assert_eq!(
+        proposal["proposed_disposition"],
+        Value::String("needs_steward_review".into())
+    );
+    assert_eq!(
+        proposal["abstention_reason"],
+        Value::String("conflicting_disposition_evidence".into())
+    );
+    assert_eq!(proposal["evidence"]["field_values"]["abstract_note"], abstract_note);
+    assert!(
+        proposal.get("review_abstract_note").is_none(),
+        "matched abstract evidence already supplies steward replay context and must not be duplicated"
+    );
+}
