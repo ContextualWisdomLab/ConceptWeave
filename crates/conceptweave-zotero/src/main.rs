@@ -54,10 +54,12 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
             "report output must be a direct child of the system temp directory",
         ));
     }
-    // `parent()` succeeded above, so an absolute path cannot be the root alone.
-    let file_name = path
-        .file_name()
-        .expect("an absolute path with a parent has a file name");
+    let file_name = path.file_name().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "report output has no file name",
+        )
+    })?;
     let resolved_path = resolved_parent.join(file_name);
     if fs::symlink_metadata(&resolved_path).is_ok() {
         return Err(io::Error::new(
@@ -462,7 +464,10 @@ mod tests {
         );
 
         assert!(validate_output_path("relative.json").is_err());
-        assert!(validate_output_path("/").is_err());
+        assert!(matches!(
+            validate_output_path("/"),
+            Err(error) if error.kind() == io::ErrorKind::InvalidInput
+        ));
         assert!(validate_output_path("/tmp/missing-directory/report.json").is_err());
         assert!(
             validate_output_path(
