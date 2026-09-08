@@ -142,6 +142,42 @@ fn source_resolution_review_json_rejects_missing_or_blank_server_identity() {
 }
 
 #[test]
+fn source_resolution_review_json_rejects_nested_server_identity_mismatch() {
+    let report = classify_snapshot(
+        "10.0.1".into(),
+        Some("local-server".into()),
+        42,
+        vec![item("SOURCE", 41, "attachment", "")],
+    );
+    let review = prepare_source_resolution_review(
+        &report,
+        vec![resolution(
+            "SOURCE",
+            41,
+            "attachment",
+            "",
+            42,
+            Some("local-server"),
+        )],
+    )
+    .expect("the exact pending source is resolvable");
+    let serialized = serde_json::to_value(review).expect("review must serialize");
+
+    for server_id in [
+        serde_json::Value::Null,
+        serde_json::Value::String(" \t".into()),
+        serde_json::Value::String("other-server".into()),
+    ] {
+        let mut candidate = serialized.clone();
+        candidate["resolved_sources"][0]["server_id"] = server_id;
+        assert!(
+            serde_json::from_value::<conceptweave_zotero::SourceResolutionReview>(candidate)
+                .is_err()
+        );
+    }
+}
+
+#[test]
 fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
     let report = classify_snapshot(
         "10.0.1".into(),
