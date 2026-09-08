@@ -94,6 +94,16 @@ This is a reproducible screening KPI for steward workload, not ontology
 precision, recall or approval coverage. The denominator includes every observed
 item, while the queue remains an overlapping title/phrase discovery projection.
 
+## Queue disposition replay (2026-09-09 06:45 KST)
+
+The latest private release-mode replay reproduced report SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc` and 142
+queue rows. Deterministic dispositions are 34 adjacent-evidence rows, one
+semantic-consumption bridge and 107 steward-review rows; the latter split into
+101 no-deterministic-rule-match and six unsupported-rule-vocabulary abstentions.
+These counts prioritize steward work only; they do not change decisions or
+authorize Zotero writes.
+
 ## Queue integrity checkpoint (2026-09-09)
 
 The private queue was revalidated against the replay envelope: the source report

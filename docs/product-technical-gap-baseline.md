@@ -1606,6 +1606,16 @@ The current Local API replay observes 3,715 bibliographic items and projects
 This measures triage workload only; it does not estimate ontology precision or
 recall and does not imply full-text review, approval or publication authority.
 
+### September 9 06:45 ontology queue disposition replay
+
+The latest `0600` release-mode replay reproduced report SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc` and the
+142-row ontology discovery projection. Its deterministic dispositions are 34
+`adjacent_evidence`, one `semantic_consumption_bridge` and 107
+`needs_steward_review`; the latter contains 101 `no_deterministic_rule_match`
+and six `unsupported_rule_vocabulary` abstentions. These are queue-priority
+signals only and do not promote any paper or grant Zotero authority.
+
 ### September 9 live Local API contract probe
 
 A secret-safe read-only probe against `http://127.0.0.1:23119/api/users/0/items`
