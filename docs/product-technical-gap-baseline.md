@@ -1184,3 +1184,7 @@ remain open; no local evidence is transferred to a remote or later head.
 - `semantic-data-portal` remains catalog/governance/consumption rather than ConceptWeave persistence; `context-graph-contracts` owns interop contracts; `enterprise-architecture-core` owns EA; `contextual-orchestrator` owns provider routing.
 - Consuming products retain tenant/purpose authorization and physical query execution.
 - Published semantic truth is immutable; corrections create a new release plus supersession evidence rather than in-place overwrite.
+
+### Downstream source-resolution envelope gap (2026-09-09)
+
+PR40's trusted source-resolution restoration remains an owner prerequisite for PR39. PR39 currently rejects pending reports before an exact `SourceResolutionReview` can travel from worksheet through finalization, evaluation and write admission. A non-force local merge attempt with PR40 produced conflicts in the shared library, CLI, transport tests and governance documents; it was aborted without shared-branch changes. After protected owner integration, the successor must add a positive exact-resolution contract while keeping missing, stale and mismatched envelopes fail-closed before any authority verifier.
