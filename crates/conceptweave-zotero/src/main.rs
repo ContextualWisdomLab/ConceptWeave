@@ -124,7 +124,13 @@ fn cleanup_published_report<F>(temporary: &Path, mut remove_file: F) -> io::Resu
 where
     F: FnMut(&Path) -> io::Result<()>,
 {
-    remove_file(temporary)
+    remove_file(temporary).map_err(|error| {
+        let kind = error.kind();
+        io::Error::new(
+            kind,
+            format!("report published but temporary cleanup failed: {error}"),
+        )
+    })
 }
 
 fn run_with<I, F>(
@@ -362,7 +368,7 @@ mod tests {
             Err(io::Error::other("cleanup failure"))
         });
 
-        assert_eq!(result.unwrap_err().to_string(), "cleanup failure");
+        assert!(result.unwrap_err().to_string().contains("cleanup failure"));
         assert_eq!(attempted_paths, vec![temporary.to_path_buf()]);
     }
 
