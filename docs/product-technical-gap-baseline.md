@@ -1670,3 +1670,13 @@ At exact PR39 head `c88c5f07c27e033ea54f71ede1cc23bfa4fa419`,
 unit, integration and documentation tests. This is local evidence only: the
 exact head still has no hosted central-workflow run or independent approval,
 so protected merge, release and deployment remain unverified.
+
+### September 9 07:24 live Local API replay continuity
+
+The pinned Rust 1.98 optimized CLI completed another read-only replay against
+the loopback Zotero Local API. Its private report reproduced the prior digest
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc` byte for
+byte, preserving the verified aggregate of 8,326 observed, 3,715 classified,
+4,611 retained, four pending source-resolution keys and 49 duplicate
+candidates. This confirms snapshot continuity only; no steward decision,
+approval or Zotero write was performed.
