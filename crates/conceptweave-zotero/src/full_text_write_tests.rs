@@ -806,6 +806,59 @@ fn full_text_write_rejects_each_stored_source_resolution_envelope_mismatch() {
 }
 
 #[test]
+fn full_text_write_rejects_reordered_source_resolution_before_authority() {
+    let items: Vec<ZoteroItem> = serde_json::from_value(serde_json::json!([
+        {"key":"ABCD2345","version":2,"data":{"itemType":"journalArticle","title":"fixture paper"}},
+        {"key":"BCDE3456","version":1,"data":{"itemType":"attachment","parentItem":"ABCD2345"}},
+        {"key":"CDEF4567","version":0,"data":{"itemType":"attachment"}},
+        {"key":"DEFG5678","version":0,"data":{"itemType":"attachment"}}
+    ]))
+    .unwrap();
+    let mut report = classify_snapshot("10.0.1".into(), Some("fixture-server".into()), 2, items);
+    report.api_version = Some(3);
+    report.schema_version = Some(44);
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(match request_path {
+            "fulltext?since=0" => CapturedResponse {
+                status: 200,
+                version: None,
+                body: r#"{"BCDE3456":12403,"CDEF4567":0,"DEFG5678":0}"#.into(),
+            },
+            "items/DEFG5678" => CapturedResponse {
+                status: 200,
+                version: Some(0),
+                body: r#"{"key":"DEFG5678","version":0,"data":{"itemType":"attachment"}}"#.into(),
+            },
+            "items/DEFG5678/fulltext" => CapturedResponse {
+                status: 200,
+                version: Some(0),
+                body: r#"{"content":"standalone evidence"}"#.into(),
+            },
+            "items/CDEF4567" => CapturedResponse {
+                status: 200,
+                version: Some(0),
+                body: r#"{"key":"CDEF4567","version":0,"data":{"itemType":"attachment"}}"#.into(),
+            },
+            "items/CDEF4567/fulltext" => CapturedResponse {
+                status: 200,
+                version: Some(0),
+                body: r#"{"content":"standalone evidence"}"#.into(),
+            },
+            _ => response_fixture(request_path),
+        })
+    })
+    .unwrap();
+    let mut scope = write_scope_fixture(&report, &capture);
+    scope
+        .source_resolution_review
+        .as_mut()
+        .unwrap()
+        .resolved_sources
+        .reverse();
+    assert!(build_full_text_write_plan(&report, &capture, scope, |_| true, |_| true).is_err());
+}
+
+#[test]
 fn full_text_write_validates_both_inputs_before_either_authority() {
     for scenario in 0..7 {
         let report = report_fixture();
