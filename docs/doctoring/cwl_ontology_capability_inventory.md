@@ -254,10 +254,16 @@ The public, nonfork, nonarchived repository has protected default `main@52f4fd6b
 
 This is an implemented product-domain service, not a general ontology generator or semantic approval authority. Birth/calendar and relationship meanings remain Saju CalDAV-owned; ConceptWeave must not copy its rule engine or treat recommendations as reviewed semantic labels. Before any shared consumption, the owner must publish a licensed, versioned, provenance-bearing contract and demonstrate exact consumer conformance. The source audit advances coverage to 40/76, leaving 36; resolved GitHub-release candidates to 8/40. No ConceptWeave adoption, paper decision or approval follows.
 
+### J Planner static-app availability audit (2026-09-08)
+
+The public, nonfork, nonarchived repository has protected default `gh-pages@ec030872a0762af8af54d359c88e4c90239e05e4`. Its complete recursive tree (`truncated=false`) contains only `index.html`, which was retrieved at the exact commit but is a large single-file web build; the response exceeded the inspection output budget and was not treated as a complete source review. The visible metadata identifies a Korean “J Planner” travel planner that stores user data in the browser and vendors Leaflet CSS inline. Repository license metadata is null and the paginated GitHub release query returned no entries.
+
+This is static-app availability evidence, not an ontology library, semantic authority or adoption contract. No browser execution, data access, package installation, deployment or source-content decision was performed. Before any reuse, the owner must establish licensing, versioned contracts, accessibility/security evidence and an exact consumer boundary. This bounded audit advances coverage to 41/76, leaving 35; resolved GitHub-release candidates remain 8/41 and verified adoption remains zero. No paper decision or approval follows.
+
 | Measure | Observation | Required next evidence |
 | --- | --- | --- |
-| Metadata census / bounded capability audit | September 6 census76; 40/40 selected candidates have exact default-head documentation, available source, tree and release-query evidence | Audit actual contracts/consumers; 36 repositories in the historical census remain unaudited at that depth. |
-| GitHub release with resolved source commit | 8/40 selected candidates, including proprietary naruon, product-domain four-pillars, Saju CalDAV and inkspan's historical release without the relevant current contracts | License, artifact/provenance and consumer conformance; a release count is not permissive-library or adoption evidence. |
+| Metadata census / bounded capability audit | September 6 census76; 41/41 selected candidates have exact default-head documentation, available source, tree and release-query evidence | Audit actual contracts/consumers; 35 repositories in the historical census remain unaudited at that depth. |
+| GitHub release with resolved source commit | 8/41 selected candidates, including proprietary naruon, product-domain four-pillars, Saju CalDAV and inkspan's historical release without the relevant current contracts | License, artifact/provenance and consumer conformance; a release count is not permissive-library or adoption evidence. |
 | Additional registry-only publication observation | ThreadWeave0.1.0 and EgressWeave0.1.0 on PyPI; not counted in the seven resolved GitHub releases | Bind the needed API and distribution to reviewed source and attestations; no package-registry completeness claim. |
 | Verified ConceptWeave adoption | 0 demonstrated in this audit | Released owner contract, exact consumer revision and passing contract/runtime evidence. |
 | Privately retained nonempty full text | 3,203/3,715 parents in the separate [capture evidence](zotero_fulltext_capture_evidence.json); 512 remain without demonstrated nonempty text | New content-bound proposals and authentic review with partial/unknown indexing. The earlier sweep's 800/1,000 abstract-missing subgroup is availability evidence, not a remeasured retained-capture subgroup. |
@@ -273,6 +279,8 @@ ContextualWisdomLab. (2026). *Learning Management Platform* (Commit 1b89a16bbbd6
 ContextualWisdomLab. (2026). *Saju CalDAV* (Commit 52f4fd6bb68f870d0519cf11dd471573a2f197c0) [Computer software]. GitHub. https://github.com/ContextualWisdomLab/saju-caldav/tree/52f4fd6bb68f870d0519cf11dd471573a2f197c0
 
 ContextualWisdomLab. (2026). *Saju CalDAV v0.2.0* (Commit 50d97fa5d948d5319b063facb83c21a1289af97f) [Software release]. GitHub. https://github.com/ContextualWisdomLab/saju-caldav/releases/tag/v0.2.0
+
+ContextualWisdomLab. (2026). *J Planner* (Commit ec030872a0762af8af54d359c88e4c90239e05e4) [Static web application]. GitHub. https://github.com/ContextualWisdomLab/j-planner/tree/ec030872a0762af8af54d359c88e4c90239e05e4
 
 ContextualWisdomLab. (2026). *Metering billing platform* (Commit ebeed33f98b34afc232eed980f41d6af9a7a445c) [Computer software]. GitHub. https://github.com/ContextualWisdomLab/metering-billing-platform/tree/ebeed33f98b34afc232eed980f41d6af9a7a445c
 
