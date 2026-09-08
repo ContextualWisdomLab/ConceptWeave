@@ -397,6 +397,20 @@ mod tests {
     }
 
     #[test]
+    fn published_report_cleanup_never_unlinks_the_final_path_after_temp_failure() {
+        let temporary = Path::new("temporary.json");
+        let output = Path::new("output.json");
+        let mut attempted_paths = Vec::new();
+        let result = cleanup_published_report(temporary, output, |path| {
+            attempted_paths.push(path.to_path_buf());
+            Err(io::Error::other("cleanup failure"))
+        });
+
+        assert_eq!(result.unwrap_err().to_string(), "cleanup failure");
+        assert_eq!(attempted_paths, vec![temporary.to_path_buf()]);
+    }
+
+    #[test]
     fn complete_report_is_published_once() {
         use std::time::{SystemTime, UNIX_EPOCH};
 
