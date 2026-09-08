@@ -10,16 +10,18 @@ PR #40 intentionally supports the host system temporary directory without requir
 
 Changing production admission to require `/tmp` was rejected because it would contradict `env::temp_dir()` ownership and the existing Windows regression. Platform-skipping the whole helper test was also rejected because the deterministic parent-policy and temporary-name assertions remain useful on every supported host.
 
-The least-widening repair is to keep the helper test cross-platform and gate only the positive `/tmp` assertion on actual path existence.
+The least-widening behavioral repair is to keep the helper test cross-platform and require the positive `/tmp` assertion only when that path actually exists.
 
 ## Repair and traceability
 
 - Reality RED/intervening regression: `a8609387cc5edf0919ed54596749bf1675aa93f5`.
-- Minimal repair: `bf5c38bd1f4b9a0eca8b736b765f4d5202ec39e5`.
+- Ordinary repair: `bf5c38bd1f4b9a0eca8b736b765f4d5202ec39e5`.
+- Net tree check: comparing pre-regression `bb9d7b691cf5601f3a60ff2a786e123f1d552704` to `bf5c38bd1f4b9a0eca8b736b765f4d5202ec39e5` yields no file delta. The repair therefore restores the exact prior portable test tree while retaining `a860938...` in commit ancestry.
+- The causal behavioral difference from `a860938...` is restoration of the `/tmp` existence guard. The same tree restoration also returns the root-like output-path error assertion to its predecessor spelling; that assertion is behaviorally equivalent and does not alter production semantics.
 - Production behavior changed: none.
 - Preserved boundaries: output-path admission, create-new publication, post-publication cleanup, Zotero transport, research classification, source-resolution construction/restoration, semantic authority.
 
-The repair is an ordinary successor; the intervening commit remains in ancestry. No force-push, destructive rebase, coverage exclusion, or threshold weakening is used.
+No force-push, destructive rebase, coverage exclusion, or threshold weakening is used.
 
 ## Acceptance
 
