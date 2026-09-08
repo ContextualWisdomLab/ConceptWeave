@@ -178,6 +178,19 @@ interval are recorded in [the private capture record](doctoring/zotero_live_full
 Content remains private evidence; no decision, approval or Zotero write was
 performed.
 
+### September 9 PR40 current-head coverage revalidation
+
+The current PR40 successor head `26d088f948ebef01dad112313391b80cda7a0a71`
+(`codex/zotero-source-resolution`) was checked in a fresh detached worktree
+with `rustup run 1.98.0 bash scripts/check_coverage.sh`. The complete locked
+workspace suite passed. Raw LLVM coverage was 3,001/3,039 regions (98.75%),
+209/211 functions (99.05%), 1,898/1,913 lines (99.22%) and 212/212 branches
+(100%). The frozen normalized owner region/branch gates passed, but raw
+per-file deficits remain in `crates/conceptweave-zotero/src/lib.rs` and
+`src/main.rs`. PR40 therefore remains Draft and has no hosted run for this
+exact head; local coverage is not protected acceptance or publication
+evidence.
+
 ### September 9 06:36 capture-bound availability replay
 
 Using the same private report, the pinned Rust 1.98 optimized CLI completed a
