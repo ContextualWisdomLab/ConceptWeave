@@ -40,6 +40,38 @@ fn read_fixture(
 }
 
 #[test]
+fn snapshot_rejects_noncanonical_zotero_object_keys() {
+    for invalid_key in [
+        "ABCDEFG",
+        "ABCDEFGHI",
+        "ABC1DEFG",
+        "ABCOEFGH",
+        "abcdefgh",
+        "ABC-DEF2",
+    ] {
+        let result = read_snapshot_with(&mut |_| {
+            Ok(fetched_page(
+                1,
+                vec![item(invalid_key, "attachment", "", "", "")],
+            ))
+        });
+        assert!(
+            matches!(result, Err(ReadError::SnapshotChanged)),
+            "noncanonical Zotero object key was admitted: {invalid_key}"
+        );
+    }
+
+    let valid = read_snapshot_with(&mut |_| {
+        Ok(fetched_page(
+            1,
+            vec![item("2A3B4C5D", "attachment", "", "", "")],
+        ))
+    })
+    .unwrap();
+    assert_eq!(valid.observed_item_count, 1);
+}
+
+#[test]
 fn snapshot_never_uses_environment_proxies() {
     let mut failures = Vec::new();
     for proxy_variable in [
