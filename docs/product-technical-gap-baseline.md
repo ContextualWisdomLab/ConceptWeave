@@ -5,13 +5,15 @@
 ## Current exact-head checkpoint
 
 PR39 is `2ead764cbf013f7d876842868322da69ed20bf59` (OPEN/Draft/CLEAN); PR40 is
-`2dba92261b3c6262d8b1d7975928f0f2b0add74b` (OPEN/Draft/CLEAN). The latest
+`8445cbb6ce5fc6988ab4609d290685ddb2fd3f01` (OPEN/Draft/CLEAN). The latest
 Local API replay remains stable at 8,326 observed records, 3,715 proposals,
 4,611 unclassified records, four pending sources and 49 duplicate candidates,
 with zero failures and private report digest
 `8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`.
-PR40's report-bound restoration passes local focused/workspace gates; hosted
-checks, owned 100% coverage and independent review remain outstanding.
+PR40's report-bound restoration passes local focused/workspace gates. Its
+owner branch coverage is 201/202 (99.50%); the only remaining branch is an
+environment-dependent `/tmp` canonicalization failure. Hosted checks, the
+owned 100% coverage target and independent review remain outstanding.
 
 ## September 8 acquisition and consolidation checkpoint
 
@@ -105,14 +107,14 @@ counts were retained in [the readiness record](doctoring/zotero_local_api_readin
 no item JSON was copied. This is endpoint readiness, not an atomic capture,
 decision, approval, write, release or deployment.
 
-PR #39 now points to exact head `7fd89bccffcaa46f5fbdaf64b4252ac3cce7438c`
+PR #39 now points to exact head `2ead764cbf013f7d876842868322da69ed20bf59`
 over stacked base `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`. The write scope
 requires a complete source-resolution aggregate and revalidates every pending
 source against the immutable report before any authority callback. Missing and
 stale source-resolution regressions pass in the locked Rust 1.98 workspace;
 Clippy, warnings-denied rustdoc and diff checks also pass. GitHub reports OPEN
 Draft/CLEAN with CodeRabbit skipped because the PR remains a draft. PR #40's
-current exact head is `2dba92261b3c6262d8b1d7975928f0f2b0add74b`; the latest
+ current exact head is `8445cbb6ce5fc6988ab4609d290685ddb2fd3f01`; the latest
 successor records the report-bound restoration repair and its unchanged-head
 evidence. Direct trusted-type deserialization is removed, and coordinated
 rewrites fail closed against the immutable `ClassificationReport`. The trusted
@@ -134,11 +136,12 @@ the next engineering gap before protected merge.
 
 The write-envelope mismatch regression now exercises four stored identity
 mismatch forms and raises normalized branch coverage to 781/782 (99.87%) in
-the pinned nightly run with 115 tests. On PR40 repair head `f660c3a`, the
-trusted-restoration coverage rerun reports 202/204 branches (99.02%); the two
-remaining branches are unreachable after prior wire checks or environment-
-dependent `/tmp` canonicalization. No exclusions or threshold changes were
-introduced.
+the pinned nightly run with 115 tests. On PR40 repair head
+`8445cbb6ce5fc6988ab4609d290685ddb2fd3f01`, the trusted-restoration coverage
+rerun reports 201/202 branches (99.50%); one
+remaining branch is the environment-dependent `/tmp` canonicalization
+failure; the other formerly reported branch was removed as unreachable after
+prior wire checks. No exclusions or threshold changes were introduced.
 
 The [refreshed capture checkpoint](doctoring/refreshed_capture_evidence.md) now records successful optimized full-library capture, verified 3,715-row blank worksheet, a 25-row bound view, and full workspace tests at `b0f7d5b8bb139d627cec37b598331464c14b60ab` (terminal exit 0). Actual decisions and approvals remain zero. The CO owner freshly reports no GitHub release or PyPI package, unmerged release PR #1030 and unmerged diagnostic PR #1105. Its stated prerequisites are protected exact-head checks/independent review, fast-mlsirm publication, immutable CO client/schema release, and verified classification serving. This is owner-reported release status, not locally verified registry evidence. Available secret metadata is not the blocker. Do not send private paper contents or substitute a direct provider while these conditions remain unmet.
 
