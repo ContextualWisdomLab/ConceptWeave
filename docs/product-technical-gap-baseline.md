@@ -59,6 +59,12 @@ passed. It asserts the operation-specific temporary prefix is absent after the
 induced link failure, so deleting the cleanup would fail the test. The finding
 is stale; no source change or authority expansion is warranted.
 
+The same PR40 tree also passed `cargo +1.98.0 test --workspace --all-targets
+--locked` locally, including all ConceptWeave domain tests, Zotero unit tests,
+source-resolution contracts and publication-cleanup regressions. This is
+current local evidence only; no hosted workflow, independent approval or
+protected merge is inferred.
+
 ## September 8 acquisition and consolidation checkpoint
 
 Nightly `2026-08-20` coverage was rerun at PR #39 exact head
