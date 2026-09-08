@@ -86,3 +86,10 @@ Case-insensitive title/phrase counts are: `ontology` 27/32, `semantic` 36/0,
 `taxonomy` 2/0, `knowledge graph` 1/2, `linked data` 1/1 and `vocab` 81/0.
 These are overlapping discovery signals, not additive paper counts or
 dispositions; no full-text decision, authority or Zotero mutation occurred.
+
+## Discovery KPI checkpoint (2026-09-09)
+
+The queue rate is `142 / 3,715 = 3.8223%` of observed bibliographic items.
+This is a reproducible screening KPI for steward workload, not ontology
+precision, recall or approval coverage. The denominator includes every observed
+item, while the queue remains an overlapping title/phrase discovery projection.

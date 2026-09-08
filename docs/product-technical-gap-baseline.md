@@ -1550,3 +1550,10 @@ Case-insensitive title/phrase counts were `ontology` 27/32, `semantic` 36/0,
 `taxonomy` 2/0, `knowledge graph` 1/2, `linked data` 1/1 and `vocab` 81/0.
 Signals overlap and are not additive classifications; this remains discovery
 evidence without steward disposition or Zotero write authority.
+
+### September 9 ontology discovery KPI
+
+The current Local API replay observes 3,715 bibliographic items and projects
+142 into the ontology discovery queue, a screening rate of `3.8223%`.
+This measures triage workload only; it does not estimate ontology precision or
+recall and does not imply full-text review, approval or publication authority.
