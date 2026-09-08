@@ -359,10 +359,15 @@ mod tests {
         assert!(write_report(&output, &serde_json::json!({"state": "complete"})).is_err());
         assert!(output.is_dir());
         let temporary_prefix = format!(".{output_name}.{}.", std::process::id());
-        assert!(!fs::read_dir(env::temp_dir())
-            .unwrap()
-            .flatten()
-            .any(|entry| entry.file_name().to_string_lossy().starts_with(&temporary_prefix)));
+        assert!(
+            !fs::read_dir(env::temp_dir())
+                .unwrap()
+                .flatten()
+                .any(|entry| entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(&temporary_prefix))
+        );
         fs::remove_dir(output).unwrap();
     }
 

@@ -116,12 +116,22 @@ fn source_resolution_review_json_rejects_missing_or_blank_server_identity() {
     );
     let review = prepare_source_resolution_review(
         &report,
-        vec![resolution("SOURCE", 41, "attachment", "", 42, Some("local-server"))],
+        vec![resolution(
+            "SOURCE",
+            41,
+            "attachment",
+            "",
+            42,
+            Some("local-server"),
+        )],
     )
     .expect("the exact pending source is resolvable");
     let serialized = serde_json::to_value(review).expect("review must serialize");
 
-    for server_id in [serde_json::Value::Null, serde_json::Value::String(" \t".into())] {
+    for server_id in [
+        serde_json::Value::Null,
+        serde_json::Value::String(" \t".into()),
+    ] {
         let mut candidate = serialized.clone();
         candidate["server_id"] = server_id;
         assert!(
