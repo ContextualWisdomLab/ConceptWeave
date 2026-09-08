@@ -6,6 +6,14 @@ This file records code-current product and technical gaps. Exact PR/check/run co
 
 ## September 8 research lifecycle, abstention, and replay-evidence checkpoint
 
+PR #40 current live head `fa8ba9c27718bc290b3c2c2c5738c3033f9f063c` (Draft/Open/CLEAN)
+also rejects stored source-resolution entries with blank item keys or reasons,
+duplicate keys, and non-strict item-key ordering. RED was reproduced at
+`99d36562`; the owner repair was merged normally into this head. Local workspace
+tests, focused source-resolution tests, strict Clippy and diff checks pass; the
+hosted review remains skipped while Draft and the owned coverage gate is still
+RED. No approval, protected merge or Zotero write follows from this repair.
+
 PR #40 exact head `0202f6551ad8a36bdda10225149d0225043b7888` now rejects
 stored source-resolution JSON whose nested `library_version` differs from the
 envelope revision. The regression was reproduced at `b2f05085` before the
