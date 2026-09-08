@@ -8,18 +8,26 @@ use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-#[cfg_attr(coverage_nightly, coverage(off))]
-fn allowed_output_parents() -> Vec<PathBuf> {
-    let system_temp = env::temp_dir()
-        .canonicalize()
-        .expect("system temporary directory must exist");
+fn allowed_output_parent_policy(
+    system_temp: PathBuf,
+    conventional_tmp: Option<PathBuf>,
+) -> Vec<PathBuf> {
     let mut parents = vec![system_temp];
-    if let Ok(conventional_tmp) = Path::new("/tmp").canonicalize() {
+    if let Some(conventional_tmp) = conventional_tmp {
         if !parents.contains(&conventional_tmp) {
             parents.push(conventional_tmp);
         }
     }
     parents
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+fn allowed_output_parents() -> Vec<PathBuf> {
+    let system_temp = env::temp_dir()
+        .canonicalize()
+        .expect("system temporary directory must exist");
+    // Host path discovery stays in this shim; admission/dedup policy is deterministic above.
+    allowed_output_parent_policy(system_temp, Path::new("/tmp").canonicalize().ok())
 }
 
 fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
@@ -378,6 +386,25 @@ mod tests {
         fs::write(&existing, b"existing").unwrap();
         assert!(validate_output_path(existing.to_str().unwrap()).is_err());
         fs::remove_file(existing).unwrap();
+    }
+
+    #[test]
+    fn output_parent_policy_covers_optional_and_deduplicated_conventional_tmp() {
+        let system_temp = PathBuf::from("system-temp");
+        let conventional_tmp = PathBuf::from("conventional-tmp");
+
+        assert_eq!(
+            allowed_output_parent_policy(system_temp.clone(), None),
+            vec![system_temp.clone()]
+        );
+        assert_eq!(
+            allowed_output_parent_policy(system_temp.clone(), Some(system_temp.clone())),
+            vec![system_temp.clone()]
+        );
+        assert_eq!(
+            allowed_output_parent_policy(system_temp.clone(), Some(conventional_tmp.clone())),
+            vec![system_temp, conventional_tmp]
+        );
     }
 
     #[cfg(windows)]
