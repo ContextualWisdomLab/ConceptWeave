@@ -1375,6 +1375,13 @@ review view was generated as a `0600`, 1,590,859-byte artifact (SHA-256
 the first 25 blank review decisions with the same capture/report/proposal
 bindings. These are steward-review inputs, not decisions, approvals or writes.
 
+At 03:10 KST, live `--worksheet` and `--review-progress` produced owner-only
+artifacts. The report stayed byte-identical to the replay digest; progress
+artifact `42212d7fd11c1e57a52fc6727ca50500c45082fb3bcdb73d13ca74fc8126de0a`
+reported total 3,715, decided 0, remaining 3,715, pending source count 4 and
+`complete=false`. The worksheet/progress path therefore remains ready for
+steward input without inventing semantic decisions or granting write authority.
+
 At exact source/test head `78d40c3` (documentation head `e16a28d`), the repository coverage gate was rerun with the
 pinned nightly toolchain after adding a two-source regression for noncanonical
 report-bound resolution order. The workspace suite passed; normalized source

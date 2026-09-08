@@ -150,3 +150,15 @@ artifact (SHA-256
 25-item blank review batch and the same capture/report/proposal bindings. These
 artifacts are prepared for steward review only; no decision or approval was
 issued.
+
+## Live worksheet and progress checkpoint (2026-09-09 03:10 KST)
+
+The release binary's `--worksheet` mode generated a fresh live report and blank
+steward worksheet, both owner-only (`0600`). The report remained byte-identical
+to the prior replay (8,132,756 bytes; SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`). The
+separate `--review-progress` artifact was `0600`, 383 bytes (SHA-256
+`42212d7fd11c1e57a52fc6727ca50500c45082fb3bcdb73d13ca74fc8126de0a`) and
+reported total 3,715, decided 0, remaining 3,715, pending sources 4,
+`complete=false`. This is an honest review-workload baseline; no decision,
+approval or Zotero write was issued.
