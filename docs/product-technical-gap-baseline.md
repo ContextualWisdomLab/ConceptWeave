@@ -1264,6 +1264,15 @@ replay remains below the 100% production target (branches 200/204, functions 207
 lines 1874/1888, regions 2969/3005). This is local owner evidence only;
 hosted required checks, independent approval and protected merge remain unverified.
 
+PR39 head `7b957ffb46c44fedaa2faa5687bcd1382d09795c` closes the downstream source-resolution
+gap in the write-plan boundary: ordinary full-text evaluation remains fail-closed for pending
+sources, while write admission now permits them only after the exact report-bound
+`SourceResolutionReview` is revalidated. A standalone pending-source fixture proves both
+verifiers are reached only after that envelope succeeds; the prior rejection test now proves
+the positive path without granting Zotero authority. Rust 1.98 all-target tests, Clippy,
+rustdoc and formatting pass locally. Hosted checks, independent approval and protected merge
+remain unverified.
+
 ### Downstream source-resolution envelope gap (2026-09-09)
 
 PR40's trusted source-resolution restoration remains an owner prerequisite for PR39. PR39 currently rejects pending reports before an exact `SourceResolutionReview` can travel from worksheet through finalization, evaluation and write admission. A non-force local merge attempt with PR40 produced conflicts in the shared library, CLI, transport tests and governance documents; it was aborted without shared-branch changes. After protected owner integration, the successor must add a positive exact-resolution contract while keeping missing, stale and mismatched envelopes fail-closed before any authority verifier.
