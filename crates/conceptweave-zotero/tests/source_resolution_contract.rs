@@ -255,6 +255,90 @@ fn source_resolution_review_json_rejects_duplicate_unsorted_or_blank_decisions()
 }
 
 #[test]
+fn source_resolution_restore_rejects_report_metadata_and_identity_drift() {
+    let report = classify_snapshot(
+        "10.0.1".into(),
+        Some("local-server".into()),
+        42,
+        vec![item("SOURCE", 41, "attachment", "")],
+    );
+    let review = prepare_source_resolution_review(
+        &report,
+        vec![resolution(
+            "SOURCE",
+            41,
+            "attachment",
+            "",
+            42,
+            Some("local-server"),
+        )],
+    )
+    .expect("the exact pending source is resolvable");
+    let serialized = serde_json::to_value(review).expect("review must serialize");
+
+    for (field, replacement) in [
+        ("zotero_version", serde_json::json!("10.0.2")),
+        ("library_version", serde_json::json!(43)),
+        ("rule_revision", serde_json::json!("other-rules")),
+    ] {
+        let mut candidate = serialized.clone();
+        candidate[field] = replacement;
+        if field == "library_version" {
+            candidate["resolved_sources"][0][field] = serde_json::json!(43);
+        }
+        assert!(restored_is_err(&report, candidate));
+    }
+
+    let mut server = serialized.clone();
+    server["server_id"] = serde_json::json!("other-server");
+    server["resolved_sources"][0]["server_id"] = serde_json::json!("other-server");
+    assert!(restored_is_err(&report, server));
+
+    let mut pending = serialized.clone();
+    pending["pending_source_item_keys"][0] = serde_json::json!("OTHER");
+    pending["expected_source_identities"][0]["item_key"] = serde_json::json!("OTHER");
+    pending["resolved_sources"][0]["item_key"] = serde_json::json!("OTHER");
+    assert!(restored_is_err(&report, pending));
+
+    let mut identity = serialized.clone();
+    identity["expected_source_identities"][0]["item_version"] = serde_json::json!(40);
+    assert!(restored_is_err(&report, identity));
+}
+
+#[test]
+fn source_resolution_restore_rejects_unordered_or_misaligned_expected_identities() {
+    let report = classify_snapshot(
+        "10.0.1".into(),
+        Some("local-server".into()),
+        42,
+        vec![
+            item("NOTE", 42, "note", ""),
+            item("SOURCE", 41, "attachment", ""),
+        ],
+    );
+    let review = prepare_source_resolution_review(
+        &report,
+        vec![
+            resolution("NOTE", 42, "note", "", 42, Some("local-server")),
+            resolution("SOURCE", 41, "attachment", "", 42, Some("local-server")),
+        ],
+    )
+    .expect("pending sources are resolvable");
+    let serialized = serde_json::to_value(review).expect("review must serialize");
+
+    let mut unordered = serialized.clone();
+    unordered["expected_source_identities"]
+        .as_array_mut()
+        .expect("expected identities are an array")
+        .swap(0, 1);
+    assert!(restored_is_err(&report, unordered));
+
+    let mut misaligned = serialized;
+    misaligned["expected_source_identities"][0]["item_key"] = serde_json::json!("OTHER");
+    assert!(restored_is_err(&report, misaligned));
+}
+
+#[test]
 fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
     let report = classify_snapshot(
         "10.0.1".into(),

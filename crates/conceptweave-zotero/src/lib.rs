@@ -366,15 +366,17 @@ pub fn restore_source_resolution_review(
     let wire: StoredSourceResolutionWire = serde_json::from_slice(stored_json)
         .map_err(|_| SourceResolutionRestoreError::InvalidStoredArtifact)?;
     validate_stored_source_resolution_wire(&wire)?;
+    if wire.zotero_version != report.zotero_version
+        || wire.server_id != report.server_id
+        || wire.library_version != report.library_version
+        || wire.rule_revision != report.rule_revision
+        || wire.pending_source_item_keys != report.pending_source_item_keys
+    {
+        return Err(SourceResolutionRestoreError::UnboundReport);
+    }
     let review = prepare_source_resolution_review(report, wire.resolved_sources.clone())
         .map_err(SourceResolutionRestoreError::SourceResolution)?;
-    if wire.zotero_version != review.zotero_version
-        || wire.server_id != review.server_id
-        || wire.library_version != review.library_version
-        || wire.rule_revision != review.rule_revision
-        || wire.pending_source_item_keys != review.pending_source_item_keys
-        || wire.expected_source_identities != review.expected_source_identities
-    {
+    if wire.expected_source_identities != review.expected_source_identities {
         return Err(SourceResolutionRestoreError::UnboundReport);
     }
     Ok(review)
