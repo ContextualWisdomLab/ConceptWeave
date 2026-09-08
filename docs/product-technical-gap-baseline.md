@@ -4,6 +4,8 @@
 
 ## September 7 remaining execution and acquisition gates
 
+The [supply-chain-control-plane bootstrap boundary audit](doctoring/cwl_ontology_capability_inventory.md#supply-chain-control-plane-bootstrap-boundary-audit-2026-09-08) advances bounded candidate coverage to 45/76, leaving 31. Protected `main@11f3e0f191d7f5a30e1bb0512d26e0db323f38e2` contains only a bootstrap README; license, implementation and release evidence are absent. Supply-chain event/evidence meaning remains product-owned, not shared ontology authority. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
 The [PolicyWeave privacy-policy app availability audit](doctoring/cwl_ontology_capability_inventory.md#policyweave-privacy-policy-app-availability-audit-2026-09-08) advances bounded candidate coverage to 44/76, leaving 32. Protected `main@52f4fd6bb68f870d0519cf11dd471573a2f197c0` contains only a README describing a local-first policy-drafting app; implementation, license and release evidence are absent. Generated legal-policy drafts are not semantic authority. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
 
 The [ELUNVERA CRM availability audit](doctoring/cwl_ontology_capability_inventory.md#elunvera-crm-availability-audit-2026-09-08) advances bounded candidate coverage to 43/76, leaving 33. Protected `main@1975f50ebe3da751097e015bdfa909ce80fc6ba2` and unprotected `develop` both contain only a bootstrap README; license, implementation and release evidence are absent. CRM/customer meaning remains owner-owned. No runtime or tests were executed; adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
