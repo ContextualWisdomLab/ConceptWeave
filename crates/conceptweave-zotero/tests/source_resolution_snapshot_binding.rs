@@ -23,6 +23,7 @@ fn resolution_for_library(library_version: u64) -> PendingSourceResolution {
     serde_json::from_value(serde_json::json!({
         "item_key": "SOURCE",
         "item_version": 3,
+        "library_version": library_version,
         "item_type": "attachment",
         "parent_item_key": "",
         "library_version": library_version,

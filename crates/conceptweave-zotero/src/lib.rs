@@ -219,6 +219,8 @@ pub struct PendingSourceResolution {
     pub item_key: String,
     /// Item revision observed in the report.
     pub item_version: u64,
+    /// Library revision that contained this item.
+    pub library_version: u64,
     /// Item type observed in the report.
     pub item_type: String,
     /// Parent key observed in the report, if any.
@@ -306,7 +308,8 @@ pub fn prepare_source_resolution_review(
         if resolution.reason.trim().is_empty() {
             return Err(SourceResolutionError::BlankReason(resolution.item_key.clone()));
         }
-        if resolution.item_version != source.version
+        if resolution.library_version != report.library_version
+            || resolution.item_version != source.version
             || resolution.item_type != source.data.item_type
             || resolution.parent_item_key != source.data.parent_item
         {

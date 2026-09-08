@@ -24,10 +24,12 @@ fn resolution(
     version: u64,
     item_type: &str,
     parent_item: &str,
+    library_version: u64,
 ) -> PendingSourceResolution {
     PendingSourceResolution {
         item_key: key.into(),
         item_version: version,
+        library_version,
         item_type: item_type.into(),
         parent_item_key: parent_item.into(),
         disposition: SourceResolutionDisposition::RetainStandaloneEvidence,
@@ -53,8 +55,8 @@ fn source_resolution_review_requires_the_exact_pending_snapshot_set() {
     let review = prepare_source_resolution_review(
         &report,
         vec![
-            resolution("SOURCE", 41, "attachment", ""),
-            resolution("NOTE", 42, "note", "SOURCE"),
+            resolution("SOURCE", 41, "attachment", "", 42),
+            resolution("NOTE", 42, "note", "SOURCE", 42),
         ],
     )
     .expect("every pending source has one exact-snapshot resolution");
@@ -73,7 +75,7 @@ fn source_resolution_review_round_trips_owned_json() {
     );
     let review = prepare_source_resolution_review(
         &report,
-        vec![resolution("SOURCE", 41, "attachment", "")],
+        vec![resolution("SOURCE", 41, "attachment", "", 42)],
     )
     .expect("the exact pending source is resolvable");
 
@@ -92,7 +94,7 @@ fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
         7,
         vec![item("SOURCE", 3, "attachment", "")],
     );
-    let exact = resolution("SOURCE", 3, "attachment", "");
+    let exact = resolution("SOURCE", 3, "attachment", "", 7);
 
     let mut duplicate = exact.clone();
     duplicate.reason = "second decision".into();
@@ -102,22 +104,22 @@ fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
     ));
 
     assert!(matches!(
-        prepare_source_resolution_review(&report, vec![resolution("OTHER", 3, "attachment", "")]),
+        prepare_source_resolution_review(&report, vec![resolution("OTHER", 3, "attachment", "", 7)]),
         Err(conceptweave_zotero::SourceResolutionError::Unknown(key)) if key == "OTHER"
     ));
 
     assert!(matches!(
-        prepare_source_resolution_review(&report, vec![resolution("SOURCE", 2, "attachment", "")]),
+        prepare_source_resolution_review(&report, vec![resolution("SOURCE", 2, "attachment", "", 7)]),
         Err(conceptweave_zotero::SourceResolutionError::Stale(key)) if key == "SOURCE"
     ));
 
     assert!(matches!(
-        prepare_source_resolution_review(&report, vec![resolution("SOURCE", 3, "note", "")]),
+        prepare_source_resolution_review(&report, vec![resolution("SOURCE", 3, "note", "", 7)]),
         Err(conceptweave_zotero::SourceResolutionError::Stale(key)) if key == "SOURCE"
     ));
 
     assert!(matches!(
-        prepare_source_resolution_review(&report, vec![resolution("SOURCE", 3, "attachment", "PARENT")]),
+        prepare_source_resolution_review(&report, vec![resolution("SOURCE", 3, "attachment", "PARENT", 7)]),
         Err(conceptweave_zotero::SourceResolutionError::Stale(key)) if key == "SOURCE"
     ));
 
