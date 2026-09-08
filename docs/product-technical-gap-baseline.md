@@ -1467,3 +1467,13 @@ workspace test/doc-test suite passed (85 library tests, 30 CLI tests, all
 integration suites). This is source/test evidence only: hosted protected
 acceptance and independent approval remain outstanding, and no paper decision,
 Zotero write or release is inferred.
+
+### September 9 PR40 source-resolution successor verification
+
+PR40's current exact head is `509ce73b1d1b4d60c898f3993bc24bbf44d45551`
+(`codex/zotero-source-resolution`). The branch includes the blank-pending-key,
+root-output-path and ambiguous-retained-inventory repairs; the older automated
+review findings were rechecked against this head and no longer apply. Pinned
+Rust 1.98 formatting and the complete workspace test/doc-test suite passed.
+PR40 remains Draft with no independent approval or protected hosted acceptance;
+this evidence does not advance paper decisions or Zotero write authority.
