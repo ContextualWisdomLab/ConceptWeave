@@ -21,6 +21,12 @@ jq -r '
   | "COVERAGE_GAP file=\(.filename) lines=\(.summary.lines.percent) functions=\(.summary.functions.percent) regions=\(.summary.regions.percent)"
 ' coverage.json
 
+jq -r '
+  .data[0].functions[]
+  | select(.count == 0)
+  | "FUNCTION_GAP name=\(.name) files=\(.filenames | join(","))"
+' coverage.json
+
 jq '
   [
     .data[0].functions[]
