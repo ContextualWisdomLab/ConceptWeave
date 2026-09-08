@@ -8,6 +8,11 @@ The reported 54/76 unique-repository coverage and 8/54 release fraction are with
 
 September 7–8 adds bounded audits of noema's release admission, EgressWeave's outbound policy, OriginWeave's provenance records, Learning Content Studio's protected-source availability, accounting-information-platform's proposal/reporting boundaries, Learning Management Platform's bootstrap availability, saju-caldav's calendar service boundary, J Planner's static app, ELUNVERA's CRM bootstrap, PolicyWeave's privacy-policy app, supply-chain-control-plane's bootstrap boundary, governance-risk-compliance's control-catalog boundary, psychometrics-commons' measurement-product boundary, learning-record-store's bootstrap boundary, learning-interoperability-contracts' bootstrap boundary, Gyeot's measurement/wellness boundary, Orgmetra's HRIS boundary, Clearfolio's document-viewer boundary, aFIPC's legacy measurement-kernel boundary and kaefa's exploratory-factor-analysis boundary: **54/76** of the September 6 census are now audited, leaving **22** in that historical denominator. Candidates with resolved GitHub releases remain **8/54**; registry-only observations are separate and verified adoption remains zero. Earlier checkpoints below retain their observation dates. A bootstrap-only finding is not an implemented library or a classified paper.
 
+The **54/76** figure above is a historical audit-activity count, not a
+reconciled unique-repository KPI. Duplicate audits identified in the correction
+section keep current unique coverage unresolved until canonical repository
+identity is recomputed.
+
 ## Scope and evidence limits
 
 The September 7 metadata refresh again returned 76 repositories, one archived repository and 11 forks. Matching counts do not prove unchanged repository contents; every capability observation retains its own exact source revision.
@@ -250,7 +255,7 @@ Cultivation belongs in that existing owner stack: establish licensed, protected 
 
 The public, nonfork, nonarchived repository has protected default `develop@1b89a16bbbd6c4b7c6ee4e8b81e2c8c651d1ce2c`. Its complete recursive tree (`truncated=false`) contains only [README.md](https://github.com/ContextualWisdomLab/learning-management-platform/blob/1b89a16bbbd6c4b7c6ee4e8b81e2c8c651d1ce2c/README.md), read in full: it identifies a bootstrap anchor and proposed development through develop. No implementation, contract, tests, package declaration, accepted ADR or license file exists in that exact tree; repository license metadata is null. The paginated GitHub release query returned no entries. No package registry, proposed PR, runtime or private learning records were inspected.
 
-Do not infer implemented learning-domain or ontology authority from the repository name. Cultivation starts with explicit product responsibilities, licensing, versioned domain contracts and conformance in the existing owner. Any later ConceptWeave observation must preserve product meaning and consume a released contract rather than copy source or invent an ontology utility. This availability audit adds one candidate to the historical census coverage: 39/76 audited, 37 remaining; seven resolved GitHub-release candidates and zero verified adoptions. It creates no paper decisions or approvals.
+Do not infer implemented learning-domain or ontology authority from the repository name. Cultivation starts with explicit product responsibilities, licensing, versioned domain contracts and conformance in the existing owner. Any later ConceptWeave observation must preserve product meaning and consume a released contract rather than copy source or invent an ontology utility. At this audit's dated checkpoint, historical census coverage was 39/76 audited with 37 remaining; later bounded audits raised the historical activity count to 54/76, while reconciled unique coverage remains unresolved. It creates no paper decisions or approvals.
 
 ### Saju CalDAV service boundary audit (2026-09-08)
 
