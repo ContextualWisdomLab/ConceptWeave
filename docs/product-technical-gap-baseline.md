@@ -4,6 +4,17 @@
 
 ## September 8 acquisition and consolidation checkpoint
 
+### PR #39 full-text write source binding checkpoint (2026-09-08)
+
+PR #39 now points to exact head `33003d707c4cbc500227c8722285f4f3cbd566ba`
+over stacked base `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`. The write scope
+requires a complete source-resolution aggregate and revalidates every pending
+source against the immutable report before any authority callback. Missing and
+stale source-resolution regressions pass in the locked Rust 1.98 workspace;
+Clippy, warnings-denied rustdoc and diff checks also pass. GitHub reports OPEN
+Draft/CLEAN with CodeRabbit queued and no required hosted check yet. This is
+not protected-merge, release or Zotero-write evidence.
+
 The [refreshed capture checkpoint](doctoring/refreshed_capture_evidence.md) now records successful optimized full-library capture, verified 3,715-row blank worksheet, a 25-row bound view, and full workspace tests at `b0f7d5b8bb139d627cec37b598331464c14b60ab` (terminal exit 0). Actual decisions and approvals remain zero. The CO owner freshly reports no GitHub release or PyPI package, unmerged release PR #1030 and unmerged diagnostic PR #1105. Its stated prerequisites are protected exact-head checks/independent review, fast-mlsirm publication, immutable CO client/schema release, and verified classification serving. This is owner-reported release status, not locally verified registry evidence. Available secret metadata is not the blocker. Do not send private paper contents or substitute a direct provider while these conditions remain unmet.
 
 This checkpoint supplements the historical snapshots below, not their unverified incremental KPIs. The [acquisition register](doctoring/missing_full_text_acquisition.md) now identifies public source locations for the four unattached rows in the first 25-row review view. Only TRINITY HTML and the anxiety-study PDF were successfully retrieved; the IRT full text remains unverified. None was added to the bound capture or counted as an approved decision.
