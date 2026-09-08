@@ -1297,3 +1297,9 @@ release-ready. Both PRs target stacked feature bases rather than the default bra
 (`codex/zotero-fulltext-review-approval` and `feat/zotero-research-classification`), so
 the default-branch ruleset does not itself create the required workflow runs on these
 intermediate bases; this is a stack topology fact, not a hosted GREEN result.
+
+On 2026-09-09 the two preceding stack PRs (#37 and #38) were also moved from Draft to
+Ready for review to remove the review-suppression state. #38 remains CLEAN; #37 reports
+`UNSTABLE` while still `MERGEABLE`, with an empty status-check rollup. All four stack PRs
+therefore still require independent review and exact hosted workflow evidence before any
+protected merge claim.
