@@ -13,10 +13,10 @@ fn allowed_output_parent_policy(
     conventional_tmp: Option<PathBuf>,
 ) -> Vec<PathBuf> {
     let mut parents = vec![system_temp];
-    if let Some(conventional_tmp) = conventional_tmp {
-        if !parents.contains(&conventional_tmp) {
-            parents.push(conventional_tmp);
-        }
+    if let Some(conventional_tmp) = conventional_tmp
+        && !parents.contains(&conventional_tmp)
+    {
+        parents.push(conventional_tmp);
     }
     parents
 }
