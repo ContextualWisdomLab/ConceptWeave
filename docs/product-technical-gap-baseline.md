@@ -6,6 +6,12 @@ This file records code-current product and technical gaps. Exact PR/check/run co
 
 ## September 8 research lifecycle, abstention, and replay-evidence checkpoint
 
+PR #40 current exact head `4c05fcd59aa31b70b1054c4d8b53697628530d27` adds
+stored-review coverage for blank item keys; the focused contract suite and
+strict workspace Clippy pass at this unchanged owner successor. The PR remains
+Draft/Open/CLEAN, so this test evidence does not grant review, merge or write
+authority.
+
 PR #40 current live head `fa8ba9c27718bc290b3c2c2c5738c3033f9f063c` (Draft/Open/CLEAN)
 also rejects stored source-resolution entries with blank item keys or reasons,
 duplicate keys, and non-strict item-key ordering. RED was reproduced at
