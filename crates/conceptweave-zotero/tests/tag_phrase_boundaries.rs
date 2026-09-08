@@ -86,3 +86,28 @@ fn every_matching_tag_is_retained_as_explicit_evidence() {
         "all and only source tags that matched rule phrases must remain explicit replay evidence"
     );
 }
+
+#[test]
+fn matching_tag_evidence_preserves_source_order_and_deduplicates_equal_values() {
+    let report = classify_snapshot(
+        "10.0.1".into(),
+        None,
+        2,
+        vec![item_with_tags(&[
+            "ontology learning",
+            "ontology alignment",
+            "ontology learning",
+            "unrelated note",
+        ])],
+    );
+
+    let classified = &report.classified_items[0];
+    assert_eq!(
+        classified.proposed_disposition,
+        Disposition::NeedsStewardReview
+    );
+    assert_eq!(
+        classified.evidence.matched_tag_values,
+        ["ontology learning", "ontology alignment"]
+    );
+}
