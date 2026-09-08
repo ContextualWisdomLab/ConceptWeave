@@ -20,6 +20,7 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - When the Local API exposes a server identity, source-resolution decisions must also match that `server_id`; a matching library version alone cannot prove the same Zotero source.
 - Stored source-resolution artifacts must validate nested `server_id` and `library_version` against their envelope during deserialization; later report validation cannot make an already accepted mismatched artifact safe.
 - Stored source-resolution artifacts must also reject blank `rule_revision`; constructor-valid data cannot be assumed valid after JSON restoration.
+- Stored source-resolution artifacts must retain a canonical expected pending-key set and reject any restored decision-key set that differs; truncating JSON must not regain typed completeness.
 - Source-resolution admission is fail-closed when the report has no `server_id`; optional identity is acceptable for lower-authority classification, not for a typed resolution review.
 - Missing or blank Local API `server_id` remains an admission error even when a report has no pending items; an empty resolution set must not yield a typed review without provider identity.
 - Public review aggregates that cross a JSON artifact boundary must use owned fields and have a round-trip test; borrowed `&'static str` metadata is not an artifact contract.
