@@ -6,7 +6,14 @@
 
 ### PR #39 full-text write source binding checkpoint (2026-09-08)
 
-PR #39 now points to exact head `33003d707c4cbc500227c8722285f4f3cbd566ba`
+The local Zotero endpoint is currently reachable read-only: HTTP 200, Zotero
+10.0.1, Connector/API v3, schema 44, 8,326 reported records, last-modified
+version 2, and an opaque server identity present. Only headers and aggregate
+counts were retained in [the readiness record](doctoring/zotero_local_api_readiness_2026-09-08.md);
+no item JSON was copied. This is endpoint readiness, not an atomic capture,
+decision, approval, write, release or deployment.
+
+PR #39 now points to exact head `950d8d8782f2ee418586993ee28c75a7b065504e`
 over stacked base `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`. The write scope
 requires a complete source-resolution aggregate and revalidates every pending
 source against the immutable report before any authority callback. Missing and
