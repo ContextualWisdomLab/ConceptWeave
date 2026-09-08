@@ -215,9 +215,7 @@ mod tests {
             vec![system_temp, alternate]
         );
         assert!(conventional_tmp_parent(Path::new("/definitely-missing-parent")).is_none());
-        if Path::new("/tmp").exists() {
-            assert!(conventional_tmp_parent(Path::new("/tmp")).is_some());
-        }
+        assert!(conventional_tmp_parent(Path::new("/tmp")).is_some());
         assert!(temporary_output_path(Path::new("relative")).is_ok());
         assert!(temporary_output_path(Path::new("/")).is_err());
     }
@@ -464,10 +462,10 @@ mod tests {
         );
 
         assert!(validate_output_path("relative.json").is_err());
-        assert!(matches!(
-            validate_output_path("/"),
-            Err(error) if error.kind() == io::ErrorKind::InvalidInput
-        ));
+        assert_eq!(
+            validate_output_path("/").unwrap_err().kind(),
+            io::ErrorKind::InvalidInput
+        );
         assert!(validate_output_path("/tmp/missing-directory/report.json").is_err());
         assert!(
             validate_output_path(
