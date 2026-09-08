@@ -4,6 +4,8 @@
 
 ## September 7 remaining execution and acquisition gates
 
+The Semantic Data Portal ontology/catalog-plane candidate remains an open owner PR [#73](https://github.com/ContextualWisdomLab/semantic-data-portal/pull/73) at `311668e46491d343de1a5f668b860557c9543c51` against `main`, not a releasable dependency: GitHub reports `CHANGES_REQUESTED`, `MERGEState=BLOCKED`, and completed `strix` and `trivy-fs` failures despite several other successful checks. Preserve the PR and repair findings at the owner; do not copy its catalog/ontology implementation into ConceptWeave or infer adoption.
+
 The [Clearfolio document-viewer boundary audit](doctoring/cwl_ontology_capability_inventory.md#clearfolio-document-viewer-boundary-audit-2026-09-08) advances bounded candidate coverage to 52/76, leaving 24. Protected `main@06633a25109c62e24a7015ae04fb9f6e0a246f7e` contains a document-viewer MVP and contracts but no ontology authority or release evidence. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
 
 The [Orgmetra HRIS boundary audit](doctoring/cwl_ontology_capability_inventory.md#orgmetra-hris-boundary-audit-2026-09-08) advances bounded candidate coverage to 51/76, leaving 25. Protected default `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f` is Apache-2.0 with substantial HRIS packages and contracts, but explicitly assigns occupation/skill/ability ontology to Semantic Data Portal; no release exists. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
