@@ -1319,3 +1319,8 @@ The latest report's discovery signals were independently recomputed over the
 graph 1, vocabulary stem 81, exact uppercase `OWL` 23 and `RDF` 20. Including
 nonbibliographic titles would overcount the KPI; the denominator boundary is
 explicitly preserved in the doctoring record.
+
+Manual `@coderabbitai review` requests were issued on PR39 and PR40 at their exact
+heads, but GitHub continued to report “reviews are disabled for this base branch”
+and produced no independent review or required workflow run. The request itself is
+coordination evidence only, not approval.
