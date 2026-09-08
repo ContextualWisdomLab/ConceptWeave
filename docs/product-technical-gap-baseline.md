@@ -1290,5 +1290,7 @@ requires one approving review, resolved review threads, and the central OpenCode
 merge-scheduler, security, Strix, Semgrep, Noema and CodeQL workflows. It also forbids
 deletion and non-fast-forward updates; only merge and squash are allowed. The legacy
 `branches/main/protection` endpoint returns 404, which is distinct from the active ruleset
-and cannot be treated as an absent protection gate. PR39 and PR40 remain Draft with no
-independent approval, so neither is protected-merge or release-ready.
+and cannot be treated as an absent protection gate. PR39 and PR40 are now Ready for review,
+but neither has an independent approval; PR40 reports that reviews are disabled for its base
+branch and no Actions run exists for either exact head, so neither is protected-merge or
+release-ready.
