@@ -1321,6 +1321,11 @@ graph 1, vocabulary stem 81, exact uppercase `OWL` 23 and `RDF` 20. Including
 nonbibliographic titles would overcount the KPI; the denominator boundary is
 explicitly preserved in the doctoring record.
 
+The classifier evidence fields in the same replay separately matched `ontology`
+32 times, `owl` 24, `rdf` 20, `knowledge graph` 2 and `linked data` 1. These
+matched-phrase counts are not title-only discovery counts and are not additive
+coverage or steward decisions.
+
 Manual `@coderabbitai review` requests were issued on PR39 and PR40 at their exact
 heads, but GitHub continued to report “reviews are disabled for this base branch”
 and produced no independent review or required workflow run. The request itself is

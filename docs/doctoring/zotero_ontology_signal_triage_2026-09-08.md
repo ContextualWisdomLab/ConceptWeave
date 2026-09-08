@@ -36,3 +36,12 @@ rule match, six unsupported rule vocabulary). Matching policy is explicit:
 `ontology`, `semantic`, `taxonomy`, `knowledge graph` and the `vocab` stem are
 case-insensitive; exact uppercase `OWL` and `RDF` counts are separate discovery
 signals. These counts do not create decisions, approvals or Zotero writes.
+
+## Deterministic evidence-phrase checkpoint (2026-09-09 03:20 KST)
+
+Recomputing classifier evidence fields from the same private replay report
+(`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`) found
+matched-phrase counts of `ontology` 32, `owl` 24, `rdf` 20, `knowledge graph`
+2 and `linked data` 1. These are classifier-evidence signals, not the separate
+title-only discovery counts above; they must not be summed into a new KPI or
+treated as steward decisions.

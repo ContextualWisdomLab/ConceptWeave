@@ -58,6 +58,7 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - Full-text worksheets are not metadata `StewardReviewWorksheet` inputs: `--review-batch` and `--review-progress` must reject them. Use `--bound-full-text-review` for capture-bound batches, and keep the metadata progress contract on its own worksheet type.
 - Title-keyword aggregates are useful discovery queues only; they must never overwrite deterministic dispositions, clear abstentions or stand in for steward review and ontology authority.
 - Discovery KPI matching must declare case semantics per signal: case-insensitive `ontology` is distinct from case-sensitive `OWL`/`RDF`; otherwise `OWL` can overcount ordinary words such as `knowledge`.
+- Keep classifier matched-phrase counts separate from title-only discovery counts; overlapping signals are evidence queues, not additive coverage or steward decisions.
 - A Zotero full-text response can report equal indexed/total page counters while containing no text. Check content availability and completeness separately, preserve unresolved sources, and require the bound capture/review path before counting a classification as reviewed.
 - Validate the report's pending-source key sequence itself before building a trusted resolution aggregate: reject duplicates and noncanonical ordering even when the supplied decisions appear complete.
 - To exercise report-bound canonicalization, use at least two valid pending sources and reverse the stored resolution order; a single-entry fixture cannot cover the mismatch branch.
