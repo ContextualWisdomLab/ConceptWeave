@@ -6,6 +6,7 @@ All notable changes to ConceptWeave are documented here.
 
 ### Fixed
 
+- Research evaluation rejects incomplete source inventories and invalidates prior approvals when retained source metadata changes.
 - Research reports retain standalone files and notes that previously disappeared from the classification view, and flag sources whose parent relationships remain unresolved.
 - Zotero research intake rejects a read whose records claim revisions newer than the library being observed, without dropping papers or changing their recorded revisions.
 - Zotero research intake rejects incomplete or late results after a five-minute read budget, even when individual pages arrive within their request limits.
@@ -20,5 +21,7 @@ All notable changes to ConceptWeave are documented here.
 
 ### Security
 
+- Source receipts bind complete captured metadata and actual classifier inputs; earlier report and review artifacts require regeneration under the versioned digest representation.
+- Golden-set evaluation rejects changed predictions or evidence under an earlier approval. Proposal-bound approvals must be reissued; aggregate receipts identify the actual evaluated proposal run.
 - Model-generated semantics remain non-authoritative until deterministic validation and authorized review.
 - Unsafe Rust is forbidden in the core domain crate.

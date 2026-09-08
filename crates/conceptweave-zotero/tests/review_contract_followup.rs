@@ -13,6 +13,7 @@ fn item(key: &str, title: &str, abstract_note: &str) -> ZoteroItem {
             collections: vec![],
             tags: vec![],
         },
+        source_record: None,
     }
 }
 
