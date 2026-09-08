@@ -70,6 +70,13 @@ all-target Clippy and warnings-denied workspace rustdoc completed successfully.
 These local checks strengthen source evidence but do not satisfy the active
 ruleset's hosted-workflow or independent-review gates.
 
+The unchanged PR40 coverage script was also rerun locally. Its raw aggregate is
+200/204 branches (98.0392%), 199/208 functions (95.6731%), 1,834/1,873 lines
+(97.9178%) and 2,904/2,966 regions (97.9096%); owned-file summaries are
+`lib.rs` 98.5519% lines/96.2121% functions/98.5478% regions and `main.rs`
+94.8905%/91.1111%/94.9772%. These gaps remain acceptance work; normalized or
+test-only success must not be promoted to the required 100% owned coverage.
+
 At 01:17 KST on 2026-09-09, a fresh release-mode Local API replay produced the
 same private report SHA
 `8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc` and
