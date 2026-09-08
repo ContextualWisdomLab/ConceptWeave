@@ -101,12 +101,12 @@ source against the immutable report before any authority callback. Missing and
 stale source-resolution regressions pass in the locked Rust 1.98 workspace;
 Clippy, warnings-denied rustdoc and diff checks also pass. GitHub reports OPEN
 Draft/CLEAN with CodeRabbit skipped because the PR remains a draft. PR #40's
-current exact head is `a3cd9b0d68b4ecc28322860d04a23867412d611f`; the latest
-successor adds a coordinated-identity regression, but that test is RED because
-restoring a jointly rewritten expected identity and decision still succeeds.
-The prior independent-coordinate repair remains valid, yet an authenticated
-binding to the immutable report/snapshot is still required. It remains OPEN
-Draft/UNSTABLE with hosted checks pending, so protected acceptance is still
+current exact head is `5f288daa49058a171a4dd7244cf85bc7a722102f`; the latest
+successor records the coordinated-identity RED and keeps the prior independent
+coordinate repair. Restoring jointly rewritten expected and decision fields can
+still succeed, so an authenticated binding to the immutable report/snapshot is
+required. It remains OPEN Draft/CLEAN with hosted checks limited to the draft
+review skip, so protected acceptance is still
 outstanding. This is not
 protected-merge, release or Zotero-write evidence.
 
