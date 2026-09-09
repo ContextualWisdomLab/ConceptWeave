@@ -23,7 +23,7 @@ Foundation #1 is OPEN Draft/mergeable at `60f14a6e85a83d56c2eea43b34d52b3366bb17
 
 Product-CI bootstrap #35 remains OPEN/non-Draft/mergeable at `22709ec9b4d969bf67ec74db402813e74d11f7ca`: Security Scan `34204381232` and SAST Semgrep `34204381260` succeeded; CodeQL PR `34204381235` is terminal failure attributable to the central CodeQL owner path rather than a ConceptWeave source defect.
 
-Central owner `.github#2051@70e8c1fcf19b2e56578e021e0b4d84a808104b24` is OPEN/non-Draft/mergeable on protected `.github/main@7fd571dbcdbae6acf29d8f4ee704d7ba6297e4db`. Two P1 identity defects have committed RED->repair lineages:
+Central owner `.github#2051@558693e0333e48012beea142f739bc634b0674a7` is OPEN/non-Draft/BLOCKED on protected `.github/main@7fd571dbcdbae6acf29d8f4ee704d7ba6297e4db`; the earlier `70e8c1fcf19b2e56578e021e0b4d84a808104b24` remains the P1 repair coordinate below. Two P1 identity defects have committed RED->repair lineages:
 
 1. changed-base wake RED `901af9f024836eadd10c6c98affbee037ffecd58` -> production `66a15d856c251f1db2f91cb3d4a2fa66afd8f48c`, with base-aware fixtures `f9d46984e1ef35341e9535af245da8e6ab9c061e`; the single post-matrix coordinator revalidates exact PR/head/base and exact required-run pull-request association before one bounded failed-job rerun;
 2. stale head-only terminal-verdict RED `cb164402518e948e6f88366b3f5187d790fb94b8` -> `70e8c1fcf19b2e56578e021e0b4d84a808104b24`; required verdict admission and pending-language suppression use immutable dispatch title `<repo>#<PR>@<head>/<base>/<required_run_id>` plus exact language-job conclusion, while commit statuses remain observability only.
@@ -105,6 +105,6 @@ Maintain explicit Subdomain/Bounded Context/Context Map/UL/Aggregate/Entity/VO/D
 
 ## Current merge/release rule
 
-No Foundation, #35, #9, #40, or downstream semantic publication is authorized. The closest owner prerequisite remains central `.github#2051@70e8c1f...`: source repair is present, but current terminal checks and qualifying independent review are pending. After normal protected central integration, #35 needs fresh exact-head CodeQL/review, then Foundation needs exact-current Product/central evidence. #9/#40 have been normally restacked without force and must now re-establish exact-head execution after movement.
+No Foundation, #35, #9, #40, or downstream semantic publication is authorized. The closest owner prerequisite remains central `.github#2051@558693e...`: source repair is present, but current terminal checks and qualifying independent review are pending. After normal protected central integration, #35 needs fresh exact-head CodeQL/review, then Foundation needs exact-current Product/central evidence. #9/#40 have been normally restacked without force and must now re-establish exact-head execution after movement.
 
 No force push, destructive rebase, self-approval, review dismissal, fail-open substitution, provider bypass, no-op trigger, synthetic status, live Zotero mutation, premature semantic publication or release is acceptance evidence.

@@ -33,6 +33,7 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - For numeric conversions whose failure is impossible at a supported target width, use a target-width helper: keep checked conversion and fail-closed handling on narrower targets, while avoiding untestable error arms on wider targets. Record the boundary rather than weakening the conversion contract.
 - Visual Zotero item counts are presentation evidence only; reconcile them with the Local API snapshot and classify attachments before claiming a complete research population.
 - Required shared-workflow checks can fail closed while an authenticated exact-head dispatch is still queued; record the dispatch receipt and queue evidence, then wait for the terminal verdict rather than manually rerunning or fabricating success.
+- In a live Gap baseline, retain a historical repair SHA as lineage but label the separately observed current owner head and merge state; a later owner push must not silently turn historical evidence into a false current-status claim.
 - A healthy local replay and a rendered Zotero view do not authorize deployment; keep protected-main, independent review, immutable release, and live-runtime evidence as separate gates.
 - Once a report is atomically published, cleanup failure must preserve the final artifact; never roll back by deleting a successfully published path.
 - Post-publication cleanup errors must retain the original I/O kind while adding enough context to distinguish an already-published report from a pre-publication failure.
