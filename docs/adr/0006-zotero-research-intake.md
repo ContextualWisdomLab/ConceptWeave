@@ -57,5 +57,5 @@ In the context of four standalone records preventing an honest whole-library com
 - Direct Zotero 9 writes were rejected because the supported Local API write capability is Zotero 10+ only.
 - Cloud Web API mutation was rejected because it expands credential and network scope without being needed for classification.
 - Arbitrary report output paths were rejected because local bibliographic titles and item keys are intentionally not repository artifacts.
-- Direct deserialization of stored source-resolution JSON was rejected because agreement between mutable fields is not provenance; restoration must bind to the immutable report.
+- Direct deserialization of stored source-resolution JSON was rejected because agreement between mutable fields is not provenance; restoration must bind to a caller-supplied report value. That proves value consistency only. Issue #41 must make report construction opaque before the report can carry original-snapshot provenance.
 - A new repository was rejected because one bounded adapter does not yet justify another lifecycle and release surface.

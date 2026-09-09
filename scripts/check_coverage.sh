@@ -2,7 +2,68 @@
 set -euo pipefail
 
 coverage_toolchain="${COVERAGE_TOOLCHAIN:-nightly-2026-08-20}"
-trap 'rm -f coverage.json source-functions.json source-branches.json source-regions.json' EXIT
+trap 'rm -f coverage.json source-functions.json source-branches.json source-regions.json coverage-branch-contract.json source-regions-contract.json source-branches-contract.json' EXIT
+
+normalize_branches() {
+  local coverage_path="$1"
+  local production_regions_path="$2"
+  local output_path="$3"
+
+  jq --slurpfile production_regions "$production_regions_path" '
+    [
+      .data[0].files[]
+      | .filename as $file
+      | (.branches // [])[]
+      | {
+          file: $file,
+          line_start: .[0],
+          column_start: .[1],
+          line_end: .[2],
+          column_end: .[3],
+          true_count: .[4],
+          false_count: .[5]
+        } as $branch
+      | select(any($production_regions[0][];
+          .file == $branch.file
+          and (
+            .line_start < $branch.line_start
+            or (
+              .line_start == $branch.line_start
+              and .column_start <= $branch.column_start
+            )
+          )
+          and (
+            .line_end > $branch.line_end
+            or (
+              .line_end == $branch.line_end
+              and .column_end >= $branch.column_end
+            )
+          )
+        ))
+      | $branch
+    ]
+    | sort_by(.file, .line_start, .column_start, .line_end, .column_end)
+    | group_by([.file, .line_start, .column_start, .line_end, .column_end])
+    | map({
+        file: .[0].file,
+        line_start: .[0].line_start,
+        column_start: .[0].column_start,
+        line_end: .[0].line_end,
+        column_end: .[0].column_end,
+        true_count: (map(.true_count) | add),
+        false_count: (map(.false_count) | add)
+      })
+  ' "$coverage_path" > "$output_path"
+}
+
+check_branch_normalization_contract() {
+  jq -n '{data:[{files:[{filename:"/repo/src/lib.rs",branches:[[12,5,12,10,1,1,0,0,0],[30,5,30,10,1,0,0,0,0]]}]}]}' > coverage-branch-contract.json
+  jq -n '[{file:"/repo/src/lib.rs",line_start:10,column_start:1,line_end:20,column_end:1,count:1}]' > source-regions-contract.json
+  normalize_branches coverage-branch-contract.json source-regions-contract.json source-branches-contract.json
+  jq -e 'length == 1 and .[0].line_start == 12 and .[0].true_count == 1 and .[0].false_count == 1' source-branches-contract.json >/dev/null
+}
+
+check_branch_normalization_contract
 
 cargo "+${coverage_toolchain}" llvm-cov \
   --workspace \
@@ -127,51 +188,7 @@ jq -r '
 # LLVM's file-level branch list also contains branches emitted by inline
 # #[cfg(test)] modules that live under src/*.rs. Bind each normalized branch to
 # a non-test production region so function, region, and branch scope agree.
-jq --slurpfile production_regions source-regions.json '
-  [
-    .data[0].files[]
-    | .filename as $file
-    | (.branches // [])[]
-    | {
-        file: $file,
-        line_start: .[0],
-        column_start: .[1],
-        line_end: .[2],
-        column_end: .[3],
-        true_count: .[4],
-        false_count: .[5]
-      } as $branch
-    | select(any($production_regions[0][];
-        .file == $branch.file
-        and (
-          .line_start < $branch.line_start
-          or (
-            .line_start == $branch.line_start
-            and .column_start <= $branch.column_start
-          )
-        )
-        and (
-          .line_end > $branch.line_end
-          or (
-            .line_end == $branch.line_end
-            and .column_end >= $branch.column_end
-          )
-        )
-      ))
-    | $branch
-  ]
-  | sort_by(.file, .line_start, .column_start, .line_end, .column_end)
-  | group_by([.file, .line_start, .column_start, .line_end, .column_end])
-  | map({
-      file: .[0].file,
-      line_start: .[0].line_start,
-      column_start: .[0].column_start,
-      line_end: .[0].line_end,
-      column_end: .[0].column_end,
-      true_count: (map(.true_count) | add),
-      false_count: (map(.false_count) | add)
-    })
-' coverage.json > source-branches.json
+normalize_branches coverage.json source-regions.json source-branches.json
 
 jq '
   {
