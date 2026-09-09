@@ -22,6 +22,7 @@ const MAX_SNAPSHOT_ITEMS: usize = 50_000;
 const MAX_SNAPSHOT_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_SNAPSHOT_ELAPSED: Duration = Duration::from_secs(300);
 const LOCAL_API: &str = "http://127.0.0.1:23119/api/users/0/items";
+static LOCAL_API_OVERRIDE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 
 /// A Zotero item returned by the Local API.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -631,7 +632,12 @@ struct FetchedPage {
 /// An in-flight request may finish later under its existing per-request limits;
 /// its late result is rejected, not returned as a partial snapshot.
 pub fn read_local_snapshot() -> Result<ClassificationReport, ReadError> {
-    read_local_snapshot_from(LOCAL_API)
+    let api_base = LOCAL_API_OVERRIDE
+        .lock()
+        .expect("Local API override lock must not be poisoned")
+        .clone()
+        .unwrap_or(LOCAL_API.to_owned());
+    read_local_snapshot_from(&api_base)
 }
 
 fn read_local_snapshot_from(api_base: &str) -> Result<ClassificationReport, ReadError> {
@@ -681,6 +687,9 @@ fn fetch_local_page(
         .map_err(|error| ReadError::Http(error.to_string()))?;
     let headers = response.headers();
     let total = header_u64(headers, "Total-Results")?;
+    #[cfg(target_pointer_width = "64")]
+    let total = page_total(total);
+    #[cfg(not(target_pointer_width = "64"))]
     let total = page_total(total)?;
     let library_version = header_u64(headers, "Last-Modified-Version")?;
     let zotero_version = header_string(headers, "X-Zotero-Version")?;
@@ -690,6 +699,9 @@ fn fetch_local_page(
 
     let body = read_bounded_response_text(&mut response, MAX_PAGE_BYTES)
         .map_err(|error| ReadError::Body(error.to_string()))?;
+    #[cfg(target_pointer_width = "64")]
+    let body_bytes = page_body_bytes(body.len());
+    #[cfg(not(target_pointer_width = "64"))]
     let body_bytes = page_body_bytes(body.len())?;
     let items: Vec<ZoteroItem> = serde_json::from_str(&body).map_err(ReadError::Json)?;
     validate_source_item_keys(&items)?;
@@ -707,8 +719,8 @@ fn fetch_local_page(
 }
 
 #[cfg(target_pointer_width = "64")]
-fn page_total(value: u64) -> Result<usize, ReadError> {
-    Ok(value as usize)
+fn page_total(value: u64) -> usize {
+    value as usize
 }
 
 #[cfg(not(target_pointer_width = "64"))]
@@ -717,8 +729,8 @@ fn page_total(value: u64) -> Result<usize, ReadError> {
 }
 
 #[cfg(target_pointer_width = "64")]
-fn page_body_bytes(value: usize) -> Result<u64, ReadError> {
-    Ok(value as u64)
+fn page_body_bytes(value: usize) -> u64 {
+    value as u64
 }
 
 #[cfg(not(target_pointer_width = "64"))]
@@ -1241,6 +1253,8 @@ mod tests {
     use std::net::TcpListener;
     use std::thread;
 
+    static LOCAL_API_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     fn item(key: &str, item_type: &str, title: &str, doi: &str, parent: &str) -> ZoteroItem {
         ZoteroItem {
             key: key.into(),
@@ -1272,9 +1286,11 @@ mod tests {
 
     #[test]
     fn production_wrapper_requests_api_v3_and_records_contract_versions() {
+        let _guard = LOCAL_API_TEST_LOCK.lock().unwrap();
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         let base = format!("http://{address}/api/users/0/items");
+        *LOCAL_API_OVERRIDE.lock().unwrap() = Some(base);
 
         let server = thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
@@ -1302,7 +1318,8 @@ mod tests {
             stream.flush().unwrap();
         });
 
-        let report = read_local_snapshot_from(&base).unwrap();
+        let report = read_local_snapshot().unwrap();
+        *LOCAL_API_OVERRIDE.lock().unwrap() = None;
         server.join().unwrap();
 
         assert_eq!(report.api_version, Some(3));

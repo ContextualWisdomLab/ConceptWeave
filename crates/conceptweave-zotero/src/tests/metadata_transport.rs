@@ -12,11 +12,13 @@ fn read_fixture(
     Result<ClassificationReport, ReadError>,
     thread::JoinHandle<String>,
 ) {
+    let _guard = LOCAL_API_TEST_LOCK.lock().unwrap();
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let api_base = format!(
         "http://{}/api/users/0/items",
         listener.local_addr().unwrap()
     );
+    *LOCAL_API_OVERRIDE.lock().unwrap() = Some(api_base);
     let server = thread::spawn(move || {
         let (mut stream, _) = listener.accept().unwrap();
         let mut request = Vec::new();
@@ -34,16 +36,19 @@ fn read_fixture(
         let _ = stream.write_all(&body);
         String::from_utf8(request).unwrap()
     });
-    let result = read_local_snapshot_from(&api_base);
+    let result = read_local_snapshot();
+    *LOCAL_API_OVERRIDE.lock().unwrap() = None;
     (result, server)
 }
 
 fn read_raw_response(response: Vec<u8>) -> Result<ClassificationReport, ReadError> {
+    let _guard = LOCAL_API_TEST_LOCK.lock().unwrap();
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let api_base = format!(
         "http://{}/api/users/0/items",
         listener.local_addr().unwrap()
     );
+    *LOCAL_API_OVERRIDE.lock().unwrap() = Some(api_base);
     let server = thread::spawn(move || {
         let (mut stream, _) = listener.accept().unwrap();
         let mut request = Vec::new();
@@ -55,7 +60,8 @@ fn read_raw_response(response: Vec<u8>) -> Result<ClassificationReport, ReadErro
         }
         stream.write_all(&response).unwrap();
     });
-    let result = read_local_snapshot_from(&api_base);
+    let result = read_local_snapshot();
+    *LOCAL_API_OVERRIDE.lock().unwrap() = None;
     server.join().unwrap();
     result
 }

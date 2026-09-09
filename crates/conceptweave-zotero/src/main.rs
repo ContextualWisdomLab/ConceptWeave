@@ -103,18 +103,21 @@ fn write_report(
     output: &Path,
     report: &ClassificationReport,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    write_serialized_report(output, report)
+    write_report_with(output, &mut open_new_output, &mut |writer| {
+        serialize_report(writer, report)
+    })
 }
 
-fn write_serialized_report<T: serde::Serialize>(
+fn write_report_with(
     output: &Path,
-    report: &T,
+    open_output: &mut dyn FnMut(&Path) -> io::Result<fs::File>,
+    serialize: &mut dyn FnMut(&mut BufWriter<fs::File>) -> Result<(), Box<dyn std::error::Error>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let temporary = temporary_output_path(output)?;
-    let file = open_new_output(&temporary)?;
+    let file = open_output(&temporary)?;
     let mut writer = BufWriter::new(file);
 
-    if let Err(error) = serialize_report(&mut writer, report) {
+    if let Err(error) = serialize(&mut writer) {
         drop(writer);
         let _ = fs::remove_file(&temporary);
         return Err(error);
@@ -128,9 +131,9 @@ fn write_serialized_report<T: serde::Serialize>(
     cleanup_published_report(&temporary).map_err(Into::into)
 }
 
-fn serialize_report<W: Write, T: serde::Serialize>(
-    writer: &mut W,
-    report: &T,
+fn serialize_report(
+    writer: &mut dyn Write,
+    report: &ClassificationReport,
 ) -> Result<(), Box<dyn std::error::Error>> {
     serde_json::to_writer_pretty(&mut *writer, report)?;
     writer.flush()?;
@@ -171,18 +174,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::cell::Cell;
 
-    struct FailingReport;
+    struct WriteFailWriter;
 
-    impl serde::Serialize for FailingReport {
-        fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            Err(<S::Error as serde::ser::Error>::custom(
-                "intentional serialization failure",
-            ))
+    impl Write for WriteFailWriter {
+        fn write(&mut self, _bytes: &[u8]) -> io::Result<usize> {
+            Err(io::Error::other("intentional write failure"))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
         }
     }
 
@@ -221,6 +222,21 @@ mod tests {
         assert!(conventional_tmp_parent(&system_temp).is_some());
         assert!(temporary_output_path(Path::new("relative")).is_ok());
         assert!(temporary_output_path(Path::new("/")).is_err());
+        let output = unique_temp_path("writer-seam");
+        let _ = fs::remove_file(&output);
+        let mut serialize = |_: &mut BufWriter<fs::File>| Ok(());
+        write_report_with(&output, &mut open_new_output, &mut serialize).unwrap();
+        fs::remove_file(&output).unwrap();
+        assert!(write_report_with(Path::new("/"), &mut open_new_output, &mut serialize).is_err());
+        let output = unique_temp_path("open-failure");
+        assert!(
+            write_report_with(
+                &output,
+                &mut |_| Err(io::Error::other("intentional open failure")),
+                &mut serialize,
+            )
+            .is_err()
+        );
     }
 
     fn sample_report(zotero_version: &str) -> ClassificationReport {
@@ -237,6 +253,10 @@ mod tests {
             pending_source_item_keys: Vec::new(),
             duplicate_candidates: Vec::new(),
         }
+    }
+
+    fn failing_snapshot() -> Result<ClassificationReport, ReadError> {
+        Err(ReadError::Budget("test-reader"))
     }
 
     #[test]
@@ -283,29 +303,22 @@ mod tests {
 
     #[test]
     fn production_runner_rejects_missing_output_before_reading() {
-        let called = Cell::new(false);
-        let result = run_with(vec!["conceptweave-zotero".to_owned()], &mut || {
-            called.set(true);
-            Ok(sample_report("10.0.1"))
-        });
+        let result = run_with(
+            vec!["conceptweave-zotero".to_owned()],
+            &mut failing_snapshot,
+        );
 
-        assert!(result.is_err());
-        assert!(!called.get());
+        assert!(result.unwrap_err().to_string().contains("usage:"));
     }
 
     #[test]
     fn production_runner_rejects_invalid_output_before_reading() {
-        let called = Cell::new(false);
         let result = run_with(
             vec!["conceptweave-zotero".to_owned(), "relative.json".to_owned()],
-            &mut || {
-                called.set(true);
-                Ok(sample_report("10.0.1"))
-            },
+            &mut failing_snapshot,
         );
 
-        assert!(result.is_err());
-        assert!(!called.get());
+        assert!(result.unwrap_err().to_string().contains("absolute path"));
     }
 
     #[test]
@@ -323,7 +336,7 @@ mod tests {
             output.to_string_lossy().into_owned(),
         ];
 
-        let result = run_with(args, &mut || Err(ReadError::Budget("test-reader")));
+        let result = run_with(args, &mut failing_snapshot);
         assert!(result.is_err());
         assert!(!output.exists());
     }
@@ -365,14 +378,24 @@ mod tests {
         let output = unique_temp_path(&format!("serialization-failure-{nonce}"));
         let _ = fs::remove_file(&output);
 
-        assert!(write_serialized_report(&output, &FailingReport).is_err());
+        assert!(
+            write_report_with(&output, &mut open_new_output, &mut |_| Err(
+                io::Error::other("intentional serialization failure").into()
+            ),)
+            .is_err()
+        );
         assert!(!output.exists());
     }
 
     #[test]
-    fn report_serialization_propagates_flush_failures() {
+    fn report_serialization_propagates_write_and_flush_failures() {
+        let report = sample_report("10.0.1");
+        let mut write_failure = WriteFailWriter;
+        assert!(serialize_report(&mut write_failure, &report).is_err());
+        assert!(write_failure.flush().is_ok());
+
         let mut writer = FlushFailWriter;
-        assert!(serialize_report(&mut writer, &serde_json::json!({"state": "complete"})).is_err());
+        assert!(serialize_report(&mut writer, &report).is_err());
     }
 
     #[test]
@@ -381,9 +404,7 @@ mod tests {
         let output = env::temp_dir().join(&output_name);
         let _ = fs::remove_dir(&output);
         fs::create_dir(&output).unwrap();
-        assert!(
-            write_serialized_report(&output, &serde_json::json!({"state": "complete"})).is_err()
-        );
+        assert!(write_report(&output, &sample_report("10.0.1")).is_err());
         assert!(output.is_dir());
         let temporary_prefix = format!(".{output_name}.{}.", std::process::id());
         assert!(
