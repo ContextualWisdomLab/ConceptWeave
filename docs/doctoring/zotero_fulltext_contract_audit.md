@@ -89,6 +89,12 @@ The 12:05:30–12:07:20 UTC refresh confirmed the same protected default SHA, ze
 
 Admission requires an immutable owner artifact and schema digest, protected-source provenance, an identified deployed gateway version and exact-consumer contract evidence. Until then, no model-assisted proposal is generated through copied source, a temporary branch or a direct provider. Catalog-sync success, source documentation and a Draft release PR cannot satisfy this gate. Review labels must not be invented to compensate for unavailable model assistance.
 
+#### September 6 release recheck
+
+The 07:50–07:54 UTC recheck found protected `main@414f22973658c4ddc3d4320fcf7acd9b4e8ba991`. Its [package declaration](https://github.com/ContextualWisdomLab/contextual-orchestrator/blob/414f22973658c4ddc3d4320fcf7acd9b4e8ba991/pyproject.toml) names `contextual-orchestrator` 0.2.0; the [changelog](https://github.com/ContextualWisdomLab/contextual-orchestrator/blob/414f22973658c4ddc3d4320fcf7acd9b4e8ba991/CHANGELOG.md#L1-L11) still marks it Unreleased. Paginated GitHub release/tag endpoints returned zero entries. The exact PyPI JSON/project pages and organization container-package endpoint returned 404. This bounded result does not exclude other registry names or private deployments; deployments and historical Actions artifacts were not recounted in this recheck.
+
+Existing [release PR #1030](https://github.com/ContextualWisdomLab/contextual-orchestrator/pull/1030) is OPEN Draft at `6c25848728a3333365454a2c74a607d576abe4c9`, base `a080297d2546bb61e89520d637cabc202db331ec`, unmerged. The CO integration task again confirmed that it owns #1067/#1074, not #1030. Central coordination did not identify the actual release writer; the integration task placed the artifact/schema/protected-provenance/deployed-version request in the [existing release PR](https://github.com/ContextualWisdomLab/contextual-orchestrator/pull/1030#issuecomment-5557913414), whose comment was independently reread at 08:05 UTC. A comment is not confirmed writer identity or publication. The dirty local CO checkout was used only to locate contracts and was not edited or substituted for this protected source. DeepWiki returned documentation but its proposed answer about NIM benchmark artifact publication does not prove a released research-proposal interface. No model request, credential inspection, new writer or private-paper transfer occurred.
+
 ## Follow-up: privately retained content, not reclassification
 
 The [capture evidence](zotero_fulltext_capture_evidence.json) records a separate live run of the proposed Rust command at `2c2226f1d583c3091cc126c96d27d55d1084c0d1`. Unlike the earlier availability audit, this run preserves exact source-response JSON privately. It performed 6,950 sequential requests: two library bookends, two complete manifests and metadata/content reads for all 3,473 manifest entries. The source-read interval was 28,898 ms; total command elapsed time was 33.12 seconds. Maximum resident memory was 283,426,816 bytes and measured peak memory footprint was 332,956,272 bytes. These are one observed local run, not a latency SLO or a production load benchmark.
@@ -132,14 +138,26 @@ The subsequent [private command evidence](zotero_bound_review_commands_evidence.
 
 For restored owned review artifacts, unknown fields must fail instead of disappearing during deserialization. Serde documents that distinction and disallows combining its strict container attribute with flattening (Serde contributors, n.d.). JSON object-name duplication has inconsistent receiver behavior under RFC 8259; ConceptWeave rejects duplicate decoded keys recursively before comparing completed evidence views, rather than accepting last-key-wins projection (Bray, 2017, Section 4). These primary references support the input-contract choice, not semantic-label correctness. Context7's monthly quota was exhausted and DeepWiki did not index this repository during this follow-up; direct official documentation and current source/tests supplied the evidence.
 
+## Indeterminate original-write inspection (2026-09-06)
+
+The official Local API and write-request documentation, reread September 6, distinguish version preconditions from duplicate-prevention tokens. Tokens are optional for unversioned writes, duplicate successful tokens return a precondition failure, and versioned requests should omit the redundant token. Zotero 10's local cache is held in memory for up to 12 hours and disappears on restart (Zotero, 2026a, 2026c). These are documented semantics, not a live write/restart experiment. No authorization prompt or source mutation ran here.
+
+ConceptWeave therefore adds inspection rather than token replay. At `dcc36310394c68fca74251ae85fe72d942be32ba`, an indeterminate full-text write receipt retains the actual submitted request, including any library revision advanced by earlier successful writes. One later read returns unverified evidence attached to the unchanged original receipt. Matching metadata alone is insufficient evidence of causal completion or quiescence; this is a conservative design conclusion, not a claim that Zotero documents a durable reconciliation endpoint. Prior inverse work and untouched items stay attached, read failures omit errors, and unknown-write rollback remains denied. The [Proposed ADR](../adr/0007-reviewed-zotero-write-plan.md#original-write-observation-follow-up-2026-09-06-still-proposed) records alternatives, examples, costs and remaining durable/governance gaps. No private capture was read, paper decision added or approval verified.
+
 ## References
 
 Bray, T. (Ed.). (2017). *The JavaScript Object Notation (JSON) data interchange format* (RFC 8259, Section 4). Internet Engineering Task Force. https://www.rfc-editor.org/rfc/rfc8259#section-4
 
 Serde contributors. (n.d.). *Container attributes*. Serde. Retrieved September 5, 2026, from https://serde.rs/container-attrs.html
 
+Serde contributors. (n.d.). *Field attributes*. Serde. Retrieved September 6, 2026, from https://serde.rs/field-attrs.html
+
+Serde contributors. (n.d.). *Implementing Serialize*. Serde. Retrieved September 6, 2026, from https://serde.rs/impl-serialize.html
+
 Zotero. (2026a, July 29). *Zotero local API*. https://www.zotero.org/support/dev/web_api/v3/local_api
 
 Zotero. (2026b, July 29). *Zotero Web API full-text content requests*. https://www.zotero.org/support/dev/web_api/v3/fulltext_content
+
+Zotero. (2026c, July 29). *Zotero Web API write requests*. https://www.zotero.org/support/dev/web_api/v3/write_requests
 
 Zotero. (n.d.). *Zotero* (Version 10.0.1, commit 36749bd0bd4fdac9ee46c16f7aa7bed094a0851f) [Computer software]. GitHub. https://github.com/zotero/zotero/tree/36749bd0bd4fdac9ee46c16f7aa7bed094a0851f

@@ -1,5 +1,415 @@
 # Product / Technical Gap Baseline
 
+**Snapshot:** 2026-09-08
+
+## Historical exact-head checkpoints
+
+At 23:17 KST a fresh release-mode Local API replay completed read-only with
+the same private `0600` digest
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`:
+8,326 observed records, 3,715 proposals, 4,611 unclassified records, four
+pending sources, 49 duplicate candidates and zero failures. Equal output is
+repeatability evidence only; it does not establish review, approval or a
+Zotero write.
+
+At 23:44 KST a second release-mode replay completed with the same digest and
+the same aggregate (8,326 observed, 3,715 proposals, 4,611 unclassified,
+four pending, 49 duplicate candidates, zero failures). This confirms
+repeatable observation without changing review, approval or write state.
+
+At 00:24 KST on 2026-09-09 a third release-mode replay completed read-only with
+the same private `0600` report digest and aggregate. Title-only discovery
+counts were 27 `ontology`, 23 `OWL` and 20 `RDF` matches; these overlap and do
+not alter deterministic classification, review, approval or Zotero write state.
+
+At 00:47 KST the release-mode replay repeated the same 8,326 observed, 3,715
+classified, 4,611 unclassified, four pending, 49 duplicate and zero-failure
+aggregate with report digest
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`. Title-only
+signals remained 27 `ontology`, 23 `OWL` and 20 `RDF`; this is repeatability and
+discovery evidence only, not review, approval or write authority.
+
+At that historical verification checkpoint, PR39 is
+`04e408ebd138177d183752b308a06811588e6668` (OPEN/Draft/CLEAN) and PR40 is
+`5397c0afca9c966b16547ee813df78e08149e97b` (OPEN/Draft/CLEAN). The latest
+Local API replay remains stable at 8,326 observed records, 3,715 proposals,
+4,611 unclassified records, four pending sources and 49 duplicate candidates,
+with zero failures and private report digest
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`.
+PR40's report-bound restoration at latest local repair head
+`d7ebef510df2481a55550eed76571589c04b3ede` passes focused/all-target gates. Its
+trusted-restoration branch metric is 200/200 (100%); the owned lib.rs function
+coverage is 100% and normalized regions are 99.44%. Page-count and body-byte
+conversion now use target-width helpers; only their non-instrumented cast
+expressions remain visible to the tool. Hosted checks and independent review
+remain outstanding.
+
+At the subsequent read-only gate audit, PR40 exact head
+`5397c0afca9c966b16547ee813df78e08149e97b` remained OPEN/Draft/CLEAN with zero
+approval reviews and zero check-runs; its sole CodeRabbit status is the Draft
+review skip. Active ruleset `18156473` still requires one independent approval,
+resolved review threads and seven central workflows, while prohibiting deletion
+and non-fast-forward updates. No Ready transition, protected merge or release
+is authorized by this observation.
+
+The CodeRabbit temporary-cleanup P2 was independently replayed against that same
+PR40 tree with `cargo +1.98.0 test -p conceptweave-zotero
+report_write_removes_temporary_file_when_hard_link_fails`; the targeted test
+passed. It asserts the operation-specific temporary prefix is absent after the
+induced link failure, so deleting the cleanup would fail the test. The finding
+is stale; no source change or authority expansion is warranted.
+
+The same PR40 tree also passed `cargo +1.98.0 test --workspace --all-targets
+--locked` locally, including all ConceptWeave domain tests, Zotero unit tests,
+source-resolution contracts and publication-cleanup regressions. This is
+current local evidence only; no hosted workflow, independent approval or
+protected merge is inferred.
+
+On the same unchanged PR40 head, `cargo +1.98.0 fmt --all -- --check`, strict
+all-target Clippy and warnings-denied workspace rustdoc completed successfully.
+These local checks strengthen source evidence but do not satisfy the active
+ruleset's hosted-workflow or independent-review gates.
+
+The unchanged PR40 coverage script was also rerun locally. Its raw aggregate is
+200/204 branches (98.0392%), 199/208 functions (95.6731%), 1,834/1,873 lines
+(97.9178%) and 2,904/2,966 regions (97.9096%); owned-file summaries are
+`lib.rs` 98.5519% lines/96.2121% functions/98.5478% regions and `main.rs`
+94.8905%/91.1111%/94.9772%. These gaps remain acceptance work; normalized or
+test-only success must not be promoted to the required 100% owned coverage.
+
+PR40 owner advanced normally to `4b601dacf2a2201cd3525243b40930b51eb1d43e`
+with a contract test covering all seven immutable source-resolution accessors.
+On that exact head, locked Rust 1.98 tests, formatting and strict Clippy pass;
+raw coverage is 204/208 functions (98.0769%), 1,849/1,873 lines (98.7186%),
+2,920/2,966 regions (98.4491%) and 200/204 branches (98.0392%). The improvement
+does not establish hosted GREEN, independent approval or protected readiness.
+
+PR40 then advanced normally to `e896e4f118e5b0078a002cd5ebf9fafd646de954`
+with deterministic output-path helper contract coverage. Its exact-head local
+coverage replay reports 206/209 functions (98.5646%), 1,868/1,887 lines
+(98.9931%), 2,963/3,004 regions (98.6352%) and 200/204 branches (98.0392%).
+The branch and remaining raw gaps are still acceptance work; no hosted or
+protected readiness is inferred.
+
+At 01:17 KST on 2026-09-09, a fresh release-mode Local API replay produced the
+same private report SHA
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc` and
+aggregate 8,326 observed, 3,715 classified, 4,611 unclassified, four pending,
+49 duplicates and zero failures. Discovery signals were ontology 27, semantic
+36, taxonomy 2, knowledge graph 1, vocabulary stem 81, with exact uppercase
+`OWL` 23 and `RDF` 20. The replay is read-only repeatability evidence, not
+steward review, approval or Zotero write authority.
+
+An isolated non-force merge rehearsal of PR40 `5397c0afca9c966b16547ee813df78e08149e97b`
+into the PR39 successor tree reproduced contract conflicts in `lib.rs`,
+`main.rs`, metadata transport tests, documentation and several modify/delete
+test paths. The merge was aborted immediately in the temporary worktree; no
+shared branch or protected ref changed. This confirms that the next step is an
+owner-integrated successor preserving both full-text and source-resolution
+contracts, not a blind cherry-pick or duplicate downstream API.
+
+## September 8 acquisition and consolidation checkpoint
+
+Nightly `2026-08-20` coverage was rerun at PR #39 exact head
+`ae572879524a15944d1a9df6e46deb4b154059ba` with `RUSTUP_TOOLCHAIN` cleared.
+All instrumented tests passed, but the owned gate remains RED: raw totals are
+447/448 functions, 8,298/8,451 regions and 728/782 branches; the normalized
+source gate is 4,718/4,739 regions (99.56%) and 778/782 branches (99.49%).
+Remaining source gaps are concentrated in `full_text_review.rs`,
+`full_text_write.rs`, `lib.rs` and `main.rs`; no exclusions or threshold
+weakening were applied. The earlier stable-toolchain attempt failed before
+measurement because branch coverage requires nightly and is not evidence for
+the gate.
+
+The focused write-envelope mismatch successor exercises the four top-level
+identity branches at source line 147-150. The subsequent nightly run executes
+115 tests and raises normalized branch coverage to 4,718/4,739 regions and
+781/782 branches (99.87%); the remaining normalized branch is the reordered
+`resolved_sources` equality arm, while raw generic instantiation gaps remain
+separately visible. The 100% gate is still RED.
+
+At current PR #39 head `89fb6c48e1208a9fa272a7c9313e0cca0a2493ae`, Rust 1.98
+workspace tests, all-target strict Clippy, warnings-denied rustdoc and diff
+checks were rerun after the evidence-only capture update and passed. This
+revalidates local code health only; the owned 100% coverage gate, hosted
+required workflows, independent approval and protected merge remain open.
+
+Fresh release-mode Local API replay at 21:09 KST reproduced the current
+aggregate without mutation: 8,326 snapshot records, 3,715 bibliographic
+proposals, 4,611 nonbibliographic records, four pending sources, 3,658
+abstentions, 49 duplicate candidates and zero failures. The private `0600`
+report digest is `sha256:8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`;
+equal aggregates are not review, approval or Zotero-write evidence.
+
+At 21:11 KST the same report/capture pair passed the bound availability
+recheck: 3,203/3,715 papers have nonempty text; 440 lack attachments, 34 have
+unmanifested attachments, 38 have captured records with no text, and 471
+review-needing papers lack text. Two nonempty records remain unbound. The
+private summary digest is
+`sha256:2168d1856188ad6aee50454c50401d4096cace74485e4b1b6c5ffbcbf99a0364`;
+these counts are acquisition evidence only.
+
+At 21:13 KST a fresh bounded capture also completed without mutation. The
+235,602,798-byte private artifact digest is
+`sha256:043e10f117fa8050fa85c2013c1fa5343a247629d533bc6fa0ce11266c165166`;
+the repeated availability counts are unchanged and remain non-authoritative
+for semantic review or Zotero writes.
+
+At 22:13 KST a second release-mode replay produced the same private report
+digest and aggregate counts; this confirms repeatable observation, not review
+or authority. The latest PR35 CodeQL dispatch run `34208633449` is terminal
+failure for the exact PR head after the shared queue completed; Noema remains
+HTTP 429 and OpenCode still lacks an authenticated current-head verdict. These
+are central control-plane gates, not leaf ontology or Zotero defects.
+
+### PR #39 full-text write source binding checkpoint (2026-09-08)
+
+The release-mode Rust CLI also produced a fresh read-only Local API report at
+private `/tmp` path (mode `0600`): 8,326 snapshot items, 3,715 classified
+proposals, 4,611 unclassified metadata records, and four pending source keys.
+The report hash and exact contract metadata are recorded in [the live snapshot
+record](doctoring/zotero_live_classification_2026-09-08.md). No decisions,
+approvals or Zotero writes occurred.
+
+The bounded release-mode full-text capture then completed against that report:
+3,473 records attempted, with 3,432 HTTP 200 and 41 HTTP 404 responses. The
+235,602,798-byte `0600` artifact, capture digest, report digest and elapsed
+interval are recorded in [the private capture record](doctoring/zotero_live_fulltext_capture_2026-09-08.md).
+Content remains private evidence; no decision, approval or Zotero write was
+performed.
+
+### September 9 07:31 live worksheet preparation
+
+The release-mode `--worksheet` command read the same live Local API snapshot and
+created separate owner-only report and steward-worksheet artifacts. The report
+digest remained `8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`;
+the worksheet artifact digest was
+`b6774b8a6b3202c1ed627f00066939377aa1df543947ad82d63e206f8785290e`.
+Both temporary private artifacts were removed after aggregate verification.
+This prepares the steward campaign but adds no decision, approval or Zotero
+write authority.
+
+### September 9 PR35 central workflow failure revalidation
+
+PR35 exact head `22709ec9b4d969bf67ec74db402813e74d11f7ca` remains blocked by
+central control-plane evidence, not a ConceptWeave leaf-test failure. The
+Noema job (`34204377844`, job `101993751408`) failed closed after the
+contextual-orchestrator gateway returned HTTP 429 from the selected free-pool
+model. OpenCode (`34204377900`, job `101997363729`) found no authenticated
+current-head verdict, and CodeQL actions (`34204381235`, job `101996716449`)
+had only a pending dispatch receipt, so both correctly rejected publication.
+The exact logs are retained as failure evidence; no stale rerun or bypass is
+authorized.
+
+### September 9 PR40 current-head coverage revalidation
+
+The current PR40 successor head `26d088f948ebef01dad112313391b80cda7a0a71`
+(`codex/zotero-source-resolution`) was checked in a fresh detached worktree
+with `rustup run 1.98.0 bash scripts/check_coverage.sh`. The complete locked
+workspace suite passed. Raw LLVM coverage was 3,001/3,039 regions (98.75%),
+209/211 functions (99.05%), 1,898/1,913 lines (99.22%) and 212/212 branches
+(100%). The frozen normalized owner region/branch gates passed, but raw
+per-file deficits remain in `crates/conceptweave-zotero/src/lib.rs` and
+`src/main.rs`. PR40 therefore remains Draft and has no hosted run for this
+exact head; local coverage is not protected acceptance or publication
+evidence.
+
+### September 9 06:36 capture-bound availability replay
+
+Using the same private report, the pinned Rust 1.98 optimized CLI completed a
+full read-only text capture to a new owner-only `0600` `/tmp` artifact
+(235,602,798 bytes; capture SHA-256
+`2a9b9be5e0f69bc460daeca05a7056d5fb5bc037ddd08e1958d842fb8f06a632`). The
+bound availability summary was also `0600` (359 bytes; SHA-256
+`0826d20281ba2fb793bd726d90aed5886006d00fb0963c388a2b28ad54fe1182`) and
+reported capture digest `sha256:2c668744e69ec44a14843d3acb7c83a39e73575702321b2c98ee171873d841ab`:
+3,715 papers, 3,203 with nonempty text, 440 without attachment, 34 with an
+unmanifested attachment, 38 captured-empty, 471 needing review without text,
+and two unbound nonempty records. This is acquisition/availability evidence
+only; it does not create steward decisions, approval, semantic authority or
+Zotero write permission.
+
+### September 9 15:45 exact-head replay
+
+The live #39 source head repeated the release-mode Local API classification
+without mutation: 8,326 observed records, 3,715 bibliographic proposals,
+4,611 retained non-bibliographic records, four pending sources, and zero
+classification failures. The private `0600` report retained snapshot digest
+`sha256:0666dbebfb0c5aa99deb5a6dda1fc02d84bc46d08aaaddf25f5526a18eceef6d`.
+Its fresh bound `0600` capture produced digest
+`sha256:acd1643d5ddf8b4d3b28c181a2fdb0fe18f16906e4b3394846ac2e31f791e63e`;
+availability was unchanged at 3,203 papers with nonempty text, 440 without
+attachment ancestry, 34 unmanifested, 38 captured-empty, 471 needing review
+without text, and two unbound nonempty records. This repeat proves current
+observation continuity only; review completion stays 0/3,715 and it grants no
+approval, publication, or Zotero write authority.
+
+The same head's frozen coverage attempt is RED. Raw owned regions are below
+100% in `full_text_review.rs`, `full_text_write.rs`, `lib.rs`, and `main.rs`.
+One concurrent LLVM run also removed `source-regions.json` before the
+normalizer consumed it, so that run is not coverage evidence; a serialized
+rerun must retain the raw deficits and repair them without lowering gates.
+PR #39 is Draft until that owner work, exact-head checks, and independent
+review are complete.
+
+### September 9 06:38 capture-bound worksheet/view preparation
+
+The same report/capture pair produced a new owner-only `0600` full-text
+worksheet (1,776,452 bytes; SHA-256
+`4e4a315a70de961ee95b90b74a12ceb8ee7b209e55d5fe4477f7aabad13f2cd6`) with
+3,715 blank decisions. A separate `0600` capture-bound review view (1,590,859
+bytes; SHA-256
+`32fed8eb28a6c3e1d1d4c4b36e15c4c039581682f670fbd25fd17241aba5c167`) contains
+the first 25 decisions and 25 attachment-evidence entries, preserves the
+report/capture/proposal digests, and leaves `remaining_count=3715` and
+`pending_source_count=4`. This prepares human review only; the view is not an
+approval, a metadata patch, or Zotero write authority.
+
+The pinned release executable was rerun against the live Local API on 2026-09-09.
+The private `0600` report `/tmp/conceptweave-zotero-live-20260909-latest.json`
+is 8,132,756 bytes with SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc` and repeats
+8,326 observed records, 3,715 classified proposals, 4,611 unclassified records,
+four pending source keys and 49 duplicate candidates under Zotero 10.0.1/API 3,
+schema 44 and library version 2. This is read-only proposal evidence; no review,
+approval or Zotero write occurred.
+
+From the unchanged private pair, the release-mode CLI created a blank
+capture-bound worksheet and a 25-row `full_text_review_view_v1` without another
+provider request. Their private hashes, sizes and exact report/capture binding
+are recorded in [the review-view record](doctoring/zotero_live_fulltext_review_view_2026-09-08.md).
+The view contains evidence only; no decision, approval or Zotero write was
+issued.
+
+Read-only title-signal triage over the fresh report yields a 137-paper discovery
+queue (ontology 27, semantic 36, taxonomy 2, knowledge graph 1, vocabulary
+stem 81). The [triage record](doctoring/zotero_ontology_signal_triage_2026-09-08.md)
+retains counts only; 29 are adjacent evidence, one is a semantic-consumption
+bridge and 107 need steward review (101 no-rule-match, 6 unsupported-vocabulary).
+This heuristic is not a semantic verdict and does not change the 3,658
+abstentions, four pending source keys, or approval state.
+
+The local Zotero endpoint is currently reachable read-only: HTTP 200, Zotero
+10.0.1, Connector/API v3, schema 44, 8,326 reported records, last-modified
+version 2, and an opaque server identity present. Only headers and aggregate
+counts were retained in [the readiness record](doctoring/zotero_local_api_readiness_2026-09-08.md);
+no item JSON was copied. This is endpoint readiness, not an atomic capture,
+decision, approval, write, release or deployment.
+
+PR #39 now points to exact head `d61b79e5de0f0d6a8f860cf1ade7458ebf8223db`
+over stacked base `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`. The write scope
+requires a complete source-resolution aggregate and revalidates every pending
+source against the immutable report before any authority callback. Missing and
+stale source-resolution regressions pass in the locked Rust 1.98 workspace;
+Clippy, warnings-denied rustdoc and diff checks also pass. GitHub reports OPEN
+Draft/CLEAN with CodeRabbit skipped because the PR remains a draft. PR #40's
+ current exact head is `fc6083de58fbe4fb1c5bcdefee8e28671fa034e8`; the latest
+successor records the report-bound restoration repair and its unchanged-head
+evidence. Direct trusted-type deserialization is removed, and coordinated
+rewrites fail closed against the immutable `ClassificationReport`. The trusted
+restoration repair is locally GREEN on focused/workspace
+Rust gates, but hosted checks, owned coverage and independent review remain
+outstanding. It remains OPEN Draft/CLEAN, so protected acceptance is still
+outstanding. This is not
+protected-merge, release or Zotero-write evidence.
+
+Pinned `cargo +1.98.0 llvm-cov --workspace --all-features --locked
+--summary-only` at this successor passes all tests but remains below the owned
+100% target: 9,302 regions / 396 missed (95.74%), 495 functions / 22 missed
+(95.56%), and 6,084 lines / 165 missed (97.29%). The new write-binding paths
+have all 10 regions and all 10 functions executed; remaining RED is in
+pre-existing full-text review (2 regions), shared report validation (81
+regions, 3 functions), and CLI error/edge paths (303 regions, 19 functions).
+No exclusions or threshold weakening were introduced; coverage repair remains
+the next engineering gap before protected merge.
+
+The write-envelope mismatch regression now exercises four stored identity
+mismatch forms and raises normalized branch coverage to 781/782 (99.87%) in
+the pinned nightly run with 115 tests. On PR40 repair head
+`d7ebef510df2481a55550eed76571589c04b3ede`, the trusted-restoration coverage
+rerun reports 200/200 branches (100%); lib.rs function coverage is 100% and
+normalized regions are 99.44%. Remaining gaps are two 64-bit
+cast expressions from target-width conversion helpers. The formerly environment-dependent
+`/tmp` test branch is now deterministic; broader normalized region gaps remain
+and no exclusions or threshold changes were introduced.
+
+The [refreshed capture checkpoint](doctoring/refreshed_capture_evidence.md) now records successful optimized full-library capture, verified 3,715-row blank worksheet, a 25-row bound view, and full workspace tests at `b0f7d5b8bb139d627cec37b598331464c14b60ab` (terminal exit 0). Actual decisions and approvals remain zero. The CO owner freshly reports no GitHub release or PyPI package, unmerged release PR #1030 and unmerged diagnostic PR #1105. Its stated prerequisites are protected exact-head checks/independent review, fast-mlsirm publication, immutable CO client/schema release, and verified classification serving. This is owner-reported release status, not locally verified registry evidence. Available secret metadata is not the blocker. Do not send private paper contents or substitute a direct provider while these conditions remain unmet.
+
+This checkpoint supplements the historical snapshots below, not their unverified incremental KPIs. The [acquisition register](doctoring/missing_full_text_acquisition.md) now identifies public source locations for the four unattached rows in the first 25-row review view. Only TRINITY HTML and the anxiety-study PDF were successfully retrieved; the IRT full text remains unverified. None was added to the bound capture or counted as an approved decision.
+
+Read-only Local API inspection returned 21 TRINITY same-URL candidates. All have empty collections, tags and relations, but one has a DOI/six creators/no child while twenty have no DOI/one creator; three of the latter have PDF children. Three observed extracted texts match, but PDF bytes and edition identity remain unverified. Consolidation must preserve the richer bibliography and children together, and must not choose a survivor by title or attachment presence alone. This is a candidate-specific observation, not a fresh atomic campaign snapshot or write approval.
+
+Next acceptance evidence: verify bibliographic edition and PDF identity, preserve all child/source provenance in a reversible plan, then execute only through the existing whole-envelope authorization boundary. Do not convert source availability or matching text into reviewed labels. [Strix request correlation](doctoring/strix_request_correlation.md) remains an owner-side prerequisite; the reported CO repair PR #1105 is not released serving evidence.
+
+The refreshed acquisition denominator is now an owned, repeatable contract at `3ca46b17c909a2785c04f9de344ead156ef0ee82`, with coverage-path completion at `666cd6ba25100b3382cbcb977f112c6e8d42620c`, not a manual JSON query. The capture-bound API and CLI revalidate the complete report/capture before returning aggregate-only counts: 440 papers lack attachment ancestry, 34 have attachment records omitted from the full-text manifest, and 38 have captured records but no nonempty text; 471 of these 512 papers carry classifier abstention and two nonempty records have no paper ancestor. The last queue resolves to 36 all-404 papers and two all-empty-200 papers. The 452 omitted attachments are predominantly linked URLs (417), plus 34 imported URLs with blank content type and one octet-stream imported file; this does not justify raising capture budgets or changing manifest semantics. Source acquisition and indexing repair remain separate queues, while semantic decisions stay 0/3,715.
+
+## September 7 remaining execution and acquisition gates
+
+KPI correction: the inventory's reported 54/76 unique candidate coverage is withdrawn. At least eight later audits duplicate repositories already counted in earlier tables, including identical source revisions. Reconcile canonical repository identities before publishing a replacement coverage or release fraction; the historical incremental counts below are superseded by this correction. The next inventory action is deduplication, not another unverified increment.
+
+A read-only candidate-table probe found 34 table-visible labels after excluding
+headings and KPI rows. This is only a reconciliation lower bound: prose-only
+audits, aliases and repeated revisions still require URL-level repository joins.
+It does not replace the withdrawn 54/76 KPI.
+
+The [kaefa exploratory-factor-analysis boundary audit](doctoring/cwl_ontology_capability_inventory.md#kaefa-exploratory-factor-analysis-boundary-audit-2026-09-08) advances bounded candidate coverage to 54/76, leaving 22. Protected default `develop@5128d4867e24b5db73e6e3c8652a8dbeabd70aa0` is GPL-3.0 with an R psychometric/model-selection package and no release; it is not ontology authority. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
+The [aFIPC legacy measurement-kernel boundary audit](doctoring/cwl_ontology_capability_inventory.md#afipc-legacy-measurement-kernel-boundary-audit-2026-09-08) advances bounded candidate coverage to 53/76, leaving 23. Protected default `master@f87c2324f1686135e57d8730c1b0b9420874f300` is an R IRT-linking package with NOASSERTION license metadata and no release; it is not ontology authority. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
+ConceptWeave PR #39 currently resolves to `e96bca0aa237afb9e969a513e5e6b52e177e06cd` over stacked base `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`; GitHub reports OPEN Draft, with CodeRabbit pending and merge state `UNSTABLE`. “CLEAN” is not required-check or protected-merge evidence, so keep the PR open and do not publish or deploy.
+
+The Semantic Data Portal ontology/catalog-plane candidate remains an open owner PR [#73](https://github.com/ContextualWisdomLab/semantic-data-portal/pull/73) at `512c89f0a99732193f32422238584f625285eb2f` against `main`, not a releasable dependency: GitHub reports `CHANGES_REQUESTED`, `MERGEState=BLOCKED`, and its exact-head protection checks are newly queued. Preserve the PR and repair findings at the owner; do not copy its catalog/ontology implementation into ConceptWeave or infer adoption.
+
+The [Clearfolio document-viewer boundary audit](doctoring/cwl_ontology_capability_inventory.md#clearfolio-document-viewer-boundary-audit-2026-09-08) advances bounded candidate coverage to 52/76, leaving 24. Protected `main@06633a25109c62e24a7015ae04fb9f6e0a246f7e` contains a document-viewer MVP and contracts but no ontology authority or release evidence. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
+The [Orgmetra HRIS boundary audit](doctoring/cwl_ontology_capability_inventory.md#orgmetra-hris-boundary-audit-2026-09-08) advances bounded candidate coverage to 51/76, leaving 25. Protected default `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f` is Apache-2.0 with substantial HRIS packages and contracts, but explicitly assigns occupation/skill/ability ontology to Semantic Data Portal; no release exists. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
+The [Gyeot measurement/wellness boundary audit](doctoring/cwl_ontology_capability_inventory.md#gyeot-measurementwellness-boundary-audit-2026-09-08) advances bounded candidate coverage to 50/76, leaving 26. Protected default `develop@4aa02cc83fcf16725118c228137b21dcccae8900` is MIT with an implemented Expo/TypeScript app and research notes, but it owns loneliness/wellness meaning and has no release; research notes are not shared semantic authority. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
+The [learning-interoperability-contracts bootstrap boundary audit](doctoring/cwl_ontology_capability_inventory.md#learning-interoperability-contracts-bootstrap-boundary-audit-2026-09-08) advances bounded candidate coverage to 49/76, leaving 27. Protected default `develop@ba2948de245448eab739329f1131a36b4e59a54d` contains only a bootstrap README; no released learning interoperability contract exists. Learning event/record semantics remain Learning Platform-owned, not shared ontology authority. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
+The [learning-record-store bootstrap boundary audit](doctoring/cwl_ontology_capability_inventory.md#learning-record-store-bootstrap-boundary-audit-2026-09-08) advances bounded candidate coverage to 48/76, leaving 28. Protected default `develop@6c888a30152dc9e258a9338397e2cb064096b370` contains only a bootstrap README; license, implementation and release evidence are absent. Learning-record persistence and xAPI meaning remain Learning Platform-owned, not shared ontology authority. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
+The [psychometrics-commons measurement-product boundary audit](doctoring/cwl_ontology_capability_inventory.md#psychometrics-commons-measurement-product-boundary-audit-2026-09-08) advances bounded candidate coverage to 47/76, leaving 29. Protected `main@e81441ce70c676992470afe2be469dd891ad3eb5` is Apache-2.0 with substantial Rust product code, but it explicitly owns hosted assessment and research-product truth while consuming reusable measurement and catalog capabilities. No GitHub release exists; adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
+The [governance-risk-compliance control-catalog boundary audit](doctoring/cwl_ontology_capability_inventory.md#governance-risk-compliance-control-catalog-boundary-audit-2026-09-08) advances bounded candidate coverage to 46/76, leaving 30. Its protected default `develop@529cf321f134e26c0cd379ee53c06ab5297363b6` contains a substantive Python developer preview, but the repository explicitly owns control/evidence truth and consumes ontology elsewhere; no release or license evidence exists. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
+The [supply-chain-control-plane bootstrap boundary audit](doctoring/cwl_ontology_capability_inventory.md#supply-chain-control-plane-bootstrap-boundary-audit-2026-09-08) advances bounded candidate coverage to 45/76, leaving 31. Protected `main@11f3e0f191d7f5a30e1bb0512d26e0db323f38e2` contains only a bootstrap README; license, implementation and release evidence are absent. Supply-chain event/evidence meaning remains product-owned, not shared ontology authority. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
+The [PolicyWeave privacy-policy app availability audit](doctoring/cwl_ontology_capability_inventory.md#policyweave-privacy-policy-app-availability-audit-2026-09-08) advances bounded candidate coverage to 44/76, leaving 32. Protected `main@52f4fd6bb68f870d0519cf11dd471573a2f197c0` contains only a README describing a local-first policy-drafting app; implementation, license and release evidence are absent. Generated legal-policy drafts are not semantic authority. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
+The [ELUNVERA CRM availability audit](doctoring/cwl_ontology_capability_inventory.md#elunvera-crm-availability-audit-2026-09-08) advances bounded candidate coverage to 43/76, leaving 33. Protected `main@1975f50ebe3da751097e015bdfa909ce80fc6ba2` and unprotected `develop` both contain only a bootstrap README; license, implementation and release evidence are absent. CRM/customer meaning remains owner-owned. No runtime or tests were executed; adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
+The [LifeOS planning platform boundary audit](doctoring/cwl_ontology_capability_inventory.md#lifeos-planning-platform-boundary-audit-2026-09-08) advances bounded candidate coverage to 42/76, leaving 34. Protected `main@193a87ef54c3fe6dcda4755bce4d6bc81e3a0297` contains a substantial TypeScript product monorepo under Apache-2.0 with no GitHub release; its README describes active foundation development and changeable interfaces. Product planning/habit/review meaning remains LifeOS-owned, not shared ontology authority. No runtime or test execution occurred; adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
+The [J Planner static-app availability audit](doctoring/cwl_ontology_capability_inventory.md#j-planner-static-app-availability-audit-2026-09-08) advances bounded candidate coverage to 41/76, leaving 35. Protected `gh-pages@ec030872a0762af8af54d359c88e4c90239e05e4` contains only a large `index.html`; repository license metadata and GitHub releases are absent. The retrieved response was output-truncated, so no complete source or runtime claim is made. This static travel planner is not an ontology authority; adoption remains zero, and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
+The [Saju CalDAV service boundary audit](doctoring/cwl_ontology_capability_inventory.md#saju-caldav-service-boundary-audit-2026-09-08) advances bounded candidate coverage to 40/76, leaving 36; resolved GitHub-release candidates to 8/40. Protected `main@52f4fd6bb68f870d0519cf11dd471573a2f197c0` contains an implemented Korean calendar/relationship service and tests, while repository license metadata is null and the v0.2.0 tag resolves to `50d97fa5d948d5319b063facb83c21a1289af97f` with no uploaded assets. Its domain rules and recommendations remain product-owned and are not ontology authority. No tests, deployment, private data or model call was executed; adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
+The [Learning Management Platform availability audit](doctoring/cwl_ontology_capability_inventory.md#learning-management-platform-availability-audit-2026-09-07) advances bounded candidate coverage to 39/76, leaving 37. Protected develop `1b89a16bbbd6c4b7c6ee4e8b81e2c8c651d1ce2c` contains only a bootstrap README; implementation, license and release evidence are absent from the inspected tree/GitHub queries. Establish product responsibilities and released contracts in the existing owner before adoption. Resolved GitHub-release candidates remain seven (7/39), verified adoption zero, and actual decisions/approvals 0/3,715 plus four pending sources. Earlier counts below retain their historical scope.
+
+Follow-up pending-source diagnostic queried metadata for all four existing pending identities and full text for the three attachments. The independent note returned an explicit note field containing 1,430 characters; its absence from the serialized typed report must not be treated as empty original content. All three attachments reported parentless PDF metadata. In private report order, full text contained 192,876 characters with page counters 59/59, zero characters with 17/17, and 173 characters with 100/208. These are availability observations, not extraction fidelity or semantic-review results. The empty and sparse/partially indexed attachments require acquisition assessment; retain all four pending identities and establish bibliographic relationships before changing scope. Requests were read-only and bounded to 1 MiB for metadata, 16 MiB for full text and 15 seconds each. Only aggregate results were emitted. No original bytes were retained, authenticated peer identity established, atomic snapshot bookends checked or classification approved. The private diagnostic note is kept outside the repository; no source titles, identities or bodies are published. The earlier paragraph below describes the preceding observation, before the note was fetched. Decisions and independent approvals remain 0/3,715 plus four pending sources.
+
+Read-only pending-source availability diagnostic: the existing private report remains a single-link regular0600 file with four pending identities (three attachments and one note). Three bounded, redirect-rejecting Local API full-text GETs returned HTTP200/API3. Two responses contained nonempty text: reported page counters were59/59 and100/208. The third reported17/17 but had empty text. Counter equality therefore does not establish usable content, and the100/208 response is incomplete by its reported counters. Only aggregate results were emitted; identities and bodies were not published or retained. This diagnostic did not check server-identity continuity, current item revisions or snapshot bookends and is not authenticated acquisition, an atomic capture or a content-bound review. The note was not fetched. Next evidence must retain and bind the original sources, resolve the empty/partial cases and establish their bibliographic relationships before any scope reconciliation; do not infer three additional papers or remove pending identities. Actual decisions/approvals remain0/3,715 plus four pending sources, with no Zotero mutation.
+
+The canonical review repair now has independently inspected hosted RED evidence. Central PR1641 advanced by one regression-only commit to `b8c986e2406beb37d254acd4c5df6389038b55f2`. [Run34073137078](https://github.com/ContextualWisdomLab/.github/actions/runs/34073137078), at that exact head, completed with failure: the original ConceptWeave35 external-behavior claim and its synonym both reached provenance validation after substantive/source binding passed, then failed the expected rejection with `DID NOT RAISE NoemaModelOutputError`. The terminal log reports two failed, 2,974 passed, one skipped and 21 subtests passed; reported coverage100% does not establish correct rejection. This supersedes the earlier owner-reported-only diagnosis, not the missing fix or independent approval. The existing central coordinator received the exact run/job evidence; no duplicate validator or review dismissal was created. Fresh CO1030 remains OPEN Draft `6c25848728a3333365454a2c74a607d576abe4c9`, with no GitHub releases returned. No classification, protected merge or release follows from these observations.
+
+The [accounting proposal/reporting audit](doctoring/cwl_ontology_capability_inventory.md#accounting-proposal-and-reporting-boundaries-2026-09-07) raises bounded candidate coverage to 38/76, leaving 38; resolved GitHub release candidates remain 7/38 and adoption zero. Protected develop `239008c4edc7d305c97704c5102b593c6622b36f` separates Billing proposal admission from accounting posting authority and accepts versioned reporting projections as design. Inspected Python ingress, receipt schema and selected test definitions are not executed posting/conformance evidence or a released Rust library. Cultivation must preserve the existing accounting owner, demonstrate projection immutability and independently bound receipts, and release the required contract before consumption. No accounting database access, utility repository, Zotero write or paper decision occurred; actual decisions/approvals remain 0/3,715 plus four pending sources. Earlier candidate counts below are historical checkpoints.
+
+The [Veilpick depth audit](doctoring/cwl_ontology_capability_inventory.md#veilpick-ontology-planning-depth-audit-2026-09-07) does not increase the 37/76 candidate count. Protected develop remains LICENSE-only; proposed PR1 architecture preserves task ontology versus governed publication, while Draft PR2's inspected Rust frontier only schedules explicit concept hints with bounded deduplication and attempts. No reasoner, source-confirmed semantic relevance, standards conformance, live acquisition or released adapter is established. Required cultivation remains supported ontology-profile selection and independently checked extraction/consumer contracts at the existing owner, not a copied queue or heuristic paper labels. Actual decisions/approvals remain 0/3,715 plus four pending sources.
+
+The [Learning Content Studio availability audit](doctoring/cwl_ontology_capability_inventory.md#learning-content-studio-authoring-boundary-2026-09-07) raises inspected candidates to 37/76, leaving 39; resolved GitHub release candidates remain 7/37 and adoption zero. Protected develop `b796e049409e14deb3939985721ff07b5ef62623` contains only the bootstrap README, with no license/code/schema/test/release evidence. Existing open PR1/6/7 remain proposed work, not a released authoring contract. The CO integration task separately confirmed it still has no identified release-owner task or immutable client/schema/serving/free-consumer evidence and will retain central coordination; its own PR1074 research contract is not a release. No duplicate owner was created and actual decisions/approvals remain 0/3,715 plus four pending sources.
+
+The [OriginWeave provenance audit](doctoring/cwl_ontology_capability_inventory.md#originweave-provenance-boundary-2026-09-07) raises bounded inventory coverage to 36/76, leaving 40 in the historical September 6 census. Resolved GitHub releases remain 7/36 and verified adoption remains zero. Protected source `87c4daa1830bac5a5228b6036752ad5633232085` has a nonpublished Rust evidence package; caller-supplied verification state is not independently authenticated semantic authority. No browser runtime or registry artifact was verified and no utility repository was created.
+
+Fresh PR inventory still leaves Foundation PR1 at `b538470c963e6524ddc0c3f652a46a4fc8265150`, Draft with review required and failed CodeQL/Strix checks; its older approval at `bba351b77bf5f1ab5cfd55979fbb2bd158f78b81` does not approve the current head. CO release PR1030 remains OPEN Draft at `6c25848728a3333365454a2c74a607d576abe4c9` with base `a080297d2546bb61e89520d637cabc202db331ec`; the GitHub release query returned no entries. The existing CO integration task was asked to identify the actual release owner and immutable client/schema/serving evidence without reassignment, duplicate machinery or direct-provider fallback. That request is not delivered release evidence. Complete classification still requires authentic decisions for all 3,715 papers and disposition of four pending sources; no decisions or approvals were added.
+
+## September 7 PR39 verified capture-limit integration
+
+Normal merge `37d2892` preserves PR39 `c797e03e51d6ae1e4a2a92a9870b855373616c85` (including EgressWeave's35/76 audit and the original write/recovery changes) and verified PR38 `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`. The sole document conflict retained both evidence sections and the current snapshot date; no source delta was discarded. Independent read-only review confirms the fixed persisted-capture limit, complete pending-source admission, whole prior rollback receipt and zero-I/O observation-retry rejection remain intact. Stable313 tests/41 unfiltered suites including seven doctests, strict Clippy, warnings-denied rustdoc, formatting, CI contract and diff checks pass. Session53301 completed successfully: unchanged pinned coverage runs306 tests/39 suites and reports433/433 functions,4,525/4,525 normalized regions and732/732 normalized branches. Raw LLVM remains5,475/5,527 lines,8,059/8,186 regions and686/732 branches, not100%. Logs `/tmp/conceptweave-pr39-verifier-{tests,clippy,rustdoc,coverage}.log` are terminal success. This checkpoint supersedes historical pending runs below; normal push still does not prove hosted checks, independent approval, protected merge or release.
+
+A separate read-only Local API header check returned HTTP200 from Zotero10.0.1/API3/schema44, library version2,8,326 total records and3,719 top-level records. Only one item per request was fetched and response bodies were discarded, not published. These counts are consistent with earlier aggregate observations but do not prove unchanged contents, an atomic snapshot, authenticated peer identity or a fresh classification. Actual decisions and independently approved labels remain0/3,715 plus four pending sources; no Zotero write occurred.
+
 ## September 7 persisted-capture prerequisite follow-up
 
 Latest checkpoint supersedes the historical pending statements below. Normal merge `d19b13c3b102c859fa6cf605697bfa382ed22bd9` preserves local `24b3c9c` and verified PR37 `3bf0b319029ee225ef809f4c30275aaf29fcf374`, including PR36's shared persisted-limit verifier repair. Independent read-only review found no loss of capture/report validation, pending-source scope or proposal identity across decision, finalization and evaluation paths. Stable297 tests/41 unfiltered suites and strict Clippy, warnings-denied rustdoc, formatting, CI contract and diff checks pass. Session6842 completed successfully: unchanged nightly coverage runs294 tests/39 suites and reports421/421 functions,4,470/4,470 normalized regions and710/710 normalized branches. Raw LLVM remains5,272/5,356 lines,7,848/8,020 regions and648/710 branches, not100%. Logs `/tmp/conceptweave-pr38-verifier-{tests,clippy,rustdoc,coverage}.log` are terminal success. No production limit, fixture size or coverage exclusion was changed to pass this integration. Fresh remote has no commits absent locally; normal push retains the existing PR38. PR39 still needs this parent, while its separate docs-only `c797e03` already records EgressWeave and35/76 audited sources. No actual paper decision, Zotero write, protected merge or release follows from these gates.
@@ -18,9 +428,133 @@ PR38 normal merge `21c3b88` retains the previously verified `76d3df5` (295 stabl
 
 Fresh PR35 audit retains `a31ae0c2df920f2794f7ddb456795b04797ab472`, OPEN non-Draft with independent review required and zero unresolved threads. Bounded audit reports terminal required-run failures CodeQL33938445642, OpenCode33938445067 and Strix33938445050, concerning terminal verdict delivery or provider availability rather than established product-code vulnerabilities. The Noema request to remove `cargo generate-lockfile --locked` contradicts installed Cargo1.98.0 help and the already posted correction [review5120921180](https://github.com/ContextualWisdomLab/ConceptWeave/pull/35#pullrequestreview-5120921180). Do not remove the valid option, self-dismiss the review or manufacture a passing verdict. The existing central coordinator received these exact references for canonical review/dispatch/backend repair. Active ruleset18156473 still requires one independent approval, resolved threads and seven central workflows, with force-push/deletion protections. No protection change or merge occurred.
 
-**Snapshot:** 2026-09-06
+The inherited PR38 baseline originally carried a September 6 snapshot date; the observations above retain their exact-head timestamps rather than replacing PR39's September 7 snapshot.
 
 This file records code-current product and technical gaps. Exact PR/check/run coordinates are evidence snapshots, not mutable-head dependencies. Live protected-branch, PR, issue and workflow state wins whenever it advances after this snapshot. Refresh the changed PR's metadata after each documentation commit; evidence from another PR or an earlier head does not transfer.
+
+## September 7 PR39 source-scope integration in verification
+
+The [EgressWeave acquisition audit](doctoring/cwl_ontology_capability_inventory.md#egressweave-acquisition-boundary-2026-09-07) raises bounded source coverage to35/76 of the September6 census, leaving41. Resolved GitHub releases remain7/35, with a separate PyPI0.1.0 observation against inspected protected source0.3.0. Artifact equivalence, provenance, installed behavior and consumer conformance are unverified; no adoption or paper decision follows. Existing EgressWeave remains the outbound-safety owner, so this audit adds no utility repository or copied runtime. Earlier34/76 noema checkpoints below are historical. Actual decisions and independent approvals remain0/3715 plus4pending sources.
+
+Final coverage repair is verified: session42218 terminal exit0 at test source `f5190a7`. The focused public preflight-retry test passes; unchanged nightly coverage runs304 tests/39 unfiltered suites and passes426/426 functions,4,425/4,425 normalized regions and730/730 normalized branches. Raw LLVM remains5,360/5,412 lines,7,959/8,086 regions and684/730 branches, not100%. Production source `c216e47` previously passed locked Rust1.98.0 workspace310 tests/41 unfiltered suites including seven doctests; the later delta adds one test only. Do not mislabel the nightly run as a fresh311-test stable workspace run. Independent review confirms public receipt construction and unchanged prior evidence, not independent approval. Final all-target Clippy refresh is tracked separately at `/tmp/conceptweave-pr39-retry-clippy.log`.
+
+Coverage session1369 is now terminal exit1: 426/426 functions and4,425/4,425 normalized regions pass, but normalized branches are729/730. The sole gap is `full_text_write.rs:243`'s nonempty remaining-work branch after a rollback preflight failure. Raw totals are5,352/5,412 lines,7,954/8,086 regions and684/730 branches; these are not raw100%. Test `f5190a7f2efc8d698ccd16435522fac30deae984` obtains the receipt through public execution with a failed preflight and zero inverse writes, then retries the unchanged unattempted work with complete fresh preflight. It preserves the earlier receipt and scope and verifies both restored items. No private resolved receipt or metadata-inferred authority is fabricated. Focused test and unchanged coverage rerun session42218 are in progress at `/tmp/conceptweave-pr39-preflight-retry.log` and `/tmp/conceptweave-pr39-retry-coverage.log`. Do not poll completed1369 or claim final coverage yet; production source remains `c216e47`.
+
+Final source `c216e47` now passes 310 tests/41 unfiltered suites and strict Clippy. Session1369 continues through the remaining gates; final coverage is not yet claimed. The [noema source audit](doctoring/cwl_ontology_capability_inventory.md#noema-release-admission-boundary-2026-09-07) raises bounded source coverage to34/76 of the September 6 census, leaving42; release-bearing candidates remain7/34 and verified adoption0. Protected noema head `0dec8d84b1e4744e7a9c6a77e2e2631a183ee2ab` separates structural release metadata from independently pinned admission and formal review from model evidence. Its package is private, no GitHub release was returned, and registry/deployed availability is unverified. This is inspected source, not executed noema tests, paper classification, semantic approval or a reason to create another utility repository.
+
+Follow-up source `c216e47b5f8de58f5275865b4f616b54cf759881` removes the unreachable observation-only retry success path while preserving its public signature and zero-I/O rejection. Independent review traced every constructor; none can issue causal-resolution authority. No resolved private receipt was fabricated for coverage. TRD `1821eb6` removes the obsolete matching-value recovery claim. The earlier verification session53234 was intentionally stopped with exit130 after compilation and during tests because source changed; it is neither a product failure nor a completed gate. Final-source session1369 is running against `/tmp/conceptweave-pr39-final-{tests,clippy,rustdoc,coverage}.log`. Source3547111's focused11/11 pass predates this final simplification; full final success remains unverified. CodeGraph sync completed, and its exploration session94183 is terminal.
+
+Baseline at `6779fc40c71eccb03b0784cee6c3b5c14fb6e25a` passes 258 tests/41 unfiltered suites. Normal merge `4e856c5` preserves PR39 and PR38 `76d3df5733c37761b6778e24d89f22c01f367bb3`; no predecessor was closed or force-pushed. Fixture `e9ff78e` adds the required proposal digest after an integration compile failure, not a production RED. The focused integrated run then fails five tests: the inherited complete-source regression and four obsolete recovery expectations. Committed regression `75b9de7` separately fails on the missing whole prior rollback receipt. Logs are `/tmp/conceptweave-pr39-{baseline,focused-red,behavior-red,envelope-red}.log`.
+
+Repair `9fcc8bb` restores pending-source admission in shared full-text preparation, retains the whole preceding rollback receipt by reference and reuses the core exact failed request. Independent bounded review requested coverage of earlier successfully restored work; the follow-up includes both inverse failure positions. Existing matching-value scenarios remain tested but no longer infer completion or permit recovery. Proposed ADR0007 records the boundary, alternatives and lifetime trade-off. Final workspace, strict checks and coverage are not yet claimed.
+
+Actual paper decisions and independently approved labels remain separately 0/3,715 with four pending sources. The native Zotero visual inspection succeeded at the PR37 checkpoint; older locked-screen observations below are historical. No real Zotero write, hosted GREEN, protected merge, release or immutable CO adoption is claimed.
+
+## Historical source-inventory owner repair checkpoint
+
+The existing #9 producer was normally pushed at `51c7df6d03f072449422fd58ca24b2f9d6026f07`, preserving `f856640` and Foundation `b538470`. [Its source-scope evidence](https://github.com/ContextualWisdomLab/ConceptWeave/blob/51c7df6d03f072449422fd58ca24b2f9d6026f07/docs/doctoring/zotero_source_scope.md) binds inventory RED `48dcd0d`, adjacency source `48c3525`, isolated blank-key RED `3a57f3b` and final shared-reader source `1e95d6eb979e66ecb7dae4f81f18a6b0a91b7624`. Fresh owner-head **47 tests / 10 unfiltered suites** pass; source strict Clippy/rustdoc/release and unchanged normalized coverage **123/123 functions, 751/751 regions, 114/114 branches** pass. Raw LLVM **1231/1232 lines, 1985/1993 regions, 113/114 branches** is not 100%.
+
+A genuine read of the `48c3525` executable completed in **17.61 seconds**, preserving **8,326 = 3,715 bibliographic proposals + 4,611 other metadata records** and exactly the four previously observed pending source identities. Bibliographic proposals compare equal to the prior private report; standalone descendants, orphan trees and cycles have unit regression coverage, not fabricated real-world examples. The live run precedes the later blank-key guard. Independent producer review reran three focused tests at `48c3525`; it is not GitHub approval of the newer final head. A new native Visual Inspection attempt failed because the Mac is locked; no new screenshot is verified.
+
+**This root runtime is unchanged and has not adopted the new owner delta.** Next integration must require both inventory fields on restoration, validate the exact observed identity partition and recompute pending ancestry before worksheet, direct golden/duplicate evaluation and write verifiers. Preserve bibliography-only progress separately from whole-library reconciliation; proposal-only approval digests do not implicitly bind inventory, and incompatible full-text captures must fail rather than be rewritten. Scope completion and independent governance remain open. Actual decisions/approvals remain 0/3,715 plus four unresolved sources; source audit33/76, releases7/33, adoption0 and lifecycle capability28 are unchanged. No protected merge, source mutation or new model call is claimed.
+
+## Previous post-cooldown integration checkpoint
+
+The ordinary GraphQL audit succeeded at **2026-09-06 11:07:24 UTC**, after the conservative 11:06:12 retry boundary. Its paginated snapshot retained **33 open PRs, 32 Drafts and 36 unresolved threads**; the latest 30 reviews per PR contained no current-head approval (#6 has older reviews outside that window). Protected main remained `f4f440dd58c77d7cd90dff8a1eb2eeb9a9940425`. A fresh ruleset 18156473 read retained one independent approval, stale dismissal, resolved threads, seven central workflows and deletion/non-fast-forward protections. #35 now reports `REVIEW_REQUIRED`; the prior `CHANGES_REQUESTED` snapshot is historical.
+
+Normal pushes preserved both histories: #9 is `f8566408e6a3017cf775fadf2a2f7e50b2d20dc6`, and #39 is `55b1d91dcd299145239a62062ed504fcb6e7bfd1` over exact named parent #38 `e2c3a9fbbe36f44525833d4a94e164c6891a0f94`. Fresh pre-push tests passed **43 / 10 unfiltered suites / 2 doctests** for #9 and **258 / 41 / 7** for #39. Formatting, CI contract and diff checks passed. Root crates/Cargo/scripts remain unchanged from `e1407d64e67be3556088c36d334427b7de103378`; no fresh coverage run is implied. #9 and #39 remain OPEN Draft with zero exact-head Actions runs and only CodeRabbit's draft-review skip, not hosted GREEN.
+
+Updated #9/#38/#39 bodies matched independent exact-head readbacks; the previously pending #38 body refresh is complete. The [#9 source-repair reply](https://github.com/ContextualWisdomLab/ConceptWeave/pull/9#discussion_r3943775918) also matched its readback and leaves the review thread open. The new item-revision guard still requires forward propagation, and the newly measured standalone-source inventory/completion gate below is still unimplemented. Keep the four unresolved sources visible, repair their earliest owner coherently before repeating a full cascade, and retain mandatory actual Visual Inspection. No approval, readiness transition, protected merge, review resolution, closure or Zotero source write occurred. Earlier cooldown/local-only paragraphs below describe their own historical checkpoints, not the current pushed state.
+
+## Live and visual source-scope checkpoint
+
+The [September 6 live/visual audit](doctoring/zotero_metadata_visual_audit.md) ran the freshly built #9 owner executable at local `f8566408e6a3017cf775fadf2a2f7e50b2d20dc6` against the actual Zotero Local API. It completed in **26.29 seconds**, retained a private `0600` report, and verified **8,326 metadata records / 3,715 bibliographic proposals**, API 3, schema 44, Zotero 10.0.1 and library revision 2. All retained bibliographic revisions are zero and the new guard admits them unchanged. There are **3,658 abstentions**, 57 other deterministic proposals and 49 duplicate-candidate groups; no proposal is an approved label. No full text or model was invoked and no source was changed.
+
+Actual native screenshots showed **3,719 selected top-level records** and a retraction warning. Complete attachment and note response audits reconcile the extra four as **three standalone PDFs and one standalone note** outside the existing bibliographic proposals. The remaining partition is 3,922 child attachments, 88 child notes and 597 annotations. `/items/top` with item-type filters included children, so its header-only count was rejected as scope evidence. The separate retracted-items accessibility view reports one record; stale later screenshot frames do not verify that view's rendering. Screenshots and raw records remain private, and the original duplicate-items accessibility view was restored.
+
+**New P0 scope gap:** the current 3,715-item worksheet does not settle those four standalone sources. PRD and TRD now require evidence-bound pending-scope reconciliation and separate retraction/correction evidence before full-library completion. The runtime inventory/gate is not implemented. Preserve the PDFs' identities and the note; do not assume three new distinct papers, silently exclude them, auto-merge/delete them or fabricate reviewed labels. The historical 0/3,715 decision/approval measurements remain valid only for the existing worksheet, not a complete statement of unresolved library scope.
+
+The prior local item-revision repair still awaits push and forward propagation. This root keeps runtime `e1407d64e67be3556088c36d334427b7de103378`; the live run used the isolated owner, not this unmodified root executable. GitHub cooldown remains **11:06:12 UTC** before one normal remote audit; no alternate GitHub endpoint, token, protected merge, review resolution or closure occurred. Source audits **33/76**, resolved releases **7/33**, adoption **0** and lifecycle capability **28** are unchanged. Continue prerequisite repair/integration and the newly measured scope gap without substituting tests or metadata observations for actual paper review.
+
+## Previous metadata item revision repair checkpoint
+
+The earliest-owner #9 [revision review](https://github.com/ContextualWisdomLab/ConceptWeave/pull/9#discussion_r3934542708) is now locally reproduced and repaired, but this root has not yet received that source delta. Owner baseline `bb2faccfda9efed55b6759f1bbf7907bf6ec0c3b` passed 41 tests / 10 unfiltered suites. Committed RED `1cf3472499ad49716a70603be2e15dc857819231` fails the new rejection assertion while its valid-version control passes. Source GREEN `8effa6a9b15ac1a09b7e80dab4cf2885fad02211` adds one shared-reader predicate before page accumulation: every returned metadata object's revision must be at most its page's library revision. Existing snapshot-consistency failure rejects the whole read before another page; no record is dropped and no revision is clamped. The pure offline classifier and full-text version contracts are unchanged.
+
+Owner documentation head `f8566408e6a3017cf775fadf2a2f7e50b2d20dc6` passes a fresh **43 tests / 10 unfiltered suites, including two doctests**; crates, Cargo files and scripts are unchanged from the tested source GREEN. The source also passed strict Clippy, rustdoc, release build, formatting, existing CI contract, diff checks and the unchanged coverage gate: **113/113 functions, 709/709 normalized source regions, 106/106 normalized branches**. Raw LLVM remains **1,097/1,098 lines, 1,690/1,697 regions, 105/106 branches**, not 100%. Unit scenarios cover first/later pages, a valid member before the bad member, bibliographic and child item types, and exact preservation of zero/lower/equal/maximum versions. No actual Zotero or paper artifact was read. Owner PRD/TRD/UML/CHANGELOG, still-Proposed ADR 0006 and owner-only `docs/doctoring/zotero_item_revision.md` retain APA provider references, alternatives, retry cost and the distinction between version consistency and atomicity.
+
+**Not remotely accepted or propagated:** the owner successor is local-only in `/private/tmp/conceptweave-pr9-transport-owner-repair-20260905`; its last verified remote remains `bb2facc`. Root runtime remains `e1407d64e67be3556088c36d334427b7de103378`, with the deadline repair and previously verified 258 tests, not the new item-revision guard. The earlier 27 deadline integrations are complete and must not be repeated as though they included this new repair. After the existing **11:06:12 UTC** cooldown, perform one normal fresh PR head/base/state/writer audit, preserve concurrent changes, then normal-push #9 and propagate this distinct revision delta through all dependent research PRs with exact-head tests. Incorporate the pending local #39 history during that forward merge; do not replace or discard it. No quota-bypass endpoint, token, push, review resolution, approval, readiness transition, merge or closure occurred during this local experiment.
+
+Lifecycle capability **28**, bounded source audits **33/76**, source-resolved releases **7/33**, verified adoption **0**, and last actual decisions/independent approvals each **0/3,715** remain unchanged. These are prior measurements, not a current library census. Protected prerequisites, genuine full-denominator research review, independent governance and released-owner consumption remain the goal; source-only regression success does not fulfill them. The checkpoints below retain their own historical heads and counts.
+
+## Previous metadata deadline repair checkpoint
+
+The earliest-owner #9 review identified that individually timely one-item pages could keep a complete metadata read running indefinitely. Committed RED `aff539fe8595a240d2da85da1a7a235dd55455e0` reproduces two late-report acceptance failures; the valid short-page control passes. GREEN `e6b2a2214b39106ddacc753595b72a699d53d04f` reuses the shared reader, standard-library monotonic clock and existing budget error. Five-minute guards precede each fetch, follow each successful page and precede complete-report acceptance. Requests and classification are not forcibly interrupted. No partial report or reduced paper denominator is accepted. PRD, TRD, Proposed ADR 0006, CHANGELOG and the [deadline doctoring report](doctoring/zotero_metadata_deadline.md) record the decision, alternatives and platform/authority limits. The separately reviewed stale schema-42 TRD claim is corrected without changing the parser.
+
+#9 was normally pushed at `bb2faccfda9efed55b6759f1bbf7907bf6ec0c3b`; all 27 dependent branches through #38 received normal parent merges and their own full tests, strict Clippy, rustdoc, formatting, CI contract and diff checks. The doctoring table binds each preserved child, verified parent, new head and unfiltered test count. Every merge retains both parents and changes only the intended six files. Documentation conflicts retain later source discovery, abstract and full-text requirements; no later feature was reverse-merged into the owner. No Cargo, workflow, threshold, exclusion or dependency changed. #9 and #10–#37 PR-body readbacks matched; #38 body refresh remains pending.
+
+The final local #39 integration `e1407d64e67be3556088c36d334427b7de103378` preserves prior `ec1435379e5fb29fbd7842137a2003d8f3363655` and parent #38 `e2c3a9fbbe36f44525833d4a94e164c6891a0f94`. It passes **258 tests / 41 unfiltered suites, including seven doctests**, strict checks and the release build. The unchanged coverage gate passes **415/415 functions, 4,465/4,465 source-normalized regions and 762/762 normalized branches**. Raw LLVM is **5,041/5,115 lines, 7,281/7,438 regions and 707/762 branches**, not 100%. Intermediate coverage is not inferred from endpoint runs. Source and normalized coverage increase; lifecycle capability remains **28**, bounded source audits **33/76**, source-resolved releases **7/33**, verified adoption **0**, and last actual decisions/independent approvals each **0/3,715**. No real paper, Zotero/model request, credential or authority issuer was used.
+
+**Remote work is incomplete:** the final #39 GraphQL read failed with exhausted API quota, confirmed September 6 at **10:05:51 UTC**. A contradictory quota summary reported full remaining allowance and reset **11:06:12 UTC**; rejected reads remain authoritative. The latter time is only a conservative retry boundary. No alternate PR API, token or push bypassed the failed gate. #39's last confirmed remote remains OPEN Draft at `ec14353`; its local successor is not pushed. After cooldown, re-read normal remote head/base/writer state once, preserve any concurrent delta, then normal-push #39, finish #38/#39 body updates and verify exact-head hosted checks/reviews. Keep the goal active; do not repeat completed integrations or close predecessors to hide pending work.
+
+The last complete all-PR audit in this increment was 33 open / 32 Draft / 36 unresolved, with no current-head approval among the latest 30 reviews returned per PR; #6's older history was outside that window. It is not a post-quota final audit. Last verified protected main is `f4f440dd58c77d7cd90dff8a1eb2eeb9a9940425`; freshly reread ruleset 18156473 still requires one independent approval, stale dismissal, resolved threads and seven central workflows. #9 has no exact-head check-run/Actions evidence, only CodeRabbit Draft skip. Local success, source response and normal branch push do not satisfy protected integration, genuine review/governance or released-owner adoption. Final documentation requires its own local verification.
+
+## Previous relationship-owner discovery checkpoint
+
+The September 6 follow-up [ThreadWeave/mightyETL/scopeweave audit](doctoring/cwl_ontology_capability_inventory.md#threading-cdc-and-work-dependency-contracts-2026-09-06) advances bounded source coverage **30/76 → 33/76**, leaving **43** repositories. The paginated census remains 76 repositories, one archived and 11 forks. Each new observation binds the actual protected default, complete tracked-file tree, package declaration, selected implementation/tests and complete GitHub release/tag queries. GitHub releases with resolved source remain **7/33**. Separately, PyPI reports ThreadWeave 0.1.0; no artifact was downloaded or bound to current 0.2.0 source. Do not silently count registry metadata as an eighth resolved GitHub release or verified consumer adoption.
+
+Three existing scopeweave unit scripts passed at `2c328875e00e86537df3e965170be80532571cad` with Node v24.19.0; Java/Python tests, live services, browser/E2E and private source data were not exercised. The audit distinguishes header/fallback/subject-grouping ancestry, raw CDC versus optional canonical mapping, and typed work dependencies with cycles/dangling links and fixed heuristic readiness weights. mightyETL's PostgreSQL DDL claim conflicts with the pinned Debezium 3.4 provider documentation. Its [existing owner issue #159](https://github.com/ContextualWisdomLab/mightyETL/issues/159#issuecomment-5558302366) now receives the exact-source finding and regression requirements; no competing owner writer or DDL service was created.
+
+PRD FR-9, TRD evaluation, Context Map, Ubiquitous Language and Proposed ADR 0006 now retain these distinct evidence kinds and pre-adoption requirements. This is source discovery and owner cultivation, not completed reclassification. Lifecycle capability **28**, last authentic decisions **0/3,715**, independent approvals **0/3,715**, and verified adoption **0** are unchanged. No Zotero/model request, paper artifact read or authority issuer was used. The next loop keeps protected prerequisite review/root repair, real full-denominator review/governance and released owner consumption open. The checkpoints below retain their historical denominators.
+
+Documentation commit `1444c44135fb822590516156e6570fd9e17eca8f` passed **255 tests / 41 unfiltered suites, including seven doctests**, explicit Rust 1.98.0 formatting, the existing CI contract, diff checks and a unique 33-row inventory assertion. Initial unqualified Cargo execution failed before tests because inherited `RUSTUP_TOOLCHAIN=stable` selected installed 1.97.1 despite the project pin; `rustup show active-toolchain` identified the override. The reproducible command is `cargo +1.98.0 test --workspace --locked`, without changing the shared environment or lowering the declared baseline. Failed and successful logs remain `/tmp/conceptweave-relationship-owner-tests-20260906.log` and `/tmp/conceptweave-relationship-owner-tests-rust198-20260906.log`. Crates, Cargo files and scripts are unchanged from `b645d6acc9396aabe05294dc617fce5b70bd3223`; no fresh coverage run or supplier test result is implied. PR #39 was normally pushed at `1444c44`, remained OPEN Draft over `8e057652ee7784b373beeeec865d80dd3db773be`, with zero reviews/Actions and CodeRabbit status only. The owner-issue comment matched an independent API readback. Final documentation requires its own verification and fresh PR-head read; ruleset 18156473 still requires one independent approval, resolved threads and seven central workflows.
+
+## Previous Source Observation prerequisite checkpoint
+
+The canonical Source Observation owner explicitly handed off PR #6's UNIQUE null-comparison finding, with no overlapping writer. An isolated worktree retained `e3c415600300b6c2d5b852c457ea6ab2e5222e08` and unchanged Client #5 base `fcf36c8a99f015b963c9f812787df127ac2e2f9e`, then normally pushed exact successor `331f8edcd7cebb1719e5cea3187f3848ce7b9e71`. [PR #6](https://github.com/ContextualWisdomLab/ConceptWeave/pull/6) remains OPEN Draft. This research lane records its evidence without copying or adopting the unprotected supplier source.
+
+The executed regression reproduced equal digests for different observed UNIQUE null behavior at `bab6984`; the explicit v2 framing test added a second failure at `8b5b738`. The repair reuses the optional-boolean encoder to preserve unknown, observed distinct and observed not-distinct in typed facts, snapshot identity and receipts. Historical v1 evidence remains immutable. The [exact-head owner report](https://github.com/ContextualWisdomLab/ConceptWeave/blob/331f8edcd7cebb1719e5cea3187f3848ce7b9e71/docs/doctoring/source-observation-unique-null-semantics.md) records full hashes, PostgreSQL primary sources, APA references and Proposed ADR 0004's alternatives and compatibility cost. No PostgreSQL adapter, business-key inference or semantic approval is introduced.
+
+Actual baseline execution also exposed Client documentation, formatting, strict Clippy and coverage failures. Ordinary commits retain the failures and fix the missing explanation, test-only async/waker wrappers, untested policy/expiry rejections and a redundant overflow guard. The shared byte guard checks the remaining admitted capacity before addition; exact cumulative UTF-8 limits and typed denials are unchanged. No test threshold, dependency, production port signature or source-policy ceiling was weakened.
+
+Final owner head passes **132 tests / 42 suites including two doctests**, strict fmt/Clippy/rustdoc, release build and the unchanged coverage gate: **228/228 functions, 2026/2026 source-normalized regions, 194/194 normalized branches**. Raw LLVM is **1807/1825 lines, 2192/2206 regions, 188/194 branches**, not 100%. Product contract, actionlint, three JSON schemas/twelve fixtures, supersession controls and unchanged lockfile pass. Installed cargo-deny reports advisories OK under its default configuration; that is not hosted security acceptance. An independent exact-head review was requested from the existing owner task, without issuing approval or starting another source writer.
+
+Fresh protected `main` remains `f4f440dd58c77d7cd90dff8a1eb2eeb9a9940425`. Ruleset `18156473` still requires independent approval, stale-review dismissal, resolved review threads and seven central workflows, with deletion/non-fast-forward protection. Local success does not satisfy those gates. Keep both Source Observation ADRs Proposed and retain prerequisite PRs. Repository audits **30/76**, release-bearing sources **7/30**, lifecycle capability **28**, and last actual decisions/independent approvals **0/3,715** are unchanged. No private paper, Zotero/model request, credential or authority issuer was used in this repair. The next safe work remains current-head review/root repair, protected prerequisite integration, released owner consumption and genuine full-denominator research governance.
+
+## Previous original-write inspection checkpoint
+
+Runtime `dcc36310394c68fca74251ae85fe72d942be32ba` extends the existing #39 owner lane with read-only inspection of indeterminate original writes. The committed RED `e300eb8` failed at both absent observation API calls. The implementation retains the actual submitted request, including the current library precondition after earlier writes, and attaches one later unverified response to the unchanged opaque receipt. Previous inverses, failed and untouched items, authority redaction and scope commitment remain intact. Non-indeterminate receipts cannot read; no observation clears uncertainty or grants retry/rollback authority. This closes the missing-attempt-evidence/inspection portion only, not causal resolution or durable recovery. See [Proposed ADR 0007](adr/0007-reviewed-zotero-write-plan.md#original-write-observation-follow-up-2026-09-06-still-proposed), [TRD](TRD.md), [plan Task 4](plans/2026-09-06_full_text_write_admission.md#task-4-observe-an-indeterminate-original-request-without-clearing-it) and [official-source audit](doctoring/zotero_fulltext_contract_audit.md#indeterminate-original-write-inspection-2026-09-06).
+
+Fresh locked Rust 1.98.0 baseline at `789637f6a54373c3176e42dda78b1075937fd273` was **252 tests / 41 unfiltered suites**. The candidate passes **255 / 41**, including seven doctests; eleven focused admission/recovery test functions pass. Strict all-target Clippy, formatting, warnings-denied rustdoc, CI contract, release build and diff checks pass. The unchanged coverage gate passes **404/404 functions, 4,448/4,448 source-normalized regions and 752/752 normalized branch outcomes**. Raw LLVM remains **4,971/5,045 lines, 7,164/7,321 regions and 697/752 branches**. Normalized regions are unchanged under the existing normalizer; this does not mean the source delta is empty or raw coverage is 100%. No threshold, exclusion, dependency or test denominator was changed. Logs: `/tmp/conceptweave-original-write-{baseline,red,focused,final-tests,coverage,clippy,rustdoc,release}-20260906.log`.
+
+This is local source evidence, not approved live execution, independent review, hosted GREEN, merge or release. Before this push, PR #39 was reread OPEN Draft at `789637f6a54373c3176e42dda78b1075937fd273`, base `8e057652ee7784b373beeeec865d80dd3db773be`, with no reviews and CodeRabbit draft-skip only. Refresh the final head after documentation/push. Source audits remain **30/76**, release-bearing sources **7/30**, lifecycle capability **28**, and last actual decisions/independent approvals each **0/3,715**. Observation hardening does not increase those metrics. No private paper, Zotero request, model request, credential or authority issuer was used. Continue protected prerequisite work with existing owners, authentic review/governance, released CO consumption, durable admission, governed original-write resolution and approved live write/rollback; the goal remains active.
+
+## Previous owner-discovery checkpoint
+
+The September 6 07:54–08:00 UTC [statistical-library source audit](doctoring/cwl_ontology_capability_inventory.md#statistical-library-contract-audits-2026-09-06) advances source coverage **27/76 → 30/76**, leaving **46** repositories. The organization census still has 76 repositories, one archived and 11 forks. kaefa, aFIPC and nonnest2 provide adjacent model-search, calibration and comparison evidence, not ontology publication authority. Their protected default heads, complete trees, package declarations, selected implementation and regression definitions are recorded. Their GitHub release/tag queries are empty; CRAN publication remains unverified after retrieval errors. Release-bearing candidates remain seven, now **7/30**. No R test or estimation run, dependency adoption or source copy occurred.
+
+This checkpoint preserves the separate lifecycle capability **28** and the last authentic-decision/independent-approval measurements, each **0/3,715**. It does not reread private paper artifacts or turn repository maturity into paper labels. [PRD FR-9](PRD.md#fr-9-research-evidence-intake), [TRD evaluation](TRD.md#10-evaluation), Proposed ADR 0006 and the research register now require comparison population/order, explicit applied/skipped anchor evidence and unavailable-diagnostic/failure denominators before statistical observations can inform a candidate. Rust-first production arithmetic and existing owner boundaries remain unchanged.
+
+The [CO release recheck](doctoring/zotero_fulltext_contract_audit.md#september-6-release-recheck) verifies protected `main@414f22973658c4ddc3d4320fcf7acd9b4e8ba991`, zero GitHub releases/tags and no result for the inspected exact PyPI/container package names. Existing release PR #1030 advanced to `6c25848728a3333365454a2c74a607d576abe4c9` but remains OPEN Draft. Other registries and a serving gateway remain unverified, not proven absent. The existing integration task and central coordination did not identify the release writer; the four evidence requirements were placed in [existing PR #1030](https://github.com/ContextualWisdomLab/contextual-orchestrator/pull/1030#issuecomment-5557913414) and independently reread. Statistical consumer requirements likewise attach to [existing kaefa issue #48](https://github.com/ContextualWisdomLab/kaefa/issues/48#issuecomment-5557928779). No duplicate issue, release writer or consumer workaround was created.
+
+Before this documentation increment, #39 remained OPEN Draft at `6cefb4f15e7072448e32414418f5d99460d72075`, exact #38 base `8e057652ee7784b373beeeec865d80dd3db773be`, with zero reviews and CodeRabbit draft-skip only. Documentation commit `3acd93f512e7e9e3e66c22dfef02f18c4df1ff6a` passed a fresh locked Rust 1.98.0 workspace run: **252 tests / 41 unfiltered suites**, including six doctests. The CI contract, formatting, diff checks and unique 30-row inventory assertion passed. `git diff bdf55bfb95b3e688e9ec58eda2785d17ed853b4e HEAD -- crates Cargo.toml Cargo.lock scripts` is empty, so no R implementation or new Rust behavior was tested; the earlier coverage result is not a fresh coverage run. The test log is `/tmp/conceptweave-statistical-owner-tests-20260906.log`. Final documentation requires a fresh PR-head read. Remaining work includes protected prerequisite integration, authentic full-denominator review and independent governance, released CO consumption, durable recovery admission, delayed unknown-original-write reconciliation and approved live write/rollback. The goal remains active.
+
+## Previous full-text write checkpoint
+
+Runtime `bdf55bfb95b3e688e9ec58eda2785d17ed853b4e` on `codex/zotero-fulltext-write-admission` adds complete typed full-text/write-scope admission, opaque execution and bound conditional recovery after #38's `8e057652ee7784b373beeeec865d80dd3db773be`. It does not extract a metadata-only review or legacy executable plan. Existing golden/write validation bodies are reused privately before either actual verifier; explicit destination/mode verification is separate from semantic approval. A later invalid item or changed capture/proposal/label makes zero authority calls. A locally valid accepted request reaches both exactly once, and semantic denial prevents write verification.
+
+Fresh locked Rust 1.98.0 baseline was 240 tests / 41 unfiltered suites. The final source passed **252 tests / 41 unfiltered suites**, including six doctests. Nine new unit tests cover the admission/recovery matrix; three additional compile-fail examples reject plan restoration, legacy-plan projection and mixed inverse work. Strict all-target Clippy, formatting, warnings-denied rustdoc, CI contract, release build and diff checks passed. Count only summary lines containing the exact `; 0 filtered out;` suffix: an unanchored `0 filtered out` search also matches nested `90 filtered out` and incorrectly reports 253/42.
+
+The unchanged coverage gate passes **402/402 functions, 4,448/4,448 source-normalized regions and 750/750 normalized branch outcomes**. Its initial run at `425fb8c` missed two branch outcomes (dry-run rollback rejection and indeterminate reconciliation retry rejection). Tests added at `bdf55bf` cover both, plus restored/failed delayed reads and known partial writes. Raw LLVM remains **4,924/5,023 lines, 7,113/7,298 regions and 693/750 branches**; no raw-100% claim, threshold change, exclusion or dependency change is made.
+
+Preserved RED/GREEN sequence: admission `47d4e890e3bf29a3f7596d7a9a0a25f780b59e8f` → `d36dad824f6d78c76cf3b5a009dee15f09e6b02f`; bound recovery `79e1c222267b6b93ce6506110e5e8ac704dc0a75` → `425fb8c46661c3f90646bb562922428b046010a9`; final coverage cases `bdf55bfb95b3e688e9ec58eda2785d17ed853b4e`. The [implementation plan](plans/2026-09-06_full_text_write_admission.md), [TRD](TRD.md) and still-Proposed [ADR 0007](adr/0007-reviewed-zotero-write-plan.md) describe the exact scope commitment and per-attempt history. Write receipts omit authority inputs and text. Unknown original writes fail closed instead of granting empty restoration; delayed rollback reconciliation retains untouched work.
+
+This is local source evidence only. The parent was last reread OPEN Draft with the exact head above and base `692cb588b26a9cc878fbaa2b47aa30fd83ea47de` before GitHub REST exhausted the shared core bucket. Ordinary PR #38 requests at 07:34:08 and 07:35:01 UTC returned 403; the latter reports remaining 0/5,000 and reset **2026-09-06 07:38:47 UTC**. A contradictory `/rate_limit` summary reporting unused quota did not override the actual rejected request. No alternate credentials/API route, readiness transition, protected merge or closure was used. Recheck normal PR state after reset before creating/updating the successor or claiming hosted evidence.
+
+After the advertised reset, ordinary API reads succeeded at 07:39 UTC. Parent #38 and active ruleset 18156473 still matched; no existing PR used this new branch. A normal push created [Draft PR #39](https://github.com/ContextualWisdomLab/ConceptWeave/pull/39), initial documentation head `06b2771e9cd38200d18e9d9087ee5482a026d802`, exact base `8e057652ee7784b373beeeec865d80dd3db773be`. Its complete body matched the submitted file including its final newline. Readback at 07:40 UTC found zero reviews, zero unresolved threads with complete pagination, zero exact-head Actions runs and only CodeRabbit's “Review skipped: draft pull request” success. This is not hosted Product GREEN or independent approval. Documentation-only follow-up commits leave tested runtime `bdf55bf` unchanged; reread the final PR head before any lifecycle claim.
+
+Actual decisions and independently verified approvals remain each **0/3,715**, source audits **27/76**, release-bearing candidates **7/27**, adoption unproven. No actual capture was opened, paper classified, approval issued, model called or Zotero record changed in this increment. Remaining acceptance: released owner contracts, independent issuer/revocation policy, durable restart/recovery admission, delayed unknown-original-write reconciliation, approved live write/rollback, required checks and protected merge. #6 and central repairs remain separate owner lanes; their newer task reports are not this child's runtime evidence.
+
+The final owner metadata refresh distinguishes issue kinds: `.github` **Issue #1929** is OPEN and concerns OpenCode dispatcher identity admission (it is not a CodeQL PR); CO **Issue #1045** is OPEN and its **PR #1049** is OPEN, non-Draft at `87612a68b3af1f305bb7b09bd0be860bad1b7fd6`, not merged or released. Source Observation #6 is OPEN Draft at `e3c415600300b6c2d5b852c457ea6ab2e5222e08`. These are metadata observations only, not tests or source audits performed in this increment. Continue the existing owner lanes without duplicate implementation.
 
 ## September 7 PR38 source-scope integration verification
 
@@ -87,7 +621,7 @@ Protected ConceptWeave main remains bootstrap `f4f440dd58c77d7cd90dff8a1eb2eeb9a
 
 No real private campaign artifact, Zotero endpoint or model was read/called during this repair continuation. The last real campaign measurement remains 3,715 blank capture-bound slots and a 25-row pending view with 21 nonempty-text and four missing-text rows. Authentic decisions and independently approved labels remain separately 0/3,715; no real write or rollback occurred. Lifecycle capability metric 27 does not increase for regression hardening or repository discovery.
 
-Next: preserve current-head review/check evidence, obtain prerequisite protected integration, continue the 49 remaining source audits and the authentic decision/independent-approval campaign, and implement full-text-aware write admission under the required contract in ADR 0007. A complete reviewed set, explicit destinations and requested mode need separate authority verification, and the sealed binding must survive execution and every recovery outcome. That contract is documented, not implemented. Released CO consumption, upstream full-text version semantics and approved live write/rollback proof remain independent gaps.
+At this approval-order checkpoint, full-text-aware write admission was still a documented next step. The latest checkpoint above implements its typed local admission and bound recovery while preserving separate meaning/destination authority. Current next work is prerequisite protected integration, 49 remaining source audits, authentic decisions and independent approval, durable recovery admission and delayed unknown-original-write reconciliation. Released CO consumption, upstream full-text version semantics and approved live write/rollback proof remain independent gaps.
 
 ## Historical private-artifact owner repair checkpoint
 
@@ -347,7 +881,7 @@ Replayable retained-text coverage has progressed from 0 to 3,203/3,715 parents. 
 
 Committed regressions repaired inherited environment proxies, exact-byte-limit rejection and replay checks occurring after digest allocation; clock fault injection verifies late/invalid-clock failures without changing the deadline. Final source verification at `733425df01511d894277fb8682e070f3dde03689` passed 173 tests across 37 suites including documentation tests, strict Clippy, formatting, rustdoc with warnings denied, the CI contract and the existing coverage gate. Coverage is 347/347 functions, 3,710/3,710 source-normalized regions and 674/674 source-normalized branch outcomes. Raw LLVM totals remain 4,159/4,255 lines, 6,129/6,274 regions and 603/674 branch outcomes; those are not 100%. The only source delta after the live run is a writer type alias resolving strict Clippy's complexity finding without changing runtime behavior. Hosted checks and independent protected approval remain separate gates.
 
-At this earlier capture checkpoint, the next gap was the context-bound review chain implemented below, with 56 repository sources then unaudited. The latest checkpoint above reduces that remaining inventory to 49 while retaining authentic decisions, independent approval, full-text-aware write admission and the upstream version-contract repair as gaps. Unchanged predictions do not require a new proposal run merely to display retained evidence. A released contextual-orchestrator integration artifact remains unverified at the audited protected owner head, so source documentation alone does not authorize model-provider bypass. No new utility repository is justified by this one intake seam.
+At this earlier capture checkpoint, the next gap was the context-bound review chain implemented below, with 56 repository sources then unaudited. The latest checkpoint above reduces that remaining inventory to 49 and adds typed full-text write admission. Authentic decisions, independent approval, durable recovery, unknown-original-write reconciliation and the upstream version-contract repair remain gaps. Unchanged predictions do not require a new proposal run merely to display retained evidence. A released contextual-orchestrator integration artifact remains unverified at the audited protected owner head, so source documentation alone does not authorize model-provider bypass. No new utility repository is justified by this one intake seam.
 
 ### Canonical transport repair and released-owner audit
 
@@ -405,7 +939,7 @@ At `2fadbdab`, the workspace test run completed successfully and its exact test 
 
 The [real private-command receipt](doctoring/zotero_bound_review_commands_evidence.json) records a new 1,590,742-byte single-link `0600` pending view, generated offline in 2.22 seconds with maximum resident memory 288,505,856 bytes. The separate audit at 12:21:47.264 UTC checked unchanged input hashes, capture identity, 25 blank pending rows, 21 parents with nonempty text and four without, and byte equality with the earlier read-only view. All 3,715 worksheet slots remain blank. No Zotero/model request, new prediction, authentic decision, external approval or write occurred. Byte equality is reuse evidence, not increased full-text coverage.
 
-At this private-command checkpoint the lifecycle capability metric advanced from 26 to 27 for callable review through finalization. This is local verified functionality, not protected-main shipment. The latest checkpoint above completes the then-pending minimal predecessor repairs and advances repository audits to 27 of 76. Authentic full-denominator decisions and governance, full-text-aware write admission, upstream full-text version semantics and released CO integration remain gaps. Current protected checks/approval and a real immutable release remain independently necessary; no Utility Repository is justified by the current single-consumer seam.
+At this private-command checkpoint the lifecycle capability metric advanced from 26 to 27 for callable review through finalization. This is local verified functionality, not protected-main shipment. The latest checkpoint completes the then-pending predecessor repairs and adds capability **28**, callable typed full-text write admission and bound recovery, verified by the nine focused tests and full workspace/coverage gates. Repository source audits remain a separate **27 of 76** metric. Authentic full-denominator decisions and governance, durable recovery, unknown-original-write reconciliation, upstream full-text version semantics and released CO integration remain gaps. Current protected checks/approval and a real immutable release remain independently necessary; no Utility Repository is justified by the current single-consumer seam.
 
 ### Historical pre-repair Zotero 10 transition
 
@@ -823,3 +1357,602 @@ remain open; no local evidence is transferred to a remote or later head.
 - `semantic-data-portal` remains catalog/governance/consumption rather than ConceptWeave persistence; `context-graph-contracts` owns interop contracts; `enterprise-architecture-core` owns EA; `contextual-orchestrator` owns provider routing.
 - Consuming products retain tenant/purpose authorization and physical query execution.
 - Published semantic truth is immutable; corrections create a new release plus supersession evidence rather than in-place overwrite.
+
+PR40 owner head `3d63989c113e1bd2bd44c98d133ea8aae8a08318` adds a regression assertion for the
+`InvalidPendingKeySet` error contract and encodes the validated output-path invariant without
+changing admission policy. Rust 1.98 all-target tests, formatting, strict Clippy and
+warnings-denied rustdoc pass; the workspace raw replay remains below the 100% production
+target (branches 201/206, functions 207/209, lines 1875/1890, regions 2971/3008). This
+is local owner evidence only;
+hosted required checks, independent approval and protected merge remain unverified.
+
+PR39 head `ec33927122ca433947b5bb3bce610cc8812c8f90` closes the downstream source-resolution
+gap in the write-plan boundary: ordinary full-text evaluation remains fail-closed for pending
+sources, while write admission now permits them only after the exact report-bound
+`SourceResolutionReview` is revalidated. A standalone pending-source fixture proves both
+verifiers are reached only after that envelope succeeds; the prior rejection test now proves
+the positive path without granting Zotero authority. Rust 1.98 all-target tests, Clippy,
+rustdoc and formatting pass locally. Hosted checks, independent approval and protected merge
+remain unverified. The subsequent full workspace all-target test replay is GREEN; no
+Zotero authority callback or live write was issued.
+
+### Downstream source-resolution envelope gap (2026-09-09)
+
+PR40's trusted source-resolution restoration remains an owner prerequisite for protected PR39
+integration. The PR39 source path now carries an exact `SourceResolutionReview` through write
+admission; missing, stale and mismatched envelopes remain fail-closed. A non-force local merge
+attempt with PR40 produced conflicts in the shared library, CLI, transport tests and governance
+documents; it was aborted without shared-branch changes. After protected owner integration,
+re-run the positive exact-resolution contract on the merged head before any authority verifier.
+
+### Protected delivery gate revalidation (2026-09-09)
+
+The live repository ruleset `CWL Central required workflows` (active, id `18156473`)
+requires one approving review, resolved review threads, and the central OpenCode,
+merge-scheduler, security, Strix, Semgrep, Noema and CodeQL workflows. It also forbids
+deletion and non-fast-forward updates; only merge and squash are allowed. The legacy
+`branches/main/protection` endpoint returns 404, which is distinct from the active ruleset
+and cannot be treated as an absent protection gate. PR39 and PR40 are now Ready for review,
+but neither has an independent approval; PR40 reports that reviews are disabled for its base
+branch and no Actions run exists for either exact head, so neither is protected-merge or
+release-ready. Both PRs target stacked feature bases rather than the default branch
+(`codex/zotero-fulltext-review-approval` and `feat/zotero-research-classification`), so
+the default-branch ruleset does not itself create the required workflow runs on these
+intermediate bases; this is a stack topology fact, not a hosted GREEN result.
+
+On 2026-09-09 the two preceding stack PRs (#37 and #38) were also moved from Draft to
+Ready for review to remove the review-suppression state. #37 and #38 are currently
+`CLEAN` and `MERGEABLE`; the commit status API contains only the CodeRabbit success note
+that reviews are disabled for the intermediate base. All four stack PRs therefore still
+require independent review and exact hosted workflow evidence before any protected merge
+claim.
+
+The latest report's discovery signals were independently recomputed over the
+3,715 classified titles only: ontology 27, semantic 36, taxonomy 2, knowledge
+graph 1, vocabulary stem 81, exact uppercase `OWL` 23 and `RDF` 20. Including
+nonbibliographic titles would overcount the KPI; the denominator boundary is
+explicitly preserved in the doctoring record.
+
+The classifier evidence fields in the same replay separately matched `ontology`
+32 times, `owl` 24, `rdf` 20, `knowledge graph` 2 and `linked data` 1. These
+matched-phrase counts are not title-only discovery counts and are not additive
+coverage or steward decisions.
+
+The first 25-item bound review view is fully blank (25/25 decisions) and has
+25 attachment-evidence entries; its titles contain zero literal `ontology` and
+zero literal `semantic` signals. This is a queue-order observation only, not a
+semantic exclusion or automatic prioritization decision.
+
+The 03:30 KST read-only replay reproduced the same owner-only report byte-for-byte:
+8,326 observed, 3,715 classified, 4,611 retained, four pending sources and 49
+duplicates, with SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`. This is a
+repeatability checkpoint, not evidence of steward decisions or Zotero mutation.
+
+The 03:35 KST bound-view regeneration was byte-identical to the prior 25-row
+view. It preserves 25 blank decisions and 25 parent evidence-map keys, with 21
+actual nonempty attachment records and four empty parent maps. Map-key count and
+attachment-record count are separate workload metrics; neither represents a
+steward decision or approval.
+
+Manual `@coderabbitai review` requests were issued on PR39 and PR40 at their exact
+heads, but GitHub continued to report “reviews are disabled for this base branch”
+and produced no independent review or required workflow run. The request itself is
+coordination evidence only, not approval.
+
+### Exact-head loop checkpoint (2026-09-09)
+
+PR39 exact head is `13bd5a3600ed68dc0c4611093114e61ce86bb525`, and PR39 remains OPEN,
+MERGEABLE and CLEAN. Its source/test successor `78d40c3` closes the report-bound
+resolution-order coverage branch; the latest documentation head records that the
+normalized source-region and branch gates are both 100%, while per-file line/region
+gaps remain. PR40 remains the trusted-restoration owner at exact head
+`19c4d5a43234b6290233f3e8b1475c9746d94dda`; its source repairs are retained as
+unmerged prerequisite work. Neither exact head has independent approval or central
+required workflow evidence, so no protected merge or release is claimed.
+
+The same PR39 exact head passed `RUSTDOCFLAGS='-D warnings' rustup run 1.98.0
+cargo doc --workspace --no-deps --locked`; this is local documentation evidence
+only and does not substitute for hosted gates.
+
+At exact head `13bd5a3600ed68dc0c4611093114e61ce86bb525`, the pinned coverage
+script reran all workspace tests successfully. It measured 451/451 functions,
+5,692/5,752 lines, 8,345/8,477 regions and 730/784 raw branches; the
+source-normalized gates remain 4,752/4,752 regions and 784/784 branches. The
+per-file line/region gaps in the full-text and CLI modules remain, so the owned
+100% line/function/region target is still open.
+
+PR40's exact head `19c4d5a43234b6290233f3e8b1475c9746d94dda` was independently
+tested in a detached worktree with Rust 1.98.0: the complete workspace suite and
+doc-tests passed (all observed tests green). This is current local owner evidence
+only; PR40 remains Draft, its base is stacked, and no hosted workflow or
+independent approval was produced.
+
+PR38's exact head `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9` was likewise tested
+in a detached Rust 1.98.0 worktree. Its complete workspace suite and doc-tests
+passed; the result remains local evidence because the stacked base reports no
+hosted required workflow and no independent approval.
+
+PR37's exact head `3bf0b319029ee225ef809f4c30275aaf29fcf374` was tested in the
+same detached Rust 1.98.0 manner. Its complete workspace suite and doc-tests
+passed, confirming the capture-bound review-view owner at that revision. This
+does not establish hosted checks, independent approval, protected merge or
+published capture behavior.
+
+The latest report retains four pending source records: one standalone note and
+three standalone attachments without parent links. Their file bytes, content type
+and link mode remain outside the metadata projection and require the separate
+capture-bound evidence path; none was cleared or promoted to a bibliographic proposal.
+
+At 02:31 KST on 2026-09-09, a fresh replay in this turn reproduced the same
+0600 report digest `8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`,
+8,326 observed records, 3,715 classified proposals, 4,611 retained records,
+four pending sources and 49 duplicate candidates. Stable output is repeatability
+evidence, not semantic approval, full-text review, Zotero mutation or release proof.
+
+At 03:04 KST, the optimized release binary completed a third read-only replay
+with the same owner-only 0600 report size and digest and the same 8,326/3,715/
+4,611/four/49 aggregate. This is repeatability evidence only; no pending source
+was cleared and no Zotero write or approval was issued.
+
+At 03:08 KST, the same report passed the capture-bound full-text and availability
+commands. The private capture was `0600`, 235,602,798 bytes; its availability
+summary was `0600`, 359 bytes, with capture digest
+`sha256:106ca65ab62151f303c5807ecceb271c0bec953f091426fb1e74ec808913f9b8`.
+The 3,715-paper workload partitions into 3,203 papers with nonempty text, 440
+without attachment, 34 with an unmanifested attachment, 38 with captured-empty
+text and 471 needing review without text; two nonempty records are unbound.
+This is an acquisition/review baseline, not semantic approval or write authority.
+
+At 03:12 KST, the report/capture generated a private `0600` worksheet of
+1,776,452 bytes (SHA-256 `87a35820097e6b858e47f251c23f8b64dd7eb6941a55fbcdcada4296c4124af6`)
+with 3,715 blank decision slots and all 8,326 snapshot items. A separate bound
+review view was generated as a `0600`, 1,590,859-byte artifact (SHA-256
+`5ec82fa82017c83bc281134a2d96f6a45040f432829a9c61124a9f639ea3460e`) containing
+the first 25 blank review decisions with the same capture/report/proposal
+bindings. These are steward-review inputs, not decisions, approvals or writes.
+
+At 03:10 KST, live `--worksheet` and `--review-progress` produced owner-only
+artifacts. The report stayed byte-identical to the replay digest; progress
+artifact `42212d7fd11c1e57a52fc6727ca50500c45082fb3bcdb73d13ca74fc8126de0a`
+reported total 3,715, decided 0, remaining 3,715, pending source count 4 and
+`complete=false`. The worksheet/progress path therefore remains ready for
+steward input without inventing semantic decisions or granting write authority.
+
+At PR39 exact head `be9ebf8`, pinned Rust formatting and all-target strict
+Clippy (`-D warnings`) passed locally after the command-boundary documentation
+update. This local gate does not establish hosted workflow or approval evidence.
+
+At exact source/test head `78d40c3` (documentation head `e16a28d`), the repository coverage gate was rerun with the
+pinned nightly toolchain after adding a two-source regression for noncanonical
+report-bound resolution order. The workspace suite passed; normalized source
+regions and branches are now both fully covered (4,752/4,752 and 784/784).
+Per-file line/region gaps remain in the full-text and CLI modules, so the owned
+100% line/function/region target is not yet met; no threshold or exclusion was
+changed.
+
+### September 9 PR38 protected adoption and PR37 successor
+
+PR38 was externally merged into its stacked base at merge commit
+`ad35015bc15dac99114d820c6c4392d75014f6c6`. Its full-text review/view and
+private-artifact boundary are now part of the canonical PR37 branch. The
+resulting PR37 exact head is `9e2e3d5513a796153ed8d5f6bff8d3ad97e113d0`, based
+on PR36's `c51330e61bf5b3d2b18a561830151ba874b17a4c`; the Rust 1.98 workspace
+and doc-test run remained green after the merge. This confirms ordinary stack
+inheritance only, not independent approval, protected-main acceptance, paper
+decisions, Zotero writes or release evidence.
+
+### September 9 PR36→PR37 persisted-capture contract adoption
+
+PR36 was externally merged at exact `c062845da8268089f09d7313dd1fb9604adfa178`.
+The earliest-owner follow-up `c51330e61bf5b3d2b18a561830151ba874b17a4c`
+exports the documented `MAX_PERSISTED_CAPTURE_BYTES` contract without changing
+the 512 MiB value or the separate 256 MiB raw-response budget. PR37 then
+adopted that base normally at exact `4e9d6c04a7a890c69b4dbf964f7579e32b1843ee`
+and removed its duplicate restore limit. Rust 1.98 formatting and the complete
+workspace test/doc-test suite passed (85 library tests, 30 CLI tests, all
+integration suites). This is source/test evidence only: hosted protected
+acceptance and independent approval remain outstanding, and no paper decision,
+Zotero write or release is inferred.
+
+### September 9 PR40 source-resolution successor verification
+
+PR40's current exact head is `509ce73b1d1b4d60c898f3993bc24bbf44d45551`
+(`codex/zotero-source-resolution`). The branch includes the blank-pending-key,
+root-output-path and ambiguous-retained-inventory repairs; the older automated
+review findings were rechecked against this head and no longer apply. Pinned
+Rust 1.98 formatting and the complete workspace test/doc-test suite passed.
+PR40 remains Draft with no independent approval or protected hosted acceptance;
+this evidence does not advance paper decisions or Zotero write authority.
+
+### September 9 04:03 live Local API replay continuity
+
+The pinned release binary performed a read-only live Local API replay into an
+owner-only report. Its SHA-256 is
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`, byte size
+8,132,756, matching the prior replay. The aggregate remains 8,326 observed,
+3,715 classified, 4,611 retained, four pending sources and 49 duplicate
+candidates. This proves reproducibility of the snapshot/classifier boundary,
+not steward review completion, approval, Zotero mutation or publication.
+
+### September 9 PR40 retained-inventory ambiguity verification
+
+PR40 successor `bb9d7b691cf5601f3a60ff2a786e123f1d552704` now rejects more than
+one retained inventory record for a pending source with the typed
+`AmbiguousInventory` error; the regression covers that exact collision. Pinned
+Rust 1.98 formatting and the complete workspace test/doc-test suite passed on
+this head. PR40 remains Draft and its local success is not independent review,
+protected hosted acceptance, paper classification or Zotero write authority.
+
+### September 9 04:08 ontology discovery queue
+
+Using the byte-identical replay, a private read-only queue was projected from
+case-insensitive title or matched-phrase signals (`ontology`, `semantic`,
+`taxonomy`, `knowledge graph`, `linked data`, `vocab`). It contains 142 rows
+(137 title-signal rows; 35 with matched phrases) and has SHA-256
+`a096e2a92bdd17f2f426fd058c619ea45b6397c54004641f40af366b08de2dd7`. This is
+a steward triage queue, not a classification decision, full-text approval,
+pending-source resolution or write authorization.
+
+### September 9 PR40 owned-coverage RED
+
+The exact PR40 head `bb9d7b691cf5601f3a60ff2a786e123f1d552704` completed its
+workspace suite but `scripts/check_coverage.sh` reported functions 208/211,
+lines 1886/1906, regions 2989/3031 and branches 206/212. Normalized coverage
+was 1,284/1,328 regions and 210/212 branches; per-file gaps remain in the
+Zotero library and CLI modules. This is a genuine owned-coverage gap, not a
+reason to lower thresholds or claim protected readiness.
+
+### September 9 04:16 capture-bound availability revalidation
+
+The current release verifier revalidated the report-bound private capture and
+regenerated an availability aggregate (`0600`, digest
+`b81ebc2bae02404303eab3922b45b998444c88ffe5888baa8a9b55b92e5daf90`). The
+capture identity remains `sha256:106ca65ab62151f303c5807ecceb271c0bec953f091426fb1e74ec808913f9b8`;
+3,715 papers include 3,203 nonempty-text, 440 no-attachment, 34 unmanifested,
+38 captured-empty, 471 needing-review-without-text and two unbound-nonempty
+records. This verifies the capture envelope and availability denominator only;
+it does not supply steward decisions or write authority.
+### September 9 PR40 coverage repair checkpoint
+
+Current-head review also rechecked two earlier findings (blank pending-key
+admission and `/` output-path panic). Both are already covered by the typed
+rejections and regression tests at `a860938`; no duplicate repair was added.
+
+At PR40 exact head `a860938`, the two test-only branch gaps in `crates/conceptweave-zotero/src/main.rs` were removed without changing production behavior: the platform `/tmp` existence guard became a direct assertion, and the `matches!` error-kind guard became an `unwrap_err().kind()` assertion. Rust 1.98 formatting and the complete locked workspace test/doc-test suite passed. The normalized branch aggregate is now 208/208 (100%), while the raw owned gate remains RED at functions 208/211, lines 1884/1903, regions 2984/3025, and branches 204/208; source-region gaps remain in `lib.rs` and `main.rs`. PR40 therefore remains Draft pending the remaining owned coverage repair and protected hosted evidence.
+
+### September 9 Rust candidate metadata reconciliation
+
+The read-only compatibility pass pinned official upstream coordinates before any
+dependency installation: Oxigraph `main@7ce152a1d910d5662027a5bcbe7c32cee0a4e059`
+and `v0.5.11@df37a5c98e2497135cdd4cfce01a049b78ca6740`, Sophia
+`main@e9d4a4b0b3e65a17319c54b7d92f53bdb60baaa5` and `v0.10.0@56e9461880d3fb7e700b3ec7dc430c12733fcb85`,
+and Rudof `master@275d01ffc29c89656f3bcb61d66e9bba86671f6d` and
+`0.3.18@f4abfcb6a797ebe4d8bac1d29d3b5c3c764c7ef1`. Cargo manifests and
+repository metadata differ in scope or declared license, so no adoption or
+utility repository is authorized. Conformance, performance, security and
+exact-consumer tests remain open gates.
+
+### September 9 ontology signal breakdown
+
+The byte-identical release replay was also projected into a private aggregate
+(`2edc6d86f9d4ea7ae745340754d7d28aaf9925551803bc2390ad2b23e31d4a0c`).
+Case-insensitive title/phrase counts were `ontology` 27/32, `semantic` 36/0,
+`taxonomy` 2/0, `knowledge graph` 1/2, `linked data` 1/1 and `vocab` 81/0.
+Signals overlap and are not additive classifications; this remains discovery
+evidence without steward disposition or Zotero write authority.
+
+### September 9 ontology queue integrity
+
+The private 142-row discovery queue was revalidated against replay SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`; its own
+SHA-256 remains `a096e2a92bdd17f2f426fd058c619ea45b6397c54004641f40af366b08de2dd7`.
+All queue keys are non-blank, unique and sorted. This is steward-input
+integrity evidence only, not classification approval or Zotero write authority.
+
+### September 9 deterministic replay verification
+
+An independent release-mode Local API execution reproduced report SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc` with the
+same 8,326 observed, 3,715 classified, 4,611 retained, four pending and 49
+duplicate-candidate counts. This is replay continuity evidence only and does
+not establish paper decisions or write authority.
+
+### September 9 ontology discovery KPI
+
+The current Local API replay observes 3,715 bibliographic items and projects
+142 into the ontology discovery queue, a screening rate of `3.8223%`.
+This measures triage workload only; it does not estimate ontology precision or
+recall and does not imply full-text review, approval or publication authority.
+
+### September 9 06:45 ontology queue disposition replay
+
+The latest `0600` release-mode replay reproduced report SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc` and the
+142-row ontology discovery projection. Its deterministic dispositions are 34
+`adjacent_evidence`, one `semantic_consumption_bridge` and 107
+`needs_steward_review`; the latter contains 101 `no_deterministic_rule_match`
+and six `unsupported_rule_vocabulary` abstentions. These are queue-priority
+signals only and do not promote any paper or grant Zotero authority.
+
+### September 9 live Local API contract probe
+
+A secret-safe read-only probe against `http://127.0.0.1:23119/api/users/0/items`
+with `Zotero-API-Version: 3` returned HTTP 200 and contract headers for Zotero
+10.0.1, Connector API 3, schema 44, total results 8,326 and
+`Last-Modified-Version: 2`. The server-instance identifier was deliberately
+not recorded. The response contained one bounded item and no mutation; these
+headers confirm transport continuity only, not review, approval or write
+authority.
+
+### September 9 06:31 live Local API replay
+
+Zotero 10.0.1 was observed listening on loopback port 23119. The pinned Rust
+1.98 optimized CLI completed a read-only full-library replay to a new owner-only
+`0600` file at `/tmp` (8,132,756 bytes). The report SHA-256 is
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`, with
+8,326 observed items, 3,715 classified proposals, 4,611 unclassified items,
+four pending source-resolution keys and 49 duplicate candidates. The existing
+142-row ontology discovery projection therefore remains byte-continuous with
+the prior replay; no title, abstract, decision, approval or Zotero write was
+performed.
+
+### September 9 PR39 exact-head local verification
+
+At exact PR39 head `c88c5f07c27e033ea54f71ede1cc23bfa4fa419`,
+`rustup run 1.98.0 cargo test --locked --workspace` completed GREEN across
+unit, integration and documentation tests. This is local evidence only: the
+exact head still has no hosted central-workflow run or independent approval,
+so protected merge, release and deployment remain unverified.
+
+### September 9 organization census drift
+
+The live GitHub organization census now returns 77 repositories, one archived
+repository and 12 forks, versus the prior 76/1/11 observation. The increment is
+the non-ontology `ContextualWisdomLab/litellm` fork, created September 8, at
+default branch `litellm_internal_staging` commit
+`13df85cceb85c85f990ac2a25214f43f03fdfb4f`; it has no repository license
+metadata. It remains in the organization inventory but is excluded from the
+ontology capability denominator pending full census reconciliation. No package
+or source dependency was added.
+
+### September 9 07:24 live Local API replay continuity
+
+The pinned Rust 1.98 optimized CLI completed another read-only replay against
+the loopback Zotero Local API. Its private report reproduced the prior digest
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc` byte for
+byte, preserving the verified aggregate of 8,326 observed, 3,715 classified,
+4,611 retained, four pending source-resolution keys and 49 duplicate
+candidates. This confirms snapshot continuity only; no steward decision,
+approval or Zotero write was performed.
+
+### September 9 15:56 live Local API reclassification
+
+At PR39 head `05d01f336f78f3a302c2e60e27a936769745e8e9`, the pinned Rust 1.98
+optimized CLI completed a fresh read-only release-mode replay into a new direct
+child of `/tmp` with mode `0600`. Its SHA-256 is
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`, matching
+the preceding replay byte for byte. The report contains 8,326 observed items:
+3,715 classification proposals, 4,611 retained unclassified items, four pending
+source-resolution keys and 49 duplicate candidates. This is a continuity KPI
+(`1/1` current replay matched); it neither changes a steward disposition nor
+issues approval, publication, or Zotero write authority.
+
+### September 9 16:21 PR39 coverage attribution revalidation
+
+At exact head `e78b616c1946005b48c75585639464b42a1462f8`, a single-writer pinned
+nightly replay recovered its profile before reporting: raw LLVM totals are
+451/451 functions, 5,692/5,752 lines, 8,345/8,477 regions and 730/784 branch
+outcomes. The raw diagnostic remains RED. The frozen production-symbol
+normalization, however, has zero uncovered regions out of 4,752 and zero
+uncovered branch outcomes out of 784. The difference is attributable to
+source-embedded test and generic-instantiation instrumentation in the raw
+per-file totals, not an identified unexecuted production symbol. This repairs
+the attribution record only; PR39 remains Draft pending current protected
+workflow evidence and an independent approval.
+
+### September 9 central owner release-chain revalidation
+
+Noema PR556 merged at `2026-09-08T09:23:17Z` from exact head
+`860714cba46dba06260a5dce09d0e9152fcb0a8c` into
+`36e5cf957ee20a8bb3e19ff50fea6c97771d2ba1`; its recorded check set completed
+successfully. A current `gh release list --repo ContextualWisdomLab/noema`
+returned no immutable release. The intended central consumer,
+`ContextualWisdomLab/.github#1641`, remains open, Draft and BEHIND at
+`b8c986e2406beb37d254acd4c5df6389038b55f2`. Consequently there is no released
+Noema coordinate, consumer adoption, rerun of ConceptWeave PR35's central
+workflow, independent approval, protected merge, publication or deployment to
+claim. This closes no product gap; it corrects the evidence boundary for the
+next owner-release loop.
+
+### September 9 16:33 current-head Local API reclassification
+
+At PR39 head `91fe1ea51dd386d663e17b469533feb154bed7d6`, the pinned Rust 1.98
+release binary rebuilt and completed a fresh read-only Local API classification
+into a new direct child of `/tmp` with mode `0600`. The private report is
+8,132,756 bytes and reproduced SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`: 8,326
+observed items, 3,715 proposals, 4,611 retained non-bibliographic records,
+four pending source keys and 49 duplicate candidates. Zotero 10.0.1 / API 3 /
+schema 44 / library version 2 and the nonblank opaque server identity were
+also present. The replay-continuity KPI is `1/1`; it neither decides sources
+nor grants review, approval, publication or Zotero write authority.
+
+### September 9 16:44 current-head replay schema revalidation
+
+At PR39 head `b109bbb5a2248e7c3e4205d38cd6c5e59901d891`, the pinned Rust 1.98
+release binary again completed a read-only Local API reclassification to a new
+direct child of `/tmp` with mode `0600`. The private 8,132,756-byte report
+reproduced SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc` and the
+aggregate 8,326 observed, 3,715 classified, 4,611 retained, four pending
+source keys and 49 `duplicate_candidates`. This explicitly revalidates the
+current report field rather than treating a missing legacy key as zero. The
+continuity KPI remains `1/1`; no steward decision, approval, publication or
+Zotero write occurred.
+
+### September 9 PR40 current-head coverage attribution
+
+At PR40 exact head `986d0a51bd446cbc010e8523834aa79f50425e72`, one serialized
+pinned-nightly coverage run completed the locked workspace suite. Raw LLVM
+reported 224/224 functions, 2,088/2,092 lines, 3,325/3,344 regions and 214/224
+branch outcomes. Its unmangled diagnostic includes generic and coverage-wrapper
+symbols; the frozen source normalization is 129/129 functions, 1,371/1,371
+regions and 102/102 branch outcomes. No production source gap was identified,
+so no duplicate test or threshold exception was added. PR40 remains Draft with
+no independent approval or protected hosted acceptance.
+
+### September 9 central workflow successor closure
+
+The stale central owner PR `ContextualWisdomLab/.github#1641` was closed only
+after its exact head `b8c986e2406beb37d254acd4c5df6389038b55f2` compared as
+`ahead_by=0`, `behind_by=59` against current `main`, and current `main` had no
+remaining `_temp_pr1641` workflow. No delta was discarded and no release is
+inferred. ConceptWeave PR35 remains at
+`22709ec9b4d969bf67ec74db402813e74d11f7ca`, Ready but BLOCKED with required
+review outstanding; its exact head did not receive a new central workflow run
+from that closure. It remains neither merge- nor release-ready.
+
+### September 9 Semantic Data Portal owner-gate revalidation
+
+The catalog-plane owner remains [Semantic Data Portal PR #73](https://github.com/ContextualWisdomLab/semantic-data-portal/pull/73), over
+`e48aa13c4af7a4875d4b53e6a60b50405c265a2f`. Its predecessor
+`311668e46491d343de1a5f668b860557c9543c51` was Open, Ready,
+`CHANGES_REQUESTED`, `BLOCKED`, with three unresolved review threads and
+terminal `strix` and `trivy-fs` failures. Those failed workflow definitions are
+unavailable through `gh run view` (workflow 404), while their exact
+check-run/job links remain visible; that absence is neither a passing verdict
+nor authorization to rerun or bypass them.
+
+The successor `1e22ab3b8b0d494809c10884c63d744555d9bf4c` removes relational
+list/query N+1 hydration with one parent and one query per child table, while
+keeping the single-object loader unchanged. A two-record regression fixes the
+list path at eight statements and preserves required and optional child rows;
+`PYTHONPATH=src pytest` passed 285 tests with nine intentional integration
+skips. GitHub now reports the successor Open, Ready, `BLOCKED`, still carrying
+the prior `CHANGES_REQUESTED` decision and three unresolved threads; its
+current-head central checks are queued. Therefore neither the local test run
+nor the queued work authorizes a merge or release.
+
+The unresolved owner findings require a root repair in that repository:
+centralize OIDC configuration across `tenant_binding`, `authz`, and the
+approved configuration boundary; retain fail-closed subject-header behavior;
+and complete the remaining relational query review without changing
+tenant-scoped catalog records. ConceptWeave must continue to consume only a
+released, versioned catalog contract through its ACL. No catalog source was
+copied, no dependency was added, and no Semantic Data Portal release or
+ConceptWeave adoption is inferred.
+
+### September 9 Semantic Data Portal OIDC owner repair
+
+Semantic Data Portal PR #73 advanced normally to
+`3f408baf4f6854de3594d063f3ae4c8353ff7cd1`. The owner moved issuer,
+audience, JWKS URL and timeout, group-to-role mapping, and the demo
+subject-header switch from request-path environment reads into its versioned
+`config_entries` application configuration. Missing OIDC coordinates and
+malformed policy values fail closed; database transport coordinates remain the
+only bootstrap environment reads. Its focused OIDC/catalog/config suite and
+the full `PYTHONPATH=src pytest -q` suite passed (285 tests; nine intended
+integration skips). This is source and local test evidence only: the successor
+still needs exact-head hosted checks, resolved review threads, an independent
+approval, and an immutable owner release before any ConceptWeave ACL adoption.
+
+### September 9 Semantic Data Portal policy and lockfile successor
+
+Semantic Data Portal PR #73 next advanced normally to
+`851ebff97dd87e55a25a23c218a61758efcbb1ce`. Its policy evaluator now carries
+verified request roles through every dataset action rather than falling back to
+the legacy demo subject map after OIDC admission; the regression uses an
+intentionally conflicting role. The owner also regenerated both hashed
+requirements files with `uv pip compile --generate-hashes`, bringing the
+pre-existing `httpx2==2.12.0` dev declaration into the lockfile. Full
+`PYTHONPATH=src pytest -q` remains green (285 tests; nine intended integration
+skips). This successor resets hosted exact-head evidence and does not resolve
+the three review threads or authorize merge, release, deployment, or
+ConceptWeave adoption.
+
+### September 9 Semantic Data Portal identity-copy successor
+
+Semantic Data Portal PR #73 advanced normally again to
+`6de14474106e10a050e243e1cd1814b57d61987b`. The owner removed the retired
+subject-header environment-key instruction from identity error guidance and
+its public binding contract: callers receive the supported Keyverse Bearer
+path plus an administrator-controlled local demo/CI option instead. A focused
+response-copy regression and the full `PYTHONPATH=src pytest -q` suite passed
+(285 tests; nine intended integration skips). The same successor fixes the
+current Code Quality finding by retaining one `sdp.api` import style in the
+test module. It is a non-force source repair, not protected evidence: hosted
+checks restarted; review threads, independent approval, immutable release,
+and ConceptWeave adoption remain unresolved.
+
+### September 9 PR40 current-head coverage attribution
+
+At PR #40 exact head `cc802740420dd4402ae2295e270af21530a682dd`, the frozen
+`rustup run 1.98.0 bash scripts/check_coverage.sh` gate completed with all
+locked tests green. Native LLVM totals still include generic instantiations and
+test wrappers (224/224 functions, 2,088/2,092 lines, 3,325/3,344 regions, and
+214/224 branch outcomes), while the production-symbol normalizer reports
+129/129 functions, 1,371/1,371 regions, and 102/102 branches. The only
+per-file raw gap is `conceptweave-zotero/src/lib.rs` at 99.7114% lines and
+99.1597% regions; no unexecuted production symbol was identified. No duplicate
+test, threshold change, release, or protected-merge claim follows from this
+attribution result. PR #40 remains Draft pending exact-head hosted evidence and
+an independent approval.
+
+### September 9 Semantic Data Portal direct-callable review repair
+
+Semantic Data Portal PR #73 advanced normally to
+`512c89f0a99732193f32422238584f625285eb2f`. The owner removed an unnecessary
+test-only lambda by passing the existing `_configuration` callable directly to
+the OIDC configuration seam. `PYTHONPATH=src pytest -q tests/test_authz.py`
+(nine tests) and the full `PYTHONPATH=src pytest -q` suite passed (285 tests;
+nine intended integration skips). The preceding Code Quality review thread was
+resolved only after the current-head repair. On September 9, the rendered
+GitHub Checks view confirmed that the current `512c89f` head has no unresolved
+review thread; the remaining `CHANGES_REQUESTED` decision is OpenCode review
+`4962193173` against the obsolete `bfa409f8971a3b28aac31ec7bca371fa94f7f07f`
+head. Current-head admission completed, while OpenCode, Noema, CodeQL, Semgrep,
+and security jobs remain queued. This leaves protected checks, a current-head
+independent approval, an immutable owner release, and ConceptWeave ACL adoption
+unresolved; the stale decision is not merge authority.
+
+### September 9 Semantic Data Portal cryptography security repair
+
+On exact PR #73 head `512c89f0a99732193f32422238584f625285eb2f`, the central
+`trivy-fs` job reported HIGH `CVE-2026-69247` in `requirements.txt`'s
+`cryptography==49.0.0`. The [GitHub Security Advisory](https://github.com/advisories/GHSA-g6cj-pr64-35w5)
+affects releases before `50.0.0`; the
+owner pinned `cryptography==50.0.1` in `pyproject.toml`, aligned the independent
+`requirements-test.in` source, and regenerated the runtime, development, and
+test hash-pinned requirements files. The owner updated `AGENTS.md` and
+`CLAUDE.md` with the three-lockfile recovery procedure. At successor
+`1681a7f28adc86b4aa6db48d05b20535fa5dc499`, `PYTHONPATH=src pytest -q`
+passed (285 tests and nine intended integration skips), local Trivy reported
+zero HIGH/CRITICAL findings, and `pip install --dry-run --require-hashes -r
+requirements-test.txt` verified the new test lockfile. Hosted checks restarted
+for that head. This removes neither the current-head review requirement nor the
+immutable owner release and ACL-adoption gates.
+
+### September 9 PR9-to-PR40 review successor trace
+
+PR #9 remains Draft at `0c935d805f01cdf548156743c20544ab4596f8c3` with its
+review findings attached to that predecessor head. The current owner successor,
+PR #40 at `cc802740420dd4402ae2295e270af21530a682dd`, contains the matching
+reader, report-boundary, provenance-state, DOI-normalization, and regression
+repairs; its nested DOI regression passed with `rustup run 1.98.0 cargo test -p
+conceptweave-zotero --test nested_doi_wrappers` (one test). A PR #9 trace
+comment links this evidence without resolving predecessor findings as though its
+head changed. PR #40 remains Draft without exact-head hosted checks or an
+independent approval, so no merge, release, or Zotero write authority follows.
+
+### September 9 PR40 current-head review-thread closure
+
+At PR #40 exact head `cc802740420dd4402ae2295e270af21530a682dd`, the
+source-resolution contract, stored-completeness, nested DOI, and CLI publication
+tests passed (32 tests). The validated current code preserves report/library
+binding, strict pending-decision completeness, private temporary-file cleanup,
+nonempty coverage denominators, and the production branch-normalization
+contract. Ten review threads tied to earlier commits were therefore resolved
+after this revalidation. PR #40 remains Draft with no exact-head hosted checks
+or independent approval; neither thread closure nor local tests authorizes
+merge, release, deployment, or Zotero mutation.

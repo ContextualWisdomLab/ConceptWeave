@@ -1,0 +1,311 @@
+{
+  "scope": "Repository commit existence only; not protection, release, content review, or adoption. Input is historical reference reconciliation index.",
+  "results": [
+    {
+      "repository": "accounting-information-platform",
+      "commit": "239008c4edc7d305c97704c5102b593c6622b36f",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "afipc",
+      "commit": "f87c2324f1686135e57d8730c1b0b9420874f300",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "calendarweave",
+      "commit": "d972ccae6225716bdff7210a1fed808c01d32689",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "clearfolio",
+      "commit": "06633a25109c62e24a7015ae04fb9f6e0a246f7e",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "conceptweave",
+      "commit": "f4f440dd58c77d7cd90dff8a1eb2eeb9a9940425",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "context-graph-contracts",
+      "commit": "99cb5468ba3c15c5e79688f53dee74724fae2d13",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "diagramweave",
+      "commit": "2f95243534778dbab69bf957aeaaeacfa253f6f0",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "disksage",
+      "commit": "0e90f9cebadbd7f59606baaec4ca1d2f178c899a",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "egressweave",
+      "commit": "bd0339bf43cf5041e861bac86a84cb6e7e32637e",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "elunvera",
+      "commit": "1975f50ebe3da751097e015bdfa909ce80fc6ba2",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "embedrelay",
+      "commit": "816dcacd4fc1903d91c5cae9b77e37e21811a78d",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "enterprise-architecture-core",
+      "commit": "dd71e40a86385fb7861b0f1be19891a3f3e29ece",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "fast-mlsirm",
+      "commit": "493326f2de49ea1704da0ded19868ed05d2fe00f",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "four-pillars",
+      "commit": "8c6a2fa76af1cb7f6bb7f56ceb4e7ce92d2f7897",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "governance-risk-compliance",
+      "commit": "529cf321f134e26c0cd379ee53c06ab5297363b6",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "graphify",
+      "commit": "ac16a93bd3f31b86c82f7d90687941e6d5c9776d",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "gyeot",
+      "commit": "4aa02cc83fcf16725118c228137b21dcccae8900",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "inkspan",
+      "commit": "0b88c16f14f51b54a87eb7164f0edfb06dd60902",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "inkspan",
+      "commit": "67afc7099cc0e5711a9cc9476bf3be5bb820e229",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "j-planner",
+      "commit": "ec030872a0762af8af54d359c88e4c90239e05e4",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "kaefa",
+      "commit": "5128d4867e24b5db73e6e3c8652a8dbeabd70aa0",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "keyverse",
+      "commit": "7d9151cd2da260e118020c938c7358e2ee75d541",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "learning-content-studio",
+      "commit": "b796e049409e14deb3939985721ff07b5ef62623",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "learning-interoperability-contracts",
+      "commit": "ba2948de245448eab739329f1131a36b4e59a54d",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "learning-management-platform",
+      "commit": "1b89a16bbbd6c4b7c6ee4e8b81e2c8c651d1ce2c",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "learning-record-store",
+      "commit": "6c888a30152dc9e258a9338397e2cb064096b370",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "life-os",
+      "commit": "193a87ef54c3fe6dcda4755bce4d6bc81e3a0297",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "lineageweave",
+      "commit": "83eba56149eb802cd63642c507c324c9976ec78e",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "metering-billing-platform",
+      "commit": "ebeed33f98b34afc232eed980f41d6af9a7a445c",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "mhtml-etl-gateway",
+      "commit": "e3d21b0a44ab8430009160e4005df18351bf27c9",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "mightyetl",
+      "commit": "e550688c80f0dcf4677c0fbe50bd3341429106fb",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "naruon",
+      "commit": "042b0c70531b229af3acbd0421a2f23098d848b3",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "newsdom-api",
+      "commit": "e06b1f3fb10903569124af011da213951e6e2473",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "newsdom-api",
+      "commit": "c26f3db7e9176b6e698b4e686aeda79b15a010b9",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "noema",
+      "commit": "0dec8d84b1e4744e7a9c6a77e2e2631a183ee2ab",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "nonnest2",
+      "commit": "b62bf9ac928988a4b988fc3efb0adfb88549fef2",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "orgmetra",
+      "commit": "eb9757f8649aaad026a9865508d9aad50c1a7a4f",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "originweave",
+      "commit": "87c4daa1830bac5a5228b6036752ad5633232085",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "pg-erd-cloud",
+      "commit": "8dc746920c12988f082e914879d95e13c9693535",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "policyweave",
+      "commit": "52f4fd6bb68f870d0519cf11dd471573a2f197c0",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "psychometrics-commons",
+      "commit": "e81441ce70c676992470afe2be469dd891ad3eb5",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "rankweave",
+      "commit": "61c49c50d3b4a24fc9bd7c6d3a7f2f4ba19d7be6",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "saju-caldav",
+      "commit": "52f4fd6bb68f870d0519cf11dd471573a2f197c0",
+      "status": "missing_commit",
+      "exit_code": 1
+    },
+    {
+      "repository": "scopeweave",
+      "commit": "2c328875e00e86537df3e965170be80532571cad",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "semantic-data-portal",
+      "commit": "e48aa13c4af7a4875d4b53e6a60b50405c265a2f",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "supply-chain-control-plane",
+      "commit": "11f3e0f191d7f5a30e1bb0512d26e0db323f38e2",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "tepp",
+      "commit": "a243f18da4a4ca8a8d068c39922537f1f8ed6ad0",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "threadweave",
+      "commit": "0fda6e60c2c80ec7b2aa2d58dac6b944dec6a6d0",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "veilpick",
+      "commit": "8fd6931092ccc2076b10e9eb23ac99b404a9880e",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "veilpick",
+      "commit": "24ee7474f02457418b120018f4c6ba6c99de66b9",
+      "status": "resolved",
+      "exit_code": 0
+    },
+    {
+      "repository": "veilpick",
+      "commit": "30bb16417c42f0478200b9ce2dade2bcd0d53c64",
+      "status": "resolved",
+      "exit_code": 0
+    }
+  ]
+}

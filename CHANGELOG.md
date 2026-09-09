@@ -19,6 +19,14 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
+- Research inventory now separates message ancestry, data changes and work dependencies from reviewed semantic relationships, with release limits and owner follow-up evidence.
+
+- Unresolved changes can be inspected again without resending them or losing the original outcome. Later observations do not authorize retry or recovery.
+
+- Research inventory now distinguishes three additional statistical-library candidates from adopted integrations and reviewed papers, with source-bound limitations and follow-up requirements.
+
+- Full-text-reviewed changes can now carry separately verified destination and execution approval through the local write and recovery workflow. Unknown writes remain unresolved until their state is proven; no command issues approval or changes the live library.
+
 - Private review commands now show saved text, accept completed decisions without replacing earlier work, and prepare a complete review for independent approval verification. They do not supply decisions or approve a review.
 
 - Private inspection of pending papers alongside their saved text, preserving missing material and leaving previous reports and decisions unchanged.

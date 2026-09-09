@@ -11,3 +11,23 @@ Zotero source capture must not alter the metadata report or renew its approval. 
 The separate full-text review view does not authorize decisions or writes. Keep its evidence binding intact; existing metadata-only apply/finalization cannot establish full-text-reviewed approval.
 
 Use the capture-bound blank-start worksheet for full-text decision work. Only the dedicated atomic view path may apply completed slots; finalization/evaluation reverify capture/report bindings and require whole-envelope external approval. Offline CLI view/application/finalization preserve that envelope and earlier files. They do not supply a reviewer, authenticate approval, or admit Zotero writes.
+
+The separate typed full-text write boundary additionally requires explicit destinations and mode verified against independent write authority, after all local checks. Keep the complete approved scope on the opaque plan and the same versioned commitment on every execution and recovery outcome. Do not extract legacy plans or mix inverse operations, restore authority from audit JSON, or call an unknown original write restored through empty rollback. No live-write CLI or approval issuer is introduced.
+
+Delayed original-write inspection preserves the actual submitted request and complete earlier receipt. Its later response is unverified evidence, even when metadata matches; it never clears uncertainty or grants retry/rollback authority.
+
+Frozen coverage needs one writer per worktree. Use a fresh `CARGO_TARGET_DIR` for decisive reruns, then treat raw line, region, and branch deficits as RED even if normalized gates pass.
+
+Raw LLVM file totals include source-embedded test and generic-instantiation instrumentation. Keep them as diagnostics, and use the frozen function-symbol normalization to identify an actual production miss; an empty normalized uncovered set does not prove protected readiness.
+
+For a Local API release report, calculate public item totals from the `classified_items` and `unclassified_items` array lengths after checking their types. Keep the `0600` report private and report only aggregates and its digest.
+
+A merged owner PR is not a released contract: require its immutable release coordinate or artifact, then verify the current consumer adoption and re-execution before treating a protected consumer prerequisite as repaired.
+
+If a historical GitHub check remains visible but its workflow definition was removed, `gh run view` can return 404. Retain the exact run/job URL and SHA, use check-run metadata plus the rendered Checks page as bounded evidence, and never treat unavailable logs as passing or safely rerunnable.
+
+OIDC policy belongs to the catalog owner's versioned configuration boundary, not request-path environment reads. A local owner test override is not consumer adoption; wait for the immutable owner release and revalidate the ACL.
+
+Verified OIDC roles must reach every catalog policy action. A regenerated hash lockfile is not a released contract or consumer-adoption proof.
+
+When catalog OIDC policy moves into versioned configuration, identity guidance must not expose retired request-path settings. Preserve a response-copy regression and wait for the owner release before adoption.

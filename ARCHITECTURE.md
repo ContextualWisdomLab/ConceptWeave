@@ -38,6 +38,10 @@ The separate Full-Text Review Worksheet starts blank and retains one capture ide
 
 ## Aggregate boundaries
 
+Full-Text Write Scope belongs to Research Intake and combines a complete capture-bound semantic review with independently authorized explicit metadata replacements and mode. Existing local validation is composed before either authority verifier. The admitted plan is opaque; bound execution and recovery wrappers reuse the existing conditional Local API cores, with no legacy-plan or free inverse-operation projection. Versioned scope commitments preserve the complete input identity without copying source text into receipts. The scope is not published semantic truth or an approval issuer. Audit serialization cannot restore executable authority; durable recovery and independently unknown original-write reconciliation remain explicit gaps.
+
+An Original Write Observation is a read-only audit projection inside this same context. It retains the opaque original receipt and exact submitted preconditions beside one later unverified response. It cannot clear uncertainty, prove request completion or enter execution/recovery as authority. The existing executor remains the sole mutation path.
+
 ### SemanticCandidate
 
 Smallest consistency boundary for a single proposed semantic artifact and its evidence-bound publication state. It cannot jump directly from Draft to Published.

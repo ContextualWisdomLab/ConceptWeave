@@ -12,13 +12,21 @@ use std::time::{Duration, Instant};
 
 mod full_text_capture;
 pub use full_text_capture::{
-    FullTextCapture, FullTextError, build_full_text_review_json, read_local_full_text,
-    verify_full_text_capture,
+    FullTextAvailabilitySummary, FullTextCapture, FullTextError, assess_full_text_availability,
+    build_full_text_review_json, read_local_full_text, verify_full_text_capture,
 };
 pub use full_text_capture::{
     FullTextReviewApproval, FullTextReviewEvaluation, FullTextReviewWorksheet,
     FullTextReviewedGoldenSet, apply_full_text_review_view, build_bound_full_text_review_json,
     build_full_text_review_worksheet, evaluate_full_text_review, finalize_full_text_review,
+};
+pub use full_text_capture::{
+    FullTextRollbackReceipt, FullTextRollbackReconciliationReceipt, execute_full_text_rollback,
+    reconcile_full_text_rollback, retry_full_text_reconciled_rollback, retry_full_text_rollback,
+};
+pub use full_text_capture::{
+    FullTextWriteObservation, FullTextWritePlan, FullTextWriteReceipt, FullTextWriteScope,
+    build_full_text_write_plan, execute_full_text_write_plan, observe_full_text_write,
 };
 
 /// Classification rule revision recorded in every report.
@@ -140,6 +148,151 @@ pub enum Disposition {
     OutOfScope,
     /// No deterministic rule supplies enough evidence for a narrower proposal.
     NeedsStewardReview,
+}
+
+/// An explicit, non-authoritative outcome for one pending source record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceResolutionDisposition {
+    /// Keep the source as independent evidence without changing Zotero.
+    RetainStandaloneEvidence,
+    /// Record that a separately authorized rebind is required.
+    RebindRequiresSeparateAuthorization,
+    /// Exclude the source from the research scope with the recorded reason.
+    ExcludeFromResearchScope,
+}
+
+/// One exact-snapshot decision for a record in `pending_source_item_keys`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct PendingSourceResolution {
+    /// Stable Zotero item key.
+    pub item_key: String,
+    /// Item revision observed in the report.
+    pub item_version: u64,
+    /// Library revision that contained this item.
+    pub library_version: u64,
+    /// Item type observed in the report.
+    pub item_type: String,
+    /// Parent key observed in the report, if any.
+    pub parent_item_key: String,
+    /// Explicit steward disposition; it never writes or rebinds a source.
+    pub disposition: SourceResolutionDisposition,
+    /// Human-readable reason required for every disposition.
+    pub reason: String,
+}
+
+/// Complete source-resolution aggregate bound to one classification snapshot.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct SourceResolutionReview {
+    /// Zotero desktop version that served the snapshot.
+    pub zotero_version: String,
+    /// Local API server identity, when supplied by the snapshot.
+    pub server_id: Option<String>,
+    /// Library version shared by the snapshot.
+    pub library_version: u64,
+    /// Rule revision used for the associated classification report.
+    pub rule_revision: String,
+    /// One resolution for every pending source, sorted by item key.
+    pub resolved_sources: Vec<PendingSourceResolution>,
+}
+
+/// Failure raised when source resolutions do not exactly match a report.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SourceResolutionError {
+    /// A pending source has no decision.
+    Missing(String),
+    /// A decision refers to a record outside the pending set.
+    Unknown(String),
+    /// More than one decision was supplied for one source key.
+    Duplicate(String),
+    /// A decision's source identity differs from the immutable report.
+    Stale(String),
+    /// A decision has no explanatory reason.
+    BlankReason(String),
+    /// The report's pending key is absent from its retained inventory.
+    MissingInventory(String),
+}
+
+impl fmt::Display for SourceResolutionError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Missing(key) => write!(formatter, "pending source lacks resolution: {key}"),
+            Self::Unknown(key) => {
+                write!(formatter, "resolution is not pending in the report: {key}")
+            }
+            Self::Duplicate(key) => {
+                write!(formatter, "pending source has duplicate resolutions: {key}")
+            }
+            Self::Stale(key) => write!(
+                formatter,
+                "resolution does not match report source identity: {key}"
+            ),
+            Self::BlankReason(key) => write!(formatter, "source resolution reason is blank: {key}"),
+            Self::MissingInventory(key) => write!(
+                formatter,
+                "pending source is absent from report inventory: {key}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for SourceResolutionError {}
+
+/// Builds a complete source-resolution aggregate without mutating Zotero.
+pub fn prepare_source_resolution_review(
+    report: &ClassificationReport,
+    mut resolutions: Vec<PendingSourceResolution>,
+) -> Result<SourceResolutionReview, SourceResolutionError> {
+    let pending: BTreeMap<_, _> = report
+        .pending_source_item_keys
+        .iter()
+        .map(|key| {
+            Ok((
+                key,
+                report
+                    .unclassified_items
+                    .iter()
+                    .find(|item| &item.key == key)
+                    .ok_or_else(|| SourceResolutionError::MissingInventory(key.clone()))?,
+            ))
+        })
+        .collect::<Result<BTreeMap<_, _>, SourceResolutionError>>()?;
+    let mut seen = BTreeSet::new();
+    for resolution in &resolutions {
+        if !seen.insert(resolution.item_key.as_str()) {
+            return Err(SourceResolutionError::Duplicate(
+                resolution.item_key.clone(),
+            ));
+        }
+        let Some(source) = pending.get(&resolution.item_key) else {
+            return Err(SourceResolutionError::Unknown(resolution.item_key.clone()));
+        };
+        if resolution.reason.trim().is_empty() {
+            return Err(SourceResolutionError::BlankReason(
+                resolution.item_key.clone(),
+            ));
+        }
+        if resolution.library_version != report.library_version
+            || resolution.item_version != source.version
+            || resolution.item_type != source.data.item_type
+            || resolution.parent_item_key != source.data.parent_item
+        {
+            return Err(SourceResolutionError::Stale(resolution.item_key.clone()));
+        }
+    }
+    for key in pending.keys() {
+        if !seen.contains(key.as_str()) {
+            return Err(SourceResolutionError::Missing((*key).clone()));
+        }
+    }
+    resolutions.sort_by(|left, right| left.item_key.cmp(&right.item_key));
+    Ok(SourceResolutionReview {
+        zotero_version: report.zotero_version.clone(),
+        server_id: report.server_id.clone(),
+        library_version: report.library_version,
+        rule_revision: report.rule_revision.clone(),
+        resolved_sources: resolutions,
+    })
 }
 
 /// Deterministic reason that a bibliographic item requires steward review.
@@ -1890,6 +2043,17 @@ pub fn evaluate_reviewed_golden_set<F>(
 where
     F: FnOnce(&ReviewedGoldenSet) -> bool,
 {
+    let evaluation = prepare_reviewed_golden_set(report, golden)?;
+    if !verify_approval(golden) {
+        return Err(EvaluationError::UnverifiedApproval);
+    }
+    Ok(evaluation)
+}
+
+fn prepare_reviewed_golden_set(
+    report: &ClassificationReport,
+    golden: &ReviewedGoldenSet,
+) -> Result<GoldenSetEvaluation, EvaluationError> {
     validate_classification_report(report)?;
     if golden.approval.receipt_id.trim().is_empty()
         || golden.approval.reviewer_subject.trim().is_empty()
@@ -1961,10 +2125,6 @@ where
         if predicted == Disposition::NeedsStewardReview {
             abstention_count += 1;
         }
-    }
-
-    if !verify_approval(golden) {
-        return Err(EvaluationError::UnverifiedApproval);
     }
 
     Ok(GoldenSetEvaluation {
@@ -2179,6 +2339,18 @@ pub fn build_classification_write_plan<F>(
 where
     F: FnOnce(&ReviewedClassificationWriteSet) -> bool,
 {
+    let plan = prepare_classification_write_plan(report, reviewed, mode)?;
+    if !verify_review(reviewed) {
+        return Err(WritePlanError::UnverifiedApproval);
+    }
+    Ok(plan)
+}
+
+fn prepare_classification_write_plan(
+    report: &ClassificationReport,
+    reviewed: &ReviewedClassificationWriteSet,
+    mode: WriteMode,
+) -> Result<ClassificationWritePlan, WritePlanError> {
     if reviewed.review_id.trim().is_empty()
         || reviewed.authority_receipt.trim().is_empty()
         || reviewed.rule_revision.trim().is_empty()
@@ -2296,9 +2468,6 @@ where
     validate_classification_report(report).map_err(|_| WritePlanError::InvalidReview)?;
     if reviewed.proposal_digest != classification_proposal_digest(report) {
         return Err(WritePlanError::SnapshotMismatch);
-    }
-    if !verify_review(reviewed) {
-        return Err(WritePlanError::UnverifiedApproval);
     }
     Ok(ClassificationWritePlan {
         mode,
@@ -3398,6 +3567,21 @@ mod tests {
     use std::thread;
 
     static LOCAL_API_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn source_resolution_errors_render_each_variant() {
+        let errors = [
+            SourceResolutionError::Missing("MISSING".into()),
+            SourceResolutionError::Unknown("UNKNOWN".into()),
+            SourceResolutionError::Duplicate("DUPLICATE".into()),
+            SourceResolutionError::Stale("STALE".into()),
+            SourceResolutionError::BlankReason("BLANK".into()),
+            SourceResolutionError::MissingInventory("INVENTORY".into()),
+        ];
+        for error in errors {
+            assert!(!error.to_string().is_empty());
+        }
+    }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
     fn serve(responses: Vec<&'static str>) -> (String, std::thread::JoinHandle<Vec<String>>) {

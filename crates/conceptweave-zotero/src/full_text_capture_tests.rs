@@ -1,6 +1,9 @@
 use super::*;
 use crate::{StewardReviewWorksheet, ZoteroItem, classify_snapshot};
 
+#[path = "full_text_write_tests.rs"]
+mod full_text_write_tests;
+
 fn completed_full_text_view(
     report: &ClassificationReport,
     worksheet: &FullTextReviewWorksheet,
@@ -722,6 +725,25 @@ fn review_view_separates_two_text_parents_and_excludes_standalone_attachments() 
         .is_err()
     );
     assert_eq!(approval_calls, 0);
+    let scope = full_text_write_tests::write_scope_fixture(&report, &capture);
+    let write_calls = std::cell::Cell::new(0);
+    assert!(
+        crate::build_full_text_write_plan(
+            &report,
+            &capture,
+            scope,
+            |_| {
+                write_calls.set(write_calls.get() + 1);
+                true
+            },
+            |_| {
+                write_calls.set(write_calls.get() + 1);
+                true
+            },
+        )
+        .is_ok()
+    );
+    assert_eq!(write_calls.get(), 2);
     assert_eq!(report.pending_source_item_keys, ["FGHI789A"]);
 }
 
@@ -1267,8 +1289,11 @@ fn byte_and_clock_limits_include_exact_boundary_and_overflow_failures() {
     };
     let mut remaining = MAX_SNAPSHOT_BYTES;
     assert!(account_body(&mut remaining, &oversized).is_err());
-    assert!(check_admission(0, Duration::ZERO).is_err());
-    assert!(check_admission(1, CAPTURE_DEADLINE).is_err());
+    assert_eq!(check_admission(0, Duration::ZERO), Err(BUDGET_EXCEEDED));
+    assert_eq!(
+        check_admission(1, CAPTURE_DEADLINE),
+        Err(FullTextError("full-text capture deadline exceeded"))
+    );
     check_admission(1, CAPTURE_DEADLINE - Duration::from_nanos(1)).unwrap();
     assert!(unix_millis(UNIX_EPOCH - Duration::from_secs(1)).is_err());
     assert_eq!(unix_millis(UNIX_EPOCH).unwrap(), 0);
@@ -1368,4 +1393,149 @@ fn every_failed_request_and_invalid_replay_input_fails_closed() {
     assert!(verify_full_text_capture(&capture, &invalid_report).is_err());
     capture.capture_evidence.manifest_before.body = "null".into();
     assert!(verify_full_text_capture(&capture, &report).is_err());
+}
+
+#[test]
+fn availability_summary_partitions_every_paper_without_exposing_item_identity() {
+    let report = report_fixture();
+    let capture = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+
+    let summary = assess_full_text_availability(&report, &capture).unwrap();
+
+    assert_eq!(summary.paper_count, 2);
+    assert_eq!(summary.papers_with_nonempty_text, 1);
+    assert_eq!(summary.papers_without_attachment, 1);
+    assert_eq!(summary.papers_with_unmanifested_attachment, 0);
+    assert_eq!(summary.papers_with_captured_no_text, 0);
+    assert_eq!(summary.papers_needing_review_without_text, 1);
+    assert_eq!(summary.unbound_nonempty_record_count, 0);
+    let serialized = serde_json::to_string(&summary).unwrap();
+    assert!(!serialized.contains("ABCD2345"));
+    assert!(!serialized.contains("fixture paper"));
+}
+
+#[test]
+fn availability_summary_separates_unmanifested_and_captured_empty_attachments() {
+    let report = availability_report_fixture();
+    let unmanifested = capture_with(&report, 4096, &mut |request_path, _| {
+        Ok(response_fixture(request_path))
+    })
+    .unwrap();
+    let summary = assess_full_text_availability(&report, &unmanifested).unwrap();
+    assert_eq!(summary.papers_with_nonempty_text, 1);
+    assert_eq!(summary.papers_with_unmanifested_attachment, 1);
+    assert_eq!(summary.papers_with_captured_no_text, 0);
+    assert_eq!(summary.papers_without_attachment, 0);
+    assert_eq!(summary.papers_needing_review_without_text, 0);
+
+    let captured_empty = capture_with(&report, 4096, &mut |request_path, _| {
+        let response = match request_path {
+            "fulltext?since=0" => CapturedResponse {
+                status: 200,
+                version: None,
+                body: r#"{"BCDE3456":12403,"CDEF4567":0,"EFGH6789":3}"#.into(),
+            },
+            "items/EFGH6789" => CapturedResponse {
+                status: 200,
+                version: Some(2),
+                body: r#"{"key":"EFGH6789","version":2,"data":{"itemType":"attachment","parentItem":"DEFG5678"}}"#.into(),
+            },
+            "items/EFGH6789/fulltext" => CapturedResponse {
+                status: 404,
+                version: None,
+                body: "missing".into(),
+            },
+            _ => response_fixture(request_path),
+        };
+        Ok(response)
+    })
+    .unwrap();
+    let summary = assess_full_text_availability(&report, &captured_empty).unwrap();
+    assert_eq!(summary.papers_with_unmanifested_attachment, 0);
+    assert_eq!(summary.papers_with_captured_no_text, 1);
+
+    let unbound_report = unbound_report_fixture();
+    let unbound = capture_with(&unbound_report, 4096, &mut |request_path, _| {
+        Ok(match request_path {
+            "fulltext?since=0" => CapturedResponse {
+                status: 200,
+                version: None,
+                body: r#"{"BCDE3456":12403,"CDEF4567":0,"FGHJ789A":2}"#.into(),
+            },
+            "items/FGHJ789A" => CapturedResponse {
+                status: 200,
+                version: Some(2),
+                body: r#"{"key":"FGHJ789A","version":2,"data":{"itemType":"attachment"}}"#.into(),
+            },
+            "items/FGHJ789A/fulltext" => CapturedResponse {
+                status: 200,
+                version: Some(2),
+                body: r#"{"content":"standalone source","indexedPages":1,"totalPages":1}"#.into(),
+            },
+            _ => response_fixture(request_path),
+        })
+    })
+    .unwrap();
+    assert_eq!(
+        assess_full_text_availability(&unbound_report, &unbound)
+            .unwrap()
+            .unbound_nonempty_record_count,
+        1
+    );
+
+    let mut tampered = unbound;
+    tampered.capture_digest.push('0');
+    assert!(assess_full_text_availability(&unbound_report, &tampered).is_err());
+}
+
+#[test]
+fn paper_ancestor_bounds_nested_or_invalid_parent_graphs() {
+    let parents = BTreeMap::from([
+        ("PAPER001", None),
+        ("CHILD001", Some("PAPER001")),
+        ("GRAND001", Some("CHILD001")),
+        ("ORPHAN01", Some("MISSING1")),
+        ("CYCLE001", Some("CYCLE002")),
+        ("CYCLE002", Some("CYCLE001")),
+    ]);
+    let papers = BTreeSet::from(["PAPER001"]);
+    assert_eq!(
+        paper_ancestor("GRAND001", &parents, &papers),
+        Some("PAPER001")
+    );
+    assert_eq!(paper_ancestor("ORPHAN01", &parents, &papers), None);
+    assert_eq!(paper_ancestor("CYCLE001", &parents, &papers), None);
+}
+
+fn availability_report_fixture() -> ClassificationReport {
+    let items: Vec<ZoteroItem> = serde_json::from_value(serde_json::json!([
+        {"key":"ABCD2345","version":2,"data":{"itemType":"journalArticle","title":"fixture paper"}},
+        {"key":"BCDE3456","version":1,"data":{"itemType":"attachment","parentItem":"ABCD2345"}},
+        {"key":"CDEF4567","version":0,"data":{"itemType":"attachment","parentItem":"ABCD2345"}},
+        {"key":"DEFG5678","version":2,"data":{"itemType":"book","title":"semantic web"}},
+        {"key":"EFGH6789","version":2,"data":{"itemType":"attachment","parentItem":"DEFG5678"}}
+    ]))
+    .unwrap();
+    let mut report = classify_snapshot("10.0.1".into(), Some("fixture-server".into()), 2, items);
+    report.api_version = Some(3);
+    report.schema_version = Some(44);
+    report
+}
+
+fn unbound_report_fixture() -> ClassificationReport {
+    let items: Vec<ZoteroItem> = serde_json::from_value(serde_json::json!([
+        {"key":"ABCD2345","version":2,"data":{"itemType":"journalArticle","title":"fixture paper"}},
+        {"key":"BCDE3456","version":1,"data":{"itemType":"attachment","parentItem":"ABCD2345"}},
+        {"key":"CDEF4567","version":0,"data":{"itemType":"attachment","parentItem":"ABCD2345"}},
+        {"key":"DEFG5678","version":2,"data":{"itemType":"book","title":"no attachment fixture"}},
+        {"key":"FGHJ789A","version":2,"data":{"itemType":"attachment"}}
+    ]))
+    .unwrap();
+    let mut report = classify_snapshot("10.0.1".into(), Some("fixture-server".into()), 2, items);
+    report.api_version = Some(3);
+    report.schema_version = Some(44);
+    report
 }
