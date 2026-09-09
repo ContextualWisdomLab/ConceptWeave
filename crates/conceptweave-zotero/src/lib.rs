@@ -22,7 +22,6 @@ const MAX_SNAPSHOT_ITEMS: usize = 50_000;
 const MAX_SNAPSHOT_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_SNAPSHOT_ELAPSED: Duration = Duration::from_secs(300);
 const LOCAL_API: &str = "http://127.0.0.1:23119/api/users/0/items";
-
 #[cfg(test)]
 static TEST_LOCAL_API: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 
@@ -280,6 +279,7 @@ pub enum SourceResolutionDisposition {
 
 /// One exact-snapshot decision for a record in `pending_source_item_keys`.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct PendingSourceResolution {
     /// Stable Zotero item key.
     pub item_key: String,
@@ -287,6 +287,8 @@ pub struct PendingSourceResolution {
     pub item_version: u64,
     /// Library revision that contained this item.
     pub library_version: u64,
+    /// Local API server identity that supplied the item, when present.
+    pub server_id: Option<String>,
     /// Item type observed in the report.
     pub item_type: String,
     /// Parent key observed in the report, if any.
@@ -297,19 +299,188 @@ pub struct PendingSourceResolution {
     pub reason: String,
 }
 
-/// Complete source-resolution aggregate bound to one classification snapshot.
+/// Constructor-bound identity coordinates retained separately from decisions.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PendingSourceIdentity {
+    /// Stable Zotero item key.
+    pub item_key: String,
+    /// Item revision observed in the report.
+    pub item_version: u64,
+    /// Item type observed in the report.
+    pub item_type: String,
+    /// Parent key observed in the report, if any.
+    pub parent_item_key: String,
+}
+
+/// Complete source-resolution aggregate bound to one classification snapshot.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SourceResolutionReview {
     /// Zotero desktop version that served the snapshot.
-    pub zotero_version: String,
+    zotero_version: String,
     /// Local API server identity, when supplied by the snapshot.
-    pub server_id: Option<String>,
+    server_id: Option<String>,
     /// Library version shared by the snapshot.
-    pub library_version: u64,
+    library_version: u64,
     /// Rule revision used for the associated classification report.
-    pub rule_revision: String,
+    rule_revision: String,
+    /// Complete pending-source key set captured with this review.
+    pending_source_item_keys: Vec<String>,
+    /// Constructor-bound item coordinates, independent of steward decisions.
+    expected_source_identities: Vec<PendingSourceIdentity>,
     /// One resolution for every pending source, sorted by item key.
-    pub resolved_sources: Vec<PendingSourceResolution>,
+    resolved_sources: Vec<PendingSourceResolution>,
+}
+
+impl SourceResolutionReview {
+    /// Returns the Zotero desktop version bound to this review.
+    pub fn zotero_version(&self) -> &str {
+        &self.zotero_version
+    }
+
+    /// Returns the Local API server identity bound to this review.
+    pub fn server_id(&self) -> Option<&str> {
+        self.server_id.as_deref()
+    }
+
+    /// Returns the library revision bound to this review.
+    pub fn library_version(&self) -> u64 {
+        self.library_version
+    }
+
+    /// Returns the classifier rule revision bound to this review.
+    pub fn rule_revision(&self) -> &str {
+        &self.rule_revision
+    }
+
+    /// Returns the complete pending-source key sequence.
+    pub fn pending_source_item_keys(&self) -> &[String] {
+        &self.pending_source_item_keys
+    }
+
+    /// Returns constructor-bound source identities.
+    pub fn expected_source_identities(&self) -> &[PendingSourceIdentity] {
+        &self.expected_source_identities
+    }
+
+    /// Returns the sorted, constructor-bound source decisions.
+    pub fn resolved_sources(&self) -> &[PendingSourceResolution] {
+        &self.resolved_sources
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StoredSourceResolutionWire {
+    zotero_version: String,
+    server_id: Option<String>,
+    library_version: u64,
+    rule_revision: String,
+    pending_source_item_keys: Vec<String>,
+    expected_source_identities: Vec<PendingSourceIdentity>,
+    resolved_sources: Vec<PendingSourceResolution>,
+}
+
+/// Failure while restoring an untrusted stored source-resolution artifact.
+#[derive(Debug)]
+pub enum SourceResolutionRestoreError {
+    /// The stored JSON is malformed or violates its internal wire contract.
+    InvalidStoredArtifact,
+    /// The stored decisions fail the normal source-resolution constructor.
+    SourceResolution(SourceResolutionError),
+    /// The stored artifact does not match the immutable report supplied by the caller.
+    UnboundReport,
+}
+
+impl fmt::Display for SourceResolutionRestoreError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidStoredArtifact => {
+                write!(formatter, "stored source-resolution artifact is invalid")
+            }
+            Self::SourceResolution(error) => error.fmt(formatter),
+            Self::UnboundReport => write!(
+                formatter,
+                "stored source-resolution artifact is not bound to the report"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for SourceResolutionRestoreError {}
+
+fn validate_stored_source_resolution_wire(
+    wire: &StoredSourceResolutionWire,
+) -> Result<(), SourceResolutionRestoreError> {
+    if wire
+        .server_id
+        .as_deref()
+        .is_none_or(|server_id| server_id.trim().is_empty())
+        || wire.rule_revision.trim().is_empty()
+        || wire
+            .pending_source_item_keys
+            .windows(2)
+            .any(|pair| pair[0] >= pair[1])
+        || wire
+            .expected_source_identities
+            .windows(2)
+            .any(|pair| pair[0].item_key >= pair[1].item_key)
+        || wire
+            .expected_source_identities
+            .iter()
+            .map(|identity| identity.item_key.as_str())
+            .ne(wire.pending_source_item_keys.iter().map(String::as_str))
+        || wire.resolved_sources.iter().any(|resolution| {
+            resolution.server_id.as_deref() != wire.server_id.as_deref()
+                || resolution.library_version != wire.library_version
+                || resolution.item_key.trim().is_empty()
+                || resolution.reason.trim().is_empty()
+        })
+        || wire
+            .resolved_sources
+            .windows(2)
+            .any(|pair| pair[0].item_key >= pair[1].item_key)
+        || wire
+            .resolved_sources
+            .iter()
+            .map(|resolution| resolution.item_key.as_str())
+            .ne(wire.pending_source_item_keys.iter().map(String::as_str))
+        || wire
+            .expected_source_identities
+            .iter()
+            .zip(&wire.resolved_sources)
+            .any(|(identity, resolution)| {
+                identity.item_version != resolution.item_version
+                    || identity.item_type != resolution.item_type
+                    || identity.parent_item_key != resolution.parent_item_key
+            })
+    {
+        return Err(SourceResolutionRestoreError::InvalidStoredArtifact);
+    }
+    Ok(())
+}
+
+/// Restores a stored review only after binding every coordinate to an immutable report.
+///
+/// The JSON is an untrusted wire artifact. Callers must provide the original report;
+/// direct deserialization into [`SourceResolutionReview`] is intentionally unavailable.
+pub fn restore_source_resolution_review(
+    report: &ClassificationReport,
+    stored_json: &[u8],
+) -> Result<SourceResolutionReview, SourceResolutionRestoreError> {
+    let wire: StoredSourceResolutionWire = serde_json::from_slice(stored_json)
+        .map_err(|_| SourceResolutionRestoreError::InvalidStoredArtifact)?;
+    validate_stored_source_resolution_wire(&wire)?;
+    if wire.zotero_version != report.zotero_version
+        || wire.server_id != report.server_id
+        || wire.library_version != report.library_version
+        || wire.rule_revision != report.rule_revision
+        || wire.pending_source_item_keys != report.pending_source_item_keys
+    {
+        return Err(SourceResolutionRestoreError::UnboundReport);
+    }
+    prepare_source_resolution_review(report, wire.resolved_sources)
+        .map_err(SourceResolutionRestoreError::SourceResolution)
 }
 
 /// Failure raised when source resolutions do not exactly match a report.
@@ -327,6 +498,14 @@ pub enum SourceResolutionError {
     BlankReason(String),
     /// The report's pending key is absent from its retained inventory.
     MissingInventory(String),
+    /// The report contains more than one retained record for a pending key.
+    AmbiguousInventory(String),
+    /// The report pending-key sequence is not unique and canonical.
+    InvalidPendingKeySet,
+    /// The report does not carry a non-blank Local API server identity.
+    MissingServerIdentity,
+    /// The report lacks a non-blank Zotero or rule-version identity coordinate.
+    InvalidSnapshotIdentity,
 }
 
 impl fmt::Display for SourceResolutionError {
@@ -348,6 +527,22 @@ impl fmt::Display for SourceResolutionError {
                 formatter,
                 "pending source is absent from report inventory: {key}"
             ),
+            Self::AmbiguousInventory(key) => write!(
+                formatter,
+                "pending source has ambiguous report inventory identity: {key}"
+            ),
+            Self::InvalidPendingKeySet => {
+                write!(
+                    formatter,
+                    "report pending source keys are not unique and canonical"
+                )
+            }
+            Self::MissingServerIdentity => {
+                write!(formatter, "report lacks a non-blank Zotero server identity")
+            }
+            Self::InvalidSnapshotIdentity => {
+                write!(formatter, "report snapshot identity is incomplete")
+            }
         }
     }
 }
@@ -359,18 +554,42 @@ pub fn prepare_source_resolution_review(
     report: &ClassificationReport,
     mut resolutions: Vec<PendingSourceResolution>,
 ) -> Result<SourceResolutionReview, SourceResolutionError> {
+    if report.zotero_version.trim().is_empty() || report.rule_revision.trim().is_empty() {
+        return Err(SourceResolutionError::InvalidSnapshotIdentity);
+    }
+    if report
+        .server_id
+        .as_deref()
+        .is_none_or(|server_id| server_id.trim().is_empty())
+    {
+        return Err(SourceResolutionError::MissingServerIdentity);
+    }
+    let mut canonical_pending_keys = report.pending_source_item_keys.clone();
+    canonical_pending_keys.sort();
+    canonical_pending_keys.dedup();
+    if canonical_pending_keys.len() != report.pending_source_item_keys.len()
+        || canonical_pending_keys != report.pending_source_item_keys
+        || canonical_pending_keys
+            .iter()
+            .any(|key| key.trim().is_empty())
+    {
+        return Err(SourceResolutionError::InvalidPendingKeySet);
+    }
     let pending: BTreeMap<_, _> = report
         .pending_source_item_keys
         .iter()
         .map(|key| {
-            Ok((
-                key,
-                report
-                    .unclassified_items
-                    .iter()
-                    .find(|item| &item.key == key)
-                    .ok_or_else(|| SourceResolutionError::MissingInventory(key.clone()))?,
-            ))
+            let mut matching_sources = report
+                .unclassified_items
+                .iter()
+                .filter(|item| &item.key == key);
+            let source = matching_sources
+                .next()
+                .ok_or_else(|| SourceResolutionError::MissingInventory(key.clone()))?;
+            if matching_sources.next().is_some() {
+                return Err(SourceResolutionError::AmbiguousInventory(key.clone()));
+            }
+            Ok((key, source))
         })
         .collect::<Result<BTreeMap<_, _>, SourceResolutionError>>()?;
     let mut seen = BTreeSet::new();
@@ -389,6 +608,7 @@ pub fn prepare_source_resolution_review(
             ));
         }
         if resolution.library_version != report.library_version
+            || resolution.server_id != report.server_id
             || resolution.item_version != source.version
             || resolution.item_type != source.data.item_type
             || resolution.parent_item_key != source.data.parent_item
@@ -402,11 +622,22 @@ pub fn prepare_source_resolution_review(
         }
     }
     resolutions.sort_by(|left, right| left.item_key.cmp(&right.item_key));
+    let expected_source_identities = pending
+        .iter()
+        .map(|(item_key, source)| PendingSourceIdentity {
+            item_key: (*item_key).clone(),
+            item_version: source.version,
+            item_type: source.data.item_type.clone(),
+            parent_item_key: source.data.parent_item.clone(),
+        })
+        .collect();
     Ok(SourceResolutionReview {
         zotero_version: report.zotero_version.clone(),
         server_id: report.server_id.clone(),
         library_version: report.library_version,
         rule_revision: report.rule_revision.to_owned(),
+        pending_source_item_keys: report.pending_source_item_keys.clone(),
+        expected_source_identities,
         resolved_sources: resolutions,
     })
 }
@@ -499,16 +730,16 @@ fn validate_source_item_keys(items: &[ZoteroItem]) -> Result<(), ReadError> {
 }
 
 fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, ReadError> {
-    let local_api = LOCAL_API.to_owned();
+    let api_base = LOCAL_API.to_owned();
     #[cfg(test)]
-    let local_api = TEST_LOCAL_API
+    let api_base = TEST_LOCAL_API
         .lock()
         .expect("test Local API lock must not be poisoned")
         .clone()
-        .unwrap_or(local_api);
+        .unwrap_or(api_base);
     let url = format!(
         "{}?format=json&include=data&limit={PAGE_LIMIT}&start={start}",
-        local_api
+        api_base
     );
     let mut response = agent
         .get(&url)
@@ -518,9 +749,9 @@ fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, Re
     let headers = response.headers();
     let total = header_u64(headers, "Total-Results")?;
     #[cfg(target_pointer_width = "64")]
-    let total = total as usize;
+    let total = page_total(total);
     #[cfg(not(target_pointer_width = "64"))]
-    let total = usize::try_from(total).map_err(|_| ReadError::Budget("item-count"))?;
+    let total = page_total(total)?;
     let library_version = header_u64(headers, "Last-Modified-Version")?;
     let zotero_version = header_string(headers, "X-Zotero-Version")?;
     let api_version = header_u64(headers, "Zotero-API-Version")?;
@@ -529,7 +760,10 @@ fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, Re
 
     let body = read_bounded_response_text(&mut response, MAX_PAGE_BYTES)
         .map_err(|error| ReadError::Body(error.to_string()))?;
-    let body_bytes = body.len() as u64;
+    #[cfg(target_pointer_width = "64")]
+    let body_bytes = page_body_bytes(body.len());
+    #[cfg(not(target_pointer_width = "64"))]
+    let body_bytes = page_body_bytes(body.len())?;
     let items: Vec<ZoteroItem> = serde_json::from_str(&body).map_err(ReadError::Json)?;
     validate_source_item_keys(&items)?;
 
@@ -543,6 +777,26 @@ fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, Re
         body_bytes,
         items,
     })
+}
+
+#[cfg(target_pointer_width = "64")]
+fn page_total(value: u64) -> usize {
+    value as usize
+}
+
+#[cfg(not(target_pointer_width = "64"))]
+fn page_total(value: u64) -> Result<usize, ReadError> {
+    usize::try_from(value).map_err(|_| ReadError::Budget("item-count"))
+}
+
+#[cfg(target_pointer_width = "64")]
+fn page_body_bytes(value: usize) -> u64 {
+    value as u64
+}
+
+#[cfg(not(target_pointer_width = "64"))]
+fn page_body_bytes(value: usize) -> Result<u64, ReadError> {
+    u64::try_from(value).map_err(|_| ReadError::Budget("byte-count"))
 }
 
 /// Reads strict UTF-8 with an inclusive byte limit and one byte of overrun evidence.
@@ -1078,6 +1332,115 @@ mod tests {
         }
     }
 
+    fn pending_resolution(item_key: &str) -> PendingSourceResolution {
+        PendingSourceResolution {
+            item_key: item_key.into(),
+            item_version: 7,
+            library_version: 7,
+            server_id: Some("local-server".into()),
+            item_type: "attachment".into(),
+            parent_item_key: String::new(),
+            disposition: SourceResolutionDisposition::RetainStandaloneEvidence,
+            reason: "Retain as standalone evidence.".into(),
+        }
+    }
+
+    #[test]
+    fn source_resolution_rejects_owner_internal_pending_set_drift() {
+        let mut duplicate = classify_snapshot(
+            "10.0.1".into(),
+            Some("local-server".into()),
+            7,
+            vec![item("SOURCE", "attachment", "", "", "")],
+        );
+        duplicate.pending_source_item_keys = vec!["SOURCE".into(), "SOURCE".into()];
+        assert!(matches!(
+            prepare_source_resolution_review(&duplicate, vec![pending_resolution("SOURCE")]),
+            Err(SourceResolutionError::InvalidPendingKeySet)
+        ));
+
+        let mut noncanonical = classify_snapshot(
+            "10.0.1".into(),
+            Some("local-server".into()),
+            7,
+            vec![
+                item("SOURCE", "attachment", "", "", ""),
+                item("SECOND", "attachment", "", "", ""),
+            ],
+        );
+        noncanonical.pending_source_item_keys = vec!["SOURCE".into(), "SECOND".into()];
+        assert!(matches!(
+            prepare_source_resolution_review(
+                &noncanonical,
+                vec![pending_resolution("SECOND"), pending_resolution("SOURCE")]
+            ),
+            Err(SourceResolutionError::InvalidPendingKeySet)
+        ));
+
+        let mut blank = classify_snapshot(
+            "10.0.1".into(),
+            Some("local-server".into()),
+            7,
+            vec![item("", "attachment", "", "", "")],
+        );
+        blank.pending_source_item_keys = vec![String::new()];
+        assert!(matches!(
+            prepare_source_resolution_review(&blank, vec![pending_resolution("")]),
+            Err(SourceResolutionError::InvalidPendingKeySet)
+        ));
+    }
+
+    #[test]
+    fn source_resolution_rejects_owner_internal_ambiguous_inventory() {
+        let mut report = classify_snapshot(
+            "10.0.1".into(),
+            Some("local-server".into()),
+            7,
+            vec![item("SOURCE", "attachment", "", "", "")],
+        );
+        let mut duplicate = item("SOURCE", "attachment", "", "", "");
+        duplicate.version = 4;
+        report.unclassified_items.push(duplicate);
+
+        assert!(matches!(
+            prepare_source_resolution_review(&report, vec![pending_resolution("SOURCE")]),
+            Err(SourceResolutionError::AmbiguousInventory(key)) if key == "SOURCE"
+        ));
+    }
+
+    #[test]
+    fn source_resolution_rejects_owner_internal_blank_snapshot_identity() {
+        let mut blank_zotero_version = classify_snapshot(
+            "10.0.1".into(),
+            Some("local-server".into()),
+            7,
+            vec![item("SOURCE", "attachment", "", "", "")],
+        );
+        blank_zotero_version.zotero_version = " \t\n".into();
+        assert!(matches!(
+            prepare_source_resolution_review(
+                &blank_zotero_version,
+                vec![pending_resolution("SOURCE")]
+            ),
+            Err(SourceResolutionError::InvalidSnapshotIdentity)
+        ));
+
+        let mut blank_rule_revision = classify_snapshot(
+            "10.0.1".into(),
+            Some("local-server".into()),
+            7,
+            vec![item("SOURCE", "attachment", "", "", "")],
+        );
+        blank_rule_revision.rule_revision = " \t\n";
+        assert!(matches!(
+            prepare_source_resolution_review(
+                &blank_rule_revision,
+                vec![pending_resolution("SOURCE")]
+            ),
+            Err(SourceResolutionError::InvalidSnapshotIdentity)
+        ));
+    }
+
     #[test]
     fn source_resolution_rejects_owner_internal_inventory_drift() {
         let mut report = classify_snapshot(
@@ -1095,6 +1458,7 @@ mod tests {
                     item_key: "SOURCE".into(),
                     item_version: 7,
                     library_version: 7,
+                    server_id: Some("local-server".into()),
                     item_type: "attachment".into(),
                     parent_item_key: String::new(),
                     disposition: SourceResolutionDisposition::RetainStandaloneEvidence,
@@ -1348,6 +1712,22 @@ mod tests {
             }),
             Err(ReadError::SnapshotChanged)
         ));
+    }
+
+    #[test]
+    fn source_resolution_error_formats_invalid_pending_key_set() {
+        assert_eq!(
+            SourceResolutionError::InvalidPendingKeySet.to_string(),
+            "report pending source keys are not unique and canonical"
+        );
+    }
+
+    #[test]
+    fn source_resolution_error_formats_invalid_snapshot_identity() {
+        assert_eq!(
+            SourceResolutionError::InvalidSnapshotIdentity.to_string(),
+            "report snapshot identity is incomplete"
+        );
     }
 
     #[test]

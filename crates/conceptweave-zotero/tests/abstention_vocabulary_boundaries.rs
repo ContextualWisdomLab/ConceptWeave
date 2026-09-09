@@ -35,6 +35,10 @@ fn ordinary_non_ascii_characters_do_not_imply_unsupported_vocabulary() {
         abstention_reason("Unmatched study", "Estimated α threshold"),
         Some(AbstentionReason::NoDeterministicRuleMatch)
     );
+    assert_eq!(
+        abstention_reason("12345", ""),
+        Some(AbstentionReason::NoDeterministicRuleMatch)
+    );
 }
 
 #[test]

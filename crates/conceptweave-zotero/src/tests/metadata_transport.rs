@@ -14,10 +14,11 @@ fn read_fixture(
 ) {
     let _guard = LOCAL_API_TEST_LOCK.lock().unwrap();
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    *TEST_LOCAL_API.lock().unwrap() = Some(format!(
+    let api_base = format!(
         "http://{}/api/users/0/items",
         listener.local_addr().unwrap()
-    ));
+    );
+    *TEST_LOCAL_API.lock().unwrap() = Some(api_base);
     let server = thread::spawn(move || {
         let (mut stream, _) = listener.accept().unwrap();
         let mut request = Vec::new();
@@ -43,10 +44,11 @@ fn read_fixture(
 fn read_raw_response(response: Vec<u8>) -> Result<ClassificationReport, ReadError> {
     let _guard = LOCAL_API_TEST_LOCK.lock().unwrap();
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    *TEST_LOCAL_API.lock().unwrap() = Some(format!(
+    let api_base = format!(
         "http://{}/api/users/0/items",
         listener.local_addr().unwrap()
-    ));
+    );
+    *TEST_LOCAL_API.lock().unwrap() = Some(api_base);
     let server = thread::spawn(move || {
         let (mut stream, _) = listener.accept().unwrap();
         let mut request = Vec::new();
@@ -259,6 +261,18 @@ fn production_transport_accepts_absent_optional_server_id_and_rejects_bad_json()
     assert!(matches!(
         read_raw_response(successful_response("Zotero-Server-ID: synthetic\r\n", b"{")),
         Err(ReadError::Json(_))
+    ));
+}
+
+#[test]
+fn production_transport_surfaces_http_errors() {
+    let response =
+        b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            .to_vec();
+
+    assert!(matches!(
+        read_raw_response(response),
+        Err(ReadError::Http(_))
     ));
 }
 

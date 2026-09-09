@@ -1,0 +1,132 @@
+use conceptweave_zotero::{
+    ItemData, PendingSourceResolution, SourceResolutionDisposition, ZoteroItem, classify_snapshot,
+    prepare_source_resolution_review, restore_source_resolution_review,
+};
+
+fn item(key: &str, version: u64, item_type: &str) -> ZoteroItem {
+    ZoteroItem {
+        key: key.into(),
+        version,
+        data: ItemData {
+            item_type: item_type.into(),
+            title: String::new(),
+            abstract_note: String::new(),
+            doi: String::new(),
+            parent_item: String::new(),
+            collections: vec![],
+            tags: vec![],
+        },
+    }
+}
+
+fn resolution(key: &str, version: u64, item_type: &str) -> PendingSourceResolution {
+    PendingSourceResolution {
+        item_key: key.into(),
+        item_version: version,
+        library_version: 42,
+        server_id: Some("local-server".into()),
+        item_type: item_type.into(),
+        parent_item_key: String::new(),
+        disposition: SourceResolutionDisposition::RetainStandaloneEvidence,
+        reason: "The source remains independent evidence.".into(),
+    }
+}
+
+#[test]
+fn stored_source_resolution_review_rejects_a_removed_pending_decision() {
+    let report = classify_snapshot(
+        "10.0.1".into(),
+        Some("local-server".into()),
+        42,
+        vec![item("NOTE", 42, "note"), item("SOURCE", 41, "attachment")],
+    );
+    let review = prepare_source_resolution_review(
+        &report,
+        vec![
+            resolution("NOTE", 42, "note"),
+            resolution("SOURCE", 41, "attachment"),
+        ],
+    )
+    .expect("constructor requires the complete pending-source decision set");
+
+    let mut stored = serde_json::to_value(review).expect("review must serialize");
+    stored["resolved_sources"]
+        .as_array_mut()
+        .expect("resolved sources are an array")
+        .remove(0);
+
+    assert!(
+        restore_source_resolution_review(
+            &report,
+            &serde_json::to_vec(&stored).expect("stored value must serialize"),
+        )
+        .is_err(),
+        "stored review must not regain typed status after one pending decision is removed"
+    );
+}
+
+#[test]
+fn stored_source_resolution_review_rejects_item_identity_drift() {
+    let report = classify_snapshot(
+        "10.0.1".into(),
+        Some("local-server".into()),
+        42,
+        vec![item("SOURCE", 41, "attachment")],
+    );
+    let review =
+        prepare_source_resolution_review(&report, vec![resolution("SOURCE", 41, "attachment")])
+            .expect("constructor binds the decision to the exact source item identity");
+    let stored = serde_json::to_value(review).expect("review must serialize");
+    assert_eq!(
+        stored["expected_source_identities"][0],
+        serde_json::json!({
+            "item_key": "SOURCE",
+            "item_version": 41,
+            "item_type": "attachment",
+            "parent_item_key": ""
+        })
+    );
+
+    for (field, replacement) in [
+        ("item_version", serde_json::json!(40)),
+        ("item_type", serde_json::json!("note")),
+        ("parent_item_key", serde_json::json!("PARENT")),
+    ] {
+        let mut candidate = stored.clone();
+        candidate["resolved_sources"][0][field] = replacement;
+        assert!(
+            restore_source_resolution_review(
+                &report,
+                &serde_json::to_vec(&candidate).expect("stored value must serialize"),
+            )
+            .is_err(),
+            "stored review must reject {field} drift from the constructor-bound snapshot"
+        );
+    }
+}
+
+#[test]
+fn stored_source_resolution_review_rejects_coordinated_identity_rewrite() {
+    let report = classify_snapshot(
+        "10.0.1".into(),
+        Some("local-server".into()),
+        42,
+        vec![item("SOURCE", 41, "attachment")],
+    );
+    let review =
+        prepare_source_resolution_review(&report, vec![resolution("SOURCE", 41, "attachment")])
+            .expect("constructor binds the decision to the exact source item identity");
+    let mut stored = serde_json::to_value(review).expect("review must serialize");
+
+    stored["expected_source_identities"][0]["item_version"] = serde_json::json!(40);
+    stored["resolved_sources"][0]["item_version"] = serde_json::json!(40);
+
+    assert!(
+        restore_source_resolution_review(
+            &report,
+            &serde_json::to_vec(&stored).expect("stored value must serialize"),
+        )
+        .is_err(),
+        "stored review must not regain exact-snapshot typed status when both the expected and decision identity are rewritten together"
+    );
+}
