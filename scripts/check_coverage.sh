@@ -215,6 +215,6 @@ jq -r '
 # additional owned-production normalization. Do not infer that a native miss is
 # test-only or duplicate codegen until exact symbol/source evidence proves it.
 jq -e '.data | all(.totals.functions.percent == 100)' coverage.json >/dev/null
-jq -e 'all(.[]; .count > 0)' source-functions.json >/dev/null
-jq -e 'all(.[]; .count > 0)' source-regions.json >/dev/null
-jq -e 'all(.[]; .true_count > 0 and .false_count > 0)' source-branches.json >/dev/null
+jq -e 'length > 0 and all(.[]; .count > 0)' source-functions.json >/dev/null
+jq -e 'length > 0 and all(.[]; .count > 0)' source-regions.json >/dev/null
+jq -e 'length > 0 and all(.[]; .true_count > 0 and .false_count > 0)' source-branches.json >/dev/null
