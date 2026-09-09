@@ -1815,20 +1815,29 @@ from that closure. It remains neither merge- nor release-ready.
 
 ### September 9 Semantic Data Portal owner-gate revalidation
 
-The catalog-plane owner remains [Semantic Data Portal PR #73](https://github.com/ContextualWisdomLab/semantic-data-portal/pull/73), at exact head
-`311668e46491d343de1a5f668b860557c9543c51` over
-`e48aa13c4af7a4875d4b53e6a60b50405c265a2f`. GitHub reports it as Open,
-Ready, `CHANGES_REQUESTED`, `BLOCKED`, with three unresolved review threads
-and terminal `strix` and `trivy-fs` failures. Its catalog API, property and
-CodeQL checks succeeded, but no immutable release was returned. The historic
-failed workflow definitions are unavailable through `gh run view` (workflow
-404), while their exact check-run/job links remain visible; that absence is
-neither a passing verdict nor authorization to rerun or bypass them.
+The catalog-plane owner remains [Semantic Data Portal PR #73](https://github.com/ContextualWisdomLab/semantic-data-portal/pull/73), over
+`e48aa13c4af7a4875d4b53e6a60b50405c265a2f`. Its predecessor
+`311668e46491d343de1a5f668b860557c9543c51` was Open, Ready,
+`CHANGES_REQUESTED`, `BLOCKED`, with three unresolved review threads and
+terminal `strix` and `trivy-fs` failures. Those failed workflow definitions are
+unavailable through `gh run view` (workflow 404), while their exact
+check-run/job links remain visible; that absence is neither a passing verdict
+nor authorization to rerun or bypass them.
+
+The successor `1e22ab3b8b0d494809c10884c63d744555d9bf4c` removes relational
+list/query N+1 hydration with one parent and one query per child table, while
+keeping the single-object loader unchanged. A two-record regression fixes the
+list path at eight statements and preserves required and optional child rows;
+`PYTHONPATH=src pytest` passed 285 tests with nine intentional integration
+skips. GitHub now reports the successor Open, Ready, `BLOCKED`, still carrying
+the prior `CHANGES_REQUESTED` decision and three unresolved threads; its
+current-head central checks are queued. Therefore neither the local test run
+nor the queued work authorizes a merge or release.
 
 The unresolved owner findings require a root repair in that repository:
 centralize OIDC configuration across `tenant_binding`, `authz`, and the
 approved configuration boundary; retain fail-closed subject-header behavior;
-and remove relational list/query N+1 child hydration without changing
+and complete the remaining relational query review without changing
 tenant-scoped catalog records. ConceptWeave must continue to consume only a
 released, versioned catalog contract through its ACL. No catalog source was
 copied, no dependency was added, and no Semantic Data Portal release or
