@@ -15,3 +15,5 @@ Use the capture-bound blank-start worksheet for full-text decision work. Only th
 The separate typed full-text write boundary additionally requires explicit destinations and mode verified against independent write authority, after all local checks. Keep the complete approved scope on the opaque plan and the same versioned commitment on every execution and recovery outcome. Do not extract legacy plans or mix inverse operations, restore authority from audit JSON, or call an unknown original write restored through empty rollback. No live-write CLI or approval issuer is introduced.
 
 Delayed original-write inspection preserves the actual submitted request and complete earlier receipt. Its later response is unverified evidence, even when metadata matches; it never clears uncertainty or grants retry/rollback authority.
+
+Frozen coverage needs one writer per worktree. Use a fresh `CARGO_TARGET_DIR` for decisive reruns, then treat raw line, region, and branch deficits as RED even if normalized gates pass.
