@@ -99,7 +99,14 @@ fn temporary_output_path(output: &Path) -> io::Result<PathBuf> {
     )))
 }
 
-fn write_report<T: serde::Serialize>(
+fn write_report(
+    output: &Path,
+    report: &ClassificationReport,
+) -> Result<(), Box<dyn std::error::Error>> {
+    write_serialized_report(output, report)
+}
+
+fn write_serialized_report<T: serde::Serialize>(
     output: &Path,
     report: &T,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -118,7 +125,7 @@ fn write_report<T: serde::Serialize>(
         let _ = fs::remove_file(&temporary);
         return Err(error.into());
     }
-    cleanup_published_report(&temporary, |path| fs::remove_file(path)).map_err(Into::into)
+    cleanup_published_report(&temporary).map_err(Into::into)
 }
 
 fn serialize_report<W: Write, T: serde::Serialize>(
@@ -130,11 +137,8 @@ fn serialize_report<W: Write, T: serde::Serialize>(
     Ok(())
 }
 
-fn cleanup_published_report<F>(temporary: &Path, mut remove_file: F) -> io::Result<()>
-where
-    F: FnMut(&Path) -> io::Result<()>,
-{
-    remove_file(temporary).map_err(|error| {
+fn cleanup_published_report(temporary: &Path) -> io::Result<()> {
+    fs::remove_file(temporary).map_err(|error| {
         let kind = error.kind();
         io::Error::new(
             kind,
@@ -143,11 +147,10 @@ where
     })
 }
 
-fn run_with<I, F>(args: I, read_snapshot: F) -> Result<(), Box<dyn std::error::Error>>
-where
-    I: IntoIterator<Item = String>,
-    F: FnOnce() -> Result<ClassificationReport, ReadError>,
-{
+fn run_with(
+    args: Vec<String>,
+    read_snapshot: &mut dyn FnMut() -> Result<ClassificationReport, ReadError>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let output = args
         .into_iter()
         .nth(1)
@@ -162,7 +165,7 @@ where
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    run_with(env::args(), read_local_snapshot)
+    run_with(env::args().collect(), &mut read_local_snapshot)
 }
 
 #[cfg(test)]
@@ -251,7 +254,7 @@ mod tests {
             output.to_string_lossy().into_owned(),
         ];
 
-        run_with(args, || Ok(sample_report("10.0.1"))).unwrap();
+        run_with(args, &mut || Ok(sample_report("10.0.1"))).unwrap();
         let saved: serde_json::Value = serde_json::from_slice(&fs::read(&output).unwrap()).unwrap();
         assert_eq!(saved["zotero_version"], "10.0.1");
         fs::remove_file(output).unwrap();
@@ -272,7 +275,7 @@ mod tests {
             output.to_string_lossy().into_owned(),
         ];
 
-        run_with(args, || Ok(sample_report("9.0.6"))).unwrap();
+        run_with(args, &mut || Ok(sample_report("9.0.6"))).unwrap();
         let saved: serde_json::Value = serde_json::from_slice(&fs::read(&output).unwrap()).unwrap();
         assert_eq!(saved["zotero_version"], "9.0.6");
         fs::remove_file(output).unwrap();
@@ -281,7 +284,7 @@ mod tests {
     #[test]
     fn production_runner_rejects_missing_output_before_reading() {
         let called = Cell::new(false);
-        let result = run_with(vec!["conceptweave-zotero".to_owned()], || {
+        let result = run_with(vec!["conceptweave-zotero".to_owned()], &mut || {
             called.set(true);
             Ok(sample_report("10.0.1"))
         });
@@ -295,7 +298,7 @@ mod tests {
         let called = Cell::new(false);
         let result = run_with(
             vec!["conceptweave-zotero".to_owned(), "relative.json".to_owned()],
-            || {
+            &mut || {
                 called.set(true);
                 Ok(sample_report("10.0.1"))
             },
@@ -320,7 +323,7 @@ mod tests {
             output.to_string_lossy().into_owned(),
         ];
 
-        let result = run_with(args, || Err(ReadError::Budget("test-reader")));
+        let result = run_with(args, &mut || Err(ReadError::Budget("test-reader")));
         assert!(result.is_err());
         assert!(!output.exists());
     }
@@ -341,7 +344,7 @@ mod tests {
         ];
         let output_during_read = output.clone();
 
-        let result = run_with(args, || {
+        let result = run_with(args, &mut || {
             fs::write(&output_during_read, b"competitor").unwrap();
             Ok(sample_report("10.0.1"))
         });
@@ -362,7 +365,7 @@ mod tests {
         let output = unique_temp_path(&format!("serialization-failure-{nonce}"));
         let _ = fs::remove_file(&output);
 
-        assert!(write_report(&output, &FailingReport).is_err());
+        assert!(write_serialized_report(&output, &FailingReport).is_err());
         assert!(!output.exists());
     }
 
@@ -378,7 +381,9 @@ mod tests {
         let output = env::temp_dir().join(&output_name);
         let _ = fs::remove_dir(&output);
         fs::create_dir(&output).unwrap();
-        assert!(write_report(&output, &serde_json::json!({"state": "complete"})).is_err());
+        assert!(
+            write_serialized_report(&output, &serde_json::json!({"state": "complete"})).is_err()
+        );
         assert!(output.is_dir());
         let temporary_prefix = format!(".{output_name}.{}.", std::process::id());
         assert!(
@@ -395,29 +400,30 @@ mod tests {
 
     #[test]
     fn published_report_cleanup_reports_the_temp_failure_without_path_rollback() {
-        let temporary = Path::new("temporary.json");
-        let mut attempted_paths = Vec::new();
-        let result = cleanup_published_report(temporary, |path| {
-            attempted_paths.push(path.to_path_buf());
-            Err(io::Error::other("cleanup failure"))
-        });
+        let output = unique_temp_path("published-cleanup-failure");
+        let temporary = unique_temp_path("missing-cleanup-source");
+        let _ = fs::remove_file(&output);
+        let _ = fs::remove_file(&temporary);
+        fs::write(&output, b"published").unwrap();
+        let result = cleanup_published_report(&temporary);
 
-        assert!(result.unwrap_err().to_string().contains("cleanup failure"));
-        assert_eq!(attempted_paths, vec![temporary.to_path_buf()]);
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("report published but temporary cleanup failed")
+        );
+        assert_eq!(fs::read(&output).unwrap(), b"published");
+        fs::remove_file(output).unwrap();
     }
 
     #[test]
     fn published_report_cleanup_error_identifies_post_publication_state() {
-        let temporary = Path::new("temporary.json");
-        let error = cleanup_published_report(temporary, |_| {
-            Err(io::Error::new(
-                io::ErrorKind::PermissionDenied,
-                "cleanup failure",
-            ))
-        })
-        .unwrap_err();
+        let temporary = unique_temp_path("missing-cleanup-kind");
+        let _ = fs::remove_file(&temporary);
+        let error = cleanup_published_report(&temporary).unwrap_err();
 
-        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(error.kind(), io::ErrorKind::NotFound);
         assert!(
             error
                 .to_string()
@@ -435,13 +441,11 @@ mod tests {
             .as_nanos();
         let output = unique_temp_path(&format!("atomic-success-{nonce}"));
         let _ = fs::remove_file(&output);
-        let report = serde_json::json!({"state": "complete"});
+        let report = sample_report("10.0.1");
 
         write_report(&output, &report).unwrap();
-        assert_eq!(
-            serde_json::from_slice::<serde_json::Value>(&fs::read(&output).unwrap()).unwrap(),
-            report
-        );
+        let saved: serde_json::Value = serde_json::from_slice(&fs::read(&output).unwrap()).unwrap();
+        assert_eq!(saved["zotero_version"], "10.0.1");
         assert!(write_report(&output, &report).is_err());
         fs::remove_file(output).unwrap();
     }

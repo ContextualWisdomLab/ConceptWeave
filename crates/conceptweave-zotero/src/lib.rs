@@ -23,9 +23,6 @@ const MAX_SNAPSHOT_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_SNAPSHOT_ELAPSED: Duration = Duration::from_secs(300);
 const LOCAL_API: &str = "http://127.0.0.1:23119/api/users/0/items";
 
-#[cfg(test)]
-static TEST_LOCAL_API: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
-
 /// A Zotero item returned by the Local API.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ZoteroItem {
@@ -634,6 +631,10 @@ struct FetchedPage {
 /// An in-flight request may finish later under its existing per-request limits;
 /// its late result is rejected, not returned as a partial snapshot.
 pub fn read_local_snapshot() -> Result<ClassificationReport, ReadError> {
+    read_local_snapshot_from(LOCAL_API)
+}
+
+fn read_local_snapshot_from(api_base: &str) -> Result<ClassificationReport, ReadError> {
     let config = ureq::Agent::config_builder()
         .proxy(None)
         .timeout_global(Some(Duration::from_secs(60)))
@@ -643,21 +644,7 @@ pub fn read_local_snapshot() -> Result<ClassificationReport, ReadError> {
         .max_redirects(0)
         .build();
     let agent = ureq::Agent::new_with_config(config);
-    read_snapshot_with(&mut |start| fetch_local_page(&agent, start))
-}
-
-fn local_api_base() -> String {
-    #[cfg(test)]
-    {
-        if let Some(value) = TEST_LOCAL_API
-            .lock()
-            .expect("test Local API lock must not be poisoned")
-            .clone()
-        {
-            return value;
-        }
-    }
-    LOCAL_API.to_owned()
+    read_snapshot_with(&mut |start| fetch_local_page(&agent, api_base, start))
 }
 
 fn is_valid_zotero_object_key(value: &str) -> bool {
@@ -678,10 +665,14 @@ fn validate_source_item_keys(items: &[ZoteroItem]) -> Result<(), ReadError> {
     }
 }
 
-fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, ReadError> {
+fn fetch_local_page(
+    agent: &ureq::Agent,
+    api_base: &str,
+    start: usize,
+) -> Result<FetchedPage, ReadError> {
     let url = format!(
         "{}?format=json&include=data&limit={PAGE_LIMIT}&start={start}",
-        local_api_base()
+        api_base
     );
     let mut response = agent
         .get(&url)
@@ -1250,8 +1241,6 @@ mod tests {
     use std::net::TcpListener;
     use std::thread;
 
-    static LOCAL_API_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
     fn item(key: &str, item_type: &str, title: &str, doi: &str, parent: &str) -> ZoteroItem {
         ZoteroItem {
             key: key.into(),
@@ -1283,11 +1272,9 @@ mod tests {
 
     #[test]
     fn production_wrapper_requests_api_v3_and_records_contract_versions() {
-        let _guard = LOCAL_API_TEST_LOCK.lock().unwrap();
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         let base = format!("http://{address}/api/users/0/items");
-        *TEST_LOCAL_API.lock().unwrap() = Some(base);
 
         let server = thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
@@ -1315,15 +1302,13 @@ mod tests {
             stream.flush().unwrap();
         });
 
-        let report = read_local_snapshot().unwrap();
-        *TEST_LOCAL_API.lock().unwrap() = None;
+        let report = read_local_snapshot_from(&base).unwrap();
         server.join().unwrap();
 
         assert_eq!(report.api_version, Some(3));
         assert_eq!(report.schema_version, Some(42));
         assert_eq!(report.library_version, 42);
         assert_eq!(report.classified_items.len(), 1);
-        assert_eq!(local_api_base(), LOCAL_API);
     }
 
     #[test]
