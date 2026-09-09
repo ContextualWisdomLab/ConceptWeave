@@ -2,7 +2,7 @@
 
 **Snapshot:** 2026-09-08
 
-## Current exact-head checkpoint
+## Historical exact-head checkpoints
 
 At 23:17 KST a fresh release-mode Local API replay completed read-only with
 the same private `0600` digest
@@ -29,7 +29,7 @@ aggregate with report digest
 signals remained 27 `ontology`, 23 `OWL` and 20 `RDF`; this is repeatability and
 discovery evidence only, not review, approval or write authority.
 
-At the current verification checkpoint, PR39 is
+At that historical verification checkpoint, PR39 is
 `04e408ebd138177d183752b308a06811588e6668` (OPEN/Draft/CLEAN) and PR40 is
 `5397c0afca9c966b16547ee813df78e08149e97b` (OPEN/Draft/CLEAN). The latest
 Local API replay remains stable at 8,326 observed records, 3,715 proposals,
