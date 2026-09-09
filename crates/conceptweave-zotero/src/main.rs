@@ -108,10 +108,13 @@ fn write_report(
     })
 }
 
+type ReportSerializer<'a> =
+    dyn FnMut(&mut BufWriter<fs::File>) -> Result<(), Box<dyn std::error::Error>> + 'a;
+
 fn write_report_with(
     output: &Path,
     open_output: &mut dyn FnMut(&Path) -> io::Result<fs::File>,
-    serialize: &mut dyn FnMut(&mut BufWriter<fs::File>) -> Result<(), Box<dyn std::error::Error>>,
+    serialize: &mut ReportSerializer<'_>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let temporary = temporary_output_path(output)?;
     let file = open_output(&temporary)?;
