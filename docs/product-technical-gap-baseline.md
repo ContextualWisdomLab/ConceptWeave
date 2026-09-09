@@ -1777,3 +1777,16 @@ four pending source keys and 49 duplicate candidates. Zotero 10.0.1 / API 3 /
 schema 44 / library version 2 and the nonblank opaque server identity were
 also present. The replay-continuity KPI is `1/1`; it neither decides sources
 nor grants review, approval, publication or Zotero write authority.
+
+### September 9 16:44 current-head replay schema revalidation
+
+At PR39 head `b109bbb5a2248e7c3e4205d38cd6c5e59901d891`, the pinned Rust 1.98
+release binary again completed a read-only Local API reclassification to a new
+direct child of `/tmp` with mode `0600`. The private 8,132,756-byte report
+reproduced SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc` and the
+aggregate 8,326 observed, 3,715 classified, 4,611 retained, four pending
+source keys and 49 `duplicate_candidates`. This explicitly revalidates the
+current report field rather than treating a missing legacy key as zero. The
+continuity KPI remains `1/1`; no steward decision, approval, publication or
+Zotero write occurred.
