@@ -32,6 +32,8 @@ Current exact central workflows remain queued/in flight and qualifying independe
 
 Central #2056 at `69ae472562c93cc17674af5e2085a58947d3fab8` is a six-commit stacked successor whose merge base is #2051 current `558693e...`; it is OPEN/non-Draft/UNSTABLE with `CHANGES_REQUESTED`. It is repair evidence, not a replacement owner coordinate or protected integration. Keep #2051 as the current dependency until #2056 clears its own checks/review and is normally merged.
 
+Semantic Data Portal #73 current `1681a7f...` has a Noema review-control-plane failure, not a product finding: its 2026-09-09 job received HTTP 429 from the free gateway after one 366.4-second attempt. The log assigns repair/failover to the gateway. Contextual Orchestrator #1094 at `73338d21cbb389210d8dcb4e189882dda38dbd36` proposes virtual-free 429/502/timeout re-selection with typed attempt receipts, but is OPEN/BLOCKED/`REVIEW_REQUIRED` and has no immutable release. It is an owner candidate only; consumers must wait for protected owner release rather than copy or bypass its behavior.
+
 ## Research Intake #9
 
 Current Research Intake authority after Foundation restack is `a67d9d66b35024d6f2155f50ee5c9fb7d2e1dbe9`, OPEN Draft/mergeable on Foundation `60f14a6...`.
