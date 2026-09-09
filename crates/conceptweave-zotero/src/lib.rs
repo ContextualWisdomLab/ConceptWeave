@@ -480,20 +480,6 @@ pub fn read_local_snapshot() -> Result<ClassificationReport, ReadError> {
     read_snapshot_with(&mut |start| fetch_local_page(&agent, start))
 }
 
-fn local_api_base() -> String {
-    #[cfg(test)]
-    {
-        if let Some(value) = TEST_LOCAL_API
-            .lock()
-            .expect("test Local API lock must not be poisoned")
-            .clone()
-        {
-            return value;
-        }
-    }
-    LOCAL_API.to_owned()
-}
-
 fn is_valid_zotero_object_key(value: &str) -> bool {
     value.len() == 8
         && value
@@ -513,9 +499,16 @@ fn validate_source_item_keys(items: &[ZoteroItem]) -> Result<(), ReadError> {
 }
 
 fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, ReadError> {
+    let local_api = LOCAL_API.to_owned();
+    #[cfg(test)]
+    let local_api = TEST_LOCAL_API
+        .lock()
+        .expect("test Local API lock must not be poisoned")
+        .clone()
+        .unwrap_or(local_api);
     let url = format!(
         "{}?format=json&include=data&limit={PAGE_LIMIT}&start={start}",
-        local_api_base()
+        local_api
     );
     let mut response = agent
         .get(&url)
@@ -524,6 +517,9 @@ fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, Re
         .map_err(|error| ReadError::Http(error.to_string()))?;
     let headers = response.headers();
     let total = header_u64(headers, "Total-Results")?;
+    #[cfg(target_pointer_width = "64")]
+    let total = total as usize;
+    #[cfg(not(target_pointer_width = "64"))]
     let total = usize::try_from(total).map_err(|_| ReadError::Budget("item-count"))?;
     let library_version = header_u64(headers, "Last-Modified-Version")?;
     let zotero_version = header_string(headers, "X-Zotero-Version")?;
@@ -533,7 +529,7 @@ fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, Re
 
     let body = read_bounded_response_text(&mut response, MAX_PAGE_BYTES)
         .map_err(|error| ReadError::Body(error.to_string()))?;
-    let body_bytes = u64::try_from(body.len()).map_err(|_| ReadError::Budget("byte-count"))?;
+    let body_bytes = body.len() as u64;
     let items: Vec<ZoteroItem> = serde_json::from_str(&body).map_err(ReadError::Json)?;
     validate_source_item_keys(&items)?;
 
@@ -1164,7 +1160,6 @@ mod tests {
         assert_eq!(report.schema_version, Some(42));
         assert_eq!(report.library_version, 42);
         assert_eq!(report.classified_items.len(), 1);
-        assert_eq!(local_api_base(), LOCAL_API);
     }
 
     #[test]

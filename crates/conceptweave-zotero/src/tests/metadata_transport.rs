@@ -223,6 +223,32 @@ fn production_transport_rejects_missing_and_malformed_required_headers() {
         read_raw_response(malformed_total),
         Err(ReadError::Header("Total-Results"))
     ));
+
+    for missing in [
+        "Last-Modified-Version",
+        "X-Zotero-Version",
+        "Zotero-API-Version",
+        "Zotero-Schema-Version",
+    ] {
+        let headers = [
+            ("Total-Results", "0"),
+            ("Last-Modified-Version", "42"),
+            ("X-Zotero-Version", "9.0.6"),
+            ("Zotero-API-Version", "3"),
+            ("Zotero-Schema-Version", "42"),
+        ]
+        .into_iter()
+        .filter(|(name, _)| *name != missing)
+        .map(|(name, value)| format!("{name}: {value}\r\n"))
+        .collect::<String>();
+        let response =
+            format!("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n{headers}Connection: close\r\n\r\n[]")
+                .into_bytes();
+        match read_raw_response(response).unwrap_err() {
+            ReadError::Header(actual) => assert_eq!(actual, missing),
+            error => panic!("unexpected transport error: {error}"),
+        }
+    }
 }
 
 #[test]
@@ -234,6 +260,16 @@ fn production_transport_accepts_absent_optional_server_id_and_rejects_bad_json()
         read_raw_response(successful_response("Zotero-Server-ID: synthetic\r\n", b"{")),
         Err(ReadError::Json(_))
     ));
+}
+
+#[test]
+fn production_transport_reports_connection_failures() {
+    let _guard = LOCAL_API_TEST_LOCK.lock().unwrap();
+    *TEST_LOCAL_API.lock().unwrap() = Some("http://127.0.0.1:0/api/users/0/items".to_owned());
+    let result = read_local_snapshot();
+    *TEST_LOCAL_API.lock().unwrap() = None;
+
+    assert!(matches!(result, Err(ReadError::Http(_))));
 }
 
 #[test]

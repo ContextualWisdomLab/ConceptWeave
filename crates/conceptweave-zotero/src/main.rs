@@ -8,6 +8,9 @@ use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+type ReportSerializer =
+    fn(&mut dyn Write, &ClassificationReport) -> Result<(), Box<dyn std::error::Error>>;
+
 fn allowed_output_parent_policy(
     system_temp: PathBuf,
     conventional_tmp: Option<PathBuf>,
@@ -39,10 +42,17 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
         ));
     }
 
+    let Some(file_name) = path.file_name() else {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "report output has no file name",
+        ));
+    };
+
     let allowed_parents = allowed_output_parents();
-    let parent = path.parent().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidInput, "report output has no parent")
-    })?;
+    let parent = path
+        .parent()
+        .expect("absolute report path with a file name has a parent");
     let resolved_parent = parent.canonicalize()?;
     if !allowed_parents.contains(&resolved_parent) {
         return Err(io::Error::new(
@@ -50,12 +60,6 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
             "report output must be a direct child of the system temp directory",
         ));
     }
-    let file_name = path.file_name().ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "report output has no file name",
-        )
-    })?;
     let resolved_path = resolved_parent.join(file_name);
     if fs::symlink_metadata(&resolved_path).is_ok() {
         return Err(io::Error::new(
@@ -77,15 +81,19 @@ fn open_new_output(path: &Path) -> io::Result<fs::File> {
     options.open(path)
 }
 
+fn remove_report_file(path: &Path) -> io::Result<()> {
+    fs::remove_file(path)
+}
+
 fn temporary_output_path(output: &Path) -> io::Result<PathBuf> {
     static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-    let file_name = output.file_name().ok_or_else(|| {
-        io::Error::new(
+    let Some(file_name) = output.file_name() else {
+        return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "report output has no file name",
-        )
-    })?;
+        ));
+    };
     let nonce = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
     Ok(output.with_file_name(format!(
         ".{}.{}.{}.tmp",
@@ -95,55 +103,82 @@ fn temporary_output_path(output: &Path) -> io::Result<PathBuf> {
     )))
 }
 
-fn write_report<T: serde::Serialize>(
+fn write_report(
     output: &Path,
-    report: &T,
+    report: &ClassificationReport,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut remove_file = remove_report_file;
+    write_report_with(output, report, serialize_report, &mut remove_file)
+}
+
+fn write_report_with(
+    output: &Path,
+    report: &ClassificationReport,
+    serialize: ReportSerializer,
+    remove_file: &mut dyn FnMut(&Path) -> io::Result<()>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let temporary = temporary_output_path(output)?;
     let file = open_new_output(&temporary)?;
     let mut writer = BufWriter::new(file);
 
-    if let Err(error) = serialize_report(&mut writer, report) {
+    if let Err(error) = serialize(&mut writer, report) {
         drop(writer);
-        let _ = fs::remove_file(&temporary);
+        if let Err(cleanup_error) = remove_file(&temporary) {
+            return Err(io::Error::new(
+                cleanup_error.kind(),
+                format!(
+                    "report serialization failed ({error}); temporary cleanup failed: {cleanup_error}"
+                ),
+            )
+            .into());
+        }
         return Err(error);
     }
     drop(writer);
 
     if let Err(error) = fs::hard_link(&temporary, output) {
-        let _ = fs::remove_file(&temporary);
+        if let Err(cleanup_error) = remove_file(&temporary) {
+            return Err(io::Error::new(
+                cleanup_error.kind(),
+                format!(
+                    "report publication failed ({error}); temporary cleanup failed: {cleanup_error}"
+                ),
+            )
+            .into());
+        }
         return Err(error.into());
     }
-    cleanup_published_report(&temporary, |path| fs::remove_file(path)).map_err(Into::into)
+    cleanup_published_report(&temporary, remove_file)?;
+    Ok(())
 }
 
-fn serialize_report<W: Write, T: serde::Serialize>(
-    writer: &mut W,
-    report: &T,
+fn serialize_report(
+    writer: &mut dyn Write,
+    report: &ClassificationReport,
 ) -> Result<(), Box<dyn std::error::Error>> {
     serde_json::to_writer_pretty(&mut *writer, report)?;
     writer.flush()?;
     Ok(())
 }
 
-fn cleanup_published_report<F>(temporary: &Path, mut remove_file: F) -> io::Result<()>
-where
-    F: FnMut(&Path) -> io::Result<()>,
-{
-    remove_file(temporary).map_err(|error| {
+fn cleanup_published_report(
+    temporary: &Path,
+    remove_file: &mut dyn FnMut(&Path) -> io::Result<()>,
+) -> io::Result<()> {
+    if let Err(error) = remove_file(temporary) {
         let kind = error.kind();
-        io::Error::new(
+        return Err(io::Error::new(
             kind,
             format!("report published but temporary cleanup failed: {error}"),
-        )
-    })
+        ));
+    }
+    Ok(())
 }
 
-fn run_with<I, F>(args: I, read_snapshot: F) -> Result<(), Box<dyn std::error::Error>>
-where
-    I: IntoIterator<Item = String>,
-    F: FnOnce() -> Result<ClassificationReport, ReadError>,
-{
+fn run_with(
+    args: Vec<String>,
+    read_snapshot: &mut dyn FnMut() -> Result<ClassificationReport, ReadError>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let output = args
         .into_iter()
         .nth(1)
@@ -158,26 +193,13 @@ where
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    run_with(env::args(), read_local_snapshot)
+    let mut read_snapshot = read_local_snapshot;
+    run_with(env::args().collect(), &mut read_snapshot)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::cell::Cell;
-
-    struct FailingReport;
-
-    impl serde::Serialize for FailingReport {
-        fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            Err(<S::Error as serde::ser::Error>::custom(
-                "intentional serialization failure",
-            ))
-        }
-    }
 
     struct FlushFailWriter;
 
@@ -188,6 +210,18 @@ mod tests {
 
         fn flush(&mut self) -> io::Result<()> {
             Err(io::Error::other("intentional flush failure"))
+        }
+    }
+
+    struct WriteFailWriter;
+
+    impl Write for WriteFailWriter {
+        fn write(&mut self, _bytes: &[u8]) -> io::Result<usize> {
+            Err(io::Error::other("intentional write failure"))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
         }
     }
 
@@ -207,6 +241,17 @@ mod tests {
         )
     }
 
+    fn fail_serialization(
+        _writer: &mut dyn Write,
+        _report: &ClassificationReport,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Err(io::Error::other("intentional serialization failure").into())
+    }
+
+    fn failing_snapshot() -> Result<ClassificationReport, ReadError> {
+        Err(ReadError::Budget("test-reader"))
+    }
+
     #[test]
     fn production_runner_publishes_a_complete_report() {
         use std::time::{SystemTime, UNIX_EPOCH};
@@ -222,7 +267,8 @@ mod tests {
             output.to_string_lossy().into_owned(),
         ];
 
-        run_with(args, || Ok(sample_report("10.0.1"))).unwrap();
+        let mut read_snapshot = || Ok(sample_report("10.0.1"));
+        run_with(args, &mut read_snapshot).unwrap();
         let saved: serde_json::Value = serde_json::from_slice(&fs::read(&output).unwrap()).unwrap();
         assert_eq!(saved["zotero_version"], "10.0.1");
         fs::remove_file(output).unwrap();
@@ -231,7 +277,11 @@ mod tests {
     #[test]
     fn report_serialization_propagates_flush_failures() {
         let mut writer = FlushFailWriter;
-        assert!(serialize_report(&mut writer, &serde_json::json!({"state": "complete"})).is_err());
+        assert!(serialize_report(&mut writer, &sample_report("10.0.1")).is_err());
+
+        let mut writer = WriteFailWriter;
+        assert!(serialize_report(&mut writer, &sample_report("10.0.1")).is_err());
+        writer.flush().unwrap();
     }
 
     #[test]
@@ -249,7 +299,8 @@ mod tests {
             output.to_string_lossy().into_owned(),
         ];
 
-        run_with(args, || Ok(sample_report("9.0.6"))).unwrap();
+        let mut read_snapshot = || Ok(sample_report("9.0.6"));
+        run_with(args, &mut read_snapshot).unwrap();
         let saved: serde_json::Value = serde_json::from_slice(&fs::read(&output).unwrap()).unwrap();
         assert_eq!(saved["zotero_version"], "9.0.6");
         fs::remove_file(output).unwrap();
@@ -257,29 +308,29 @@ mod tests {
 
     #[test]
     fn production_runner_rejects_missing_output_before_reading() {
-        let called = Cell::new(false);
-        let result = run_with(vec!["conceptweave-zotero".to_owned()], || {
-            called.set(true);
-            Ok(sample_report("10.0.1"))
-        });
+        let mut read_snapshot = failing_snapshot;
+        let error =
+            run_with(vec!["conceptweave-zotero".to_owned()], &mut read_snapshot).unwrap_err();
 
-        assert!(result.is_err());
-        assert!(!called.get());
+        assert_eq!(
+            error.to_string(),
+            "usage: conceptweave-zotero /tmp/OUTPUT.json"
+        );
     }
 
     #[test]
     fn production_runner_rejects_invalid_output_before_reading() {
-        let called = Cell::new(false);
-        let result = run_with(
+        let mut read_snapshot = failing_snapshot;
+        let error = run_with(
             vec!["conceptweave-zotero".to_owned(), "relative.json".to_owned()],
-            || {
-                called.set(true);
-                Ok(sample_report("10.0.1"))
-            },
-        );
+            &mut read_snapshot,
+        )
+        .unwrap_err();
 
-        assert!(result.is_err());
-        assert!(!called.get());
+        assert_eq!(
+            error.to_string(),
+            "report output must be an absolute path in the system temp directory"
+        );
     }
 
     #[test]
@@ -297,7 +348,8 @@ mod tests {
             output.to_string_lossy().into_owned(),
         ];
 
-        let result = run_with(args, || Err(ReadError::Budget("test-reader")));
+        let mut read_snapshot = failing_snapshot;
+        let result = run_with(args, &mut read_snapshot);
         assert!(result.is_err());
         assert!(!output.exists());
     }
@@ -318,13 +370,32 @@ mod tests {
         ];
         let output_during_read = output.clone();
 
-        let result = run_with(args, || {
+        let mut read_snapshot = || {
             fs::write(&output_during_read, b"competitor").unwrap();
             Ok(sample_report("10.0.1"))
-        });
+        };
+        let result = run_with(args, &mut read_snapshot);
 
         assert!(result.is_err());
         assert_eq!(fs::read(&output).unwrap(), b"competitor");
+
+        let mut retained_temporary = None;
+        let mut fail_remove = |path: &Path| {
+            retained_temporary = Some(path.to_path_buf());
+            Err(io::Error::other("intentional cleanup failure"))
+        };
+        let error = write_report_with(
+            &output,
+            &sample_report("10.0.1"),
+            serialize_report,
+            &mut fail_remove,
+        )
+        .unwrap_err();
+        let retained_temporary = retained_temporary.unwrap();
+        assert!(error.to_string().contains("report publication failed"));
+        assert_eq!(fs::read(&output).unwrap(), b"competitor");
+        assert!(retained_temporary.exists());
+        fs::remove_file(retained_temporary).unwrap();
         fs::remove_file(output).unwrap();
     }
 
@@ -339,18 +410,43 @@ mod tests {
         let output = unique_temp_path(&format!("serialization-failure-{nonce}"));
         let _ = fs::remove_file(&output);
 
-        assert!(write_report(&output, &FailingReport).is_err());
+        let report = sample_report("10.0.1");
+        let mut removed_temporary = None;
+        let mut remove_file = |path: &Path| {
+            removed_temporary = Some(path.to_path_buf());
+            remove_report_file(path)
+        };
+        assert!(write_report_with(&output, &report, fail_serialization, &mut remove_file).is_err());
         assert!(!output.exists());
+        assert!(!removed_temporary.unwrap().exists());
+
+        let mut retained_temporary = None;
+        let mut fail_remove = |path: &Path| {
+            retained_temporary = Some(path.to_path_buf());
+            Err(io::Error::other("intentional cleanup failure"))
+        };
+        let error =
+            write_report_with(&output, &report, fail_serialization, &mut fail_remove).unwrap_err();
+        let retained_temporary = retained_temporary.unwrap();
+        assert!(
+            error
+                .to_string()
+                .contains("report serialization failed (intentional serialization failure); temporary cleanup failed")
+        );
+        assert!(!output.exists());
+        assert!(retained_temporary.exists());
+        fs::remove_file(retained_temporary).unwrap();
     }
 
     #[test]
     fn published_report_cleanup_reports_temp_failure_without_final_path_rollback() {
         let temporary = Path::new("temporary.json");
         let mut attempted_paths = Vec::new();
-        let result = cleanup_published_report(temporary, |path| {
+        let mut remove_file = |path: &Path| {
             attempted_paths.push(path.to_path_buf());
             Err(io::Error::other("cleanup failure"))
-        });
+        };
+        let result = cleanup_published_report(temporary, &mut remove_file);
 
         assert!(result.unwrap_err().to_string().contains("cleanup failure"));
         assert_eq!(attempted_paths, vec![temporary.to_path_buf()]);
@@ -359,13 +455,13 @@ mod tests {
     #[test]
     fn published_report_cleanup_error_identifies_post_publication_state() {
         let temporary = Path::new("temporary.json");
-        let error = cleanup_published_report(temporary, |_| {
+        let mut remove_file = |_: &Path| {
             Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
                 "cleanup failure",
             ))
-        })
-        .unwrap_err();
+        };
+        let error = cleanup_published_report(temporary, &mut remove_file).unwrap_err();
 
         assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
         assert!(
@@ -373,6 +469,33 @@ mod tests {
                 .to_string()
                 .contains("report published but temporary cleanup failed")
         );
+
+        let output = unique_temp_path("published-cleanup-failure");
+        let _ = fs::remove_file(&output);
+        let mut retained_temporary = None;
+        let mut fail_remove = |path: &Path| {
+            retained_temporary = Some(path.to_path_buf());
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "cleanup failure",
+            ))
+        };
+        let error = write_report_with(
+            &output,
+            &sample_report("10.0.1"),
+            serialize_report,
+            &mut fail_remove,
+        )
+        .unwrap_err();
+        let retained_temporary = retained_temporary.unwrap();
+        assert_eq!(
+            error.downcast_ref::<io::Error>().unwrap().kind(),
+            io::ErrorKind::PermissionDenied
+        );
+        assert!(output.exists());
+        assert!(retained_temporary.exists());
+        fs::remove_file(output).unwrap();
+        fs::remove_file(retained_temporary).unwrap();
     }
 
     #[test]
@@ -385,12 +508,12 @@ mod tests {
             .as_nanos();
         let output = unique_temp_path(&format!("atomic-success-{nonce}"));
         let _ = fs::remove_file(&output);
-        let report = serde_json::json!({"state": "complete"});
+        let report = sample_report("10.0.1");
 
         write_report(&output, &report).unwrap();
         assert_eq!(
-            serde_json::from_slice::<serde_json::Value>(&fs::read(&output).unwrap()).unwrap(),
-            report
+            serde_json::from_slice::<serde_json::Value>(&fs::read(&output).unwrap()).unwrap()["zotero_version"],
+            "10.0.1"
         );
         assert!(write_report(&output, &report).is_err());
         fs::remove_file(output).unwrap();
@@ -398,6 +521,7 @@ mod tests {
 
     #[test]
     fn output_path_must_be_a_new_direct_temp_child() {
+        let report = sample_report("10.0.1");
         let allowed = unique_temp_path("allowed");
         let _ = fs::remove_file(&allowed);
         let expected = allowed
@@ -414,6 +538,8 @@ mod tests {
         assert!(validate_output_path("relative.json").is_err());
         assert!(validate_output_path("/").is_err());
         assert!(validate_output_path("/tmp/missing-directory/report.json").is_err());
+        assert!(write_report(Path::new("/"), &report).is_err());
+        assert!(write_report(Path::new("/tmp/missing-directory/report.json"), &report).is_err());
         assert!(
             validate_output_path(
                 env::current_dir()
