@@ -54,11 +54,12 @@ fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
             "report output must be a direct child of the system temp directory",
         ));
     }
-    // A path with a canonicalized parent necessarily has a file name; root-only
-    // paths fail the parent check above before reaching this invariant.
-    let file_name = path
-        .file_name()
-        .expect("canonicalized child path has a file name");
+    let file_name = path.file_name().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "report output has no file name",
+        )
+    })?;
     let resolved_path = resolved_parent.join(file_name);
     if fs::symlink_metadata(&resolved_path).is_ok() {
         return Err(io::Error::new(
