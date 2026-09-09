@@ -229,6 +229,29 @@ and two unbound nonempty records. This is acquisition/availability evidence
 only; it does not create steward decisions, approval, semantic authority or
 Zotero write permission.
 
+### September 9 15:45 exact-head replay
+
+The live #39 source head repeated the release-mode Local API classification
+without mutation: 8,326 observed records, 3,715 bibliographic proposals,
+4,611 retained non-bibliographic records, four pending sources, and zero
+classification failures. The private `0600` report retained snapshot digest
+`sha256:0666dbebfb0c5aa99deb5a6dda1fc02d84bc46d08aaaddf25f5526a18eceef6d`.
+Its fresh bound `0600` capture produced digest
+`sha256:acd1643d5ddf8b4d3b28c181a2fdb0fe18f16906e4b3394846ac2e31f791e63e`;
+availability was unchanged at 3,203 papers with nonempty text, 440 without
+attachment ancestry, 34 unmanifested, 38 captured-empty, 471 needing review
+without text, and two unbound nonempty records. This repeat proves current
+observation continuity only; review completion stays 0/3,715 and it grants no
+approval, publication, or Zotero write authority.
+
+The same head's frozen coverage attempt is RED. Raw owned regions are below
+100% in `full_text_review.rs`, `full_text_write.rs`, `lib.rs`, and `main.rs`.
+One concurrent LLVM run also removed `source-regions.json` before the
+normalizer consumed it, so that run is not coverage evidence; a serialized
+rerun must retain the raw deficits and repair them without lowering gates.
+PR #39 is Draft until that owner work, exact-head checks, and independent
+review are complete.
+
 ### September 9 06:38 capture-bound worksheet/view preparation
 
 The same report/capture pair produced a new owner-only `0600` full-text
