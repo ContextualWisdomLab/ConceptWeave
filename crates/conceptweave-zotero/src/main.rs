@@ -465,6 +465,13 @@ mod tests {
             validate_output_path("/").unwrap_err().kind(),
             io::ErrorKind::InvalidInput
         );
+        let parent_component = env::temp_dir().join("..");
+        assert_eq!(
+            validate_output_path(parent_component.to_str().unwrap())
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::InvalidInput
+        );
         let missing_parent = env::temp_dir().join("conceptweave-zotero-missing-directory");
         let missing_report = missing_parent.join("report.json");
         assert_ne!(
