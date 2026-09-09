@@ -1,0 +1,12 @@
+[package]
+name = "conceptweave-client"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "Offline semantic-release admission contracts for ConceptWeave consumers"
+
+[dependencies]
+conceptweave-domain = { path = "../conceptweave-domain" }
+sha2 = "0.10.9"

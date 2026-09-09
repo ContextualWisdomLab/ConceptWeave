@@ -1,0 +1,11 @@
+{
+  "superseded": {
+    "release_id": "semantic_release_2026_09",
+    "artifact_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "successor": {
+    "release_id": "semantic_release_2026_10",
+    "artifact_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "rationale": "   "
+}

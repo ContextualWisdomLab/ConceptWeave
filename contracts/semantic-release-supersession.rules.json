@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.contextualwisdomlab.org/conceptweave/semantic-release-supersession/1.0.0/semantic-rules",
+  "contract_version": "1.0.0",
+  "rules": [
+    {
+      "id": "distinct_release_id",
+      "operator": "not_equal",
+      "left": "/superseded/release_id",
+      "right": "/successor/release_id"
+    }
+  ]
+}
