@@ -1790,3 +1790,14 @@ source keys and 49 `duplicate_candidates`. This explicitly revalidates the
 current report field rather than treating a missing legacy key as zero. The
 continuity KPI remains `1/1`; no steward decision, approval, publication or
 Zotero write occurred.
+
+### September 9 PR40 current-head coverage attribution
+
+At PR40 exact head `986d0a51bd446cbc010e8523834aa79f50425e72`, one serialized
+pinned-nightly coverage run completed the locked workspace suite. Raw LLVM
+reported 224/224 functions, 2,088/2,092 lines, 3,325/3,344 regions and 214/224
+branch outcomes. Its unmangled diagnostic includes generic and coverage-wrapper
+symbols; the frozen source normalization is 129/129 functions, 1,371/1,371
+regions and 102/102 branch outcomes. No production source gap was identified,
+so no duplicate test or threshold exception was added. PR40 remains Draft with
+no independent approval or protected hosted acceptance.
