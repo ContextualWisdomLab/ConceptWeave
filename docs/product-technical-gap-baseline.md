@@ -1910,3 +1910,15 @@ nine intended integration skips). The preceding Code Quality review thread was
 resolved only after the current-head repair; all hosted checks have restarted
 for this SHA. This leaves `CHANGES_REQUESTED`, `BLOCKED`, independent approval,
 an immutable owner release, and ConceptWeave ACL adoption unresolved.
+
+### September 9 PR9-to-PR40 review successor trace
+
+PR #9 remains Draft at `0c935d805f01cdf548156743c20544ab4596f8c3` with its
+review findings attached to that predecessor head. The current owner successor,
+PR #40 at `cc802740420dd4402ae2295e270af21530a682dd`, contains the matching
+reader, report-boundary, provenance-state, DOI-normalization, and regression
+repairs; its nested DOI regression passed with `rustup run 1.98.0 cargo test -p
+conceptweave-zotero --test nested_doi_wrappers` (one test). A PR #9 trace
+comment links this evidence without resolving predecessor findings as though its
+head changed. PR #40 remains Draft without exact-head hosted checks or an
+independent approval, so no merge, release, or Zotero write authority follows.
