@@ -18,4 +18,6 @@ Delayed original-write inspection preserves the actual submitted request and com
 
 Frozen coverage needs one writer per worktree. Use a fresh `CARGO_TARGET_DIR` for decisive reruns, then treat raw line, region, and branch deficits as RED even if normalized gates pass.
 
+Raw LLVM file totals include source-embedded test and generic-instantiation instrumentation. Keep them as diagnostics, and use the frozen function-symbol normalization to identify an actual production miss; an empty normalized uncovered set does not prove protected readiness.
+
 For a Local API release report, calculate public item totals from the `classified_items` and `unclassified_items` array lengths after checking their types. Keep the `0600` report private and report only aggregates and its digest.

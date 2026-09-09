@@ -86,6 +86,7 @@ When a coverage gate exposes test-only branches, remove unreachable platform gua
 
 - Compare raw coverage gaps with the frozen repository gate before editing. Direct `cargo llvm-cov` can report intentionally uncalled rejection-test callbacks, coverage-off entrypoints or fixture-only unreachable arms; classify those lines first and never hide them by weakening the owned threshold.
 - Concurrent frozen coverage runs share `coverage.json` and normalized intermediates in the worktree. For a decisive rerun, use a fresh `CARGO_TARGET_DIR`, run only one coverage command, and retain raw line/region/branch deficits as RED even when native functions and normalized predicates pass.
+- Raw LLVM file totals include source-embedded test and generic-instantiation instrumentation. Preserve them as diagnostics, but locate production gaps with the frozen function-symbol normalization: an empty normalized uncovered set is evidence that the reported raw deficit is not an unexecuted production region; it does not by itself make a PR protected-ready.
 
 - Upstream repository license metadata and Cargo package license declarations are separate evidence. Record both at immutable head/release coordinates and resolve any divergence before proposing a dependency or utility repository.
 - Discovery KPIs must name their denominator: the 142/3,715 ontology queue rate is steward workload screening only, never precision, recall, approval coverage or semantic authority.

@@ -1737,3 +1737,16 @@ the preceding replay byte for byte. The report contains 8,326 observed items:
 source-resolution keys and 49 duplicate candidates. This is a continuity KPI
 (`1/1` current replay matched); it neither changes a steward disposition nor
 issues approval, publication, or Zotero write authority.
+
+### September 9 16:21 PR39 coverage attribution revalidation
+
+At exact head `e78b616c1946005b48c75585639464b42a1462f8`, a single-writer pinned
+nightly replay recovered its profile before reporting: raw LLVM totals are
+451/451 functions, 5,692/5,752 lines, 8,345/8,477 regions and 730/784 branch
+outcomes. The raw diagnostic remains RED. The frozen production-symbol
+normalization, however, has zero uncovered regions out of 4,752 and zero
+uncovered branch outcomes out of 784. The difference is attributable to
+source-embedded test and generic-instantiation instrumentation in the raw
+per-file totals, not an identified unexecuted production symbol. This repairs
+the attribution record only; PR39 remains Draft pending current protected
+workflow evidence and an independent approval.
