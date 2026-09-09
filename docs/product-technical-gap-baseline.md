@@ -1,8 +1,14 @@
 # Product / Technical Gap Baseline
 
-**Snapshot:** 2026-09-08 (current top checkpoint; older exact coordinates below are retained as dated evidence)
+**Snapshot:** 2026-09-09 (current top checkpoint; older exact coordinates below are retained as dated evidence)
 
 This file records code-current product and technical gaps. Exact PR/check/run coordinates are evidence snapshots, not mutable-head dependencies. Live protected-branch, PR, issue and workflow state wins whenever it advances after a dated checkpoint.
+
+## September 9 classification-report provenance checkpoint
+
+Research Intake Issue #41 is source-repaired locally at `826987122124c86791e3958b996c8ea871d0964c`, directly after PR #9 owner head `63c22bb0dfa2ca13b703928fe4f8aeafa947bba3`. The pre-repair regression executed RED: coherent caller mutation of both report identity/inventory and matching source-resolution values could be admitted as though it were the original classifier snapshot. The repair makes every `ClassificationReport` field private and constructor-bound, retains only immutable public accessors, keeps the existing proposal JSON shape, and adds no trusted deserialization or public reconstruction route. Malformed retained-state defense remains covered inside the owner module without exposing a public mutation seam.
+
+Exact source commit `8269871` passed the focused regression, source-resolution tests, compile-fail rustdoc, locked Rust 1.98.0 workspace tests, formatting, strict all-target/all-feature Clippy, warnings-denied documentation, and release build. Coverage remains RED rather than waived: raw LLVM measured 155/160 branches, 190/195 functions, 1,738/1,761 lines, and 2,789/2,841 regions; the frozen normalized gate measured 159/160 branches and 1,130/1,187 source regions. PR #40 has not been restacked, and any field-syntax/struct-literal consumers must migrate on a normal non-force restack after the owner contract is reviewed. No hosted check, protected merge, release, steward approval, Zotero write authority, or cryptographic authenticity is claimed.
 
 ## September 8 research lifecycle, abstention, and replay-evidence checkpoint
 
