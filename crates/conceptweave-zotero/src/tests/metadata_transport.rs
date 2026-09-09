@@ -174,8 +174,8 @@ fn metadata_routing_child() {
     }
     let (result, server) = read_fixture(b"[]".to_vec(), 2, 0);
     let report = result.unwrap();
-    assert_eq!(report.library_version, 42);
-    assert!(report.classified_items.is_empty());
+    assert_eq!(report.library_version(), 42);
+    assert!(report.classified_items().is_empty());
     let request = server.join().unwrap();
     assert!(request.starts_with(
         "GET /api/users/0/items?format=json&include=data&limit=100&start=0 HTTP/1.1\r\n"
@@ -191,8 +191,8 @@ fn snapshot_accepts_a_response_exactly_at_the_byte_limit() {
     let (result, server) = read_fixture(body, MAX_PAGE_BYTES as usize, 0);
     server.join().unwrap();
     let report = result.expect("exact-limit synthetic JSON must be accepted");
-    assert_eq!(report.library_version, 42);
-    assert!(report.classified_items.is_empty());
+    assert_eq!(report.library_version(), 42);
+    assert!(report.classified_items().is_empty());
 }
 
 #[test]
@@ -228,7 +228,7 @@ fn production_transport_rejects_missing_and_malformed_required_headers() {
 #[test]
 fn production_transport_accepts_absent_optional_server_id_and_rejects_bad_json() {
     let report = read_raw_response(successful_response("", b"[]")).unwrap();
-    assert_eq!(report.server_id, None);
+    assert_eq!(report.server_id(), None);
 
     assert!(matches!(
         read_raw_response(successful_response("Zotero-Server-ID: synthetic\r\n", b"{")),

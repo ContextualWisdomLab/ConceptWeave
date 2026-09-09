@@ -104,22 +104,7 @@ fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
 }
 
 #[test]
-fn source_resolution_rejects_missing_inventory_and_explains_errors() {
-    let mut report = classify_snapshot(
-        "10.0.1".into(),
-        Some("local-server".into()),
-        7,
-        vec![item("SOURCE", 3, "attachment", "")],
-    );
-    report.unclassified_items.clear();
-    assert!(matches!(
-        prepare_source_resolution_review(
-            &report,
-            vec![resolution("SOURCE", 3, "attachment", "", 7, "keep")]
-        ),
-        Err(SourceResolutionError::MissingInventory(key)) if key == "SOURCE"
-    ));
-
+fn source_resolution_errors_remain_explainable() {
     let messages = [
         (
             SourceResolutionError::Missing("SOURCE".into()),

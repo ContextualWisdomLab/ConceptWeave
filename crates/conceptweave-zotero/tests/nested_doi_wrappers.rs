@@ -29,7 +29,7 @@ fn nested_supported_doi_wrappers_share_one_duplicate_identity() {
     );
 
     let doi_candidates = report
-        .duplicate_candidates
+        .duplicate_candidates()
         .iter()
         .filter(|candidate| candidate.identity_kind == "doi")
         .collect::<Vec<_>>();
