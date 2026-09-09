@@ -1907,9 +1907,14 @@ test-only lambda by passing the existing `_configuration` callable directly to
 the OIDC configuration seam. `PYTHONPATH=src pytest -q tests/test_authz.py`
 (nine tests) and the full `PYTHONPATH=src pytest -q` suite passed (285 tests;
 nine intended integration skips). The preceding Code Quality review thread was
-resolved only after the current-head repair; all hosted checks have restarted
-for this SHA. This leaves `CHANGES_REQUESTED`, `BLOCKED`, independent approval,
-an immutable owner release, and ConceptWeave ACL adoption unresolved.
+resolved only after the current-head repair. On September 9, the rendered
+GitHub Checks view confirmed that the current `512c89f` head has no unresolved
+review thread; the remaining `CHANGES_REQUESTED` decision is OpenCode review
+`4962193173` against the obsolete `bfa409f8971a3b28aac31ec7bca371fa94f7f07f`
+head. Current-head admission completed, while OpenCode, Noema, CodeQL, Semgrep,
+and security jobs remain queued. This leaves protected checks, a current-head
+independent approval, an immutable owner release, and ConceptWeave ACL adoption
+unresolved; the stale decision is not merge authority.
 
 ### September 9 PR9-to-PR40 review successor trace
 
