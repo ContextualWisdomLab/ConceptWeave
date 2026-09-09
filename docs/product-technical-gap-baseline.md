@@ -16,7 +16,7 @@
 ### Bootstrap dependency and contract escape path
 
 ```mermaid
-flowchart LR
+flowchart TB
     ci["#35 Product CI bootstrap"] --> foundation["#1 Foundation"]
     foundation --> intake["#9 Research Intake owner"]
     intake --> resolution["#40 Pending-source resolution"]
