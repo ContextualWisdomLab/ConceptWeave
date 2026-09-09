@@ -17,3 +17,5 @@ The separate typed full-text write boundary additionally requires explicit desti
 Delayed original-write inspection preserves the actual submitted request and complete earlier receipt. Its later response is unverified evidence, even when metadata matches; it never clears uncertainty or grants retry/rollback authority.
 
 Frozen coverage needs one writer per worktree. Use a fresh `CARGO_TARGET_DIR` for decisive reruns, then treat raw line, region, and branch deficits as RED even if normalized gates pass.
+
+For a Local API release report, calculate public item totals from the `classified_items` and `unclassified_items` array lengths after checking their types. Keep the `0600` report private and report only aggregates and its digest.

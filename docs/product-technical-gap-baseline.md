@@ -1725,3 +1725,15 @@ byte, preserving the verified aggregate of 8,326 observed, 3,715 classified,
 4,611 retained, four pending source-resolution keys and 49 duplicate
 candidates. This confirms snapshot continuity only; no steward decision,
 approval or Zotero write was performed.
+
+### September 9 15:56 live Local API reclassification
+
+At PR39 head `05d01f336f78f3a302c2e60e27a936769745e8e9`, the pinned Rust 1.98
+optimized CLI completed a fresh read-only release-mode replay into a new direct
+child of `/tmp` with mode `0600`. Its SHA-256 is
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`, matching
+the preceding replay byte for byte. The report contains 8,326 observed items:
+3,715 classification proposals, 4,611 retained unclassified items, four pending
+source-resolution keys and 49 duplicate candidates. This is a continuity KPI
+(`1/1` current replay matched); it neither changes a steward disposition nor
+issues approval, publication, or Zotero write authority.
