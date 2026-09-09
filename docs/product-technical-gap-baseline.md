@@ -1884,3 +1884,17 @@ current Code Quality finding by retaining one `sdp.api` import style in the
 test module. It is a non-force source repair, not protected evidence: hosted
 checks restarted; review threads, independent approval, immutable release,
 and ConceptWeave adoption remain unresolved.
+
+### September 9 PR40 current-head coverage attribution
+
+At PR #40 exact head `cc802740420dd4402ae2295e270af21530a682dd`, the frozen
+`rustup run 1.98.0 bash scripts/check_coverage.sh` gate completed with all
+locked tests green. Native LLVM totals still include generic instantiations and
+test wrappers (224/224 functions, 2,088/2,092 lines, 3,325/3,344 regions, and
+214/224 branch outcomes), while the production-symbol normalizer reports
+129/129 functions, 1,371/1,371 regions, and 102/102 branches. The only
+per-file raw gap is `conceptweave-zotero/src/lib.rs` at 99.7114% lines and
+99.1597% regions; no unexecuted production symbol was identified. No duplicate
+test, threshold change, release, or protected-merge claim follows from this
+attribution result. PR #40 remains Draft pending exact-head hosted evidence and
+an independent approval.
