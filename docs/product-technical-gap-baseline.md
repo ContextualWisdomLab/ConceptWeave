@@ -1801,3 +1801,14 @@ symbols; the frozen source normalization is 129/129 functions, 1,371/1,371
 regions and 102/102 branch outcomes. No production source gap was identified,
 so no duplicate test or threshold exception was added. PR40 remains Draft with
 no independent approval or protected hosted acceptance.
+
+### September 9 central workflow successor closure
+
+The stale central owner PR `ContextualWisdomLab/.github#1641` was closed only
+after its exact head `b8c986e2406beb37d254acd4c5df6389038b55f2` compared as
+`ahead_by=0`, `behind_by=59` against current `main`, and current `main` had no
+remaining `_temp_pr1641` workflow. No delta was discarded and no release is
+inferred. ConceptWeave PR35 remains at
+`22709ec9b4d969bf67ec74db402813e74d11f7ca`, Ready but BLOCKED with required
+review outstanding; its exact head did not receive a new central workflow run
+from that closure. It remains neither merge- nor release-ready.
