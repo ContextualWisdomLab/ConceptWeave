@@ -42,3 +42,4 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - Never suppress deprecation warnings; fix causes.
 - Never force-push shared branches, self-approve, fabricate checks, or weaken branch protection.
 - Coverage assertions should inspect an already-returned error with direct kind comparisons; `matches!` guards create test-only branch obligations and can obscure the production coverage deficit.
+- Keep test injection seams source-identical to production code. A `cfg(test)` branch or generic callback can create a separately uncovered production instance; prefer one private, non-generic boundary and exercise it through the public wrapper.
