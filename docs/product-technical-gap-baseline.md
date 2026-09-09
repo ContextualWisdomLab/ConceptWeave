@@ -1856,3 +1856,17 @@ the full `PYTHONPATH=src pytest -q` suite passed (285 tests; nine intended
 integration skips). This is source and local test evidence only: the successor
 still needs exact-head hosted checks, resolved review threads, an independent
 approval, and an immutable owner release before any ConceptWeave ACL adoption.
+
+### September 9 Semantic Data Portal policy and lockfile successor
+
+Semantic Data Portal PR #73 next advanced normally to
+`851ebff97dd87e55a25a23c218a61758efcbb1ce`. Its policy evaluator now carries
+verified request roles through every dataset action rather than falling back to
+the legacy demo subject map after OIDC admission; the regression uses an
+intentionally conflicting role. The owner also regenerated both hashed
+requirements files with `uv pip compile --generate-hashes`, bringing the
+pre-existing `httpx2==2.12.0` dev declaration into the lockfile. Full
+`PYTHONPATH=src pytest -q` remains green (285 tests; nine intended integration
+skips). This successor resets hosted exact-head evidence and does not resolve
+the three review threads or authorize merge, release, deployment, or
+ConceptWeave adoption.
