@@ -1922,3 +1922,15 @@ conceptweave-zotero --test nested_doi_wrappers` (one test). A PR #9 trace
 comment links this evidence without resolving predecessor findings as though its
 head changed. PR #40 remains Draft without exact-head hosted checks or an
 independent approval, so no merge, release, or Zotero write authority follows.
+
+### September 9 PR40 current-head review-thread closure
+
+At PR #40 exact head `cc802740420dd4402ae2295e270af21530a682dd`, the
+source-resolution contract, stored-completeness, nested DOI, and CLI publication
+tests passed (32 tests). The validated current code preserves report/library
+binding, strict pending-decision completeness, private temporary-file cleanup,
+nonempty coverage denominators, and the production branch-normalization
+contract. Ten review threads tied to earlier commits were therefore resolved
+after this revalidation. PR #40 remains Draft with no exact-head hosted checks
+or independent approval; neither thread closure nor local tests authorizes
+merge, release, deployment, or Zotero mutation.
