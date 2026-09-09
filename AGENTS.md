@@ -22,3 +22,8 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - Owned production coverage target is 100% line/function/region/branch where tooling exposes it.
 - Never suppress deprecation warnings; fix causes.
 - Never force-push shared branches, self-approve, fabricate checks, or weaken branch protection.
+
+## Operational lessons
+
+- Do not compile test-only endpoint overrides into `coverage_nightly`: that changes the measured production artifact. Normalize cfg-varying function records by declaration origin plus normalized function identity while the independent native 100% function gate remains authoritative, and freeze both same-function merging and same-origin function separation with a synthetic contract fixture.
+- When report publication fails, preserve both the operation error and any temporary-cleanup error. Tests must capture the exact operation-specific temporary path from the removal boundary and verify whether it was removed or retained; prefix scans and destination-only assertions are insufficient.
