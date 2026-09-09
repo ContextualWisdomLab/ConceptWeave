@@ -22,7 +22,8 @@ const MAX_SNAPSHOT_ITEMS: usize = 50_000;
 const MAX_SNAPSHOT_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_SNAPSHOT_ELAPSED: Duration = Duration::from_secs(300);
 const LOCAL_API: &str = "http://127.0.0.1:23119/api/users/0/items";
-static LOCAL_API_OVERRIDE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+#[cfg(test)]
+static TEST_LOCAL_API: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 
 /// A Zotero item returned by the Local API.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -698,15 +699,6 @@ struct FetchedPage {
 /// An in-flight request may finish later under its existing per-request limits;
 /// its late result is rejected, not returned as a partial snapshot.
 pub fn read_local_snapshot() -> Result<ClassificationReport, ReadError> {
-    let api_base = LOCAL_API_OVERRIDE
-        .lock()
-        .expect("Local API override lock must not be poisoned")
-        .clone()
-        .unwrap_or(LOCAL_API.to_owned());
-    read_local_snapshot_from(&api_base)
-}
-
-fn read_local_snapshot_from(api_base: &str) -> Result<ClassificationReport, ReadError> {
     let config = ureq::Agent::config_builder()
         .proxy(None)
         .timeout_global(Some(Duration::from_secs(60)))
@@ -716,7 +708,7 @@ fn read_local_snapshot_from(api_base: &str) -> Result<ClassificationReport, Read
         .max_redirects(0)
         .build();
     let agent = ureq::Agent::new_with_config(config);
-    read_snapshot_with(&mut |start| fetch_local_page(&agent, api_base, start))
+    read_snapshot_with(&mut |start| fetch_local_page(&agent, start))
 }
 
 fn is_valid_zotero_object_key(value: &str) -> bool {
@@ -737,11 +729,14 @@ fn validate_source_item_keys(items: &[ZoteroItem]) -> Result<(), ReadError> {
     }
 }
 
-fn fetch_local_page(
-    agent: &ureq::Agent,
-    api_base: &str,
-    start: usize,
-) -> Result<FetchedPage, ReadError> {
+fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, ReadError> {
+    let api_base = LOCAL_API.to_owned();
+    #[cfg(test)]
+    let api_base = TEST_LOCAL_API
+        .lock()
+        .expect("test Local API lock must not be poisoned")
+        .clone()
+        .unwrap_or(api_base);
     let url = format!(
         "{}?format=json&include=data&limit={PAGE_LIMIT}&start={start}",
         api_base
@@ -1493,7 +1488,7 @@ mod tests {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         let base = format!("http://{address}/api/users/0/items");
-        *LOCAL_API_OVERRIDE.lock().unwrap() = Some(base);
+        *TEST_LOCAL_API.lock().unwrap() = Some(base);
 
         let server = thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
@@ -1522,7 +1517,7 @@ mod tests {
         });
 
         let report = read_local_snapshot().unwrap();
-        *LOCAL_API_OVERRIDE.lock().unwrap() = None;
+        *TEST_LOCAL_API.lock().unwrap() = None;
         server.join().unwrap();
 
         assert_eq!(report.api_version, Some(3));

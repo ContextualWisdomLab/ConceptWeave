@@ -56,6 +56,46 @@ normalize_branches() {
   ' "$coverage_path" > "$output_path"
 }
 
+normalize_functions() {
+  local coverage_path="$1"
+  local output_path="$2"
+
+  jq '
+    [
+      .data[0].functions[]
+      | select(.name | contains("5tests") | not)
+      | . as $function
+      | [
+          .regions[]
+          | {
+              file: $function.filenames[.[5]],
+              line_start: .[0],
+              column_start: .[1],
+              line_end: .[2],
+              column_end: .[3]
+            }
+          | select(.file | contains("/tests/") | not)
+        ]
+        | sort_by(.file, .line_start, .column_start, .line_end, .column_end) as $source_regions
+      | select($source_regions | length > 0)
+      | {
+          origin: $source_regions[0],
+          symbol_identity: ($function.name | sub("Cs[[:alnum:]_]+_19conceptweave_"; "19conceptweave_")),
+          source_regions: $source_regions,
+          raw_name: $function.name,
+          count: $function.count
+        }
+    ]
+    | sort_by(.origin, .symbol_identity)
+    | group_by([.origin, .symbol_identity])
+    | map({
+        source_regions: ([.[].source_regions[]] | unique | sort_by(.file, .line_start, .column_start, .line_end, .column_end)),
+        raw_names: (map(.raw_name) | unique),
+        count: (map(.count) | add)
+      })
+  ' "$coverage_path" > "$output_path"
+}
+
 check_branch_normalization_contract() {
   (
     local contract_dir
@@ -69,7 +109,37 @@ check_branch_normalization_contract() {
   )
 }
 
+check_function_normalization_contract() {
+  (
+    local contract_dir
+    contract_dir=$(mktemp -d "${TMPDIR:-/tmp}/conceptweave-function-contract.XXXXXX")
+    trap 'rm -rf -- "${contract_dir:?}"' EXIT
+
+    jq -n '{data:[{functions:[
+      {name:"_RNvCsAAAA_19conceptweave_zotero9read_page",count:0,filenames:["/repo/src/lib.rs"],regions:[[10,1,20,1,0,0,0,0]]},
+      {name:"_RNvCsBBBB_19conceptweave_zotero9read_page",count:1,filenames:["/repo/src/lib.rs"],regions:[[10,1,20,1,1,0,0,0],[12,1,12,8,1,0,0,0]]},
+      {name:"_RNvCsCCCC_19conceptweave_zotero10other_here",count:1,filenames:["/repo/src/lib.rs"],regions:[[10,1,20,1,1,0,0,0]]},
+      {name:"crate::other",count:1,filenames:["/repo/src/lib.rs"],regions:[[30,1,35,1,1,0,0,0]]},
+      {name:"crate::5tests::helper",count:0,filenames:["/repo/src/lib.rs"],regions:[[40,1,45,1,0,0,0,0]]}
+    ]}]}' > "$contract_dir/coverage.json"
+    normalize_functions "$contract_dir/coverage.json" "$contract_dir/source-functions.json"
+    jq -e '
+      length == 3
+      and any(.[];
+        .count == 1
+        and .raw_names == ["_RNvCsAAAA_19conceptweave_zotero9read_page", "_RNvCsBBBB_19conceptweave_zotero9read_page"]
+      )
+      and any(.[];
+        .count == 1
+        and .raw_names == ["_RNvCsCCCC_19conceptweave_zotero10other_here"]
+      )
+      and any(.[]; .count == 1 and .raw_names == ["crate::other"])
+    ' "$contract_dir/source-functions.json" >/dev/null
+  )
+}
+
 check_branch_normalization_contract
+check_function_normalization_contract
 
 cargo "+${coverage_toolchain}" llvm-cov \
   --workspace \
@@ -99,38 +169,7 @@ jq -r '
   | "RAW_FUNCTION_GAP name=\(.name) files=\(.filenames | join(","))"
 ' coverage.json
 
-jq '
-  [
-    .data[0].functions[]
-    | select(.name | contains("5tests") | not)
-    | . as $function
-    | [
-        .regions[]
-        | . as $region
-        | {
-            file: $function.filenames[$region[5]],
-            line_start: $region[0],
-            column_start: $region[1],
-            line_end: $region[2],
-            column_end: $region[3]
-          }
-        | select(.file | contains("/tests/") | not)
-      ] as $source_regions
-    | select($source_regions | length > 0)
-    | {
-        source_regions: ($source_regions | sort_by(.file, .line_start, .column_start, .line_end, .column_end)),
-        raw_name: .name,
-        count: .count
-      }
-  ]
-  | sort_by(.source_regions)
-  | group_by(.source_regions)
-  | map({
-      source_regions: .[0].source_regions,
-      raw_names: (map(.raw_name) | unique),
-      count: (map(.count) | add)
-    })
-' coverage.json > source-functions.json
+normalize_functions coverage.json source-functions.json
 
 jq '
   {

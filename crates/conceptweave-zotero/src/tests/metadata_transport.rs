@@ -18,7 +18,7 @@ fn read_fixture(
         "http://{}/api/users/0/items",
         listener.local_addr().unwrap()
     );
-    *LOCAL_API_OVERRIDE.lock().unwrap() = Some(api_base);
+    *TEST_LOCAL_API.lock().unwrap() = Some(api_base);
     let server = thread::spawn(move || {
         let (mut stream, _) = listener.accept().unwrap();
         let mut request = Vec::new();
@@ -37,7 +37,7 @@ fn read_fixture(
         String::from_utf8(request).unwrap()
     });
     let result = read_local_snapshot();
-    *LOCAL_API_OVERRIDE.lock().unwrap() = None;
+    *TEST_LOCAL_API.lock().unwrap() = None;
     (result, server)
 }
 
@@ -48,7 +48,7 @@ fn read_raw_response(response: Vec<u8>) -> Result<ClassificationReport, ReadErro
         "http://{}/api/users/0/items",
         listener.local_addr().unwrap()
     );
-    *LOCAL_API_OVERRIDE.lock().unwrap() = Some(api_base);
+    *TEST_LOCAL_API.lock().unwrap() = Some(api_base);
     let server = thread::spawn(move || {
         let (mut stream, _) = listener.accept().unwrap();
         let mut request = Vec::new();
@@ -61,7 +61,7 @@ fn read_raw_response(response: Vec<u8>) -> Result<ClassificationReport, ReadErro
         stream.write_all(&response).unwrap();
     });
     let result = read_local_snapshot();
-    *LOCAL_API_OVERRIDE.lock().unwrap() = None;
+    *TEST_LOCAL_API.lock().unwrap() = None;
     server.join().unwrap();
     result
 }
@@ -226,7 +226,7 @@ fn production_transport_rejects_missing_and_malformed_required_headers() {
         Err(ReadError::Header("Total-Results"))
     ));
 
-    for omitted in [
+    for missing in [
         "Last-Modified-Version",
         "X-Zotero-Version",
         "Zotero-API-Version",
@@ -240,16 +240,16 @@ fn production_transport_rejects_missing_and_malformed_required_headers() {
             ("Zotero-Schema-Version", "42"),
         ]
         .into_iter()
-        .filter(|(name, _)| *name != omitted)
+        .filter(|(name, _)| *name != missing)
         .map(|(name, value)| format!("{name}: {value}\r\n"))
         .collect::<String>();
         let response =
             format!("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n{headers}Connection: close\r\n\r\n[]")
                 .into_bytes();
-        assert!(matches!(
-            read_raw_response(response),
-            Err(ReadError::Header(name)) if name == omitted
-        ));
+        match read_raw_response(response).unwrap_err() {
+            ReadError::Header(actual) => assert_eq!(actual, missing),
+            error => panic!("unexpected transport error: {error}"),
+        }
     }
 }
 
@@ -274,6 +274,16 @@ fn production_transport_surfaces_http_errors() {
         read_raw_response(response),
         Err(ReadError::Http(_))
     ));
+}
+
+#[test]
+fn production_transport_reports_connection_failures() {
+    let _guard = LOCAL_API_TEST_LOCK.lock().unwrap();
+    *TEST_LOCAL_API.lock().unwrap() = Some("http://127.0.0.1:0/api/users/0/items".to_owned());
+    let result = read_local_snapshot();
+    *TEST_LOCAL_API.lock().unwrap() = None;
+
+    assert!(matches!(result, Err(ReadError::Http(_))));
 }
 
 #[test]
