@@ -16,6 +16,7 @@
 ### Bootstrap dependency and contract escape path
 
 ```mermaid
+%%{init: {"flowchart": {"rankSpacing": 20}}}%%
 flowchart TB
     ci["#35 Product CI bootstrap"] --> foundation["#1 Foundation"]
     foundation --> intake["#9 Research Intake owner"]
