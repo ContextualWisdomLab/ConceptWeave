@@ -358,7 +358,7 @@ The [aFIPC legacy measurement-kernel boundary audit](doctoring/cwl_ontology_capa
 
 ConceptWeave PR #39 currently resolves to `e96bca0aa237afb9e969a513e5e6b52e177e06cd` over stacked base `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`; GitHub reports OPEN Draft, with CodeRabbit pending and merge state `UNSTABLE`. “CLEAN” is not required-check or protected-merge evidence, so keep the PR open and do not publish or deploy.
 
-The Semantic Data Portal ontology/catalog-plane candidate remains an open owner PR [#73](https://github.com/ContextualWisdomLab/semantic-data-portal/pull/73) at `311668e46491d343de1a5f668b860557c9543c51` against `main`, not a releasable dependency: GitHub reports `CHANGES_REQUESTED`, `MERGEState=BLOCKED`, and completed `strix` and `trivy-fs` failures despite several other successful checks. Preserve the PR and repair findings at the owner; do not copy its catalog/ontology implementation into ConceptWeave or infer adoption.
+The Semantic Data Portal ontology/catalog-plane candidate remains an open owner PR [#73](https://github.com/ContextualWisdomLab/semantic-data-portal/pull/73) at `512c89f0a99732193f32422238584f625285eb2f` against `main`, not a releasable dependency: GitHub reports `CHANGES_REQUESTED`, `MERGEState=BLOCKED`, and its exact-head protection checks are newly queued. Preserve the PR and repair findings at the owner; do not copy its catalog/ontology implementation into ConceptWeave or infer adoption.
 
 The [Clearfolio document-viewer boundary audit](doctoring/cwl_ontology_capability_inventory.md#clearfolio-document-viewer-boundary-audit-2026-09-08) advances bounded candidate coverage to 52/76, leaving 24. Protected `main@06633a25109c62e24a7015ae04fb9f6e0a246f7e` contains a document-viewer MVP and contracts but no ontology authority or release evidence. Adoption remains zero and actual decisions/approvals remain 0/3,715 plus four pending sources.
 
@@ -1898,3 +1898,15 @@ per-file raw gap is `conceptweave-zotero/src/lib.rs` at 99.7114% lines and
 test, threshold change, release, or protected-merge claim follows from this
 attribution result. PR #40 remains Draft pending exact-head hosted evidence and
 an independent approval.
+
+### September 9 Semantic Data Portal direct-callable review repair
+
+Semantic Data Portal PR #73 advanced normally to
+`512c89f0a99732193f32422238584f625285eb2f`. The owner removed an unnecessary
+test-only lambda by passing the existing `_configuration` callable directly to
+the OIDC configuration seam. `PYTHONPATH=src pytest -q tests/test_authz.py`
+(nine tests) and the full `PYTHONPATH=src pytest -q` suite passed (285 tests;
+nine intended integration skips). The preceding Code Quality review thread was
+resolved only after the current-head repair; all hosted checks have restarted
+for this SHA. This leaves `CHANGES_REQUESTED`, `BLOCKED`, independent approval,
+an immutable owner release, and ConceptWeave ACL adoption unresolved.
