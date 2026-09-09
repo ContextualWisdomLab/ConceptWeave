@@ -21,3 +21,5 @@ Frozen coverage needs one writer per worktree. Use a fresh `CARGO_TARGET_DIR` fo
 Raw LLVM file totals include source-embedded test and generic-instantiation instrumentation. Keep them as diagnostics, and use the frozen function-symbol normalization to identify an actual production miss; an empty normalized uncovered set does not prove protected readiness.
 
 For a Local API release report, calculate public item totals from the `classified_items` and `unclassified_items` array lengths after checking their types. Keep the `0600` report private and report only aggregates and its digest.
+
+A merged owner PR is not a released contract: require its immutable release coordinate or artifact, then verify the current consumer adoption and re-execution before treating a protected consumer prerequisite as repaired.
