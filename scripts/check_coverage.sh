@@ -124,7 +124,10 @@ jq -r '
   | "REGION_GAP file=\(.file) start=\(.line_start):\(.column_start) end=\(.line_end):\(.column_end)"
 ' source-regions.json
 
-jq '
+# LLVM's file-level branch list also contains branches emitted by inline
+# #[cfg(test)] modules that live under src/*.rs. Bind each normalized branch to
+# a non-test production region so function, region, and branch scope agree.
+jq --slurpfile production_regions source-regions.json '
   [
     .data[0].files[]
     | .filename as $file
@@ -137,7 +140,25 @@ jq '
         column_end: .[3],
         true_count: .[4],
         false_count: .[5]
-      }
+      } as $branch
+    | select(any($production_regions[0][];
+        .file == $branch.file
+        and (
+          .line_start < $branch.line_start
+          or (
+            .line_start == $branch.line_start
+            and .column_start <= $branch.column_start
+          )
+        )
+        and (
+          .line_end > $branch.line_end
+          or (
+            .line_end == $branch.line_end
+            and .column_end >= $branch.column_end
+          )
+        )
+      ))
+    | $branch
   ]
   | sort_by(.file, .line_start, .column_start, .line_end, .column_end)
   | group_by([.file, .line_start, .column_start, .line_end, .column_end])
