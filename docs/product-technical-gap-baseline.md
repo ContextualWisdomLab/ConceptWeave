@@ -1764,3 +1764,16 @@ Noema coordinate, consumer adoption, rerun of ConceptWeave PR35's central
 workflow, independent approval, protected merge, publication or deployment to
 claim. This closes no product gap; it corrects the evidence boundary for the
 next owner-release loop.
+
+### September 9 16:33 current-head Local API reclassification
+
+At PR39 head `91fe1ea51dd386d663e17b469533feb154bed7d6`, the pinned Rust 1.98
+release binary rebuilt and completed a fresh read-only Local API classification
+into a new direct child of `/tmp` with mode `0600`. The private report is
+8,132,756 bytes and reproduced SHA-256
+`8e533d4d4b27d93bce8e1223528b109f07ba69ff19d1e41cf58a3245b02545cc`: 8,326
+observed items, 3,715 proposals, 4,611 retained non-bibliographic records,
+four pending source keys and 49 duplicate candidates. Zotero 10.0.1 / API 3 /
+schema 44 / library version 2 and the nonblank opaque server identity were
+also present. The replay-continuity KPI is `1/1`; it neither decides sources
+nor grants review, approval, publication or Zotero write authority.
