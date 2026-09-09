@@ -1,6 +1,6 @@
 # Zotero report output parent-component admission
 
-Status: `SOURCE_TEST_REPAIRED_PENDING_EXECUTION`
+Status: `LOCAL_EXACT_HEAD_GREEN_PENDING_HOSTED_REVIEW`
 
 ## Problem
 
@@ -34,4 +34,4 @@ This is a behavioral regression of the earlier fail-closed implementation, not a
 
 ## Acceptance
 
-No predecessor execution transfers after the RED/source/docs commits. Before this lane can be GREEN, one unchanged exact successor must pass the repository's locked Rust 1.98 workspace tests, `cargo fmt --all -- --check`, all-target strict Clippy, warnings-denied rustdoc/release, LLVM native function coverage 100%, normalized owned-production source-function/region/branch 100%, applicable hosted checks, and qualifying independent review. The PR remains Draft until those gates are evidenced.
+No predecessor execution transferred after the RED/source/docs commits. Frozen local verification at source/test successor `3bccda338a2fc34e57ae6767c1a643cb744c48d5` passes the repository's locked Rust 1.98 workspace tests, `cargo fmt --all -- --check`, all-target strict Clippy, warnings-denied rustdoc/release, LLVM native function coverage 100%, and normalized owned-production source-function/region/branch 100%. The live PR ref remains the authority for later successors. The PR is Ready for review, but applicable hosted checks and qualifying independent approval remain unverified; this lane is not protected-merge GREEN.
