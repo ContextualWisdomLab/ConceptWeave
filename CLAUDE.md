@@ -29,3 +29,5 @@ If a historical GitHub check remains visible but its workflow definition was rem
 OIDC policy belongs to the catalog owner's versioned configuration boundary, not request-path environment reads. A local owner test override is not consumer adoption; wait for the immutable owner release and revalidate the ACL.
 
 Verified OIDC roles must reach every catalog policy action. A regenerated hash lockfile is not a released contract or consumer-adoption proof.
+
+When catalog OIDC policy moves into versioned configuration, identity guidance must not expose retired request-path settings. Preserve a response-copy regression and wait for the owner release before adoption.

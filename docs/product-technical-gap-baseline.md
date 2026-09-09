@@ -1870,3 +1870,17 @@ pre-existing `httpx2==2.12.0` dev declaration into the lockfile. Full
 skips). This successor resets hosted exact-head evidence and does not resolve
 the three review threads or authorize merge, release, deployment, or
 ConceptWeave adoption.
+
+### September 9 Semantic Data Portal identity-copy successor
+
+Semantic Data Portal PR #73 advanced normally again to
+`6de14474106e10a050e243e1cd1814b57d61987b`. The owner removed the retired
+subject-header environment-key instruction from identity error guidance and
+its public binding contract: callers receive the supported Keyverse Bearer
+path plus an administrator-controlled local demo/CI option instead. A focused
+response-copy regression and the full `PYTHONPATH=src pytest -q` suite passed
+(285 tests; nine intended integration skips). The same successor fixes the
+current Code Quality finding by retaining one `sdp.api` import style in the
+test module. It is a non-force source repair, not protected evidence: hosted
+checks restarted; review threads, independent approval, immutable release,
+and ConceptWeave adoption remain unresolved.
