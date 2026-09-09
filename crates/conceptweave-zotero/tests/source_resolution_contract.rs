@@ -423,25 +423,6 @@ fn source_resolution_rejects_duplicate_unknown_stale_and_blank_decisions() {
 }
 
 #[test]
-fn source_resolution_rejects_pending_keys_missing_from_retained_inventory() {
-    let mut report = classify_snapshot(
-        "10.0.1".into(),
-        Some("local-server".into()),
-        7,
-        vec![item("SOURCE", 3, "attachment", "")],
-    );
-    report.unclassified_items.clear();
-
-    assert!(matches!(
-        prepare_source_resolution_review(
-            &report,
-            vec![resolution("SOURCE", 3, "attachment", "", 7, Some("local-server"))]
-        ),
-        Err(SourceResolutionError::MissingInventory(key)) if key == "SOURCE"
-    ));
-}
-
-#[test]
 fn source_resolution_errors_explain_each_rejection() {
     let cases = [
         (
@@ -469,8 +450,20 @@ fn source_resolution_errors_explain_each_rejection() {
             "pending source is absent from report inventory: SOURCE",
         ),
         (
+            SourceResolutionError::AmbiguousInventory("SOURCE".into()),
+            "pending source has ambiguous report inventory identity: SOURCE",
+        ),
+        (
+            SourceResolutionError::InvalidPendingKeySet,
+            "report pending source keys are not unique and canonical",
+        ),
+        (
             SourceResolutionError::MissingServerIdentity,
             "report lacks a non-blank Zotero server identity",
+        ),
+        (
+            SourceResolutionError::InvalidSnapshotIdentity,
+            "report snapshot identity is incomplete",
         ),
     ];
     for (error, expected) in cases {

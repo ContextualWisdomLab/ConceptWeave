@@ -36,6 +36,7 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - A healthy local replay and a rendered Zotero view do not authorize deployment; keep protected-main, independent review, immutable release, and live-runtime evidence as separate gates.
 - Once a report is atomically published, cleanup failure must preserve the final artifact; never roll back by deleting a successfully published path.
 - Post-publication cleanup errors must retain the original I/O kind while adding enough context to distinguish an already-published report from a pre-publication failure.
+- Treat `ClassificationReport` as a trusted Research Intake aggregate: keep snapshot identity and retained inventory private and constructor-bound, expose only immutable accessors, and test public mutation attempts with compile-fail documentation. Preserve defensive malformed-state tests inside the owner module instead of adding public corruption helpers.
 - Published semantic truth is immutable; correction uses supersession/new release.
 - Public Rust APIs require beginner-readable documentation.
 - Owned production coverage target is 100% line/function/region/branch where tooling exposes it.

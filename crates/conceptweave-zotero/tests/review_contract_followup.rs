@@ -25,7 +25,7 @@ fn conflicting_specific_rule_families_abstain_for_steward_review() {
         vec![item("A", "Ontology matching and ontology learning", "")],
     );
 
-    let classified = &report.classified_items[0];
+    let classified = &report.classified_items()[0];
     assert_eq!(
         classified.proposed_disposition,
         Disposition::NeedsStewardReview
@@ -50,7 +50,7 @@ fn matched_abstract_value_is_preserved_for_replayable_review() {
         vec![item("A", "Uninformative title", abstract_note)],
     );
 
-    let classified = &report.classified_items[0];
+    let classified = &report.classified_items()[0];
     assert_eq!(
         classified.proposed_disposition,
         Disposition::AlignmentVersioning

@@ -29,7 +29,7 @@ fn separate_tags_do_not_synthesize_a_multiword_rule_phrase() {
         vec![item_with_tags(&["ontology", "alignment"])],
     );
 
-    let classified = &report.classified_items[0];
+    let classified = &report.classified_items()[0];
     assert_eq!(
         classified.proposed_disposition,
         Disposition::AdjacentEvidence
@@ -51,7 +51,7 @@ fn one_tag_containing_the_complete_phrase_still_matches_exactly() {
         vec![item_with_tags(&["ontology alignment"])],
     );
 
-    let classified = &report.classified_items[0];
+    let classified = &report.classified_items()[0];
     assert_eq!(
         classified.proposed_disposition,
         Disposition::AlignmentVersioning
@@ -85,7 +85,7 @@ fn every_matching_tag_is_retained_as_explicit_evidence() {
         ])],
     );
 
-    let classified = &report.classified_items[0];
+    let classified = &report.classified_items()[0];
     assert_eq!(
         classified.proposed_disposition,
         Disposition::NeedsStewardReview
@@ -116,7 +116,7 @@ fn matching_tag_evidence_preserves_source_order_and_deduplicates_equal_values() 
         ])],
     );
 
-    let classified = &report.classified_items[0];
+    let classified = &report.classified_items()[0];
     assert_eq!(
         classified.proposed_disposition,
         Disposition::NeedsStewardReview

@@ -18,8 +18,8 @@ fn item(title: &str, abstract_note: &str) -> ZoteroItem {
 
 fn abstention_reason(title: &str, abstract_note: &str) -> Option<AbstentionReason> {
     classify_snapshot("10.0.1".into(), None, 42, vec![item(title, abstract_note)])
-        .classified_items
-        .into_iter()
+        .classified_items()
+        .iter()
         .next()
         .expect("one bibliographic proposal")
         .abstention_reason

@@ -31,22 +31,22 @@ fn steward_abstention_reason_is_explicit_and_deterministic() {
     );
 
     assert_eq!(
-        report.classified_items[0].abstention_reason,
+        report.classified_items()[0].abstention_reason,
         Some(AbstentionReason::MissingClassificationMetadata)
     );
     assert_eq!(
-        report.classified_items[1].abstention_reason,
+        report.classified_items()[1].abstention_reason,
         Some(AbstentionReason::UnsupportedRuleVocabulary)
     );
     assert_eq!(
-        report.classified_items[2].abstention_reason,
+        report.classified_items()[2].abstention_reason,
         Some(AbstentionReason::NoDeterministicRuleMatch)
     );
     assert_eq!(
-        report.classified_items[3].proposed_disposition,
+        report.classified_items()[3].proposed_disposition,
         Disposition::AlignmentVersioning
     );
-    assert_eq!(report.classified_items[3].abstention_reason, None);
+    assert_eq!(report.classified_items()[3].abstention_reason, None);
 }
 
 #[test]
@@ -63,7 +63,7 @@ fn legacy_dx_doi_uri_collapses_into_the_same_duplicate_group() {
     );
 
     let doi_group = report
-        .duplicate_candidates
+        .duplicate_candidates()
         .iter()
         .find(|candidate| candidate.identity_kind == "doi")
         .expect("all DOI resolver forms must normalize to one candidate group");

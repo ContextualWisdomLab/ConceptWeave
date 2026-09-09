@@ -163,7 +163,7 @@ fn run_with(
         .ok_or("usage: conceptweave-zotero /tmp/OUTPUT.json")?;
     let output = validate_output_path(&output)?;
     let report = read_snapshot()?;
-    if report.zotero_version.starts_with("9.") {
+    if report.zotero_version().starts_with("9.") {
         eprintln!("Zotero 9 Local API is read-only; writing a local proposal report only");
     }
     write_report(&output, &report)
@@ -243,19 +243,12 @@ mod tests {
     }
 
     fn sample_report(zotero_version: &str) -> ClassificationReport {
-        ClassificationReport {
-            zotero_version: zotero_version.to_owned(),
-            api_version: Some(3),
-            schema_version: Some(44),
-            server_id: Some("test-server".to_owned()),
-            library_version: 2,
-            rule_revision: conceptweave_zotero::RULE_REVISION,
-            observed_item_count: 0,
-            classified_items: Vec::new(),
-            unclassified_items: Vec::new(),
-            pending_source_item_keys: Vec::new(),
-            duplicate_candidates: Vec::new(),
-        }
+        conceptweave_zotero::classify_snapshot(
+            zotero_version.to_owned(),
+            Some("test-server".to_owned()),
+            2,
+            Vec::new(),
+        )
     }
 
     fn failing_snapshot() -> Result<ClassificationReport, ReadError> {

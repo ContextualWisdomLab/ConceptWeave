@@ -163,39 +163,105 @@ pub struct DuplicateCandidate {
 }
 
 /// Complete local classification report for one immutable library version.
+///
+/// Its snapshot identity and inventory are constructor-bound. Callers can read
+/// them through accessors but cannot construct or mutate a trusted report.
+///
+/// ```compile_fail
+/// # use conceptweave_zotero::{ClassificationReport, classify_snapshot};
+/// let mut report = classify_snapshot("10.0.1".into(), None, 1, Vec::new());
+/// report.library_version = 2;
+/// ```
 #[derive(Debug, Serialize)]
 pub struct ClassificationReport {
     /// Zotero desktop version that served the snapshot.
-    pub zotero_version: String,
+    zotero_version: String,
     /// Requested and observed Local API version for a live read.
-    pub api_version: Option<u64>,
+    api_version: Option<u64>,
     /// Zotero schema revision observed consistently across a live read.
-    pub schema_version: Option<u64>,
+    schema_version: Option<u64>,
     /// Local API server identifier observed on every page when supplied.
-    pub server_id: Option<String>,
+    server_id: Option<String>,
     /// Library version shared by every fetched page.
-    pub library_version: u64,
+    library_version: u64,
     /// Rule revision used for all proposals.
-    pub rule_revision: &'static str,
+    rule_revision: &'static str,
     /// Number of items read, including child notes and attachments.
-    pub observed_item_count: usize,
+    observed_item_count: usize,
     /// One proposal for every top-level bibliographic item.
-    pub classified_items: Vec<ClassifiedItem>,
+    classified_items: Vec<ClassifiedItem>,
     /// Metadata for every remaining record, sorted by its original key.
     ///
     /// Together with `classified_items`, this accounts for all observed items.
     /// Notes, attachments and annotations remain evidence, not paper proposals.
     /// Only the fields represented by `ItemData` are retained; this is not a
     /// full-text capture or a lossless copy of the provider's original JSON.
-    pub unclassified_items: Vec<ZoteroItem>,
+    unclassified_items: Vec<ZoteroItem>,
     /// Sorted keys whose parent chain does not reach a bibliographic proposal.
     ///
     /// Standalone sources, their descendants, orphan trees and cycles remain
     /// pending. An empty list proves only parent-link accounting for this input,
     /// never research completion, semantic approval or permission to write.
-    pub pending_source_item_keys: Vec<String>,
+    pending_source_item_keys: Vec<String>,
     /// Reversible DOI/title duplicate candidates.
-    pub duplicate_candidates: Vec<DuplicateCandidate>,
+    duplicate_candidates: Vec<DuplicateCandidate>,
+}
+
+impl ClassificationReport {
+    /// Returns the Zotero desktop version that served this snapshot.
+    pub fn zotero_version(&self) -> &str {
+        &self.zotero_version
+    }
+
+    /// Returns the Local API version observed for a live read.
+    pub fn api_version(&self) -> Option<u64> {
+        self.api_version
+    }
+
+    /// Returns the Zotero schema revision observed for a live read.
+    pub fn schema_version(&self) -> Option<u64> {
+        self.schema_version
+    }
+
+    /// Returns the Local API server identity when the provider supplied one.
+    pub fn server_id(&self) -> Option<&str> {
+        self.server_id.as_deref()
+    }
+
+    /// Returns the library revision shared by the complete snapshot.
+    pub fn library_version(&self) -> u64 {
+        self.library_version
+    }
+
+    /// Returns the classifier rule revision used for every proposal.
+    pub fn rule_revision(&self) -> &str {
+        self.rule_revision
+    }
+
+    /// Returns the number of records observed in the snapshot.
+    pub fn observed_item_count(&self) -> usize {
+        self.observed_item_count
+    }
+
+    /// Returns the bibliographic classification proposals in canonical order.
+    pub fn classified_items(&self) -> &[ClassifiedItem] {
+        &self.classified_items
+    }
+
+    /// Returns the retained nonbibliographic source inventory.
+    pub fn unclassified_items(&self) -> &[ZoteroItem] {
+        &self.unclassified_items
+    }
+
+    /// Returns the canonical pending-source key sequence.
+    pub fn pending_source_item_keys(&self) -> &[String] {
+        &self.pending_source_item_keys
+    }
+
+    /// Returns the reversible duplicate candidates detected in this snapshot.
+    pub fn duplicate_candidates(&self) -> &[DuplicateCandidate] {
+        &self.duplicate_candidates
+    }
 }
 
 /// An explicit, non-authoritative outcome for one pending source record.
@@ -1269,6 +1335,143 @@ mod tests {
                 tags: vec![],
             },
         }
+    }
+
+    fn pending_resolution(item_key: &str) -> PendingSourceResolution {
+        PendingSourceResolution {
+            item_key: item_key.into(),
+            item_version: 7,
+            library_version: 7,
+            server_id: Some("local-server".into()),
+            item_type: "attachment".into(),
+            parent_item_key: String::new(),
+            disposition: SourceResolutionDisposition::RetainStandaloneEvidence,
+            reason: "Retain as standalone evidence.".into(),
+        }
+    }
+
+    #[test]
+    fn source_resolution_rejects_owner_internal_pending_set_drift() {
+        let mut duplicate = classify_snapshot(
+            "10.0.1".into(),
+            Some("local-server".into()),
+            7,
+            vec![item("SOURCE", "attachment", "", "", "")],
+        );
+        duplicate.pending_source_item_keys = vec!["SOURCE".into(), "SOURCE".into()];
+        assert!(matches!(
+            prepare_source_resolution_review(&duplicate, vec![pending_resolution("SOURCE")]),
+            Err(SourceResolutionError::InvalidPendingKeySet)
+        ));
+
+        let mut noncanonical = classify_snapshot(
+            "10.0.1".into(),
+            Some("local-server".into()),
+            7,
+            vec![
+                item("SOURCE", "attachment", "", "", ""),
+                item("SECOND", "attachment", "", "", ""),
+            ],
+        );
+        noncanonical.pending_source_item_keys = vec!["SOURCE".into(), "SECOND".into()];
+        assert!(matches!(
+            prepare_source_resolution_review(
+                &noncanonical,
+                vec![pending_resolution("SECOND"), pending_resolution("SOURCE")]
+            ),
+            Err(SourceResolutionError::InvalidPendingKeySet)
+        ));
+
+        let mut blank = classify_snapshot(
+            "10.0.1".into(),
+            Some("local-server".into()),
+            7,
+            vec![item("", "attachment", "", "", "")],
+        );
+        blank.pending_source_item_keys = vec![String::new()];
+        assert!(matches!(
+            prepare_source_resolution_review(&blank, vec![pending_resolution("")]),
+            Err(SourceResolutionError::InvalidPendingKeySet)
+        ));
+    }
+
+    #[test]
+    fn source_resolution_rejects_owner_internal_ambiguous_inventory() {
+        let mut report = classify_snapshot(
+            "10.0.1".into(),
+            Some("local-server".into()),
+            7,
+            vec![item("SOURCE", "attachment", "", "", "")],
+        );
+        let mut duplicate = item("SOURCE", "attachment", "", "", "");
+        duplicate.version = 4;
+        report.unclassified_items.push(duplicate);
+
+        assert!(matches!(
+            prepare_source_resolution_review(&report, vec![pending_resolution("SOURCE")]),
+            Err(SourceResolutionError::AmbiguousInventory(key)) if key == "SOURCE"
+        ));
+    }
+
+    #[test]
+    fn source_resolution_rejects_owner_internal_blank_snapshot_identity() {
+        let mut blank_zotero_version = classify_snapshot(
+            "10.0.1".into(),
+            Some("local-server".into()),
+            7,
+            vec![item("SOURCE", "attachment", "", "", "")],
+        );
+        blank_zotero_version.zotero_version = " \t\n".into();
+        assert!(matches!(
+            prepare_source_resolution_review(
+                &blank_zotero_version,
+                vec![pending_resolution("SOURCE")]
+            ),
+            Err(SourceResolutionError::InvalidSnapshotIdentity)
+        ));
+
+        let mut blank_rule_revision = classify_snapshot(
+            "10.0.1".into(),
+            Some("local-server".into()),
+            7,
+            vec![item("SOURCE", "attachment", "", "", "")],
+        );
+        blank_rule_revision.rule_revision = " \t\n";
+        assert!(matches!(
+            prepare_source_resolution_review(
+                &blank_rule_revision,
+                vec![pending_resolution("SOURCE")]
+            ),
+            Err(SourceResolutionError::InvalidSnapshotIdentity)
+        ));
+    }
+
+    #[test]
+    fn source_resolution_rejects_owner_internal_inventory_drift() {
+        let mut report = classify_snapshot(
+            "10.0.1".into(),
+            Some("local-server".into()),
+            7,
+            vec![item("SOURCE", "attachment", "", "", "")],
+        );
+        report.unclassified_items.clear();
+
+        assert!(matches!(
+            prepare_source_resolution_review(
+                &report,
+                vec![PendingSourceResolution {
+                    item_key: "SOURCE".into(),
+                    item_version: 7,
+                    library_version: 7,
+                    server_id: Some("local-server".into()),
+                    item_type: "attachment".into(),
+                    parent_item_key: String::new(),
+                    disposition: SourceResolutionDisposition::RetainStandaloneEvidence,
+                    reason: "keep".into(),
+                }]
+            ),
+            Err(SourceResolutionError::MissingInventory(key)) if key == "SOURCE"
+        ));
     }
 
     fn fetched_page(total: usize, items: Vec<ZoteroItem>) -> FetchedPage {

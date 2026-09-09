@@ -21,7 +21,7 @@ fn serialized_item(title: &str, abstract_note: &str) -> Value {
     let report = classify_snapshot("10.0.1".into(), None, 42, vec![item(title, abstract_note)]);
     serde_json::to_value(
         report
-            .classified_items
+            .classified_items()
             .first()
             .expect("one bibliographic proposal"),
     )
