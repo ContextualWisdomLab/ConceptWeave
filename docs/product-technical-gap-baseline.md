@@ -1842,3 +1842,17 @@ tenant-scoped catalog records. ConceptWeave must continue to consume only a
 released, versioned catalog contract through its ACL. No catalog source was
 copied, no dependency was added, and no Semantic Data Portal release or
 ConceptWeave adoption is inferred.
+
+### September 9 Semantic Data Portal OIDC owner repair
+
+Semantic Data Portal PR #73 advanced normally to
+`3f408baf4f6854de3594d063f3ae4c8353ff7cd1`. The owner moved issuer,
+audience, JWKS URL and timeout, group-to-role mapping, and the demo
+subject-header switch from request-path environment reads into its versioned
+`config_entries` application configuration. Missing OIDC coordinates and
+malformed policy values fail closed; database transport coordinates remain the
+only bootstrap environment reads. Its focused OIDC/catalog/config suite and
+the full `PYTHONPATH=src pytest -q` suite passed (285 tests; nine intended
+integration skips). This is source and local test evidence only: the successor
+still needs exact-head hosted checks, resolved review threads, an independent
+approval, and an immutable owner release before any ConceptWeave ACL adoption.

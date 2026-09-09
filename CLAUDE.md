@@ -25,3 +25,5 @@ For a Local API release report, calculate public item totals from the `classifie
 A merged owner PR is not a released contract: require its immutable release coordinate or artifact, then verify the current consumer adoption and re-execution before treating a protected consumer prerequisite as repaired.
 
 If a historical GitHub check remains visible but its workflow definition was removed, `gh run view` can return 404. Retain the exact run/job URL and SHA, use check-run metadata plus the rendered Checks page as bounded evidence, and never treat unavailable logs as passing or safely rerunnable.
+
+OIDC policy belongs to the catalog owner's versioned configuration boundary, not request-path environment reads. A local owner test override is not consumer adoption; wait for the immutable owner release and revalidate the ACL.
