@@ -98,3 +98,7 @@ The following canonical Consensus records were fetched before recording the corr
 3. GRC must remain the first enterprise round-trip fixture, while OAEI/RODI/LLMs4OL-style data guards against overfitting the general contract to GRC.
 4. LLM calls remain behind `contextual-orchestrator`; model/provider/prompt changes require receipts and sensitivity evidence.
 5. Human review remains mandatory before authority promotion; Crowd-OM is evidence for scalable validation mechanics, not permission to replace GRC/domain steward authority.
+
+## Research intake evidence
+
+The Zotero classifier records item and library revisions plus the exact rule revision for each proposal. Keyword evidence is routing evidence only: unmatched records abstain, duplicate identities remain candidates, and neither path creates authoritative ontology knowledge. Any model-assisted successor must add a `contextual-orchestrator` receipt while preserving the deterministic inputs and steward decision separately.

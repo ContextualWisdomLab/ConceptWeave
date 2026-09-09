@@ -1,0 +1,665 @@
+#![forbid(unsafe_code)]
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+
+use conceptweave_zotero::{ClassificationReport, ReadError, read_local_snapshot};
+use std::env;
+use std::fs::{self, OpenOptions};
+use std::io::{self, BufWriter, Write};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+type ReportSerializer =
+    fn(&mut dyn Write, &ClassificationReport) -> Result<(), Box<dyn std::error::Error>>;
+
+fn allowed_output_parent_policy(
+    system_temp: PathBuf,
+    conventional_tmp: Option<PathBuf>,
+) -> Vec<PathBuf> {
+    let mut parents = vec![system_temp];
+    if let Some(conventional_tmp) = conventional_tmp
+        && !parents.contains(&conventional_tmp)
+    {
+        parents.push(conventional_tmp);
+    }
+    parents
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+fn allowed_output_parents() -> Vec<PathBuf> {
+    let system_temp = env::temp_dir()
+        .canonicalize()
+        .expect("system temporary directory must exist");
+    // Host path discovery stays in this shim; admission/dedup policy is deterministic above.
+    allowed_output_parent_policy(system_temp, Path::new("/tmp").canonicalize().ok())
+}
+
+fn validate_output_path(raw: &str) -> io::Result<PathBuf> {
+    let path = PathBuf::from(raw);
+    if !path.is_absolute() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "report output must be an absolute path in the system temp directory",
+        ));
+    }
+
+    let Some(file_name) = path.file_name() else {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "report output has no file name",
+        ));
+    };
+
+    let allowed_parents = allowed_output_parents();
+    let parent = path
+        .parent()
+        .expect("absolute report path with a file name has a parent");
+    let resolved_parent = parent.canonicalize()?;
+    if !allowed_parents.contains(&resolved_parent) {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "report output must be a direct child of the system temp directory",
+        ));
+    }
+    let resolved_path = resolved_parent.join(file_name);
+    if fs::symlink_metadata(&resolved_path).is_ok() {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "report output must not already exist or be a symlink",
+        ));
+    }
+    Ok(resolved_path)
+}
+
+fn open_new_output(path: &Path) -> io::Result<fs::File> {
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    options.open(path)
+}
+
+fn remove_report_file(path: &Path) -> io::Result<()> {
+    fs::remove_file(path)
+}
+
+fn temporary_output_path(output: &Path) -> io::Result<PathBuf> {
+    static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    let Some(file_name) = output.file_name() else {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "report output has no file name",
+        ));
+    };
+    let nonce = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    Ok(output.with_file_name(format!(
+        ".{}.{}.{}.tmp",
+        file_name.to_string_lossy(),
+        std::process::id(),
+        nonce
+    )))
+}
+
+fn write_report(
+    output: &Path,
+    report: &ClassificationReport,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut remove_file = remove_report_file;
+    write_report_with(output, report, serialize_report, &mut remove_file)
+}
+
+fn write_report_with(
+    output: &Path,
+    report: &ClassificationReport,
+    serialize: ReportSerializer,
+    remove_file: &mut dyn FnMut(&Path) -> io::Result<()>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let temporary = temporary_output_path(output)?;
+    let file = open_new_output(&temporary)?;
+    let mut writer = BufWriter::new(file);
+
+    if let Err(error) = serialize(&mut writer, report) {
+        drop(writer);
+        if let Err(cleanup_error) = remove_file(&temporary) {
+            return Err(io::Error::new(
+                cleanup_error.kind(),
+                format!(
+                    "report serialization failed ({error}); temporary cleanup failed: {cleanup_error}"
+                ),
+            )
+            .into());
+        }
+        return Err(error);
+    }
+    drop(writer);
+
+    if let Err(error) = fs::hard_link(&temporary, output) {
+        if let Err(cleanup_error) = remove_file(&temporary) {
+            return Err(io::Error::new(
+                cleanup_error.kind(),
+                format!(
+                    "report publication failed ({error}); temporary cleanup failed: {cleanup_error}"
+                ),
+            )
+            .into());
+        }
+        return Err(error.into());
+    }
+    cleanup_published_report(&temporary, remove_file)?;
+    Ok(())
+}
+
+fn serialize_report(
+    writer: &mut dyn Write,
+    report: &ClassificationReport,
+) -> Result<(), Box<dyn std::error::Error>> {
+    serde_json::to_writer_pretty(&mut *writer, report)?;
+    writer.flush()?;
+    Ok(())
+}
+
+fn cleanup_published_report(
+    temporary: &Path,
+    remove_file: &mut dyn FnMut(&Path) -> io::Result<()>,
+) -> io::Result<()> {
+    if let Err(error) = remove_file(temporary) {
+        let kind = error.kind();
+        return Err(io::Error::new(
+            kind,
+            format!("report published but temporary cleanup failed: {error}"),
+        ));
+    }
+    Ok(())
+}
+
+fn run_with(
+    args: Vec<String>,
+    read_snapshot: &mut dyn FnMut() -> Result<ClassificationReport, ReadError>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let output = args
+        .into_iter()
+        .nth(1)
+        .ok_or("usage: conceptweave-zotero /tmp/OUTPUT.json")?;
+    let output = validate_output_path(&output)?;
+    let report = read_snapshot()?;
+    if report.zotero_version().starts_with("9.") {
+        eprintln!("Zotero 9 Local API is read-only; writing a local proposal report only");
+    }
+    write_report(&output, &report)
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut read_snapshot = read_local_snapshot;
+    run_with(env::args().collect(), &mut read_snapshot)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct FlushFailWriter;
+
+    impl Write for FlushFailWriter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Err(io::Error::other("intentional flush failure"))
+        }
+    }
+
+    struct WriteFailWriter;
+
+    impl Write for WriteFailWriter {
+        fn write(&mut self, _bytes: &[u8]) -> io::Result<usize> {
+            Err(io::Error::other("intentional write failure"))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn unique_temp_path(suffix: &str) -> PathBuf {
+        env::temp_dir().join(format!(
+            "conceptweave-zotero-{}-{suffix}.json",
+            std::process::id()
+        ))
+    }
+
+    fn sample_report(zotero_version: &str) -> ClassificationReport {
+        conceptweave_zotero::classify_snapshot(
+            zotero_version.to_owned(),
+            Some("test-server".to_owned()),
+            2,
+            Vec::new(),
+        )
+    }
+
+    fn fail_serialization(
+        _writer: &mut dyn Write,
+        _report: &ClassificationReport,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Err(io::Error::other("intentional serialization failure").into())
+    }
+
+    fn failing_snapshot() -> Result<ClassificationReport, ReadError> {
+        Err(ReadError::Budget("test-reader"))
+    }
+
+    #[test]
+    fn production_runner_publishes_a_complete_report() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let output = unique_temp_path(&format!("runner-success-{nonce}"));
+        let _ = fs::remove_file(&output);
+        let args = vec![
+            "conceptweave-zotero".to_owned(),
+            output.to_string_lossy().into_owned(),
+        ];
+
+        let mut read_snapshot = || Ok(sample_report("10.0.1"));
+        run_with(args, &mut read_snapshot).unwrap();
+        let saved: serde_json::Value = serde_json::from_slice(&fs::read(&output).unwrap()).unwrap();
+        assert_eq!(saved["zotero_version"], "10.0.1");
+        fs::remove_file(output).unwrap();
+    }
+
+    #[test]
+    fn report_serialization_propagates_flush_failures() {
+        let mut writer = FlushFailWriter;
+        assert!(serialize_report(&mut writer, &sample_report("10.0.1")).is_err());
+
+        let mut writer = WriteFailWriter;
+        assert!(serialize_report(&mut writer, &sample_report("10.0.1")).is_err());
+        writer.flush().unwrap();
+    }
+
+    #[test]
+    fn production_runner_preserves_the_zotero_9_read_only_path() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let output = unique_temp_path(&format!("runner-zotero9-{nonce}"));
+        let _ = fs::remove_file(&output);
+        let args = vec![
+            "conceptweave-zotero".to_owned(),
+            output.to_string_lossy().into_owned(),
+        ];
+
+        let mut read_snapshot = || Ok(sample_report("9.0.6"));
+        run_with(args, &mut read_snapshot).unwrap();
+        let saved: serde_json::Value = serde_json::from_slice(&fs::read(&output).unwrap()).unwrap();
+        assert_eq!(saved["zotero_version"], "9.0.6");
+        fs::remove_file(output).unwrap();
+    }
+
+    #[test]
+    fn production_runner_rejects_missing_output_before_reading() {
+        let mut read_snapshot = failing_snapshot;
+        let error =
+            run_with(vec!["conceptweave-zotero".to_owned()], &mut read_snapshot).unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "usage: conceptweave-zotero /tmp/OUTPUT.json"
+        );
+    }
+
+    #[test]
+    fn production_runner_rejects_invalid_output_before_reading() {
+        let mut read_snapshot = failing_snapshot;
+        let error = run_with(
+            vec!["conceptweave-zotero".to_owned(), "relative.json".to_owned()],
+            &mut read_snapshot,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "report output must be an absolute path in the system temp directory"
+        );
+    }
+
+    #[test]
+    fn production_runner_propagates_snapshot_failure_without_publishing() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let output = unique_temp_path(&format!("runner-read-failure-{nonce}"));
+        let _ = fs::remove_file(&output);
+        let args = vec![
+            "conceptweave-zotero".to_owned(),
+            output.to_string_lossy().into_owned(),
+        ];
+
+        let mut read_snapshot = failing_snapshot;
+        let result = run_with(args, &mut read_snapshot);
+        assert!(result.is_err());
+        assert!(!output.exists());
+    }
+
+    #[test]
+    fn production_runner_does_not_overwrite_a_path_created_during_the_read() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let output = unique_temp_path(&format!("runner-publication-race-{nonce}"));
+        let _ = fs::remove_file(&output);
+        let args = vec![
+            "conceptweave-zotero".to_owned(),
+            output.to_string_lossy().into_owned(),
+        ];
+        let output_during_read = output.clone();
+
+        let mut read_snapshot = || {
+            fs::write(&output_during_read, b"competitor").unwrap();
+            Ok(sample_report("10.0.1"))
+        };
+        let result = run_with(args, &mut read_snapshot);
+
+        assert!(result.is_err());
+        assert_eq!(fs::read(&output).unwrap(), b"competitor");
+
+        let mut retained_temporary = None;
+        let mut fail_remove = |path: &Path| {
+            retained_temporary = Some(path.to_path_buf());
+            Err(io::Error::other("intentional cleanup failure"))
+        };
+        let error = write_report_with(
+            &output,
+            &sample_report("10.0.1"),
+            serialize_report,
+            &mut fail_remove,
+        )
+        .unwrap_err();
+        let retained_temporary = retained_temporary.unwrap();
+        assert!(error.to_string().contains("report publication failed"));
+        assert_eq!(fs::read(&output).unwrap(), b"competitor");
+        assert!(retained_temporary.exists());
+        fs::remove_file(retained_temporary).unwrap();
+        fs::remove_file(output).unwrap();
+    }
+
+    #[test]
+    fn failed_serialization_never_exposes_the_final_report_path() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let output = unique_temp_path(&format!("serialization-failure-{nonce}"));
+        let _ = fs::remove_file(&output);
+
+        let report = sample_report("10.0.1");
+        let mut removed_temporary = None;
+        let mut remove_file = |path: &Path| {
+            removed_temporary = Some(path.to_path_buf());
+            remove_report_file(path)
+        };
+        assert!(write_report_with(&output, &report, fail_serialization, &mut remove_file).is_err());
+        assert!(!output.exists());
+        assert!(!removed_temporary.unwrap().exists());
+
+        let mut retained_temporary = None;
+        let mut fail_remove = |path: &Path| {
+            retained_temporary = Some(path.to_path_buf());
+            Err(io::Error::other("intentional cleanup failure"))
+        };
+        let error =
+            write_report_with(&output, &report, fail_serialization, &mut fail_remove).unwrap_err();
+        let retained_temporary = retained_temporary.unwrap();
+        assert!(
+            error
+                .to_string()
+                .contains("report serialization failed (intentional serialization failure); temporary cleanup failed")
+        );
+        assert!(!output.exists());
+        assert!(retained_temporary.exists());
+        fs::remove_file(retained_temporary).unwrap();
+    }
+
+    #[test]
+    fn published_report_cleanup_reports_temp_failure_without_final_path_rollback() {
+        let temporary = Path::new("temporary.json");
+        let mut attempted_paths = Vec::new();
+        let mut remove_file = |path: &Path| {
+            attempted_paths.push(path.to_path_buf());
+            Err(io::Error::other("cleanup failure"))
+        };
+        let result = cleanup_published_report(temporary, &mut remove_file);
+
+        assert!(result.unwrap_err().to_string().contains("cleanup failure"));
+        assert_eq!(attempted_paths, vec![temporary.to_path_buf()]);
+    }
+
+    #[test]
+    fn published_report_cleanup_error_identifies_post_publication_state() {
+        let temporary = Path::new("temporary.json");
+        let mut remove_file = |_: &Path| {
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "cleanup failure",
+            ))
+        };
+        let error = cleanup_published_report(temporary, &mut remove_file).unwrap_err();
+
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+        assert!(
+            error
+                .to_string()
+                .contains("report published but temporary cleanup failed")
+        );
+
+        let output = unique_temp_path("published-cleanup-failure");
+        let _ = fs::remove_file(&output);
+        let mut retained_temporary = None;
+        let mut fail_remove = |path: &Path| {
+            retained_temporary = Some(path.to_path_buf());
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "cleanup failure",
+            ))
+        };
+        let error = write_report_with(
+            &output,
+            &sample_report("10.0.1"),
+            serialize_report,
+            &mut fail_remove,
+        )
+        .unwrap_err();
+        let retained_temporary = retained_temporary.unwrap();
+        assert_eq!(
+            error.downcast_ref::<io::Error>().unwrap().kind(),
+            io::ErrorKind::PermissionDenied
+        );
+        assert!(output.exists());
+        assert!(retained_temporary.exists());
+        fs::remove_file(output).unwrap();
+        fs::remove_file(retained_temporary).unwrap();
+    }
+
+    #[test]
+    fn complete_report_is_published_once() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let output = unique_temp_path(&format!("atomic-success-{nonce}"));
+        let _ = fs::remove_file(&output);
+        let report = sample_report("10.0.1");
+
+        write_report(&output, &report).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&fs::read(&output).unwrap()).unwrap()["zotero_version"],
+            "10.0.1"
+        );
+        assert!(write_report(&output, &report).is_err());
+        fs::remove_file(output).unwrap();
+    }
+
+    #[test]
+    fn output_path_must_be_a_new_direct_temp_child() {
+        let report = sample_report("10.0.1");
+        let allowed = unique_temp_path("allowed");
+        let _ = fs::remove_file(&allowed);
+        let expected = allowed
+            .parent()
+            .unwrap()
+            .canonicalize()
+            .unwrap()
+            .join(allowed.file_name().unwrap());
+        assert_eq!(
+            validate_output_path(allowed.to_str().unwrap()).unwrap(),
+            expected
+        );
+
+        assert!(validate_output_path("relative.json").is_err());
+        assert!(validate_output_path("/").is_err());
+        assert!(validate_output_path("/tmp/missing-directory/report.json").is_err());
+        assert!(write_report(Path::new("/"), &report).is_err());
+        assert!(write_report(Path::new("/tmp/missing-directory/report.json"), &report).is_err());
+        assert!(
+            validate_output_path(
+                env::current_dir()
+                    .unwrap()
+                    .join("report.json")
+                    .to_str()
+                    .unwrap()
+            )
+            .is_err()
+        );
+
+        #[cfg(unix)]
+        {
+            let conventional = Path::new("/tmp").join(format!(
+                "conceptweave-zotero-{}-conventional.json",
+                std::process::id()
+            ));
+            let _ = fs::remove_file(&conventional);
+            assert!(validate_output_path(conventional.to_str().unwrap()).is_ok());
+        }
+
+        let nested_dir =
+            env::temp_dir().join(format!("conceptweave-zotero-{}-nested", std::process::id()));
+        fs::create_dir_all(&nested_dir).unwrap();
+        assert!(validate_output_path(nested_dir.join("report.json").to_str().unwrap()).is_err());
+        fs::remove_dir_all(nested_dir).unwrap();
+
+        let existing = unique_temp_path("existing");
+        fs::write(&existing, b"existing").unwrap();
+        assert!(validate_output_path(existing.to_str().unwrap()).is_err());
+        fs::remove_file(existing).unwrap();
+    }
+
+    #[test]
+    fn output_parent_policy_covers_optional_and_deduplicated_conventional_tmp() {
+        let system_temp = PathBuf::from("system-temp");
+        let conventional_tmp = PathBuf::from("conventional-tmp");
+
+        assert_eq!(
+            allowed_output_parent_policy(system_temp.clone(), None),
+            vec![system_temp.clone()]
+        );
+        assert_eq!(
+            allowed_output_parent_policy(system_temp.clone(), Some(system_temp.clone())),
+            vec![system_temp.clone()]
+        );
+        assert_eq!(
+            allowed_output_parent_policy(system_temp.clone(), Some(conventional_tmp.clone())),
+            vec![system_temp, conventional_tmp]
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn allowed_output_parents_does_not_require_posix_tmp() {
+        let system_temp = env::temp_dir().canonicalize().unwrap();
+        assert!(allowed_output_parents().contains(&system_temp));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn new_report_files_are_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let output = unique_temp_path(&format!("private-{nonce}"));
+        let _ = fs::remove_file(&output);
+        let file = open_new_output(&output).unwrap();
+        drop(file);
+
+        let mode = fs::metadata(&output).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        fs::remove_file(output).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn output_path_rejects_symlinks_before_open() {
+        use std::os::unix::fs::symlink;
+
+        let target = unique_temp_path("target");
+        let link = unique_temp_path("link");
+        let _ = fs::remove_file(&target);
+        let _ = fs::remove_file(&link);
+        fs::write(&target, b"target").unwrap();
+        symlink(&target, &link).unwrap();
+        assert!(validate_output_path(link.to_str().unwrap()).is_err());
+        fs::remove_file(link).unwrap();
+        fs::remove_file(target).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn output_path_uses_the_validated_parent_not_a_swappable_symlink() {
+        use std::os::unix::fs::symlink;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let allowed_parent = env::temp_dir().canonicalize().unwrap();
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let alias = allowed_parent.join(format!(
+            "conceptweave-zotero-{}-{nonce}-parent-link",
+            std::process::id()
+        ));
+        symlink(&allowed_parent, &alias).unwrap();
+        let leaf = format!(
+            "conceptweave-zotero-{}-{nonce}-canonical.json",
+            std::process::id()
+        );
+        let output = alias.join(&leaf);
+
+        let validated = validate_output_path(output.to_str().unwrap()).unwrap();
+        assert_eq!(validated, allowed_parent.join(&leaf));
+
+        fs::remove_file(alias).unwrap();
+    }
+}

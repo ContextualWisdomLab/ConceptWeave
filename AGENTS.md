@@ -16,8 +16,14 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - No direct cross-service application-table SQL.
 - New database objects, when introduced, use descriptive two-or-more-word `snake_case` names and 3NF by default.
 - Preserve source evidence, truth status, and publication state separately.
+- Treat `ClassificationReport` as a trusted Research Intake aggregate: keep snapshot identity and retained inventory private and constructor-bound, expose only immutable accessors, and test public mutation attempts with compile-fail documentation. Preserve defensive malformed-state tests inside the owner module instead of adding public corruption helpers.
 - Published semantic truth is immutable; correction uses supersession/new release.
 - Public Rust APIs require beginner-readable documentation.
 - Owned production coverage target is 100% line/function/region/branch where tooling exposes it.
 - Never suppress deprecation warnings; fix causes.
 - Never force-push shared branches, self-approve, fabricate checks, or weaken branch protection.
+
+## Operational lessons
+
+- Do not compile test-only endpoint overrides into `coverage_nightly`: that changes the measured production artifact. Normalize cfg-varying function records by declaration origin plus normalized function identity while the independent native 100% function gate remains authoritative, and freeze both same-function merging and same-origin function separation with a synthetic contract fixture.
+- When report publication fails, preserve both the operation error and any temporary-cleanup error. Tests must capture the exact operation-specific temporary path from the removal boundary and verify whether it was removed or retained; prefix scans and destination-only assertions are insufficient.
