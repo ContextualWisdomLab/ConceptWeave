@@ -1916,6 +1916,23 @@ and security jobs remain queued. This leaves protected checks, a current-head
 independent approval, an immutable owner release, and ConceptWeave ACL adoption
 unresolved; the stale decision is not merge authority.
 
+### September 9 Semantic Data Portal cryptography security repair
+
+On exact PR #73 head `512c89f0a99732193f32422238584f625285eb2f`, the central
+`trivy-fs` job reported HIGH `CVE-2026-69247` in `requirements.txt`'s
+`cryptography==49.0.0`. The [GitHub Security Advisory](https://github.com/advisories/GHSA-g6cj-pr64-35w5)
+affects releases before `50.0.0`; the
+owner pinned `cryptography==50.0.1` in `pyproject.toml`, aligned the independent
+`requirements-test.in` source, and regenerated the runtime, development, and
+test hash-pinned requirements files. The owner updated `AGENTS.md` and
+`CLAUDE.md` with the three-lockfile recovery procedure. At successor
+`1681a7f28adc86b4aa6db48d05b20535fa5dc499`, `PYTHONPATH=src pytest -q`
+passed (285 tests and nine intended integration skips), local Trivy reported
+zero HIGH/CRITICAL findings, and `pip install --dry-run --require-hashes -r
+requirements-test.txt` verified the new test lockfile. Hosted checks restarted
+for that head. This removes neither the current-head review requirement nor the
+immutable owner release and ACL-adoption gates.
+
 ### September 9 PR9-to-PR40 review successor trace
 
 PR #9 remains Draft at `0c935d805f01cdf548156743c20544ab4596f8c3` with its
