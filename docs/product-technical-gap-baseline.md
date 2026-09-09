@@ -44,6 +44,8 @@ Pre-restack exact `0c935d8...` passed locked Rust 1.98 workspace tests, fmt, str
 
 `ClassificationReport` snapshot/inventory/provenance state remains private and constructor-bound with read-only accessors. This is ordinary aggregate encapsulation, not cryptographic authenticity or peer authentication. Local classification/replay never grants semantic authority, approval, publication or Zotero write permission.
 
+Read-only Local API census on 2026-09-09: Zotero `10.0.1`, API v3/schema 44 observed 8,326 items and reconciled 3,715 classifier proposals plus 4,611 unclassified items. The private `0600` report has SHA-256 `5b2d81bddf09475de76ce18efa9fb5b486c44b794c9db6b697d183da5c268b48`; it contains 3,658 `needs_steward_review`, 56 `adjacent_evidence`, one `semantic_consumption_bridge`, four pending source keys, and 49 duplicate candidates. The serialized report deliberately does not expose a snapshot digest, so its private artifact hash identifies this replay only. These are workload and reconciliation KPIs, never precision, recall, review completion, semantic authority, or Zotero write authority.
+
 ## Pending-source resolution #40
 
 Pre-current-restack head `cc802740420dd4402ae2295e270af21530a682dd` was OPEN Draft and became non-mergeable after #9 advanced to `a67d9d66...`. This was a valid wrong-base/intervening-delta finding, not a reason to close the dependent PR.
