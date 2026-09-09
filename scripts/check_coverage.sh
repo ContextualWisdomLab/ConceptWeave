@@ -2,7 +2,7 @@
 set -euo pipefail
 
 coverage_toolchain="${COVERAGE_TOOLCHAIN:-nightly-2026-08-20}"
-trap 'rm -f coverage.json source-functions.json source-branches.json source-regions.json coverage-branch-contract.json source-regions-contract.json source-branches-contract.json' EXIT
+trap 'rm -f coverage.json source-functions.json source-branches.json source-regions.json' EXIT
 
 normalize_branches() {
   local coverage_path="$1"
@@ -57,10 +57,16 @@ normalize_branches() {
 }
 
 check_branch_normalization_contract() {
-  jq -n '{data:[{files:[{filename:"/repo/src/lib.rs",branches:[[12,5,12,10,1,1,0,0,0],[30,5,30,10,1,0,0,0,0]]}]}]}' > coverage-branch-contract.json
-  jq -n '[{file:"/repo/src/lib.rs",line_start:10,column_start:1,line_end:20,column_end:1,count:1}]' > source-regions-contract.json
-  normalize_branches coverage-branch-contract.json source-regions-contract.json source-branches-contract.json
-  jq -e 'length == 1 and .[0].line_start == 12 and .[0].true_count == 1 and .[0].false_count == 1' source-branches-contract.json >/dev/null
+  (
+    local contract_dir
+    contract_dir=$(mktemp -d "${TMPDIR:-/tmp}/conceptweave-coverage-contract.XXXXXX")
+    trap 'rm -rf -- "${contract_dir:?}"' EXIT
+
+    jq -n '{data:[{files:[{filename:"/repo/src/lib.rs",branches:[[10,1,20,1,1,1,0,0,0],[30,5,30,10,1,0,0,0,0]]}]}]}' > "$contract_dir/coverage.json"
+    jq -n '[{file:"/repo/src/lib.rs",line_start:10,column_start:1,line_end:20,column_end:1,count:1},{file:"/repo/src/decoy.rs",line_start:30,column_start:5,line_end:30,column_end:10,count:1}]' > "$contract_dir/source-regions.json"
+    normalize_branches "$contract_dir/coverage.json" "$contract_dir/source-regions.json" "$contract_dir/source-branches.json"
+    jq -e '. == [{file:"/repo/src/lib.rs",line_start:10,column_start:1,line_end:20,column_end:1,true_count:1,false_count:1}]' "$contract_dir/source-branches.json" >/dev/null
+  )
 }
 
 check_branch_normalization_contract
