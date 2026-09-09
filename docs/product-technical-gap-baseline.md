@@ -30,6 +30,8 @@ Central owner `.github#2051@558693e0333e48012beea142f739bc634b0674a7` is OPEN/no
 
 Current exact central workflows remain queued/in flight and qualifying independent current-head approval is absent. Keep #35 stable until normal protected central integration; do not manufacture leaf evidence with a no-op push or blind/manual rerun. After central integration, #35 still requires fresh authenticated exact-head CodeQL and independent approval.
 
+Central #2056 at `69ae472562c93cc17674af5e2085a58947d3fab8` is a six-commit stacked successor whose merge base is #2051 current `558693e...`; it is OPEN/non-Draft/UNSTABLE with `CHANGES_REQUESTED`. It is repair evidence, not a replacement owner coordinate or protected integration. Keep #2051 as the current dependency until #2056 clears its own checks/review and is normally merged.
+
 ## Research Intake #9
 
 Current Research Intake authority after Foundation restack is `a67d9d66b35024d6f2155f50ee5c9fb7d2e1dbe9`, OPEN Draft/mergeable on Foundation `60f14a6...`.
