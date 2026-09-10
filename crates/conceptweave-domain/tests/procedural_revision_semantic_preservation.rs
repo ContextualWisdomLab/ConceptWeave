@@ -93,12 +93,11 @@ fn retained_semantics_do_not_weaken_external_context_binding() {
         proposal_id: "other_revision",
         ..expected_revision()
     };
-    assert_eq!(
-        admit_procedural_revision_json_transport(
-            canonical_revision_with_distinct_semantics().as_bytes(),
-            expected,
-            ReachabilityRule::RequireEntryReachability,
-        ),
-        Err(ProceduralIngressError::RevisionContextMismatch)
-    );
+    let error = admit_procedural_revision_json_transport(
+        canonical_revision_with_distinct_semantics().as_bytes(),
+        expected,
+        ReachabilityRule::RequireEntryReachability,
+    )
+    .expect_err("mismatched external revision context must fail closed");
+    assert_eq!(error, ProceduralIngressError::RevisionContextMismatch);
 }
