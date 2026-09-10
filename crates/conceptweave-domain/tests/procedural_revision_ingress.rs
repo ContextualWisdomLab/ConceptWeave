@@ -48,7 +48,10 @@ fn canonical_revision() -> String {
     )
 }
 
-fn validate(input: &str, expected: ProceduralRevisionExpectation<'_>) -> Result<procedural_model_validation::TopologySummary, ProceduralIngressError> {
+fn validate(
+    input: &str,
+    expected: ProceduralRevisionExpectation<'_>,
+) -> Result<procedural_model_validation::TopologySummary, ProceduralIngressError> {
     validate_procedural_revision_json_transport(
         input.as_bytes(),
         expected,
@@ -104,10 +107,22 @@ fn candidate_scope_mismatch_fails_before_domain_validation() {
 #[test]
 fn revision_authority_constants_and_origin_fail_closed() {
     for invalid in [
-        canonical_revision().replace("\"decision_authority\":\"none\"", "\"decision_authority\":\"self\""),
-        canonical_revision().replace("\"proposal_state\":\"proposed\"", "\"proposal_state\":\"approved\""),
-        canonical_revision().replace("\"evidence_partition\":\"training\"", "\"evidence_partition\":\"validation\""),
-        canonical_revision().replace("\"proposal_origin\":\"model_assisted\"", "\"proposal_origin\":\"runtime_generated\""),
+        canonical_revision().replace(
+            "\"decision_authority\":\"none\"",
+            "\"decision_authority\":\"self\"",
+        ),
+        canonical_revision().replace(
+            "\"proposal_state\":\"proposed\"",
+            "\"proposal_state\":\"approved\"",
+        ),
+        canonical_revision().replace(
+            "\"evidence_partition\":\"training\"",
+            "\"evidence_partition\":\"validation\"",
+        ),
+        canonical_revision().replace(
+            "\"proposal_origin\":\"model_assisted\"",
+            "\"proposal_origin\":\"runtime_generated\"",
+        ),
     ] {
         assert_eq!(
             validate(&invalid, expected_revision()),
@@ -117,19 +132,22 @@ fn revision_authority_constants_and_origin_fail_closed() {
 }
 
 #[test]
-fn revision_shape_bounds_fail_closed() {
+fn revision_shape_bounds_and_unknown_members_fail_closed() {
+    let training_evidence = format!(
+        r#""training_evidence":[{{"source_id":"unit_fixture_review_sop","source_digest":"{DIGEST_A}","location":"section_2/step_1"}}]"#,
+    );
+    let empty_training = canonical_revision().replace(&training_evidence, "\"training_evidence\":[]");
     assert_eq!(
-        validate(
-            &canonical_revision().replace("\"training_evidence\":[{", "\"training_evidence\":[] , \"ignored\":[{") ,
-            expected_revision(),
-        ),
+        validate(&empty_training, expected_revision()),
         Err(ProceduralIngressError::SchemaInvalid)
     );
+
+    let unknown_member = canonical_revision().replace(
+        "\"change_rationale\":",
+        "\"unexpected_authority\":true,\"change_rationale\":",
+    );
     assert_eq!(
-        validate(
-            &canonical_revision().replace("\"change_rationale\":", "\"unexpected_authority\":true,\"change_rationale\":"),
-            expected_revision(),
-        ),
+        validate(&unknown_member, expected_revision()),
         Err(ProceduralIngressError::SchemaInvalid)
     );
 }
