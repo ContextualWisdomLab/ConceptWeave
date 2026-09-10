@@ -20,6 +20,32 @@ fn duplicate_decoded_members_are_rejected_before_mapping() {
 }
 
 #[test]
+fn byte_transport_rejects_malformed_utf8_without_lossy_conversion() {
+    let malformed = [b'{', b'"', b'x', b'"', b':', b'"', 0xff, b'"', b'}'];
+    assert_eq!(
+        admit_procedural_json_transport_bytes(&malformed),
+        Err(ProceduralTransportError::InvalidJson)
+    );
+}
+
+#[test]
+fn byte_transport_applies_wire_size_limit_before_utf8_validation() {
+    let exact = vec![b' '; MAX_PROCEDURAL_TRANSPORT_BYTES - 4];
+    let mut exact_json = Vec::with_capacity(MAX_PROCEDURAL_TRANSPORT_BYTES);
+    exact_json.extend_from_slice(b"\"");
+    exact_json.extend_from_slice(&exact);
+    exact_json.extend_from_slice(b"\"");
+    assert_eq!(exact_json.len(), MAX_PROCEDURAL_TRANSPORT_BYTES - 2);
+    assert_eq!(admit_procedural_json_transport_bytes(&exact_json), Ok(()));
+
+    let oversized_invalid = vec![0xff; MAX_PROCEDURAL_TRANSPORT_BYTES + 1];
+    assert_eq!(
+        admit_procedural_json_transport_bytes(&oversized_invalid),
+        Err(ProceduralTransportError::InputTooLarge)
+    );
+}
+
+#[test]
 fn malformed_strings_surrogates_and_trailing_data_fail_closed() {
     for input in [
         r#"{"x":"unterminated}"#,
