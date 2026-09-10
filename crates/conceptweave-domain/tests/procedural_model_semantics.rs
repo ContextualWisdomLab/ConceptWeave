@@ -1,8 +1,8 @@
-//! RED contract for schema-significant procedural semantics.
+//! Contract tests for schema-significant procedural semantics in the unpublished Rust projection.
 //!
-//! The current topology-only candidate intentionally cannot satisfy this test yet.
-//! The repair must preserve the procedural draft schema's semantic fields in the
-//! deterministic Rust projection without turning artifact references into authority.
+//! The predecessor topology-only projection could not satisfy these cases. The current
+//! candidate retains the draft contract's semantic fields without treating artifact
+//! references, validation success, or structural reachability as authority.
 use conceptweave_domain::EvidenceReference;
 #[path = "../src/procedural_model_validation.rs"]
 mod procedural_model_validation;
