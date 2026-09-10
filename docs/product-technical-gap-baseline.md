@@ -4,7 +4,7 @@
 
 This is the code-current ConceptWeave gap baseline for this branch. Exact SHA, run, review and PR coordinates are evidence snapshots, not mutable dependencies. Live protected branches and owner PRs supersede a recorded coordinate when they advance. Earlier snapshots remain in Git history as historical evidence; they are not current authority. GitHub's computed `mergeable` flag is volatile mechanical state and is never acceptance evidence.
 
-This refresh follows procedural self-application source/test head `484db0083c9604cd41112c4a35ae9c31f3d667cc`. The commit containing this file is a documentation-only successor, so source-head local evidence does not automatically become exact-current whole-head evidence.
+This refresh follows procedural self-application source/test head `10799a65325319c6ff337814b23d9d7a48d82fcd`. RED-only test head `4fac2eb62f5484c20bce44c5abfc57b93592a596` first proved that duplicate-key rejection could amplify an attacker-controlled member name into the diagnostic; the minimal source repair then bounded the diagnostic while preserving strict decoded-key rejection. The commit containing this file is a documentation-only successor, so source-head local evidence does not automatically become exact-current whole-head evidence.
 
 ## Canonical product boundary
 
@@ -48,7 +48,7 @@ This is a stable consumer reproduction of the central settlement gap. Do not man
 
 `.github#2056@69ae472562c93cc17674af5e2085a58947d3fab8` remains stacked on #2051 and preserves complete-failed-job-set validation plus one atomic run-wide wake. It must adopt a repaired exact #2051 successor rather than independently attaching to protected main.
 
-Owner repair must preserve authenticated repository/PR/head/base/required-run/language/job/SARIF/artifact evidence, boundedly converge the complete terminal job set, and perform one run-wide wake before producing terminal receipt. Old-base hosted evidence does not transfer after ancestry repair.
+Owner repair must preserve authenticated repository/PR/head/base/required-run/language/job/SARIF/artifact evidence, boundedly converge the complete terminal job set, and perform one run-wide wake before producing terminal receipt. Fresh consumer canaries observed on 2026-09-10 continue to reproduce receiver-before-dispatch ordering on unchanged exact heads, so this remains a central owner defect rather than a ConceptWeave leaf workaround. Old-base hosted evidence does not transfer after ancestry repair.
 
 Required central order: ordinary non-force adoption of protected `cb0872c...` -> reproduce current consumer RED -> minimal settlement repair -> reconcile valid #2051/#2056 identity/wake deltas -> exact-current central GREEN and qualifying independent review -> normal protected integration -> fresh unchanged-head #35 acceptance.
 
@@ -61,7 +61,7 @@ Required central order: ordinary non-force adoption of protected `cb0872c...` ->
 - Pending-source #40: `4efe15c6318d8cb65c52a974a2c105363a4c82a5`, OPEN Draft on #9.
 - Golden-set #10: `fdf8b8d70c05bcb76c55cb6336c9bf31b5e42ce4`, OPEN Draft from historical #9 ancestry; it remains a semantic reconciliation finding rather than a closure candidate.
 - Procedural authoring #43: `2c6d3037acdeae2b152c335ee2f60a59b4472831`, OPEN Draft on Foundation. It owns local draft/revision schemas, locked AJV fixture validation and Draft-safe Product/CI-contract source repair; it is not a production self-modifying runtime.
-- Procedural self-application #44: source/test head `484db0083c9604cd41112c4a35ae9c31f3d667cc`, OPEN Draft on #43. It adds inferred self-application profiles, a Rust topology/evidence-membership candidate, local-Git source-provenance verification, strict duplicate-key checked-in artifact admission, and regular-file path-mode binding for provenance sources.
+- Procedural self-application #44: source/test head `10799a65325319c6ff337814b23d9d7a48d82fcd`, OPEN Draft on #43. It adds inferred self-application profiles, a Rust topology/evidence-membership candidate, local-Git source-provenance verification, strict duplicate-key checked-in artifact admission, regular-file path-mode binding for provenance sources, and bounded non-echoing duplicate-key diagnostics.
 
 ## Source Observation P0 — PostgreSQL 18 representation before transport
 
@@ -84,12 +84,13 @@ Only after this representation/version/authorization slice is exact-head Rust GR
 
 The checked-in profiles remain inferred Draft artifacts, KO/EN authoring only, with runtime activation disabled. Shape or topology validation never grants execution or publication authority.
 
-Four artifact-admission defects now have explicit RED -> repair evidence on #44:
+Five artifact-admission defects now have explicit RED -> repair evidence on #44:
 
 1. **Self-consistency was not immutable provenance.** RED `86c74f66098ae83df935b11ad250f3a02ff8a732` showed coordinated source-digest/profile-reference/profile-digest rewriting could remain internally consistent. GREEN `a963a1f24902347f7ec8aca9fd9bee8837986ce7` resolves exact local-Git `commit:path`, requires the recorded blob identity/type, bounds source bytes and checks exact SHA-256.
 2. **Object existence was not authored-history membership.** RED `a7e6b821262671c0f72974bfc86ff8b6fd935227` reproduced a dangling/orphan source commit whose object remained locally. GREEN `e22647e6f45f7244552c0e2d74f86dcc8ac0e85c` verifies repository top-level identity, strips ambient `GIT_*` overrides and requires each source commit to be an ancestor of exact checked-out `HEAD` before path/blob/byte verification.
-3. **Ordinary JSON parsing collapsed duplicate object members before admission.** Review `5163384790` records the unchanged-head RED: Node 22.16 last-wins parsing discarded duplicate `model_id`/nested scope evidence before AJV or provenance logic could observe it. Source `898cd641e60426541b567d02ba090b20249c88b2` adds `scripts/parse_strict_json.mjs`, bounded to 2 MiB and depth 128, rejects duplicate decoded member names at every object depth including escaped-equivalent names, and then delegates ordinary syntax/value parsing to `JSON.parse`. `check_semantic_engineering_profiles.mjs` uses this reader for the manifest and both checked-in profiles. Six local Node contract tests cover valid JSON, top-level/nested/escaped-equivalent duplicates, malformed/trailing input, excessive nesting and oversize. This is checked-in artifact admission only, not the future Rust production transport.
+3. **Ordinary JSON parsing collapsed duplicate object members before admission.** Review `5163384790` records the unchanged-head RED: Node 22.16 last-wins parsing discarded duplicate `model_id`/nested scope evidence before AJV or provenance logic could observe it. Source `898cd641e60426541b567d02ba090b20249c88b2` adds `scripts/parse_strict_json.mjs`, bounded to 2 MiB and depth 128, rejects duplicate decoded member names at every object depth including escaped-equivalent names, and then delegates ordinary syntax/value parsing to `JSON.parse`. `check_semantic_engineering_profiles.mjs` uses this reader for the manifest and both checked-in profiles. This is checked-in artifact admission only, not the future Rust production transport.
 4. **A Git blob was not necessarily a regular source file.** Review `5163577072` records the RED: Git symbolic links are blobs whose content is the link-target pathname, so blob type/ID and content digest alone could authenticate link metadata instead of the intended design-source bytes. Test commit `3fd1873bcbb29d74308131bde98a8503561d72d6`, suite wiring `435155f691749e87d0f3b0e7e2f2e3c7c2b4769b`, repair `aab84a9d72686fc4de8c43ba4d9e1548c3cad9da`, and source/test successor `484db0083c9604cd41112c4a35ae9c31f3d667cc` bind the exact tree entry mode and object ID. Only regular `100644`/`100755` blob entries are admitted; `120000` symlinks fail closed. Exact synthetic Node slice verifies symlink rejection and preservation of both regular modes: 2 tests / 2 passed.
+5. **Fail-closed duplicate detection could still amplify untrusted content into diagnostics.** Exact-head review `5164233960` reproduced a 1,800,011-byte valid duplicate-member input whose ~900 KiB member name became a 900,029-byte exception message. RED-only commit `4fac2eb62f5484c20bce44c5abfc57b93592a596` adds the bounded-diagnostic regression. GREEN source `10799a65325319c6ff337814b23d9d7a48d82fcd` replaces raw member-name echo with a 16-hex SHA-256 fingerprint plus exact UTF-8 byte count. Local Node 22.16 strict-JSON slice is **7 tests / 7 passed**, including decoded-key equivalence, malformed/trailing input, depth/size bounds and the 900,000-byte duplicate-key witness; the repaired diagnostic remains <=128 bytes for the production label used by the checker. No semantic value or source text is emitted in the duplicate-key error.
 
 The manifest deliberately remains `source_authentication: not_established_by_manifest`: metadata cannot authenticate itself. The external local-Git verifier establishes only checked-in design-source provenance. It does not establish factual truth, independent evaluation, steward approval, publication or runtime activation.
 
@@ -116,10 +117,10 @@ No release is currently authorized. Release-ready protected head must still exec
 
 ## Current execution order
 
-1. Central `.github` owners adopt protected `cb0872c...` non-force, repair terminal settlement with the stable #35 consumer RED, reconcile #2051/#2056 valid deltas, obtain exact-current GREEN/review and integrate normally.
+1. Central `.github` owners adopt protected `cb0872c...` non-force, repair terminal settlement with the stable #35 and other fresh consumer REDs, reconcile #2051/#2056 valid deltas, obtain exact-current GREEN/review and integrate normally.
 2. Re-run #35 unchanged exact head against the protected central repair; require terminal required checks, zero valid findings and qualifying independent review before normal merge.
 3. Restack Foundation #1 onto protected Product bootstrap non-force and repair its Product workflow plus executable CI-contract guard as one parent prerequisite; obtain fresh Foundation exact-head evidence.
-4. Restack dependent #5/#9/#43 and descendants normally and reset evidence. #44 retains the four artifact-admission RED/repair lineages.
+4. Restack dependent #5/#9/#43 and descendants normally and reset evidence. #44 retains the five artifact-admission RED/repair lineages.
 5. On #44, progress the Rust production transport/domain admission from executable REDs; do not treat the JS artifact reader or local-Git verifier as production semantic/domain validation.
 6. Independently progress Source Observation from frozen-v2/versioned-representation/type-authorization RED; do not add transport first.
 7. Repair Golden-set #10 against current #9 semantically, then propagate descendants without closure or whole-tree ours/theirs shortcuts.
