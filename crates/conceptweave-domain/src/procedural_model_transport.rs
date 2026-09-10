@@ -19,7 +19,7 @@ pub const MAX_PROCEDURAL_TRANSPORT_DEPTH: usize = 128;
 pub enum ProceduralTransportError {
     /// Input exceeded the bounded transport size.
     InputTooLarge,
-    /// Input was not strict JSON for this admission boundary.
+    /// Input was not valid UTF-8 or strict JSON for this admission boundary.
     InvalidJson,
     /// An object repeated the same decoded member name.
     DuplicateMember,
@@ -306,14 +306,29 @@ fn hex_value(byte: u8) -> Option<u16> {
     }
 }
 
-/// Admits one bounded UTF-8 JSON transport before schema/domain projection.
+/// Admits one bounded UTF-8 JSON byte transport before schema/domain projection.
 ///
-/// Object-member uniqueness is evaluated after JSON escape decoding, so differently
-/// encoded spellings of one logical member fail closed. The parser validates JSON
-/// grammar only; Draft 2020-12 mapping and authenticated scope admission are later gates.
-pub fn admit_procedural_json_transport(input: &str) -> Result<(), ProceduralTransportError> {
+/// The byte ceiling is enforced before UTF-8 validation so callers do not need to
+/// allocate or lossily decode an oversized payload before admission. Invalid UTF-8
+/// maps to the fixed `invalid_json` diagnostic. Object-member uniqueness is evaluated
+/// after JSON escape decoding, so differently encoded spellings of one logical member
+/// fail closed. The parser validates JSON grammar only; Draft 2020-12 mapping and
+/// authenticated scope admission are later gates.
+pub fn admit_procedural_json_transport_bytes(
+    input: &[u8],
+) -> Result<(), ProceduralTransportError> {
     if input.len() > MAX_PROCEDURAL_TRANSPORT_BYTES {
         return Err(ProceduralTransportError::InputTooLarge);
     }
+    let input = std::str::from_utf8(input).map_err(|_| ProceduralTransportError::InvalidJson)?;
     StrictJsonParser::new(input).finish()
+}
+
+/// Admits one already decoded UTF-8 JSON transport before schema/domain projection.
+///
+/// This convenience wrapper preserves the existing borrowed-string call surface while
+/// routing through the byte-first transport boundary. Callers receiving raw network,
+/// file or message bytes should use [`admit_procedural_json_transport_bytes`] directly.
+pub fn admit_procedural_json_transport(input: &str) -> Result<(), ProceduralTransportError> {
+    admit_procedural_json_transport_bytes(input.as_bytes())
 }
