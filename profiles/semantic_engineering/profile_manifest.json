@@ -1,0 +1,54 @@
+{
+  "schema_version": "conceptweave.self_application_manifest/v0-proposed",
+  "status": "inferred_draft",
+  "runtime_activation": false,
+  "source_authentication": "not_established_by_manifest",
+  "label_completeness": "ko_en_authoring_only",
+  "loop_separation": {
+    "object_level": "conceptweave_semantic_authoring",
+    "meta_level": "conceptweave_procedural_refinement",
+    "self_approval_permitted": false
+  },
+  "sources": [
+    {
+      "source_id": "conceptweave_prd",
+      "repository": "ContextualWisdomLab/ConceptWeave",
+      "commit_sha": "2c6d3037acdeae2b152c335ee2f60a59b4472831",
+      "path": "docs/PRD.md",
+      "git_blob_sha": "444eac2f6e10efe18bdcf94315e967784c23139c",
+      "content_digest": "sha256:eb68bfe0c8891667858e42790b919d9b2ffe20f0ce455492be731d4a911df636",
+      "source_status": "proposed_design_not_operational_evidence"
+    },
+    {
+      "source_id": "procedural_adoption_design",
+      "repository": "ContextualWisdomLab/ConceptWeave",
+      "commit_sha": "300fed966643fa4bf2c4be29514b8796da764166",
+      "path": "docs/adr/pg_20260910_procedural_model_engineering.md",
+      "git_blob_sha": "6e9905a32a68452aa7ae7a316716ebf63134a10e",
+      "content_digest": "sha256:cc47ec9f83aab5ca5563ecaae0de8be440de224ecd9ac139ed93a80169713505",
+      "source_status": "proposed_design_not_operational_evidence"
+    }
+  ],
+  "profiles": [
+    {
+      "path": "profiles/semantic_engineering/semantic_authoring.draft.json",
+      "model_id": "conceptweave_semantic_authoring",
+      "task_type": "semantic_model_engineering",
+      "content_digest": "sha256:a3a5a91cb522fd8910b5e7e183f98c5bb1f967d2c2ead2d8249e7a986b397cbe",
+      "procedure_count": 8,
+      "relation_count": 9,
+      "epistemic_status": "inferred_from_proposed_design",
+      "intended_consumer": "Noema_via_released_contract_not_connected"
+    },
+    {
+      "path": "profiles/semantic_engineering/procedural_refinement.draft.json",
+      "model_id": "conceptweave_procedural_refinement",
+      "task_type": "procedural_model_engineering",
+      "content_digest": "sha256:fda2c4c1fd19a30d3875b05775a39550971c789d949aaac6a7da8f31b8b4c7d1",
+      "procedure_count": 9,
+      "relation_count": 11,
+      "epistemic_status": "inferred_from_proposed_design",
+      "intended_consumer": "Noema_via_released_contract_not_connected"
+    }
+  ]
+}
