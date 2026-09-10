@@ -58,12 +58,13 @@ test("references name pinned source coordinates without claiming operational tru
     }
   }
 });
-test("manifest source coordinates resolve to the exact immutable Git bytes", () => {
+test("manifest source coordinates resolve to exact immutable Git bytes without claiming authentication", () => {
   const result = verifyManifestSourceProvenance(repositoryRoot, manifest);
   assert.equal(result.sources_verified, manifest.sources.length);
   assert.ok(result.source_bytes_verified > 0);
   assert.equal(result.verification_scope, "local_git_commit_path_blob_and_sha256");
-  assert.equal(result.source_authentication_established, true);
+  assert.equal(result.local_git_provenance_established, true);
+  assert.equal(Object.hasOwn(result, "source_authentication_established"), false);
 });
 test("coordinated digest tampering cannot self-authorize source provenance", () => {
   const tamperedManifest = structuredClone(manifest);
