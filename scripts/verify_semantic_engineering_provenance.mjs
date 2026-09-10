@@ -6,6 +6,7 @@ const SOURCE_ID = /^[A-Za-z0-9._-]{1,128}$/;
 const HEX40 = /^[0-9a-f]{40}$/;
 const SHA256 = /^sha256:[0-9a-f]{64}$/;
 const SAFE_PATH = /^[A-Za-z0-9._/-]{1,512}$/;
+const REGULAR_FILE_MODES = new Set(["100644", "100755"]);
 const DEFAULT_MAX_SOURCE_BYTES = 2 * 1024 * 1024;
 const DEFAULT_GIT_TIMEOUT_MS = 5000;
 
@@ -101,6 +102,18 @@ export function verifyManifestSourceProvenance(repositoryRoot, manifest, options
     }
     const blob = gitText(root, ["rev-parse", "--verify", `${source.commit_sha}:${source.path}`], `source_path_unavailable:${id}`, { timeout: gitTimeoutMs });
     if (!HEX40.test(blob)) throw new Error(`source_git_blob_invalid:${id}`);
+
+    const treeEntry = gitText(
+      root,
+      ["ls-tree", "--full-tree", source.commit_sha, "--", source.path],
+      `source_path_unavailable:${id}`,
+      { timeout: gitTimeoutMs },
+    );
+    const treeMatch = /^([0-9]{6}) blob ([0-9a-f]{40})\t(.+)$/.exec(treeEntry);
+    if (!treeMatch || !REGULAR_FILE_MODES.has(treeMatch[1]) || treeMatch[2] !== blob || treeMatch[3] !== source.path) {
+      throw new Error(`source_path_not_regular:${id}`);
+    }
+
     const objectType = gitText(root, ["cat-file", "-t", blob], `source_git_blob_unavailable:${id}`, { timeout: gitTimeoutMs });
     if (objectType !== "blob") throw new Error(`source_object_not_blob:${id}`);
     if (blob !== source.git_blob_sha) throw new Error(`source_git_blob_mismatch:${id}`);
