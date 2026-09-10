@@ -2,8 +2,11 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
+import { sha256Digest, verifyManifestSourceProvenance } from "../verify_semantic_engineering_provenance.mjs";
 
 const root = new URL("../../", import.meta.url);
+const repositoryRoot = fileURLToPath(root);
 const read = path => readFileSync(new URL(path, root));
 const manifest = JSON.parse(read("profiles/semantic_engineering/profile_manifest.json"));
 const records = manifest.profiles.map(item => ({...item, payload: JSON.parse(read(item.path))}));
@@ -51,6 +54,58 @@ test("references name pinned source coordinates without claiming operational tru
       assert.ok(ref.location.startsWith(`${source.path}::`));
     }
   }
+});
+test("manifest source coordinates resolve to the exact immutable Git bytes", () => {
+  const result = verifyManifestSourceProvenance(repositoryRoot, manifest);
+  assert.equal(result.sources_verified, manifest.sources.length);
+  assert.ok(result.source_bytes_verified > 0);
+  assert.equal(result.verification_scope, "local_git_commit_path_blob_and_sha256");
+  assert.equal(result.source_authentication_established, true);
+});
+test("coordinated digest tampering cannot self-authorize source provenance", () => {
+  const tamperedManifest = structuredClone(manifest);
+  const fakeDigest = sha256Digest(Buffer.from("coordinated-source-tamper"));
+  tamperedManifest.sources[0].content_digest = fakeDigest;
+  const tamperedPayloads = records.map(({payload}) => structuredClone(payload));
+  let rewrittenReferences = 0;
+  tamperedPayloads.forEach((payload, index) => {
+    for (const ref of payload.source_evidence) {
+      if (ref.source_id === tamperedManifest.sources[0].source_id) {
+        ref.source_digest = fakeDigest;
+        rewrittenReferences += 1;
+      }
+    }
+    const bytes = Buffer.from(JSON.stringify(payload));
+    tamperedManifest.profiles[index].content_digest = sha256Digest(bytes);
+    assert.equal(tamperedManifest.profiles[index].content_digest, sha256Digest(bytes));
+  });
+  assert.ok(rewrittenReferences > 0);
+  assert.throws(
+    () => verifyManifestSourceProvenance(repositoryRoot, tamperedManifest),
+    /source_content_digest_mismatch:conceptweave_prd/,
+  );
+});
+test("source provenance fails closed on malformed, missing, oversized and duplicate coordinates", () => {
+  const duplicate = structuredClone(manifest);
+  duplicate.sources[1].source_id = duplicate.sources[0].source_id;
+  assert.throws(() => verifyManifestSourceProvenance(repositoryRoot, duplicate), /source_id_invalid_or_duplicate/);
+
+  const malformedBlob = structuredClone(manifest);
+  malformedBlob.sources[0].git_blob_sha = "not-a-blob";
+  assert.throws(() => verifyManifestSourceProvenance(repositoryRoot, malformedBlob), /source_git_blob_invalid:conceptweave_prd/);
+
+  const missingCommit = structuredClone(manifest);
+  missingCommit.sources[0].commit_sha = "0".repeat(40);
+  assert.throws(() => verifyManifestSourceProvenance(repositoryRoot, missingCommit), /source_commit_unavailable:conceptweave_prd/);
+
+  const missingPath = structuredClone(manifest);
+  missingPath.sources[0].path = "docs/does-not-exist.md";
+  assert.throws(() => verifyManifestSourceProvenance(repositoryRoot, missingPath), /source_path_unavailable:conceptweave_prd/);
+
+  assert.throws(
+    () => verifyManifestSourceProvenance(repositoryRoot, manifest, {maxSourceBytes: 1}),
+    /source_size_limit_exceeded:conceptweave_prd/,
+  );
 });
 test("authoring profile retains the seven canonical phases and a correction path", () => {
   const authoring = records[0].payload;
