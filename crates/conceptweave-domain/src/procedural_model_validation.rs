@@ -88,8 +88,8 @@ pub struct ProcedureNodeView<'a> {
     pub procedure_kind: ProcedureKind,
     /// Locale-specific labels retained without interpretation.
     pub locale_labels: LocaleAnnotationsView<'a>,
-    /// Optional semantic artifact references; empty means the optional field was absent.
-    pub semantic_refs: &'a [ArtifactReferenceView<'a>],
+    /// Optional semantic artifact references; `None` preserves field absence.
+    pub semantic_refs: Option<&'a [ArtifactReferenceView<'a>]>,
     /// Tool contract coordinate required for tool operations.
     pub tool_contract_ref: Option<ArtifactReferenceView<'a>>,
     /// Exact references that must also occur in the model evidence inventory.
@@ -306,10 +306,13 @@ fn artifact_reference<'a>(
 }
 
 fn semantic_artifacts(
-    references: &[ArtifactReferenceView<'_>],
+    references: Option<&[ArtifactReferenceView<'_>]>,
     budget: &mut usize,
 ) -> Result<(), ProceduralValidationError> {
-    if references.len() > 32 {
+    let Some(references) = references else {
+        return Ok(());
+    };
+    if references.is_empty() || references.len() > 32 {
         return Err(ProceduralValidationError::CollectionLimit);
     }
     let mut unique = BTreeSet::new();
