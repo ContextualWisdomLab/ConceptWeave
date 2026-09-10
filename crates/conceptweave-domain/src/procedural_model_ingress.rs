@@ -76,11 +76,41 @@ pub(crate) struct ProceduralRevisionExpectation<'a> {
     pub candidate_scope: ProceduralScope<'a>,
 }
 
+/// Canonical origin of an admitted revision proposal; neither variant grants authority.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ProceduralProposalOrigin {
+    /// Candidate was produced with model assistance and remains proposed evidence.
+    ModelAssisted,
+    /// Candidate was authored by a steward but is not thereby reviewed or approved.
+    StewardAuthored,
+}
+
+/// Borrowed view of one retained training-evidence coordinate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ProceduralEvidenceView<'a> {
+    /// Stable source identity asserted by the proposal.
+    pub source_id: &'a str,
+    /// Exact source digest asserted by the proposal.
+    pub source_digest: &'a str,
+    /// Bounded location inside the asserted source.
+    pub location: &'a str,
+}
+
 #[derive(Clone, Debug)]
 struct OwnedEvidenceReference {
     source_id: String,
     source_digest: String,
     location: String,
+}
+
+impl OwnedEvidenceReference {
+    fn as_view(&self) -> ProceduralEvidenceView<'_> {
+        ProceduralEvidenceView {
+            source_id: &self.source_id,
+            source_digest: &self.source_digest,
+            location: &self.location,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -172,8 +202,75 @@ struct OwnedProceduralDraft {
 #[derive(Clone, Debug)]
 struct OwnedProceduralRevisionProposal {
     proposal_id: String,
+    proposal_origin: ProceduralProposalOrigin,
     base_model_ref: OwnedArtifactReference,
     candidate_model: OwnedProceduralDraft,
+    training_evidence: Vec<OwnedEvidenceReference>,
+    rejected_edit_refs: Vec<OwnedArtifactReference>,
+    change_rationale: String,
+}
+
+/// One schema-valid revision proposal retained after context binding and deterministic validation.
+///
+/// This value preserves proposal evidence for later application-layer evaluation without
+/// reparsing the untrusted transport. It is not an authentication, authorization, approval,
+/// publication, capability, or execution receipt.
+#[derive(Clone, Debug)]
+pub(crate) struct ProceduralRevisionAdmission {
+    revision: OwnedProceduralRevisionProposal,
+    topology_summary: TopologySummary,
+}
+
+impl ProceduralRevisionAdmission {
+    /// Returns the exact proposal identity retained from the canonical envelope.
+    pub(crate) fn proposal_id(&self) -> &str {
+        &self.revision.proposal_id
+    }
+
+    /// Returns the proposal origin without promoting it to decision authority.
+    pub(crate) fn proposal_origin(&self) -> ProceduralProposalOrigin {
+        self.revision.proposal_origin
+    }
+
+    /// Returns the exact asserted base-model coordinate retained by admission.
+    pub(crate) fn base_model_ref(&self) -> ArtifactReferenceView<'_> {
+        self.revision.base_model_ref.as_view()
+    }
+
+    /// Returns the candidate scope retained from the schema-valid draft.
+    pub(crate) fn candidate_scope(&self) -> ProceduralScope<'_> {
+        self.revision.candidate_model.scope()
+    }
+
+    /// Iterates retained training evidence without copying or changing its epistemic status.
+    pub(crate) fn training_evidence(
+        &self,
+    ) -> impl Iterator<Item = ProceduralEvidenceView<'_>> + '_ {
+        self.revision
+            .training_evidence
+            .iter()
+            .map(OwnedEvidenceReference::as_view)
+    }
+
+    /// Iterates retained rejected-edit coordinates without resolving their artifact authority.
+    pub(crate) fn rejected_edit_refs(
+        &self,
+    ) -> impl Iterator<Item = ArtifactReferenceView<'_>> + '_ {
+        self.revision
+            .rejected_edit_refs
+            .iter()
+            .map(OwnedArtifactReference::as_view)
+    }
+
+    /// Returns the exact bounded rationale retained for later independent evaluation.
+    pub(crate) fn change_rationale(&self) -> &str {
+        &self.revision.change_rationale
+    }
+
+    /// Returns the deterministic topology summary produced during this admission.
+    pub(crate) fn topology_summary(&self) -> TopologySummary {
+        self.topology_summary
+    }
 }
 
 fn schema_invalid<T>() -> Result<T, ProceduralIngressError> {
@@ -438,6 +535,14 @@ fn parse_relation_kind(value: String) -> Result<ProceduralRelationKind, Procedur
     }
 }
 
+fn parse_proposal_origin(value: String) -> Result<ProceduralProposalOrigin, ProceduralIngressError> {
+    match value.as_str() {
+        "model_assisted" => Ok(ProceduralProposalOrigin::ModelAssisted),
+        "steward_authored" => Ok(ProceduralProposalOrigin::StewardAuthored),
+        _ => schema_invalid(),
+    }
+}
+
 fn parse_node(value: StrictJsonValue) -> Result<OwnedProcedureNode, ProceduralIngressError> {
     let mut object = into_object(value)?;
     require_exact_keys(
@@ -597,19 +702,15 @@ fn parse_revision_proposal(
         return schema_invalid();
     }
 
-    match take_required_string(&mut object, "proposal_origin")?.as_str() {
-        "model_assisted" | "steward_authored" => {}
-        _ => return schema_invalid(),
-    }
-
+    let proposal_origin = parse_proposal_origin(take_required_string(&mut object, "proposal_origin")?)?;
     let proposal_id = take_required_string(&mut object, "proposal_id")?;
     if !valid_identity(&proposal_id) {
         return schema_invalid();
     }
     let base_model_ref = parse_artifact_reference(take_required(&mut object, "base_model_ref")?)?;
     let candidate_model = parse_draft(take_required(&mut object, "candidate_model")?)?;
-    let _training_evidence = parse_evidence_list(take_required(&mut object, "training_evidence")?)?;
-    let _rejected_edit_refs = bounded_array(take_required(&mut object, "rejected_edit_refs")?, 0, 64)?
+    let training_evidence = parse_evidence_list(take_required(&mut object, "training_evidence")?)?;
+    let rejected_edit_refs = bounded_array(take_required(&mut object, "rejected_edit_refs")?, 0, 64)?
         .into_iter()
         .map(parse_artifact_reference)
         .collect::<Result<Vec<_>, _>>()?;
@@ -620,8 +721,12 @@ fn parse_revision_proposal(
 
     Ok(OwnedProceduralRevisionProposal {
         proposal_id,
+        proposal_origin,
         base_model_ref,
         candidate_model,
+        training_evidence,
+        rejected_edit_refs,
+        change_rationale,
     })
 }
 
@@ -642,6 +747,15 @@ fn evidence_domain(
 }
 
 impl OwnedProceduralDraft {
+    fn scope(&self) -> ProceduralScope<'_> {
+        ProceduralScope {
+            model_id: &self.model_id,
+            tenant_ref: &self.tenant_ref,
+            task_type: &self.task_type,
+            domain_owner_ref: &self.domain_owner_ref,
+        }
+    }
+
     fn matches_scope(&self, expected_scope: ProceduralScope<'_>) -> bool {
         self.model_id == expected_scope.model_id
             && self.tenant_ref == expected_scope.tenant_ref
@@ -712,12 +826,7 @@ impl OwnedProceduralDraft {
             .collect::<Vec<_>>();
 
         let model = ProceduralModelView {
-            scope: ProceduralScope {
-                model_id: &self.model_id,
-                tenant_ref: &self.tenant_ref,
-                task_type: &self.task_type,
-                domain_owner_ref: &self.domain_owner_ref,
-            },
+            scope: self.scope(),
             entry_procedure_id: &self.entry_procedure_id,
             source_evidence: &root_evidence,
             procedure_nodes: &nodes,
@@ -747,21 +856,20 @@ pub(crate) fn validate_procedural_model_json_transport(
     draft.validate(expected_scope, reachability)
 }
 
-/// Admits one canonical procedural revision envelope and binds it to separately supplied
-/// request coordinates before deterministic candidate validation.
+/// Admits one canonical procedural revision envelope, preserves its proposal semantics,
+/// and binds it to separately supplied request coordinates before deterministic validation.
 ///
-/// The envelope is still untrusted input. This function rejects unknown/missing members,
-/// self-issued authority, non-training partitions, malformed base/candidate/evidence shapes,
-/// and mismatched proposal/base/scope coordinates. `expected` is only an independent value
-/// boundary; this domain module does not authenticate it. A production application adapter
-/// must issue the expectation only after Keyverse-backed request authentication. Referenced
-/// artifact authenticity/ACL/capability, evaluation, stewardship, publication and execution
-/// remain later owner gates.
-pub(crate) fn validate_procedural_revision_json_transport(
+/// The envelope remains untrusted input. Successful admission retains the proposal origin,
+/// training evidence, rejected-edit references, rationale, exact base coordinate and complete
+/// candidate in one typed private value so later evaluation does not need to reparse transport
+/// bytes. The supplied expectation is still not an authentication receipt; authentication,
+/// ConceptWeave resource authorization, artifact authenticity/ACL/capability, stewardship,
+/// publication and execution remain separate owner gates.
+pub(crate) fn admit_procedural_revision_json_transport(
     input: &[u8],
     expected: ProceduralRevisionExpectation<'_>,
     reachability: ReachabilityRule,
-) -> Result<TopologySummary, ProceduralIngressError> {
+) -> Result<ProceduralRevisionAdmission, ProceduralIngressError> {
     let decoded = parse_procedural_json_transport_bytes(input)?;
     let revision = parse_revision_proposal(decoded)?;
     if revision.proposal_id != expected.proposal_id
@@ -770,5 +878,27 @@ pub(crate) fn validate_procedural_revision_json_transport(
     {
         return Err(ProceduralIngressError::RevisionContextMismatch);
     }
-    revision.candidate_model.validate(expected.candidate_scope, reachability)
+    let topology_summary = revision
+        .candidate_model
+        .validate(expected.candidate_scope, reachability)?;
+    Ok(ProceduralRevisionAdmission {
+        revision,
+        topology_summary,
+    })
+}
+
+/// Validates one canonical procedural revision envelope and returns its topology summary.
+///
+/// This compatibility surface delegates to [`admit_procedural_revision_json_transport`], so
+/// validation and later typed admission share one transport/schema/context implementation.
+/// Callers that need proposal evidence for independent evaluation should keep the admission
+/// value rather than reparsing the original JSON. No returned value grants approval,
+/// publication or execution authority.
+pub(crate) fn validate_procedural_revision_json_transport(
+    input: &[u8],
+    expected: ProceduralRevisionExpectation<'_>,
+    reachability: ReachabilityRule,
+) -> Result<TopologySummary, ProceduralIngressError> {
+    admit_procedural_revision_json_transport(input, expected, reachability)
+        .map(|admission| admission.topology_summary())
 }
