@@ -3,14 +3,18 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { materializeContractCases, createAjvInvocations } from "../check_procedural_contracts.mjs";
+import {
+  materializeContractCases,
+  createProceduralValidators,
+  validateContractCases,
+} from "../check_procedural_contracts.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const readFixture = name => JSON.parse(readFileSync(resolve(repositoryRoot, "contracts/fixtures", name), "utf8"));
 const fixtureBases = {model: readFixture("procedural-model.base.json"), revision: readFixture("procedural-revision.base.json")};
 const caseManifest = readFixture("procedural-authoring.cases.json");
 
-// These tests cover only the fixture runner. Schema conformance uses a real validator separately.
+// These tests cover the fixture protocol and real in-process JSON Schema validation only.
 test("materializes every registered case without changing retained fixture bytes", () => {
   const beforeBytes = JSON.stringify({fixtureBases, caseManifest});
   const outputCases = materializeContractCases(caseManifest, fixtureBases);
@@ -50,16 +54,23 @@ for (const [caseName, mutation] of [
   assert.throws(() => materializeContractCases(changedManifest, fixtureBases), /invalid_fixture_protocol/);
 });
 
-test("AJV invocations compile both schemas and check all four positive/negative groups", () => {
+test("validates all shape cases in process through the locked AJV library", () => {
   const outputCases = materializeContractCases(caseManifest, fixtureBases);
-  const invocations = createAjvInvocations(repositoryRoot, "/tmp/procedural_fixture_test", outputCases);
-  assert.equal(invocations.length, 6);
-  assert.equal(invocations.filter(item => item[0] === "compile").length, 2);
-  assert.equal(invocations.filter(item => item.includes("--valid")).length, 2);
-  assert.equal(invocations.filter(item => item.includes("--invalid")).length, 2);
-  for (const argumentList of invocations) {
-    assert.ok(argumentList.includes("--spec=draft2020"));
-    assert.ok(!argumentList.some(value => /coerce|remove-additional|use-defaults/.test(value)));
-    assert.ok(argumentList.includes(resolve(repositoryRoot, "contracts/semantic-candidate.schema.json")));
-  }
+  const summary = validateContractCases(createProceduralValidators(repositoryRoot), outputCases);
+  assert.equal(summary.checked_cases, 46);
+  assert.equal(summary.semantic_gap_witnesses, 4);
+  assert.equal(summary.publication_authorized, false);
+  assert.equal(summary.activation_authorized, false);
+});
+
+test("keeps JSON Schema validation off dynamic package execution paths", () => {
+  const packageManifest = JSON.parse(readFileSync(resolve(repositoryRoot, "package.json"), "utf8"));
+  const packageLock = JSON.parse(readFileSync(resolve(repositoryRoot, "package-lock.json"), "utf8"));
+  const workflow = readFileSync(resolve(repositoryRoot, ".github/workflows/product.yml"), "utf8");
+  const checker = readFileSync(resolve(repositoryRoot, "scripts/check_procedural_contracts.mjs"), "utf8");
+  assert.equal(packageManifest.devDependencies.ajv, "8.20.0");
+  assert.equal(packageLock.packages["node_modules/ajv"].version, "8.20.0");
+  assert.match(workflow, /npm ci --ignore-scripts --no-audit --no-fund/);
+  assert.doesNotMatch(workflow, /\bnpx\b|ajv-cli/);
+  assert.doesNotMatch(checker, /spawnSync|\bnpx\b|ajv-cli/);
 });

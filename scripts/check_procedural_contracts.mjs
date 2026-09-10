@@ -1,8 +1,7 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import Ajv2020 from "ajv/dist/2020.js";
 
 const forbiddenKeys = new Set(["__proto__", "prototype", "constructor"]);
 const schemaFiles = {
@@ -55,23 +54,42 @@ export function materializeContractCases(caseManifest, fixtureBases) {
   });
 }
 
-/** Uses the existing pinned AJV CLI; expected-invalid cases must be rejected without coercion. */
-export function createAjvInvocations(repositoryRoot, temporaryRoot, outputCases) {
-  const existingSchema = resolve(repositoryRoot, "contracts/semantic-candidate.schema.json");
-  const draftSchema = resolve(repositoryRoot, "contracts", schemaFiles.model);
-  const invocations = [];
-  for (const baseName of Object.keys(schemaFiles)) {
-    const schemaPath = resolve(repositoryRoot, "contracts", schemaFiles[baseName]);
-    const commonArguments = ["--spec=draft2020", "-s", schemaPath, "-r", existingSchema];
-    if (baseName === "revision") commonArguments.push("-r", draftSchema);
-    invocations.push(["compile", ...commonArguments]);
-    for (const shapeValid of [true, false]) {
-      if (!outputCases.some(item => item.base_name === baseName && item.shape_valid === shapeValid)) continue;
-      const groupName = `${baseName}_${shapeValid ? "valid" : "invalid"}`;
-      invocations.push(["test", ...commonArguments, "-d", join(temporaryRoot, `${groupName}_*.json`), shapeValid ? "--valid" : "--invalid"]);
+/** Builds in-process Draft 2020-12 validators from repository-owned schemas. */
+export function createProceduralValidators(repositoryRoot) {
+  const readJson = path => JSON.parse(readFileSync(resolve(repositoryRoot, path), "utf8"));
+  const semanticCandidateSchema = readJson("contracts/semantic-candidate.schema.json");
+  const proceduralModelSchema = readJson("contracts/procedural-model-draft.schema.json");
+  const proceduralRevisionSchema = readJson("contracts/procedural-revision-proposal.schema.json");
+  const ajv = new Ajv2020({allErrors: true, strict: true});
+  ajv.addSchema(semanticCandidateSchema);
+  ajv.addSchema(proceduralModelSchema);
+  ajv.addSchema(proceduralRevisionSchema);
+  const validators = {
+    model: ajv.getSchema(proceduralModelSchema.$id),
+    revision: ajv.getSchema(proceduralRevisionSchema.$id),
+  };
+  requireFixture(typeof validators.model === "function" && typeof validators.revision === "function");
+  return validators;
+}
+
+/** Evaluates every materialized shape case without coercion, defaults, or external command execution. */
+export function validateContractCases(validators, outputCases) {
+  for (const caseRow of outputCases) {
+    const validator = validators[caseRow.base_name];
+    requireFixture(typeof validator === "function");
+    const actualValid = validator(caseRow.payload);
+    if (actualValid !== caseRow.shape_valid) {
+      const details = validator.errors ? JSON.stringify(validator.errors) : "[]";
+      throw new Error(`procedural_contract_validation_failed:${caseRow.case_name}:${details}`);
     }
   }
-  return invocations;
+  return {
+    validation_scope: "input_shape_only",
+    checked_cases: outputCases.length,
+    semantic_gap_witnesses: outputCases.filter(item => item.semantic_expectation !== "not_evaluated").length,
+    publication_authorized: false,
+    activation_authorized: false,
+  };
 }
 
 function runFixtureChecks() {
@@ -79,24 +97,8 @@ function runFixtureChecks() {
   const readFixture = filename => JSON.parse(readFileSync(resolve(repositoryRoot, "contracts/fixtures", filename), "utf8"));
   const fixtureBases = {model: readFixture("procedural-model.base.json"), revision: readFixture("procedural-revision.base.json")};
   const outputCases = materializeContractCases(readFixture("procedural-authoring.cases.json"), fixtureBases);
-  const temporaryRoot = mkdtempSync(join(tmpdir(), "conceptweave_procedural_fixtures_"));
-  try {
-    for (const caseRow of outputCases) {
-      const groupName = `${caseRow.base_name}_${caseRow.shape_valid ? "valid" : "invalid"}`;
-      writeFileSync(join(temporaryRoot, `${groupName}_${caseRow.case_name}.json`), JSON.stringify(caseRow.payload), {flag: "wx", mode: 0o600});
-    }
-    for (const commandArguments of createAjvInvocations(repositoryRoot, temporaryRoot, outputCases)) {
-      const result = spawnSync("npx", ["--yes", "ajv-cli@5.0.0", ...commandArguments], {
-        cwd: repositoryRoot, stdio: "inherit", shell: false,
-      });
-      if (result.error || result.status !== 0) throw new Error("procedural_contract_validation_failed");
-    }
-    console.log(JSON.stringify({validation_scope: "input_shape_only", checked_cases: outputCases.length,
-      semantic_gap_witnesses: outputCases.filter(item => item.semantic_expectation !== "not_evaluated").length,
-      publication_authorized: false, activation_authorized: false}));
-  } finally {
-    rmSync(temporaryRoot, {recursive: true, force: true});
-  }
+  const validators = createProceduralValidators(repositoryRoot);
+  console.log(JSON.stringify(validateContractCases(validators, outputCases)));
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) runFixtureChecks();
