@@ -1,134 +1,81 @@
-# Procedural self-application and topology validation candidate
+# Procedural self-application and governed revision admission
 
-Status: Proposed / native Rust unverified / not operational. Tracking: ConceptWeave
-#42, parent #43, ContextualWisdomLab/.github#2067. Observed parent at authoring:
-`2c6d3037acdeae2b152c335ee2f60a59b4472831`; Foundation at observation remains
-`60f14a6e85a83d56c2eea43b34d52b3366bb1735`. Live GitHub state supersedes these observations.
-This extends, rather than replaces, ADR-PG-20260910 and the existing PRD/TRD.
+Status: Proposed / source-shaped Rust repair / native Rust acceptance unverified / not operational. Tracking: ConceptWeave #42, parent #43, ContextualWisdomLab/.github#2067. Observed parent at this revision: `2c6d3037acdeae2b152c335ee2f60a59b4472831`; Foundation observation: `60f14a6e85a83d56c2eea43b34d52b3366bb1735`. Live GitHub state supersedes recorded coordinates. This document extends ADR-PG-20260910, PRD, TRD and the product/technical gap baseline; it is not publication authority.
 
-## Additional ownership gap
+## Ownership and epistemic boundary
 
-The earlier implementation made ConceptWeave a procedural-model authoring producer.
-It did not yet represent ConceptWeave's own semantic-engineering work as a first-party
-consumer. These are separate uses of the method, not a reason to add another runtime:
+ConceptWeave owns procedural representation engineering inside its semantic-engineering lifecycle: `observe -> discover -> propose -> align -> validate -> review -> publish`. The self-application work has two separate uses:
 
-- object-level: observe -> discover -> propose -> align -> validate -> steward review
-  -> publication, with explicit revision paths;
-- meta-level: retain baseline -> observe training outcomes -> contrast success/failure
-  -> propose a procedure revision -> validate -> independent evaluation -> steward
-  review -> publish successor, or retain the rejected proposal and revisit the hypothesis.
+- object-level semantic authoring: evidence-bound procedures and relations for semantic discovery/alignment/validation and steward review;
+- meta-level refinement: retain a baseline, observe training outcomes, propose a revision, preserve rejected alternatives, validate it, pass it to independent evaluation and then to steward decision.
 
-The meta-level process may propose changes to procedural knowledge. It cannot edit
-its own permissions, judge/approve itself, change evaluation acceptance criteria,
-relabel failed checks, or turn a Proposed ADR into operational authority. ConceptWeave
-owns representation engineering; Noema remains the runtime/lifecycle consumer, CO the
-model-call owner, CGC the released interchange owner and the evaluator an independent
-source of measurement evidence. Product facts and policy authority stay with their owners.
+Neither path may edit its own permissions, self-approve, relabel failed evidence, change acceptance criteria, publish itself or activate a runtime graph. Noema owns execution-local projection/lifecycle/runtime authorization integration; contextual-orchestrator owns production model routing; context-graph-contracts owns released interchange; Keyverse owns identity/credential/authentication trust. ConceptWeave retains authorization of its own exact proposal/base resources after authenticated identity evidence is admitted.
 
-This separation is a CWL architecture decision. Lu et al. describe procedural triplets,
-local situational guidance and offline refinement with retained rejected proposals;
-their method does not prescribe CWL repository ownership or its authorization design.
-No new empirical performance result or paper replication is claimed here.
+Lu et al. (2026) motivate procedural graphs, local guidance, retained rejected proposals and offline refinement. Those method claims do not prescribe CWL repository ownership, authentication or publication design, and this branch does not claim a paper replication or performance gain.
 
-## Source and effect map
+## Current source and contract map
 
-| Artifact / symbol | Role and actual integration state |
+| Artifact / symbol | Current role |
 | --- | --- |
-| `profiles/semantic_engineering/semantic_authoring.draft.json` | First-party authoring profile: 8 procedures, 9 relations, including correction paths |
-| `profiles/semantic_engineering/procedural_refinement.draft.json` | Separate meta-level profile: 9 procedures, 11 relations, independent evaluation/review and rejection paths |
-| `profiles/semantic_engineering/profile_manifest.json` | Exact source coordinates and profile SHA-256 values; inferred draft and activation false, not a signature or approval |
-| `crates/conceptweave-domain/src/procedural_model_validation.rs` | Rust source candidate for topology/evidence membership; no network/provider/database dependency |
-| `validate_procedural_model` | Borrowed structural projection + independently supplied scope + explicit reachability rule -> counts or a fixed error |
-| `crates/conceptweave-domain/tests/procedural_model_validation.rs` | 20 authored native contract tests; the path import compiles the actual source module during Cargo integration tests |
-| `scripts/tests/semantic_engineering_profiles.test.mjs` | Checked-in artifact assertions, not a production graph validator |
-| `scripts/check_semantic_engineering_profiles.mjs` | Reuses parent's `createProceduralValidators` and locked AJV; no new package resolver |
-| `package.json` | Only extends the existing `check:json-contracts` script; dependencies/version and lock file unchanged |
+| `contracts/procedural-model-draft.schema.json` | Local unreleased Draft 2020-12 candidate shape; `draft/inferred`, bounded evidence/artifact coordinates and eight locale slots |
+| `contracts/procedural-revision-proposal.schema.json` | Local offline proposal envelope; `proposed`, `decision_authority:none`, exact base coordinate, training evidence, retained rejected-edit references and rationale |
+| `profiles/semantic_engineering/semantic_authoring.draft.json` | First-party inferred Draft authoring profile; runtime activation remains disabled |
+| `profiles/semantic_engineering/procedural_refinement.draft.json` | Separate inferred Draft refinement profile with independent evaluation/review and rejection paths |
+| `profiles/semantic_engineering/profile_manifest.json` | Exact local-Git source/profile coordinates and digests; provenance metadata, not signature or approval |
+| `scripts/parse_strict_json.mjs` | Repository-side duplicate-decoded-member-safe JSON admission used before AJV for owned schema/fixture artifacts |
+| `crates/conceptweave-domain/src/procedural_model_transport.rs` | Private std-only raw-byte/UTF-8/strict-JSON recognizer with byte/depth/surrogate/duplicate-member bounds |
+| `crates/conceptweave-domain/src/procedural_model_ingress.rs` | Private canonical Draft/revision mapping, proposal/base/scope expectation binding and typed proposal retention |
+| `crates/conceptweave-domain/src/procedural_model_validation.rs` | Borrowed semantic/topology validation: scope equality, evidence closure, semantic/tool coordinates, topology, reachability and schema-significant text semantics |
+| `crates/conceptweave-domain/tests/procedural_model_transport.rs` and `procedural_model_ingress.rs` | Raw transport and Draft mapping regression contracts |
+| `crates/conceptweave-domain/tests/procedural_model_semantics.rs` and `procedural_model_validation.rs` | Direct semantic/topology contracts, including alternate-ingress parity witnesses |
+| `crates/conceptweave-domain/tests/procedural_revision_ingress.rs` and `procedural_revision_semantic_preservation.rs` | Revision-envelope/context-binding and lossless proposal-semantic contracts |
 
-The Rust candidate is deliberately not exported by `src/lib.rs` yet. Its integration-test
-path is an explicit pre-acceptance seam, not a second implementation. After native
-verification, export the module through the library and switch the test import to that
-public API, then exercise a strict JSON-to-domain adapter. Remove the path-import seam
-in the same accepted integration. Do not describe this slice as a shipped library API.
+The procedural Rust modules are intentionally not exported as accepted product API. Integration tests path-import the exact source modules while the branch is Draft. Widening/exporting these seams requires one unchanged exact head with pinned Rust 1.98 fmt, strict all-target Clippy, native tests, rustdoc, release and owned-production coverage plus the required hosted Product/security/review evidence. A source-shaped repair is not a substitute for that evidence.
 
-## What the Rust candidate checks
+## Admission sequence and invariants
 
-The view has exact model/tenant/task/domain-owner scope; scope equality is not identity
-or token verification. Logical procedure IDs must be unique even when record content
-differs. Entry and both endpoints must be present. Relation identity is the complete
-source/type/target triple. Evidence coordinates include source ID, SHA-256 syntax and
-location; node/relation references must be members of the supplied root inventory.
-Repeated coordinates and a source snapshot identity with conflicting digests fail.
+The current private path is deliberately layered:
 
-Bounds: 1–256 procedures, 0–512 relations, 1–64 references per evidence set, local
-128-byte ASCII identifier grammar and 2048 Unicode scalar values per evidence location.
-A single 1 MiB budget covers the projection's identity/evidence text across the whole
-validation, not a per-node reset. It does not cover omitted annotations or raw transport
-bytes; those need pre-parse limits. Error messages contain fixed codes, not input text.
+1. bound raw bytes before UTF-8 conversion;
+2. parse strict JSON with decoded duplicate-member rejection, bounded nesting and valid surrogate handling;
+3. map only the canonical Draft 2020-12 shape, rejecting unknown/missing/wrong-typed/schema-invalid members before domain construction;
+4. preserve procedure kind, locale labels, optional `semantic_refs` presence, tool-contract coordinates, relation condition/guidance/pitfalls and evidence references;
+5. validate logical procedure/relation identity, evidence closure, topology and explicit reachability policy;
+6. for a revision proposal, retain proposal origin, exact base coordinate, complete candidate, training evidence, rejected-edit references and rationale in one typed `ProceduralRevisionAdmission`;
+7. compare proposal/base/candidate scope with a separately supplied `ProceduralRevisionExpectation` before deterministic candidate validation.
 
-Reachability is selected explicitly: partial drafts may be disconnected; a complete
-profile may require every node to be reachable from its entry. Cycles are allowed in
-both modes and traversal is iterative. `requires` is an advisory label, not an executable
-condition or an OWL restriction. The validator never executes or evaluates edge prose.
+`ProceduralRevisionExpectation` is not an authentication receipt. Its equality checks only prove that two independently supplied coordinate sets match. Production construction must wait for an immutable released Keyverse trust contract at the application boundary, then apply ConceptWeave-owned authorization for the exact proposal/base resource. Mutable Keyverse source, JWT/provider verification inside `conceptweave-domain`, or a caller-minted `authenticated=true` substitute are invalid integrations.
 
-A passing result reports counts only. It does not construct a publishable aggregate,
-authenticate source evidence, verify a release signature, compare revision-parent
-artifacts, validate label meanings/tool contracts, attest evaluation quality or approve
-an execution. These remain separate, mandatory owner boundaries.
+Artifact references are coordinates only. Semantic references and tool-contract references still require released-owner authenticity, ACL/capability resolution and consumer authorization before use. Training evidence remains proposed evidence; it is not evaluation truth, approval or publication authority.
 
-## Profile evidence and applicability
+## Canonical text semantics and alternate-ingress parity
 
-Profiles are authored in Korean/English and remain `inferred`/`draft`, with no concrete
-tool-operation contracts because no released executable mapping was established. They
-are derived from exact internal PRD/Proposed ADR source files, not from live customer
-trajectories. The source digests and locator text were verified against retrieved Git
-blob identities; the manifest is still neither cryptographic source authentication nor
-proof that a source statement is normatively correct.
+The procedural Draft schemas use ECMAScript regular-expression `\S` for annotation text. ECMAScript defines U+FEFF ZERO WIDTH NO-BREAK SPACE as White Space. Rust `str::trim`, however, follows Unicode's Derived Core Property `White_Space`; relying on it creates a different text language. Review `5173430684` therefore treated direct borrowed-Rust admission as an alternate ingress rather than assuming AJV had already normalized the contract.
 
-The raw historical ADR source at `300fed966...` is pinned only as method/design evidence.
-Its earlier AJV/CI notes are not current operational instructions. The parent #43 uses
-locked in-process AJV; this change preserves that repair rather than reviving `npx`.
+Source-level RED `029502b278552929677e62ee9df23afd48fd77d6` adds U+FEFF-only witnesses for both locale annotations and evidence locations. Production repair `1ace968b309334bdba8475f8357a207d405ca96b` mirrors the canonical ECMAScript whitespace set in `procedural_model_validation.rs` and applies the same non-whitespace predicate to both fields. This closes the procedural alternate-ingress discrepancy without granting authentication, artifact authority, publication or runtime authority.
 
-Noema currently has its own local graph/Start-node representation. These profiles are
-not asserted to be compatible with it. A released projection contract must preserve or
-explicitly map entry and procedure identities, relation direction, locale/evidence and
-abstention states; it must not silently rename, truncate or activate a graph. No mutable
-sibling PR head is an operational dependency.
+The same inspection exposed a Foundation-level follow-up: the generic `EvidenceReference::new` and `SemanticCandidate::new` constructors still use Rust `str::trim()` while `contracts/semantic-candidate.schema.json` uses ECMAScript `\S`. Foundation review `5173461698` records that repair, but its source must not be churned ahead of the Product-CI bootstrap prerequisite. After #35 normally integrates and Foundation is ordinary/non-force restacked, the generic API should receive its own U+FEFF RED and one shared canonical text predicate rather than maintaining divergent copies.
 
-## Measured evidence and non-evidence
+Authoritative references for this distinction:
 
-The existing exact schema blob `311937137224cdd3036a9a614901c4a99ba62a6b` accepts
-three malformed graph shapes: missing entry, dangling endpoint and duplicate logical
-node ID. An independent diagnostic expecting semantic rejection failed **3/3**.
-This reproduces the existing boundary gap; it is not a Rust execution result and that
-diagnostic is intentionally not rewritten to pretend the schema gained semantic checks.
+- Ecma International. (2026). *ECMAScript® 2026 language specification*, §12.2 White Space. TC39. https://tc39.es/ecma262/multipage/ecmascript-language-lexical-grammar.html#sec-white-space
+- The Rust Project Developers. (2026). *Primitive type `str`: `trim`*. Rust standard library documentation. https://doc.rust-lang.org/std/primitive.str.html#method.trim
 
-On the final authoring bytes, Node 22.16.0 executed **9/9 profile tests**, with no skips.
-Independent Python jsonschema validated **2/2 profiles**, and all declared source
-locations resolved in their pinned source files. Node syntax checks passed for the new
-CI-only scripts. These results do not prove native Rust or production behavior.
+The standards explain the character-set difference; the repository RED/repair commits above are the exact implementation evidence.
 
-The authoring environment has no rustc/cargo/rustup and cannot resolve compiler/package
-hosts. No usable compiler artifact was obtained. The **20 Rust tests are authored but
-unexecuted**; compile, fmt, Clippy, rustdoc, coverage, full native AJV and hosted checks
-remain unverified. Do not replace the parent's locked validator, fabricate results or
-merge on the basis of the narrower Node/Python checks. Python is used only for an
-independent authoring check and is not added to the product.
+## Provenance and security boundary
 
-## Todo / continuation contract
+The self-application manifest is verified against bounded local-Git provenance: exact `commit:path`, object identity/type, regular-file mode, authored-history membership, bounded source bytes and SHA-256. Ambient `GIT_*` overrides are scrubbed and attacker-controlled duplicate keys are not echoed into diagnostics. This establishes local repository provenance only. It does not authenticate remote source ownership, make the source statement normatively correct, establish steward identity or authorize publication.
 
-| Action | Prerequisite | Completion evidence | State |
-| --- | --- | --- | --- |
-| Refresh owner/source/PR/review structure | Live repository access | Parent SHA and inherited repair inspection | Done at dated observation |
-| Reproduce schema-only gap | Exact schema bytes | 3 failing semantic-expectation diagnostics | Done; gap remains until native integration |
-| Author Rust validator and tests | Reproduced boundary cases | Candidate source + 20 tests | Source candidate; native verification blocked |
-| Add first-party authoring/refinement profiles | Exact source bindings | 2 profiles, 9 Node tests, source/digest checks | Local artifact checks passed |
-| Finish native/public API/strict transport integration | Compiler and parent prerequisite | Exact-head native tests/fmt/Clippy/docs/coverage + input-to-domain tests | Pending; path seam must be removed |
-| Released CGC/Noema projection | Semantic admission + publication contract | Cross-language/consumer round trip; explicit unsupported cases | Pending |
-| Controlled shadow evaluation | Real isolated integrations and approved task sample | Matched no-graph/fixed/evolved evidence with all failure denominators | Pending; no performance baseline yet |
-| Authenticated evolution, publication and product rollout | Independent evaluation/review | Persistent rejection history, CAS, revocation, rollback and product controls | Pending |
+The profiles are authored in Korean/English and remain `inferred`/`draft`. No released executable tool-operation mapping is asserted. A future CGC/Noema projection must preserve or explicitly map entry/procedure identity, relation direction, locale/evidence and abstention/rejection semantics; it may not silently truncate or activate a graph. Mutable sibling PR heads are not operational dependencies.
 
-Native continuation commands on an exact full checkout, using the repository-pinned
-Rust toolchain and lock files:
+## Evidence status
+
+Earlier Node/AJV/Python authoring observations remain historical predecessor evidence and do not transfer to the current Rust source head. The current branch contains source-level regression contracts for transport, schema mapping, semantics/topology, revision context and lossless proposal retention, including the U+FEFF parity witnesses above.
+
+Native acceptance is still absent. This execution environment does not provide the repository-pinned Rust 1.98 toolchain, and the current #44 lane has no hosted Product run proving the Rust changes. CodeRabbit status does not substitute for fmt, strict Clippy, native tests, rustdoc, release, owned coverage, security gates or qualifying independent review. The branch must remain Draft/non-public until those conditions are met.
+
+Native continuation on an exact full checkout uses the repository-pinned toolchain and lock files:
 
 ```sh
 cargo test --locked --workspace
@@ -140,19 +87,30 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run check:json-contracts
 ```
 
-Check/test failure is not a reason to loosen those commands. Read current parent/review
-state, repair on the responsible path, and use ordinary non-force integration. The
-source module's public export, actual release, deployment and canary each need separate
-evidence. There is no background execution or new recurring schedule in this slice.
+A failure is a repair signal, not permission to weaken the gate or reduce the denominator.
+
+## Continuation contract
+
+| Next boundary | Prerequisite | Required evidence |
+| --- | --- | --- |
+| Native acceptance of current private Rust seams | Product-CI/central prerequisite repaired and branch ordinary-restacked | One unchanged exact head: Rust 1.98 fmt/Clippy/tests/rustdoc/release/owned coverage + hosted required workflows + independent review |
+| Authenticated application request adapter | Immutable released Keyverse trust contract | Versioned application port/ACL; subject/tenant trust admitted without copying payload authority; stale/replay/mismatch fail closed |
+| ConceptWeave proposal/base authorization | Authenticated request context | Exact proposal/base resource authorization receipt owned by ConceptWeave |
+| Released semantic/tool artifact admission | Versioned canonical owner releases | Digest/authenticity + ACL/capability resolution; no mutable head/source copy |
+| Independent evaluation | Admitted revision + retained proposal evidence | Evaluation evidence with explicit denominators and no self-issued approval |
+| Steward decision and immutable publication | Independent evaluation + authorized steward | CAS/immutable release, provenance/SBOM/signing, supersession/revocation/rollback evidence |
+| CGC/Noema consumption | Published semantic release + released projection contract | Consumer round trip, unsupported-case behavior, runtime activation separately authorized |
+
+Current prerequisite order remains central backward-compatible CodeQL handler bootstrap -> ordinary/non-force #2051/#2056 current-main reconciliation and exact terminal GREEN -> unchanged-head #35 acceptance/normal merge -> Foundation restack and Product/CI-contract repair (including its generic text-parity finding) -> #43/#44 ordinary restack -> native #44 acceptance -> released Keyverse trust consumption -> ConceptWeave resource authorization -> released artifact admission -> evaluation -> steward decision -> immutable publication.
 
 ## References
 
-Lu, Y., Chen, Y., Wu, S., & Arık, S. Ö. (2026). *Procedural graphs: Self-evolving execution
-structures for LLM agents* (arXiv:2609.09153v1). arXiv. https://arxiv.org/abs/2609.09153
+Lu, Y., Chen, Y., Wu, S., & Arık, S. Ö. (2026). *Procedural graphs: Self-evolving execution structures for LLM agents* (arXiv:2609.09153v1). arXiv. https://arxiv.org/abs/2609.09153
 
-코난쌤. (2026, September 10). *Procedural Graph: LLM 에이전트를 위한 자가진화 절차 그래프
-(arXiv 2609.09153) 논문 정리*.
-https://conanssam.com/posts/2026-09-10-procedural-graphs-self-evolving-llm-agents
+Ecma International. (2026). *ECMAScript® 2026 language specification*. TC39. https://tc39.es/ecma262/
 
-Method statements were checked against the primary abstract and retrieved section
-excerpts; no full appendix or reference implementation audit is claimed in this slice.
+The Rust Project Developers. (2026). *Primitive type `str`*. Rust standard library documentation. https://doc.rust-lang.org/std/primitive.str.html
+
+코난쌤. (2026, September 10). *Procedural Graph: LLM 에이전트를 위한 자가진화 절차 그래프 (arXiv 2609.09153) 논문 정리*. https://conanssam.com/posts/2026-09-10-procedural-graphs-self-evolving-llm-agents
+
+The Lu et al. method statements are treated as research context; no unverified benchmark or replication result is promoted to product evidence. Standards are used for contract semantics only. Repository commits, PR reviews and exact-head checks remain the implementation authority.
