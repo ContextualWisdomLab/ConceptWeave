@@ -126,8 +126,8 @@ fn tool_operation_requires_a_tool_contract_reference() {
 }
 
 #[test]
-fn locale_annotations_are_nonempty_bounded_and_nul_free() {
-    for bad in ["", "   ", "embedded\0nul"] {
+fn locale_annotations_match_canonical_ecmascript_non_whitespace_semantics() {
+    for bad in ["", "   ", "\u{feff}", "embedded\0nul"] {
         let evidence = evidence();
         let nodes = [ProcedureNodeView {
             procedure_id: "review_model",
@@ -149,6 +149,36 @@ fn locale_annotations_are_nonempty_bounded_and_nul_free() {
             Err(ProceduralValidationError::InvalidAnnotation)
         );
     }
+}
+
+#[test]
+fn evidence_locations_match_canonical_ecmascript_non_whitespace_semantics() {
+    let evidence = vec![EvidenceReference::new(
+        "source_snapshot",
+        format!("sha256:{}", "a".repeat(64)),
+        "\u{feff}",
+    )
+    .expect("base EvidenceReference currently permits U+FEFF; procedural validation must enforce its schema")];
+    let nodes = [ProcedureNodeView {
+        procedure_id: "review_model",
+        procedure_kind: ProcedureKind::ReasoningStep,
+        locale_labels: labels(None, Some("Review model")),
+        semantic_refs: None,
+        tool_contract_ref: None,
+        source_evidence: &evidence,
+    }];
+    let model = ProceduralModelView {
+        scope: scope(),
+        entry_procedure_id: "review_model",
+        source_evidence: &evidence,
+        procedure_nodes: &nodes,
+        procedure_relations: &[],
+    };
+
+    assert_eq!(
+        validate_procedural_model(&model, scope(), ReachabilityRule::AllowPartialDraft),
+        Err(ProceduralValidationError::InvalidEvidence)
+    );
 }
 
 #[test]
