@@ -131,7 +131,7 @@ Issue #8 has been refreshed to this root authority and to the live later researc
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | PRD/TRD/ADR/context map define canonical ConceptWeave ownership and foreign-owner seams. |
 | Truth/publication lifecycle | SOURCE_REPAIRED_PENDING_PROTECTED_EVIDENCE | Observed/inferred/proposed/authoritative/rejected/superseded distinctions exist; no protected immutable semantic release exists. |
-| Client Consumption | RESTACKED_HOSTED_PENDING | #5 consumes current Foundation through ordinary non-force ancestry; exact-head execution/review must regenerate. |
+| Client Consumption | RESTACKED_HOSTED_PENDING | #5 consumes current Foundation through ordinary non-force ancestry; exact-head execution/review must regenerate. Its existing `SemanticReleaseClient::verify_detached_artifact` remains current: after admission it hashes the exact caller-supplied detached immutable artifact bytes against the declared digest, keeping digest syntax distinct from byte-integrity evidence. |
 | Source Observation | REPRESENTATION_V3_P0 | #6 is stack-current; PostgreSQL representation needs versioned digest/receipt + direct schema authorization + qualified column/type binding RED->GREEN before transport. |
 | Research Intake | RESTACKED_HOSTED_PENDING | #9 is current; predecessor local evidence is historical only. |
 | Golden-set evaluation | STALE_PARENT_REPAIR_P1 | #10 is non-mergeable and 81 commits behind current #9; preserve and semantically reconcile rather than close. |
