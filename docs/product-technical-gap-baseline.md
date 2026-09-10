@@ -2,9 +2,9 @@
 
 **Current snapshot:** 2026-09-10
 
-This is the code-current ConceptWeave gap baseline for this branch. Exact SHA, run, review and PR coordinates are evidence snapshots, not mutable dependencies. Live protected branches and owner PRs supersede a recorded coordinate when they advance. Detailed earlier snapshots remain in Git history as historical evidence; they are not current authority.
+This is the code-current ConceptWeave gap baseline for this branch. Exact SHA, run, review and PR coordinates are evidence snapshots, not mutable dependencies. Live protected branches and owner PRs supersede a recorded coordinate when they advance. Detailed earlier snapshots remain in Git history as historical evidence; they are not current authority. GitHub's computed `mergeable` flag is treated as volatile mechanical state and never as acceptance evidence.
 
-This refresh is authored from procedural self-application source head `e22647e6f45f7244552c0e2d74f86dcc8ac0e85c`. The documentation successor that contains this file resets exact-head execution/review evidence; no predecessor GREEN transfers merely because production source is unchanged.
+This refresh is authored from procedural self-application source head `e22647e6f45f7244552c0e2d74f86dcc8ac0e85c`. Documentation-only successors reset exact-head execution/review evidence; no predecessor GREEN transfers merely because production source is unchanged.
 
 ## Canonical product boundary
 
@@ -27,7 +27,7 @@ Central protected `.github/main` advanced on 2026-09-10 to `cb0872c9a20d5584703d
 
 ### Product-CI bootstrap #35
 
-Exact head `9bb82f041483cb4e0cf1aa1f5450b413309f9a05`, OPEN non-Draft/mergeable on protected ConceptWeave `main`.
+Exact head `9bb82f041483cb4e0cf1aa1f5450b413309f9a05`, OPEN non-Draft on protected ConceptWeave `main`.
 
 The branch repairs two bootstrap defects: Draft PRs are no longer suppressed from Product validation, and dynamic `npx --yes ajv-cli` execution is replaced by lockfile-pinned `ajv@8.20.0` plus a repository-owned in-process validator.
 
@@ -42,9 +42,9 @@ This is a stable consumer reproduction of the central settlement gap. Do not man
 
 ### Central CodeQL owner stack
 
-`.github#2040@6706c231ab06a3c91c43fdb5b989cfcd79fff593` carries the broad producer/handler/SARIF/settlement work but is now diverged from protected `cb0872c...`: **144 commits ahead / 32 behind**, merge base `7fd571dbcdbae6acf29d8f4ee704d7ba6297e4db`.
+`.github#2040@6706c231ab06a3c91c43fdb5b989cfcd79fff593` carries the broad producer/handler/SARIF/settlement work but is diverged from protected `cb0872c...`: **144 commits ahead / 32 behind**, merge base `7fd571dbcdbae6acf29d8f4ee704d7ba6297e4db`.
 
-`.github#2051@558693e0333e48012beea142f739bc634b0674a7` is **18 ahead / 32 behind** current protected main and is OPEN Draft/non-mergeable. It preserves one post-matrix wake coordinator, exact PR/head/base/run identity, stricter `{base_ref, base_sha}` binding and versioned rollout work.
+`.github#2051@558693e0333e48012beea142f739bc634b0674a7` is **18 ahead / 32 behind** current protected main and remains OPEN Draft. Its computed mergeability has changed during live reads and is not used as a gate. It preserves one post-matrix wake coordinator, exact PR/head/base/run identity, stricter `{base_ref, base_sha}` binding and versioned rollout work.
 
 `.github#2056@69ae472562c93cc17674af5e2085a58947d3fab8` remains stacked on #2051 and preserves complete-failed-job-set validation plus one atomic run-wide wake. It must adopt a repaired exact #2051 successor rather than independently attaching to protected main.
 
@@ -54,14 +54,14 @@ Required central order: ordinary non-force adoption of protected `cb0872c...` ->
 
 ## Current ConceptWeave roots
 
-- Foundation #1: `60f14a6e85a83d56c2eea43b34d52b3366bb1735`, OPEN Draft/mergeable. Protected Product bootstrap #35 is its direct prerequisite. Foundation's Product definition and `scripts/check_ci_contract.py` must be repaired together after #35 integrates so Draft validation and executable contract agree.
-- Client Consumption #5: `6873ec0c0a701b2c59f3e0785d48d8739f019d5b`, OPEN Draft/mergeable on Foundation. It owns deterministic immutable semantic-release admission/diff/compatibility/supersession, not physical execution or foreign business truth.
-- Source Observation #6: `6c1157efad5d2e4258330d6485ff2ea980ae331b`, OPEN Draft/mergeable on #5. Its next source slice is PostgreSQL representation/versioning/authorization before transport.
-- Research Intake #9: `a67d9d66b35024d6f2155f50ee5c9fb7d2e1dbe9`, OPEN Draft/mergeable on Foundation. `ClassificationReport` remains private and constructor-bound with read-only accessors.
-- Pending-source #40: `4efe15c6318d8cb65c52a974a2c105363a4c82a5`, OPEN Draft/mergeable on #9.
-- Golden-set #10: `fdf8b8d70c05bcb76c55cb6336c9bf31b5e42ce4`, OPEN Draft/non-mergeable from historical #9 ancestry; it is 35 commits ahead / 81 behind current #9 and requires semantic non-force reconciliation.
-- Procedural authoring #43: `2c6d3037acdeae2b152c335ee2f60a59b4472831`, OPEN Draft/mergeable on Foundation. It owns local draft/revision schemas, locked AJV fixture validation and Draft-safe Product/CI-contract source repair; it is not a production self-modifying runtime.
-- Procedural self-application #44: source head before this baseline refresh `e22647e6f45f7244552c0e2d74f86dcc8ac0e85c`, OPEN Draft/mergeable on #43. It adds ConceptWeave self-application profiles, a Rust topology/evidence-membership candidate and source-provenance admission. The documentation successor containing this baseline requires fresh exact-head evidence.
+- Foundation #1: `60f14a6e85a83d56c2eea43b34d52b3366bb1735`, OPEN Draft. Protected Product bootstrap #35 is its direct prerequisite. Foundation's Product definition and `scripts/check_ci_contract.py` must be repaired together after #35 integrates so Draft validation and executable contract agree.
+- Client Consumption #5: `6873ec0c0a701b2c59f3e0785d48d8739f019d5b`, OPEN Draft on Foundation. It owns deterministic immutable semantic-release admission/diff/compatibility/supersession, not physical execution or foreign business truth.
+- Source Observation #6: `6c1157efad5d2e4258330d6485ff2ea980ae331b`, OPEN Draft on #5. Its next source slice is PostgreSQL representation/versioning/authorization before transport.
+- Research Intake #9: `a67d9d66b35024d6f2155f50ee5c9fb7d2e1dbe9`, OPEN Draft on Foundation. `ClassificationReport` remains private and constructor-bound with read-only accessors.
+- Pending-source #40: `4efe15c6318d8cb65c52a974a2c105363a4c82a5`, OPEN Draft on #9.
+- Golden-set #10: `fdf8b8d70c05bcb76c55cb6336c9bf31b5e42ce4`, OPEN Draft from historical #9 ancestry; it is 35 commits ahead / 81 behind current #9 and requires semantic non-force reconciliation.
+- Procedural authoring #43: `2c6d3037acdeae2b152c335ee2f60a59b4472831`, OPEN Draft on Foundation. It owns local draft/revision schemas, locked AJV fixture validation and Draft-safe Product/CI-contract source repair; it is not a production self-modifying runtime.
+- Procedural self-application #44: production/test source `e22647e6f45f7244552c0e2d74f86dcc8ac0e85c` with documentation successors above it, OPEN Draft on #43. It adds ConceptWeave self-application profiles, a Rust topology/evidence-membership candidate and source-provenance admission. Every documentation successor requires fresh exact-head evidence.
 
 ## Source Observation P0 — PostgreSQL 18 representation before transport
 
