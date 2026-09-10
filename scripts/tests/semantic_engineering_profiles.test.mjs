@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { sha256Digest, verifyManifestSourceProvenance } from "../verify_semantic_engineering_provenance.mjs";
@@ -106,6 +109,47 @@ test("source provenance fails closed on malformed, missing, oversized and duplic
     () => verifyManifestSourceProvenance(repositoryRoot, manifest, {maxSourceBytes: 1}),
     /source_size_limit_exceeded:conceptweave_prd/,
   );
+});
+test("source commits must belong to the checked-out head history, not merely exist as dangling objects", () => {
+  const temporaryRoot = mkdtempSync(join(tmpdir(), "conceptweave-provenance-"));
+  const runGit = (...args) => execFileSync("git", ["-C", temporaryRoot, ...args], {encoding: "utf8"}).trim();
+  try {
+    runGit("init", "-q", "-b", "main");
+    runGit("config", "user.email", "provenance-test@example.invalid");
+    runGit("config", "user.name", "ConceptWeave provenance test");
+    writeFileSync(join(temporaryRoot, "current.txt"), "current branch\n");
+    runGit("add", "current.txt");
+    runGit("commit", "-q", "-m", "current");
+
+    runGit("switch", "--orphan", "detached-source", "-q");
+    runGit("rm", "-rf", ".");
+    writeFileSync(join(temporaryRoot, "source.md"), "detached design source\n");
+    runGit("add", "source.md");
+    runGit("commit", "-q", "-m", "detached");
+    const detachedCommit = runGit("rev-parse", "HEAD");
+    const detachedBlob = runGit("rev-parse", "HEAD:source.md");
+    const detachedDigest = sha256Digest(readFileSync(join(temporaryRoot, "source.md")));
+
+    runGit("switch", "main", "-q");
+    runGit("branch", "-D", "detached-source");
+
+    const detachedManifest = {
+      sources: [{
+        source_id: "detached_source",
+        repository: "ContextualWisdomLab/ConceptWeave",
+        commit_sha: detachedCommit,
+        path: "source.md",
+        git_blob_sha: detachedBlob,
+        content_digest: detachedDigest,
+      }],
+    };
+    assert.throws(
+      () => verifyManifestSourceProvenance(temporaryRoot, detachedManifest),
+      /source_commit_not_in_head_history:detached_source/,
+    );
+  } finally {
+    rmSync(temporaryRoot, {recursive: true, force: true});
+  }
 });
 test("authoring profile retains the seven canonical phases and a correction path", () => {
   const authoring = records[0].payload;
