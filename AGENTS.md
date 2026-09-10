@@ -21,3 +21,12 @@ ConceptWeave owns automatic, evidence-bound **Semantic Model Engineering**. Do n
 - Owned production coverage target is 100% line/function/region/branch where tooling exposes it.
 - Never suppress deprecation warnings; fix causes.
 - Never force-push shared branches, self-approve, fabricate checks, or weaken branch protection.
+
+## Procedural model engineering (Proposed, issue #42)
+
+Follow [ADR-PG-20260910](docs/adr/pg_20260910_procedural_model_engineering.md).
+ConceptWeave owns evidence-bound procedural authoring, semantic validation and model
+publication; Noema owns execution-local guidance/lifecycle. The local draft schemas
+and their shape tests grant no publication, runtime or tool authority. Preserve the
+existing candidate schema and Noema implementation. Rust semantic validation and
+released cross-product contracts must precede any runtime integration.

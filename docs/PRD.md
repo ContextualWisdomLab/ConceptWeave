@@ -79,3 +79,16 @@ Relational schema snapshot -> observed tables/columns/foreign keys -> concept/re
 - malformed/hostile source contracts rejected with bounded resource use;
 - semantic-model release can be reproduced from source receipts and approved proposal receipts;
 - buyer can inspect why each published artifact exists and which evidence supported it.
+
+## Procedural model engineering extension — Proposed, issue #42
+
+Requirements PG-FR-1 through PG-FR-6 are defined in
+[ADR-PG-20260910](adr/pg_20260910_procedural_model_engineering.md): evidence-bound
+procedure authoring, concept/tool-contract alignment, independent offline evaluation,
+steward publication, released consumer projection and inspectable authoring/review UX.
+These identifiers are profile-scoped and do not renumber existing FRs or research work.
+
+The current slice delivers only draft/revision input schemas and structural fixtures.
+It does not replace the initial relational vertical slice, deliver a graph editor,
+run a model, or publish/activate procedural knowledge. A customer must ultimately
+trace every suggested procedure to an approved model revision and exact source evidence.

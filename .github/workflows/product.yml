@@ -88,6 +88,8 @@ jobs:
             -s contracts/semantic-candidate.schema.json \
             -d contracts/fixtures/semantic-candidate.invalid-state-truth-mismatch.json \
             --invalid
+          node --test scripts/tests/procedural_contract_fixtures.test.mjs
+          node scripts/check_procedural_contracts.mjs
 
       - name: Lockfile freshness
         run: |
