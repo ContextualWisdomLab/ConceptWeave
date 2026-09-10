@@ -2,7 +2,7 @@
 #![deny(missing_docs)]
 //! Private canonical Draft 2020-12 transport-to-domain admission seam.
 //!
-//! The mapper consumes only the repository-owned procedural draft shape after strict
+//! The mapper consumes only repository-owned procedural draft/revision shapes after strict
 //! byte/UTF-8/JSON admission. It does not authenticate callers or referenced artifacts,
 //! publish a model, or authorize execution merely because deterministic checks succeed.
 
@@ -28,6 +28,8 @@ pub enum ProceduralIngressError {
     Transport(ProceduralTransportError),
     /// JSON was syntactically valid but did not satisfy the canonical draft shape.
     SchemaInvalid,
+    /// Revision or base coordinates differ from the separately supplied request context.
+    RevisionContextMismatch,
     /// A schema-valid projection failed deterministic semantic/topology validation.
     Validation(ProceduralValidationError),
 }
@@ -37,6 +39,7 @@ impl fmt::Display for ProceduralIngressError {
         match self {
             Self::Transport(error) => write!(formatter, "transport:{error}"),
             Self::SchemaInvalid => formatter.write_str("schema_invalid"),
+            Self::RevisionContextMismatch => formatter.write_str("revision_context_mismatch"),
             Self::Validation(error) => write!(formatter, "validation:{error}"),
         }
     }
@@ -56,6 +59,23 @@ impl From<ProceduralValidationError> for ProceduralIngressError {
     }
 }
 
+/// Coordinates expected by the application request/revision boundary.
+///
+/// This value is deliberately named an expectation, not an authentication receipt. The
+/// current private Rust slice can prove only that a revision envelope matches coordinates
+/// supplied independently of its payload. A future application adapter must obtain these
+/// coordinates from Keyverse-authenticated request context before this seam can become a
+/// production admission path.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ProceduralRevisionExpectation<'a> {
+    /// Exact revision proposal identity expected by the request path.
+    pub proposal_id: &'a str,
+    /// Exact retained base model coordinate expected by the request path.
+    pub base_model_ref: ArtifactReferenceView<'a>,
+    /// Exact candidate model/tenant/task/domain-owner scope expected by the request path.
+    pub candidate_scope: ProceduralScope<'a>,
+}
+
 #[derive(Clone, Debug)]
 struct OwnedEvidenceReference {
     source_id: String,
@@ -63,7 +83,7 @@ struct OwnedEvidenceReference {
     location: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct OwnedArtifactReference {
     authority_ref: String,
     release_ref: String,
@@ -79,6 +99,13 @@ impl OwnedArtifactReference {
             artifact_digest: &self.artifact_digest,
             object_ref: &self.object_ref,
         }
+    }
+
+    fn matches(&self, expected: ArtifactReferenceView<'_>) -> bool {
+        self.authority_ref == expected.authority_ref
+            && self.release_ref == expected.release_ref
+            && self.artifact_digest == expected.artifact_digest
+            && self.object_ref == expected.object_ref
     }
 }
 
@@ -140,6 +167,13 @@ struct OwnedProceduralDraft {
     source_evidence: Vec<OwnedEvidenceReference>,
     procedure_nodes: Vec<OwnedProcedureNode>,
     procedure_relations: Vec<OwnedProcedureRelation>,
+}
+
+#[derive(Clone, Debug)]
+struct OwnedProceduralRevisionProposal {
+    proposal_id: String,
+    base_model_ref: OwnedArtifactReference,
+    candidate_model: OwnedProceduralDraft,
 }
 
 fn schema_invalid<T>() -> Result<T, ProceduralIngressError> {
@@ -533,6 +567,64 @@ fn parse_draft(value: StrictJsonValue) -> Result<OwnedProceduralDraft, Procedura
     })
 }
 
+fn parse_revision_proposal(
+    value: StrictJsonValue,
+) -> Result<OwnedProceduralRevisionProposal, ProceduralIngressError> {
+    let mut object = into_object(value)?;
+    require_exact_keys(
+        &object,
+        &[
+            "schema_version",
+            "proposal_id",
+            "proposal_origin",
+            "proposal_state",
+            "decision_authority",
+            "base_model_ref",
+            "candidate_model",
+            "evidence_partition",
+            "training_evidence",
+            "rejected_edit_refs",
+            "change_rationale",
+        ],
+        &[],
+    )?;
+
+    if take_required_string(&mut object, "schema_version")? != SCHEMA_VERSION
+        || take_required_string(&mut object, "proposal_state")? != "proposed"
+        || take_required_string(&mut object, "decision_authority")? != "none"
+        || take_required_string(&mut object, "evidence_partition")? != "training"
+    {
+        return schema_invalid();
+    }
+
+    match take_required_string(&mut object, "proposal_origin")?.as_str() {
+        "model_assisted" | "steward_authored" => {}
+        _ => return schema_invalid(),
+    }
+
+    let proposal_id = take_required_string(&mut object, "proposal_id")?;
+    if !valid_identity(&proposal_id) {
+        return schema_invalid();
+    }
+    let base_model_ref = parse_artifact_reference(take_required(&mut object, "base_model_ref")?)?;
+    let candidate_model = parse_draft(take_required(&mut object, "candidate_model")?)?;
+    let _training_evidence = parse_evidence_list(take_required(&mut object, "training_evidence")?)?;
+    let _rejected_edit_refs = bounded_array(take_required(&mut object, "rejected_edit_refs")?, 0, 64)?
+        .into_iter()
+        .map(parse_artifact_reference)
+        .collect::<Result<Vec<_>, _>>()?;
+    let change_rationale = take_required_string(&mut object, "change_rationale")?;
+    if !valid_annotation(&change_rationale) {
+        return schema_invalid();
+    }
+
+    Ok(OwnedProceduralRevisionProposal {
+        proposal_id,
+        base_model_ref,
+        candidate_model,
+    })
+}
+
 fn evidence_domain(
     references: &[OwnedEvidenceReference],
 ) -> Result<Vec<EvidenceReference>, ProceduralIngressError> {
@@ -550,6 +642,13 @@ fn evidence_domain(
 }
 
 impl OwnedProceduralDraft {
+    fn matches_scope(&self, expected_scope: ProceduralScope<'_>) -> bool {
+        self.model_id == expected_scope.model_id
+            && self.tenant_ref == expected_scope.tenant_ref
+            && self.task_type == expected_scope.task_type
+            && self.domain_owner_ref == expected_scope.domain_owner_ref
+    }
+
     fn validate(
         &self,
         expected_scope: ProceduralScope<'_>,
@@ -638,7 +737,7 @@ impl OwnedProceduralDraft {
 /// `expected_scope` is caller-supplied context only: equality does not authenticate it.
 /// Released artifact authenticity, ACL, stewardship, publication and runtime authority
 /// remain separate gates.
-pub fn validate_procedural_model_json_transport(
+pub(crate) fn validate_procedural_model_json_transport(
     input: &[u8],
     expected_scope: ProceduralScope<'_>,
     reachability: ReachabilityRule,
@@ -646,4 +745,30 @@ pub fn validate_procedural_model_json_transport(
     let decoded = parse_procedural_json_transport_bytes(input)?;
     let draft = parse_draft(decoded)?;
     draft.validate(expected_scope, reachability)
+}
+
+/// Admits one canonical procedural revision envelope and binds it to separately supplied
+/// request coordinates before deterministic candidate validation.
+///
+/// The envelope is still untrusted input. This function rejects unknown/missing members,
+/// self-issued authority, non-training partitions, malformed base/candidate/evidence shapes,
+/// and mismatched proposal/base/scope coordinates. `expected` is only an independent value
+/// boundary; this domain module does not authenticate it. A production application adapter
+/// must issue the expectation only after Keyverse-backed request authentication. Referenced
+/// artifact authenticity/ACL/capability, evaluation, stewardship, publication and execution
+/// remain later owner gates.
+pub(crate) fn validate_procedural_revision_json_transport(
+    input: &[u8],
+    expected: ProceduralRevisionExpectation<'_>,
+    reachability: ReachabilityRule,
+) -> Result<TopologySummary, ProceduralIngressError> {
+    let decoded = parse_procedural_json_transport_bytes(input)?;
+    let revision = parse_revision_proposal(decoded)?;
+    if revision.proposal_id != expected.proposal_id
+        || !revision.base_model_ref.matches(expected.base_model_ref)
+        || !revision.candidate_model.matches_scope(expected.candidate_scope)
+    {
+        return Err(ProceduralIngressError::RevisionContextMismatch);
+    }
+    revision.candidate_model.validate(expected.candidate_scope, reachability)
 }
