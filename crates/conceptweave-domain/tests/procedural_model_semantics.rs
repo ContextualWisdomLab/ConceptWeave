@@ -59,7 +59,7 @@ fn schema_significant_semantics_are_present_in_the_rust_projection() {
             procedure_id: "observe_source",
             procedure_kind: ProcedureKind::ToolOperation,
             locale_labels: labels(Some("근거 관찰"), Some("Observe evidence")),
-            semantic_refs: &semantic_refs,
+            semantic_refs: Some(&semantic_refs),
             tool_contract_ref: Some(tool_contract),
             source_evidence: &evidence,
         },
@@ -67,7 +67,7 @@ fn schema_significant_semantics_are_present_in_the_rust_projection() {
             procedure_id: "review_model",
             procedure_kind: ProcedureKind::ReasoningStep,
             locale_labels: labels(Some("모델 검토"), Some("Review model")),
-            semantic_refs: &[],
+            semantic_refs: None,
             tool_contract_ref: None,
             source_evidence: &evidence,
         },
@@ -107,7 +107,7 @@ fn tool_operation_requires_a_tool_contract_reference() {
         procedure_id: "observe_source",
         procedure_kind: ProcedureKind::ToolOperation,
         locale_labels: labels(None, Some("Observe evidence")),
-        semantic_refs: &[],
+        semantic_refs: None,
         tool_contract_ref: None,
         source_evidence: &evidence,
     }];
@@ -133,7 +133,7 @@ fn locale_annotations_are_nonempty_bounded_and_nul_free() {
             procedure_id: "review_model",
             procedure_kind: ProcedureKind::ReasoningStep,
             locale_labels: labels(None, Some(bad)),
-            semantic_refs: &[],
+            semantic_refs: None,
             tool_contract_ref: None,
             source_evidence: &evidence,
         }];
@@ -152,6 +152,31 @@ fn locale_annotations_are_nonempty_bounded_and_nul_free() {
 }
 
 #[test]
+fn present_empty_semantic_refs_is_rejected_instead_of_collapsing_to_absence() {
+    let evidence = evidence();
+    let nodes = [ProcedureNodeView {
+        procedure_id: "review_model",
+        procedure_kind: ProcedureKind::ReasoningStep,
+        locale_labels: labels(None, Some("Review model")),
+        semantic_refs: Some(&[]),
+        tool_contract_ref: None,
+        source_evidence: &evidence,
+    }];
+    let model = ProceduralModelView {
+        scope: scope(),
+        entry_procedure_id: "review_model",
+        source_evidence: &evidence,
+        procedure_nodes: &nodes,
+        procedure_relations: &[],
+    };
+
+    assert_eq!(
+        validate_procedural_model(&model, scope(), ReachabilityRule::AllowPartialDraft),
+        Err(ProceduralValidationError::CollectionLimit)
+    );
+}
+
+#[test]
 fn semantic_artifact_references_are_bounded_well_formed_and_unique() {
     let evidence = evidence();
     let digest = format!("sha256:{}", "c".repeat(64));
@@ -161,7 +186,7 @@ fn semantic_artifact_references_are_bounded_well_formed_and_unique() {
         procedure_id: "review_model",
         procedure_kind: ProcedureKind::ReasoningStep,
         locale_labels: labels(None, Some("Review model")),
-        semantic_refs: &duplicates,
+        semantic_refs: Some(&duplicates),
         tool_contract_ref: None,
         source_evidence: &evidence,
     }];
@@ -182,7 +207,7 @@ fn semantic_artifact_references_are_bounded_well_formed_and_unique() {
         procedure_id: "review_model",
         procedure_kind: ProcedureKind::ReasoningStep,
         locale_labels: labels(None, Some("Review model")),
-        semantic_refs: &invalid,
+        semantic_refs: Some(&invalid),
         tool_contract_ref: None,
         source_evidence: &evidence,
     }];
