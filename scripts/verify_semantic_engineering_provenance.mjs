@@ -34,13 +34,24 @@ function validateSourceShape(source, seen) {
   }
 }
 
+function cleanGitEnvironment() {
+  const environment = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (!key.startsWith("GIT_")) environment[key] = value;
+  }
+  environment.GIT_OPTIONAL_LOCKS = "0";
+  environment.GIT_CONFIG_NOSYSTEM = "1";
+  environment.GIT_TERMINAL_PROMPT = "0";
+  return environment;
+}
+
 function git(repositoryRoot, args, { maxBuffer = 256 * 1024, timeout = DEFAULT_GIT_TIMEOUT_MS } = {}) {
   return execFileSync(
     "git",
     ["--no-replace-objects", "-C", repositoryRoot, ...args],
     {
       encoding: null,
-      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+      env: cleanGitEnvironment(),
       maxBuffer,
       timeout,
       stdio: ["ignore", "pipe", "pipe"],
@@ -74,6 +85,8 @@ export function verifyManifestSourceProvenance(repositoryRoot, manifest, options
   }
 
   const root = realpathSync(repositoryRoot);
+  const gitTopLevel = realpathSync(gitText(root, ["rev-parse", "--show-toplevel"], "source_repository_unavailable", { timeout: gitTimeoutMs }));
+  if (gitTopLevel !== root) throw new Error("source_repository_root_mismatch");
   const seen = new Set();
   let sourceBytesVerified = 0;
 
@@ -81,6 +94,11 @@ export function verifyManifestSourceProvenance(repositoryRoot, manifest, options
     validateSourceShape(source, seen);
     const id = source.source_id;
     gitText(root, ["cat-file", "-e", `${source.commit_sha}^{commit}`], `source_commit_unavailable:${id}`, { timeout: gitTimeoutMs });
+    try {
+      git(root, ["merge-base", "--is-ancestor", source.commit_sha, "HEAD"], { timeout: gitTimeoutMs });
+    } catch {
+      throw new Error(`source_commit_not_in_head_history:${id}`);
+    }
     const blob = gitText(root, ["rev-parse", "--verify", `${source.commit_sha}:${source.path}`], `source_path_unavailable:${id}`, { timeout: gitTimeoutMs });
     if (!HEX40.test(blob)) throw new Error(`source_git_blob_invalid:${id}`);
     const objectType = gitText(root, ["cat-file", "-t", blob], `source_git_blob_unavailable:${id}`, { timeout: gitTimeoutMs });
