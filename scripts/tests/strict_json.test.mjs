@@ -10,22 +10,37 @@ test("valid JSON retains normal JSON.parse semantics", () => {
 test("top-level duplicate member is rejected before last-wins parsing", () => {
   assert.throws(
     () => parseJsonRejectDuplicateKeys('{"model_id":"trusted","model_id":"shadow"}', "profile"),
-    /duplicate_json_key:profile:"model_id"/,
+    /duplicate_json_key:profile:/,
   );
 });
 
 test("nested duplicate member is rejected", () => {
   assert.throws(
     () => parseJsonRejectDuplicateKeys('{"scope":{"tenant_ref":"trusted","tenant_ref":"shadow"}}', "profile"),
-    /duplicate_json_key:profile:"tenant_ref"/,
+    /duplicate_json_key:profile:/,
   );
 });
 
 test("escaped-equivalent member names are one decoded identity", () => {
   assert.throws(
     () => parseJsonRejectDuplicateKeys('{"scope":{"a":1,"\\u0061":2}}', "profile"),
-    /duplicate_json_key:profile:"a"/,
+    /duplicate_json_key:profile:/,
   );
+});
+
+test("duplicate-key diagnostics do not echo attacker-sized member names", () => {
+  const key = "s".repeat(900_000);
+  const input = `{"${key}":1,"${key}":2}`;
+  let failure;
+  try {
+    parseJsonRejectDuplicateKeys(input, "profile");
+  } catch (error) {
+    failure = error;
+  }
+  assert.ok(failure instanceof Error);
+  assert.match(failure.message, /^duplicate_json_key:profile:key_sha256:[0-9a-f]{16}:bytes=900000$/);
+  assert.ok(Buffer.byteLength(failure.message, "utf8") <= 128);
+  assert.equal(failure.message.includes(key.slice(0, 128)), false);
 });
 
 test("ordinary JSON syntax errors still fail closed", () => {
