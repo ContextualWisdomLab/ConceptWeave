@@ -6,7 +6,7 @@
 //! RED/GREEN development. Successful transport admission does not validate the
 //! procedural-model schema, authenticate scope, or grant publication/execution authority.
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::fmt;
 
 /// Maximum accepted UTF-8 transport size before structural parsing.
@@ -41,6 +41,27 @@ impl fmt::Display for ProceduralTransportError {
 
 impl std::error::Error for ProceduralTransportError {}
 
+/// Bounded decoded JSON tree retained only for private schema mapping.
+///
+/// Numbers and booleans intentionally retain only their JSON type because the procedural
+/// Draft 2020-12 contract has no numeric or boolean value fields. Any occurrence at a
+/// canonical field is therefore rejected by the mapper before domain construction.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum StrictJsonValue {
+    /// JSON null.
+    Null,
+    /// A JSON boolean value.
+    Boolean,
+    /// A syntactically valid JSON number.
+    Number,
+    /// A decoded JSON string.
+    String(String),
+    /// An ordered JSON array.
+    Array(Vec<StrictJsonValue>),
+    /// A JSON object keyed by decoded, unique member names.
+    Object(BTreeMap<String, StrictJsonValue>),
+}
+
 struct StrictJsonParser<'a> {
     input: &'a str,
     index: usize,
@@ -51,61 +72,72 @@ impl<'a> StrictJsonParser<'a> {
         Self { input, index: 0 }
     }
 
-    fn finish(mut self) -> Result<(), ProceduralTransportError> {
+    fn parse_document(mut self) -> Result<StrictJsonValue, ProceduralTransportError> {
         self.skip_whitespace();
-        self.parse_value(0)?;
+        let value = self.parse_value(0)?;
         self.skip_whitespace();
         if self.index == self.input.len() {
-            Ok(())
+            Ok(value)
         } else {
             Err(ProceduralTransportError::InvalidJson)
         }
     }
 
-    fn parse_value(&mut self, depth: usize) -> Result<(), ProceduralTransportError> {
+    fn parse_value(&mut self, depth: usize) -> Result<StrictJsonValue, ProceduralTransportError> {
         self.skip_whitespace();
         match self.peek_byte() {
             Some(b'{') => self.parse_object(depth),
             Some(b'[') => self.parse_array(depth),
-            Some(b'"') => self.parse_string(false).map(|_| ()),
-            Some(b't') => self.parse_literal(b"true"),
-            Some(b'f') => self.parse_literal(b"false"),
-            Some(b'n') => self.parse_literal(b"null"),
-            Some(b'-' | b'0'..=b'9') => self.parse_number(),
+            Some(b'"') => self.parse_string().map(StrictJsonValue::String),
+            Some(b't') => {
+                self.parse_literal(b"true")?;
+                Ok(StrictJsonValue::Boolean)
+            }
+            Some(b'f') => {
+                self.parse_literal(b"false")?;
+                Ok(StrictJsonValue::Boolean)
+            }
+            Some(b'n') => {
+                self.parse_literal(b"null")?;
+                Ok(StrictJsonValue::Null)
+            }
+            Some(b'-' | b'0'..=b'9') => {
+                self.parse_number()?;
+                Ok(StrictJsonValue::Number)
+            }
             _ => Err(ProceduralTransportError::InvalidJson),
         }
     }
 
-    fn parse_object(&mut self, depth: usize) -> Result<(), ProceduralTransportError> {
+    fn parse_object(&mut self, depth: usize) -> Result<StrictJsonValue, ProceduralTransportError> {
         if depth >= MAX_PROCEDURAL_TRANSPORT_DEPTH {
             return Err(ProceduralTransportError::DepthLimit);
         }
         self.index += 1;
         self.skip_whitespace();
+        let mut members = BTreeMap::new();
         if self.consume_if(b'}') {
-            return Ok(());
+            return Ok(StrictJsonValue::Object(members));
         }
 
-        let mut members = BTreeSet::new();
         loop {
             self.skip_whitespace();
             if self.peek_byte() != Some(b'"') {
                 return Err(ProceduralTransportError::InvalidJson);
             }
-            let member = self
-                .parse_string(true)?
-                .ok_or(ProceduralTransportError::InvalidJson)?;
-            if !members.insert(member) {
+            let member = self.parse_string()?;
+            if members.contains_key(&member) {
                 return Err(ProceduralTransportError::DuplicateMember);
             }
             self.skip_whitespace();
             if !self.consume_if(b':') {
                 return Err(ProceduralTransportError::InvalidJson);
             }
-            self.parse_value(depth + 1)?;
+            let value = self.parse_value(depth + 1)?;
+            members.insert(member, value);
             self.skip_whitespace();
             if self.consume_if(b'}') {
-                return Ok(());
+                return Ok(StrictJsonValue::Object(members));
             }
             if !self.consume_if(b',') {
                 return Err(ProceduralTransportError::InvalidJson);
@@ -113,21 +145,22 @@ impl<'a> StrictJsonParser<'a> {
         }
     }
 
-    fn parse_array(&mut self, depth: usize) -> Result<(), ProceduralTransportError> {
+    fn parse_array(&mut self, depth: usize) -> Result<StrictJsonValue, ProceduralTransportError> {
         if depth >= MAX_PROCEDURAL_TRANSPORT_DEPTH {
             return Err(ProceduralTransportError::DepthLimit);
         }
         self.index += 1;
         self.skip_whitespace();
+        let mut values = Vec::new();
         if self.consume_if(b']') {
-            return Ok(());
+            return Ok(StrictJsonValue::Array(values));
         }
 
         loop {
-            self.parse_value(depth + 1)?;
+            values.push(self.parse_value(depth + 1)?);
             self.skip_whitespace();
             if self.consume_if(b']') {
-                return Ok(());
+                return Ok(StrictJsonValue::Array(values));
             }
             if !self.consume_if(b',') {
                 return Err(ProceduralTransportError::InvalidJson);
@@ -135,11 +168,11 @@ impl<'a> StrictJsonParser<'a> {
         }
     }
 
-    fn parse_string(&mut self, capture: bool) -> Result<Option<String>, ProceduralTransportError> {
+    fn parse_string(&mut self) -> Result<String, ProceduralTransportError> {
         if !self.consume_if(b'"') {
             return Err(ProceduralTransportError::InvalidJson);
         }
-        let mut output = if capture { Some(String::new()) } else { None };
+        let mut output = String::new();
 
         loop {
             let byte = self
@@ -157,14 +190,14 @@ impl<'a> StrictJsonParser<'a> {
                         .ok_or(ProceduralTransportError::InvalidJson)?;
                     self.index += 1;
                     let decoded = match escape {
-                        b'"' => Some('"'),
-                        b'\\' => Some('\\'),
-                        b'/' => Some('/'),
-                        b'b' => Some('\u{0008}'),
-                        b'f' => Some('\u{000c}'),
-                        b'n' => Some('\n'),
-                        b'r' => Some('\r'),
-                        b't' => Some('\t'),
+                        b'"' => '"',
+                        b'\\' => '\\',
+                        b'/' => '/',
+                        b'b' => '\u{0008}',
+                        b'f' => '\u{000c}',
+                        b'n' => '\n',
+                        b'r' => '\r',
+                        b't' => '\t',
                         b'u' => {
                             let first = self.parse_hex_quad()?;
                             if (0xd800..=0xdbff).contains(&first) {
@@ -178,22 +211,18 @@ impl<'a> StrictJsonParser<'a> {
                                 let scalar = 0x1_0000
                                     + (((first as u32) - 0xd800) << 10)
                                     + ((second as u32) - 0xdc00);
-                                Some(char::from_u32(scalar).ok_or(
-                                    ProceduralTransportError::InvalidJson,
-                                )?)
+                                char::from_u32(scalar)
+                                    .ok_or(ProceduralTransportError::InvalidJson)?
                             } else if (0xdc00..=0xdfff).contains(&first) {
                                 return Err(ProceduralTransportError::InvalidJson);
                             } else {
-                                Some(char::from_u32(first as u32).ok_or(
-                                    ProceduralTransportError::InvalidJson,
-                                )?)
+                                char::from_u32(first as u32)
+                                    .ok_or(ProceduralTransportError::InvalidJson)?
                             }
                         }
                         _ => return Err(ProceduralTransportError::InvalidJson),
                     };
-                    if let (Some(output), Some(decoded)) = (output.as_mut(), decoded) {
-                        output.push(decoded);
-                    }
+                    output.push(decoded);
                 }
                 0x00..=0x1f => return Err(ProceduralTransportError::InvalidJson),
                 _ => {
@@ -202,9 +231,7 @@ impl<'a> StrictJsonParser<'a> {
                         .next()
                         .ok_or(ProceduralTransportError::InvalidJson)?;
                     self.index += character.len_utf8();
-                    if let Some(output) = output.as_mut() {
-                        output.push(character);
-                    }
+                    output.push(character);
                 }
             }
         }
@@ -306,6 +333,18 @@ fn hex_value(byte: u8) -> Option<u16> {
     }
 }
 
+/// Parses one bounded UTF-8 JSON byte transport into the private decoded tree used by
+/// canonical schema mapping.
+pub(crate) fn parse_procedural_json_transport_bytes(
+    input: &[u8],
+) -> Result<StrictJsonValue, ProceduralTransportError> {
+    if input.len() > MAX_PROCEDURAL_TRANSPORT_BYTES {
+        return Err(ProceduralTransportError::InputTooLarge);
+    }
+    let input = std::str::from_utf8(input).map_err(|_| ProceduralTransportError::InvalidJson)?;
+    StrictJsonParser::new(input).parse_document()
+}
+
 /// Admits one bounded UTF-8 JSON byte transport before schema/domain projection.
 ///
 /// The byte ceiling is enforced before UTF-8 validation so callers do not need to
@@ -317,11 +356,7 @@ fn hex_value(byte: u8) -> Option<u16> {
 pub fn admit_procedural_json_transport_bytes(
     input: &[u8],
 ) -> Result<(), ProceduralTransportError> {
-    if input.len() > MAX_PROCEDURAL_TRANSPORT_BYTES {
-        return Err(ProceduralTransportError::InputTooLarge);
-    }
-    let input = std::str::from_utf8(input).map_err(|_| ProceduralTransportError::InvalidJson)?;
-    StrictJsonParser::new(input).finish()
+    parse_procedural_json_transport_bytes(input).map(|_| ())
 }
 
 /// Admits one already decoded UTF-8 JSON transport before schema/domain projection.
