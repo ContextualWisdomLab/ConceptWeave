@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
+import { parseJsonRejectDuplicateKeys } from "./parse_strict_json.mjs";
 
 const forbiddenKeys = new Set(["__proto__", "prototype", "constructor"]);
 const schemaFiles = {
@@ -11,6 +12,10 @@ const schemaFiles = {
 const requireFixture = predicate => {
   if (!predicate) throw new Error("invalid_fixture_protocol");
 };
+const readRepositoryJson = (repositoryRoot, path) => parseJsonRejectDuplicateKeys(
+  readFileSync(resolve(repositoryRoot, path), "utf8"),
+  path,
+);
 
 /** Test-only corpus expansion; it never authorizes graph changes or handles product requests. */
 export function materializeContractCases(caseManifest, fixtureBases) {
@@ -56,10 +61,9 @@ export function materializeContractCases(caseManifest, fixtureBases) {
 
 /** Builds in-process Draft 2020-12 validators from repository-owned schemas. */
 export function createProceduralValidators(repositoryRoot) {
-  const readJson = path => JSON.parse(readFileSync(resolve(repositoryRoot, path), "utf8"));
-  const semanticCandidateSchema = readJson("contracts/semantic-candidate.schema.json");
-  const proceduralModelSchema = readJson("contracts/procedural-model-draft.schema.json");
-  const proceduralRevisionSchema = readJson("contracts/procedural-revision-proposal.schema.json");
+  const semanticCandidateSchema = readRepositoryJson(repositoryRoot, "contracts/semantic-candidate.schema.json");
+  const proceduralModelSchema = readRepositoryJson(repositoryRoot, "contracts/procedural-model-draft.schema.json");
+  const proceduralRevisionSchema = readRepositoryJson(repositoryRoot, "contracts/procedural-revision-proposal.schema.json");
   const ajv = new Ajv2020({allErrors: true, strict: true});
   ajv.addSchema(semanticCandidateSchema);
   ajv.addSchema(proceduralModelSchema);
@@ -94,7 +98,7 @@ export function validateContractCases(validators, outputCases) {
 
 function runFixtureChecks() {
   const repositoryRoot = fileURLToPath(new URL("../", import.meta.url));
-  const readFixture = filename => JSON.parse(readFileSync(resolve(repositoryRoot, "contracts/fixtures", filename), "utf8"));
+  const readFixture = filename => readRepositoryJson(repositoryRoot, `contracts/fixtures/${filename}`);
   const fixtureBases = {model: readFixture("procedural-model.base.json"), revision: readFixture("procedural-revision.base.json")};
   const outputCases = materializeContractCases(readFixture("procedural-authoring.cases.json"), fixtureBases);
   const validators = createProceduralValidators(repositoryRoot);
