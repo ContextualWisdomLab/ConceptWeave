@@ -145,11 +145,15 @@ external evidence authenticity and exact base/scope comparison. They are deliber
 NOT described as valid graphs or approved revisions.
 
 `scripts/check_procedural_contracts.mjs` materializes the fixed unit corpus in a
-private temporary directory, compiles the schemas and checks positive/negative groups
-using the already used AJV CLI 5.0.0. It has no product API or model/provider role.
-No coercion, default insertion or removal of unknown fields is enabled. Product adds
-this fixture check and Node runner tests without changing workflow triggers, permissions,
-concurrency, Rust/coverage/security gates or the pinned dependencies.
+private temporary directory, compiles the schemas, and validates the positive/negative
+groups in-process with the repository-pinned `ajv` `8.20.0` Draft 2020-12 library.
+Product installs that dependency from the committed lockfile with
+`npm ci --ignore-scripts --no-audit --no-fund` before running the repository-owned
+contract checks. Dynamic `npx`, `ajv-cli`, and child-process package execution are not
+part of the current validation path. No coercion, default insertion or removal of
+unknown fields is enabled. Product adds this fixture check and Node runner tests without
+changing workflow triggers, permissions, concurrency, Rust/coverage/security gates or
+the pinned dependencies.
 
 ## Planned Rust and persistence boundary, not implemented here
 
@@ -229,16 +233,20 @@ all supported locale layout checks before any UI delivery or accessibility claim
 
 ## Verification record and remaining uncertainty
 
-The authoring environment has Node 22.16.0 and Python jsonschema 4.26.0, but lacks
-Rust 1.98 and a cached AJV CLI. The same Node-materialized 46 cases passed independent
-Draft 2020-12 schema validation. Sixteen Node test-runner assertions passed. An offline
-AJV availability attempt failed with ENOTCACHED; native AJV and whole-workspace CI
-are not claimed. The initial absent-runner import failure records test-file ordering
-only, not an executed behavioral RED. The unchanged generic schema rejecting these
-new envelopes is a capability gap, not a defect in that existing contract.
+Predecessor authoring evidence at `300fed966643fa4bf2c4be29514b8796da764166`
+remains historical: Python jsonschema 4.26.0 observed 46/46 structural expectations,
+Node fixture-runner 16/16, and 14 ECMAScript pattern checks. The current supply-chain
+repair at `61e08d597643a68515c126dbcca25c2495104adc` replaced dynamic AJV CLI execution
+with locked in-process `ajv` `8.20.0`. The edited `.mjs` sources pass `node --check`
+under Node 22.16.0, and the exact package manifest/lock pair reaches npm's offline
+artifact lookup without a lock-consistency `EUSAGE` failure. This establishes source
+syntax and manifest/lock consistency only.
 
-Required remaining evidence: native Product AJV and Node runner checks, all inherited
-Rust/coverage/security gates and independent review on the unchanged PR head. Schema
+The current execution environment has neither a cached AJV package nor Rust 1.98, and
+this Draft head has no Product workflow generation. Native exact-head AJV execution,
+Rust workspace/fmt/strict Clippy/rustdoc/release, owned coverage, hosted security and
+qualifying independent review therefore remain unproven. The four shape-positive
+semantic witnesses remain expected RED for the planned Rust semantic validator; schema
 shape is not semantic integrity, release approval, production performance or deployment.
 
 ## References and traceability
@@ -251,8 +259,8 @@ https://arxiv.org/abs/2609.09153
 (arXiv 2609.09153) 논문 정리*.
 https://conanssam.com/posts/2026-09-10-procedural-graphs-self-evolving-llm-agents
 
-AJV CLI maintainers. (n.d.). *ajv-cli: JSON schema version, compile and test commands*.
-https://github.com/ajv-validator/ajv-cli/blob/master/README.md
+AJV contributors. (n.d.). *Ajv JSON schema validator*.
+https://github.com/ajv-validator/ajv
 
 Method -> issue #42 -> PG-FR-1..6 -> these draft schemas ->
 `contracts/fixtures/procedural-authoring.cases.json` -> existing Product fixture step.
