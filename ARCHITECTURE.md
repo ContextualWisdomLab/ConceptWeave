@@ -75,3 +75,14 @@ scripts/                     # Deterministic repository-quality helpers
 ```
 
 Adapters and application services are added only when their bounded responsibility exists; generic `utils`, `helpers`, or `services` dumping grounds are prohibited.
+
+## Procedural knowledge profile — Proposed
+
+The existing discovery/validation/publication contexts also own procedure concepts,
+advisory relations, evidence alignment and reviewed model revisions. Noema consumes
+a released projection for online advice and retains execution/cancellation authority.
+CO supplies model calls; CGC owns shared interchange; SDP catalogs releases; EAC owns
+the architecture/adoption map. Product factual and policy authority do not move.
+See [ADR-PG-20260910](docs/adr/pg_20260910_procedural_model_engineering.md) for the
+context/aggregate map, UML, source claims, current input-schema implementation and
+explicit Rust, governance, projection, security and recovery prerequisites.

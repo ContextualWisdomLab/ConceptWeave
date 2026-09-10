@@ -6,6 +6,8 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
+- Proposed procedural-model engineering profile: local draft/revision input schemas, structural conformance fixtures and existing Product AJV wiring. ConceptWeave owns authoring/validation/publication; Noema retains runtime guidance. No Rust semantic validator, model call, release or activation is delivered by this input-contract slice. Issue #42; ADR-PG-20260910.
+
 - Initial ConceptWeave product, DDD, security, test, and operability baselines.
 - Rust 1.98.0 `conceptweave-domain` foundation with evidence-bound semantic candidate contracts.
 - Fail-closed Draft -> Proposed -> Validated -> Reviewed -> Published lifecycle with explicit rejection and supersession.

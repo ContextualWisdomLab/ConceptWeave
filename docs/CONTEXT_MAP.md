@@ -14,3 +14,15 @@
 - context-graph-contracts <-> Interoperability: **Shared Kernel only for versioned public contracts**, kept minimal.
 - semantic-data-portal <- Interoperability: **Published Language**. SDP consumes releases; ConceptWeave does not read SDP application tables.
 - Keyverse -> future delivery layer: **Anti-Corruption Layer** for verified identity/tenant context.
+
+## Procedural model extension — Proposed, issue #42
+
+- ConceptWeave Governance & Publication -> Noema: **Published Language + consumer ACL**.
+  ConceptWeave publishes procedural representations; Noema pins a compatible projection
+  per execution. Neither graph publication nor a relation label authorizes a tool call.
+- Noema -> Source Observation: **Anti-Corruption Layer**, minimized observable training
+  evidence only; no hidden reasoning, secrets or foreign domain-truth replication.
+- Independent evaluation -> Governance & Publication: **Customer/Supplier**, authenticated
+  exact-candidate paired evidence under a registered protocol; refiner output is not approval.
+- The first local authoring schemas do not establish any of these live integrations.
+  Shared wire contracts remain owned by `context-graph-contracts`.

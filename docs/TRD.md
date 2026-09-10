@@ -56,3 +56,19 @@ Source artifacts are untrusted input. Adapters must enforce source size/type bou
 ## 10. Evaluation
 
 Evaluation must separate extraction recall, semantic correctness, structural correctness, ontology consistency, mapping accuracy, measure correctness, and governance outcomes. Model-judge scores may supplement but never replace deterministic golden fixtures and human-reviewed expert cases.
+
+## Procedural authoring contract slice — Proposed, issue #42
+
+`contracts/procedural-model-draft.schema.json` and
+`contracts/procedural-revision-proposal.schema.json` define separate local
+`0.1.0-draft.1` inputs, reusing the existing evidence-reference grammar without
+altering `semantic-candidate/0.1.0`. The Node script
+`scripts/check_procedural_contracts.mjs` is test infrastructure using existing AJV
+CLI 5.0.0; it is not production validation or a provider/runtime dependency.
+
+Draft validation is shape-only. Rust must separately enforce entry/edge/evidence
+membership, unique identifiers, exact tenant/task/base identity, duplicate-key and
+byte bounds, deterministic hashing and profile-specific topology. CGC release and
+Noema projection tests must precede cross-product activation. The ADR records
+transactional publication, independent evidence, multilingual labels and rollback
+requirements; none is implied by a passing schema fixture.

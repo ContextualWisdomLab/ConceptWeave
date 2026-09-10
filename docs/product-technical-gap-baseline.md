@@ -120,3 +120,28 @@ The live Local API replay remains acquisition/observation evidence only: 8,326 o
 No Foundation, #35, #9, #40, or downstream semantic publication is authorized by this snapshot. The closest prerequisite is central `.github#2051@70e8c1f...`: source repair is present, but exact-head required workflows and qualifying independent review are still pending. After its normal protected integration, #35 requires a fresh authenticated exact-head CodeQL run and independent approval; Foundation then requires its own exact-current Product and central evidence. Local predecessor evidence never transfers merely because a successor is docs-only.
 
 No force push, destructive rebase, self-approval, review dismissal, fail-open scanner substitution, provider bypass, no-op trigger, synthetic status, live Zotero mutation, premature semantic publication, or release is acceptance evidence.
+
+## Procedural model engineering — 2026-09-10 scoped extension
+
+Tracking: issue #42 and ContextualWisdomLab/.github #2067;
+[ADR-PG-20260910](adr/pg_20260910_procedural_model_engineering.md), Proposed.
+The preceding Foundation snapshot is retained byte-for-byte as historical evidence;
+this section updates only the procedural-model scope, not unrelated live PR counters.
+Branch point observed: Foundation #1 `60f14a6e85a83d56c2eea43b34d52b3366bb1735`.
+Protected-main observation remains bootstrap-only, not a semantic release.
+
+| Gap | This slice / next acceptance |
+| --- | --- |
+| Procedural authoring ownership missing from initial Noema-centric adoption | ConceptWeave authors, aligns, validates and publishes procedural models; Noema retains execution-local advice/lifecycle. Product facts and permissions remain with their owners. |
+| No procedural draft/revision grammar | Two local `0.1.0-draft.1` schemas and 46 shape cases are added; the existing generic candidate schema and all Rust source remain unchanged. |
+| Shape checks mistaken for model integrity | Four explicit shape-positive semantic-gap witnesses retain missing-entry, dangling-endpoint, duplicate-identity and evidence/scope authenticity gaps. Rust semantic admission is still required. |
+| Offline refinement and independent evaluation | Training-only proposal envelope exists; actual source admission, CO generation, matched evaluation, final confirmation and persistent scoped rejections remain unimplemented by this slice. |
+| Steward publication, release and consumer projection | Exact-candidate review, CAS publication, validity/confidence/provenance, signed immutable release, CGC interoperability and Noema projection remain required; no current mutable PR is a consumer dependency. |
+| Product operation and authoring experience | Shadow comparison, product-specific authorization/idempotency, live revocation/rollback and eight-locale accessible editor/review UX still require actual implementation/evidence. |
+
+Local evidence is 46/46 Python-jsonschema input-shape cases from the Node materializer
+and 16/16 Node fixture-runner tests. These are not native Product AJV/Rust/coverage or
+hosted approval. AJV's offline availability check returned ENOTCACHED. The inherited
+Product job remains subject to its existing Draft/prerequisite rules; no gate was
+weakened or no-op rerun created. No model call, source mutation, semantic publication,
+software release or product activation is delivered by this input-contract slice.
