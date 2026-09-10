@@ -139,6 +139,6 @@ export function verifyManifestSourceProvenance(repositoryRoot, manifest, options
     sources_verified: manifest.sources.length,
     source_bytes_verified: sourceBytesVerified,
     verification_scope: "local_git_commit_path_blob_and_sha256",
-    source_authentication_established: true,
+    local_git_provenance_established: true,
   };
 }
