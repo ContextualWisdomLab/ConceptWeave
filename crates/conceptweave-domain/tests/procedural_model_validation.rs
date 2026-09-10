@@ -41,7 +41,7 @@ fn node<'a>(procedure_id: &'a str, evidence: &'a [EvidenceReference]) -> Procedu
         procedure_id,
         procedure_kind: ProcedureKind::ReasoningStep,
         locale_labels: annotations(),
-        semantic_refs: &[],
+        semantic_refs: None,
         tool_contract_ref: None,
         source_evidence: evidence,
     }
@@ -220,7 +220,7 @@ fn scope_mismatch_rejects_each_coordinate_without_trim_or_casefold() {
             _ => model.scope.domain_owner_ref = "other_owner",
         }
         assert_eq!(
-            check(&model),
+            check(&model(&evidence, &nodes, &edges)),
             Err(ProceduralValidationError::ScopeMismatch)
         );
     }
