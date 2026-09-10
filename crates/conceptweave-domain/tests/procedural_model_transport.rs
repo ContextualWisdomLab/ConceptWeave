@@ -10,6 +10,7 @@ fn duplicate_decoded_members_are_rejected_before_mapping() {
         r#"{"model_id":"first","model_id":"second"}"#,
         r#"{"model_id":"first","\u006dodel_id":"second"}"#,
         r#"{"outer":{"task_type":"one","\u0074ask_type":"two"}}"#,
+        r#"{"🚀":1,"\uD83D\uDE80":2}"#,
     ] {
         assert_eq!(
             admit_procedural_json_transport(input),
@@ -24,6 +25,9 @@ fn malformed_strings_surrogates_and_trailing_data_fail_closed() {
         r#"{"x":"unterminated}"#,
         r#"{"x":"\uD800"}"#,
         r#"{"x":"\uDC00"}"#,
+        r#"{"x":"\uD800\u0041"}"#,
+        r#"{"x":"\u12xz"}"#,
+        r#"{"x":"\q"}"#,
         r#"{"x":1} trailing"#,
         "{\"x\":\"line\nfeed\"}",
     ] {
@@ -35,13 +39,45 @@ fn malformed_strings_surrogates_and_trailing_data_fail_closed() {
 }
 
 #[test]
-fn depth_and_transport_size_are_bounded_without_changing_valid_boundary() {
-    let depth_128 = format!("{}0{}", "[".repeat(128), "]".repeat(128));
-    assert_eq!(admit_procedural_json_transport(&depth_128), Ok(()));
+fn malformed_container_and_number_grammar_fails_closed() {
+    for input in [
+        "",
+        " ",
+        "{",
+        "[",
+        r#"{"x" 1}"#,
+        r#"{"x":1,}"#,
+        r#"[1,]"#,
+        r#"{"x":01}"#,
+        r#"{"x":-}"#,
+        r#"{"x":1.}"#,
+        r#"{"x":1e}"#,
+        r#"{"x":1e+}"#,
+        "truth",
+    ] {
+        assert_eq!(
+            admit_procedural_json_transport(input),
+            Err(ProceduralTransportError::InvalidJson)
+        );
+    }
+}
 
-    let depth_129 = format!("{}0{}", "[".repeat(129), "]".repeat(129));
+#[test]
+fn depth_and_transport_size_are_bounded_without_changing_valid_boundary() {
+    let at_limit = format!(
+        "{}0{}",
+        "[".repeat(MAX_PROCEDURAL_TRANSPORT_DEPTH),
+        "]".repeat(MAX_PROCEDURAL_TRANSPORT_DEPTH)
+    );
+    assert_eq!(admit_procedural_json_transport(&at_limit), Ok(()));
+
+    let beyond_limit = format!(
+        "{}0{}",
+        "[".repeat(MAX_PROCEDURAL_TRANSPORT_DEPTH + 1),
+        "]".repeat(MAX_PROCEDURAL_TRANSPORT_DEPTH + 1)
+    );
     assert_eq!(
-        admit_procedural_json_transport(&depth_129),
+        admit_procedural_json_transport(&beyond_limit),
         Err(ProceduralTransportError::DepthLimit)
     );
 
@@ -58,12 +94,16 @@ fn depth_and_transport_size_are_bounded_without_changing_valid_boundary() {
 }
 
 #[test]
-fn valid_json_forms_and_unicode_escape_pairs_are_admitted() {
+fn valid_json_forms_unicode_and_all_string_escapes_are_admitted() {
     for input in [
         r#"null"#,
         r#"true"#,
+        r#"false"#,
+        r#"0"#,
         r#"-12.5e+2"#,
-        r#"[null,false,0,1.25,{"ko":"검증","emoji":"\uD83D\uDE80"}]"#,
+        r#"{}"#,
+        r#"[]"#,
+        " \n\t{\"escaped\":\"\\\"\\\\\\/\\b\\f\\n\\r\\t\\u0041\",\"ko\":\"검증\",\"emoji\":\"\\uD83D\\uDE80\"}\r ",
         r#"{"schema_version":"0.1.0-draft.1","procedure_nodes":[],"procedure_edges":[]}"#,
     ] {
         assert_eq!(admit_procedural_json_transport(input), Ok(()));
