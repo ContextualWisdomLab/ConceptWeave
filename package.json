@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "check:json-contracts": "node scripts/check_semantic_candidate_contracts.mjs && node --test scripts/tests/procedural_contract_fixtures.test.mjs scripts/tests/strict_json.test.mjs scripts/tests/semantic_engineering_profiles.test.mjs scripts/tests/provenance_symlink.test.mjs && node scripts/check_procedural_contracts.mjs && node scripts/check_semantic_engineering_profiles.mjs"
+    "check:json-contracts": "node scripts/check_semantic_candidate_contracts.mjs && node --test scripts/tests/procedural_contract_fixtures.test.mjs scripts/tests/strict_json.test.mjs scripts/tests/semantic_engineering_profiles.test.mjs scripts/tests/provenance_symlink.test.mjs scripts/tests/repository_json_admission.test.mjs && node scripts/check_procedural_contracts.mjs && node scripts/check_semantic_engineering_profiles.mjs"
   },
   "devDependencies": {
     "ajv": "8.20.0"
