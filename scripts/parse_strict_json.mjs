@@ -1,9 +1,13 @@
+import { createHash } from "node:crypto";
+
 const JSON_WHITESPACE = new Set([" ", "\t", "\r", "\n"]);
 const MAX_JSON_BYTES = 2 * 1024 * 1024;
 const MAX_JSON_DEPTH = 128;
 
 function duplicateKeyError(label, key) {
-  return new Error(`duplicate_json_key:${label}:${JSON.stringify(key)}`);
+  const keyBytes = Buffer.byteLength(key, "utf8");
+  const fingerprint = createHash("sha256").update(key, "utf8").digest("hex").slice(0, 16);
+  return new Error(`duplicate_json_key:${label}:key_sha256:${fingerprint}:bytes=${keyBytes}`);
 }
 
 /**
@@ -11,8 +15,9 @@ function duplicateKeyError(label, key) {
  *
  * JSON.parse alone cannot preserve duplicate-member evidence: many runtimes keep the
  * last value. This scanner walks object boundaries first and compares decoded key
- * values, so `"a"` and `"\\u0061"` are treated as the same member name. JSON.parse
- * remains the syntax/value authority after the duplicate-key pass.
+ * values, so `"a"` and `"\\u0061"` are treated as the same member name. Duplicate
+ * diagnostics expose only a bounded fingerprint and byte length, never the member
+ * value itself. JSON.parse remains the syntax/value authority after this pass.
  */
 export function parseJsonRejectDuplicateKeys(text, label = "json") {
   if (typeof text !== "string") throw new TypeError("json_text_must_be_string");
