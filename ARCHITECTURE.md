@@ -6,7 +6,10 @@ ConceptWeave owns the process that turns observed enterprise evidence into gover
 
 ```mermaid
 flowchart LR
-    S[Source systems and artifacts] --> O[Source Observation]
+    S[Source systems and artifacts] --> R[ObservationRequest admission]
+    R --> A[Registry source + schema + resource authorization]
+    A --> SP[Authorized Source Observation port]
+    SP --> O[Immutable Source Observation]
     O --> D[Semantic Discovery]
     D --> V[Model Validation]
     V --> G[Governance & Publication]
@@ -26,7 +29,7 @@ flowchart LR
 
 | Context | Type | Owns | Does not own |
 | --- | --- | --- | --- |
-| Source Observation | Supporting | immutable observations, parser receipts, evidence locations | source-system business truth |
+| Source Observation | Supporting | bounded request admission, registry source/schema/resource policy and immutable capability binding, source-access port policy, immutable observations, parser/extractor receipts, evidence locations | credentials, source-system business truth, semantic inference |
 | Semantic Discovery | Core | candidate generation and evidence binding | publication authority |
 | Model Validation | Supporting | deterministic validation reports | human review decisions |
 | Governance & Publication | Core | proposal lifecycle, review receipts, releases, supersession authority | catalog/search runtime |
@@ -36,6 +39,36 @@ flowchart LR
 The generation-to-client dependency crosses only versioned public release contracts. Client code may reuse public domain value types, but it must not import generator-private adapters, prompts, persistence tables, Source Observation internals, or orchestration state.
 
 ## Aggregate and value-object boundaries
+
+### ObservationRequest / ObservationRequestBudget / ObservationLimits / ObservationResourceEnvelope / AuthorizedObservationRequest
+
+Provider-independent Source Observation port value objects. A raw request contains only a bounded opaque source registry key (at most 128 bytes, lowercase multiword `snake_case`), an explicit non-empty exact-schema allowlist, a caller-selected authorization-metadata budget, and positive operation/statement-timeout, row, byte, and concurrency execution ceilings. `ObservationRequestBudget` itself is bounded before registry access by canonical product-level caps of 4,096 exact schema identifiers and 1,048,576 retained UTF-8 schema-name bytes. These caps prevent a caller from minting an effectively unbounded retained-metadata envelope before trusted policy runs; they are provider-independent denial-of-service guardrails, not PostgreSQL identifier semantics or source authorization. A request may choose a narrower budget but never a wider one.
+
+Structural admission is not source authority. `ObservationResourceEnvelope` combines the structurally admitted metadata budget and runtime ceilings into one immutable policy input so trusted local policy can admit only an equal-or-narrower complete resource contract. Request count/byte validation occurs before registry or database access and deliberately does not reuse PostgreSQL's build-time identifier-length default as a security constant.
+
+A well-formed key, caller-selected schema list, structurally valid metadata budget, and positive runtime envelope are not authority. `ObservationRequest::authorize` resolves the key through the caller's `SourceConnectionRegistry`, requires a nonblank opaque immutable connection-policy binding for that exact mapping, asks the same registry to authorize the exact schema scope against the resulting `ResolvedSourceConnection`, then asks it to admit the complete `ObservationResourceEnvelope` against that same binding. Schema and resource policy methods default to fail closed. A key-only registry therefore cannot silently turn caller-selected schemas or timeout/row/byte/concurrency/schema-metadata ceilings into application grants. Successful authorization produces one non-`Clone` `AuthorizedObservationRequest`; `SourceObservationPort::observe` consumes that envelope by value. One authorization therefore cannot be replayed to multiply the policy-admitted row, byte, concurrency, deadline, or source-access budget. Retry after cancellation or failure requires a fresh `ObservationRequest::authorize` call. Raw DSNs, URLs, shell-style connection parameters, one-word/generic keys, malformed registry identifiers, over-cap structural budgets, over-budget allowlists, blank schema names, exact duplicates and raw credentials do not cross the canonical execution seam.
+
+`ResolvedSourceConnection` carries only the opaque source key and opaque connection-policy binding. The binding is provider-independent provenance, not connection material. A concrete adapter ACL may resolve credentials only for that exact key-and-binding pair. If a registry key is retargeted from policy/source revision A to B after authorization, an A capability must fail before source access rather than silently inherit B. Exact schema identifiers retain source spelling throughout the policy decision; case or Unicode normalization must not broaden access. Resource admission is likewise bound to the same source-policy revision rather than to a mutable key or caller-selected defaults.
+
+Caller cancellation and source-disappearance/resource-limit outcomes are part of the typed port seam. Request admission and source/schema/resource registry authorization remain deterministic pre-adapter steps; live adapter execution is awaitable and returns a `Send` future without making an async runtime part of the port contract. The end-to-end operation budget starts before source lookup, policy-binding resolution, schema authorization and resource-envelope authorization, then continues through the single authorized connection/catalog execution. Runtime integration must account for pre-adapter elapsed time rather than restarting the deadline at `observe`, and must re-authorize rather than replay a consumed envelope for a retry. Concrete PostgreSQL drivers, credentials, catalog SQL and scheduling remain adapter responsibilities outside the domain and observation-fact crates. ADR 0004 remains Proposed until a concrete adapter and conformance evidence prove these invariants.
+
+### PostgresSchemaSnapshot
+
+Immutable Source Observation aggregate for one bounded relational metadata capture. It owns source-connection reference, the opaque connection-policy binding authorized for that observation, snapshot digest identity, extractor revision, observation time, and exact qualified table observations. The public constructor accepts the complete `AuthorizedObservationRequest`, not a source-only capability, and rejects every locally observed table whose exact schema identifier is absent from the request allowlist before the owner-computed digest or any evidence receipt can exist. Exact matching is case-sensitive and normalization-free. Foreign-key target schema names remain relationship evidence and do not imply that the referenced schema itself was locally observed. Duplicate table coordinates also fail closed. A concrete adapter may construct this aggregate only after a complete bounded capture; cancellation, stale binding, source disappearance, authorization-scope mismatch, or resource exhaustion must not produce a partial snapshot.
+
+The source-content digest deliberately excludes source identity and policy revision, which remain separate provenance coordinates. `SourceObservationReceipt` therefore carries the stable source key and the exact opaque connection-policy binding alongside the source-content digest, extractor revision, observation time, and verified location. This keeps content identity deterministic without losing which immutable authorization mapping produced the evidence.
+
+### TableObservation / ColumnObservation
+
+Immutable Source Observation value objects. Table observations keep exact schema/table identity. Column observations keep exact source name, one-based ordinal, source type, nullability, and optional source comment. Duplicate names or ordinals within a table fail closed, and read APIs return deterministic source order.
+
+### PrimaryKeyObservation / UniqueConstraintObservation / ForeignKeyObservation / CheckConstraintObservation
+
+Unique constraints retain null-comparison evidence as unknown, observed distinct, or observed not-distinct. The existing constructor leaves this evidence unknown; observing it produces a new value without changing the original. The Source Observation aggregate binds all three states into v2 snapshot content identity and derived receipts. This is source fact preservation, not a rule for promoting a relational key to semantic authority.
+
+Immutable Source Observation value objects for deterministic constraint evidence. Composite key order is preserved exactly. Foreign keys retain ordered local and referenced coordinates, including cross-schema targets. When the source adapter observes foreign-key reference behavior, `ForeignKeyReferenceBehavior` preserves exact `ON UPDATE` and `ON DELETE` actions, any PostgreSQL column subset targeted by `ON DELETE SET NULL (...)` or `SET DEFAULT`, match type, and deferrability/initial timing; when it observes PostgreSQL 18 constraint state, `ForeignKeyObservation` also preserves exact `convalidated` and `conenforced` booleans. Either metadata family remains explicitly absent when not observed rather than deriving PostgreSQL defaults.
+
+`CheckConstraintObservation` retains the reconstructed PostgreSQL definition together with validation, enforcement, and `NO INHERIT` status. PostgreSQL stores a CHECK expression internally and recommends `pg_get_constraintdef()` for reconstruction, so ConceptWeave preserves that adapter-supplied definition as source evidence rather than parsing it into guessed ordered column coordinates. Constraint names remain unique within a table observation, while explicit PK/unique/FK coordinate lists must bind to observed local columns. These contracts preserve source metadata only and do not infer join semantics, CHECK dependencies, or business meaning.
 
 ### SemanticCandidate
 
@@ -81,7 +114,7 @@ Truth status and publication workflow are distinct. A source observation can be 
 - Keyverse: future identity/tenant authentication boundary.
 - Consuming products: retain tenant/purpose authorization, business-domain truth, and physical data/query execution behind their own ACLs.
 
-No direct cross-service application-table SQL is permitted.
+No direct cross-service application-table SQL is permitted. A PostgreSQL Source Observation adapter may access only explicitly authorized read-only metadata through the port contract and must not become a hidden foreign-product repository.
 
 ## Current directory structure
 
@@ -89,6 +122,8 @@ No direct cross-service application-table SQL is permitted.
 crates/
   conceptweave-domain/       # Core candidate/evidence lifecycle contracts
   conceptweave-client/       # Offline release admission, compatibility, integrity and supersession validation
+  conceptweave-observation/  # Provider-independent immutable source-observation facts
+  conceptweave-source-port/  # Request admission, registry authorization and source-access execution seam
 contracts/                   # Versioned public JSON Schemas and fixtures
 docs/
   adr/                       # Proposed/accepted architecture decisions
