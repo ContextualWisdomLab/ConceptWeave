@@ -250,6 +250,43 @@ fn sha256_digest(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(byte))
 }
 
+fn is_ecmascript_whitespace(character: char) -> bool {
+    matches!(
+        character,
+        '\u{0009}'
+            | '\u{000a}'
+            | '\u{000b}'
+            | '\u{000c}'
+            | '\u{000d}'
+            | '\u{0020}'
+            | '\u{00a0}'
+            | '\u{1680}'
+            | '\u{2000}'
+            | '\u{2001}'
+            | '\u{2002}'
+            | '\u{2003}'
+            | '\u{2004}'
+            | '\u{2005}'
+            | '\u{2006}'
+            | '\u{2007}'
+            | '\u{2008}'
+            | '\u{2009}'
+            | '\u{200a}'
+            | '\u{2028}'
+            | '\u{2029}'
+            | '\u{202f}'
+            | '\u{205f}'
+            | '\u{3000}'
+            | '\u{feff}'
+    )
+}
+
+fn has_ecmascript_non_whitespace(value: &str) -> bool {
+    value
+        .chars()
+        .any(|character| !is_ecmascript_whitespace(character))
+}
+
 fn charge(bytes: usize, budget: &mut usize) -> Result<(), ProceduralValidationError> {
     *budget = budget.saturating_add(bytes);
     if *budget > 1_048_576 {
@@ -265,7 +302,10 @@ fn annotations(
     let mut count = 0;
     for value in annotations.values().into_iter().flatten() {
         count += 1;
-        if value.trim().is_empty() || value.contains('\0') || value.chars().count() > 2048 {
+        if !has_ecmascript_non_whitespace(value)
+            || value.contains('\0')
+            || value.chars().count() > 2048
+        {
             return Err(ProceduralValidationError::InvalidAnnotation);
         }
         charge(value.len(), budget)?;
@@ -342,7 +382,7 @@ fn evidence_keys<'a>(
         if !sha256_digest(digest)
             || location.len() > 8192
             || location.chars().count() > 2048
-            || location.trim().is_empty()
+            || !has_ecmascript_non_whitespace(location)
             || location.contains('\0')
         {
             return Err(ProceduralValidationError::InvalidEvidence);
@@ -365,10 +405,12 @@ fn evidence_keys<'a>(
 /// `expected_scope` must come from the calling application's authenticated context,
 /// not be copied from the candidate. Equality alone does not authenticate that context.
 /// At most 256 nodes, 512 relations, 64 references per evidence set and 32 semantic
-/// references per node are examined. Locale fields are limited to the eight contract
-/// locales and 2,048 Unicode scalar values per annotation. A 1 MiB cumulative budget
-/// covers identifiers, annotations, artifact coordinates and evidence in this borrowed
-/// projection; serialized transport must apply its own byte/depth/duplicate-key bounds.
+/// references per node are examined. Locale fields and evidence locations mirror the
+/// canonical Draft 2020-12 ECMAScript `\S` non-whitespace semantics; locale fields are
+/// limited to the eight contract locales and 2,048 Unicode scalar values per annotation.
+/// A 1 MiB cumulative budget covers identifiers, annotations, artifact coordinates and
+/// evidence in this borrowed projection; serialized transport must apply its own
+/// byte/depth/duplicate-key bounds.
 ///
 /// Returns counts only. Success is neither a semantic-release receipt nor a publishable
 /// aggregate: source signatures, artifact authenticity/ACL, factual correctness,
