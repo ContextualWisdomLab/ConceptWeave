@@ -219,7 +219,7 @@ fn compute_snapshot_digest(tables: &[TableObservation]) -> String {
                     hasher.update([1]);
                     encode_str(&mut hasher, observation.constraint_name());
                     encode_str_slice(&mut hasher, observation.column_names());
-                    encode_optional_bool(hasher, observation.nulls_not_distinct());
+                    encode_optional_bool(&mut hasher, observation.nulls_not_distinct());
                 }
                 TableConstraintObservation::ForeignKey(observation) => {
                     hasher.update([2]);
