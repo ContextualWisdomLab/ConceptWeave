@@ -7,10 +7,12 @@
 #![deny(missing_docs)]
 
 mod array_type;
+mod constraint_timing;
 mod model;
 mod representation_v3;
 
 pub use array_type::{ArrayTypeLocation, ArrayTypeObservation, ArrayTypeSourceReceipt};
+pub use constraint_timing::{ConstraintDeferrability, ConstraintTimingObservation};
 pub use model::{
     CheckConstraintObservation, ColumnObservation, ForeignKeyAction, ForeignKeyDeferrability,
     ForeignKeyMatchType, ForeignKeyObservation, ForeignKeyReferenceBehavior, ObservationError,
@@ -33,14 +35,15 @@ use sha2::{Digest, Sha256};
 const SNAPSHOT_DIGEST_DOMAIN_V2: &[u8] = b"conceptweave.postgres_schema_snapshot.v2";
 const SNAPSHOT_DIGEST_DOMAIN_V3_ARRAY_TYPES_V1: &[u8] =
     b"conceptweave.postgres_schema_snapshot.v3.array_types.v1";
+const SNAPSHOT_DIGEST_DOMAIN_V3_CONSTRAINT_TIMINGS_V1: &[u8] =
+    b"conceptweave.postgres_schema_snapshot.v3.constraint_timings.v1";
 const POSTGRES_CATALOG_SCHEMA_NAME: &str = "pg_catalog";
 
 /// Immutable receipt binding one exact successor source coordinate to snapshot provenance.
 ///
 /// The receipt always carries the public aggregate's governed source digest. This matters for
 /// array-aware v3 snapshots because the private representation remains the compatibility validator
-/// for the original v3 constructor while the public owner adds a domain-separated true-array
-/// identity extension.
+/// for the original v3 constructor while the public owner adds domain-separated identity extensions.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SuccessorSourceReceipt {
     source_id: String,
@@ -93,8 +96,8 @@ impl SuccessorSourceReceipt {
 ///
 /// The representation module remains an implementation detail. This owner-level aggregate validates
 /// PostgreSQL's unique `(relname, relnamespace)` catalog namespace, relation-kind ownership rules,
-/// exact schema-local `pg_type` identity, and optional observed true-array relationships before
-/// exposing immutable governed evidence.
+/// exact schema-local `pg_type` identity, optional observed true-array relationships, and optional
+/// PRIMARY KEY/UNIQUE timing evidence before exposing immutable governed evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PostgresSchemaSnapshotV3 {
     inner: representation_v3::PostgresSchemaSnapshotV3,
@@ -104,14 +107,16 @@ pub struct PostgresSchemaSnapshotV3 {
     enums: Vec<EnumObservation>,
     array_types: Vec<ArrayTypeObservation>,
     array_types_observed: bool,
+    constraint_timings: Vec<ConstraintTimingObservation>,
+    constraint_timings_observed: bool,
 }
 
 impl PostgresSchemaSnapshotV3 {
-    /// Creates the original deterministic v3 snapshot without claiming true-array inventory.
+    /// Creates the original deterministic v3 snapshot without claiming true-array or key-constraint
+    /// timing inventory.
     ///
-    /// This constructor deliberately preserves its existing digest contract. Call
-    /// [`Self::new_with_array_types`] only when the adapter has explicitly observed exact
-    /// `pg_type.typarray`/`typelem` relationships.
+    /// This constructor deliberately preserves its existing digest contract. Use the explicit
+    /// observed-family constructors only when the adapter captured those catalog families.
     pub fn new(
         authorized_request: &AuthorizedObservationRequest,
         extractor_revision: impl Into<String>,
@@ -141,7 +146,34 @@ impl PostgresSchemaSnapshotV3 {
             enums,
             array_types: Vec::new(),
             array_types_observed: false,
+            constraint_timings: Vec::new(),
+            constraint_timings_observed: false,
         })
+    }
+
+    /// Creates a deterministic v3 snapshot with explicitly observed PRIMARY KEY/UNIQUE timing.
+    ///
+    /// The observed timing family is validated against exact relation and constraint coordinates and
+    /// is framed behind its own digest domain. An empty timing vector therefore means observed-empty,
+    /// not unobserved, while the legacy [`Self::new`] digest remains unchanged.
+    pub fn new_with_constraint_timings(
+        authorized_request: &AuthorizedObservationRequest,
+        extractor_revision: impl Into<String>,
+        observed_at_utc: impl Into<String>,
+        relations: Vec<RelationObservation>,
+        domains: Vec<DomainObservation>,
+        enums: Vec<EnumObservation>,
+        constraint_timings: Vec<ConstraintTimingObservation>,
+    ) -> Result<Self, ObservationError> {
+        Self::new(
+            authorized_request,
+            extractor_revision,
+            observed_at_utc,
+            relations,
+            domains,
+            enums,
+        )?
+        .with_observed_constraint_timings(constraint_timings)
     }
 
     /// Creates a deterministic v3 snapshot with explicitly observed PostgreSQL true-array identity.
@@ -217,7 +249,51 @@ impl PostgresSchemaSnapshotV3 {
             enums,
             array_types,
             array_types_observed: true,
+            constraint_timings: Vec::new(),
+            constraint_timings_observed: false,
         })
+    }
+
+    /// Creates a deterministic v3 snapshot with both true-array identity and key-constraint timing.
+    ///
+    /// The array-aware digest is computed first; timing evidence then adds its own domain-separated
+    /// layer. This keeps each observed catalog family explicit while supporting one immutable source
+    /// snapshot containing both families.
+    pub fn new_with_array_types_and_constraint_timings(
+        authorized_request: &AuthorizedObservationRequest,
+        extractor_revision: impl Into<String>,
+        observed_at_utc: impl Into<String>,
+        relations: Vec<RelationObservation>,
+        domains: Vec<DomainObservation>,
+        enums: Vec<EnumObservation>,
+        array_types: Vec<ArrayTypeObservation>,
+        constraint_timings: Vec<ConstraintTimingObservation>,
+    ) -> Result<Self, ObservationError> {
+        Self::new_with_array_types(
+            authorized_request,
+            extractor_revision,
+            observed_at_utc,
+            relations,
+            domains,
+            enums,
+            array_types,
+        )?
+        .with_observed_constraint_timings(constraint_timings)
+    }
+
+    fn with_observed_constraint_timings(
+        mut self,
+        constraint_timings: Vec<ConstraintTimingObservation>,
+    ) -> Result<Self, ObservationError> {
+        let constraint_timings =
+            canonicalize_constraint_timings(&self.relations, constraint_timings)?;
+        self.snapshot_digest = compute_constraint_timing_digest(
+            &self.snapshot_digest,
+            &constraint_timings,
+        );
+        self.constraint_timings = constraint_timings;
+        self.constraint_timings_observed = true;
+        Ok(self)
     }
 
     /// Returns the stable source-connection registry reference, never a credential.
@@ -274,6 +350,14 @@ impl PostgresSchemaSnapshotV3 {
     pub fn array_types(&self) -> Option<&[ArrayTypeObservation]> {
         self.array_types_observed
             .then_some(self.array_types.as_slice())
+    }
+
+    /// Returns explicitly observed PRIMARY KEY/UNIQUE timing, or `None` when that catalog family was
+    /// not observed by the constructor.
+    #[must_use]
+    pub fn constraint_timings(&self) -> Option<&[ConstraintTimingObservation]> {
+        self.constraint_timings_observed
+            .then_some(self.constraint_timings.as_slice())
     }
 
     /// Issues provenance for an exact successor coordinate only when it exists in this snapshot.
@@ -399,6 +483,69 @@ fn validate_schema_relation_invariants(
         }
     }
     Ok(())
+}
+
+fn canonicalize_constraint_timings(
+    relations: &[RelationObservation],
+    mut constraint_timings: Vec<ConstraintTimingObservation>,
+) -> Result<Vec<ConstraintTimingObservation>, ObservationError> {
+    constraint_timings.sort_by(|left, right| {
+        (
+            left.schema_name(),
+            left.relation_name(),
+            left.relation_kind().token(),
+            left.constraint_name(),
+        )
+            .cmp(&(
+                right.schema_name(),
+                right.relation_name(),
+                right.relation_kind().token(),
+                right.constraint_name(),
+            ))
+    });
+
+    for pair in constraint_timings.windows(2) {
+        if pair[0].schema_name() == pair[1].schema_name()
+            && pair[0].relation_name() == pair[1].relation_name()
+            && pair[0].relation_kind() == pair[1].relation_kind()
+            && pair[0].constraint_name() == pair[1].constraint_name()
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "constraint_timing_coordinate",
+            });
+        }
+    }
+
+    for timing in &constraint_timings {
+        let Some(relation) = relations.iter().find(|relation| {
+            relation.schema_name() == timing.schema_name()
+                && relation.relation_name() == timing.relation_name()
+                && relation.kind() == timing.relation_kind()
+        }) else {
+            return Err(ObservationError::InvalidObservationField {
+                field: "constraint_timing_coordinate",
+            });
+        };
+        let Some(constraint) = relation
+            .constraints()
+            .iter()
+            .find(|constraint| constraint.constraint_name() == timing.constraint_name())
+        else {
+            return Err(ObservationError::InvalidObservationField {
+                field: "constraint_timing_coordinate",
+            });
+        };
+        if !matches!(
+            constraint,
+            TableConstraintObservation::PrimaryKey(_) | TableConstraintObservation::Unique(_)
+        ) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "constraint_timing_kind",
+            });
+        }
+    }
+
+    Ok(constraint_timings)
 }
 
 fn relation_has_row_type(kind: RelationKind) -> bool {
@@ -695,6 +842,27 @@ fn compute_array_aware_snapshot_digest(
         }
     }
 
+    encode_sha256(hasher)
+}
+
+fn compute_constraint_timing_digest(
+    base_snapshot_digest: &str,
+    constraint_timings: &[ConstraintTimingObservation],
+) -> String {
+    let mut hasher = Sha256::new();
+    encode_bytes(
+        &mut hasher,
+        SNAPSHOT_DIGEST_DOMAIN_V3_CONSTRAINT_TIMINGS_V1,
+    );
+    encode_str(&mut hasher, base_snapshot_digest);
+    encode_len(&mut hasher, constraint_timings.len());
+    for timing in constraint_timings {
+        encode_str(&mut hasher, timing.schema_name());
+        encode_str(&mut hasher, timing.relation_name());
+        encode_str(&mut hasher, timing.relation_kind().token());
+        encode_str(&mut hasher, timing.constraint_name());
+        hasher.update([timing.deferrability().tag()]);
+    }
     encode_sha256(hasher)
 }
 
