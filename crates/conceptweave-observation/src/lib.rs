@@ -527,7 +527,7 @@ fn canonicalize_constraint_timings(
                     (
                         relation.schema_name().to_owned(),
                         relation.relation_name().to_owned(),
-                        relation.kind(),
+                        relation.kind().token().to_owned(),
                         constraint.constraint_name().to_owned(),
                     )
                 })
@@ -566,7 +566,7 @@ fn canonicalize_constraint_timings(
         observed_key_coordinates.insert((
             timing.schema_name().to_owned(),
             timing.relation_name().to_owned(),
-            timing.relation_kind(),
+            timing.relation_kind().token().to_owned(),
             timing.constraint_name().to_owned(),
         ));
     }
