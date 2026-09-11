@@ -213,6 +213,19 @@ fn base_snapshot(relations: Vec<RelationObservation>) -> PostgresSchemaSnapshotV
     .expect("base snapshot fixture is valid")
 }
 
+fn timed_base_snapshot(relations: Vec<RelationObservation>) -> PostgresSchemaSnapshotV3 {
+    PostgresSchemaSnapshotV3::new_with_constraint_timings(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-11T22:00:00Z",
+        relations,
+        Vec::new(),
+        Vec::new(),
+        vec![temporal_key_timing()],
+    )
+    .expect("timed base snapshot fixture is valid")
+}
+
 #[test]
 fn observed_false_period_state_is_distinct_from_unobserved() {
     let relation = ordinary_unique_relation();
@@ -259,9 +272,7 @@ fn temporal_primary_key_requires_matching_exclusion_backing_index_evidence() {
 
 #[test]
 fn period_foreign_key_and_referenced_temporal_key_are_preserved_together() {
-    let snapshot = base_snapshot(vec![temporal_parent_relation(), period_child_relation()])
-        .with_observed_constraint_timings(vec![temporal_key_timing()])
-        .expect("referenced temporal key timing is explicitly observed")
+    let snapshot = timed_base_snapshot(vec![temporal_parent_relation(), period_child_relation()])
         .with_observed_constraint_periods(vec![
             period("document_version", "document_version_period_fk", true),
             period("document", "document_temporal_key", true),
@@ -348,17 +359,13 @@ fn period_observation_cannot_target_check_constraint() {
 #[test]
 fn period_family_input_order_does_not_change_identity() {
     let relations = vec![temporal_parent_relation(), period_child_relation()];
-    let forward = base_snapshot(relations.clone())
-        .with_observed_constraint_timings(vec![temporal_key_timing()])
-        .expect("forward timing inventory is valid")
+    let forward = timed_base_snapshot(relations.clone())
         .with_observed_constraint_periods(vec![
             period("document", "document_temporal_key", true),
             period("document_version", "document_version_period_fk", true),
         ])
         .expect("forward period inventory is valid");
-    let reverse = base_snapshot(relations)
-        .with_observed_constraint_timings(vec![temporal_key_timing()])
-        .expect("reverse timing inventory is valid")
+    let reverse = timed_base_snapshot(relations)
         .with_observed_constraint_periods(vec![
             period("document_version", "document_version_period_fk", true),
             period("document", "document_temporal_key", true),
