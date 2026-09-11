@@ -135,7 +135,9 @@ fn validate_schema_relation_invariants(
         if !relation.indexes().is_empty()
             && !matches!(
                 relation.kind(),
-                RelationKind::Table | RelationKind::PartitionedTable | RelationKind::MaterializedView
+                RelationKind::Table
+                    | RelationKind::PartitionedTable
+                    | RelationKind::MaterializedView
             )
         {
             return Err(ObservationError::InvalidObservationField {
