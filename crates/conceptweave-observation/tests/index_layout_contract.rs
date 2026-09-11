@@ -54,6 +54,32 @@ fn index_layout_rejects_non_contiguous_key_include_boundary() {
 }
 
 #[test]
+fn index_layout_rejects_expression_include_attributes() {
+    let expression = IndexAttributeObservation::expression(
+        2,
+        IndexAttributeKind::Include,
+        "lower(event_key)",
+    )
+    .expect("expression fixture is structurally valid before index-layout admission");
+
+    let error = IndexObservation::new(
+        "event_parent_ix",
+        false,
+        None,
+        vec![column_attribute(1, IndexAttributeKind::Key, "parent_key")],
+        vec![expression],
+    )
+    .expect_err("PostgreSQL INCLUDE accepts columns, not expressions");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "index_attribute_layout",
+        }
+    );
+}
+
+#[test]
 fn index_layout_accepts_contiguous_key_then_include_ordinals() {
     let index = IndexObservation::new(
         "event_parent_ix",
