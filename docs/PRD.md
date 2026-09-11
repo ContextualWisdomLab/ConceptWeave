@@ -88,7 +88,24 @@ procedure authoring, concept/tool-contract alignment, independent offline evalua
 steward publication, released consumer projection and inspectable authoring/review UX.
 These identifiers are profile-scoped and do not renumber existing FRs or research work.
 
-The current slice delivers only draft/revision input schemas and structural fixtures.
-It does not replace the initial relational vertical slice, deliver a graph editor,
-run a model, or publish/activate procedural knowledge. A customer must ultimately
-trace every suggested procedure to an approved model revision and exact source evidence.
+The current #44 source slice goes beyond schema fixtures but remains private and
+unreleased. It includes bounded raw-byte/UTF-8/strict-JSON admission, canonical Draft
+2020-12 transport-to-domain mapping, schema-significant semantic/topology validation,
+and canonical revision-envelope/base/candidate-scope comparison against a separately
+supplied `ProceduralRevisionExpectation`. That expectation is deliberately not an
+authentication receipt, and none of these source-shaped gates grants publication,
+runtime, tool, factual, or steward authority.
+
+Production admission still requires fresh native Rust 1.98 and hosted Product evidence,
+then an application-layer adapter consuming an immutable released Keyverse trust
+contract to obtain authenticated RP/subject/tenant context. ConceptWeave must apply its
+own proposal/base resource authorization after identity admission; it must not copy
+mutable Keyverse source, mint a local `authenticated=true` substitute, or move JWT/
+provider verification into `conceptweave-domain`. Released semantic/tool artifact
+authenticity and ACL/capability, independent evaluation, steward decision, immutable
+publication and Noema activation remain later gates.
+
+The procedural extension does not replace the initial relational vertical slice,
+deliver a graph editor, run a model, or publish/activate procedural knowledge. A
+customer must ultimately trace every suggested procedure to an approved model revision
+and exact source evidence.

@@ -2,9 +2,13 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
+import { parseJsonRejectDuplicateKeys } from "./parse_strict_json.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../", import.meta.url));
-const readJson = path => JSON.parse(readFileSync(resolve(repositoryRoot, path), "utf8"));
+const readJson = path => parseJsonRejectDuplicateKeys(
+  readFileSync(resolve(repositoryRoot, path), "utf8"),
+  path,
+);
 const schema = readJson("contracts/semantic-candidate.schema.json");
 const validator = new Ajv2020({allErrors: true, strict: true}).compile(schema);
 

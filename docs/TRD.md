@@ -57,18 +57,42 @@ Source artifacts are untrusted input. Adapters must enforce source size/type bou
 
 Evaluation must separate extraction recall, semantic correctness, structural correctness, ontology consistency, mapping accuracy, measure correctness, and governance outcomes. Model-judge scores may supplement but never replace deterministic golden fixtures and human-reviewed expert cases.
 
-## Procedural authoring contract slice — Proposed, issue #42
+## Procedural authoring and admission slice — Proposed, issue #42
 
 `contracts/procedural-model-draft.schema.json` and
 `contracts/procedural-revision-proposal.schema.json` define separate local
 `0.1.0-draft.1` inputs, reusing the existing evidence-reference grammar without
-altering `semantic-candidate/0.1.0`. The Node script
-`scripts/check_procedural_contracts.mjs` is test infrastructure using existing AJV
-CLI 5.0.0; it is not production validation or a provider/runtime dependency.
+altering `semantic-candidate/0.1.0`. Repository-owned validation uses the pinned
+`ajv` `8.20.0` Draft 2020-12 library through the committed lockfile and in-process
+Node checker. Dynamic `npx`, `ajv-cli`, coercion/default insertion, and registry-
+resolved package execution are not part of the current contract path.
 
-Draft validation is shape-only. Rust must separately enforce entry/edge/evidence
-membership, unique identifiers, exact tenant/task/base identity, duplicate-key and
-byte bounds, deterministic hashing and profile-specific topology. CGC release and
-Noema projection tests must precede cross-product activation. The ADR records
-transactional publication, independent evidence, multilingual labels and rollback
-requirements; none is implied by a passing schema fixture.
+The private Rust #44 source now owns bounded raw-byte admission before UTF-8 decoding,
+strict JSON grammar with decoded duplicate-member rejection, canonical Draft 2020-12
+mapping, schema-significant semantic/topology validation, and canonical revision-
+envelope mapping. The revision path preserves `proposal_state: proposed`,
+`decision_authority: none`, exact `base_model_ref`, candidate model/tenant/task/
+domain-owner scope, bounded training evidence/rejection references/rationale, and
+fails closed when those coordinates differ from a separately supplied
+`ProceduralRevisionExpectation`.
+
+This implementation is source-shaped, not accepted production evidence. The branch
+still requires pinned Rust 1.98 fmt, strict all-target Clippy, native tests, rustdoc,
+release and owned-production coverage plus hosted Product/security/review evidence
+on one unchanged exact head before widening or exporting the private seam.
+
+`ProceduralRevisionExpectation` is not an authentication receipt. The application
+layer must construct it only after consuming an immutable released Keyverse trust
+contract that authenticates the relying-party identity/subject and tenant context.
+Keyverse owns issuer/signature/algorithm/audience/time/subject/tenant trust semantics;
+ConceptWeave owns authorization of ConceptWeave proposal/base resources after that
+identity evidence is admitted. The application must reject replayed, stale or
+mismatched request context and must not infer authentication from revision-payload
+fields. Until Keyverse publishes a consumable immutable contract, no mutable Keyverse
+source, provider/JWT verification logic, or local `authenticated=true` substitute may
+enter `conceptweave-domain`.
+
+Released semantic/tool-contract authenticity and ACL/capability admission, independent
+evaluation, steward decision binding, immutable publication, released CGC projection,
+and Noema runtime activation remain later distinct gates. A passing schema, Rust
+mapping, or coordinate comparison alone grants none of those authorities.
