@@ -7,11 +7,13 @@
 #![deny(missing_docs)]
 
 mod array_type;
+mod constraint_period;
 mod constraint_timing;
 mod model;
 mod representation_v3;
 
 pub use array_type::{ArrayTypeLocation, ArrayTypeObservation, ArrayTypeSourceReceipt};
+pub use constraint_period::ConstraintPeriodObservation;
 pub use constraint_timing::{ConstraintDeferrability, ConstraintTimingObservation};
 pub use model::{
     CheckConstraintObservation, ColumnObservation, ForeignKeyAction, ForeignKeyDeferrability,
@@ -37,6 +39,8 @@ const SNAPSHOT_DIGEST_DOMAIN_V3_ARRAY_TYPES_V1: &[u8] =
     b"conceptweave.postgres_schema_snapshot.v3.array_types.v1";
 const SNAPSHOT_DIGEST_DOMAIN_V3_CONSTRAINT_TIMINGS_V1: &[u8] =
     b"conceptweave.postgres_schema_snapshot.v3.constraint_timings.v1";
+const SNAPSHOT_DIGEST_DOMAIN_V3_CONSTRAINT_PERIODS_V1: &[u8] =
+    b"conceptweave.postgres_schema_snapshot.v3.constraint_periods.v1";
 const POSTGRES_CATALOG_SCHEMA_NAME: &str = "pg_catalog";
 
 /// Immutable receipt binding one exact successor source coordinate to snapshot provenance.
@@ -96,8 +100,9 @@ impl SuccessorSourceReceipt {
 ///
 /// The representation module remains an implementation detail. This owner-level aggregate validates
 /// PostgreSQL's unique `(relname, relnamespace)` catalog namespace, relation-kind ownership rules,
-/// exact schema-local `pg_type` identity, optional observed true-array relationships, and optional
-/// PRIMARY KEY/UNIQUE timing evidence before exposing immutable governed evidence.
+/// exact schema-local `pg_type` identity, optional observed true-array relationships, optional
+/// PRIMARY KEY/UNIQUE timing evidence, and optional explicit temporal-constraint state before
+/// exposing immutable governed evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PostgresSchemaSnapshotV3 {
     inner: representation_v3::PostgresSchemaSnapshotV3,
@@ -109,14 +114,17 @@ pub struct PostgresSchemaSnapshotV3 {
     array_types_observed: bool,
     constraint_timings: Vec<ConstraintTimingObservation>,
     constraint_timings_observed: bool,
+    constraint_periods: Vec<ConstraintPeriodObservation>,
+    constraint_periods_observed: bool,
 }
 
 impl PostgresSchemaSnapshotV3 {
-    /// Creates the original deterministic v3 snapshot without claiming true-array or key-constraint
-    /// timing inventory.
+    /// Creates the original deterministic v3 snapshot without claiming true-array, key-constraint
+    /// timing, or temporal-constraint inventory.
     ///
     /// This constructor deliberately preserves its existing digest contract. Use the explicit
-    /// observed-family constructors only when the adapter captured those catalog families.
+    /// observed-family constructors or consuming family methods only when the adapter captured those
+    /// catalog families.
     pub fn new(
         authorized_request: &AuthorizedObservationRequest,
         extractor_revision: impl Into<String>,
@@ -148,6 +156,8 @@ impl PostgresSchemaSnapshotV3 {
             array_types_observed: false,
             constraint_timings: Vec::new(),
             constraint_timings_observed: false,
+            constraint_periods: Vec::new(),
+            constraint_periods_observed: false,
         })
     }
 
@@ -252,6 +262,8 @@ impl PostgresSchemaSnapshotV3 {
             array_types_observed: true,
             constraint_timings: Vec::new(),
             constraint_timings_observed: false,
+            constraint_periods: Vec::new(),
+            constraint_periods_observed: false,
         })
     }
 
@@ -292,6 +304,33 @@ impl PostgresSchemaSnapshotV3 {
             compute_constraint_timing_digest(&self.snapshot_digest, &constraint_timings);
         self.constraint_timings = constraint_timings;
         self.constraint_timings_observed = true;
+        Ok(self)
+    }
+
+    /// Adds one complete explicitly observed `pg_constraint.conperiod` family to this snapshot.
+    ///
+    /// The family is domain-separated from prior v3 identity and must cover every PRIMARY KEY,
+    /// UNIQUE, and FOREIGN KEY constraint in the bounded snapshot. Explicit `false` therefore remains
+    /// distinct from an unobserved family. PRIMARY KEY/UNIQUE values are cross-checked against any
+    /// already-observed same-name backing-index exclusion flags, while those index facts are never
+    /// used to invent `conperiod`. A PERIOD foreign key targeting a relation inside the same bounded
+    /// snapshot must resolve to an explicitly observed `WITHOUT OVERLAPS` key on the referenced
+    /// columns. This consuming method may be applied only once.
+    pub fn with_observed_constraint_periods(
+        mut self,
+        constraint_periods: Vec<ConstraintPeriodObservation>,
+    ) -> Result<Self, ObservationError> {
+        if self.constraint_periods_observed {
+            return Err(ObservationError::InvalidObservationField {
+                field: "constraint_period_already_observed",
+            });
+        }
+        let constraint_periods =
+            canonicalize_constraint_periods(&self.relations, constraint_periods)?;
+        self.snapshot_digest =
+            compute_constraint_period_digest(&self.snapshot_digest, &constraint_periods);
+        self.constraint_periods = constraint_periods;
+        self.constraint_periods_observed = true;
         Ok(self)
     }
 
@@ -357,6 +396,14 @@ impl PostgresSchemaSnapshotV3 {
     pub fn constraint_timings(&self) -> Option<&[ConstraintTimingObservation]> {
         self.constraint_timings_observed
             .then_some(self.constraint_timings.as_slice())
+    }
+
+    /// Returns explicitly observed PostgreSQL temporal-constraint state, or `None` when the
+    /// `pg_constraint.conperiod` family was not observed.
+    #[must_use]
+    pub fn constraint_periods(&self) -> Option<&[ConstraintPeriodObservation]> {
+        self.constraint_periods_observed
+            .then_some(self.constraint_periods.as_slice())
     }
 
     /// Issues provenance for an exact successor coordinate only when it exists in this snapshot.
@@ -635,6 +682,163 @@ fn canonicalize_constraint_timings(
     }
 
     Ok(constraint_timings)
+}
+
+fn canonicalize_constraint_periods(
+    relations: &[RelationObservation],
+    mut constraint_periods: Vec<ConstraintPeriodObservation>,
+) -> Result<Vec<ConstraintPeriodObservation>, ObservationError> {
+    constraint_periods.sort_by(|left, right| {
+        (
+            left.schema_name(),
+            left.relation_name(),
+            left.relation_kind().token(),
+            left.constraint_name(),
+        )
+            .cmp(&(
+                right.schema_name(),
+                right.relation_name(),
+                right.relation_kind().token(),
+                right.constraint_name(),
+            ))
+    });
+
+    for pair in constraint_periods.windows(2) {
+        if pair[0].schema_name() == pair[1].schema_name()
+            && pair[0].relation_name() == pair[1].relation_name()
+            && pair[0].relation_kind() == pair[1].relation_kind()
+            && pair[0].constraint_name() == pair[1].constraint_name()
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "constraint_period_coordinate",
+            });
+        }
+    }
+
+    let expected_period_coordinates = relations
+        .iter()
+        .flat_map(|relation| {
+            relation.constraints().iter().filter_map(move |constraint| {
+                matches!(
+                    constraint,
+                    TableConstraintObservation::PrimaryKey(_)
+                        | TableConstraintObservation::Unique(_)
+                        | TableConstraintObservation::ForeignKey(_)
+                )
+                .then(|| {
+                    (
+                        relation.schema_name().to_owned(),
+                        relation.relation_name().to_owned(),
+                        relation.kind().token().to_owned(),
+                        constraint.constraint_name().to_owned(),
+                    )
+                })
+            })
+        })
+        .collect::<BTreeSet<_>>();
+    let mut observed_period_coordinates = BTreeSet::new();
+
+    for period in &constraint_periods {
+        let Some(relation) = relations.iter().find(|relation| {
+            relation.schema_name() == period.schema_name()
+                && relation.relation_name() == period.relation_name()
+                && relation.kind() == period.relation_kind()
+        }) else {
+            return Err(ObservationError::InvalidObservationField {
+                field: "constraint_period_coordinate",
+            });
+        };
+        let Some(constraint) = relation
+            .constraints()
+            .iter()
+            .find(|constraint| constraint.constraint_name() == period.constraint_name())
+        else {
+            return Err(ObservationError::InvalidObservationField {
+                field: "constraint_period_coordinate",
+            });
+        };
+
+        match constraint {
+            TableConstraintObservation::PrimaryKey(_) | TableConstraintObservation::Unique(_) => {
+                if let Some(backing_index) = relation
+                    .indexes()
+                    .iter()
+                    .find(|index| index.index_name() == period.constraint_name())
+                    && let Some(catalog_flags) = backing_index.catalog_flags()
+                {
+                    let period_matches_exclusion =
+                        catalog_flags.exclusion() == period.has_period_semantics();
+                    let temporal_access_method_matches = !period.has_period_semantics()
+                        || backing_index.access_method() == Some("gist");
+                    if !period_matches_exclusion || !temporal_access_method_matches {
+                        return Err(ObservationError::InvalidObservationField {
+                            field: "constraint_period_backing_index",
+                        });
+                    }
+                }
+            }
+            TableConstraintObservation::ForeignKey(foreign_key) => {
+                if period.has_period_semantics() {
+                    if foreign_key.column_names().len() < 2 {
+                        return Err(ObservationError::InvalidObservationField {
+                            field: "constraint_period_shape",
+                        });
+                    }
+                    if let Some(referenced_relation) = relations.iter().find(|candidate| {
+                        candidate.schema_name() == foreign_key.referenced_schema_name()
+                            && candidate.relation_name() == foreign_key.referenced_table_name()
+                    }) {
+                        let referenced_temporal_key = referenced_relation.constraints().iter().any(
+                            |candidate_constraint| {
+                                matches!(
+                                    candidate_constraint,
+                                    TableConstraintObservation::PrimaryKey(_)
+                                        | TableConstraintObservation::Unique(_)
+                                ) && candidate_constraint.column_names()
+                                    == foreign_key.referenced_column_names()
+                                    && constraint_periods.iter().any(|candidate_period| {
+                                        candidate_period.schema_name()
+                                            == referenced_relation.schema_name()
+                                            && candidate_period.relation_name()
+                                                == referenced_relation.relation_name()
+                                            && candidate_period.relation_kind()
+                                                == referenced_relation.kind()
+                                            && candidate_period.constraint_name()
+                                                == candidate_constraint.constraint_name()
+                                            && candidate_period.has_period_semantics()
+                                    })
+                            },
+                        );
+                        if !referenced_temporal_key {
+                            return Err(ObservationError::InvalidObservationField {
+                                field: "constraint_period_reference",
+                            });
+                        }
+                    }
+                }
+            }
+            TableConstraintObservation::Check(_) => {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "constraint_period_kind",
+                });
+            }
+        }
+
+        observed_period_coordinates.insert((
+            period.schema_name().to_owned(),
+            period.relation_name().to_owned(),
+            period.relation_kind().token().to_owned(),
+            period.constraint_name().to_owned(),
+        ));
+    }
+
+    if observed_period_coordinates != expected_period_coordinates {
+        return Err(ObservationError::InvalidObservationField {
+            field: "constraint_period_completeness",
+        });
+    }
+
+    Ok(constraint_periods)
 }
 
 fn relation_has_row_type(kind: RelationKind) -> bool {
@@ -951,6 +1155,27 @@ fn compute_constraint_timing_digest(
         encode_str(&mut hasher, timing.relation_kind().token());
         encode_str(&mut hasher, timing.constraint_name());
         hasher.update([timing.deferrability().tag()]);
+    }
+    encode_sha256(hasher)
+}
+
+fn compute_constraint_period_digest(
+    base_snapshot_digest: &str,
+    constraint_periods: &[ConstraintPeriodObservation],
+) -> String {
+    let mut hasher = Sha256::new();
+    encode_bytes(
+        &mut hasher,
+        SNAPSHOT_DIGEST_DOMAIN_V3_CONSTRAINT_PERIODS_V1,
+    );
+    encode_str(&mut hasher, base_snapshot_digest);
+    encode_len(&mut hasher, constraint_periods.len());
+    for period in constraint_periods {
+        encode_str(&mut hasher, period.schema_name());
+        encode_str(&mut hasher, period.relation_name());
+        encode_str(&mut hasher, period.relation_kind().token());
+        encode_str(&mut hasher, period.constraint_name());
+        encode_bool(&mut hasher, period.has_period_semantics());
     }
     encode_sha256(hasher)
 }
