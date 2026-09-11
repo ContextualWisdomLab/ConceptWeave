@@ -250,7 +250,7 @@ fn sha256_digest(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(byte))
 }
 
-fn is_ecmascript_whitespace(character: char) -> bool {
+fn is_canonical_blank_character(character: char) -> bool {
     matches!(
         character,
         '\u{0009}'
@@ -259,6 +259,7 @@ fn is_ecmascript_whitespace(character: char) -> bool {
             | '\u{000c}'
             | '\u{000d}'
             | '\u{0020}'
+            | '\u{0085}'
             | '\u{00a0}'
             | '\u{1680}'
             | '\u{2000}'
@@ -281,10 +282,10 @@ fn is_ecmascript_whitespace(character: char) -> bool {
     )
 }
 
-fn has_ecmascript_non_whitespace(value: &str) -> bool {
+fn has_canonical_nonblank(value: &str) -> bool {
     value
         .chars()
-        .any(|character| !is_ecmascript_whitespace(character))
+        .any(|character| !is_canonical_blank_character(character))
 }
 
 fn charge(bytes: usize, budget: &mut usize) -> Result<(), ProceduralValidationError> {
@@ -302,7 +303,7 @@ fn annotations(
     let mut count = 0;
     for value in annotations.values().into_iter().flatten() {
         count += 1;
-        if !has_ecmascript_non_whitespace(value)
+        if !has_canonical_nonblank(value)
             || value.contains('\0')
             || value.chars().count() > 2048
         {
@@ -382,7 +383,7 @@ fn evidence_keys<'a>(
         if !sha256_digest(digest)
             || location.len() > 8192
             || location.chars().count() > 2048
-            || !has_ecmascript_non_whitespace(location)
+            || !has_canonical_nonblank(location)
             || location.contains('\0')
         {
             return Err(ProceduralValidationError::InvalidEvidence);
@@ -405,12 +406,13 @@ fn evidence_keys<'a>(
 /// `expected_scope` must come from the calling application's authenticated context,
 /// not be copied from the candidate. Equality alone does not authenticate that context.
 /// At most 256 nodes, 512 relations, 64 references per evidence set and 32 semantic
-/// references per node are examined. Locale fields and evidence locations mirror the
-/// canonical Draft 2020-12 ECMAScript `\S` non-whitespace semantics; locale fields are
-/// limited to the eight contract locales and 2,048 Unicode scalar values per annotation.
-/// A 1 MiB cumulative budget covers identifiers, annotations, artifact coordinates and
-/// evidence in this borrowed projection; serialized transport must apply its own
-/// byte/depth/duplicate-key bounds.
+/// references per node are examined. Locale fields and evidence locations use the
+/// canonical cross-runtime nonblank contract: ECMAScript whitespace/line terminators plus
+/// Unicode-only U+0085 are blank, so JavaScript schema validation and Rust admission cannot
+/// disagree at that boundary. Locale fields are limited to the eight contract locales and
+/// 2,048 Unicode scalar values per annotation. A 1 MiB cumulative budget covers identifiers,
+/// annotations, artifact coordinates and evidence in this borrowed projection; serialized
+/// transport must apply its own byte/depth/duplicate-key bounds.
 ///
 /// Returns counts only. Success is neither a semantic-release receipt nor a publishable
 /// aggregate: source signatures, artifact authenticity/ACL, factual correctness,
