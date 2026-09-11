@@ -110,12 +110,12 @@ fn snapshot(
 ) -> Result<PostgresSchemaSnapshotV3, ObservationError> {
     let key_shape = timings.first().and_then(|timing| match &constraint {
         TableConstraintObservation::PrimaryKey(primary_key) => Some((
-            primary_key.constraint_name(),
+            primary_key.constraint_name().to_owned(),
             true,
             timing.deferrability(),
         )),
         TableConstraintObservation::Unique(unique) => Some((
-            unique.constraint_name(),
+            unique.constraint_name().to_owned(),
             false,
             timing.deferrability(),
         )),
@@ -124,7 +124,7 @@ fn snapshot(
     let observed_relation = match key_shape {
         Some((constraint_name, primary, deferrability)) => relation(constraint)
             .with_indexes(vec![backing_index(
-                constraint_name,
+                &constraint_name,
                 primary,
                 deferrability,
             )])?,
