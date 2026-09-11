@@ -126,8 +126,8 @@ fn tool_operation_requires_a_tool_contract_reference() {
 }
 
 #[test]
-fn locale_annotations_match_canonical_ecmascript_non_whitespace_semantics() {
-    for bad in ["", "   ", "\u{feff}", "embedded\0nul"] {
+fn locale_annotations_match_canonical_cross_runtime_nonblank_semantics() {
+    for bad in ["", "   ", "\u{feff}", "\u{0085}", "embedded\0nul"] {
         let evidence = evidence();
         let nodes = [ProcedureNodeView {
             procedure_id: "review_model",
