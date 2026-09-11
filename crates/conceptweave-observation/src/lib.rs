@@ -17,10 +17,10 @@ pub use model::{
 };
 pub use representation_v3::{
     ColumnObservationV3, DomainCheckConstraintObservation, DomainObservation, EnumObservation,
-    IndexAttributeKind, IndexAttributeObservation, IndexAttributeSource, IndexKeySemantics,
-    IndexObservation, OperatorClassOption, PostgresSchemaSnapshotV3, QualifiedCollationName,
-    QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
-    SchemaObjectLocation, SchemaObjectLocationKind, SuccessorSourceReceipt,
+    IndexAttributeKind, IndexAttributeObservation, IndexAttributeSource, IndexCatalogFlags,
+    IndexKeySemantics, IndexObservation, OperatorClassOption, PostgresSchemaSnapshotV3,
+    QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
+    RelationObservation, SchemaObjectLocation, SchemaObjectLocationKind, SuccessorSourceReceipt,
 };
 
 use conceptweave_source_port::AuthorizedObservationRequest;
@@ -235,6 +235,7 @@ fn compute_snapshot_digest(tables: &[TableObservation]) -> String {
                 TableConstraintObservation::Check(observation) => {
                     hasher.update([3]);
                     encode_str(&mut hasher, observation.constraint_name());
+                    encode_str_slice(&mut hasher, observation.column_names());
                     encode_str(&mut hasher, observation.definition());
                     encode_bool(&mut hasher, observation.validated());
                     encode_bool(&mut hasher, observation.enforced());
