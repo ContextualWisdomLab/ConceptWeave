@@ -45,7 +45,7 @@ Historical v2 evidence is frozen. The v2 digest domain, table/column/constraint 
 
 ## PostgreSQL 18 representation-v3 current state
 
-The representation-before-transport prerequisite is now materially implemented in the #45 -> #46 successor lineage, but exact-head native/Product acceptance is still absent.
+The representation-before-transport prerequisite is materially implemented in the #45 -> #46 successor lineage, but it is not yet representation-complete and exact-head native/Product acceptance is still absent.
 
 The v3 source currently preserves:
 
@@ -78,14 +78,26 @@ Exact repair evidence on #46:
 - ordinary forward commit `294a6d06ec4986f51b0cd714868d6b4de8253fc6`: role/collection, contiguous ordinal and expression-INCLUDE constructor repair plus contradictory-fixture correction;
 - review `5174770575`: missing-key-cardinality finding against exact `294a6d...`;
 - RED contract `808faa922c466a586ea3bc8bf9f928f049ec3b95`: empty-index and INCLUDE-only rejection cases;
-- minimal production repair `6dd59aef9a69e08aae6e7ede54ed1e204a634d9f`: fail closed when `key_attributes` is empty, at the same `index_attribute_layout` boundary.
+- minimal production repair `6dd59aef9a69e08aae6e7ede54ed1e204a634d9f`: fail closed when `key_attributes` is empty, at the same `index_attribute_layout` boundary;
+- `033ae72b95e3ef490c47ec84c191b83632601b10`: currentized this baseline after the layout repair;
+- ordinary docs successor `b2806d0b2d02d1a635d5a4850a88082c99c38fda`: preserves the detached-artifact integrity boundary and is adopted rather than treated as a race.
 
-The above is source-shaped repair evidence, not native GREEN. Head movement after `6dd59aef...`, including this baseline commit, resets exact-head execution evidence again.
+The above is source-shaped repair evidence, not native GREEN. Every subsequent head movement resets exact-head execution evidence again.
+
+### Open P1: per-key index semantics are not yet lossless
+
+Review `5175066205` on exact #46 head `b2806d0b2d02d1a635d5a4850a88082c99c38fda` identified a remaining semantic-identity defect. `IndexAttributeObservation` currently stores position, Key/INCLUDE role and column-versus-expression source. PostgreSQL 18 additionally stores material key semantics in `pg_index.indcollation`, `indclass`, and `indoption`: per-key collation, operator class, and access-method-specific option bits. `CREATE INDEX` exposes corresponding per-key `COLLATE`, operator-class/options, `ASC|DESC`, and `NULLS FIRST|LAST` semantics.
+
+Those facts affect index behavior and query usability. Two valid indexes that differ only in one of them can currently collapse to the same structured v3 identity unless optional reconstructed `pg_get_indexdef` text happens to be populated. An optional text rendering is useful provenance, but it is not an acceptable substitute for first-class governed facts.
+
+The next RED must prove that changing one structured per-key semantic changes v3 identity and that malformed/unqualified semantic coordinates fail closed. The repair must use exact qualified coordinates for collation/operator class and preserve access-method option semantics without OID-as-identity or `search_path` inference. `pg_get_indexdef` remains reconstructed provenance text, not the sole semantic carrier. Do not attach a concrete PostgreSQL adapter or call representation-v3 complete before this RED -> minimal repair -> exact-head GREEN sequence is finished.
 
 Authoritative PostgreSQL 18 basis:
 
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE INDEX*. https://www.postgresql.org/docs/18/sql-createindex.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_index*. https://www.postgresql.org/docs/18/catalog-pg-index.html
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: Operator classes and operator families*. https://www.postgresql.org/docs/18/indexes-opclass.html
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: Indexes and collations*. https://www.postgresql.org/docs/18/indexes-collations.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_class*. https://www.postgresql.org/docs/18/catalog-pg-class.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_type*. https://www.postgresql.org/docs/18/catalog-pg-type.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_enum*. https://www.postgresql.org/docs/18/catalog-pg-enum.html
@@ -96,11 +108,11 @@ Server-rendered `pg_get_constraintdef`, `pg_get_indexdef` and `pg_get_expr` text
 
 ## Representation acceptance still required
 
-Before #46/#45/#6 can claim the representation prerequisite GREEN, the current exact successor must execute and pass repository-pinned Rust 1.98:
+Before #46/#45/#6 can claim the representation prerequisite GREEN, the current exact successor must first repair the per-key semantics P1 and then execute and pass repository-pinned Rust 1.98:
 
 - `cargo fmt --all --check`;
 - strict workspace/all-target Clippy with warnings denied;
-- workspace tests including the v2-frozen and v3/index-layout contracts;
+- workspace tests including the v2-frozen and v3/index-layout/per-key semantic contracts;
 - rustdoc/doc tests and release build;
 - owned production docstring/test/edge-case coverage requirements;
 - Product/security/dependency/review workflows applicable to the exact protected-stack state.
@@ -118,6 +130,7 @@ The representation regression set must keep proving:
 - enum label/order and material domain semantics alter successor identity;
 - relation-level and child coordinates preserve exact `RelationKind` and reject same-name wrong-kind receipt lookup;
 - index role/position/source/predicate/null-uniqueness/readiness/validity/liveness/access-method/definition changes alter identity;
+- per-key collation/operator-class/access-method option semantics are structured first-class identity rather than optional text-only provenance;
 - role/collection disagreement, non-contiguous ordinals, expression INCLUDE, empty indexes and INCLUDE-only indexes fail closed;
 - input-order permutations of identical complete evidence remain digest-identical.
 
@@ -138,7 +151,7 @@ For the procedural-generation lane, #44 remains a private source-shaped Rust bou
 | Product boundary | ACTIVE_PR | PRD/TRD/ADR/context map define canonical ConceptWeave ownership and foreign-owner seams. |
 | Truth/publication lifecycle | SOURCE_REPAIRED_PENDING_PROTECTED_EVIDENCE | No protected immutable semantic release exists. |
 | Client Consumption | RESTACKED_HOSTED_PENDING | #5 remains the current Source Observation parent; its existing `SemanticReleaseClient::verify_detached_artifact` remains current because after admission it hashes the exact caller-supplied detached immutable artifact bytes against the declared digest, keeping digest syntax distinct from byte-integrity evidence; exact live evidence must be re-read before Client action. |
-| Source Observation | REPRESENTATION_V3_SOURCE_REPAIRED_EXECUTION_PENDING | #45/#46 carry the v3 source repairs; exact-head Rust/Product acceptance and ordinary parent adoption remain. |
+| Source Observation | REPRESENTATION_V3_P1_OPEN | #45/#46 carry the prior v3 source repairs; per-key index semantics remain lossy until `indcollation`/`indclass`/`indoption`-equivalent structured evidence is RED->GREEN, then exact-head Rust/Product acceptance and ordinary parent adoption remain. |
 | Product CI | BLOCKED_OWNER_RECONCILIATION | #35 waits on central backward-compatible handler/current-main reconciliation and exact terminal GREEN. |
 | Quality gate | ACTIVE | Rust 1.98, unsafe forbidden, public docs, fmt, strict Clippy, tests, rustdoc, release, owned production coverage, fixture/schema/lock/clean-tree checks; every head movement resets acceptance. |
 | Security / review | PENDING_EXACT_HEAD | Scanner/reviewer status is accepted only when bound to the exact current head and applicable protected policy. |
@@ -146,7 +159,7 @@ For the procedural-generation lane, #44 remains a private source-shaped Rust bou
 
 ## Current causal sequence
 
-1. Finish the #46 representation repair lineage without flattening #45/#6 and obtain exact-current Rust 1.98 plus applicable hosted acceptance.
+1. Repair #46's structured per-key PostgreSQL semantic identity gap, then obtain exact-current Rust 1.98 plus applicable hosted acceptance without flattening #45/#6.
 2. Ordinary/non-force adopt the verified #46 delta into #45 and then #6; do not transfer predecessor GREEN.
 3. In parallel prerequisite order, central owner lands a backward-compatible handler, reconciles #2051/#2056 onto protected `.github/main`, obtains exact terminal GREEN, then unchanged #35 obtains fresh acceptance and merges normally.
 4. Foundation ordinary/non-force restacks after #35 and repairs its generic owner text-contract discrepancy under its own authority before descendants inherit a fresh parent.
