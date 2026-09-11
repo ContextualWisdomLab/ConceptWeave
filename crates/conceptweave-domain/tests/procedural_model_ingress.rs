@@ -94,6 +94,20 @@ fn node_enum_and_locale_constraints_fail_closed() {
 }
 
 #[test]
+fn cross_runtime_blank_union_fails_before_foundation_evidence_construction() {
+    for escaped_blank in ["\\uFEFF", "\\u0085"] {
+        assert_schema_invalid(
+            &canonical_draft("", "").replace("Observe source evidence", escaped_blank),
+        );
+        assert_schema_invalid(&canonical_draft("", "").replace("section_2", escaped_blank));
+    }
+
+    assert_canonical_ok(
+        &canonical_draft("", "").replace("Observe source evidence", "\\u0085review"),
+    );
+}
+
+#[test]
 fn semantic_refs_presence_and_tool_contract_condition_are_preserved() {
     assert_schema_invalid(&canonical_draft(",\"semantic_refs\":[]", ""));
     assert_schema_invalid(&canonical_draft("", "").replace("\"skill_procedure\"", "\"tool_operation\""));
