@@ -26,7 +26,7 @@ Fresh 2026-09-11 authority:
 - Foundation #1: `60f14a6e85a83d56c2eea43b34d52b3366bb1735`, OPEN Draft and must ordinary/non-force restack after #35;
 - Source Observation #6: `287165d399c5f54d6c4b4aa3c15497b47de8244b`, OPEN Draft;
 - representation-v3 parent #45: `6b2a8f555725dc79f60432afbc492d6005290a4a`, OPEN Draft on #6;
-- representation/index successor #46: tablespace RED `1a47d6b16838006e5f7a75407e69464740f368b1` is source-repaired by `5021ed6b6fc8c6af136f8560c5d0c80c5da6c7ce` plus export `b56a38de7f5a1c7419fa0ea2105c9cd7422a59a3`; the provisional index-relkind RED was superseded and removed at `96e2b683ad21ebdd1137f618b6f1d2c56ae544c2`; review `5177885832` identified the real schema-local `pg_class` namespace gap, RED `b820c7b80b6c95e6ae419515882d850d79e578ec` exercised it, and source repair `1bede23588956c11500beb9a54f1f617ceb5429f` now enforces one schema-local relation/index namespace at the public v3 aggregate seam. Exact-current review `5178298921` keeps native/Product acceptance pending.
+- representation/index successor #46: tablespace RED `1a47d6b16838006e5f7a75407e69464740f368b1` is source-repaired by `5021ed6b6fc8c6af136f8560c5d0c80c5da6c7ce` plus export `b56a38de7f5a1c7419fa0ea2105c9cd7422a59a3`; the provisional index-relkind RED was superseded and removed at `96e2b683ad21ebdd1137f618b6f1d2c56ae544c2`; schema-local `pg_class` namespace review `5177885832` -> RED `b820c7b80b6c95e6ae419515882d850d79e578ec` -> source repair `1bede23588956c11500beb9a54f1f617ceb5429f`; index-owner relation-kind review `5178743508` -> RED `f81ae51af614a39e648a9c314776ba79bf99d64e` -> source repair `a8e9fac16896e3e6d48ec5bc20cafae8c855da39`. Native/Product acceptance remains pending.
 
 Protected central `.github/main` was freshly verified at `cb0872c9a20d5584703dffacca65c096fc034c6c`. `.github#2051@558693e0333e48012beea142f739bc634b0674a7` and stacked `.github#2056@69ae472562c93cc17674af5e2085a58947d3fab8` remain owner prerequisites: reconcile them ordinary/non-force onto current main, preserve terminal-job-set/atomic-wake behavior, land a backward-compatible protected handler, and obtain fresh exact terminal GREEN before unchanged-head #35 acceptance.
 
@@ -50,6 +50,7 @@ Implemented source repair includes:
 - index `pg_class.reloptions` as canonical exact name/value evidence with unobserved state distinct from an observed empty set;
 - index `pg_class.reltablespace` as first-class resolved tablespace evidence, preserving unobserved vs observed database-default vs explicit named assignment as distinct states;
 - schema-local `pg_class` relation-name consistency across every modeled owning relation and nested index before v3 digest/receipt construction;
+- fail-closed index ownership admission: nested local index evidence is accepted only for ordinary tables, partitioned tables, and materialized views, not views, foreign tables, sequences, or standalone composite-type relations;
 - deterministic v3 digest framing for the above while frozen v2 framing remains unchanged.
 
 Recent exact repair lineage:
@@ -59,7 +60,8 @@ Recent exact repair lineage:
 - RED `f796bf51110863e98e5d4d16a7f7bbea689b4705` -> repair `70455fdfbc28dffc8f306619e806b79ca9678693` -> public export `3eab943ad85584b535417b770f05c67192a7a081`: preserve `pg_class.reloptions` identity, canonicalize option order, reject duplicate names, and distinguish unobserved from observed-empty state;
 - review `5176975409` -> RED `1a47d6b16838006e5f7a75407e69464740f368b1` -> repair `5021ed6b6fc8c6af136f8560c5d0c80c5da6c7ce` -> export `b56a38de7f5a1c7419fa0ea2105c9cd7422a59a3`: preserve exact resolved index tablespace identity without promoting catalog OIDs into the governed contract;
 - review `5177806003` -> provisional RED `d425bdfb00652321367dd1fef0c77930d2ade327` -> superseding review `5177862263` -> removal `96e2b683ad21ebdd1137f618b6f1d2c56ae544c2`: PostgreSQL 18 source proved index `relkind` is a derived invariant, so the impossible same-owner alternative was removed rather than implemented;
-- review `5177885832` -> RED `b820c7b80b6c95e6ae419515882d850d79e578ec` -> repair `1bede23588956c11500beb9a54f1f617ceb5429f` -> exact-current review `5178298921`: enforce PostgreSQL's schema-local `pg_class` relation-name namespace across modeled owning relations and nested indexes without changing frozen v2 or successor coordinate vocabulary.
+- review `5177885832` -> RED `b820c7b80b6c95e6ae419515882d850d79e578ec` -> repair `1bede23588956c11500beb9a54f1f617ceb5429f` -> exact-current review `5178298921`: enforce PostgreSQL's schema-local `pg_class` relation-name namespace across modeled owning relations and nested indexes without changing frozen v2 or successor coordinate vocabulary;
+- review `5178743508` -> RED `f81ae51af614a39e648a9c314776ba79bf99d64e` -> repair `a8e9fac16896e3e6d48ec5bc20cafae8c855da39`: reject impossible nested index evidence on non-indexable PostgreSQL relation kinds before governed v3 digest/receipt construction while preserving table, partitioned-table, and materialized-view indexes.
 
 ### Tablespace repair source-complete
 
@@ -77,10 +79,17 @@ Review `5177885832` recorded that the prior v3 constructor validated duplicate o
 
 Repair `1bede23588956c11500beb9a54f1f617ceb5429f` makes the public `PostgresSchemaSnapshotV3` the owner-level aggregate seam instead of directly re-exporting the private representation constructor. Before delegating to deterministic v3 canonicalization it builds one exact `(schema_name, relation_or_index_name)` set from every owning relation and nested index. A duplicate fails closed before digest or receipt construction; identical names in different schemas remain legal. The private representation type remains inaccessible to consumers, matching the existing v2 owner-wrapper pattern. Frozen v2 identity and successor coordinate vocabulary are unchanged.
 
-Exact-current review `5178298921` recognizes source repair only. Repository-pinned Rust 1.98, strict lint/doc/release/coverage and hosted Product/security/dependency/review evidence must still be produced on one unchanged exact successor before adoption or merge.
+### Index owner relation-kind P1 — source repaired, exact-head acceptance pending
+
+PostgreSQL 18 `CREATE INDEX` defines an index on a table or materialized view. Partitioned tables use the table path and own partitioned indexes. Views, foreign tables, sequences, and standalone composite-type relations do not own local PostgreSQL indexes. The v3 domain previously allowed `RelationObservation::with_indexes` on every `RelationKind`, so an impossible snapshot such as a view carrying a nested local index could reach governed identity.
+
+Review `5178743508` records the finding. Behavioral RED `f81ae51af614a39e648a9c314776ba79bf99d64e` admits indexed `Table`, `PartitionedTable`, and `MaterializedView` fixtures while requiring indexed `View`, `ForeignTable`, `Sequence`, and `CompositeType` fixtures to fail with `index_relation_kind` before snapshot identity. Repair `a8e9fac16896e3e6d48ec5bc20cafae8c855da39` extends the public v3 aggregate admission seam so the relation-kind invariant is enforced before deterministic digest or receipt construction. It does not add a second mutable index-kind field and does not alter frozen v2 identity.
+
+Repository-pinned Rust 1.98, strict lint/doc/release/coverage and hosted Product/security/dependency/review evidence must still be produced on one unchanged exact successor before adoption or merge.
 
 Authoritative basis:
 
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE INDEX*. https://www.postgresql.org/docs/18/sql-createindex.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_class*. https://www.postgresql.org/docs/18/catalog-pg-class.html
 - PostgreSQL 18 source, `src/include/catalog/pg_class.h`: `pg_class_relname_nsp_index` is unique on `(relname, relnamespace)`.
 - PostgreSQL 18 source, `src/backend/commands/indexcmds.c`: partitioned-index creation derives from the owning relation kind.
@@ -92,11 +101,11 @@ Catalog OIDs may be adapter-local join coordinates but are not governed semantic
 
 ## Representation acceptance still required
 
-#46/#45/#6 cannot claim representation GREEN merely because the schema-local namespace source is repaired. One unchanged exact #46 successor must pass repository-pinned Rust 1.98:
+#46/#45/#6 cannot claim representation GREEN merely because the relation invariants are source-repaired. One unchanged exact #46 successor must pass repository-pinned Rust 1.98:
 
 - `cargo fmt --all --check`;
 - strict workspace/all-target Clippy with warnings denied;
-- workspace tests including frozen-v2 and all retained v3 index/schema namespace contracts;
+- workspace tests including frozen-v2 and all retained v3 index/schema namespace/relation-kind contracts;
 - rustdoc/doc tests and release build;
 - owned production docstring/test/edge-case coverage requirements;
 - applicable Product/security/dependency/review workflows bound to the exact head.
@@ -105,7 +114,7 @@ Hosted or local execution produced for predecessor heads does not transfer. Draf
 
 ## Concrete PostgreSQL adapter boundary
 
-Do not attach transport while exact-head representation acceptance is absent. After representation GREEN and ordinary/non-force adoption through #45/#6, the PostgreSQL adapter must use a maintained patched Rust driver pinned by immutable lock coordinate and passing cargo-deny/SBOM review; resolve least-privilege credentials only for the authorized source key+binding; reject stale binding before credential/source I/O; use one explicit `REPEATABLE READ READ ONLY` catalog transaction; resolve catalog OIDs to exact governed coordinates before crossing the Anti-Corruption Layer; preserve complete schema/index evidence including tablespace; validate index `pg_class.relkind` against the owning relation-derived invariant; consume one non-resetting operation budget across connect/query/cancellation; enforce policy-admitted row/byte/concurrency ceilings; and complete-or-fail snapshot construction.
+Do not attach transport while exact-head representation acceptance is absent. After representation GREEN and ordinary/non-force adoption through #45/#6, the PostgreSQL adapter must use a maintained patched Rust driver pinned by immutable lock coordinate and passing cargo-deny/SBOM review; resolve least-privilege credentials only for the authorized source key+binding; reject stale binding before credential/source I/O; use one explicit `REPEATABLE READ READ ONLY` catalog transaction; resolve catalog OIDs to exact governed coordinates before crossing the Anti-Corruption Layer; preserve complete schema/index evidence including tablespace; validate both index-owning relation kind and catalog index `pg_class.relkind` against the owning relation-derived invariant; consume one non-resetting operation budget across connect/query/cancellation; enforce policy-admitted row/byte/concurrency ceilings; and complete-or-fail snapshot construction.
 
 ## Capability status
 
@@ -113,7 +122,7 @@ Do not attach transport while exact-head representation acceptance is absent. Af
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | Canonical owner seams remain unchanged. |
 | Truth/publication lifecycle | SOURCE_REPAIRED_PENDING_PROTECTED_EVIDENCE | No protected immutable semantic release exists. |
-| Source Observation | REPRESENTATION_V3_NAMESPACE_SOURCE_REPAIRED | RED `b820c7b...` has production repair `1bede235...`; exact-head Rust/Product/security/dependency/review evidence remains required. |
+| Source Observation | REPRESENTATION_V3_RELATION_INVARIANTS_SOURCE_REPAIRED | Namespace RED `b820c7b...` and index-owner RED `f81ae51...` have production repairs; exact-head Rust/Product/security/dependency/review evidence remains required. |
 | Product CI | BLOCKED_OWNER_RECONCILIATION | #35 waits on central backward-compatible handler/current-main reconciliation and exact terminal GREEN. |
 | Quality gate | EXACT_HEAD_PENDING | Keep #46 Draft until one unchanged successor produces required Rust/Product/security/review acceptance. |
 | Release | NOT_STARTED | Version/CHANGELOG/tag/package/immutable semantic release/SBOM/provenance/reproducibility/rollback remain mandatory. |
