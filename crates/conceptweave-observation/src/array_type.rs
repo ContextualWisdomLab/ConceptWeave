@@ -6,8 +6,10 @@ use crate::representation_v3::QualifiedTypeName;
 /// Exact `pg_type` relationship between one true array type and its element type.
 ///
 /// The observation preserves the two schema-qualified catalog coordinates exposed by the element
-/// row's `typarray` and the array row's `typelem`. Catalog OIDs, `search_path`, display text, and
-/// PostgreSQL's conventional underscore naming are deliberately excluded from governed identity.
+/// row's `typarray` and the array row's `typelem`. PostgreSQL keeps an associated true array in the
+/// same schema as its element type, including when that type is moved. Catalog OIDs, `search_path`,
+/// display text, and PostgreSQL's conventional underscore naming are deliberately excluded from
+/// governed identity.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ArrayTypeObservation {
     array_type: QualifiedTypeName,
@@ -20,8 +22,8 @@ impl ArrayTypeObservation {
         array_type: QualifiedTypeName,
         element_type: QualifiedTypeName,
     ) -> Result<Self, ObservationError> {
-        if array_type.schema_name() == element_type.schema_name()
-            && array_type.type_name() == element_type.type_name()
+        if array_type.schema_name() != element_type.schema_name()
+            || array_type.type_name() == element_type.type_name()
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "array_type_element",
