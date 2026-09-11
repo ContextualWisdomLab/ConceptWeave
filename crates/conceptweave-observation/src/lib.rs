@@ -10,7 +10,7 @@ mod array_type;
 mod model;
 mod representation_v3;
 
-pub use array_type::ArrayTypeObservation;
+pub use array_type::{ArrayTypeLocation, ArrayTypeObservation, ArrayTypeSourceReceipt};
 pub use model::{
     CheckConstraintObservation, ColumnObservation, ForeignKeyAction, ForeignKeyDeferrability,
     ForeignKeyMatchType, ForeignKeyObservation, ForeignKeyReferenceBehavior, ObservationError,
@@ -290,6 +290,35 @@ impl PostgresSchemaSnapshotV3 {
             observed_at_utc: verified.observed_at_utc().to_owned(),
             location,
         })
+    }
+
+    /// Issues provenance for one exact observed true-array coordinate.
+    ///
+    /// This separate successor seam keeps all pre-array [`SchemaObjectLocation`] meanings frozen.
+    /// The receipt is available only when this snapshot explicitly observed the array family and the
+    /// requested exact array coordinate exists in that immutable inventory.
+    pub fn array_type_source_receipt(
+        &self,
+        location: ArrayTypeLocation,
+    ) -> Result<ArrayTypeSourceReceipt, ObservationError> {
+        let exists = self.array_types_observed
+            && self.array_types.iter().any(|array_type| {
+                array_type.array_type().schema_name() == location.schema_name()
+                    && array_type.array_type().type_name() == location.array_type_name()
+            });
+        if !exists {
+            return Err(ObservationError::UnknownObservationLocation {
+                location: location.canonical_location(),
+            });
+        }
+        Ok(ArrayTypeSourceReceipt::new(
+            self.source_connection_key().to_owned(),
+            self.connection_policy_binding().to_owned(),
+            self.snapshot_digest.clone(),
+            self.extractor_revision().to_owned(),
+            self.observed_at_utc().to_owned(),
+            location,
+        ))
     }
 }
 
