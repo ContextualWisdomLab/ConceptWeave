@@ -30,24 +30,26 @@ use sha2::{Digest, Sha256};
 
 const SNAPSHOT_DIGEST_DOMAIN_V2: &[u8] = b"conceptweave.postgres_schema_snapshot.v2";
 
-/// Public v3 aggregate enforcing PostgreSQL schema-local `pg_class` namespace invariants.
+/// Public v3 aggregate enforcing PostgreSQL schema-local relation invariants.
 ///
 /// The representation module remains an implementation detail. This owner-level aggregate validates
-/// the cross-relation namespace that PostgreSQL enforces with the unique `(relname, relnamespace)`
-/// catalog key before delegating to the deterministic v3 representation constructor. Relation names
-/// and relation-scoped index names therefore cannot collide within one schema, while identical names
-/// remain legal in different schemas.
+/// PostgreSQL's unique `(relname, relnamespace)` catalog namespace and rejects nested index evidence
+/// on relation kinds that cannot own local PostgreSQL indexes before delegating to the deterministic
+/// v3 representation constructor. Relation names and relation-scoped index names therefore cannot
+/// collide within one schema, while identical names remain legal in different schemas.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PostgresSchemaSnapshotV3 {
     inner: representation_v3::PostgresSchemaSnapshotV3,
 }
 
 impl PostgresSchemaSnapshotV3 {
-    /// Creates a deterministic v3 snapshot after validating the modeled PostgreSQL namespace.
+    /// Creates a deterministic v3 snapshot after validating modeled PostgreSQL relation invariants.
     ///
     /// All modeled owning relations and nested indexes share PostgreSQL's schema-local `pg_class`
-    /// relation namespace. The check runs before digest or receipt construction and does not broaden
-    /// the representation to foreign truth or mutable catalog identifiers.
+    /// relation namespace. Nested indexes are admitted only for ordinary tables, partitioned tables,
+    /// and materialized views, matching PostgreSQL's local index ownership rules. These checks run
+    /// before digest or receipt construction and do not broaden the representation to foreign truth
+    /// or mutable catalog identifiers.
     pub fn new(
         authorized_request: &AuthorizedObservationRequest,
         extractor_revision: impl Into<String>,
@@ -56,7 +58,7 @@ impl PostgresSchemaSnapshotV3 {
         domains: Vec<DomainObservation>,
         enums: Vec<EnumObservation>,
     ) -> Result<Self, ObservationError> {
-        validate_schema_relation_namespace(&relations)?;
+        validate_schema_relation_invariants(&relations)?;
         let inner = representation_v3::PostgresSchemaSnapshotV3::new(
             authorized_request,
             extractor_revision,
@@ -125,11 +127,22 @@ impl PostgresSchemaSnapshotV3 {
     }
 }
 
-fn validate_schema_relation_namespace(
+fn validate_schema_relation_invariants(
     relations: &[RelationObservation],
 ) -> Result<(), ObservationError> {
     let mut observed_names = BTreeSet::new();
     for relation in relations {
+        if !relation.indexes().is_empty()
+            && !matches!(
+                relation.kind(),
+                RelationKind::Table | RelationKind::PartitionedTable | RelationKind::MaterializedView
+            )
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "index_relation_kind",
+            });
+        }
+
         let schema_name = relation.schema_name().to_owned();
         if !observed_names.insert((schema_name.clone(), relation.relation_name().to_owned())) {
             return Err(ObservationError::InvalidObservationField {
