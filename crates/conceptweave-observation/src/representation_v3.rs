@@ -370,9 +370,13 @@ pub struct IndexObservation {
 impl IndexObservation {
     /// Creates an index observation from exactly the observed material index evidence.
     ///
-    /// Key and INCLUDE attributes are canonicalized into deterministic position order, attribute
-    /// positions must be unique, and every simple column attribute is validated against the owning
-    /// relation columns when the index is attached to a relation observation.
+    /// Key and INCLUDE attributes are canonicalized into deterministic position order. Attribute
+    /// roles must agree with their collection (`key_attributes` holds only key positions and
+    /// `include_attributes` holds only payload positions), the combined one-based positions must be
+    /// contiguous with every key position preceding every INCLUDE position, and INCLUDE attributes
+    /// must be simple columns because PostgreSQL `INCLUDE` does not accept expressions. Every simple
+    /// column attribute is validated against the owning relation columns when the index is attached
+    /// to a relation observation.
     pub fn new(
         index_name: impl Into<String>,
         is_unique: bool,
@@ -384,6 +388,7 @@ impl IndexObservation {
         validate_nonblank(&index_name, "index_name")?;
         key_attributes.sort_by_key(IndexAttributeObservation::position);
         include_attributes.sort_by_key(IndexAttributeObservation::position);
+        Self::validate_attribute_layout(&key_attributes, &include_attributes)?;
         Ok(Self {
             index_name,
             is_unique,
@@ -398,6 +403,32 @@ impl IndexObservation {
             index_definition: None,
             source_comment: None,
         })
+    }
+
+    fn validate_attribute_layout(
+        key_attributes: &[IndexAttributeObservation],
+        include_attributes: &[IndexAttributeObservation],
+    ) -> Result<(), ObservationError> {
+        let layout_error = || ObservationError::InvalidObservationField {
+            field: "index_attribute_layout",
+        };
+        for (expected_position, attribute) in (1u32..).zip(key_attributes) {
+            if attribute.kind() != IndexAttributeKind::Key
+                || attribute.position() != expected_position
+            {
+                return Err(layout_error());
+            }
+        }
+        let key_count = key_attributes.len() as u32;
+        for (offset, attribute) in include_attributes.iter().enumerate() {
+            if attribute.kind() != IndexAttributeKind::Include
+                || attribute.position() != key_count + offset as u32 + 1
+                || attribute.attribute_name().is_none()
+            {
+                return Err(layout_error());
+            }
+        }
+        Ok(())
     }
 
     /// Records the exact observed access method name, such as `btree` or `gin`.
@@ -934,8 +965,8 @@ impl RelationObservation {
     ///
     /// Indexes are canonicalized into deterministic exact source-name order. Every simple column
     /// key or INCLUDE attribute must resolve to a column on this same relation observation, while
-    /// expression attributes stay structurally separate. Attribute positions within an index must
-    /// be unique, and duplicate index names fail closed.
+    /// expression attributes stay structurally separate. Index names must be unique; attribute
+    /// layout validity is enforced by [`IndexObservation::new`] before an index reaches a relation.
     pub fn with_indexes(
         mut self,
         mut indexes: Vec<IndexObservation>,
@@ -968,21 +999,6 @@ impl RelationObservation {
                         relation_name: self.relation_name.clone(),
                         index_name: index_name.to_owned(),
                         attribute_name: attribute_name.to_owned(),
-                    });
-                }
-            }
-            let mut positions = BTreeSet::new();
-            for attribute in index
-                .key_attributes()
-                .iter()
-                .chain(index.include_attributes())
-            {
-                if !positions.insert(attribute.position()) {
-                    return Err(ObservationError::DuplicateIndexAttribute {
-                        schema_name: self.schema_name.clone(),
-                        relation_name: self.relation_name.clone(),
-                        index_name: index_name.to_owned(),
-                        position: attribute.position(),
                     });
                 }
             }

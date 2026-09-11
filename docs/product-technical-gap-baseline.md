@@ -97,6 +97,8 @@ Review `5160252371` adds a semantic binding prerequisite: current `ColumnObserva
 
 Review `5174202474` establishes that relation-level successor coordinates must carry the exact observed `pg_class.relkind` rather than reusing table vocabulary. A v3 relation location is `/schemas/{schema}/relations/{kind}/{name}` with `/columns/{name}`, `/constraints/{name}`, and `/indexes/{name}` children, so views, materialized views, foreign tables, sequences, and composite types stay distinguishable from tables at the same qualified name. Receipt lookup must fail closed when the observed relation kind differs, and the kind segment must not alter v2 `/tables/` meaning or any digest.
 
+Index layout evidence is admitted only when it matches `pg_index` structure: attribute roles must agree with their key/include collection, combined positions must be contiguous with key positions first, and `INCLUDE` payload positions must be simple columns because PostgreSQL rejects expressions there. Contradictory layouts fail closed at construction rather than being recorded as evidence.
+
 ### Authorization
 
 Current snapshot construction enforces schema scope by iterating observed tables. Schema-scoped domain/enum evidence must be checked directly against the exact `AuthorizedObservationRequest` allowlist, including a schema with zero observed tables. Otherwise a type-only schema could bypass the existing table-driven containment invariant.
@@ -113,6 +115,7 @@ Current snapshot construction enforces schema scope by iterating observed tables
 - material domain base/default/null/collation/check-constraint changes alter successor identity;
 - a schema-scoped receipt cannot be satisfied merely because an unrelated table exists in that schema;
 - index key/INCLUDE role, attribute position and expression-versus-column form, partial predicate, NULL uniqueness semantics, readiness/validity/liveness, access method, and reconstructed definition changes alter successor identity;
+- contradictory index layouts (role/collection disagreement, non-contiguous positions, expression INCLUDE attributes) fail closed instead of entering successor identity;
 - index receipt coordinates cannot be satisfied by a same-named constraint, an unrelated relation, or a missing index;
 - relation-level and relation-child coordinates preserve the exact observed relation kind, so a non-table relation never receives a table-labelled receipt;
 - fake table-scoped type coordinates fail;

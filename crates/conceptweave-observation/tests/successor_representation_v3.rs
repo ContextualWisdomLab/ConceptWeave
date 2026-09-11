@@ -1487,16 +1487,15 @@ fn index_evidence_is_material_successor_identity() {
     .expect("index fixture")
     .with_predicate("(parent_key IS NOT NULL)")
     .with_source_comment("observed index comment");
-    let role_swapped = IndexObservation::new(
+    let all_key_attributes = IndexObservation::new(
         "event_parent_ix",
         true,
         None,
-        vec![index_attribute(
-            1,
-            IndexAttributeKind::Include,
-            "parent_key",
-        )],
-        vec![index_attribute(2, IndexAttributeKind::Key, "event_key")],
+        vec![
+            index_attribute(1, IndexAttributeKind::Key, "parent_key"),
+            index_attribute(2, IndexAttributeKind::Key, "event_key"),
+        ],
+        Vec::new(),
     )
     .expect("index fixture")
     .with_predicate("(parent_key IS NOT NULL)")
@@ -1548,7 +1547,7 @@ fn index_evidence_is_material_successor_identity() {
         no_predicate,
         non_unique,
         nulls_not_distinct,
-        role_swapped,
+        all_key_attributes,
         reordered_attributes,
         renamed,
         comment_only,
@@ -1671,28 +1670,21 @@ fn relation_indexes_reject_duplicate_or_unknown_coordinates() {
         }
     );
 
-    let duplicate_position = event_relation(RelationKind::Table)
-        .with_indexes(vec![
-            IndexObservation::new(
-                "event_parent_ix",
-                true,
-                None,
-                vec![
-                    index_attribute(1, IndexAttributeKind::Key, "parent_key"),
-                    index_attribute(1, IndexAttributeKind::Key, "event_key"),
-                ],
-                Vec::new(),
-            )
-            .expect("index fixture"),
-        ])
-        .expect_err("duplicate attribute positions must fail closed");
+    let duplicate_position = IndexObservation::new(
+        "event_parent_ix",
+        true,
+        None,
+        vec![
+            index_attribute(1, IndexAttributeKind::Key, "parent_key"),
+            index_attribute(1, IndexAttributeKind::Key, "event_key"),
+        ],
+        Vec::new(),
+    )
+    .expect_err("duplicate attribute positions must fail closed");
     assert_eq!(
         duplicate_position,
-        ObservationError::DuplicateIndexAttribute {
-            schema_name: "public".to_owned(),
-            relation_name: "event_record".to_owned(),
-            index_name: "event_parent_ix".to_owned(),
-            position: 1,
+        ObservationError::InvalidObservationField {
+            field: "index_attribute_layout",
         }
     );
 

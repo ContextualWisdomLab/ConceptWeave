@@ -87,15 +87,6 @@ fn every_observation_error_has_a_stable_operator_message() {
             "duplicate index observation on public.events: events_parent_ix",
         ),
         (
-            ObservationError::DuplicateIndexAttribute {
-                schema_name: "public".into(),
-                relation_name: "events".into(),
-                index_name: "events_parent_ix".into(),
-                position: 2,
-            },
-            "duplicate index attribute on public.events: events_parent_ix at position 2",
-        ),
-        (
             ObservationError::UnknownIndexAttribute {
                 schema_name: "public".into(),
                 relation_name: "events".into(),

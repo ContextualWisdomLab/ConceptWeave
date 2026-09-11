@@ -157,17 +157,6 @@ pub enum ObservationError {
         /// Exact duplicated source index identifier.
         index_name: String,
     },
-    /// One index listed the same exact attribute position more than once.
-    DuplicateIndexAttribute {
-        /// Exact source schema identifier.
-        schema_name: String,
-        /// Exact owning relation identifier.
-        relation_name: String,
-        /// Exact source index identifier.
-        index_name: String,
-        /// Duplicated one-based attribute position.
-        position: u32,
-    },
     /// An index attribute did not resolve to a key or INCLUDE coordinate on the owning relation.
     UnknownIndexAttribute {
         /// Exact source schema identifier.
@@ -309,15 +298,6 @@ impl Display for ObservationError {
             } => write!(
                 formatter,
                 "duplicate index observation on {schema_name}.{relation_name}: {index_name}"
-            ),
-            Self::DuplicateIndexAttribute {
-                schema_name,
-                relation_name,
-                index_name,
-                position,
-            } => write!(
-                formatter,
-                "duplicate index attribute on {schema_name}.{relation_name}: {index_name} at position {position}"
             ),
             Self::UnknownIndexAttribute {
                 schema_name,
