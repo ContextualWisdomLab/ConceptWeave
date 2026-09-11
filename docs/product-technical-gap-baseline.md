@@ -26,9 +26,9 @@ Fresh authority entering this update:
 - Foundation #1: `60f14a6e85a83d56c2eea43b34d52b3366bb1735`, OPEN Draft;
 - Source Observation #6: `287165d399c5f54d6c4b4aa3c15497b47de8244b`, OPEN Draft;
 - representation-v3 parent #45: `6b2a8f555725dc79f60432afbc492d6005290a4a`, OPEN Draft on #6;
-- representation/index successor #46 source head before this documentation commit: `c0cec50ed29e2435cf1552302e166a7ff7494924`, OPEN Draft and mechanically mergeable.
+- representation/index successor #46 source head before this documentation commit: `8efc1e5d24c3fb4670237515f3f760b73ee5303e`, OPEN Draft and mechanically mergeable.
 
-Protected central `.github/main` was last freshly verified at `cb0872c9a20d5584703dffacca65c096fc034c6c`; `.github#2051@558693e0333e48012beea142f739bc634b0674a7` remains Draft on historical `main@7fd571db...`, with `.github#2056@69ae472562c93cc17674af5e2085a58947d3fab8` stacked on it. The central owner must land a backward-compatible handler, ordinary/non-force reconcile those PRs onto current protected main and obtain terminal GREEN before unchanged #35 can receive fresh acceptance and normal merge.
+Protected central `.github/main` was freshly verified at `cb0872c9a20d5584703dffacca65c096fc034c6c`; `.github#2051@558693e0333e48012beea142f739bc634b0674a7` remains Draft on historical `main@7fd571db...`, with `.github#2056@69ae472562c93cc17674af5e2085a58947d3fab8` stacked on it. The central owner must land a backward-compatible handler, ordinary/non-force reconcile those PRs onto current protected main and obtain terminal GREEN before unchanged #35 can receive fresh acceptance and normal merge.
 
 Protected/default ConceptWeave `main` still lacks repository-local `.github/workflows` authority for the Product `pull_request` workflow. A PR branch cannot bootstrap its own default-branch trigger. Draft/Ready toggles, no-op commits and manual retriggers are not acceptance evidence.
 
@@ -73,7 +73,9 @@ The timing family is additive. It does not mutate `PrimaryKeyObservation`/`Uniqu
 
 Review `5181223180` on exact `9020f3620afbe932aec7a0ca6f1bb3dbf5b0d316` found that v3 now models both sides of PostgreSQL's key-constraint/index relationship but does not bind them. `pg_constraint.conindid` identifies the index supporting PRIMARY KEY/UNIQUE, PostgreSQL creates the supporting unique index with the same constraint name, and a deferrable unique/primary constraint is backed by a non-immediate index (`pg_index.indimmediate = false`).
 
-Behavioral RED `c0cec50ed29e2435cf1552302e166a7ff7494924`, `constraint_backing_index_contract.rs`, requires the public v3 aggregate to fail closed when explicitly observed key-constraint timing disagrees with represented index evidence:
+Initial behavioral RED `c0cec50ed29e2435cf1552302e166a7ff7494924` added `constraint_backing_index_contract.rs`. Fixture review then caught a non-canonical UTC provenance timestamp; ordinary-forward refinement `8efc1e5d24c3fb4670237515f3f760b73ee5303e` changes it to exact `Z` UTC so the test reaches the intended backing-index invariant rather than failing on provenance validation first.
+
+The current RED requires the public v3 aggregate to fail closed when explicitly observed key-constraint timing disagrees with represented index evidence:
 
 - every represented PRIMARY KEY/UNIQUE must resolve to one same-relation, same-name supporting index;
 - PRIMARY KEY must bind an observed unique index with `indisprimary = true`;
@@ -142,7 +144,7 @@ Catalog OIDs are adapter-local joins, never governed semantic identity. `pg_get_
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | Canonical owner seams unchanged. |
 | Truth/publication lifecycle | RED_ACTIVE_NO_PUBLICATION | No protected immutable semantic release exists. |
-| Source Observation | REPRESENTATION_V3_BACKING_INDEX_RED_ACTIVE | Timing/array/index/type repairs are preserved; `constraint_backing_index_contract` is intentionally unsatisfied pending causal aggregate admission repair. |
+| Source Observation | REPRESENTATION_V3_BACKING_INDEX_RED_ACTIVE | Timing/array/index/type repairs are preserved; corrected `constraint_backing_index_contract` is intentionally unsatisfied pending causal aggregate admission repair. |
 | Product CI | BLOCKED_OWNER_RECONCILIATION | Protected/default ConceptWeave `main` still lacks Product workflow authority; #35 waits on central owner settlement. |
 | Quality gate | RED_ACTIVE | No Ready/adoption/merge before source repair and unchanged-head Rust/Product/security/dependency/review evidence. |
 | PostgreSQL adapter | BLOCKED_ON_REPRESENTATION_ACCEPTANCE | No transport before representation GREEN and parent adoption. |
@@ -150,7 +152,7 @@ Catalog OIDs are adapter-local joins, never governed semantic identity. `pg_get_
 
 ## Current causal sequence
 
-1. Repair the public v3 aggregate so explicitly observed PK/UNIQUE timing and represented backing-index evidence satisfy the active RED without persisting `conindid` as semantic identity.
+1. Repair the public v3 aggregate so explicitly observed PK/UNIQUE timing and represented backing-index evidence satisfy the corrected active RED without persisting `conindid` as semantic identity.
 2. On the repaired unchanged #46 head, produce repository-pinned Rust 1.98 and applicable hosted Product/security/dependency/review acceptance; causally repair any real failure.
 3. Ordinary/non-force adopt verified #46 into #45 and obtain fresh parent acceptance; then adopt #45 into #6. Never transfer predecessor GREEN.
 4. In parallel, central owner lands the backward-compatible protected handler, reconciles #2051/#2056 onto current protected `.github/main`, obtains terminal GREEN, then unchanged #35 gets fresh acceptance and normal merge.
