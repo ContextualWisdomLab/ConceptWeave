@@ -1,6 +1,7 @@
 use conceptweave_observation::{
-    CheckConstraintObservation, ColumnObservationV3, ConstraintPeriodObservation,
-    ForeignKeyObservation, IndexAttributeKind, IndexAttributeObservation, IndexCatalogFlags,
+    CheckConstraintObservation, ColumnObservationV3, ConstraintPeriodObservation, ForeignKeyAction,
+    ForeignKeyDeferrability, ForeignKeyMatchType, ForeignKeyObservation,
+    ForeignKeyReferenceBehavior, IndexAttributeKind, IndexAttributeObservation, IndexCatalogFlags,
     IndexObservation, ObservationError, PostgresSchemaSnapshotV3, PrimaryKeyObservation,
     QualifiedTypeName, RelationKind, RelationObservation, TableConstraintObservation,
     UniqueConstraintObservation,
@@ -116,6 +117,12 @@ fn temporal_parent_relation() -> RelationObservation {
 }
 
 fn period_child_relation() -> RelationObservation {
+    let behavior = ForeignKeyReferenceBehavior::new(
+        ForeignKeyAction::NoAction,
+        ForeignKeyAction::NoAction,
+        ForeignKeyMatchType::Simple,
+        ForeignKeyDeferrability::NotDeferrable,
+    );
     RelationObservation::new(
         "public",
         "document_version",
@@ -127,12 +134,13 @@ fn period_child_relation() -> RelationObservation {
     )
     .expect("child relation fixture is valid")
     .with_constraints(vec![TableConstraintObservation::ForeignKey(
-        ForeignKeyObservation::new(
+        ForeignKeyObservation::with_reference_behavior(
             "document_version_period_fk",
             vec!["document_id".to_owned(), "valid_during".to_owned()],
             "public",
             "document",
             vec!["document_id".to_owned(), "valid_during".to_owned()],
+            behavior,
         )
         .expect("period foreign-key fixture is structurally valid"),
     )])
