@@ -1,8 +1,9 @@
 use conceptweave_observation::{
     CheckConstraintObservation, ColumnObservationV3, ConstraintDeferrability,
-    ConstraintTimingObservation, ObservationError, PostgresSchemaSnapshotV3, PrimaryKeyObservation,
-    QualifiedTypeName, RelationKind, RelationObservation, TableConstraintObservation,
-    UniqueConstraintObservation,
+    ConstraintTimingObservation, IndexAttributeKind, IndexAttributeObservation, IndexCatalogFlags,
+    IndexKeySemantics, IndexObservation, ObservationError, PostgresSchemaSnapshotV3,
+    PrimaryKeyObservation, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
+    RelationObservation, TableConstraintObservation, UniqueConstraintObservation,
 };
 
 mod support;
@@ -33,6 +34,46 @@ fn relation(constraint: TableConstraintObservation) -> RelationObservation {
     base_relation()
         .with_constraints(vec![constraint])
         .expect("constraint fixture is valid")
+}
+
+fn backing_index(
+    constraint_name: &str,
+    primary: bool,
+    deferrability: ConstraintDeferrability,
+) -> IndexObservation {
+    let immediate = matches!(deferrability, ConstraintDeferrability::NotDeferrable);
+    IndexObservation::new(
+        constraint_name,
+        true,
+        Some(false),
+        vec![IndexAttributeObservation::new(
+            1,
+            IndexAttributeKind::Key,
+            "document_id",
+        )
+        .expect("key fixture is valid")],
+        Vec::new(),
+    )
+    .expect("backing-index fixture is structurally valid")
+    .with_access_method("btree")
+    .with_key_semantics(vec![IndexKeySemantics::new(
+        1,
+        None,
+        QualifiedOperatorClassName::new("pg_catalog", "int8_ops")
+            .expect("operator-class fixture is valid"),
+        0,
+    )
+    .expect("key semantics fixture is valid")])
+    .expect("one semantic record matches the single key position")
+    .with_catalog_flags(IndexCatalogFlags::new(
+        primary,
+        false,
+        immediate,
+        false,
+        false,
+        false,
+    ))
+    .expect("catalog-flag fixture is coherent")
 }
 
 fn primary_key() -> TableConstraintObservation {
@@ -67,11 +108,34 @@ fn snapshot(
     constraint: TableConstraintObservation,
     timings: Vec<ConstraintTimingObservation>,
 ) -> Result<PostgresSchemaSnapshotV3, ObservationError> {
+    let key_shape = timings.first().and_then(|timing| match &constraint {
+        TableConstraintObservation::PrimaryKey(primary_key) => Some((
+            primary_key.constraint_name(),
+            true,
+            timing.deferrability(),
+        )),
+        TableConstraintObservation::Unique(unique) => Some((
+            unique.constraint_name(),
+            false,
+            timing.deferrability(),
+        )),
+        TableConstraintObservation::ForeignKey(_) | TableConstraintObservation::Check(_) => None,
+    });
+    let observed_relation = match key_shape {
+        Some((constraint_name, primary, deferrability)) => relation(constraint)
+            .with_indexes(vec![backing_index(
+                constraint_name,
+                primary,
+                deferrability,
+            )])?,
+        None => relation(constraint),
+    };
+
     PostgresSchemaSnapshotV3::new_with_constraint_timings(
         &support::authorized_source("warehouse_primary", &["public"]),
         "postgres_introspector_v3",
         "2026-09-11T16:48:00Z",
-        vec![relation(constraint)],
+        vec![observed_relation],
         Vec::new(),
         Vec::new(),
         timings,
@@ -79,7 +143,7 @@ fn snapshot(
 }
 
 #[test]
-fn primary_key_deferrability_changes_governed_identity() {
+fn coherent_primary_key_deferrability_states_change_governed_identity() {
     let not_deferrable = snapshot(
         primary_key(),
         vec![timing(
