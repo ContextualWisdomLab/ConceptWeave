@@ -343,7 +343,7 @@ impl PostgresSchemaSnapshotV3 {
     /// Returns the opaque immutable connection-policy revision authorized for this snapshot.
     #[must_use]
     pub fn connection_policy_binding(&self) -> &str {
-        self.inner.connection_policy_binding()
+        &self.connection_policy_binding()
     }
 
     /// Returns the owner-computed canonical SHA-256 successor source-content digest.
