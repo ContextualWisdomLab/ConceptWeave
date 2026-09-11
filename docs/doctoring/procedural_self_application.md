@@ -17,16 +17,16 @@ Lu et al. (2026) motivate procedural graphs, local guidance, retained rejected p
 
 | Artifact / symbol | Current role |
 | --- | --- |
-| `contracts/procedural-model-draft.schema.json` | Local unreleased Draft 2020-12 candidate shape; `draft/inferred`, bounded evidence/artifact coordinates and eight locale slots |
+| `contracts/procedural-model-draft.schema.json` | Local unreleased Draft 2020-12 candidate shape; `draft/inferred`, bounded evidence/artifact coordinates, eight locale slots and the procedural cross-runtime nonblank text contract |
 | `contracts/procedural-revision-proposal.schema.json` | Local offline proposal envelope; `proposed`, `decision_authority:none`, exact base coordinate, training evidence, retained rejected-edit references and rationale |
 | `profiles/semantic_engineering/semantic_authoring.draft.json` | First-party inferred Draft authoring profile; runtime activation remains disabled |
 | `profiles/semantic_engineering/procedural_refinement.draft.json` | Separate inferred Draft refinement profile with independent evaluation/review and rejection paths |
 | `profiles/semantic_engineering/profile_manifest.json` | Exact local-Git source/profile coordinates and digests; provenance metadata, not signature or approval |
 | `scripts/parse_strict_json.mjs` | Repository-side duplicate-decoded-member-safe JSON admission used before AJV for owned schema/fixture artifacts |
 | `crates/conceptweave-domain/src/procedural_model_transport.rs` | Private std-only raw-byte/UTF-8/strict-JSON recognizer with byte/depth/surrogate/duplicate-member bounds |
-| `crates/conceptweave-domain/src/procedural_model_ingress.rs` | Private canonical Draft/revision mapping, proposal/base/scope expectation binding and typed proposal retention |
+| `crates/conceptweave-domain/src/procedural_model_ingress.rs` | Private canonical Draft/revision mapping, cross-runtime text admission, proposal/base/scope expectation binding and typed proposal retention |
 | `crates/conceptweave-domain/src/procedural_model_validation.rs` | Borrowed semantic/topology validation: scope equality, evidence closure, semantic/tool coordinates, topology, reachability and schema-significant text semantics |
-| `crates/conceptweave-domain/tests/procedural_model_transport.rs` and `procedural_model_ingress.rs` | Raw transport and Draft mapping regression contracts |
+| `crates/conceptweave-domain/tests/procedural_model_transport.rs` and `procedural_model_ingress.rs` | Raw transport and Draft mapping regression contracts, including canonical blank-union witnesses |
 | `crates/conceptweave-domain/tests/procedural_model_semantics.rs` and `procedural_model_validation.rs` | Direct semantic/topology contracts, including alternate-ingress parity witnesses |
 | `crates/conceptweave-domain/tests/procedural_revision_ingress.rs` and `procedural_revision_semantic_preservation.rs` | Revision-envelope/context-binding and lossless proposal-semantic contracts |
 
@@ -40,7 +40,7 @@ The current private path is deliberately layered:
 2. parse strict JSON with decoded duplicate-member rejection, bounded nesting and valid surrogate handling;
 3. map only the canonical Draft 2020-12 shape, rejecting unknown/missing/wrong-typed/schema-invalid members before domain construction;
 4. preserve procedure kind, locale labels, optional `semantic_refs` presence, tool-contract coordinates, relation condition/guidance/pitfalls and evidence references;
-5. validate logical procedure/relation identity, evidence closure, topology and explicit reachability policy;
+5. apply one procedural cross-runtime nonblank policy before inherited Foundation evidence construction, then validate logical procedure/relation identity, evidence closure, topology and explicit reachability policy;
 6. for a revision proposal, retain proposal origin, exact base coordinate, complete candidate, training evidence, rejected-edit references and rationale in one typed `ProceduralRevisionAdmission`;
 7. compare proposal/base/candidate scope with a separately supplied `ProceduralRevisionExpectation` before deterministic candidate validation.
 
@@ -50,18 +50,21 @@ Artifact references are coordinates only. Semantic references and tool-contract 
 
 ## Canonical text semantics and alternate-ingress parity
 
-The procedural Draft schemas use ECMAScript regular-expression `\S` for annotation text. ECMAScript defines U+FEFF ZERO WIDTH NO-BREAK SPACE as White Space. Rust `str::trim`, however, follows Unicode's Derived Core Property `White_Space`; relying on it creates a different text language. Review `5173430684` therefore treated direct borrowed-Rust admission as an alternate ingress rather than assuming AJV had already normalized the contract.
+The original procedural Draft contract used ECMAScript regular-expression `\S` as its nonblank test. That was not a stable cross-runtime definition. ECMAScript 2026 treats U+FEFF ZERO WIDTH NO-BREAK SPACE as White Space and explicitly excludes Unicode `White_Space` code points that are not `Space_Separator`, while Rust `str::trim()` follows Unicode `White_Space`. U+0085 NEXT LINE is the material inverse witness: Unicode classifies it as `White_Space`, but ECMAScript does not include it in its regular-expression whitespace set. A contract expressed only as ECMAScript `\S` could therefore accept U+0085-only text that a later Foundation `str::trim()` constructor rejected, even after the earlier U+FEFF repair.
 
-Source-level RED `029502b278552929677e62ee9df23afd48fd77d6` adds U+FEFF-only witnesses for both locale annotations and evidence locations. Production repair `1ace968b309334bdba8475f8357a207d405ca96b` mirrors the canonical ECMAScript whitespace set in `procedural_model_validation.rs` and applies the same non-whitespace predicate to both fields. This closes the procedural alternate-ingress discrepancy without granting authentication, artifact authority, publication or runtime authority.
+Review `5173430684` first captured the U+FEFF direction. Source-level RED `029502b278552929677e62ee9df23afd48fd77d6` added U+FEFF-only witnesses for locale annotations and evidence locations, and repair `1ace968b309334bdba8475f8357a207d405ca96b` stopped the borrowed validator from relying on Rust `str::trim()` for that boundary.
 
-The same inspection exposed a Foundation-level follow-up: the generic `EvidenceReference::new` and `SemanticCandidate::new` constructors still use Rust `str::trim()` while `contracts/semantic-candidate.schema.json` uses ECMAScript `\S`. Foundation review `5173461698` records that repair, but its source must not be churned ahead of the Product-CI bootstrap prerequisite. After #35 normally integrates and Foundation is ordinary/non-force restacked, the generic API should receive its own U+FEFF RED and one shared canonical text predicate rather than maintaining divergent copies.
+Review `5173839274` then captured the inverse U+0085 mismatch. Source-level RED `692928c81bbfdec2bc5f3ed652f09d15a7021e77` requires the direct Rust semantic boundary to reject U+0085-only annotation text. Repairs `dfc532689d9b23a999ac6d296eb3d6af0c6c8857` and `bb07a5d6c5d9b5bc4da77051e20ee2b310e04e21` define the same procedural canonical blank union in the borrowed validator and manual Draft mapper: ECMAScript whitespace/line terminators, including U+FEFF, plus U+0085. Contract successor `832f7f847315dde7d1f23df252047ec1d4b6a48c` encodes the same rule in Draft 2020-12 `annotation_text` as `[^\s\u0085]`, while `6ea9aeb9af019955ca808a548e6660aacb7c9c75` adds AJV witnesses and `eee54d250e1318634ea611bb849e113c8c34ac88` pins the transport-to-domain mapping boundary. Visible text containing U+0085 remains admissible; blank-only U+0085, U+FEFF, or their combination does not.
+
+This is deliberately a procedural contract refinement, not an attempt to mutate the historical Foundation source from a child branch. Foundation review `5173461698` still records the generic `EvidenceReference::new` / `SemanticCandidate::new` versus `semantic-candidate.schema.json` U+FEFF discrepancy. That generic owner repair remains sequenced after #35 normally integrates and Foundation is ordinary/non-force restacked. The procedural path now fails closed before it reaches the inherited generic evidence constructor, so its accepted text language no longer depends on which runtime performed the first nonblank check.
 
 Authoritative references for this distinction:
 
-- Ecma International. (2026). *ECMAScript® 2026 language specification*, §12.2 White Space. TC39. https://tc39.es/ecma262/multipage/ecmascript-language-lexical-grammar.html#sec-white-space
+- Ecma International. (2026). *ECMAScript® 2026 language specification*, §§12.2–12.3, White Space and Line Terminators. TC39. https://tc39.es/ecma262/multipage/ecmascript-language-lexical-grammar.html#sec-white-space
 - The Rust Project Developers. (2026). *Primitive type `str`: `trim`*. Rust standard library documentation. https://doc.rust-lang.org/std/primitive.str.html#method.trim
+- The Unicode Consortium. (2026). *Unicode Character Database: White_Space property*. Unicode Standard Annex and property data. https://www.unicode.org/Public/UCD/latest/ucd/PropList.txt
 
-The standards explain the character-set difference; the repository RED/repair commits above are the exact implementation evidence.
+The standards define the differing character sets. Review/commit coordinates above are the implementation evidence; no standards citation substitutes for exact-head executable acceptance.
 
 ## Provenance and security boundary
 
@@ -71,9 +74,9 @@ The profiles are authored in Korean/English and remain `inferred`/`draft`. No re
 
 ## Evidence status
 
-Earlier Node/AJV/Python authoring observations remain historical predecessor evidence and do not transfer to the current Rust source head. The current branch contains source-level regression contracts for transport, schema mapping, semantics/topology, revision context and lossless proposal retention, including the U+FEFF parity witnesses above.
+Earlier Node/AJV/Python authoring observations remain historical predecessor evidence and do not transfer to the current Rust source head. The current branch contains source-level regression contracts for transport, schema mapping, semantics/topology, revision context and lossless proposal retention, including the U+FEFF/U+0085 cross-runtime blank-union witnesses above.
 
-Native acceptance is still absent. This execution environment does not provide the repository-pinned Rust 1.98 toolchain, and the current #44 lane has no hosted Product run proving the Rust changes. CodeRabbit status does not substitute for fmt, strict Clippy, native tests, rustdoc, release, owned coverage, security gates or qualifying independent review. The branch must remain Draft/non-public until those conditions are met.
+Native acceptance is still absent. This execution environment does not provide the repository-pinned Rust 1.98 toolchain, and the current #44 lane has not yet produced hosted Product evidence proving the newest Rust changes. CodeRabbit status alone does not substitute for fmt, strict Clippy, native tests, rustdoc, release, owned coverage, security gates or qualifying independent review. The branch must remain Draft/non-public until those conditions are met.
 
 Native continuation on an exact full checkout uses the repository-pinned toolchain and lock files:
 
@@ -110,6 +113,8 @@ Lu, Y., Chen, Y., Wu, S., & Arık, S. Ö. (2026). *Procedural graphs: Self-evolv
 Ecma International. (2026). *ECMAScript® 2026 language specification*. TC39. https://tc39.es/ecma262/
 
 The Rust Project Developers. (2026). *Primitive type `str`*. Rust standard library documentation. https://doc.rust-lang.org/std/primitive.str.html
+
+The Unicode Consortium. (2026). *Unicode Character Database*. https://www.unicode.org/ucd/
 
 코난쌤. (2026, September 10). *Procedural Graph: LLM 에이전트를 위한 자가진화 절차 그래프 (arXiv 2609.09153) 논문 정리*. https://conanssam.com/posts/2026-09-10-procedural-graphs-self-evolving-llm-agents
 
