@@ -605,10 +605,13 @@ fn canonicalize_constraint_timings(
             timing.deferrability(),
             ConstraintDeferrability::NotDeferrable
         );
+        let exclusion_access_method_matches =
+            !catalog_flags.exclusion() || backing_index.access_method() == Some("gist");
         if !backing_index.is_unique()
             || !key_columns_match
             || backing_index.predicate().is_some()
             || !null_treatment_matches
+            || !exclusion_access_method_matches
             || catalog_flags.primary() != expected_primary
             || catalog_flags.immediate() != expected_immediate
         {
