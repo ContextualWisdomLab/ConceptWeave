@@ -27,7 +27,7 @@ Fresh 2026-09-11 authority:
 - Client Consumption #5: `6873ec0c0a701b2c59f3e0785d48d8739f019d5b`, the current parent of Source Observation #6;
 - Source Observation #6: `287165d399c5f54d6c4b4aa3c15497b47de8244b`, OPEN Draft/mechanically mergeable;
 - representation-v3 parent #45: `6b2a8f555725dc79f60432afbc492d6005290a4a`, OPEN Draft/mechanically mergeable on #6;
-- representation/index successor #46: per-key semantics repair ancestor `173ae2f5a187341421ec5ed94f3fcc7d69c1de35`; operator-class option RED `d87eb560f3c90fd22c8ac669febf0d85b030e1a0` and source repair through `d25a9d5022a483693819663f27b7e1f1f0c2969d`; NULL-uniqueness invariant review `5176683395` -> behavioral RED `908d1b10e63254aa4cb85eda9c078ee79f950c0c` -> minimal source repair `68efaf0fc735faa74202b420df9bf031069e5116`. Re-read the exact branch head after every ordinary forward commit; this documentation commit itself resets exact-head execution evidence.
+- representation/index successor #46: per-key semantics repair ancestor `173ae2f5a187341421ec5ed94f3fcc7d69c1de35`; operator-class option source repair through `d25a9d5022a483693819663f27b7e1f1f0c2969d`; NULL-uniqueness review `5176683395` -> RED `908d1b10e63254aa4cb85eda9c078ee79f950c0c` -> repair `68efaf0fc735faa74202b420df9bf031069e5116`; remaining `pg_index` flag review `5176751905` -> RED `0e6c7314bdd36f313abb6c09231d1e1271383ce0` -> source repair `f207bb0e205150578d382e4c20f094d7cfdab55d` -> public export/frozen-v2 correction through `f24242708cf82f4405c12ed2b8fa7153b1c58b24`. Re-read the exact branch head after every ordinary forward commit; this documentation commit itself resets exact-head execution evidence.
 
 Protected central `.github/main` is `cb0872c9a20d5584703dffacca65c096fc034c6c`. Its required contexts include CodeQL compatibility analysis for actions/python, queue/security/dependency checks, Noema, required-workflow bootstrap, coverage evidence and OpenCode review. Historical central-base execution evidence does not become current-base acceptance merely because an old PR remains mechanically mergeable.
 
@@ -47,7 +47,7 @@ Client Consumption verifies exact detached immutable semantic-artifact bytes wit
 
 ## PostgreSQL 18 representation-v3 current state
 
-The representation-before-transport prerequisite is materially implemented in the #45 -> #46 successor lineage. The previously active per-key PostgreSQL index semantics RED, the later operator-class parameter loss, and the impossible non-unique/`NULLS NOT DISTINCT = true` state are source-repaired, but exact-head native/Product acceptance is still absent and this documentation successor resets execution evidence again.
+The representation-before-transport prerequisite is materially implemented in the #45 -> #46 successor lineage. Per-key PostgreSQL index semantics, operator-class parameters, NULL-uniqueness consistency, and the remaining first-class `pg_index` flag vector are source-repaired. Exact-head native/Product acceptance is still absent, and index `pg_class.reloptions` remains the next verified representation audit before transport can be called lossless.
 
 The v3 source currently preserves:
 
@@ -56,8 +56,9 @@ The v3 source currently preserves:
 - schema-scoped domains and enums, including domain base type, typmod/array/collation/NOT NULL/default/CHECK evidence and enum membership/order;
 - direct schema allowlist revalidation for relations/domains/enums before immutable snapshot or receipt issuance;
 - first-class indexes with key versus `INCLUDE` roles, expression-versus-column structure, exact positions, uniqueness, `NULLS NOT DISTINCT`, access method, readiness/validity/liveness, partial predicate, reconstructed `pg_get_indexdef` text and comments;
+- the additional exact `pg_index` state vector `indisprimary`, `indisexclusion`, `indimmediate`, `indisclustered`, `indcheckxmin`, and `indisreplident`, kept distinct from unobserved state;
 - one structured `IndexKeySemantics` record for every key position, carrying exact qualified collation when present, exact qualified operator-class coordinate, opaque access-method-specific `indoption` bits and canonical exact operator-class option name/value evidence;
-- v3 domain-separated deterministic digest framing, including complete per-key semantic records and operator-class options;
+- v3 domain-separated deterministic digest framing, including complete per-key semantic records, operator-class options and the observed `pg_index` flag vector;
 - kind-aware successor coordinates `/schemas/{schema}/relations/{kind}/{name}/...` with relation-child column/constraint/index coordinates, while frozen v2 `/tables/...` semantics stay unchanged;
 - exact qualified-type resolution shared by relation columns and domain base types; unknown qualified types fail closed.
 
@@ -120,13 +121,31 @@ Review `5176683395` verified a separate catalog-integrity defect at exact predec
 
 Behavioral RED `908d1b10e63254aa4cb85eda9c078ee79f950c0c` uses the existing constructor rather than a compile-only placeholder. It requires the impossible `false + Some(true)` combination to return `InvalidObservationField { field: "nulls_not_distinct" }` while preserving `Some(false)` as admissible directly observed catalog evidence on a non-unique index. Minimal production repair `68efaf0fc735faa74202b420df9bf031069e5116` enforces that invariant before attribute canonicalization or snapshot identity construction. `None` remains the explicit unobserved state.
 
-This repair is intentionally narrow. It does not infer catalog defaults, reinterpret `Some(false)`, or silently add the broader `pg_index` state vector. Remaining fields such as `indisprimary`, `indisexclusion`, `indimmediate`, `indisclustered`, `indcheckxmin`, and `indisreplident`, and index `pg_class.reloptions`, require a separate representation audit before transport is called lossless; they are not smuggled into this invariant fix.
+### Remaining `pg_index` catalog flags: behavioral RED -> source repair
+
+Review `5176751905` identified six material PostgreSQL 18 `pg_index` facts not represented by the dedicated uniqueness/null-uniqueness and ready/valid/live fields: `indisprimary`, `indisexclusion`, `indimmediate`, `indisclustered`, `indcheckxmin`, and `indisreplident`. The current constraint vocabulary does not make these facts derivable in all cases, so dropping them can collapse materially distinct catalog snapshots.
+
+RED `0e6c7314bdd36f313abb6c09231d1e1271383ce0` requires:
+
+- changing each of the six observed flags changes v3 source-content identity;
+- unobserved catalog flags remain distinct from an explicitly observed all-false vector;
+- `indisprimary=true` fails closed when the same index is non-unique, matching the PostgreSQL catalog invariant.
+
+Source repair `f207bb0e205150578d382e4c20f094d7cfdab55d` adds the exact `IndexCatalogFlags` value object, optional admission on `IndexObservation`, primary-implies-unique validation and presence-tagged digest framing of all six booleans without decoding or inventing provider defaults. Public export was added in ordinary-forward history. During that export, an unintended temporary edit to frozen v2 CHECK-constraint digest framing was detected by immediate exact diff inspection; it was not accepted as a semantic change and was restored ordinary-forward in `f24242708cf82f4405c12ed2b8fa7153b1c58b24`. No history was rewritten and no v2 contract change is authorized.
+
+### Remaining representation audit: index `pg_class.reloptions`
+
+PostgreSQL 18 `pg_class.reloptions` stores access-method-specific options as exact `keyword=value` strings. `ALTER INDEX ... SET/RESET` changes index-method-specific storage parameters, and PostgreSQL documents cases where `REINDEX` is required for a changed storage parameter such as `fillfactor` to take full effect. These options therefore belong to observed index configuration rather than disposable display text.
+
+Current v3 has no first-class `reloptions` carrier. Before transport is called lossless, add a behavioral RED and minimal repair that preserve exact option name/value evidence while keeping unobserved state distinct from an observed empty option set. Option input order must canonicalize, duplicate names must fail closed, and changing one material option value must change v3 identity. The generic representation should not decode access-method-specific semantics; interpretation stays at the access-method/adapter boundary.
 
 The representation must never use catalog OIDs or `search_path` inference as governed identity. `pg_get_indexdef` remains reconstructed provenance text, not the sole semantic carrier. PostgreSQL access-method-specific decoding belongs in the adapter/access-method boundary; ConceptWeave's generic representation owns exact observed facts and deterministic identity.
 
 Authoritative PostgreSQL 18 basis:
 
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE INDEX*. https://www.postgresql.org/docs/18/sql-createindex.html
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: ALTER INDEX*. https://www.postgresql.org/docs/18/sql-alterindex.html
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: REINDEX*. https://www.postgresql.org/docs/18/sql-reindex.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_index*. https://www.postgresql.org/docs/18/catalog-pg-index.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_opclass*. https://www.postgresql.org/docs/18/catalog-pg-opclass.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_am*. https://www.postgresql.org/docs/18/catalog-pg-am.html
@@ -145,7 +164,7 @@ Before #46/#45/#6 can claim the representation prerequisite GREEN, the current e
 
 - `cargo fmt --all --check`;
 - strict workspace/all-target Clippy with warnings denied;
-- workspace tests including v2-frozen and v3/index-layout/per-key semantic/operator-class-option/null-uniqueness contracts;
+- workspace tests including v2-frozen and v3/index-layout/per-key semantic/operator-class-option/null-uniqueness/catalog-flag contracts;
 - rustdoc/doc tests and release build;
 - owned production docstring/test/edge-case coverage requirements;
 - Product/security/dependency/review workflows applicable to the exact protected-stack state.
@@ -164,6 +183,7 @@ The representation regression set must keep proving:
 - relation-level and child coordinates preserve exact `RelationKind` and reject same-name wrong-kind receipt lookup;
 - index role/position/source/predicate/null-uniqueness/readiness/validity/liveness/access-method/definition changes alter identity;
 - non-unique `NULLS NOT DISTINCT = true` fails closed while directly observed non-unique false remains admissible;
+- each observed `indisprimary`/`indisexclusion`/`indimmediate`/`indisclustered`/`indcheckxmin`/`indisreplident` flag changes identity; absence differs from observed all-false; primary requires uniqueness;
 - per-key collation/operator-class/access-method option semantics and operator-class parameters are structured first-class identity rather than optional text-only provenance;
 - operator-class option order canonicalizes, duplicate option names fail closed, and material option-value changes alter identity;
 - missing/misaligned key semantics, blank access method, role/collection disagreement, non-contiguous ordinals, expression INCLUDE, empty indexes and INCLUDE-only indexes fail closed;
@@ -171,7 +191,7 @@ The representation regression set must keep proving:
 
 ## Concrete PostgreSQL adapter boundary
 
-Do not attach transport until the representation successor is exact-head GREEN and ordinarily adopted through the stack. Before transport is called lossless, complete the separate representation audit for the still-unmodeled PostgreSQL 18 index state vector (`indisprimary`, `indisexclusion`, `indimmediate`, `indisclustered`, `indcheckxmin`, `indisreplident`) and index `pg_class.reloptions`, then RED -> repair every material fact selected into the governed contract. The later adapter must use a maintained patched Rust PostgreSQL driver pinned by immutable lock coordinate and passing cargo-deny/SBOM review; resolve least-privilege credentials only for the exact authorized key+binding; reject stale binding before credential/source I/O; use one explicit `REPEATABLE READ READ ONLY` catalog transaction; preserve exact-schema `pg_catalog` evidence, including per-key collations/operator classes/`indoption` and operator-class option arrays; consume one remaining-operation budget across connect/transaction/query/cancellation; enforce policy-admitted row/byte/concurrency ceilings; perform complete-or-fail snapshot construction; handle source disappearance deterministically; and replay a frozen anonymized GRC-shaped conformance fixture without copying `governance-risk-compliance` business truth or querying its application tables through hidden coupling.
+Do not attach transport until the representation successor is exact-head GREEN and ordinarily adopted through the stack. Before transport is called lossless, close the remaining index `pg_class.reloptions` representation gap with authoritative RED -> repair. The later adapter must use a maintained patched Rust PostgreSQL driver pinned by immutable lock coordinate and passing cargo-deny/SBOM review; resolve least-privilege credentials only for the exact authorized key+binding; reject stale binding before credential/source I/O; use one explicit `REPEATABLE READ READ ONLY` catalog transaction; preserve exact-schema `pg_catalog` evidence, including index catalog flags, per-key collations/operator classes/`indoption`, operator-class option arrays and index `reloptions`; consume one remaining-operation budget across connect/transaction/query/cancellation; enforce policy-admitted row/byte/concurrency ceilings; perform complete-or-fail snapshot construction; handle source disappearance deterministically; and replay a frozen anonymized GRC-shaped conformance fixture without copying `governance-risk-compliance` business truth or querying its application tables through hidden coupling.
 
 ## Other product/research lanes
 
@@ -186,7 +206,7 @@ For the procedural-generation lane, #44 remains a private source-shaped Rust bou
 | Product boundary | ACTIVE_PR | PRD/TRD/ADR/context map define canonical ConceptWeave ownership and foreign-owner seams. |
 | Truth/publication lifecycle | SOURCE_REPAIRED_PENDING_PROTECTED_EVIDENCE | No protected immutable semantic release exists. |
 | Client Consumption | RESTACKED_HOSTED_PENDING | #5 remains the current Source Observation parent; exact live evidence must be re-read before Client action. |
-| Source Observation | REPRESENTATION_V3_SOURCE_REPAIRED_AUDIT_PENDING | Per-key/operator-class-option/null-uniqueness source repairs are present; exact-head Rust/Product acceptance remains absent, and the remaining PostgreSQL index state-vector/`reloptions` audit must close before transport is called lossless. |
+| Source Observation | REPRESENTATION_V3_SOURCE_REPAIRED_STORAGE_OPTIONS_AUDIT_PENDING | Per-key/operator-class-option/null-uniqueness/`pg_index`-flag source repairs are present. Exact-head Rust/Product acceptance remains absent, and index `pg_class.reloptions` remains the last identified catalog slice before transport can be called lossless. |
 | Product CI | BLOCKED_OWNER_RECONCILIATION | #35 waits on central backward-compatible handler/current-main reconciliation and exact terminal GREEN. |
 | Quality gate | ACTIVE | Rust 1.98, unsafe forbidden, public docs, fmt, strict Clippy, tests, rustdoc, release, owned production coverage, fixture/schema/lock/clean-tree checks; every head movement resets acceptance. |
 | Security / review | PENDING_EXACT_HEAD | Scanner/reviewer status is accepted only when bound to the exact current head and applicable protected policy. |
@@ -194,7 +214,7 @@ For the procedural-generation lane, #44 remains a private source-shaped Rust bou
 
 ## Current causal sequence
 
-1. Re-read #46 after this documentation successor and complete the separate PostgreSQL 18 index state-vector/`pg_class.reloptions` representation audit with authoritative RED -> repair for each material governed fact; do not attach transport to a partially modeled catalog.
+1. Re-read #46 after this documentation successor and close index `pg_class.reloptions` with authoritative behavioral RED -> minimal structured repair; do not attach transport to a partially modeled catalog.
 2. On the resulting exact #46 head, obtain repository-pinned Rust 1.98 plus applicable hosted Product/security/dependency/review acceptance without flattening #45/#6.
 3. Ordinary/non-force adopt the verified #46 delta into #45 and then #6; do not transfer predecessor GREEN.
 4. In parallel prerequisite order, central owner lands a backward-compatible handler, reconciles #2051/#2056 onto protected `.github/main`, obtains exact terminal GREEN, then unchanged #35 obtains fresh acceptance and merges normally.
