@@ -88,8 +88,9 @@ fn index_evidence_is_admitted_only_for_postgresql_indexable_relation_kinds() {
         RelationKind::Sequence,
         RelationKind::CompositeType,
     ] {
-        let error = snapshot(kind)
-            .expect_err("non-indexable PostgreSQL relation kinds must fail before governed identity");
+        let error = snapshot(kind).expect_err(
+            "non-indexable PostgreSQL relation kinds must fail before governed identity",
+        );
         assert_eq!(
             error,
             ObservationError::InvalidObservationField {
