@@ -43,6 +43,8 @@ Source Observation owns bounded request admission, exact source/schema/resource 
 
 Historical v2 evidence is frozen. The v2 digest domain, table/column/constraint representation and `/schemas/{schema}/tables/{table}` receipt vocabulary retain identical meaning and reproducibility. New PostgreSQL facts must never be appended under the v2 identity domain.
 
+Client Consumption verifies exact detached immutable semantic-artifact bytes with `SemanticReleaseClient::verify_detached_artifact` after authoritative-use admission; digest syntax alone is never integrity evidence.
+
 ## PostgreSQL 18 representation-v3 current state
 
 The representation-before-transport prerequisite is materially implemented in the #45 -> #46 successor lineage. The previously active per-key PostgreSQL index semantics RED is now source-repaired, but exact-head native/Product acceptance is still absent and this documentation successor resets execution evidence again.
