@@ -514,6 +514,79 @@ impl IndexAttributeObservation {
     }
 }
 
+/// Remaining exact PostgreSQL `pg_index` catalog flags not modeled by the dedicated index fields.
+///
+/// These booleans preserve source state without deriving defaults or interpreting provider runtime
+/// behavior. Readiness, validity, and liveness remain dedicated [`IndexObservation`] fields because
+/// they predate this grouped successor state and have distinct lifecycle semantics in the public API.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct IndexCatalogFlags {
+    primary: bool,
+    exclusion: bool,
+    immediate: bool,
+    clustered: bool,
+    check_xmin: bool,
+    replica_identity: bool,
+}
+
+impl IndexCatalogFlags {
+    /// Creates the exact observed remaining `pg_index` flag vector.
+    #[must_use]
+    pub const fn new(
+        primary: bool,
+        exclusion: bool,
+        immediate: bool,
+        clustered: bool,
+        check_xmin: bool,
+        replica_identity: bool,
+    ) -> Self {
+        Self {
+            primary,
+            exclusion,
+            immediate,
+            clustered,
+            check_xmin,
+            replica_identity,
+        }
+    }
+
+    /// Returns observed `pg_index.indisprimary`.
+    #[must_use]
+    pub const fn primary(self) -> bool {
+        self.primary
+    }
+
+    /// Returns observed `pg_index.indisexclusion`.
+    #[must_use]
+    pub const fn exclusion(self) -> bool {
+        self.exclusion
+    }
+
+    /// Returns observed `pg_index.indimmediate`.
+    #[must_use]
+    pub const fn immediate(self) -> bool {
+        self.immediate
+    }
+
+    /// Returns observed `pg_index.indisclustered`.
+    #[must_use]
+    pub const fn clustered(self) -> bool {
+        self.clustered
+    }
+
+    /// Returns observed `pg_index.indcheckxmin`.
+    #[must_use]
+    pub const fn check_xmin(self) -> bool {
+        self.check_xmin
+    }
+
+    /// Returns observed `pg_index.indisreplident`.
+    #[must_use]
+    pub const fn replica_identity(self) -> bool {
+        self.replica_identity
+    }
+}
+
 /// Immutable observation of one relation-scoped PostgreSQL index.
 ///
 /// Key attributes are held separately from INCLUDE payload attributes because the two roles are
@@ -526,6 +599,7 @@ pub struct IndexObservation {
     index_name: String,
     is_unique: bool,
     nulls_not_distinct: Option<bool>,
+    catalog_flags: Option<IndexCatalogFlags>,
     access_method: Option<String>,
     key_attributes: Vec<IndexAttributeObservation>,
     include_attributes: Vec<IndexAttributeObservation>,
@@ -571,6 +645,7 @@ impl IndexObservation {
             index_name,
             is_unique,
             nulls_not_distinct,
+            catalog_flags: None,
             access_method: None,
             key_attributes,
             include_attributes,
@@ -645,6 +720,24 @@ impl IndexObservation {
         Ok(self)
     }
 
+    /// Records the remaining exact `pg_index` catalog flags as one observed vector.
+    ///
+    /// PostgreSQL requires a primary-key index to be unique. Other flags are preserved exactly even
+    /// when PostgreSQL documents them as irrelevant in a particular state; this representation does
+    /// not invent or normalize provider values.
+    pub fn with_catalog_flags(
+        mut self,
+        catalog_flags: IndexCatalogFlags,
+    ) -> Result<Self, ObservationError> {
+        if catalog_flags.primary() && !self.is_unique {
+            return Err(ObservationError::InvalidObservationField {
+                field: "index_catalog_flags",
+            });
+        }
+        self.catalog_flags = Some(catalog_flags);
+        Ok(self)
+    }
+
     /// Records an exact server-rendered partial predicate, never original DDL.
     #[must_use]
     pub fn with_predicate(mut self, predicate: impl Into<String>) -> Self {
@@ -703,6 +796,12 @@ impl IndexObservation {
     #[must_use]
     pub const fn nulls_not_distinct(&self) -> Option<bool> {
         self.nulls_not_distinct
+    }
+
+    /// Returns the observed remaining `pg_index` catalog flag vector, or `None` when unobserved.
+    #[must_use]
+    pub const fn catalog_flags(&self) -> Option<&IndexCatalogFlags> {
+        self.catalog_flags.as_ref()
     }
 
     /// Returns the exact observed access method name, or `None` when it was not captured.
@@ -963,7 +1062,7 @@ impl DomainObservation {
         self.collation.as_ref()
     }
 
-    /// Returns observed NOT NULL state when observed, or `None` when it was not captured.
+    /// Returns observed NOT NULL state, or `None` when it was not captured.
     #[must_use]
     pub const fn not_null(&self) -> Option<bool> {
         self.not_null
@@ -1882,7 +1981,7 @@ impl PostgresSchemaSnapshotV3 {
         })
     }
 
-    /// Returns the stable source-connection reference, never a credential.
+    /// Returns the stable source-connection registry reference, never a credential.
     #[must_use]
     pub fn source_connection_key(&self) -> &str {
         &self.source_connection_key
@@ -2134,6 +2233,18 @@ fn encode_index(hasher: &mut Sha256, index: &IndexObservation) {
     encode_str(hasher, index.index_name());
     encode_bool(hasher, index.is_unique());
     encode_optional_bool(hasher, index.nulls_not_distinct());
+    match index.catalog_flags() {
+        None => hasher.update([0]),
+        Some(flags) => {
+            hasher.update([1]);
+            encode_bool(hasher, flags.primary());
+            encode_bool(hasher, flags.exclusion());
+            encode_bool(hasher, flags.immediate());
+            encode_bool(hasher, flags.clustered());
+            encode_bool(hasher, flags.check_xmin());
+            encode_bool(hasher, flags.replica_identity());
+        }
+    }
     encode_optional_str(hasher, index.access_method());
 
     encode_len(hasher, index.key_attributes().len());
