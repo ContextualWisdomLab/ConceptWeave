@@ -8,6 +8,8 @@ All notable changes to ConceptWeave are documented here.
 
 - Relational evidence now distinguishes unique constraints that treat missing values as distinct from those that treat them as equal, while retaining unknown behavior when it was not observed. Evidence identity changes with that behavior; earlier evidence is not rewritten.
 
+- PostgreSQL schema snapshots now carry a v3 successor representation alongside the existing v2 form. Relations retain their observed kind and source comment, schema-scoped domain and enum observations join the same authorized schema allowlist as tables, and column type bindings resolve by exact qualified name without consulting `search_path`. The v3 identity is domain-separated from v2, so equal object sets never collapse the two generations into one digest, and unknown or ambiguous type bindings fail closed.
+
 - Initial ConceptWeave product, DDD, security, test, and operability baselines.
 - Rust 1.98.0 `conceptweave-domain` foundation with evidence-bound semantic candidate contracts.
 - Rust-first `conceptweave-observation` contract for immutable PostgreSQL schema snapshots with exact qualified identifiers, deterministic source ordering, canonical lowercase `sha256:<64 hex>` snapshot identity, snapshot/extractor/time evidence, and fail-closed duplicate or blank metadata validation.

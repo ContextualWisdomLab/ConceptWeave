@@ -95,6 +95,59 @@ pub enum ObservationError {
         /// Canonical escaped location requested by the caller.
         location: String,
     },
+    /// The same exact schema-scoped relation observation appeared more than once.
+    DuplicateRelationObservation {
+        /// Exact source schema identifier.
+        schema_name: String,
+        /// Exact duplicated source relation identifier.
+        relation_name: String,
+    },
+    /// The same exact schema-scoped domain observation appeared more than once.
+    DuplicateDomainObservation {
+        /// Exact source schema identifier.
+        schema_name: String,
+        /// Exact duplicated source domain identifier.
+        domain_name: String,
+    },
+    /// The same exact schema-scoped enum observation appeared more than once.
+    DuplicateEnumObservation {
+        /// Exact source schema identifier.
+        schema_name: String,
+        /// Exact duplicated source enum identifier.
+        enum_name: String,
+    },
+    /// A domain and an enum claimed the same exact schema-scoped type name.
+    DuplicateSchemaTypeName {
+        /// Exact source schema identifier.
+        schema_name: String,
+        /// Exact duplicated source type identifier.
+        type_name: String,
+    },
+    /// The same exact enum label appeared more than once in one enum observation.
+    DuplicateEnumLabel {
+        /// Exact source schema identifier.
+        schema_name: String,
+        /// Exact source enum identifier.
+        enum_name: String,
+        /// Exact duplicated source label text.
+        label: String,
+    },
+    /// The same exact check-constraint name appeared more than once on one domain.
+    DuplicateDomainCheckConstraint {
+        /// Exact source schema identifier.
+        schema_name: String,
+        /// Exact source domain identifier.
+        domain_name: String,
+        /// Exact duplicated source constraint identifier.
+        constraint_name: String,
+    },
+    /// A column or domain referenced a qualified type coordinate the snapshot cannot resolve.
+    UnknownTypeBinding {
+        /// Exact source schema identifier of the unresolved type coordinate.
+        schema_name: String,
+        /// Exact source type identifier of the unresolved type coordinate.
+        type_name: String,
+    },
 }
 
 impl Display for ObservationError {
@@ -167,6 +220,57 @@ impl Display for ObservationError {
             Self::UnknownObservationLocation { location } => {
                 write!(formatter, "unobserved source location: {location}")
             }
+            Self::DuplicateRelationObservation {
+                schema_name,
+                relation_name,
+            } => write!(
+                formatter,
+                "duplicate relation observation: {schema_name}.{relation_name}"
+            ),
+            Self::DuplicateDomainObservation {
+                schema_name,
+                domain_name,
+            } => write!(
+                formatter,
+                "duplicate domain observation: {schema_name}.{domain_name}"
+            ),
+            Self::DuplicateEnumObservation {
+                schema_name,
+                enum_name,
+            } => write!(
+                formatter,
+                "duplicate enum observation: {schema_name}.{enum_name}"
+            ),
+            Self::DuplicateSchemaTypeName {
+                schema_name,
+                type_name,
+            } => write!(
+                formatter,
+                "duplicate schema-scoped type name: {schema_name}.{type_name}"
+            ),
+            Self::DuplicateEnumLabel {
+                schema_name,
+                enum_name,
+                label,
+            } => write!(
+                formatter,
+                "duplicate enum label on {schema_name}.{enum_name}: {label}"
+            ),
+            Self::DuplicateDomainCheckConstraint {
+                schema_name,
+                domain_name,
+                constraint_name,
+            } => write!(
+                formatter,
+                "duplicate domain constraint on {schema_name}.{domain_name}: {constraint_name}"
+            ),
+            Self::UnknownTypeBinding {
+                schema_name,
+                type_name,
+            } => write!(
+                formatter,
+                "unresolved qualified type binding: {schema_name}.{type_name}"
+            ),
         }
     }
 }
@@ -1178,7 +1282,7 @@ fn validate_constraint_columns(
     Ok(())
 }
 
-fn escape_json_pointer_token(value: &str) -> String {
+pub(crate) fn escape_json_pointer_token(value: &str) -> String {
     value.replace('~', "~0").replace('/', "~1")
 }
 
@@ -1197,7 +1301,7 @@ fn validate_snapshot_digest(value: &str) -> Result<(), ObservationError> {
     Ok(())
 }
 
-fn validate_observed_at_utc(value: &str) -> Result<(), ObservationError> {
+pub(crate) fn validate_observed_at_utc(value: &str) -> Result<(), ObservationError> {
     let invalid = || ObservationError::InvalidObservationField {
         field: "observed_at_utc",
     };
@@ -1273,7 +1377,7 @@ fn is_gregorian_leap_year(year: u32) -> bool {
     (year.is_multiple_of(4) && !year.is_multiple_of(100)) || year.is_multiple_of(400)
 }
 
-fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
+pub(crate) fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
     if value.trim().is_empty() {
         return Err(ObservationError::InvalidObservationField { field });
     }
