@@ -27,7 +27,7 @@ Fresh 2026-09-11 authority:
 - Client Consumption #5: `6873ec0c0a701b2c59f3e0785d48d8739f019d5b`, the current parent of Source Observation #6;
 - Source Observation #6: `287165d399c5f54d6c4b4aa3c15497b47de8244b`, OPEN Draft/mechanically mergeable;
 - representation-v3 parent #45: `6b2a8f555725dc79f60432afbc492d6005290a4a`, OPEN Draft/mechanically mergeable on #6;
-- representation/index successor #46: current active RED lineage begins at `ebac140d8e4e554b5f43603ed167999efa7c739b`; the exact branch head must be re-read after every forward commit.
+- representation/index successor #46: production repair ancestor `173ae2f5a187341421ec5ed94f3fcc7d69c1de35`; review `5175722509` identified the stale-authority defect repaired by this baseline successor. Re-read the exact branch head after every ordinary forward commit; this documentation commit itself resets exact-head execution evidence.
 
 Protected central `.github/main` is `cb0872c9a20d5584703dffacca65c096fc034c6c`. Its required contexts include CodeQL compatibility analysis for actions/python, queue/security/dependency checks, Noema, required-workflow bootstrap, coverage evidence and OpenCode review. Historical central-base execution evidence does not become current-base acceptance merely because an old PR remains mechanically mergeable.
 
@@ -45,7 +45,7 @@ Historical v2 evidence is frozen. The v2 digest domain, table/column/constraint 
 
 ## PostgreSQL 18 representation-v3 current state
 
-The representation-before-transport prerequisite is materially implemented in the #45 -> #46 successor lineage, but it is not yet representation-complete and exact-head native/Product acceptance is still absent.
+The representation-before-transport prerequisite is materially implemented in the #45 -> #46 successor lineage. The previously active per-key PostgreSQL index semantics RED is now source-repaired, but exact-head native/Product acceptance is still absent and this documentation successor resets execution evidence again.
 
 The v3 source currently preserves:
 
@@ -54,52 +54,50 @@ The v3 source currently preserves:
 - schema-scoped domains and enums, including domain base type, typmod/array/collation/NOT NULL/default/CHECK evidence and enum membership/order;
 - direct schema allowlist revalidation for relations/domains/enums before immutable snapshot or receipt issuance;
 - first-class indexes with key versus `INCLUDE` roles, expression-versus-column structure, exact positions, uniqueness, `NULLS NOT DISTINCT`, access method, readiness/validity/liveness, partial predicate, reconstructed `pg_get_indexdef` text and comments;
-- v3 domain-separated deterministic digest framing;
+- one structured `IndexKeySemantics` record for every key position, carrying exact qualified collation when present, exact qualified operator-class coordinate, and opaque access-method-specific `indoption` bits;
+- v3 domain-separated deterministic digest framing, including the complete per-key semantic records;
 - kind-aware successor coordinates `/schemas/{schema}/relations/{kind}/{name}/...` with relation-child column/constraint/index coordinates, while frozen v2 `/tables/...` semantics stay unchanged;
 - exact qualified-type resolution shared by relation columns and domain base types; unknown qualified types fail closed.
 
-### Current index-layout repair lineage
+### Index representation repair lineage
 
-PostgreSQL 18 defines `indnatts` as total key plus included attributes and `indnkeyatts` as key attributes. Key positions precede included payload positions; a zero `indkey` position denotes a key expression. PostgreSQL `INCLUDE` accepts columns, not expressions, and `CREATE INDEX` requires at least one key `index_elem` before optional `INCLUDE` payload.
+PostgreSQL 18 defines `indnatts` as total key plus included attributes and `indnkeyatts` as key attributes. Key positions precede included payload positions; a zero `indkey` entry denotes a key expression. `INCLUDE` accepts columns, not expressions, and `CREATE INDEX` requires at least one key `index_elem` before optional payload.
 
-The current source lineage therefore enforces one canonical invariant at `IndexObservation::new`:
+The source lineage enforces one canonical structural invariant at `IndexObservation::new`: at least one key; collection/`IndexAttributeKind` agreement; one-based contiguous key -> INCLUDE positions; expression keys permitted; INCLUDE columns only.
 
-1. at least one key attribute exists;
-2. every item in `key_attributes` is `IndexAttributeKind::Key`;
-3. every item in `include_attributes` is `IndexAttributeKind::Include`;
-4. positions are one-based and contiguous across one key -> INCLUDE boundary;
-5. key attributes may be simple columns or expressions;
-6. INCLUDE attributes are simple columns only.
+Exact structural repair evidence on #46:
 
-Exact repair evidence on #46:
+- reviews `5174516003`, `5174543856`, `5174551665`: role/order/expression findings;
+- `0ec2d1016b931230655eb3536bb40e62d07f8531`: kind-aware relation/child successor coordinates;
+- `294a6d06ec4986f51b0cd714868d6b4de8253fc6`: role/collection, contiguous ordinal and expression-INCLUDE constructor repair plus contradictory-fixture correction;
+- review `5174770575` -> RED `808faa922c466a586ea3bc8bf9f928f049ec3b95` -> repair `6dd59aef9a69e08aae6e7ede54ed1e204a634d9f`: empty and INCLUDE-only indexes fail closed;
+- `033ae72b95e3ef490c47ec84c191b83632601b10` and `b2806d0b2d02d1a635d5a4850a88082c99c38fda`: prior authority/integrity documentation successors adopted as ordinary forward history.
 
-- reviews `5174516003`, `5174543856`, `5174551665`: original role/order/expression findings;
-- ordinary forward commit `0ec2d1016b931230655eb3536bb40e62d07f8531`: kind-aware relation/child successor coordinates, repairing the prior table-labelled non-table relation receipt defect;
-- ordinary forward commit `294a6d06ec4986f51b0cd714868d6b4de8253fc6`: role/collection, contiguous ordinal and expression-INCLUDE constructor repair plus contradictory-fixture correction;
-- review `5174770575`: missing-key-cardinality finding against exact `294a6d...`;
-- RED contract `808faa922c466a586ea3bc8bf9f928f049ec3b95`: empty-index and INCLUDE-only rejection cases;
-- minimal production repair `6dd59aef9a69e08aae6e7ede54ed1e204a634d9f`: fail closed when `key_attributes` is empty, at the same `index_attribute_layout` boundary;
-- `033ae72b95e3ef490c47ec84c191b83632601b10`: currentized this baseline after the layout repair;
-- ordinary docs successor `b2806d0b2d02d1a635d5a4850a88082c99c38fda`: preserves the detached-artifact integrity boundary and is adopted rather than treated as a race.
+### Per-key PostgreSQL semantics: RED -> source repair
 
-The above is source-shaped repair evidence, not native GREEN. Every subsequent head movement resets exact-head execution evidence again.
+Review `5175066205` identified that key position/source alone lost PostgreSQL 18 `pg_index.indcollation`, `indclass`, and `indoption`. Refinement review `5175346595` fixed the cardinality and interpretation boundary: those arrays have exactly `indnkeyatts` key entries, INCLUDE positions carry none, and `indoption` meaning belongs to the owning access method.
 
-### Active RED: per-key index semantics are not yet lossless
+RED `ebac140d8e4e554b5f43603ed167999efa7c739b` requires:
 
-Review `5175066205` identified that `IndexAttributeObservation` preserves position, Key/INCLUDE role and column-versus-expression source but not PostgreSQL 18 `pg_index.indcollation`, `indclass`, or `indoption`. Exact-head refinement review `5175346595` makes the catalog cardinality and interpretation boundary explicit: all three are arrays of exactly `indnkeyatts` key entries, INCLUDE attributes are not key semantics, and the meaning of each `indoption` bit is defined by the owning index access method.
+1. changing qualified collation, qualified operator class, or exact per-key access-method option bits changes structured v3 identity without relying on `pg_get_indexdef`;
+2. every key position has exactly one semantic record and INCLUDE positions have none;
+3. semantic positions match structural key positions exactly;
+4. blank/unqualified operator-class or collation coordinates fail closed;
+5. relation-attached indexes cannot enter governed snapshot identity with missing key semantics or blank access-method context;
+6. the generic domain preserves exact `indoption` bits under the access-method binding rather than decoding them as B-tree-specific ASC/DESC/NULLS semantics.
 
-Source-level RED `ebac140d8e4e554b5f43603ed167999efa7c739b` adds `crates/conceptweave-observation/tests/index_key_semantics_contract.rs`. It requires the production boundary to prove all of the following before representation-v3 can be called complete:
+Ordinary forward repair `173ae2f5a187341421ec5ed94f3fcc7d69c1de35` implements the missing production seam:
 
-1. changing one exact qualified collation, exact qualified operator class, or per-key access-method option bit pattern changes the structured v3 digest even when `pg_get_indexdef` is absent;
-2. one semantic record exists for every key position and no semantic record is manufactured for INCLUDE payload positions;
-3. semantic positions must match structural key positions exactly;
-4. blank or unqualified operator-class/collation coordinates fail closed;
-5. a relation-attached index cannot enter governed snapshot identity with missing key semantics or a blank access-method context;
-6. the generic domain preserves the exact `indoption` bit pattern under its access-method binding instead of decoding it as B-tree-specific ASC/DESC/NULLS behavior.
+- `QualifiedOperatorClassName` uses exact schema/name coordinates and does not use OID or `search_path` as governed identity;
+- `IndexKeySemantics` owns one-based key position, optional exact qualified collation, exact qualified operator class, and opaque option bits;
+- `IndexObservation::with_key_semantics` requires one record for every structural key position and rejects position/count mismatch;
+- `RelationObservation::with_indexes` requires complete key semantics plus a nonblank observed access method before an index can enter governed snapshot identity;
+- the v3 digest frames each semantic position, optional collation, operator class and option bit pattern as structured identity;
+- current fixtures/tests cover material digest variation, missing semantics, blank access method, position mismatch and operator-class coordinate validation.
 
-The RED intentionally names the not-yet-implemented `QualifiedOperatorClassName`, `IndexKeySemantics`, and `IndexObservation::with_key_semantics` production seam. This is a real RED contract, not GREEN evidence. The next causal source delta is the minimal VO/admission/digest implementation plus any required current fixture migration; only the resulting exact head may run acceptance.
+This closes the earlier source-level RED at the implementation/fixture boundary, but it is not native/Product GREEN. Review `5175722509` found that PR/baseline authority still described the predecessor RED after this ordinary forward repair; the PR body was currentized and this baseline successor completes the documentation side of that repair. Every resulting head movement still requires fresh executable acceptance.
 
-The repair must never use catalog OIDs or `search_path` inference as governed identity. `pg_get_indexdef` remains reconstructed provenance text, not the sole semantic carrier. PostgreSQL access-method-specific decoding belongs in the adapter/access-method boundary; ConceptWeave's generic representation owns exact observed facts and deterministic identity.
+The representation must never use catalog OIDs or `search_path` inference as governed identity. `pg_get_indexdef` remains reconstructed provenance text, not the sole semantic carrier. PostgreSQL access-method-specific decoding belongs in the adapter/access-method boundary; ConceptWeave's generic representation owns exact observed facts and deterministic identity.
 
 Authoritative PostgreSQL 18 basis:
 
@@ -117,16 +115,16 @@ Server-rendered `pg_get_constraintdef`, `pg_get_indexdef` and `pg_get_expr` text
 
 ## Representation acceptance still required
 
-Before #46/#45/#6 can claim the representation prerequisite GREEN, the current exact successor must close the active per-key RED and then execute and pass repository-pinned Rust 1.98:
+Before #46/#45/#6 can claim the representation prerequisite GREEN, the current exact successor must execute and pass repository-pinned Rust 1.98:
 
 - `cargo fmt --all --check`;
 - strict workspace/all-target Clippy with warnings denied;
-- workspace tests including the v2-frozen and v3/index-layout/per-key semantic contracts;
+- workspace tests including v2-frozen and v3/index-layout/per-key semantic contracts;
 - rustdoc/doc tests and release build;
 - owned production docstring/test/edge-case coverage requirements;
 - Product/security/dependency/review workflows applicable to the exact protected-stack state.
 
-Hosted runs or local execution produced for predecessor heads do not transfer. A draft-skipped CodeRabbit status is not Product/security/native acceptance. The `ebac140d...` head itself had no pull-request workflow run at the fresh post-RED check and only a CodeRabbit success status, so it is explicitly RED/pending rather than accepted.
+Hosted runs or local execution produced for predecessor heads do not transfer. At the fresh post-repair check of `173ae2f...`, pull-request workflow runs were absent and combined status exposed CodeRabbit success only. This documentation successor resets that evidence again. Draft-skipped or bot-only status is not Product/security/native acceptance.
 
 The representation regression set must keep proving:
 
@@ -134,13 +132,13 @@ The representation regression set must keep proving:
 - otherwise-identical v3 snapshots differing in one material PostgreSQL fact have distinct v3 identity;
 - every new evidence kind has a verified receipt coordinate;
 - unauthorized domain/enum-only schema fails before immutable snapshot/receipt side effects while an authorized type-only schema succeeds;
-- same-name types in different allowed schemas stay distinct and columns resolve to the exact qualified type coordinate;
+- same-name types in different allowed schemas stay distinct and columns resolve to exact qualified type coordinates;
 - unknown domain base types fail closed through the same exact qualified-type resolver as columns;
 - enum label/order and material domain semantics alter successor identity;
 - relation-level and child coordinates preserve exact `RelationKind` and reject same-name wrong-kind receipt lookup;
 - index role/position/source/predicate/null-uniqueness/readiness/validity/liveness/access-method/definition changes alter identity;
 - per-key collation/operator-class/access-method option semantics are structured first-class identity rather than optional text-only provenance;
-- role/collection disagreement, non-contiguous ordinals, expression INCLUDE, empty indexes and INCLUDE-only indexes fail closed;
+- missing/misaligned key semantics, blank access method, role/collection disagreement, non-contiguous ordinals, expression INCLUDE, empty indexes and INCLUDE-only indexes fail closed;
 - input-order permutations of identical complete evidence remain digest-identical.
 
 ## Concrete PostgreSQL adapter boundary
@@ -149,7 +147,7 @@ Do not attach transport until the representation successor is exact-head GREEN a
 
 ## Other product/research lanes
 
-This Source Observation lineage does not rewrite Client Consumption, Research Intake, golden-set evaluation or later steward/full-text deltas. Those lanes retain their canonical owner histories. Before acting on one of them, re-read its live PR/issue/default-branch authority rather than relying on historical coordinates that were previously embedded in this baseline.
+This Source Observation lineage does not rewrite Client Consumption, Research Intake, golden-set evaluation or later steward/full-text deltas. Those lanes retain their canonical owner histories. Before acting on one of them, re-read its live PR/issue/default-branch authority rather than relying on historical coordinates embedded in this baseline.
 
 For the procedural-generation lane, #44 remains a private source-shaped Rust boundary until native/Product acceptance and released Keyverse trust consumption exist. LLM-produced semantics remain proposed/inferred and cannot become authoritative before independent validation, authorized stewardship and immutable publication.
 
@@ -159,8 +157,8 @@ For the procedural-generation lane, #44 remains a private source-shaped Rust bou
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | PRD/TRD/ADR/context map define canonical ConceptWeave ownership and foreign-owner seams. |
 | Truth/publication lifecycle | SOURCE_REPAIRED_PENDING_PROTECTED_EVIDENCE | No protected immutable semantic release exists. |
-| Client Consumption | RESTACKED_HOSTED_PENDING | #5 remains the current Source Observation parent; its existing `SemanticReleaseClient::verify_detached_artifact` remains current because after admission it hashes the exact caller-supplied detached immutable artifact bytes against the declared digest, keeping digest syntax distinct from byte-integrity evidence; exact live evidence must be re-read before Client action. |
-| Source Observation | REPRESENTATION_V3_RED_ACTIVE | #46 now carries an explicit per-key semantic RED at `ebac140d...`; production VO/admission/digest repair, exact-head Rust/Product acceptance and ordinary parent adoption remain. |
+| Client Consumption | RESTACKED_HOSTED_PENDING | #5 remains the current Source Observation parent; exact live evidence must be re-read before Client action. |
+| Source Observation | REPRESENTATION_V3_SOURCE_REPAIRED_PENDING_EXACT_HEAD_GREEN | `173ae2f...` closes the explicit per-key source RED; this docs successor resets execution evidence. Rust/Product acceptance and ordinary parent adoption remain. |
 | Product CI | BLOCKED_OWNER_RECONCILIATION | #35 waits on central backward-compatible handler/current-main reconciliation and exact terminal GREEN. |
 | Quality gate | ACTIVE | Rust 1.98, unsafe forbidden, public docs, fmt, strict Clippy, tests, rustdoc, release, owned production coverage, fixture/schema/lock/clean-tree checks; every head movement resets acceptance. |
 | Security / review | PENDING_EXACT_HEAD | Scanner/reviewer status is accepted only when bound to the exact current head and applicable protected policy. |
@@ -168,7 +166,7 @@ For the procedural-generation lane, #44 remains a private source-shaped Rust bou
 
 ## Current causal sequence
 
-1. Close #46's explicit per-key PostgreSQL semantic RED with the minimal qualified-operator-class/key-semantics/admission/digest repair, then obtain exact-current Rust 1.98 plus applicable hosted acceptance without flattening #45/#6.
+1. Re-read #46 after this documentation successor, review the exact current head, and obtain exact-current Rust 1.98 plus applicable hosted Product/security/dependency/review acceptance without flattening #45/#6.
 2. Ordinary/non-force adopt the verified #46 delta into #45 and then #6; do not transfer predecessor GREEN.
 3. In parallel prerequisite order, central owner lands a backward-compatible handler, reconciles #2051/#2056 onto protected `.github/main`, obtains exact terminal GREEN, then unchanged #35 obtains fresh acceptance and merges normally.
 4. Foundation ordinary/non-force restacks after #35 and repairs its generic owner text-contract discrepancy under its own authority before descendants inherit a fresh parent.
