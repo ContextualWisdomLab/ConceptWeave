@@ -110,6 +110,8 @@ Current snapshot construction enforces schema scope by iterating observed tables
 - enum label/order changes alter successor identity;
 - material domain base/default/null/collation/check-constraint changes alter successor identity;
 - a schema-scoped receipt cannot be satisfied merely because an unrelated table exists in that schema;
+- index key/INCLUDE role, attribute position and expression-versus-column form, partial predicate, NULL uniqueness semantics, readiness/validity/liveness, access method, and reconstructed definition changes alter successor identity;
+- index receipt coordinates cannot be satisfied by a same-named constraint, an unrelated relation, or a missing index;
 - fake table-scoped type coordinates fail;
 - input-order permutations of identical complete evidence remain digest-identical.
 

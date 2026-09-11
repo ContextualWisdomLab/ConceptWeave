@@ -1,9 +1,10 @@
 use conceptweave_observation::{
     CheckConstraintObservation, ColumnObservationV3, DomainCheckConstraintObservation,
-    DomainObservation, EnumObservation, ObservationError, PostgresSchemaSnapshot,
-    PostgresSchemaSnapshotV3, QualifiedCollationName, QualifiedTypeName, RelationKind,
-    RelationObservation, SchemaObjectLocation, SchemaObjectLocationKind,
-    TableConstraintObservation, UniqueConstraintObservation,
+    DomainObservation, EnumObservation, IndexAttributeKind, IndexAttributeObservation,
+    IndexObservation, ObservationError, PostgresSchemaSnapshot, PostgresSchemaSnapshotV3,
+    QualifiedCollationName, QualifiedTypeName, RelationKind, RelationObservation,
+    SchemaObjectLocation, SchemaObjectLocationKind, TableConstraintObservation,
+    UniqueConstraintObservation,
 };
 
 mod support;
@@ -28,6 +29,59 @@ fn bound_column(
         None,
     )
     .expect("bound column fixture is valid")
+}
+
+fn event_index() -> IndexObservation {
+    IndexObservation::new(
+        "event_parent_ix",
+        true,
+        None,
+        vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
+        vec![index_attribute(2, IndexAttributeKind::Include, "event_key")],
+    )
+    .expect("index fixture is valid")
+    .with_predicate("(parent_key IS NOT NULL)")
+    .with_source_comment("observed index comment")
+}
+
+fn index_attribute(
+    position: u32,
+    kind: IndexAttributeKind,
+    attribute_name: &str,
+) -> IndexAttributeObservation {
+    IndexAttributeObservation::new(position, kind, attribute_name)
+        .expect("index attribute fixture is valid")
+}
+
+fn indexed_relation() -> RelationObservation {
+    event_relation(RelationKind::Table)
+        .with_indexes(vec![event_index()])
+        .expect("index fixture references observed columns")
+}
+
+fn expression_index() -> IndexObservation {
+    IndexObservation::new(
+        "event_lower_email_ix",
+        true,
+        Some(false),
+        vec![IndexAttributeObservation::expression(
+            1,
+            IndexAttributeKind::Key,
+            "lower(parent_key)",
+        )
+        .expect("expression attribute fixture is valid")],
+        Vec::new(),
+    )
+    .expect("expression index fixture is valid")
+    .with_access_method("btree")
+    .with_predicate("(parent_key IS NOT NULL)")
+    .with_ready(true)
+    .with_valid(true)
+    .with_live(false)
+    .with_index_definition(
+        "CREATE UNIQUE INDEX event_lower_email_ix ON public.event_record USING btree (lower(parent_key)) WHERE (parent_key IS NOT NULL)",
+    )
+    .with_source_comment("observed expression index comment")
 }
 
 fn event_constraints(reversed: bool) -> Vec<TableConstraintObservation> {
@@ -1207,4 +1261,440 @@ fn enum_labels_preserve_exact_source_text_including_empty_labels() {
     )
     .expect("an empty enum label is exact source text, not a missing value");
     assert_eq!(observed_enum.labels(), ["", "pending"]);
+}
+
+#[test]
+fn index_evidence_is_material_successor_identity() {
+    let base = digest_of(vec![indexed_relation()], Vec::new(), Vec::new());
+
+    let no_predicate = IndexObservation::new(
+        "event_parent_ix",
+        true,
+        None,
+        vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
+        vec![index_attribute(2, IndexAttributeKind::Include, "event_key")],
+    )
+    .expect("index fixture")
+    .with_source_comment("observed index comment");
+    let non_unique = IndexObservation::new(
+        "event_parent_ix",
+        false,
+        None,
+        vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
+        vec![index_attribute(2, IndexAttributeKind::Include, "event_key")],
+    )
+    .expect("index fixture")
+    .with_predicate("(parent_key IS NOT NULL)")
+    .with_source_comment("observed index comment");
+    let nulls_not_distinct = IndexObservation::new(
+        "event_parent_ix",
+        true,
+        Some(true),
+        vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
+        vec![index_attribute(2, IndexAttributeKind::Include, "event_key")],
+    )
+    .expect("index fixture")
+    .with_predicate("(parent_key IS NOT NULL)")
+    .with_source_comment("observed index comment");
+    let role_swapped = IndexObservation::new(
+        "event_parent_ix",
+        true,
+        None,
+        vec![index_attribute(
+            1,
+            IndexAttributeKind::Include,
+            "parent_key",
+        )],
+        vec![index_attribute(2, IndexAttributeKind::Key, "event_key")],
+    )
+    .expect("index fixture")
+    .with_predicate("(parent_key IS NOT NULL)")
+    .with_source_comment("observed index comment");
+    let reordered_attributes = IndexObservation::new(
+        "event_parent_ix",
+        true,
+        None,
+        vec![index_attribute(1, IndexAttributeKind::Key, "event_key")],
+        vec![index_attribute(
+            2,
+            IndexAttributeKind::Include,
+            "parent_key",
+        )],
+    )
+    .expect("index fixture")
+    .with_predicate("(parent_key IS NOT NULL)")
+    .with_source_comment("observed index comment");
+    let renamed = IndexObservation::new(
+        "event_parent_ix_v2",
+        true,
+        None,
+        vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
+        vec![index_attribute(2, IndexAttributeKind::Include, "event_key")],
+    )
+    .expect("index fixture")
+    .with_predicate("(parent_key IS NOT NULL)")
+    .with_source_comment("observed index comment");
+    let comment_only = IndexObservation::new(
+        "event_parent_ix",
+        true,
+        None,
+        vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
+        vec![index_attribute(2, IndexAttributeKind::Include, "event_key")],
+    )
+    .expect("index fixture")
+    .with_predicate("(parent_key IS NOT NULL)")
+    .with_source_comment("changed index comment");
+
+    let variants = [
+        IndexObservation::new(
+            "event_parent_ix",
+            true,
+            None,
+            vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
+            vec![index_attribute(2, IndexAttributeKind::Include, "event_key")],
+        )
+        .expect("index fixture"),
+        no_predicate,
+        non_unique,
+        nulls_not_distinct,
+        role_swapped,
+        reordered_attributes,
+        renamed,
+        comment_only,
+    ];
+
+    assert_ne!(
+        digest_of(
+            vec![event_relation(RelationKind::Table)],
+            Vec::new(),
+            Vec::new()
+        ),
+        base,
+        "adding index evidence must change successor identity"
+    );
+    for (index_number, variant) in variants.into_iter().enumerate() {
+        let relation = event_relation(RelationKind::Table)
+            .with_indexes(vec![variant])
+            .expect("variant index references observed columns");
+        assert_ne!(
+            base,
+            digest_of(vec![relation], Vec::new(), Vec::new()),
+            "material index variant {index_number} must change successor identity"
+        );
+    }
+}
+
+#[test]
+fn index_coordinates_receive_verified_receipts() {
+    let snapshot = snapshot_v3(vec![indexed_relation()], Vec::new(), Vec::new())
+        .expect("indexed fixture snapshot is valid");
+
+    let location = SchemaObjectLocation::index("public", "event_record", "event_parent_ix")
+        .expect("index location");
+    assert_eq!(location.kind(), SchemaObjectLocationKind::Index);
+    assert_eq!(
+        location.canonical_location(),
+        "/schemas/public/tables/event_record/indexes/event_parent_ix"
+    );
+    assert_eq!(location.table_name(), Some("event_record"));
+    assert_eq!(location.index_name(), Some("event_parent_ix"));
+    assert_eq!(location.column_name(), None);
+    assert_eq!(location.constraint_name(), None);
+    assert_eq!(location.domain_name(), None);
+    assert_eq!(location.enum_name(), None);
+
+    let receipt = snapshot
+        .source_receipt(location)
+        .expect("observed index coordinate can be receipted");
+    assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+}
+
+#[test]
+fn index_locational_coordinates_are_collision_safe() {
+    let location = SchemaObjectLocation::index("Sales/~North", "Event/Record", "Parent/~Ix")
+        .expect("index location");
+    assert_eq!(
+        location.canonical_location(),
+        "/schemas/Sales~1~0North/tables/Event~1Record/indexes/Parent~1~0Ix"
+    );
+}
+
+#[test]
+fn index_attributes_are_canonicalized_in_position_order() {
+    let index = IndexObservation::new(
+        "event_parent_ix",
+        true,
+        None,
+        vec![
+            index_attribute(2, IndexAttributeKind::Key, "event_key"),
+            index_attribute(1, IndexAttributeKind::Key, "parent_key"),
+        ],
+        vec![
+            index_attribute(4, IndexAttributeKind::Include, "event_key"),
+            index_attribute(3, IndexAttributeKind::Include, "parent_key"),
+        ],
+    )
+    .expect("out-of-order attributes are canonicalized, not rejected");
+
+    let key_positions: Vec<u32> = index
+        .key_attributes()
+        .iter()
+        .map(IndexAttributeObservation::position)
+        .collect();
+    let include_positions: Vec<u32> = index
+        .include_attributes()
+        .iter()
+        .map(IndexAttributeObservation::position)
+        .collect();
+    assert_eq!(key_positions, vec![1, 2]);
+    assert_eq!(include_positions, vec![3, 4]);
+    assert_eq!(
+        index.key_attributes()[0].attribute_name(),
+        Some("parent_key")
+    );
+    assert_eq!(index.key_attributes()[0].kind(), IndexAttributeKind::Key);
+}
+
+#[test]
+fn relation_indexes_reject_duplicate_or_unknown_coordinates() {
+    let duplicate_index = event_relation(RelationKind::Table)
+        .with_indexes(vec![event_index(), event_index()])
+        .expect_err("duplicate index names must fail closed");
+    assert_eq!(
+        duplicate_index,
+        ObservationError::DuplicateIndexObservation {
+            schema_name: "public".to_owned(),
+            relation_name: "event_record".to_owned(),
+            index_name: "event_parent_ix".to_owned(),
+        }
+    );
+
+    let duplicate_position = event_relation(RelationKind::Table)
+        .with_indexes(vec![
+            IndexObservation::new(
+                "event_parent_ix",
+                true,
+                None,
+                vec![
+                    index_attribute(1, IndexAttributeKind::Key, "parent_key"),
+                    index_attribute(1, IndexAttributeKind::Key, "event_key"),
+                ],
+                Vec::new(),
+            )
+            .expect("index fixture"),
+        ])
+        .expect_err("duplicate attribute positions must fail closed");
+    assert_eq!(
+        duplicate_position,
+        ObservationError::DuplicateIndexAttribute {
+            schema_name: "public".to_owned(),
+            relation_name: "event_record".to_owned(),
+            index_name: "event_parent_ix".to_owned(),
+            position: 1,
+        }
+    );
+
+    let unknown_attribute = event_relation(RelationKind::Table)
+        .with_indexes(vec![
+            IndexObservation::new(
+                "event_parent_ix",
+                true,
+                None,
+                vec![index_attribute(1, IndexAttributeKind::Key, "missing_key")],
+                Vec::new(),
+            )
+            .expect("index fixture"),
+        ])
+        .expect_err("index attributes must resolve to observed relation columns");
+    assert_eq!(
+        unknown_attribute,
+        ObservationError::UnknownIndexAttribute {
+            schema_name: "public".to_owned(),
+            relation_name: "event_record".to_owned(),
+            index_name: "event_parent_ix".to_owned(),
+            attribute_name: "missing_key".to_owned(),
+        }
+    );
+}
+
+#[test]
+fn index_value_objects_reject_blank_or_zero_evidence() {
+    assert_eq!(
+        IndexObservation::new(" ", true, None, Vec::new(), Vec::new()),
+        Err(ObservationError::InvalidObservationField {
+            field: "index_name"
+        })
+    );
+    assert_eq!(
+        IndexAttributeObservation::new(1, IndexAttributeKind::Key, " "),
+        Err(ObservationError::InvalidObservationField {
+            field: "attribute_name"
+        })
+    );
+    assert_eq!(
+        IndexAttributeObservation::new(0, IndexAttributeKind::Key, "parent_key"),
+        Err(ObservationError::InvalidOrdinalPosition)
+    );
+    assert_eq!(
+        SchemaObjectLocation::index("public", " ", "event_parent_ix"),
+        Err(ObservationError::InvalidObservationField {
+            field: "table_name"
+        })
+    );
+    assert_eq!(
+        SchemaObjectLocation::index("public", "event_record", " "),
+        Err(ObservationError::InvalidObservationField {
+            field: "index_name"
+        })
+    );
+}
+
+#[test]
+fn index_readiness_validity_liveness_and_definition_are_material() {
+    let base = digest_of(
+        vec![
+            event_relation(RelationKind::Table)
+                .with_indexes(vec![
+                    event_index()
+                        .with_ready(true)
+                        .with_valid(true)
+                        .with_live(true),
+                ])
+                .expect("observed index"),
+        ],
+        Vec::new(),
+        Vec::new(),
+    );
+    let variants = [
+        digest_of(
+            vec![event_relation(RelationKind::Table)
+                .with_indexes(vec![event_index()
+                    .with_ready(false)
+                    .with_valid(true)
+                    .with_live(true)])
+                .expect("observed index")],
+            Vec::new(),
+            Vec::new(),
+        ),
+        digest_of(
+            vec![event_relation(RelationKind::Table)
+                .with_indexes(vec![event_index()
+                    .with_ready(true)
+                    .with_valid(false)
+                    .with_live(true)])
+                .expect("observed index")],
+            Vec::new(),
+            Vec::new(),
+        ),
+        digest_of(
+            vec![event_relation(RelationKind::Table)
+                .with_indexes(vec![event_index()
+                    .with_ready(true)
+                    .with_valid(true)
+                    .with_live(false)])
+                .expect("observed index")],
+            Vec::new(),
+            Vec::new(),
+        ),
+        digest_of(
+            vec![event_relation(RelationKind::Table)
+                .with_indexes(vec![event_index()
+                    .with_ready(true)
+                    .with_valid(true)
+                    .with_live(true)
+                    .with_access_method("hash")])
+                .expect("observed index")],
+            Vec::new(),
+            Vec::new(),
+        ),
+        digest_of(
+            vec![event_relation(RelationKind::Table)
+                .with_indexes(vec![event_index()
+                    .with_ready(true)
+                    .with_valid(true)
+                    .with_live(true)
+                    .with_index_definition(
+                        "CREATE UNIQUE INDEX event_parent_ix ON public.event_record USING btree (parent_key)",
+                    )])
+                .expect("observed index")],
+            Vec::new(),
+            Vec::new(),
+        ),
+    ];
+
+    for (index_number, variant) in variants.into_iter().enumerate() {
+        assert_ne!(
+            base, variant,
+            "index readiness/validity/liveness/definition variant {index_number} must change successor identity"
+        );
+    }
+}
+
+#[test]
+fn expression_indexes_are_structurally_distinct_from_column_indexes() {
+    let expression_snapshot = snapshot_v3(
+        vec![
+            event_relation(RelationKind::Table)
+                .with_indexes(vec![expression_index()])
+                .expect("expression index fixture is valid"),
+        ],
+        Vec::new(),
+        Vec::new(),
+    )
+    .expect("expression index snapshot is valid");
+    let observed = &expression_snapshot.relations()[0].indexes()[0];
+    let attribute = &observed.key_attributes()[0];
+    assert_eq!(attribute.attribute_name(), None);
+    assert_eq!(attribute.expression_text(), Some("lower(parent_key)"));
+    assert_eq!(observed.access_method(), Some("btree"));
+    assert_eq!(observed.ready(), Some(true));
+    assert_eq!(observed.valid(), Some(true));
+    assert_eq!(observed.live(), Some(false));
+    assert!(observed.index_definition().is_some());
+
+    let column_snapshot = snapshot_v3(vec![indexed_relation()], Vec::new(), Vec::new())
+        .expect("column index snapshot is valid");
+    assert_ne!(
+        expression_snapshot.snapshot_digest(),
+        column_snapshot.snapshot_digest(),
+        "the same position as an expression and as a column must not collapse"
+    );
+}
+
+#[test]
+fn index_attribute_rejects_a_blank_expression() {
+    assert_eq!(
+        IndexAttributeObservation::expression(1, IndexAttributeKind::Key, " "),
+        Err(ObservationError::InvalidObservationField {
+            field: "expression"
+        })
+    );
+    assert_eq!(
+        IndexAttributeObservation::expression(0, IndexAttributeKind::Key, "lower(x)"),
+        Err(ObservationError::InvalidOrdinalPosition)
+    );
+}
+
+#[test]
+fn index_receipts_cannot_be_satisfied_by_a_different_kind_or_relation() {
+    let snapshot = snapshot_v3(vec![indexed_relation()], Vec::new(), Vec::new())
+        .expect("indexed fixture snapshot is valid");
+    let unobserved = [
+        SchemaObjectLocation::index("public", "event_record", "missing_ix").expect("index shape"),
+        SchemaObjectLocation::index("public", "missing_relation", "event_parent_ix")
+            .expect("index shape"),
+        SchemaObjectLocation::constraint("public", "event_record", "event_parent_ix")
+            .expect("constraint shape"),
+    ];
+
+    for location in unobserved {
+        let expected = location.canonical_location();
+        let error = snapshot
+            .source_receipt(location)
+            .expect_err("an unrelated coordinate must not be receipted as an index");
+        assert_eq!(
+            error,
+            ObservationError::UnknownObservationLocation { location: expected }
+        );
+    }
 }

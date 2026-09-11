@@ -148,6 +148,37 @@ pub enum ObservationError {
         /// Exact source type identifier of the unresolved type coordinate.
         type_name: String,
     },
+    /// The same exact relation-scoped index name appeared more than once.
+    DuplicateIndexObservation {
+        /// Exact source schema identifier.
+        schema_name: String,
+        /// Exact owning relation identifier.
+        relation_name: String,
+        /// Exact duplicated source index identifier.
+        index_name: String,
+    },
+    /// One index listed the same exact attribute position more than once.
+    DuplicateIndexAttribute {
+        /// Exact source schema identifier.
+        schema_name: String,
+        /// Exact owning relation identifier.
+        relation_name: String,
+        /// Exact source index identifier.
+        index_name: String,
+        /// Duplicated one-based attribute position.
+        position: u32,
+    },
+    /// An index attribute did not resolve to a key or INCLUDE coordinate on the owning relation.
+    UnknownIndexAttribute {
+        /// Exact source schema identifier.
+        schema_name: String,
+        /// Exact owning relation identifier.
+        relation_name: String,
+        /// Exact source index identifier.
+        index_name: String,
+        /// Exact attribute identifier that could not be resolved.
+        attribute_name: String,
+    },
 }
 
 impl Display for ObservationError {
@@ -270,6 +301,32 @@ impl Display for ObservationError {
             } => write!(
                 formatter,
                 "unresolved qualified type binding: {schema_name}.{type_name}"
+            ),
+            Self::DuplicateIndexObservation {
+                schema_name,
+                relation_name,
+                index_name,
+            } => write!(
+                formatter,
+                "duplicate index observation on {schema_name}.{relation_name}: {index_name}"
+            ),
+            Self::DuplicateIndexAttribute {
+                schema_name,
+                relation_name,
+                index_name,
+                position,
+            } => write!(
+                formatter,
+                "duplicate index attribute on {schema_name}.{relation_name}: {index_name} at position {position}"
+            ),
+            Self::UnknownIndexAttribute {
+                schema_name,
+                relation_name,
+                index_name,
+                attribute_name,
+            } => write!(
+                formatter,
+                "unknown index attribute on {schema_name}.{relation_name}: {index_name} refers to {attribute_name}"
             ),
         }
     }

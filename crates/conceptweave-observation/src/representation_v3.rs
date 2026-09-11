@@ -1,9 +1,10 @@
 //! Versioned successor observation value objects for PostgreSQL schema evidence.
 //!
 //! These contracts form the successor evidence family to the frozen v2 representation: relation
-//! kind and relation comments, schema-scoped domains and enums, qualified column type bindings,
-//! domain semantics, and enum label order. The successor framing is domain-separated from v2, so no
-//! v2 digest, receipt, or coordinate changes meaning because of this module.
+//! kind and relation comments, relation-scoped index evidence, schema-scoped domains and enums,
+//! qualified column type bindings, domain semantics, and enum label order. The successor framing is
+//! domain-separated from v2, so no v2 digest, receipt, or coordinate changes meaning because of this
+//! module.
 
 use std::collections::BTreeSet;
 
@@ -201,6 +202,303 @@ impl ColumnObservationV3 {
     #[must_use]
     pub const fn nullable(&self) -> bool {
         self.nullable
+    }
+
+    /// Returns the exact optional source comment without inventing missing metadata.
+    #[must_use]
+    pub fn source_comment(&self) -> Option<&str> {
+        self.source_comment.as_deref()
+    }
+}
+
+/// PostgreSQL index attribute role within one index observation.
+///
+/// Key attributes participate in the index key and uniqueness, while INCLUDE attributes are
+/// payload-only. The role is material identity: the same exact attribute in a different role is a
+/// different observation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum IndexAttributeKind {
+    /// A key attribute of the index.
+    Key,
+    /// A non-key payload attribute carried by `INCLUDE`.
+    Include,
+}
+
+impl IndexAttributeKind {
+    fn tag(self) -> u8 {
+        match self {
+            Self::Key => 0,
+            Self::Include => 1,
+        }
+    }
+}
+
+/// One immutable index attribute in exact `indkey` position order.
+///
+/// A zero `indkey` position denotes a server-rendered expression rather than a simple column
+/// reference, so the two forms are structurally distinct and never collapse into one string.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IndexAttributeObservation {
+    position: u32,
+    kind: IndexAttributeKind,
+    source: IndexAttributeSource,
+}
+
+/// Exact source of one index attribute position.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum IndexAttributeSource {
+    /// A simple column reference addressed by exact attribute name.
+    Column(String),
+    /// An exact server-rendered expression occupying a zero `indkey` position.
+    Expression(String),
+}
+
+impl IndexAttributeObservation {
+    /// Creates a simple column index attribute from exact source attribute text.
+    pub fn new(
+        position: u32,
+        kind: IndexAttributeKind,
+        attribute_name: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        Self::column(position, kind, attribute_name)
+    }
+
+    /// Creates a simple column index attribute from exact source attribute text.
+    pub fn column(
+        position: u32,
+        kind: IndexAttributeKind,
+        attribute_name: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        let attribute_name = attribute_name.into();
+        if position == 0 {
+            return Err(ObservationError::InvalidOrdinalPosition);
+        }
+        validate_nonblank(&attribute_name, "attribute_name")?;
+        Ok(Self {
+            position,
+            kind,
+            source: IndexAttributeSource::Column(attribute_name),
+        })
+    }
+
+    /// Creates an expression index attribute from exact server-rendered expression text.
+    pub fn expression(
+        position: u32,
+        kind: IndexAttributeKind,
+        expression: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        let expression = expression.into();
+        if position == 0 {
+            return Err(ObservationError::InvalidOrdinalPosition);
+        }
+        validate_nonblank(&expression, "expression")?;
+        Ok(Self {
+            position,
+            kind,
+            source: IndexAttributeSource::Expression(expression),
+        })
+    }
+
+    /// Returns the one-based source attribute position.
+    #[must_use]
+    pub const fn position(&self) -> u32 {
+        self.position
+    }
+
+    /// Returns the key or INCLUDE role of this attribute.
+    #[must_use]
+    pub const fn kind(&self) -> IndexAttributeKind {
+        self.kind
+    }
+
+    /// Returns the exact source column name for a simple column attribute.
+    #[must_use]
+    pub fn attribute_name(&self) -> Option<&str> {
+        match &self.source {
+            IndexAttributeSource::Column(attribute_name) => Some(attribute_name),
+            IndexAttributeSource::Expression(_) => None,
+        }
+    }
+
+    /// Returns the exact server-rendered expression for an expression attribute.
+    #[must_use]
+    pub fn expression_text(&self) -> Option<&str> {
+        match &self.source {
+            IndexAttributeSource::Expression(expression) => Some(expression),
+            IndexAttributeSource::Column(_) => None,
+        }
+    }
+}
+
+/// Immutable observation of one relation-scoped PostgreSQL index.
+///
+/// Key attributes are held separately from INCLUDE payload attributes because the two roles are
+/// materially distinct. A partial index carries its exact server-rendered predicate, while a
+/// non-partial index carries no predicate so the two never collapse. Readiness, validity, and
+/// liveness remain independently optional because the adapter may not observe every catalog flag.
+/// Reconstructed definition text is exact server output (`pg_get_indexdef`), never original DDL.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IndexObservation {
+    index_name: String,
+    is_unique: bool,
+    nulls_not_distinct: Option<bool>,
+    access_method: Option<String>,
+    key_attributes: Vec<IndexAttributeObservation>,
+    include_attributes: Vec<IndexAttributeObservation>,
+    predicate: Option<String>,
+    ready: Option<bool>,
+    valid: Option<bool>,
+    live: Option<bool>,
+    index_definition: Option<String>,
+    source_comment: Option<String>,
+}
+
+impl IndexObservation {
+    /// Creates an index observation from exactly the observed material index evidence.
+    ///
+    /// Key and INCLUDE attributes are canonicalized into deterministic position order, attribute
+    /// positions must be unique, and every simple column attribute is validated against the owning
+    /// relation columns when the index is attached to a relation observation.
+    pub fn new(
+        index_name: impl Into<String>,
+        is_unique: bool,
+        nulls_not_distinct: Option<bool>,
+        mut key_attributes: Vec<IndexAttributeObservation>,
+        mut include_attributes: Vec<IndexAttributeObservation>,
+    ) -> Result<Self, ObservationError> {
+        let index_name = index_name.into();
+        validate_nonblank(&index_name, "index_name")?;
+        key_attributes.sort_by_key(IndexAttributeObservation::position);
+        include_attributes.sort_by_key(IndexAttributeObservation::position);
+        Ok(Self {
+            index_name,
+            is_unique,
+            nulls_not_distinct,
+            access_method: None,
+            key_attributes,
+            include_attributes,
+            predicate: None,
+            ready: None,
+            valid: None,
+            live: None,
+            index_definition: None,
+            source_comment: None,
+        })
+    }
+
+    /// Records the exact observed access method name, such as `btree` or `gin`.
+    #[must_use]
+    pub fn with_access_method(mut self, access_method: impl Into<String>) -> Self {
+        self.access_method = Some(access_method.into());
+        self
+    }
+
+    /// Records an exact server-rendered partial predicate, never original DDL.
+    #[must_use]
+    pub fn with_predicate(mut self, predicate: impl Into<String>) -> Self {
+        self.predicate = Some(predicate.into());
+        self
+    }
+
+    /// Records observed `pg_index.indisready` state, or leaves `None` when it was not captured.
+    #[must_use]
+    pub const fn with_ready(mut self, ready: bool) -> Self {
+        self.ready = Some(ready);
+        self
+    }
+
+    /// Records observed `pg_index.indisvalid` state, or leaves `None` when it was not captured.
+    #[must_use]
+    pub const fn with_valid(mut self, valid: bool) -> Self {
+        self.valid = Some(valid);
+        self
+    }
+
+    /// Records observed `pg_index.indislive` state, or leaves `None` when it was not captured.
+    #[must_use]
+    pub const fn with_live(mut self, live: bool) -> Self {
+        self.live = Some(live);
+        self
+    }
+
+    /// Records exact server-rendered `pg_get_indexdef` text, never original DDL.
+    #[must_use]
+    pub fn with_index_definition(mut self, index_definition: impl Into<String>) -> Self {
+        self.index_definition = Some(index_definition.into());
+        self
+    }
+
+    /// Records the exact optional index comment without inventing missing metadata.
+    #[must_use]
+    pub fn with_source_comment(mut self, source_comment: impl Into<String>) -> Self {
+        self.source_comment = Some(source_comment.into());
+        self
+    }
+
+    /// Returns the exact source index identifier.
+    #[must_use]
+    pub fn index_name(&self) -> &str {
+        &self.index_name
+    }
+
+    /// Returns whether the index enforces uniqueness.
+    #[must_use]
+    pub const fn is_unique(&self) -> bool {
+        self.is_unique
+    }
+
+    /// Returns observed `NULLS NOT DISTINCT` state, or `None` when it was not captured.
+    #[must_use]
+    pub const fn nulls_not_distinct(&self) -> Option<bool> {
+        self.nulls_not_distinct
+    }
+
+    /// Returns the exact observed access method name, or `None` when it was not captured.
+    #[must_use]
+    pub fn access_method(&self) -> Option<&str> {
+        self.access_method.as_deref()
+    }
+
+    /// Returns key attributes in deterministic source position order.
+    #[must_use]
+    pub fn key_attributes(&self) -> &[IndexAttributeObservation] {
+        &self.key_attributes
+    }
+
+    /// Returns INCLUDE payload attributes in deterministic source position order.
+    #[must_use]
+    pub fn include_attributes(&self) -> &[IndexAttributeObservation] {
+        &self.include_attributes
+    }
+
+    /// Returns the exact server-rendered partial predicate, or `None` for a full index.
+    #[must_use]
+    pub fn predicate(&self) -> Option<&str> {
+        self.predicate.as_deref()
+    }
+
+    /// Returns observed `pg_index.indisready` state, or `None` when it was not captured.
+    #[must_use]
+    pub const fn ready(&self) -> Option<bool> {
+        self.ready
+    }
+
+    /// Returns observed `pg_index.indisvalid` state, or `None` when it was not captured.
+    #[must_use]
+    pub const fn valid(&self) -> Option<bool> {
+        self.valid
+    }
+
+    /// Returns observed `pg_index.indislive` state, or `None` when it was not captured.
+    #[must_use]
+    pub const fn live(&self) -> Option<bool> {
+        self.live
+    }
+
+    /// Returns exact server-rendered `pg_get_indexdef` text, or `None` when it was not captured.
+    #[must_use]
+    pub fn index_definition(&self) -> Option<&str> {
+        self.index_definition.as_deref()
     }
 
     /// Returns the exact optional source comment without inventing missing metadata.
@@ -510,7 +808,8 @@ impl EnumObservation {
 /// Immutable observation of one schema-scoped PostgreSQL relation.
 ///
 /// The relation carries its exact `pg_class.relkind`, optional relation comment, columns bound to
-/// qualified type coordinates, and the same deterministic constraint vocabulary used by v2.
+/// qualified type coordinates, relation-scoped index evidence, and the same deterministic
+/// constraint vocabulary used by v2.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RelationObservation {
     schema_name: String,
@@ -518,6 +817,7 @@ pub struct RelationObservation {
     kind: RelationKind,
     columns: Vec<ColumnObservationV3>,
     constraints: Vec<TableConstraintObservation>,
+    indexes: Vec<IndexObservation>,
     source_comment: Option<String>,
 }
 
@@ -566,6 +866,7 @@ impl RelationObservation {
             kind,
             columns,
             constraints: Vec::new(),
+            indexes: Vec::new(),
             source_comment: None,
         })
     }
@@ -615,6 +916,68 @@ impl RelationObservation {
         self
     }
 
+    /// Replaces relation-scoped index evidence, preserving exact local-column coordinates.
+    ///
+    /// Indexes are canonicalized into deterministic exact source-name order. Every simple column
+    /// key or INCLUDE attribute must resolve to a column on this same relation observation, while
+    /// expression attributes stay structurally separate. Attribute positions within an index must
+    /// be unique, and duplicate index names fail closed.
+    pub fn with_indexes(
+        mut self,
+        mut indexes: Vec<IndexObservation>,
+    ) -> Result<Self, ObservationError> {
+        let mut index_names = BTreeSet::new();
+        for index in &indexes {
+            let index_name = index.index_name();
+            if !index_names.insert(index_name.to_owned()) {
+                return Err(ObservationError::DuplicateIndexObservation {
+                    schema_name: self.schema_name.clone(),
+                    relation_name: self.relation_name.clone(),
+                    index_name: index_name.to_owned(),
+                });
+            }
+            for attribute in index
+                .key_attributes()
+                .iter()
+                .chain(index.include_attributes())
+            {
+                let Some(attribute_name) = attribute.attribute_name() else {
+                    continue;
+                };
+                if !self
+                    .columns
+                    .iter()
+                    .any(|column| column.column_name() == attribute_name)
+                {
+                    return Err(ObservationError::UnknownIndexAttribute {
+                        schema_name: self.schema_name.clone(),
+                        relation_name: self.relation_name.clone(),
+                        index_name: index_name.to_owned(),
+                        attribute_name: attribute_name.to_owned(),
+                    });
+                }
+            }
+            let mut positions = BTreeSet::new();
+            for attribute in index
+                .key_attributes()
+                .iter()
+                .chain(index.include_attributes())
+            {
+                if !positions.insert(attribute.position()) {
+                    return Err(ObservationError::DuplicateIndexAttribute {
+                        schema_name: self.schema_name.clone(),
+                        relation_name: self.relation_name.clone(),
+                        index_name: index_name.to_owned(),
+                        position: attribute.position(),
+                    });
+                }
+            }
+        }
+        indexes.sort_by(|left, right| left.index_name().cmp(right.index_name()));
+        self.indexes = indexes;
+        Ok(self)
+    }
+
     /// Returns the exact source schema identifier.
     #[must_use]
     pub fn schema_name(&self) -> &str {
@@ -645,6 +1008,12 @@ impl RelationObservation {
         &self.constraints
     }
 
+    /// Returns relation-scoped indexes in deterministic exact source-name order.
+    #[must_use]
+    pub fn indexes(&self) -> &[IndexObservation] {
+        &self.indexes
+    }
+
     /// Returns the exact optional source comment without inventing missing metadata.
     #[must_use]
     pub fn source_comment(&self) -> Option<&str> {
@@ -661,6 +1030,8 @@ pub enum SchemaObjectLocationKind {
     Column,
     /// A relation table-constraint observation.
     Constraint,
+    /// A relation-scoped index observation.
+    Index,
     /// A schema-scoped domain observation.
     Domain,
     /// A schema-scoped enum observation.
@@ -678,6 +1049,10 @@ enum SchemaObjectElement {
         table_name: String,
         constraint_name: String,
     },
+    Index {
+        table_name: String,
+        index_name: String,
+    },
     Domain(String),
     Enum(String),
 }
@@ -685,7 +1060,8 @@ enum SchemaObjectElement {
 /// Exact structured location inside an immutable successor schema snapshot.
 ///
 /// Table, column, and constraint coordinates keep the historical v2 canonical shape so v2 evidence
-/// stays comparable. Domain and enum coordinates use the successor schema-scoped vocabulary
+/// stays comparable. Index coordinates add `/schemas/{schema}/tables/{table}/indexes/{name}`.
+/// Domain and enum coordinates use the successor schema-scoped vocabulary
 /// `/schemas/{schema}/domains/{name}` and `/schemas/{schema}/enums/{name}`. Every identifier token
 /// applies RFC 6901 escaping (`~` -> `~0`, `/` -> `~1`) without case or Unicode normalization.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -743,6 +1119,25 @@ impl SchemaObjectLocation {
         )
     }
 
+    /// Creates a location for an exact relation-scoped index.
+    pub fn index(
+        schema_name: impl Into<String>,
+        table_name: impl Into<String>,
+        index_name: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        let table_name = table_name.into();
+        let index_name = index_name.into();
+        validate_nonblank(&table_name, "table_name")?;
+        validate_nonblank(&index_name, "index_name")?;
+        Self::new(
+            schema_name,
+            SchemaObjectElement::Index {
+                table_name,
+                index_name,
+            },
+        )
+    }
+
     /// Creates a location for an exact schema-scoped domain.
     pub fn domain(
         schema_name: impl Into<String>,
@@ -785,6 +1180,7 @@ impl SchemaObjectLocation {
             SchemaObjectElement::Table(_) => SchemaObjectLocationKind::Table,
             SchemaObjectElement::Column { .. } => SchemaObjectLocationKind::Column,
             SchemaObjectElement::Constraint { .. } => SchemaObjectLocationKind::Constraint,
+            SchemaObjectElement::Index { .. } => SchemaObjectLocationKind::Index,
             SchemaObjectElement::Domain(_) => SchemaObjectLocationKind::Domain,
             SchemaObjectElement::Enum(_) => SchemaObjectLocationKind::Enum,
         }
@@ -802,7 +1198,8 @@ impl SchemaObjectLocation {
         match &self.element {
             SchemaObjectElement::Table(table_name) => Some(table_name),
             SchemaObjectElement::Column { table_name, .. }
-            | SchemaObjectElement::Constraint { table_name, .. } => Some(table_name),
+            | SchemaObjectElement::Constraint { table_name, .. }
+            | SchemaObjectElement::Index { table_name, .. } => Some(table_name),
             SchemaObjectElement::Domain(_) | SchemaObjectElement::Enum(_) => None,
         }
     }
@@ -814,6 +1211,7 @@ impl SchemaObjectLocation {
             SchemaObjectElement::Column { column_name, .. } => Some(column_name),
             SchemaObjectElement::Table(_)
             | SchemaObjectElement::Constraint { .. }
+            | SchemaObjectElement::Index { .. }
             | SchemaObjectElement::Domain(_)
             | SchemaObjectElement::Enum(_) => None,
         }
@@ -828,6 +1226,20 @@ impl SchemaObjectLocation {
             } => Some(constraint_name),
             SchemaObjectElement::Table(_)
             | SchemaObjectElement::Column { .. }
+            | SchemaObjectElement::Index { .. }
+            | SchemaObjectElement::Domain(_)
+            | SchemaObjectElement::Enum(_) => None,
+        }
+    }
+
+    /// Returns the exact source index identifier for an index coordinate.
+    #[must_use]
+    pub fn index_name(&self) -> Option<&str> {
+        match &self.element {
+            SchemaObjectElement::Index { index_name, .. } => Some(index_name),
+            SchemaObjectElement::Table(_)
+            | SchemaObjectElement::Column { .. }
+            | SchemaObjectElement::Constraint { .. }
             | SchemaObjectElement::Domain(_)
             | SchemaObjectElement::Enum(_) => None,
         }
@@ -841,6 +1253,7 @@ impl SchemaObjectLocation {
             SchemaObjectElement::Table(_)
             | SchemaObjectElement::Column { .. }
             | SchemaObjectElement::Constraint { .. }
+            | SchemaObjectElement::Index { .. }
             | SchemaObjectElement::Enum(_) => None,
         }
     }
@@ -853,6 +1266,7 @@ impl SchemaObjectLocation {
             SchemaObjectElement::Table(_)
             | SchemaObjectElement::Column { .. }
             | SchemaObjectElement::Constraint { .. }
+            | SchemaObjectElement::Index { .. }
             | SchemaObjectElement::Domain(_) => None,
         }
     }
@@ -886,6 +1300,15 @@ impl SchemaObjectLocation {
                 escape_json_pointer_token(&self.schema_name),
                 escape_json_pointer_token(table_name),
                 escape_json_pointer_token(constraint_name)
+            ),
+            SchemaObjectElement::Index {
+                table_name,
+                index_name,
+            } => format!(
+                "/schemas/{}/tables/{}/indexes/{}",
+                escape_json_pointer_token(&self.schema_name),
+                escape_json_pointer_token(table_name),
+                escape_json_pointer_token(index_name)
             ),
             SchemaObjectElement::Domain(domain_name) => format!(
                 "/schemas/{}/domains/{}",
@@ -1250,6 +1673,22 @@ impl PostgresSchemaSnapshotV3 {
             SchemaObjectElement::Domain(domain_name) => self.domains.iter().any(|domain| {
                 domain.schema_name == location.schema_name && domain.domain_name == *domain_name
             }),
+            SchemaObjectElement::Index {
+                table_name,
+                index_name,
+            } => self
+                .relations
+                .iter()
+                .find(|relation| {
+                    relation.schema_name == location.schema_name
+                        && relation.relation_name == *table_name
+                })
+                .is_some_and(|relation| {
+                    relation
+                        .indexes
+                        .iter()
+                        .any(|index| index.index_name() == index_name)
+                }),
             SchemaObjectElement::Enum(enum_name) => self.enums.iter().any(|observed_enum| {
                 observed_enum.schema_name == location.schema_name
                     && observed_enum.enum_name == *enum_name
@@ -1287,6 +1726,11 @@ fn compute_snapshot_digest_v3(
         encode_len(&mut hasher, relation.constraints().len());
         for constraint in relation.constraints() {
             encode_constraint(&mut hasher, constraint);
+        }
+
+        encode_len(&mut hasher, relation.indexes().len());
+        for index in relation.indexes() {
+            encode_index(&mut hasher, index);
         }
     }
 
@@ -1367,6 +1811,45 @@ fn encode_constraint(hasher: &mut Sha256, constraint: &TableConstraintObservatio
             encode_bool(hasher, observation.validated());
             encode_bool(hasher, observation.enforced());
             encode_bool(hasher, observation.no_inherit());
+        }
+    }
+}
+
+fn encode_index(hasher: &mut Sha256, index: &IndexObservation) {
+    encode_str(hasher, index.index_name());
+    encode_bool(hasher, index.is_unique());
+    encode_optional_bool(hasher, index.nulls_not_distinct());
+    encode_optional_str(hasher, index.access_method());
+
+    encode_len(hasher, index.key_attributes().len());
+    for attribute in index.key_attributes() {
+        encode_index_attribute(hasher, attribute);
+    }
+
+    encode_len(hasher, index.include_attributes().len());
+    for attribute in index.include_attributes() {
+        encode_index_attribute(hasher, attribute);
+    }
+
+    encode_optional_str(hasher, index.predicate());
+    encode_optional_bool(hasher, index.ready());
+    encode_optional_bool(hasher, index.valid());
+    encode_optional_bool(hasher, index.live());
+    encode_optional_str(hasher, index.index_definition());
+    encode_optional_str(hasher, index.source_comment());
+}
+
+fn encode_index_attribute(hasher: &mut Sha256, attribute: &IndexAttributeObservation) {
+    hasher.update(attribute.position().to_be_bytes());
+    hasher.update([attribute.kind().tag()]);
+    match &attribute.source {
+        IndexAttributeSource::Column(attribute_name) => {
+            hasher.update([0]);
+            encode_str(hasher, attribute_name);
+        }
+        IndexAttributeSource::Expression(expression) => {
+            hasher.update([1]);
+            encode_str(hasher, expression);
         }
     }
 }
