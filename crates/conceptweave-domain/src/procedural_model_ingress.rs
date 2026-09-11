@@ -377,7 +377,7 @@ fn valid_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(byte))
 }
 
-fn is_ecmascript_whitespace(character: char) -> bool {
+fn is_canonical_blank_character(character: char) -> bool {
     matches!(
         character,
         '\u{0009}'
@@ -386,6 +386,7 @@ fn is_ecmascript_whitespace(character: char) -> bool {
             | '\u{000c}'
             | '\u{000d}'
             | '\u{0020}'
+            | '\u{0085}'
             | '\u{00a0}'
             | '\u{1680}'
             | '\u{2000}'
@@ -413,7 +414,7 @@ fn valid_annotation(value: &str) -> bool {
     length > 0
         && length <= 2048
         && !value.contains('\0')
-        && value.chars().any(|character| !is_ecmascript_whitespace(character))
+        && value.chars().any(|character| !is_canonical_blank_character(character))
 }
 
 fn parse_evidence(value: StrictJsonValue) -> Result<OwnedEvidenceReference, ProceduralIngressError> {
@@ -842,7 +843,8 @@ impl OwnedProceduralDraft {
 /// Unknown, missing, wrong-typed and schema-invalid members fail with a fixed diagnostic
 /// before a domain view is constructed. Canonical constants are consumed as invariants;
 /// optional `semantic_refs` absence remains distinct from a present array, and the
-/// conditional `tool_contract_ref` requirement is enforced for tool operations.
+/// conditional `tool_contract_ref` requirement is enforced for tool operations. Text fields
+/// use the procedural cross-runtime nonblank policy before Foundation evidence construction.
 /// `expected_scope` is caller-supplied context only: equality does not authenticate it.
 /// Released artifact authenticity, ACL, stewardship, publication and runtime authority
 /// remain separate gates.
