@@ -41,7 +41,11 @@ fn index_layout_rejects_non_contiguous_key_include_boundary() {
         true,
         None,
         vec![column_attribute(2, IndexAttributeKind::Key, "parent_key")],
-        vec![column_attribute(4, IndexAttributeKind::Include, "event_key")],
+        vec![column_attribute(
+            4,
+            IndexAttributeKind::Include,
+            "event_key",
+        )],
     )
     .expect_err("pg_index ordinal evidence must be contiguous across the key/INCLUDE boundary");
 
@@ -55,12 +59,9 @@ fn index_layout_rejects_non_contiguous_key_include_boundary() {
 
 #[test]
 fn index_layout_rejects_expression_include_attributes() {
-    let expression = IndexAttributeObservation::expression(
-        2,
-        IndexAttributeKind::Include,
-        "lower(event_key)",
-    )
-    .expect("expression fixture is structurally valid before index-layout admission");
+    let expression =
+        IndexAttributeObservation::expression(2, IndexAttributeKind::Include, "lower(event_key)")
+            .expect("expression fixture is structurally valid before index-layout admission");
 
     let error = IndexObservation::new(
         "event_parent_ix",

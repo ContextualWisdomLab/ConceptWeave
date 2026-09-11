@@ -130,6 +130,20 @@ impl RelationKind {
             Self::CompositeType => 6,
         }
     }
+
+    /// Exact stable coordinate token preserving the relation kind without loss.
+    #[must_use]
+    pub const fn token(self) -> &'static str {
+        match self {
+            Self::Table => "table",
+            Self::PartitionedTable => "partitioned_table",
+            Self::View => "view",
+            Self::MaterializedView => "materialized_view",
+            Self::ForeignTable => "foreign_table",
+            Self::Sequence => "sequence",
+            Self::CompositeType => "composite_type",
+        }
+    }
 }
 
 /// One immutable successor PostgreSQL column observation.
@@ -1024,8 +1038,8 @@ impl RelationObservation {
 /// Stable kind discriminator for one schema-scoped evidence coordinate.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SchemaObjectLocationKind {
-    /// A schema-scoped relation observation.
-    Table,
+    /// A schema-scoped relation observation of any `pg_class.relkind`.
+    Relation,
     /// A relation column observation.
     Column,
     /// A relation table-constraint observation.
@@ -1040,17 +1054,23 @@ pub enum SchemaObjectLocationKind {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum SchemaObjectElement {
-    Table(String),
+    Relation {
+        relation_name: String,
+        kind: RelationKind,
+    },
     Column {
-        table_name: String,
+        relation_name: String,
+        kind: RelationKind,
         column_name: String,
     },
     Constraint {
-        table_name: String,
+        relation_name: String,
+        kind: RelationKind,
         constraint_name: String,
     },
     Index {
-        table_name: String,
+        relation_name: String,
+        kind: RelationKind,
         index_name: String,
     },
     Domain(String),
@@ -1059,11 +1079,13 @@ enum SchemaObjectElement {
 
 /// Exact structured location inside an immutable successor schema snapshot.
 ///
-/// Table, column, and constraint coordinates keep the historical v2 canonical shape so v2 evidence
-/// stays comparable. Index coordinates add `/schemas/{schema}/tables/{table}/indexes/{name}`.
-/// Domain and enum coordinates use the successor schema-scoped vocabulary
-/// `/schemas/{schema}/domains/{name}` and `/schemas/{schema}/enums/{name}`. Every identifier token
-/// applies RFC 6901 escaping (`~` -> `~0`, `/` -> `~1`) without case or Unicode normalization.
+/// Relation-level coordinates use the successor vocabulary
+/// `/schemas/{schema}/relations/{kind}/{name}` so the exact `pg_class.relkind` is carried in the
+/// coordinate. Relation children append `/columns/{name}`, `/constraints/{name}`, or
+/// `/indexes/{name}` under that kind-aware relation segment. Domain and enum coordinates use the
+/// schema-scoped vocabulary `/schemas/{schema}/domains/{name}` and `/schemas/{schema}/enums/{name}`.
+/// Every identifier token applies RFC 6901 escaping (`~` -> `~0`, `/` -> `~1`) without case or
+/// Unicode normalization. Frozen v2 `/schemas/{schema}/tables/{table}` meaning is unchanged.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SchemaObjectLocation {
     schema_name: String,
@@ -1071,30 +1093,39 @@ pub struct SchemaObjectLocation {
 }
 
 impl SchemaObjectLocation {
-    /// Creates a location for an exact schema-qualified relation.
-    pub fn table(
+    /// Creates a location for an exact schema-qualified relation of any observed kind.
+    pub fn relation(
         schema_name: impl Into<String>,
-        table_name: impl Into<String>,
+        relation_name: impl Into<String>,
+        kind: RelationKind,
     ) -> Result<Self, ObservationError> {
-        let table_name = table_name.into();
-        validate_nonblank(&table_name, "table_name")?;
-        Self::new(schema_name, SchemaObjectElement::Table(table_name))
+        let relation_name = relation_name.into();
+        validate_nonblank(&relation_name, "relation_name")?;
+        Self::new(
+            schema_name,
+            SchemaObjectElement::Relation {
+                relation_name,
+                kind,
+            },
+        )
     }
 
     /// Creates a location for an exact schema-qualified relation column.
     pub fn column(
         schema_name: impl Into<String>,
-        table_name: impl Into<String>,
+        relation_name: impl Into<String>,
+        kind: RelationKind,
         column_name: impl Into<String>,
     ) -> Result<Self, ObservationError> {
-        let table_name = table_name.into();
+        let relation_name = relation_name.into();
         let column_name = column_name.into();
-        validate_nonblank(&table_name, "table_name")?;
+        validate_nonblank(&relation_name, "relation_name")?;
         validate_nonblank(&column_name, "column_name")?;
         Self::new(
             schema_name,
             SchemaObjectElement::Column {
-                table_name,
+                relation_name,
+                kind,
                 column_name,
             },
         )
@@ -1103,17 +1134,19 @@ impl SchemaObjectLocation {
     /// Creates a location for an exact schema-qualified relation table constraint.
     pub fn constraint(
         schema_name: impl Into<String>,
-        table_name: impl Into<String>,
+        relation_name: impl Into<String>,
+        kind: RelationKind,
         constraint_name: impl Into<String>,
     ) -> Result<Self, ObservationError> {
-        let table_name = table_name.into();
+        let relation_name = relation_name.into();
         let constraint_name = constraint_name.into();
-        validate_nonblank(&table_name, "table_name")?;
+        validate_nonblank(&relation_name, "relation_name")?;
         validate_nonblank(&constraint_name, "constraint_name")?;
         Self::new(
             schema_name,
             SchemaObjectElement::Constraint {
-                table_name,
+                relation_name,
+                kind,
                 constraint_name,
             },
         )
@@ -1122,17 +1155,19 @@ impl SchemaObjectLocation {
     /// Creates a location for an exact relation-scoped index.
     pub fn index(
         schema_name: impl Into<String>,
-        table_name: impl Into<String>,
+        relation_name: impl Into<String>,
+        kind: RelationKind,
         index_name: impl Into<String>,
     ) -> Result<Self, ObservationError> {
-        let table_name = table_name.into();
+        let relation_name = relation_name.into();
         let index_name = index_name.into();
-        validate_nonblank(&table_name, "table_name")?;
+        validate_nonblank(&relation_name, "relation_name")?;
         validate_nonblank(&index_name, "index_name")?;
         Self::new(
             schema_name,
             SchemaObjectElement::Index {
-                table_name,
+                relation_name,
+                kind,
                 index_name,
             },
         )
@@ -1177,7 +1212,7 @@ impl SchemaObjectLocation {
     #[must_use]
     pub fn kind(&self) -> SchemaObjectLocationKind {
         match self.element {
-            SchemaObjectElement::Table(_) => SchemaObjectLocationKind::Table,
+            SchemaObjectElement::Relation { .. } => SchemaObjectLocationKind::Relation,
             SchemaObjectElement::Column { .. } => SchemaObjectLocationKind::Column,
             SchemaObjectElement::Constraint { .. } => SchemaObjectLocationKind::Constraint,
             SchemaObjectElement::Index { .. } => SchemaObjectLocationKind::Index,
@@ -1192,14 +1227,29 @@ impl SchemaObjectLocation {
         &self.schema_name
     }
 
+    /// Returns the exact owning relation kind for relation-scoped coordinates.
+    ///
+    /// The kind is carried by every relation-level coordinate so a view, materialized view,
+    /// sequence, composite type, or foreign table is never addressed with table vocabulary.
+    #[must_use]
+    pub fn relation_kind(&self) -> Option<RelationKind> {
+        match &self.element {
+            SchemaObjectElement::Relation { kind, .. }
+            | SchemaObjectElement::Column { kind, .. }
+            | SchemaObjectElement::Constraint { kind, .. }
+            | SchemaObjectElement::Index { kind, .. } => Some(*kind),
+            SchemaObjectElement::Domain(_) | SchemaObjectElement::Enum(_) => None,
+        }
+    }
+
     /// Returns the owning relation identifier when this coordinate has one.
     #[must_use]
-    pub fn table_name(&self) -> Option<&str> {
+    pub fn relation_name(&self) -> Option<&str> {
         match &self.element {
-            SchemaObjectElement::Table(table_name) => Some(table_name),
-            SchemaObjectElement::Column { table_name, .. }
-            | SchemaObjectElement::Constraint { table_name, .. }
-            | SchemaObjectElement::Index { table_name, .. } => Some(table_name),
+            SchemaObjectElement::Relation { relation_name, .. } => Some(relation_name),
+            SchemaObjectElement::Column { relation_name, .. }
+            | SchemaObjectElement::Constraint { relation_name, .. }
+            | SchemaObjectElement::Index { relation_name, .. } => Some(relation_name),
             SchemaObjectElement::Domain(_) | SchemaObjectElement::Enum(_) => None,
         }
     }
@@ -1209,7 +1259,7 @@ impl SchemaObjectLocation {
     pub fn column_name(&self) -> Option<&str> {
         match &self.element {
             SchemaObjectElement::Column { column_name, .. } => Some(column_name),
-            SchemaObjectElement::Table(_)
+            SchemaObjectElement::Relation { .. }
             | SchemaObjectElement::Constraint { .. }
             | SchemaObjectElement::Index { .. }
             | SchemaObjectElement::Domain(_)
@@ -1224,7 +1274,7 @@ impl SchemaObjectLocation {
             SchemaObjectElement::Constraint {
                 constraint_name, ..
             } => Some(constraint_name),
-            SchemaObjectElement::Table(_)
+            SchemaObjectElement::Relation { .. }
             | SchemaObjectElement::Column { .. }
             | SchemaObjectElement::Index { .. }
             | SchemaObjectElement::Domain(_)
@@ -1237,7 +1287,7 @@ impl SchemaObjectLocation {
     pub fn index_name(&self) -> Option<&str> {
         match &self.element {
             SchemaObjectElement::Index { index_name, .. } => Some(index_name),
-            SchemaObjectElement::Table(_)
+            SchemaObjectElement::Relation { .. }
             | SchemaObjectElement::Column { .. }
             | SchemaObjectElement::Constraint { .. }
             | SchemaObjectElement::Domain(_)
@@ -1250,7 +1300,7 @@ impl SchemaObjectLocation {
     pub fn domain_name(&self) -> Option<&str> {
         match &self.element {
             SchemaObjectElement::Domain(domain_name) => Some(domain_name),
-            SchemaObjectElement::Table(_)
+            SchemaObjectElement::Relation { .. }
             | SchemaObjectElement::Column { .. }
             | SchemaObjectElement::Constraint { .. }
             | SchemaObjectElement::Index { .. }
@@ -1263,7 +1313,7 @@ impl SchemaObjectLocation {
     pub fn enum_name(&self) -> Option<&str> {
         match &self.element {
             SchemaObjectElement::Enum(enum_name) => Some(enum_name),
-            SchemaObjectElement::Table(_)
+            SchemaObjectElement::Relation { .. }
             | SchemaObjectElement::Column { .. }
             | SchemaObjectElement::Constraint { .. }
             | SchemaObjectElement::Index { .. }
@@ -1274,40 +1324,51 @@ impl SchemaObjectLocation {
     /// Returns a deterministic collision-safe successor evidence location string.
     ///
     /// The vocabulary segments are ConceptWeave coordinate labels; identifier tokens use RFC 6901
-    /// escaping and retain exact case and text.
+    /// escaping and retain exact case and text. Relation-level coordinates carry the exact relation
+    /// kind so non-table relations never receive table vocabulary.
     #[must_use]
     pub fn canonical_location(&self) -> String {
         match &self.element {
-            SchemaObjectElement::Table(table_name) => format!(
-                "/schemas/{}/tables/{}",
+            SchemaObjectElement::Relation {
+                relation_name,
+                kind,
+            } => format!(
+                "/schemas/{}/relations/{}/{}",
                 escape_json_pointer_token(&self.schema_name),
-                escape_json_pointer_token(table_name)
+                kind.token(),
+                escape_json_pointer_token(relation_name)
             ),
             SchemaObjectElement::Column {
-                table_name,
+                relation_name,
+                kind,
                 column_name,
             } => format!(
-                "/schemas/{}/tables/{}/columns/{}",
+                "/schemas/{}/relations/{}/{}/columns/{}",
                 escape_json_pointer_token(&self.schema_name),
-                escape_json_pointer_token(table_name),
+                kind.token(),
+                escape_json_pointer_token(relation_name),
                 escape_json_pointer_token(column_name)
             ),
             SchemaObjectElement::Constraint {
-                table_name,
+                relation_name,
+                kind,
                 constraint_name,
             } => format!(
-                "/schemas/{}/tables/{}/constraints/{}",
+                "/schemas/{}/relations/{}/{}/constraints/{}",
                 escape_json_pointer_token(&self.schema_name),
-                escape_json_pointer_token(table_name),
+                kind.token(),
+                escape_json_pointer_token(relation_name),
                 escape_json_pointer_token(constraint_name)
             ),
             SchemaObjectElement::Index {
-                table_name,
+                relation_name,
+                kind,
                 index_name,
             } => format!(
-                "/schemas/{}/tables/{}/indexes/{}",
+                "/schemas/{}/relations/{}/{}/indexes/{}",
                 escape_json_pointer_token(&self.schema_name),
-                escape_json_pointer_token(table_name),
+                kind.token(),
+                escape_json_pointer_token(relation_name),
                 escape_json_pointer_token(index_name)
             ),
             SchemaObjectElement::Domain(domain_name) => format!(
@@ -1645,62 +1706,59 @@ impl PostgresSchemaSnapshotV3 {
     }
 
     fn contains_location(&self, location: &SchemaObjectLocation) -> bool {
-        match &location.element {
-            SchemaObjectElement::Table(table_name) => self.relations.iter().any(|relation| {
+        let relation_matches = |relation_name: &str, kind: RelationKind| {
+            self.relations.iter().any(|relation| {
                 relation.schema_name == location.schema_name
-                    && relation.relation_name == *table_name
-            }),
+                    && relation.relation_name == relation_name
+                    && relation.kind == kind
+            })
+        };
+        let find_relation = |relation_name: &str, kind: RelationKind| {
+            self.relations.iter().find(|relation| {
+                relation.schema_name == location.schema_name
+                    && relation.relation_name == relation_name
+                    && relation.kind == kind
+            })
+        };
+
+        match &location.element {
+            SchemaObjectElement::Relation {
+                relation_name,
+                kind,
+            } => relation_matches(relation_name, *kind),
             SchemaObjectElement::Column {
-                table_name,
+                relation_name,
+                kind,
                 column_name,
-            } => self
-                .relations
-                .iter()
-                .find(|relation| {
-                    relation.schema_name == location.schema_name
-                        && relation.relation_name == *table_name
-                })
-                .is_some_and(|relation| {
-                    relation
-                        .columns
-                        .iter()
-                        .any(|column| column.column_name == *column_name)
-                }),
+            } => find_relation(relation_name, *kind).is_some_and(|relation| {
+                relation
+                    .columns
+                    .iter()
+                    .any(|column| column.column_name == *column_name)
+            }),
             SchemaObjectElement::Constraint {
-                table_name,
+                relation_name,
+                kind,
                 constraint_name,
-            } => self
-                .relations
-                .iter()
-                .find(|relation| {
-                    relation.schema_name == location.schema_name
-                        && relation.relation_name == *table_name
-                })
-                .is_some_and(|relation| {
-                    relation
-                        .constraints
-                        .iter()
-                        .any(|constraint| constraint.constraint_name() == constraint_name)
-                }),
+            } => find_relation(relation_name, *kind).is_some_and(|relation| {
+                relation
+                    .constraints
+                    .iter()
+                    .any(|constraint| constraint.constraint_name() == constraint_name)
+            }),
+            SchemaObjectElement::Index {
+                relation_name,
+                kind,
+                index_name,
+            } => find_relation(relation_name, *kind).is_some_and(|relation| {
+                relation
+                    .indexes
+                    .iter()
+                    .any(|index| index.index_name() == index_name)
+            }),
             SchemaObjectElement::Domain(domain_name) => self.domains.iter().any(|domain| {
                 domain.schema_name == location.schema_name && domain.domain_name == *domain_name
             }),
-            SchemaObjectElement::Index {
-                table_name,
-                index_name,
-            } => self
-                .relations
-                .iter()
-                .find(|relation| {
-                    relation.schema_name == location.schema_name
-                        && relation.relation_name == *table_name
-                })
-                .is_some_and(|relation| {
-                    relation
-                        .indexes
-                        .iter()
-                        .any(|index| index.index_name() == index_name)
-                }),
             SchemaObjectElement::Enum(enum_name) => self.enums.iter().any(|observed_enum| {
                 observed_enum.schema_name == location.schema_name
                     && observed_enum.enum_name == *enum_name

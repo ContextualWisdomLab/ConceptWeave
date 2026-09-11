@@ -95,6 +95,8 @@ Review `5160201671` established that schema-scoped objects need a backward-compa
 
 Review `5160252371` adds a semantic binding prerequisite: current `ColumnObservation` stores only unqualified `data_type: String`. Creating qualified domain/enum objects without a qualified column type reference leaves the evidence graph ambiguous. The successor must keep presentation text separate from identity and bind each column to the exact immutable built-in/qualified source-type coordinate. Same-named types in two allowed schemas must remain distinguishishable even if existing `data_type()` text is identical. Do not infer a type from `search_path` during validation.
 
+Review `5174202474` establishes that relation-level successor coordinates must carry the exact observed `pg_class.relkind` rather than reusing table vocabulary. A v3 relation location is `/schemas/{schema}/relations/{kind}/{name}` with `/columns/{name}`, `/constraints/{name}`, and `/indexes/{name}` children, so views, materialized views, foreign tables, sequences, and composite types stay distinguishable from tables at the same qualified name. Receipt lookup must fail closed when the observed relation kind differs, and the kind segment must not alter v2 `/tables/` meaning or any digest.
+
 ### Authorization
 
 Current snapshot construction enforces schema scope by iterating observed tables. Schema-scoped domain/enum evidence must be checked directly against the exact `AuthorizedObservationRequest` allowlist, including a schema with zero observed tables. Otherwise a type-only schema could bypass the existing table-driven containment invariant.
@@ -112,6 +114,7 @@ Current snapshot construction enforces schema scope by iterating observed tables
 - a schema-scoped receipt cannot be satisfied merely because an unrelated table exists in that schema;
 - index key/INCLUDE role, attribute position and expression-versus-column form, partial predicate, NULL uniqueness semantics, readiness/validity/liveness, access method, and reconstructed definition changes alter successor identity;
 - index receipt coordinates cannot be satisfied by a same-named constraint, an unrelated relation, or a missing index;
+- relation-level and relation-child coordinates preserve the exact observed relation kind, so a non-table relation never receives a table-labelled receipt;
 - fake table-scoped type coordinates fail;
 - input-order permutations of identical complete evidence remain digest-identical.
 

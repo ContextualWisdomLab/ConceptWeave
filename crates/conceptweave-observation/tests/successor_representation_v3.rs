@@ -563,21 +563,32 @@ fn every_v3_evidence_kind_has_a_verified_receipt_coordinate() {
     let snapshot = complete_snapshot();
     let cases = [
         (
-            SchemaObjectLocation::table("public", "event_record").expect("table location"),
-            SchemaObjectLocationKind::Table,
-            "/schemas/public/tables/event_record",
+            SchemaObjectLocation::relation("public", "event_record", RelationKind::Table)
+                .expect("relation location"),
+            SchemaObjectLocationKind::Relation,
+            "/schemas/public/relations/table/event_record",
         ),
         (
-            SchemaObjectLocation::column("public", "event_record", "parent_key")
-                .expect("column location"),
+            SchemaObjectLocation::column(
+                "public",
+                "event_record",
+                RelationKind::Table,
+                "parent_key",
+            )
+            .expect("column location"),
             SchemaObjectLocationKind::Column,
-            "/schemas/public/tables/event_record/columns/parent_key",
+            "/schemas/public/relations/table/event_record/columns/parent_key",
         ),
         (
-            SchemaObjectLocation::constraint("public", "event_record", "event_parent_uq")
-                .expect("constraint location"),
+            SchemaObjectLocation::constraint(
+                "public",
+                "event_record",
+                RelationKind::Table,
+                "event_parent_uq",
+            )
+            .expect("constraint location"),
             SchemaObjectLocationKind::Constraint,
-            "/schemas/public/tables/event_record/constraints/event_parent_uq",
+            "/schemas/public/relations/table/event_record/constraints/event_parent_uq",
         ),
         (
             SchemaObjectLocation::domain("public", "event_status_kind").expect("domain location"),
@@ -627,24 +638,46 @@ fn v3_schema_scoped_canonical_locations_are_collision_safe() {
 #[test]
 fn v3_location_accessors_expose_only_the_declared_coordinate() {
     let locations = [
-        SchemaObjectLocation::table("public", "event_record").expect("table"),
-        SchemaObjectLocation::column("public", "event_record", "event_key").expect("column"),
-        SchemaObjectLocation::constraint("public", "event_record", "event_parent_uq")
-            .expect("constraint"),
+        SchemaObjectLocation::relation("public", "event_record", RelationKind::Table)
+            .expect("relation"),
+        SchemaObjectLocation::column("public", "event_record", RelationKind::Table, "event_key")
+            .expect("column"),
+        SchemaObjectLocation::constraint(
+            "public",
+            "event_record",
+            RelationKind::Table,
+            "event_parent_uq",
+        )
+        .expect("constraint"),
         SchemaObjectLocation::domain("public", "event_status_kind").expect("domain"),
         SchemaObjectLocation::enum_("public", "event_status").expect("enum"),
     ];
 
-    let tables: Vec<Option<&str>> = locations
+    let relations: Vec<Option<&str>> = locations
         .iter()
-        .map(SchemaObjectLocation::table_name)
+        .map(SchemaObjectLocation::relation_name)
         .collect();
     assert_eq!(
-        tables,
+        relations,
         vec![
             Some("event_record"),
             Some("event_record"),
             Some("event_record"),
+            None,
+            None
+        ]
+    );
+
+    let kinds: Vec<Option<RelationKind>> = locations
+        .iter()
+        .map(SchemaObjectLocation::relation_kind)
+        .collect();
+    assert_eq!(
+        kinds,
+        vec![
+            Some(RelationKind::Table),
+            Some(RelationKind::Table),
+            Some(RelationKind::Table),
             None,
             None
         ]
@@ -689,12 +722,19 @@ fn v3_location_accessors_expose_only_the_declared_coordinate() {
 fn schema_scoped_receipts_cannot_be_satisfied_by_a_different_kind() {
     let snapshot = complete_snapshot();
     let unobserved = [
-        SchemaObjectLocation::table("public", "event_status").expect("table shape"),
-        SchemaObjectLocation::table("public", "missing_relation").expect("table shape"),
-        SchemaObjectLocation::column("public", "event_record", "missing_key")
+        SchemaObjectLocation::relation("public", "event_status", RelationKind::Table)
+            .expect("relation shape"),
+        SchemaObjectLocation::relation("public", "missing_relation", RelationKind::Table)
+            .expect("relation shape"),
+        SchemaObjectLocation::column("public", "event_record", RelationKind::Table, "missing_key")
             .expect("column shape"),
-        SchemaObjectLocation::constraint("public", "event_record", "missing_constraint")
-            .expect("constraint shape"),
+        SchemaObjectLocation::constraint(
+            "public",
+            "event_record",
+            RelationKind::Table,
+            "missing_constraint",
+        )
+        .expect("constraint shape"),
         SchemaObjectLocation::domain("public", "event_status").expect("domain shape"),
         SchemaObjectLocation::domain("public", "missing_domain").expect("domain shape"),
         SchemaObjectLocation::enum_("public", "event_record").expect("enum shape"),
@@ -711,6 +751,93 @@ fn schema_scoped_receipts_cannot_be_satisfied_by_a_different_kind() {
             ObservationError::UnknownObservationLocation { location: expected }
         );
     }
+}
+
+#[test]
+fn relation_coordinates_carry_kind_and_reject_a_mislabelled_table_receipt() {
+    let snapshot = complete_snapshot();
+
+    let mislabelled = SchemaObjectLocation::relation("audit", "event_record", RelationKind::Table)
+        .expect("relation shape");
+    let expected = mislabelled.canonical_location();
+    assert_eq!(expected, "/schemas/audit/relations/table/event_record");
+    let error = snapshot
+        .source_receipt(mislabelled)
+        .expect_err("a view must not be receipted with table vocabulary");
+    assert_eq!(
+        error,
+        ObservationError::UnknownObservationLocation { location: expected }
+    );
+
+    let view = SchemaObjectLocation::relation("audit", "event_record", RelationKind::View)
+        .expect("view coordinate");
+    assert_eq!(view.relation_kind(), Some(RelationKind::View));
+    assert_eq!(
+        view.canonical_location(),
+        "/schemas/audit/relations/view/event_record"
+    );
+    let receipt = snapshot
+        .source_receipt(view)
+        .expect("the observed view coordinate is receipted with its exact kind");
+
+    assert_ne!(
+        receipt.location().canonical_location(),
+        SchemaObjectLocation::relation("audit", "event_record", RelationKind::Table)
+            .expect("relation shape")
+            .canonical_location(),
+        "the kind segment must distinguish a view from a table at the same name"
+    );
+}
+
+#[test]
+fn every_relation_kind_has_a_distinct_lossless_coordinate() {
+    let kinds = [
+        RelationKind::Table,
+        RelationKind::PartitionedTable,
+        RelationKind::View,
+        RelationKind::MaterializedView,
+        RelationKind::ForeignTable,
+        RelationKind::Sequence,
+        RelationKind::CompositeType,
+    ];
+    let mut seen = std::collections::BTreeSet::new();
+    for kind in kinds {
+        let location = SchemaObjectLocation::relation("public", "event_record", kind)
+            .expect("relation coordinate");
+        assert_eq!(location.relation_kind(), Some(kind));
+        let canonical = location.canonical_location();
+        assert!(
+            seen.insert(canonical.clone()),
+            "each relation kind must map to a distinct coordinate, repeated: {canonical}"
+        );
+    }
+    assert_eq!(seen.len(), kinds.len());
+}
+
+#[test]
+fn non_table_relation_children_keep_the_relation_kind_in_their_coordinates() {
+    let location =
+        SchemaObjectLocation::column("audit", "event_record", RelationKind::View, "parent_key")
+            .expect("view column coordinate");
+    assert_eq!(
+        location.canonical_location(),
+        "/schemas/audit/relations/view/event_record/columns/parent_key"
+    );
+    assert_eq!(location.relation_kind(), Some(RelationKind::View));
+
+    let snapshot = snapshot_v3(vec![audit_view()], Vec::new(), Vec::new())
+        .expect("view-only fixture is valid");
+    let table_child =
+        SchemaObjectLocation::column("audit", "event_record", RelationKind::Table, "parent_key")
+            .expect("column shape");
+    let expected = table_child.canonical_location();
+    let error = snapshot
+        .source_receipt(table_child)
+        .expect_err("a view child must not be receipted with table vocabulary");
+    assert_eq!(
+        error,
+        ObservationError::UnknownObservationLocation { location: expected }
+    );
 }
 
 #[test]
@@ -1153,25 +1280,25 @@ fn v3_value_objects_reject_ambiguous_or_blank_evidence() {
     );
 
     assert_eq!(
-        SchemaObjectLocation::table(" ", "event_record"),
+        SchemaObjectLocation::relation(" ", "event_record", RelationKind::Table),
         Err(ObservationError::InvalidObservationField {
             field: "schema_name"
         })
     );
     assert_eq!(
-        SchemaObjectLocation::table("public", " "),
+        SchemaObjectLocation::relation("public", " ", RelationKind::Table),
         Err(ObservationError::InvalidObservationField {
-            field: "table_name"
+            field: "relation_name"
         })
     );
     assert_eq!(
-        SchemaObjectLocation::column("public", "event_record", " "),
+        SchemaObjectLocation::column("public", "event_record", RelationKind::Table, " "),
         Err(ObservationError::InvalidObservationField {
             field: "column_name"
         })
     );
     assert_eq!(
-        SchemaObjectLocation::constraint("public", "event_record", "\n"),
+        SchemaObjectLocation::constraint("public", "event_record", RelationKind::Table, "\n"),
         Err(ObservationError::InvalidObservationField {
             field: "constraint_name"
         })
@@ -1453,14 +1580,20 @@ fn index_coordinates_receive_verified_receipts() {
     let snapshot = snapshot_v3(vec![indexed_relation()], Vec::new(), Vec::new())
         .expect("indexed fixture snapshot is valid");
 
-    let location = SchemaObjectLocation::index("public", "event_record", "event_parent_ix")
-        .expect("index location");
+    let location = SchemaObjectLocation::index(
+        "public",
+        "event_record",
+        RelationKind::Table,
+        "event_parent_ix",
+    )
+    .expect("index location");
     assert_eq!(location.kind(), SchemaObjectLocationKind::Index);
     assert_eq!(
         location.canonical_location(),
-        "/schemas/public/tables/event_record/indexes/event_parent_ix"
+        "/schemas/public/relations/table/event_record/indexes/event_parent_ix"
     );
-    assert_eq!(location.table_name(), Some("event_record"));
+    assert_eq!(location.relation_name(), Some("event_record"));
+    assert_eq!(location.relation_kind(), Some(RelationKind::Table));
     assert_eq!(location.index_name(), Some("event_parent_ix"));
     assert_eq!(location.column_name(), None);
     assert_eq!(location.constraint_name(), None);
@@ -1475,11 +1608,16 @@ fn index_coordinates_receive_verified_receipts() {
 
 #[test]
 fn index_locational_coordinates_are_collision_safe() {
-    let location = SchemaObjectLocation::index("Sales/~North", "Event/Record", "Parent/~Ix")
-        .expect("index location");
+    let location = SchemaObjectLocation::index(
+        "Sales/~North",
+        "Event/Record",
+        RelationKind::Table,
+        "Parent/~Ix",
+    )
+    .expect("index location");
     assert_eq!(
         location.canonical_location(),
-        "/schemas/Sales~1~0North/tables/Event~1Record/indexes/Parent~1~0Ix"
+        "/schemas/Sales~1~0North/relations/table/Event~1Record/indexes/Parent~1~0Ix"
     );
 }
 
@@ -1600,13 +1738,13 @@ fn index_value_objects_reject_blank_or_zero_evidence() {
         Err(ObservationError::InvalidOrdinalPosition)
     );
     assert_eq!(
-        SchemaObjectLocation::index("public", " ", "event_parent_ix"),
+        SchemaObjectLocation::index("public", " ", RelationKind::Table, "event_parent_ix"),
         Err(ObservationError::InvalidObservationField {
-            field: "table_name"
+            field: "relation_name"
         })
     );
     assert_eq!(
-        SchemaObjectLocation::index("public", "event_record", " "),
+        SchemaObjectLocation::index("public", "event_record", RelationKind::Table, " "),
         Err(ObservationError::InvalidObservationField {
             field: "index_name"
         })
@@ -1744,11 +1882,22 @@ fn index_receipts_cannot_be_satisfied_by_a_different_kind_or_relation() {
     let snapshot = snapshot_v3(vec![indexed_relation()], Vec::new(), Vec::new())
         .expect("indexed fixture snapshot is valid");
     let unobserved = [
-        SchemaObjectLocation::index("public", "event_record", "missing_ix").expect("index shape"),
-        SchemaObjectLocation::index("public", "missing_relation", "event_parent_ix")
+        SchemaObjectLocation::index("public", "event_record", RelationKind::Table, "missing_ix")
             .expect("index shape"),
-        SchemaObjectLocation::constraint("public", "event_record", "event_parent_ix")
-            .expect("constraint shape"),
+        SchemaObjectLocation::index(
+            "public",
+            "missing_relation",
+            RelationKind::Table,
+            "event_parent_ix",
+        )
+        .expect("index shape"),
+        SchemaObjectLocation::constraint(
+            "public",
+            "event_record",
+            RelationKind::Table,
+            "event_parent_ix",
+        )
+        .expect("constraint shape"),
     ];
 
     for location in unobserved {
