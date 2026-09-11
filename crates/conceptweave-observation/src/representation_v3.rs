@@ -214,6 +214,51 @@ impl IndexStorageOption {
     }
 }
 
+/// Exact resolved PostgreSQL tablespace evidence for one index.
+///
+/// `pg_class.reltablespace = 0` means that the relation uses its database's default tablespace, not
+/// that tablespace evidence was absent. The adapter therefore resolves both explicit and database-
+/// default catalog state to an exact tablespace name before entering this domain contract. Catalog
+/// OIDs are join coordinates only and never participate in governed identity.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IndexTablespace {
+    name: String,
+    database_default: bool,
+}
+
+impl IndexTablespace {
+    /// Records an explicitly assigned named tablespace.
+    pub fn named(name: impl Into<String>) -> Result<Self, ObservationError> {
+        Self::new(name, false)
+    }
+
+    /// Records the resolved database-default tablespace used by `reltablespace = 0`.
+    pub fn database_default(name: impl Into<String>) -> Result<Self, ObservationError> {
+        Self::new(name, true)
+    }
+
+    fn new(name: impl Into<String>, database_default: bool) -> Result<Self, ObservationError> {
+        let name = name.into();
+        validate_nonblank(&name, "index_tablespace_name")?;
+        Ok(Self {
+            name,
+            database_default,
+        })
+    }
+
+    /// Returns the exact resolved tablespace name.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Returns whether the source catalog used its database-default tablespace marker.
+    #[must_use]
+    pub const fn is_database_default(&self) -> bool {
+        self.database_default
+    }
+}
+
 /// One exact PostgreSQL per-key index semantic record.
 ///
 /// PostgreSQL 18 carries one `pg_index.indcollation`, `indclass`, and `indoption` entry for each of
@@ -638,6 +683,7 @@ pub struct IndexObservation {
     nulls_not_distinct: Option<bool>,
     catalog_flags: Option<IndexCatalogFlags>,
     storage_options: Option<Vec<IndexStorageOption>>,
+    tablespace: Option<IndexTablespace>,
     access_method: Option<String>,
     key_attributes: Vec<IndexAttributeObservation>,
     include_attributes: Vec<IndexAttributeObservation>,
@@ -685,6 +731,7 @@ impl IndexObservation {
             nulls_not_distinct,
             catalog_flags: None,
             storage_options: None,
+            tablespace: None,
             access_method: None,
             key_attributes,
             include_attributes,
@@ -802,6 +849,13 @@ impl IndexObservation {
         Ok(self)
     }
 
+    /// Records the exact resolved tablespace and whether PostgreSQL used the database-default marker.
+    #[must_use]
+    pub fn with_tablespace(mut self, tablespace: IndexTablespace) -> Self {
+        self.tablespace = Some(tablespace);
+        self
+    }
+
     /// Records an exact server-rendered partial predicate, never original DDL.
     #[must_use]
     pub fn with_predicate(mut self, predicate: impl Into<String>) -> Self {
@@ -872,6 +926,12 @@ impl IndexObservation {
     #[must_use]
     pub fn storage_options(&self) -> Option<&[IndexStorageOption]> {
         self.storage_options.as_deref()
+    }
+
+    /// Returns the resolved index tablespace evidence, or `None` when it was not observed.
+    #[must_use]
+    pub const fn tablespace(&self) -> Option<&IndexTablespace> {
+        self.tablespace.as_ref()
     }
 
     /// Returns the exact observed access method name, or `None` when it was not captured.
@@ -1442,7 +1502,7 @@ impl RelationObservation {
         &self.indexes
     }
 
-    /// Returns the exact optional source comment without inventing missing metadata.
+    /// Returns the exact optional relation comment without inventing missing metadata.
     #[must_use]
     pub fn source_comment(&self) -> Option<&str> {
         self.source_comment.as_deref()
@@ -2324,6 +2384,14 @@ fn encode_index(hasher: &mut Sha256, index: &IndexObservation) {
                 encode_str(hasher, option.name());
                 encode_str(hasher, option.value());
             }
+        }
+    }
+    match index.tablespace() {
+        None => hasher.update([0]),
+        Some(tablespace) => {
+            hasher.update([1]);
+            encode_bool(hasher, tablespace.is_database_default());
+            encode_str(hasher, tablespace.name());
         }
     }
     encode_optional_str(hasher, index.access_method());
