@@ -63,6 +63,22 @@ test("validates all shape cases in process through the locked AJV library", () =
   assert.equal(summary.activation_authorized, false);
 });
 
+test("canonical text rejects both ECMAScript and Unicode-only blank code points", () => {
+  const validators = createProceduralValidators(repositoryRoot);
+  for (const blank of ["\uFEFF", "\u0085", "\uFEFF\u0085"]) {
+    const model = structuredClone(fixtureBases.model);
+    model.procedure_nodes[0].locale_labels.en = blank;
+    assert.equal(validators.model(model), false);
+  }
+  const evidenceBlank = structuredClone(fixtureBases.model);
+  evidenceBlank.source_evidence[0].location = "\u0085";
+  assert.equal(validators.model(evidenceBlank), false);
+
+  const visible = structuredClone(fixtureBases.model);
+  visible.procedure_nodes[0].locale_labels.en = "\u0085review";
+  assert.equal(validators.model(visible), true);
+});
+
 test("keeps JSON Schema validation off dynamic package execution paths", () => {
   const packageManifest = JSON.parse(readFileSync(resolve(repositoryRoot, "package.json"), "utf8"));
   const packageLock = JSON.parse(readFileSync(resolve(repositoryRoot, "package-lock.json"), "utf8"));
