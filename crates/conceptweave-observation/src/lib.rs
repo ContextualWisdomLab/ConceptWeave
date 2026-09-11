@@ -563,6 +563,35 @@ fn canonicalize_constraint_timings(
                 field: "constraint_timing_kind",
             });
         }
+
+        let Some(backing_index) = relation
+            .indexes()
+            .iter()
+            .find(|index| index.index_name() == timing.constraint_name())
+        else {
+            return Err(ObservationError::InvalidObservationField {
+                field: "constraint_backing_index",
+            });
+        };
+        let Some(catalog_flags) = backing_index.catalog_flags() else {
+            return Err(ObservationError::InvalidObservationField {
+                field: "constraint_backing_index",
+            });
+        };
+        let expected_primary = matches!(constraint, TableConstraintObservation::PrimaryKey(_));
+        let expected_immediate = matches!(
+            timing.deferrability(),
+            ConstraintDeferrability::NotDeferrable
+        );
+        if !backing_index.is_unique()
+            || catalog_flags.primary() != expected_primary
+            || catalog_flags.immediate() != expected_immediate
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "constraint_backing_index",
+            });
+        }
+
         observed_key_coordinates.insert((
             timing.schema_name().to_owned(),
             timing.relation_name().to_owned(),
