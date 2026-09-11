@@ -1,5 +1,6 @@
 use conceptweave_observation::{
-    CheckConstraintObservation, ColumnObservationV3, ConstraintPeriodObservation, ForeignKeyAction,
+    CheckConstraintObservation, ColumnObservationV3, ConstraintDeferrability,
+    ConstraintPeriodObservation, ConstraintTimingObservation, ForeignKeyAction,
     ForeignKeyDeferrability, ForeignKeyMatchType, ForeignKeyObservation,
     ForeignKeyReferenceBehavior, IndexAttributeKind, IndexAttributeObservation, IndexCatalogFlags,
     IndexObservation, ObservationError, PostgresSchemaSnapshotV3, PrimaryKeyObservation,
@@ -174,6 +175,17 @@ fn single_column_foreign_key_relation() -> RelationObservation {
     .expect("single-column child constraint fixture is valid")
 }
 
+fn temporal_key_timing() -> ConstraintTimingObservation {
+    ConstraintTimingObservation::new(
+        "public",
+        "document",
+        RelationKind::Table,
+        "document_temporal_key",
+        ConstraintDeferrability::NotDeferrable,
+    )
+    .expect("referenced temporal-key timing fixture is valid")
+}
+
 fn period(
     relation_name: &str,
     constraint_name: &str,
@@ -248,11 +260,13 @@ fn temporal_primary_key_requires_matching_exclusion_backing_index_evidence() {
 #[test]
 fn period_foreign_key_and_referenced_temporal_key_are_preserved_together() {
     let snapshot = base_snapshot(vec![temporal_parent_relation(), period_child_relation()])
+        .with_observed_constraint_timings(vec![temporal_key_timing()])
+        .expect("referenced temporal key timing is explicitly observed")
         .with_observed_constraint_periods(vec![
             period("document_version", "document_version_period_fk", true),
             period("document", "document_temporal_key", true),
         ])
-        .expect("PERIOD foreign key targets an observed WITHOUT OVERLAPS primary key");
+        .expect("PERIOD foreign key targets an observed non-deferrable WITHOUT OVERLAPS primary key");
 
     let periods = snapshot
         .constraint_periods()
@@ -335,12 +349,16 @@ fn period_observation_cannot_target_check_constraint() {
 fn period_family_input_order_does_not_change_identity() {
     let relations = vec![temporal_parent_relation(), period_child_relation()];
     let forward = base_snapshot(relations.clone())
+        .with_observed_constraint_timings(vec![temporal_key_timing()])
+        .expect("forward timing inventory is valid")
         .with_observed_constraint_periods(vec![
             period("document", "document_temporal_key", true),
             period("document_version", "document_version_period_fk", true),
         ])
         .expect("forward period inventory is valid");
     let reverse = base_snapshot(relations)
+        .with_observed_constraint_timings(vec![temporal_key_timing()])
+        .expect("reverse timing inventory is valid")
         .with_observed_constraint_periods(vec![
             period("document_version", "document_version_period_fk", true),
             period("document", "document_temporal_key", true),
