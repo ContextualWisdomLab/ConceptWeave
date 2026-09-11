@@ -26,9 +26,11 @@ Fresh authority entering this baseline update:
 - Foundation #1: `60f14a6e85a83d56c2eea43b34d52b3366bb1735`, OPEN Draft;
 - Source Observation #6: `287165d399c5f54d6c4b4aa3c15497b47de8244b`, OPEN Draft;
 - representation-v3 parent #45: `6b2a8f555725dc79f60432afbc492d6005290a4a`, OPEN Draft on #6;
-- representation/index successor #46 source head before this documentation commit: `da6fe0fd51431fa0f902566a9d8d3fac6bd8caf9`, OPEN Draft and mechanically mergeable.
+- representation/index successor #46 source head before this documentation commit: `27de693b18d6cb1936e572a44e91c5ace2b7209a`, OPEN Draft and mechanically mergeable.
 
 Protected central `.github/main` was freshly verified at `cb0872c9a20d5584703dffacca65c096fc034c6c`; `.github#2051@558693e0333e48012beea142f739bc634b0674a7` and stacked `.github#2056@69ae472562c93cc17674af5e2085a58947d3fab8` remain the protected-workflow owner prerequisites. #2051 remains Draft on historical `main@7fd571db...`; #2056 remains Draft stacked on #2051. Product-CI #35 remains unchanged and therefore still waits on a backward-compatible protected handler, ordinary/non-force current-main reconciliation and fresh exact terminal evidence.
+
+The protected/default ConceptWeave `main` currently has no repository-local `.github/workflows` directory. `product.yml` exists only on the stacked Source Observation branch/base lineage and is itself introduced through the still-unmerged Product-CI bootstrap. A `pull_request` workflow cannot supply exact-head Product evidence until the workflow exists on the protected default branch. Draft toggling, no-op commits, or manual retriggers do not repair that bootstrap boundary and are not acceptance evidence.
 
 No force push, destructive rebase, self-approval, review dismissal, gate weakening, fail-open scanner substitution, synthetic status, no-op/manual retrigger or mutable supplier dependency is acceptance evidence.
 
@@ -53,7 +55,20 @@ Source-repaired behavior now includes:
 - exact relation-scoped index evidence: key/`INCLUDE` layout, expressions, per-key collation/operator class/opaque `indoption`, operator-class parameters, `NULLS NOT DISTINCT`, material `pg_index` flags, `pg_class.reloptions`, resolved tablespace state and index definition/comment provenance;
 - schema-local `pg_class` name consistency across modeled owning relations and nested indexes;
 - local index evidence admitted only on ordinary tables, partitioned tables and materialized views;
-- represented table constraints admitted on ordinary/partitioned tables, CHECK-only for foreign tables, and rejected on views/materialized views/sequences/standalone composite-type relations.
+- represented table constraints admitted on ordinary/partitioned tables, CHECK-only for foreign tables, and rejected on views/materialized views/sequences/standalone composite-type relations;
+- one modeled relation admits at most one primary-key observation, and every primary-key column must carry exact `nullable = false` evidence before governed digest/receipt construction.
+
+### Primary-key invariant repair lineage
+
+PostgreSQL 18 permits at most one primary key per table and a primary key makes every participating column `NOT NULL`. Before this repair, v3 could accept two differently named `PrimaryKeyObservation`s on one relation or accept a primary key over `ColumnObservationV3 { nullable: true }` because relation-local constraint validation checked only names and local column resolution.
+
+The active lineage is:
+
+- finding review `5180938301` on exact predecessor `1104f406891def7f0fd47c97630891cd68a53d9b`;
+- behavioral RED `65be0a02da340ecc4ab96b34b8a5325d8f8b197c`, `primary_key_invariants_contract.rs`;
+- minimal v3 owner-admission repair `27de693b18d6cb1936e572a44e91c5ace2b7209a`, enforcing `primary_key_cardinality` and `primary_key_nullable_column` before private representation/digest construction.
+
+The repair deliberately stays in the public v3 admission seam. It does not reinterpret the frozen v2 snapshot/digest contract, does not add a new primary-key identity field, and does not alter existing constraint receipt coordinates.
 
 ### Exact true-array repair lineage
 
@@ -77,7 +92,8 @@ The active lineage is:
 - receipt behavioral RED `60d34c2ab52f8215701d865b6b830b5391f91a29`, `array_type_receipt_contract.rs`;
 - `ArrayTypeLocation`/`ArrayTypeSourceReceipt` repair `975bd892d57ced8a546cceaebd6b456857ac4700`;
 - aggregate export/exact verification seam `da6fe0fd51431fa0f902566a9d8d3fac6bd8caf9`;
-- exact-current source review `5180826533`.
+- exact-current source review `5180826533`;
+- code-current pre-primary-key baseline `1104f406891def7f0fd47c97630891cd68a53d9b` / authority review `5180840543`.
 
 The repair intentionally keeps the original v3 constructor and existing successor location semantics stable. `new_with_array_types` is a separate observed-family admission path with domain separator `conceptweave.postgres_schema_snapshot.v3.array_types.v1`; it canonicalizes exact array observations and binds the array inventory plus original qualified domain/column type bindings into the public source digest. The private pre-array representation is used only as compatibility validation after array bindings are projected to their exact element coordinates; public evidence retains the original array coordinate and the public digest prevents that projection from collapsing identity.
 
@@ -97,16 +113,16 @@ True-array receipts are likewise additive. `SchemaObjectLocation` remains frozen
 
 ## Representation acceptance still required
 
-#46 is source-repaired for the current true-array identity and receipt P1s but is **not** native/Product GREEN. One unchanged exact successor must still produce repository-pinned Rust 1.98 and hosted acceptance evidence:
+#46 is source-repaired for the current primary-key, true-array identity and receipt P1s but is **not** native/Product GREEN. One unchanged exact successor must still produce repository-pinned Rust 1.98 and hosted acceptance evidence:
 
 - `cargo fmt --all --check`;
 - strict workspace/all-target Clippy with warnings denied;
-- workspace tests including frozen-v2, retained v3 index/namespace/relation-kind/constraint-kind/relation-backed-type contracts, `array_type_identity_contract`, `array_type_digest_contract`, `array_type_schema_contract` and `array_type_receipt_contract`;
+- workspace tests including frozen-v2, retained v3 index/namespace/relation-kind/constraint-kind/relation-backed-type contracts, `primary_key_invariants_contract`, `array_type_identity_contract`, `array_type_digest_contract`, `array_type_schema_contract` and `array_type_receipt_contract`;
 - rustdoc/doc tests and release build;
 - owned production docstring/test/edge-case coverage requirements;
 - applicable Product/security/dependency/review workflows on the exact head.
 
-At earlier source/docs heads, pull-request workflow runs were absent and combined commit status contained only CodeRabbit success. Draft/bot-only status is not acceptance. Every successor, including documentation-only successors, requires a fresh exact-head cycle before adoption.
+Pull-request workflow runs remain absent because the protected default branch has not yet received the Product workflow bootstrap. The current exact branch workflow cannot bootstrap its own `pull_request` run. Combined commit status at the pre-repair head contained only CodeRabbit success with `Review skipped: draft pull request`. Draft/bot-only status is not acceptance, and toggling Draft/Ready before the owner bootstrap would not repair the missing default-branch trigger authority. Every successor, including documentation-only successors, requires a fresh exact-head cycle before adoption.
 
 ## Concrete PostgreSQL adapter boundary
 
@@ -120,11 +136,13 @@ Do not attach transport before representation acceptance. After exact-head GREEN
 - resolve `pg_type.typarray`/`typelem` for exact associated array/element coordinates without generated-name inference;
 - validate shared schema-local `pg_type` namespace, one-element/one-array reciprocity, no array-of-array interpretation and same-schema array/element reciprocity;
 - emit exact array-type evidence coordinates/receipts only after the array row is part of the immutable snapshot;
-- validate schema-local `pg_class`, index owning relation kind, derived index `relkind`, index tablespace/options and relation-kind constraint rules;
+- validate schema-local `pg_class`, index owning relation kind, derived index `relkind`, index tablespace/options, relation-kind constraint rules, single-primary-key cardinality and primary-key NOT NULL consistency;
 - enforce policy-admitted row/byte/concurrency ceilings and complete-or-fail snapshot construction.
 
 ## Standards and primary authority
 
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE TABLE — primary-key cardinality and NOT NULL semantics*.
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_constraint*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_type*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: The PostgreSQL Type System*, §36.2.2.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE TYPE — Array Types and Notes*.
@@ -141,17 +159,17 @@ Catalog OIDs are adapter-local join coordinates, never governed semantic identit
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | Canonical owner seams unchanged. |
 | Truth/publication lifecycle | SOURCE_REPAIRED_PENDING_PROTECTED_EVIDENCE | No protected immutable semantic release exists. |
-| Source Observation | REPRESENTATION_V3_ARRAY_TYPE_SOURCE_REPAIRED | True-array identity + receipt-coordinate source repair through `da6fe0fd...`; native/Product acceptance still absent. |
-| Product CI | BLOCKED_OWNER_RECONCILIATION | #35 still depends on central backward-compatible handler/current-main reconciliation and exact terminal GREEN. |
+| Source Observation | REPRESENTATION_V3_SOURCE_REPAIRED | Primary-key + true-array/receipt and retained index/type invariants are source-repaired through `27de693...`; native/Product acceptance still absent. |
+| Product CI | BLOCKED_OWNER_RECONCILIATION | Protected/default ConceptWeave `main` does not yet contain Product workflow authority; #35 still depends on central backward-compatible handler/current-main reconciliation and exact terminal GREEN. |
 | Quality gate | SOURCE_REPAIRED_NATIVE_ACCEPTANCE_PENDING | Keep #46 Draft until one unchanged exact head has Rust/Product/security/dependency/review evidence. |
 | PostgreSQL adapter | BLOCKED_ON_REPRESENTATION_ACCEPTANCE | No transport before representation GREEN and parent adoption. |
 | Release | NOT_STARTED | Version/CHANGELOG/tag/package/immutable semantic release/SBOM/provenance/reproducibility/rollback remain mandatory. |
 
 ## Current causal sequence
 
-1. Treat the current true-array identity + receipt source delta as repaired, then obtain repository-pinned Rust 1.98 plus applicable hosted Product/security/dependency/review acceptance on one unchanged exact #46 head. Real failures require causal repair and a new exact-head cycle.
+1. Treat the current primary-key + true-array identity/receipt source delta as repaired, then obtain repository-pinned Rust 1.98 plus applicable hosted Product/security/dependency/review acceptance on one unchanged exact #46 head. Real failures require causal repair and a new exact-head cycle.
 2. Ordinary/non-force adopt verified #46 into #45 and obtain fresh parent acceptance; then adopt #45 into #6. Never transfer predecessor GREEN.
-3. In parallel, central owner must land the backward-compatible protected handler, reconcile #2051/#2056 onto current protected `.github/main`, obtain terminal GREEN, then give unchanged-head #35 fresh acceptance and normal merge.
+3. In parallel, central owner must land the backward-compatible protected handler, reconcile #2051/#2056 onto current protected `.github/main`, obtain terminal GREEN, then give unchanged-head #35 fresh acceptance and normal merge so Product workflow authority reaches protected ConceptWeave `main`.
 4. Foundation ordinary/non-force restacks after #35; descendants consume only released/versioned owner contracts.
 5. Only after Source Observation representation and protected prerequisites are current, implement the bounded PostgreSQL adapter and frozen conformance fixture.
 6. Continue discovery/alignment/deterministic validation/independent evaluation/steward review/immutable publication under the canonical owner boundaries. Production LLM calls remain behind released `contextual-orchestrator` contracts.
