@@ -142,12 +142,17 @@ fn observed_domain_and_relation_row_type_arrays_resolve() {
 
 #[test]
 fn collision_adjusted_array_name_is_observed_not_inferred_from_underscore_convention() {
-    let reserved_underscore_name = EnumObservation::new(
+    let reserved = EnumObservation::new(
         "public",
-        "_status",
+        "reserved",
         vec!["reserved".to_owned()],
     )
-    .expect("pre-existing type fixture is valid");
+    .expect("reserved enum fixture is valid");
+    let renamed_reserved_array = ArrayTypeObservation::new(
+        type_name("public", "_status"),
+        type_name("public", "reserved"),
+    )
+    .expect("renamed prior true-array fixture is valid");
     let status = EnumObservation::new(
         "public",
         "status",
@@ -170,11 +175,11 @@ fn collision_adjusted_array_name_is_observed_not_inferred_from_underscore_conven
         snapshot(
             vec![consumer],
             Vec::new(),
-            vec![reserved_underscore_name, status],
-            vec![collision_adjusted_array],
+            vec![reserved, status],
+            vec![renamed_reserved_array, collision_adjusted_array],
         )
         .is_ok(),
-        "array identity must use the exact pg_type.typarray row rather than guessing _element_name"
+        "array identity must follow the exact typarray row when a prior true-array name occupies the conventional candidate"
     );
 }
 
@@ -242,5 +247,67 @@ fn duplicate_exact_array_type_coordinates_fail_closed() {
     assert!(
         snapshot(Vec::new(), Vec::new(), vec![status], vec![first, duplicate]).is_err(),
         "duplicate exact array pg_type rows are contradictory observation evidence"
+    );
+}
+
+#[test]
+fn one_element_type_cannot_claim_two_true_array_rows() {
+    let status = EnumObservation::new(
+        "public",
+        "status",
+        vec!["open".to_owned(), "closed".to_owned()],
+    )
+    .expect("enum fixture is valid");
+    let first = ArrayTypeObservation::new(
+        type_name("public", "_status"),
+        type_name("public", "status"),
+    )
+    .expect("first true-array fixture is valid");
+    let contradictory = ArrayTypeObservation::new(
+        type_name("public", "__status"),
+        type_name("public", "status"),
+    )
+    .expect("second coordinate is structurally valid");
+
+    assert!(
+        snapshot(
+            Vec::new(),
+            Vec::new(),
+            vec![status],
+            vec![first, contradictory],
+        )
+        .is_err(),
+        "pg_type.typarray identifies one true array row for one element type"
+    );
+}
+
+#[test]
+fn observed_true_array_cannot_be_the_element_of_another_true_array() {
+    let status = EnumObservation::new(
+        "public",
+        "status",
+        vec!["open".to_owned(), "closed".to_owned()],
+    )
+    .expect("enum fixture is valid");
+    let status_array = ArrayTypeObservation::new(
+        type_name("public", "_status"),
+        type_name("public", "status"),
+    )
+    .expect("true-array fixture is valid");
+    let array_of_array = ArrayTypeObservation::new(
+        type_name("public", "__status"),
+        type_name("public", "_status"),
+    )
+    .expect("nested array coordinate is structurally valid");
+
+    assert!(
+        snapshot(
+            Vec::new(),
+            Vec::new(),
+            vec![status],
+            vec![status_array, array_of_array],
+        )
+        .is_err(),
+        "PostgreSQL multidimensional values use the same true array type rather than arrays of arrays"
     );
 }
