@@ -26,7 +26,7 @@ Fresh authority entering this update:
 - Foundation #1: `60f14a6e85a83d56c2eea43b34d52b3366bb1735`, OPEN Draft;
 - Source Observation #6: `287165d399c5f54d6c4b4aa3c15497b47de8244b`, OPEN Draft;
 - representation-v3 parent #45: `6b2a8f555725dc79f60432afbc492d6005290a4a`, OPEN Draft on #6;
-- representation/index successor #46 source head before this documentation commit: `8efc1e5d24c3fb4670237515f3f760b73ee5303e`, OPEN Draft and mechanically mergeable.
+- representation/index successor #46 source head before this documentation commit: `40337bc086f5b12b981c0f602bfc6413287644ea`, OPEN Draft and mechanically mergeable.
 
 Protected central `.github/main` was freshly verified at `cb0872c9a20d5584703dffacca65c096fc034c6c`; `.github#2051@558693e0333e48012beea142f739bc634b0674a7` remains Draft on historical `main@7fd571db...`, with `.github#2056@69ae472562c93cc17674af5e2085a58947d3fab8` stacked on it. The central owner must land a backward-compatible handler, ordinary/non-force reconcile those PRs onto current protected main and obtain terminal GREEN before unchanged #35 can receive fresh acceptance and normal merge.
 
@@ -53,7 +53,8 @@ Preserved source repairs include:
 - local index admission only on ordinary tables, partitioned tables and materialized views;
 - represented table constraints on ordinary/partitioned tables, CHECK-only on foreign tables, and no modeled table constraints on views/materialized views/sequences/standalone composite-type relations;
 - at most one represented primary key per relation and exact `nullable = false` evidence for every primary-key column;
-- explicitly observed PRIMARY KEY/UNIQUE timing as `NotDeferrable`, `InitiallyImmediate` or `InitiallyDeferred`, with exact relation/constraint coordinates, complete inventory, observed-empty versus unobserved state and a separate `conceptweave.postgres_schema_snapshot.v3.constraint_timings.v1` digest layer.
+- explicitly observed PRIMARY KEY/UNIQUE timing as `NotDeferrable`, `InitiallyImmediate` or `InitiallyDeferred`, with exact relation/constraint coordinates, complete inventory, observed-empty versus unobserved state and a separate `conceptweave.postgres_schema_snapshot.v3.constraint_timings.v1` digest layer;
+- explicitly observed PRIMARY KEY/UNIQUE timing now binds to same-relation/same-name supporting-index evidence, requiring observed uniqueness, PK/non-PK role and `indimmediate` coherence before immutable timing evidence is admitted.
 
 ### Key-constraint timing lineage
 
@@ -69,24 +70,23 @@ PostgreSQL 18 stores constraint timing in `pg_constraint.condeferrable`/`condefe
 
 The timing family is additive. It does not mutate `PrimaryKeyObservation`/`UniqueConstraintObservation` shared with frozen v2. Existing constraint receipt paths remain stable and bind the public digest, including timing when explicitly observed.
 
-### Active P1 — key constraint to supporting-index coherence
+### Key constraint to supporting-index coherence
 
-Review `5181223180` on exact `9020f3620afbe932aec7a0ca6f1bb3dbf5b0d316` found that v3 now models both sides of PostgreSQL's key-constraint/index relationship but does not bind them. `pg_constraint.conindid` identifies the index supporting PRIMARY KEY/UNIQUE, PostgreSQL creates the supporting unique index with the same constraint name, and a deferrable unique/primary constraint is backed by a non-immediate index (`pg_index.indimmediate = false`).
+Review `5181223180` on exact `9020f3620afbe932aec7a0ca6f1bb3dbf5b0d316` found that v3 modeled both sides of PostgreSQL's key-constraint/index relationship without binding them. `pg_constraint.conindid` identifies the index supporting PRIMARY KEY/UNIQUE, PostgreSQL constraint-owned indexes share the constraint name, and `pg_index.indimmediate` distinguishes immediate uniqueness enforcement from deferrable constraint support.
 
-Initial behavioral RED `c0cec50ed29e2435cf1552302e166a7ff7494924` added `constraint_backing_index_contract.rs`. Fixture review then caught a non-canonical UTC provenance timestamp; ordinary-forward refinement `8efc1e5d24c3fb4670237515f3f760b73ee5303e` changes it to exact `Z` UTC so the test reaches the intended backing-index invariant rather than failing on provenance validation first.
+Initial behavioral RED `c0cec50ed29e2435cf1552302e166a7ff7494924` added `constraint_backing_index_contract.rs`. Fixture review then caught a non-canonical UTC provenance timestamp; ordinary-forward refinement `8efc1e5d24c3fb4670237515f3f760b73ee5303e` changed it to exact `Z` UTC so the test reaches the intended backing-index invariant rather than failing on provenance validation first.
 
-The current RED requires the public v3 aggregate to fail closed when explicitly observed key-constraint timing disagrees with represented index evidence:
+Production repair `40337bc086f5b12b981c0f602bfc6413287644ea` extends `canonicalize_constraint_timings` so every explicitly observed PRIMARY KEY/UNIQUE timing coordinate must resolve one same-relation/same-name represented index with observed catalog flags. Admission now requires:
 
-- every represented PRIMARY KEY/UNIQUE must resolve to one same-relation, same-name supporting index;
-- PRIMARY KEY must bind an observed unique index with `indisprimary = true`;
-- UNIQUE must bind an observed unique non-primary index;
-- `NotDeferrable` must agree with `indimmediate = true`;
-- `InitiallyImmediate` and `InitiallyDeferred` are both deferrable and therefore require `indimmediate = false`;
-- coherent evidence remains admissible.
+- PRIMARY KEY -> `is_unique = true`, `indisprimary = true`;
+- UNIQUE -> `is_unique = true`, `indisprimary = false`;
+- `NotDeferrable` -> `indimmediate = true`;
+- `InitiallyImmediate` or `InitiallyDeferred` -> `indimmediate = false`;
+- missing index evidence or missing/contradictory catalog flags -> fail closed as `constraint_backing_index`.
 
-`conindid` remains an adapter-local join coordinate, not governed semantic identity. The canonical domain relationship is the exact relation + constraint/index coordinate and observed catalog state.
+Exact-head static review `5181883061` found the repair causally aligned with the corrected RED and PostgreSQL 18 catalog semantics. `conindid` remains an adapter-local join coordinate, not governed semantic identity. The canonical domain relationship is the exact relation + constraint/index coordinate and observed catalog state.
 
-This P1 is **RED-active**. Production aggregate admission has not yet been changed to satisfy `constraint_backing_index_contract`; no source GREEN or native/Product GREEN claim is valid on this head.
+This P1 is **source-repaired but not native/Product GREEN**. No exact-head Rust 1.98 execution evidence or hosted Product acceptance has yet been produced for the repaired successor.
 
 ### Preserved high-value repair lineage
 
@@ -100,10 +100,11 @@ This P1 is **RED-active**. Production aggregate admission has not yet been chang
 - `5180058119 -> eca8adb2e5667048c220a37ad863971a8457e9d3 -> 66130c568705092ffd4dabc9bf56bf2a8c88da3a`: exact relation-backed composite row-type identity.
 - `5180207753 -> 51075e48da8da3059cb6ec764f8c45b88b1f933c -> 8d8bd115f080fbcc11fb2be755f41436ba3b8886 -> 21c216aae61009d54dcb4a593f502fdd8654598d -> a7d20d90f1de5a4b94ac23e1d22737be3c4d9c1d -> da6fe0fd51431fa0f902566a9d8d3fac6bd8caf9`: exact true-array identity, reciprocity, digest and receipt coordinates.
 - `5180938301 -> 65be0a02da340ecc4ab96b34b8a5325d8f8b197c -> 27de693b18d6cb1936e572a44e91c5ace2b7209a`: primary-key cardinality/nullability invariant.
+- `5181223180 -> c0cec50ed29e2435cf1552302e166a7ff7494924 -> 8efc1e5d24c3fb4670237515f3f760b73ee5303e -> 40337bc086f5b12b981c0f602bfc6413287644ea -> 5181883061`: key constraint/supporting-index coherence source repair.
 
 ## Acceptance still required
 
-The current #46 lineage is not native/Product GREEN. After the backing-index RED is causally repaired, one unchanged exact successor must produce:
+The current #46 lineage is source-repaired but not native/Product GREEN. One unchanged exact successor must produce:
 
 - repository-pinned Rust 1.98 `cargo fmt --all --check`;
 - strict workspace/all-target Clippy with warnings denied;
@@ -130,11 +131,12 @@ No transport is admitted before representation exact-head GREEN and ordinary/non
 ## Standards and primary authority
 
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE TABLE — UNIQUE/PRIMARY KEY indexes, deferrability, constraint naming and primary-key semantics*.
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: ALTER TABLE — constraint ownership of supporting indexes and constraint/index rename coupling*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_constraint — `condeferrable`, `condeferred`, `conindid`*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_index — `indisunique`, `indisprimary`, `indimmediate` and index state*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_type and the PostgreSQL Type System*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_class and CREATE INDEX*.
-- PostgreSQL 18 source `src/backend/catalog/index.c` for deferrable supporting-index `indimmediate` behavior and `src/backend/parser/parse_utilcmd.c` for deferrable-index/constraint compatibility.
+- PostgreSQL 18 source `src/backend/catalog/index.c` for supporting-index state and `src/backend/parser/parse_utilcmd.c` for deferrable-index/constraint compatibility.
 
 Catalog OIDs are adapter-local joins, never governed semantic identity. `pg_get_indexdef`/`pg_get_expr` are reconstructed provenance text, never the sole semantic carrier.
 
@@ -143,20 +145,19 @@ Catalog OIDs are adapter-local joins, never governed semantic identity. `pg_get_
 | Area | Status | Evidence / next verification |
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | Canonical owner seams unchanged. |
-| Truth/publication lifecycle | RED_ACTIVE_NO_PUBLICATION | No protected immutable semantic release exists. |
-| Source Observation | REPRESENTATION_V3_BACKING_INDEX_RED_ACTIVE | Timing/array/index/type repairs are preserved; corrected `constraint_backing_index_contract` is intentionally unsatisfied pending causal aggregate admission repair. |
+| Truth/publication lifecycle | SOURCE_REPAIRED_NO_PUBLICATION | No protected immutable semantic release exists. |
+| Source Observation | REPRESENTATION_V3_BACKING_INDEX_SOURCE_REPAIRED | `40337bc...` satisfies the corrected backing-index RED at source level; exact-head Rust/Product acceptance remains mandatory. |
 | Product CI | BLOCKED_OWNER_RECONCILIATION | Protected/default ConceptWeave `main` still lacks Product workflow authority; #35 waits on central owner settlement. |
-| Quality gate | RED_ACTIVE | No Ready/adoption/merge before source repair and unchanged-head Rust/Product/security/dependency/review evidence. |
+| Quality gate | ACCEPTANCE_PENDING | No Ready/adoption/merge before unchanged-head Rust/Product/security/dependency/review evidence. |
 | PostgreSQL adapter | BLOCKED_ON_REPRESENTATION_ACCEPTANCE | No transport before representation GREEN and parent adoption. |
 | Release | NOT_STARTED | Version/CHANGELOG/tag/package/immutable semantic release/SBOM/provenance/reproducibility/rollback remain mandatory. |
 
 ## Current causal sequence
 
-1. Repair the public v3 aggregate so explicitly observed PK/UNIQUE timing and represented backing-index evidence satisfy the corrected active RED without persisting `conindid` as semantic identity.
-2. On the repaired unchanged #46 head, produce repository-pinned Rust 1.98 and applicable hosted Product/security/dependency/review acceptance; causally repair any real failure.
-3. Ordinary/non-force adopt verified #46 into #45 and obtain fresh parent acceptance; then adopt #45 into #6. Never transfer predecessor GREEN.
-4. In parallel, central owner lands the backward-compatible protected handler, reconciles #2051/#2056 onto current protected `.github/main`, obtains terminal GREEN, then unchanged #35 gets fresh acceptance and normal merge.
-5. Foundation ordinary/non-force restacks after #35; descendants consume only released/versioned owner contracts.
-6. Only then implement the bounded PostgreSQL adapter and frozen conformance fixture, followed by discovery/alignment/deterministic validation/independent evaluation/steward review/immutable publication under the canonical owner boundaries.
+1. On the repaired unchanged #46 successor, produce repository-pinned Rust 1.98 and applicable hosted Product/security/dependency/review acceptance; causally repair any real failure.
+2. Ordinary/non-force adopt verified #46 into #45 and obtain fresh parent acceptance; then adopt #45 into #6. Never transfer predecessor GREEN.
+3. In parallel, central owner lands the backward-compatible protected handler, reconciles #2051/#2056 onto current protected `.github/main`, obtains terminal GREEN, then unchanged #35 gets fresh acceptance and normal merge.
+4. Foundation ordinary/non-force restacks after #35; descendants consume only released/versioned owner contracts.
+5. Only then implement the bounded PostgreSQL adapter and frozen conformance fixture, followed by discovery/alignment/deterministic validation/independent evaluation/steward review/immutable publication under the canonical owner boundaries.
 
 Adapters remain outside the core domain model and external DTOs cross explicit Anti-Corruption Layers. Source Observation facts are evidence, not source-system business truth. Published semantic truth is immutable; corrections create a new release plus supersession evidence.
