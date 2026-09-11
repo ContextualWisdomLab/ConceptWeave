@@ -1,6 +1,6 @@
 # Product / Technical Gap Baseline
 
-**Snapshot:** 2026-09-11
+**Snapshot:** 2026-09-12
 
 This document records ConceptWeave's code-current product and technical gap baseline. Exact SHA/run coordinates are immutable evidence snapshots, never mutable supplier dependencies. Live protected branch, PR, issue, review, and workflow state supersedes a recorded coordinate when it advances. Any head movement resets exact-head execution/review evidence unless that evidence was actually produced for the successor.
 
@@ -19,16 +19,16 @@ Consumers use released/versioned `semantic_release`/contract/ACL coordinates. So
 
 ## Protected truth and active prerequisites
 
-Fresh 2026-09-11 authority for this repair lane:
+Fresh 2026-09-12 authority for this repair lane:
 
 - protected/default ConceptWeave `main`: `f4f440dd58c77d7cd90dff8a1eb2eeb9a9940425`; no immutable ConceptWeave semantic release exists yet;
 - Product-CI bootstrap #35: `9bb82f041483cb4e0cf1aa1f5450b413309f9a05`, OPEN/non-Draft/mechanically mergeable; central CodeQL rollout/settlement remains the prerequisite to fresh acceptance;
 - Foundation #1: `60f14a6e85a83d56c2eea43b34d52b3366bb1735`, OPEN Draft and must ordinary/non-force restack after #35;
 - Source Observation #6: `287165d399c5f54d6c4b4aa3c15497b47de8244b`, OPEN Draft;
 - representation-v3 parent #45: `6b2a8f555725dc79f60432afbc492d6005290a4a`, OPEN Draft on #6;
-- representation/index successor #46: relation-backed composite type identity was repaired by review `5180058119` -> RED `eca8adb2e5667048c220a37ad863971a8457e9d3` -> repair `66130c568705092ffd4dabc9bf56bf2a8c88da3a`; the next true-array type identity P1 is review `5180207753` -> compile/behavioral RED `856934e561cf41b9ef546570b9a41524549b57f2` and remains production-unrepaired.
+- representation/index successor #46: relation-backed composite type identity was repaired by review `5180058119` -> RED `eca8adb2e5667048c220a37ad863971a8457e9d3` -> repair `66130c568705092ffd4dabc9bf56bf2a8c88da3a`; true-array identity remains production-unrepaired, with finding `5180207753`, initial RED `856934e561cf41b9ef546570b9a41524549b57f2`, verified RED-fixture correction review `5180344773`, and ordinary-forward corrected RED head `51075e48da8da3059cb6ec764f8c45b88b1f933c`.
 
-Protected central `.github/main` was freshly verified at `cb0872c9a20d5584703dffacca65c096fc034c6c`. `.github#2051@558693e0333e48012beea142f739bc634b0674a7` and stacked `.github#2056@69ae472562c93cc17674af5e2085a58947d3fab8` remain owner prerequisites: reconcile them ordinary/non-force onto current main, preserve terminal-job-set/atomic-wake behavior, land a backward-compatible protected handler, and obtain fresh exact terminal GREEN before unchanged-head #35 acceptance.
+Protected central `.github/main` was freshly verified at `cb0872c9a20d5584703dffacca65c096fc034c6c`. `.github#2051@558693e0333e48012beea142f739bc634b0674a7` and stacked `.github#2056@69ae472562c93cc17674af5e2085a58947d3fab8` remain owner prerequisites until fresh protected truth advances them: reconcile them ordinary/non-force onto current main, preserve terminal-job-set/atomic-wake behavior, land a backward-compatible protected handler, and obtain fresh exact terminal GREEN before unchanged-head #35 acceptance.
 
 No force push, destructive rebase, self-approval, review dismissal, fail-open scanner substitution, no-op/manual retrigger, synthetic status, mutable supplier dependency or routine administrator bypass is acceptance evidence.
 
@@ -67,7 +67,7 @@ Recent exact repair lineage:
 - review `5178743508` -> RED `f81ae51af614a39e648a9c314776ba79bf99d64e` -> repair `a8e9fac16896e3e6d48ec5bc20cafae8c855da39`: reject impossible nested index evidence on non-indexable PostgreSQL relation kinds;
 - review `5179341855` -> RED `089df3d4d59a45cd87afd30c4d86390a96c8c674` -> repair `50b8d05e286181a3d39e88186116a4af173a4285`: reject impossible represented constraint evidence by owning relation kind;
 - review `5180058119` -> RED `eca8adb2e5667048c220a37ad863971a8457e9d3` -> repair `66130c568705092ffd4dabc9bf56bf2a8c88da3a`: resolve exact relation-backed composite row types and reject same-schema domain/enum collisions with relation-generated row types;
-- review `5180207753` -> RED `856934e561cf41b9ef546570b9a41524549b57f2`: require first-class exact true-array `pg_type` identity instead of inferring user-defined array names.
+- review `5180207753` -> initial RED `856934e561cf41b9ef546570b9a41524549b57f2` -> RED verification review `5180344773` -> corrected RED `51075e48da8da3059cb6ec764f8c45b88b1f933c`: retain the exact `typarray`/`typelem` P1 while replacing an incomplete collision fixture with catalog-realistic prior-array occupancy and adding one-element/one-true-array plus no-array-of-array invariants.
 
 ### Tablespace repair source-complete
 
@@ -95,20 +95,22 @@ PostgreSQL 18 `pg_class.reltype` links relation-like objects that own row types 
 
 Review `5180058119` records the defect. RED `eca8adb2e5667048c220a37ad863971a8457e9d3` requires all modeled non-sequence relation row types to resolve by exact schema/name, keeps Sequence non-resolving, proves an observed standalone composite can underlie a domain, and requires relation-generated row-type name collisions with domain/enum names to fail closed. Repair `66130c568705092ffd4dabc9bf56bf2a8c88da3a` adds the derived `relation_has_row_type` invariant and includes those relation-backed coordinates in exact type resolution without promoting `pg_class.reltype`/`pg_type.oid` into governed identity or consulting `search_path`.
 
-### True array type identity P1 — RED active
+### True array type identity P1 — corrected RED active
 
-PostgreSQL 18 creates a true array type for each user-defined base, composite, range, and domain type. The element type's `pg_type.typarray` points to the exact array `pg_type` row and the array row's `typelem` identifies its element. PostgreSQL explicitly warns that generated array names are not a stable `_` + element-name convention: truncation and existing type-name collisions can cause a different generated name, and clients should use `pg_type.typarray` rather than infer the name.
+PostgreSQL 18 creates an associated true array type for every user-defined type, and its type system treats arrays as one container type per element type rather than recursively distinct array-of-array types. The element type's `pg_type.typarray` identifies the exact true-array row; the array row's `typelem` identifies the element. PostgreSQL explicitly warns that generated array names are not a stable `_` + element-name convention: truncation and type-name collisions can force a different exact name, so clients must follow catalog truth rather than infer it.
 
 The current v3 resolver recognizes `pg_catalog`, observed domains/enums, and relation-backed row types but has no first-class observation for the exact true-array row. Consequently legitimate columns using arrays of an observed enum, domain, or relation-backed composite cannot be represented without either failing `UnknownTypeBinding` or guessing a generated name.
 
-Review `5180207753` records the finding. RED `856934e561cf41b9ef546570b9a41524549b57f2` introduces `array_type_identity_contract.rs` and requires:
+Review `5180207753` records the underlying finding. Initial RED `856934e561cf41b9ef546570b9a41524549b57f2` correctly demanded first-class array/element coordinates but its collision fixture used an enum named `_status` while omitting the true array automatically associated with that enum; under ordinary creation that omitted array itself participates in generated-name collision. Verification review `5180344773` therefore kept the P1 but rejected that fixture as incomplete catalog evidence. Corrected RED `51075e48da8da3059cb6ec764f8c45b88b1f933c` now requires:
 
 - exact array-type and exact element coordinates as first-class observation evidence;
 - user-defined enum, domain, and relation-backed composite arrays to satisfy type resolution;
-- collision-adjusted array names such as an observed `__status` to work without assuming `_status`;
-- unknown element coordinates, duplicate array coordinates, and collisions with an existing exact schema-local `pg_type` name to fail closed.
+- collision-adjusted array names to work from exact catalog coordinates using a prior true-array name that already occupies the conventional candidate, rather than inventing a user type whose own automatic array is omitted;
+- unknown element coordinates, duplicate array coordinates, and collisions with an existing exact schema-local `pg_type` name to fail closed;
+- one observed element coordinate to map to at most one observed true-array row;
+- an observed true array not to become the element of another observed true array, because multidimensional values use the same true array type.
 
-The RED intentionally references not-yet-existing `ArrayTypeObservation` and `PostgresSchemaSnapshotV3::new_with_array_types`; production remains RED until the v3 aggregate admits, canonicalizes, frames, and resolves exact array-type evidence. A correct repair must preserve exact schema/name from catalog truth, use OIDs only as adapter-local joins, and must not model multidimensional values as arrays-of-arrays because PostgreSQL uses the same true array type for every dimensionality.
+The RED intentionally references not-yet-existing `ArrayTypeObservation` and `PostgresSchemaSnapshotV3::new_with_array_types`; production remains RED until the v3 aggregate admits, canonicalizes, frames, and resolves exact array-type evidence. A correct repair must preserve exact schema/name from catalog truth, use OIDs only as adapter-local joins, keep the legacy `PostgresSchemaSnapshotV3::new` digest contract stable, and give `new_with_array_types` a domain-separated array-inventory framing so observed-empty array inventory is not silently conflated with the older constructor's unmodeled state.
 
 Authoritative basis:
 
@@ -117,6 +119,7 @@ Authoritative basis:
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_type*. https://www.postgresql.org/docs/18/catalog-pg-type.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: The PostgreSQL Type System*. https://www.postgresql.org/docs/18/extend-type-system.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE TYPE — Array Types and Notes*. https://www.postgresql.org/docs/18/sql-createtype.html
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: ALTER TYPE*. https://www.postgresql.org/docs/18/sql-altertype.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE TABLE*. https://www.postgresql.org/docs/18/sql-createtable.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE FOREIGN TABLE*. https://www.postgresql.org/docs/18/sql-createforeigntable.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE DOMAIN*. https://www.postgresql.org/docs/18/sql-createdomain.html
@@ -130,7 +133,7 @@ Catalog OIDs may be adapter-local join coordinates but are not governed semantic
 
 ## Representation acceptance still required
 
-#46/#45/#6 cannot claim representation GREEN while the true-array RED is active. After the causal repair, one unchanged exact #46 successor must pass repository-pinned Rust 1.98:
+#46/#45/#6 cannot claim representation GREEN while the corrected true-array RED is active. After the causal repair, one unchanged exact #46 successor must pass repository-pinned Rust 1.98:
 
 - `cargo fmt --all --check`;
 - strict workspace/all-target Clippy with warnings denied;
@@ -143,7 +146,7 @@ Hosted or local execution produced for predecessor heads does not transfer. Draf
 
 ## Concrete PostgreSQL adapter boundary
 
-Do not attach transport while exact-head representation acceptance is absent. After representation GREEN and ordinary/non-force adoption through #45/#6, the PostgreSQL adapter must use a maintained patched Rust driver pinned by immutable lock coordinate and passing cargo-deny/SBOM review; resolve least-privilege credentials only for the authorized source key+binding; reject stale binding before credential/source I/O; use one explicit `REPEATABLE READ READ ONLY` catalog transaction; resolve catalog OIDs to exact governed coordinates before crossing the Anti-Corruption Layer; preserve complete schema/index evidence including tablespace; resolve `pg_class.reltype`/`pg_type.typrelid` to exact relation-backed row-type coordinates; resolve `pg_type.typarray`/`typelem` to exact array/element coordinates without inferring generated names; validate schema-local `pg_type` and `pg_class` namespace invariants; validate index-owning relation kind, catalog index `pg_class.relkind` against the owning relation-derived invariant, and represented constraints against relation-kind rules; consume one non-resetting operation budget across connect/query/cancellation; enforce policy-admitted row/byte/concurrency ceilings; and complete-or-fail snapshot construction.
+Do not attach transport while exact-head representation acceptance is absent. After representation GREEN and ordinary/non-force adoption through #45/#6, the PostgreSQL adapter must use a maintained patched Rust driver pinned by immutable lock coordinate and passing cargo-deny/SBOM review; resolve least-privilege credentials only for the authorized source key+binding; reject stale binding before credential/source I/O; use one explicit `REPEATABLE READ READ ONLY` catalog transaction; resolve catalog OIDs to exact governed coordinates before crossing the Anti-Corruption Layer; preserve complete schema/index evidence including tablespace; resolve `pg_class.reltype`/`pg_type.typrelid` to exact relation-backed row-type coordinates; resolve `pg_type.typarray`/`typelem` to exact array/element coordinates without inferring generated names; validate schema-local `pg_type` and `pg_class` namespace invariants; validate one-element/one-true-array reciprocity and reject array-of-array catalog interpretations; validate index-owning relation kind, catalog index `pg_class.relkind` against the owning relation-derived invariant, and represented constraints against relation-kind rules; consume one non-resetting operation budget across connect/query/cancellation; enforce policy-admitted row/byte/concurrency ceilings; and complete-or-fail snapshot construction.
 
 ## Capability status
 
@@ -151,14 +154,14 @@ Do not attach transport while exact-head representation acceptance is absent. Af
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | Canonical owner seams remain unchanged. |
 | Truth/publication lifecycle | SOURCE_REPAIRED_PENDING_PROTECTED_EVIDENCE | No protected immutable semantic release exists. |
-| Source Observation | REPRESENTATION_V3_ARRAY_TYPE_IDENTITY_RED_ACTIVE | Review `5180207753` and RED `856934e5...` expose missing exact true-array identity; production repair is next. |
+| Source Observation | REPRESENTATION_V3_ARRAY_TYPE_IDENTITY_RED_ACTIVE | Finding `5180207753`; RED corrected by review `5180344773` and commit `51075e48...`; production repair is next. |
 | Product CI | BLOCKED_OWNER_RECONCILIATION | #35 waits on central backward-compatible handler/current-main reconciliation and exact terminal GREEN. |
-| Quality gate | RED_ACTIVE | Keep #46 Draft; repair true-array identity before exact-head Rust/Product acceptance. |
+| Quality gate | RED_ACTIVE | Keep #46 Draft; repair corrected true-array identity contract before exact-head Rust/Product acceptance. |
 | Release | NOT_STARTED | Version/CHANGELOG/tag/package/immutable semantic release/SBOM/provenance/reproducibility/rollback remain mandatory. |
 
 ## Current causal sequence
 
-1. Repair #46's true-array identity RED with a first-class exact array/element observation in the v3 aggregate; canonicalize schema-local type names, validate element bindings, include array identity in deterministic digest framing, preserve frozen v2, and do not infer generated names.
+1. Repair #46's corrected true-array identity RED with a first-class exact array/element observation in the v3 aggregate; canonicalize schema-local type names, validate element bindings plus one-element/one-true-array/no-array-of-array invariants, include observed array inventory in domain-separated deterministic digest framing, preserve the existing `new`/frozen-v2 contracts, and never infer generated names.
 2. On one unchanged repaired #46 successor, obtain repository-pinned Rust 1.98 plus applicable hosted Product/security/dependency/review acceptance. Any real failure requires causal repair and a new exact-head evidence cycle.
 3. Ordinary/non-force adopt verified #46 into #45 and then #6; do not transfer predecessor GREEN.
 4. In parallel, central owner lands the backward-compatible handler, reconciles #2051/#2056 onto current protected `.github/main`, obtains terminal GREEN, then unchanged-head #35 receives fresh acceptance and merges normally.
