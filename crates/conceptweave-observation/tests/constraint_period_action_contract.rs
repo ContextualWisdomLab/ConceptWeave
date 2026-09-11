@@ -74,23 +74,27 @@ fn temporal_parent_relation() -> RelationObservation {
 }
 
 fn period_child_relation(
-    update_action: ForeignKeyAction,
-    delete_action: ForeignKeyAction,
+    reference_behavior: Option<ForeignKeyReferenceBehavior>,
 ) -> RelationObservation {
-    let behavior = ForeignKeyReferenceBehavior::new(
-        update_action,
-        delete_action,
-        ForeignKeyMatchType::Simple,
-        ForeignKeyDeferrability::NotDeferrable,
-    );
-    let foreign_key = ForeignKeyObservation::with_reference_behavior(
-        "document_version_period_fk",
-        vec!["document_id".to_owned(), "valid_during".to_owned()],
-        "public",
-        "document",
-        vec!["document_id".to_owned(), "valid_during".to_owned()],
-        behavior,
-    )
+    let column_names = vec!["document_id".to_owned(), "valid_during".to_owned()];
+    let referenced_column_names = column_names.clone();
+    let foreign_key = match reference_behavior {
+        Some(behavior) => ForeignKeyObservation::with_reference_behavior(
+            "document_version_period_fk",
+            column_names,
+            "public",
+            "document",
+            referenced_column_names,
+            behavior,
+        ),
+        None => ForeignKeyObservation::new(
+            "document_version_period_fk",
+            column_names,
+            "public",
+            "document",
+            referenced_column_names,
+        ),
+    }
     .expect("foreign key fixture is structurally valid");
 
     RelationObservation::new(
@@ -107,6 +111,18 @@ fn period_child_relation(
     .expect("child constraint fixture is valid")
 }
 
+fn reference_behavior(
+    update_action: ForeignKeyAction,
+    delete_action: ForeignKeyAction,
+) -> ForeignKeyReferenceBehavior {
+    ForeignKeyReferenceBehavior::new(
+        update_action,
+        delete_action,
+        ForeignKeyMatchType::Simple,
+        ForeignKeyDeferrability::NotDeferrable,
+    )
+}
+
 fn period(relation_name: &str, constraint_name: &str) -> ConstraintPeriodObservation {
     ConstraintPeriodObservation::new(
         "public",
@@ -119,8 +135,7 @@ fn period(relation_name: &str, constraint_name: &str) -> ConstraintPeriodObserva
 }
 
 fn snapshot_with_temporal_fk(
-    update_action: ForeignKeyAction,
-    delete_action: ForeignKeyAction,
+    reference_behavior: Option<ForeignKeyReferenceBehavior>,
 ) -> Result<PostgresSchemaSnapshotV3, ObservationError> {
     PostgresSchemaSnapshotV3::new(
         &support::authorized_source("warehouse_primary", &["public"]),
@@ -128,7 +143,7 @@ fn snapshot_with_temporal_fk(
         "2026-09-11T23:00:00Z",
         vec![
             temporal_parent_relation(),
-            period_child_relation(update_action, delete_action),
+            period_child_relation(reference_behavior),
         ],
         Vec::new(),
         Vec::new(),
@@ -141,8 +156,23 @@ fn snapshot_with_temporal_fk(
 
 #[test]
 fn temporal_foreign_key_accepts_no_action_reference_behavior() {
-    snapshot_with_temporal_fk(ForeignKeyAction::NoAction, ForeignKeyAction::NoAction)
-        .expect("PostgreSQL temporal foreign keys support NO ACTION");
+    snapshot_with_temporal_fk(Some(reference_behavior(
+        ForeignKeyAction::NoAction,
+        ForeignKeyAction::NoAction,
+    )))
+    .expect("PostgreSQL temporal foreign keys support NO ACTION");
+}
+
+#[test]
+fn temporal_foreign_key_requires_observed_reference_behavior() {
+    let error = snapshot_with_temporal_fk(None)
+        .expect_err("a governed PERIOD foreign key needs observed referential actions");
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "constraint_period_action",
+        }
+    );
 }
 
 #[test]
@@ -153,8 +183,11 @@ fn temporal_foreign_key_rejects_unsupported_update_actions() {
         ForeignKeyAction::SetNull,
         ForeignKeyAction::SetDefault,
     ] {
-        let error = snapshot_with_temporal_fk(action, ForeignKeyAction::NoAction)
-            .expect_err("PostgreSQL temporal foreign keys reject this ON UPDATE action");
+        let error = snapshot_with_temporal_fk(Some(reference_behavior(
+            action,
+            ForeignKeyAction::NoAction,
+        )))
+        .expect_err("PostgreSQL temporal foreign keys reject this ON UPDATE action");
         assert_eq!(
             error,
             ObservationError::InvalidObservationField {
@@ -172,8 +205,11 @@ fn temporal_foreign_key_rejects_unsupported_delete_actions() {
         ForeignKeyAction::SetNull,
         ForeignKeyAction::SetDefault,
     ] {
-        let error = snapshot_with_temporal_fk(ForeignKeyAction::NoAction, action)
-            .expect_err("PostgreSQL temporal foreign keys reject this ON DELETE action");
+        let error = snapshot_with_temporal_fk(Some(reference_behavior(
+            ForeignKeyAction::NoAction,
+            action,
+        )))
+        .expect_err("PostgreSQL temporal foreign keys reject this ON DELETE action");
         assert_eq!(
             error,
             ObservationError::InvalidObservationField {
