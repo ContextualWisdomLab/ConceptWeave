@@ -314,8 +314,9 @@ impl PostgresSchemaSnapshotV3 {
     /// distinct from an unobserved family. PRIMARY KEY/UNIQUE values are cross-checked against any
     /// already-observed same-name backing-index exclusion flags, while those index facts are never
     /// used to invent `conperiod`. A PERIOD foreign key targeting a relation inside the same bounded
-    /// snapshot must resolve to an explicitly observed `WITHOUT OVERLAPS` key on the referenced
-    /// columns. This consuming method may be applied only once.
+    /// snapshot must resolve to an explicitly observed `WITHOUT OVERLAPS`, `NOT DEFERRABLE` key on
+    /// the referenced columns; referenced-key timing is never inferred from index shape. This
+    /// consuming method may be applied only once.
     pub fn with_observed_constraint_periods(
         mut self,
         constraint_periods: Vec<ConstraintPeriodObservation>,
@@ -325,8 +326,14 @@ impl PostgresSchemaSnapshotV3 {
                 field: "constraint_period_already_observed",
             });
         }
-        let constraint_periods =
-            canonicalize_constraint_periods(&self.relations, constraint_periods)?;
+        let constraint_timings = self
+            .constraint_timings_observed
+            .then_some(self.constraint_timings.as_slice());
+        let constraint_periods = canonicalize_constraint_periods(
+            &self.relations,
+            constraint_timings,
+            constraint_periods,
+        )?;
         self.snapshot_digest =
             compute_constraint_period_digest(&self.snapshot_digest, &constraint_periods);
         self.constraint_periods = constraint_periods;
@@ -686,6 +693,7 @@ fn canonicalize_constraint_timings(
 
 fn canonicalize_constraint_periods(
     relations: &[RelationObservation],
+    constraint_timings: Option<&[ConstraintTimingObservation]>,
     mut constraint_periods: Vec<ConstraintPeriodObservation>,
 ) -> Result<Vec<ConstraintPeriodObservation>, ObservationError> {
     constraint_periods.sort_by(|left, right| {
@@ -800,7 +808,7 @@ fn canonicalize_constraint_periods(
                         candidate.schema_name() == foreign_key.referenced_schema_name()
                             && candidate.relation_name() == foreign_key.referenced_table_name()
                     }) {
-                        let referenced_temporal_key = referenced_relation.constraints().iter().any(
+                        let referenced_temporal_key = referenced_relation.constraints().iter().find(
                             |candidate_constraint| {
                                 matches!(
                                     candidate_constraint,
@@ -821,9 +829,28 @@ fn canonicalize_constraint_periods(
                                     })
                             },
                         );
-                        if !referenced_temporal_key {
+                        let Some(referenced_temporal_key) = referenced_temporal_key else {
                             return Err(ObservationError::InvalidObservationField {
                                 field: "constraint_period_reference",
+                            });
+                        };
+                        let referenced_key_is_nondeferrable = constraint_timings
+                            .and_then(|timings| {
+                                timings.iter().find(|timing| {
+                                    timing.schema_name() == referenced_relation.schema_name()
+                                        && timing.relation_name()
+                                            == referenced_relation.relation_name()
+                                        && timing.relation_kind() == referenced_relation.kind()
+                                        && timing.constraint_name()
+                                            == referenced_temporal_key.constraint_name()
+                                })
+                            })
+                            .is_some_and(|timing| {
+                                timing.deferrability() == ConstraintDeferrability::NotDeferrable
+                            });
+                        if !referenced_key_is_nondeferrable {
+                            return Err(ObservationError::InvalidObservationField {
+                                field: "constraint_period_reference_timing",
                             });
                         }
                     }
