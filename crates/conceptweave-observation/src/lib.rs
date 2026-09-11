@@ -19,15 +19,133 @@ pub use representation_v3::{
     ColumnObservationV3, DomainCheckConstraintObservation, DomainObservation, EnumObservation,
     IndexAttributeKind, IndexAttributeObservation, IndexAttributeSource, IndexCatalogFlags,
     IndexKeySemantics, IndexObservation, IndexStorageOption, IndexTablespace, OperatorClassOption,
-    PostgresSchemaSnapshotV3, QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName,
-    RelationKind, RelationObservation, SchemaObjectLocation, SchemaObjectLocationKind,
-    SuccessorSourceReceipt,
+    QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
+    RelationObservation, SchemaObjectLocation, SchemaObjectLocationKind, SuccessorSourceReceipt,
 };
+
+use std::collections::BTreeSet;
 
 use conceptweave_source_port::AuthorizedObservationRequest;
 use sha2::{Digest, Sha256};
 
 const SNAPSHOT_DIGEST_DOMAIN_V2: &[u8] = b"conceptweave.postgres_schema_snapshot.v2";
+
+/// Public v3 aggregate enforcing PostgreSQL schema-local `pg_class` namespace invariants.
+///
+/// The representation module remains an implementation detail. This owner-level aggregate validates
+/// the cross-relation namespace that PostgreSQL enforces with the unique `(relname, relnamespace)`
+/// catalog key before delegating to the deterministic v3 representation constructor. Relation names
+/// and relation-scoped index names therefore cannot collide within one schema, while identical names
+/// remain legal in different schemas.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PostgresSchemaSnapshotV3 {
+    inner: representation_v3::PostgresSchemaSnapshotV3,
+}
+
+impl PostgresSchemaSnapshotV3 {
+    /// Creates a deterministic v3 snapshot after validating the modeled PostgreSQL namespace.
+    ///
+    /// All modeled owning relations and nested indexes share PostgreSQL's schema-local `pg_class`
+    /// relation namespace. The check runs before digest or receipt construction and does not broaden
+    /// the representation to foreign truth or mutable catalog identifiers.
+    pub fn new(
+        authorized_request: &AuthorizedObservationRequest,
+        extractor_revision: impl Into<String>,
+        observed_at_utc: impl Into<String>,
+        relations: Vec<RelationObservation>,
+        domains: Vec<DomainObservation>,
+        enums: Vec<EnumObservation>,
+    ) -> Result<Self, ObservationError> {
+        validate_schema_relation_namespace(&relations)?;
+        let inner = representation_v3::PostgresSchemaSnapshotV3::new(
+            authorized_request,
+            extractor_revision,
+            observed_at_utc,
+            relations,
+            domains,
+            enums,
+        )?;
+        Ok(Self { inner })
+    }
+
+    /// Returns the stable source-connection registry reference, never a credential.
+    #[must_use]
+    pub fn source_connection_key(&self) -> &str {
+        self.inner.source_connection_key()
+    }
+
+    /// Returns the opaque immutable connection-policy revision authorized for this snapshot.
+    #[must_use]
+    pub fn connection_policy_binding(&self) -> &str {
+        self.inner.connection_policy_binding()
+    }
+
+    /// Returns the owner-computed canonical SHA-256 successor source-content digest.
+    #[must_use]
+    pub fn snapshot_digest(&self) -> &str {
+        self.inner.snapshot_digest()
+    }
+
+    /// Returns the exact extractor implementation/configuration revision.
+    #[must_use]
+    pub fn extractor_revision(&self) -> &str {
+        self.inner.extractor_revision()
+    }
+
+    /// Returns the exact UTC observation-time evidence supplied by the adapter.
+    #[must_use]
+    pub fn observed_at_utc(&self) -> &str {
+        self.inner.observed_at_utc()
+    }
+
+    /// Returns qualified relations in deterministic exact-identifier order.
+    #[must_use]
+    pub fn relations(&self) -> &[RelationObservation] {
+        self.inner.relations()
+    }
+
+    /// Returns qualified domains in deterministic exact-identifier order.
+    #[must_use]
+    pub fn domains(&self) -> &[DomainObservation] {
+        self.inner.domains()
+    }
+
+    /// Returns qualified enums in deterministic exact-identifier order.
+    #[must_use]
+    pub fn enums(&self) -> &[EnumObservation] {
+        self.inner.enums()
+    }
+
+    /// Issues provenance for an exact successor coordinate only when it exists in this snapshot.
+    pub fn source_receipt(
+        &self,
+        location: SchemaObjectLocation,
+    ) -> Result<SuccessorSourceReceipt, ObservationError> {
+        self.inner.source_receipt(location)
+    }
+}
+
+fn validate_schema_relation_namespace(
+    relations: &[RelationObservation],
+) -> Result<(), ObservationError> {
+    let mut observed_names = BTreeSet::new();
+    for relation in relations {
+        let schema_name = relation.schema_name().to_owned();
+        if !observed_names.insert((schema_name.clone(), relation.relation_name().to_owned())) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "schema_relation_namespace",
+            });
+        }
+        for index in relation.indexes() {
+            if !observed_names.insert((schema_name.clone(), index.index_name().to_owned())) {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "schema_relation_namespace",
+                });
+            }
+        }
+    }
+    Ok(())
+}
 
 /// Immutable receipt binding one exact observed source coordinate to snapshot provenance.
 ///
