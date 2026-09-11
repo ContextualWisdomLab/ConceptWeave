@@ -25,9 +25,9 @@ const POSTGRES_CATALOG_SCHEMA_NAME: &str = "pg_catalog";
 
 /// Exact schema-qualified PostgreSQL type coordinate.
 ///
-/// The coordinate identifies a built-in, domain, or enum type without relying on `search_path`
-/// resolution. Exact source text is preserved, including case and characters that would require
-/// quoting in PostgreSQL.
+/// The coordinate identifies a built-in, domain, enum, or relation-backed composite row type
+/// without relying on `search_path` resolution. Exact source text is preserved, including case and
+/// characters that would require quoting in PostgreSQL.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct QualifiedTypeName {
     schema_name: String,
@@ -1502,7 +1502,7 @@ impl RelationObservation {
         &self.indexes
     }
 
-    /// Returns the exact optional relation comment without inventing missing metadata.
+    /// Returns the exact optional source comment without inventing missing metadata.
     #[must_use]
     pub fn source_comment(&self) -> Option<&str> {
         self.source_comment.as_deref()
@@ -1657,7 +1657,7 @@ impl SchemaObjectLocation {
         Self::new(schema_name, SchemaObjectElement::Domain(domain_name))
     }
 
-    /// Creates a location for an exact schema-scoped enum.
+    /// Creates a location for an exact schema-scoped PostgreSQL enum.
     ///
     /// The trailing underscore keeps the constructor name legal Rust; the coordinate semantics are
     /// still the PostgreSQL `ENUM` type at `/schemas/{schema}/enums/{name}`.
@@ -1866,12 +1866,22 @@ struct CanonicalSnapshotObjects {
     enums: Vec<EnumObservation>,
 }
 
+/// Returns whether a modeled `pg_class` relation owns a composite row type in `pg_type`.
+///
+/// PostgreSQL 18 reports `reltype = 0` for indexes, sequences, and TOAST relations. Indexes are
+/// modeled as relation children here and TOAST is outside this contract, so Sequence is the only
+/// modeled owning relation kind without a relation-backed row type.
+fn relation_has_row_type(kind: RelationKind) -> bool {
+    !matches!(kind, RelationKind::Sequence)
+}
+
 /// Canonicalizes successor collections and enforces every cross-object invariant.
 ///
-/// Collections are sorted by exact qualified identifier, duplicates fail closed, domain and enum
-/// type coordinates must not collide, and every column type binding and domain base type must
-/// resolve to the PostgreSQL built-in namespace or to a domain or enum observed in the same
-/// snapshot. Type resolution never consults `search_path`.
+/// Collections are sorted by exact qualified identifier, duplicates fail closed, domain, enum, and
+/// relation-backed composite type coordinates must not collide, and every column type binding and
+/// domain base type must resolve to the PostgreSQL built-in namespace or to an observed domain,
+/// enum, or relation-backed composite row type in the same snapshot. Type resolution never consults
+/// `search_path`.
 fn canonicalize_snapshot_objects(
     mut relations: Vec<RelationObservation>,
     mut domains: Vec<DomainObservation>,
@@ -1929,6 +1939,22 @@ fn canonicalize_snapshot_objects(
         });
     }
 
+    if let Some(relation) = relations.iter().find(|relation| {
+        relation_has_row_type(relation.kind)
+            && (domains.iter().any(|domain| {
+                domain.schema_name == relation.schema_name
+                    && domain.domain_name == relation.relation_name
+            }) || enums.iter().any(|observed_enum| {
+                observed_enum.schema_name == relation.schema_name
+                    && observed_enum.enum_name == relation.relation_name
+            }))
+    }) {
+        return Err(ObservationError::DuplicateSchemaTypeName {
+            schema_name: relation.schema_name.clone(),
+            type_name: relation.relation_name.clone(),
+        });
+    }
+
     let resolves = |binding: &QualifiedTypeName| {
         if binding.schema_name == POSTGRES_CATALOG_SCHEMA_NAME {
             return true;
@@ -1938,6 +1964,10 @@ fn canonicalize_snapshot_objects(
         }) || enums.iter().any(|observed_enum| {
             observed_enum.schema_name == binding.schema_name
                 && observed_enum.enum_name == binding.type_name
+        }) || relations.iter().any(|relation| {
+            relation_has_row_type(relation.kind)
+                && relation.schema_name == binding.schema_name
+                && relation.relation_name == binding.type_name
         })
     };
 
