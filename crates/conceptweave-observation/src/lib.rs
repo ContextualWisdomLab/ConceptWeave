@@ -359,6 +359,31 @@ fn validate_schema_relation_invariants(
             }
         }
 
+        let mut primary_keys = relation.constraints().iter().filter_map(|constraint| {
+            if let TableConstraintObservation::PrimaryKey(primary_key) = constraint {
+                Some(primary_key)
+            } else {
+                None
+            }
+        });
+        if let Some(primary_key) = primary_keys.next() {
+            if primary_keys.next().is_some() {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "primary_key_cardinality",
+                });
+            }
+            if primary_key.column_names().iter().any(|column_name| {
+                relation
+                    .columns()
+                    .iter()
+                    .any(|column| column.column_name() == column_name && column.nullable())
+            }) {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "primary_key_nullable_column",
+                });
+            }
+        }
+
         let schema_name = relation.schema_name().to_owned();
         if !observed_names.insert((schema_name.clone(), relation.relation_name().to_owned())) {
             return Err(ObservationError::InvalidObservationField {
