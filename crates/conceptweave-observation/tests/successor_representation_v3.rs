@@ -867,6 +867,70 @@ fn fake_type_coordinates_fail_closed() {
 }
 
 #[test]
+fn domain_base_type_must_resolve_without_search_path() {
+    let missing_base = DomainObservation::new(
+        "public",
+        "money_kind",
+        QualifiedTypeName::new("public", "missing_base").expect("type"),
+    )
+    .expect("domain fixture");
+    let error = snapshot_v3(Vec::new(), vec![missing_base], Vec::new())
+        .expect_err("an unresolvable domain base type must fail closed");
+    assert_eq!(
+        error,
+        ObservationError::UnknownTypeBinding {
+            schema_name: "public".to_owned(),
+            type_name: "missing_base".to_owned(),
+        }
+    );
+
+    let relation_base = DomainObservation::new(
+        "public",
+        "money_kind",
+        QualifiedTypeName::new("public", "event_record").expect("type"),
+    )
+    .expect("domain fixture");
+    let error = snapshot_v3(
+        vec![event_relation(RelationKind::Table)],
+        vec![relation_base],
+        Vec::new(),
+    )
+    .expect_err("a relation coordinate must not satisfy a domain base type");
+    assert_eq!(
+        error,
+        ObservationError::UnknownTypeBinding {
+            schema_name: "public".to_owned(),
+            type_name: "event_record".to_owned(),
+        }
+    );
+}
+
+#[test]
+fn domain_may_build_on_an_observed_domain_or_enum() {
+    let base_domain = DomainObservation::new("public", "base_kind", catalog_type("text"))
+        .expect("base domain fixture");
+    let derived_domain = DomainObservation::new(
+        "public",
+        "derived_kind",
+        QualifiedTypeName::new("public", "base_kind").expect("type"),
+    )
+    .expect("derived domain fixture");
+    let enum_base = DomainObservation::new(
+        "public",
+        "on_enum_kind",
+        QualifiedTypeName::new("public", "event_status").expect("type"),
+    )
+    .expect("enum-backed domain fixture");
+    let snapshot = snapshot_v3(
+        Vec::new(),
+        vec![base_domain, derived_domain, enum_base],
+        vec![status_enum()],
+    )
+    .expect("observed schema-scoped base types must resolve");
+    assert_eq!(snapshot.domains().len(), 3);
+}
+
+#[test]
 fn unauthorized_schema_objects_fail_before_a_snapshot_exists() {
     let unauthorized_domain =
         DomainObservation::new("audit", "money_kind", catalog_type("numeric"))

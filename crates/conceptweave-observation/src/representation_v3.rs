@@ -1334,9 +1334,9 @@ struct CanonicalSnapshotObjects {
 /// Canonicalizes successor collections and enforces every cross-object invariant.
 ///
 /// Collections are sorted by exact qualified identifier, duplicates fail closed, domain and enum
-/// type coordinates must not collide, and every column type binding must resolve to the PostgreSQL
-/// built-in namespace or to a domain or enum observed in the same snapshot. Type resolution never
-/// consults `search_path`.
+/// type coordinates must not collide, and every column type binding and domain base type must
+/// resolve to the PostgreSQL built-in namespace or to a domain or enum observed in the same
+/// snapshot. Type resolution never consults `search_path`.
 fn canonicalize_snapshot_objects(
     mut relations: Vec<RelationObservation>,
     mut domains: Vec<DomainObservation>,
@@ -1394,20 +1394,32 @@ fn canonicalize_snapshot_objects(
         });
     }
 
+    let resolves = |binding: &QualifiedTypeName| {
+        if binding.schema_name == POSTGRES_CATALOG_SCHEMA_NAME {
+            return true;
+        }
+        domains.iter().any(|domain| {
+            domain.schema_name == binding.schema_name && domain.domain_name == binding.type_name
+        }) || enums.iter().any(|observed_enum| {
+            observed_enum.schema_name == binding.schema_name
+                && observed_enum.enum_name == binding.type_name
+        })
+    };
+
+    for domain in &domains {
+        let binding = domain.base_type();
+        if !resolves(binding) {
+            return Err(ObservationError::UnknownTypeBinding {
+                schema_name: binding.schema_name.clone(),
+                type_name: binding.type_name.clone(),
+            });
+        }
+    }
+
     for relation in &relations {
         for column in &relation.columns {
             let binding = &column.type_binding;
-            if binding.schema_name == POSTGRES_CATALOG_SCHEMA_NAME {
-                continue;
-            }
-            let is_observed_domain = domains.iter().any(|domain| {
-                domain.schema_name == binding.schema_name && domain.domain_name == binding.type_name
-            });
-            let is_observed_enum = enums.iter().any(|observed_enum| {
-                observed_enum.schema_name == binding.schema_name
-                    && observed_enum.enum_name == binding.type_name
-            });
-            if !is_observed_domain && !is_observed_enum {
+            if !resolves(binding) {
                 return Err(ObservationError::UnknownTypeBinding {
                     schema_name: binding.schema_name.clone(),
                     type_name: binding.type_name.clone(),
