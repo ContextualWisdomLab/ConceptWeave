@@ -1,6 +1,7 @@
 use conceptweave_observation::{
-    ColumnObservationV3, ConstraintPeriodObservation, ForeignKeyAction, ForeignKeyDeferrability,
-    ForeignKeyMatchType, ForeignKeyObservation, ForeignKeyReferenceBehavior, IndexAttributeKind,
+    ColumnObservationV3, ConstraintDeferrability, ConstraintPeriodObservation,
+    ConstraintTimingObservation, ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType,
+    ForeignKeyObservation, ForeignKeyReferenceBehavior, IndexAttributeKind,
     IndexAttributeObservation, IndexCatalogFlags, IndexObservation, ObservationError,
     PostgresSchemaSnapshotV3, PrimaryKeyObservation, QualifiedTypeName, RelationKind,
     RelationObservation, TableConstraintObservation,
@@ -123,6 +124,17 @@ fn reference_behavior(
     )
 }
 
+fn timing() -> ConstraintTimingObservation {
+    ConstraintTimingObservation::new(
+        "public",
+        "document",
+        RelationKind::Table,
+        "document_temporal_key",
+        ConstraintDeferrability::NotDeferrable,
+    )
+    .expect("referenced temporal-key timing fixture is valid")
+}
+
 fn period(relation_name: &str, constraint_name: &str) -> ConstraintPeriodObservation {
     ConstraintPeriodObservation::new(
         "public",
@@ -148,6 +160,7 @@ fn snapshot_with_temporal_fk(
         Vec::new(),
         Vec::new(),
     )?
+    .with_observed_constraint_timings(vec![timing()])?
     .with_observed_constraint_periods(vec![
         period("document", "document_temporal_key"),
         period("document_version", "document_version_period_fk"),
