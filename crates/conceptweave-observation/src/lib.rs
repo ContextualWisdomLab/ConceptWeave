@@ -155,7 +155,8 @@ impl PostgresSchemaSnapshotV3 {
     ///
     /// The observed timing family is validated against exact relation and constraint coordinates and
     /// is framed behind its own digest domain. An empty timing vector therefore means observed-empty,
-    /// not unobserved, while the legacy [`Self::new`] digest remains unchanged.
+    /// not unobserved, and is valid only when the snapshot contains no PRIMARY KEY or UNIQUE
+    /// constraints. The legacy [`Self::new`] digest remains unchanged.
     pub fn new_with_constraint_timings(
         authorized_request: &AuthorizedObservationRequest,
         extractor_revision: impl Into<String>,
@@ -287,10 +288,8 @@ impl PostgresSchemaSnapshotV3 {
     ) -> Result<Self, ObservationError> {
         let constraint_timings =
             canonicalize_constraint_timings(&self.relations, constraint_timings)?;
-        self.snapshot_digest = compute_constraint_timing_digest(
-            &self.snapshot_digest,
-            &constraint_timings,
-        );
+        self.snapshot_digest =
+            compute_constraint_timing_digest(&self.snapshot_digest, &constraint_timings);
         self.constraint_timings = constraint_timings;
         self.constraint_timings_observed = true;
         Ok(self)
@@ -516,6 +515,27 @@ fn canonicalize_constraint_timings(
         }
     }
 
+    let expected_key_coordinates = relations
+        .iter()
+        .flat_map(|relation| {
+            relation.constraints().iter().filter_map(move |constraint| {
+                matches!(
+                    constraint,
+                    TableConstraintObservation::PrimaryKey(_) | TableConstraintObservation::Unique(_)
+                )
+                .then(|| {
+                    (
+                        relation.schema_name().to_owned(),
+                        relation.relation_name().to_owned(),
+                        relation.kind(),
+                        constraint.constraint_name().to_owned(),
+                    )
+                })
+            })
+        })
+        .collect::<BTreeSet<_>>();
+    let mut observed_key_coordinates = BTreeSet::new();
+
     for timing in &constraint_timings {
         let Some(relation) = relations.iter().find(|relation| {
             relation.schema_name() == timing.schema_name()
@@ -543,6 +563,18 @@ fn canonicalize_constraint_timings(
                 field: "constraint_timing_kind",
             });
         }
+        observed_key_coordinates.insert((
+            timing.schema_name().to_owned(),
+            timing.relation_name().to_owned(),
+            timing.relation_kind(),
+            timing.constraint_name().to_owned(),
+        ));
+    }
+
+    if observed_key_coordinates != expected_key_coordinates {
+        return Err(ObservationError::InvalidObservationField {
+            field: "constraint_timing_completeness",
+        });
     }
 
     Ok(constraint_timings)
