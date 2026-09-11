@@ -149,7 +149,7 @@ fn period(relation_name: &str, constraint_name: &str) -> ConstraintPeriodObserva
 fn snapshot_with_temporal_fk(
     reference_behavior: Option<ForeignKeyReferenceBehavior>,
 ) -> Result<PostgresSchemaSnapshotV3, ObservationError> {
-    PostgresSchemaSnapshotV3::new(
+    PostgresSchemaSnapshotV3::new_with_constraint_timings(
         &support::authorized_source("warehouse_primary", &["public"]),
         "postgres_introspector_v3",
         "2026-09-11T23:00:00Z",
@@ -159,8 +159,8 @@ fn snapshot_with_temporal_fk(
         ],
         Vec::new(),
         Vec::new(),
+        vec![timing()],
     )?
-    .with_observed_constraint_timings(vec![timing()])?
     .with_observed_constraint_periods(vec![
         period("document", "document_temporal_key"),
         period("document_version", "document_version_period_fk"),
