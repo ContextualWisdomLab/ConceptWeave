@@ -94,7 +94,7 @@ fn snapshot(
     PostgresSchemaSnapshotV3::new_with_constraint_timings(
         &support::authorized_source("warehouse_primary", &["public"]),
         "postgres_introspector_v3",
-        "2026-09-12T01:38:00+09:00",
+        "2026-09-11T16:38:00Z",
         vec![relation],
         Vec::new(),
         Vec::new(),
