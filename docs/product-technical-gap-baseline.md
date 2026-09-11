@@ -26,7 +26,7 @@ Fresh authority entering this baseline update:
 - Foundation #1: `60f14a6e85a83d56c2eea43b34d52b3366bb1735`, OPEN Draft;
 - Source Observation #6: `287165d399c5f54d6c4b4aa3c15497b47de8244b`, OPEN Draft;
 - representation-v3 parent #45: `6b2a8f555725dc79f60432afbc492d6005290a4a`, OPEN Draft on #6;
-- representation/index successor #46 source head before this documentation commit: `27de693b18d6cb1936e572a44e91c5ace2b7209a`, OPEN Draft and mechanically mergeable.
+- representation/index successor #46 source head before this documentation commit: `8a6092733c2417fd3eae88bd279e0dbdcc880e85`, OPEN Draft and mechanically mergeable.
 
 Protected central `.github/main` was freshly verified at `cb0872c9a20d5584703dffacca65c096fc034c6c`; `.github#2051@558693e0333e48012beea142f739bc634b0674a7` and stacked `.github#2056@69ae472562c93cc17674af5e2085a58947d3fab8` remain the protected-workflow owner prerequisites. #2051 remains Draft on historical `main@7fd571db...`; #2056 remains Draft stacked on #2051. Product-CI #35 remains unchanged and therefore still waits on a backward-compatible protected handler, ordinary/non-force current-main reconciliation and fresh exact terminal evidence.
 
@@ -56,7 +56,24 @@ Source-repaired behavior now includes:
 - schema-local `pg_class` name consistency across modeled owning relations and nested indexes;
 - local index evidence admitted only on ordinary tables, partitioned tables and materialized views;
 - represented table constraints admitted on ordinary/partitioned tables, CHECK-only for foreign tables, and rejected on views/materialized views/sequences/standalone composite-type relations;
-- one modeled relation admits at most one primary-key observation, and every primary-key column must carry exact `nullable = false` evidence before governed digest/receipt construction.
+- one modeled relation admits at most one primary-key observation, and every primary-key column must carry exact `nullable = false` evidence before governed digest/receipt construction;
+- explicitly observed PRIMARY KEY/UNIQUE timing preserves PostgreSQL `condeferrable`/`condeferred` as `NotDeferrable`, `InitiallyImmediate`, or `InitiallyDeferred`, validates exact owning relation/constraint coordinates, requires complete timing inventory for every represented PK/UNIQUE, distinguishes observed-empty from unobserved, and frames the family behind `conceptweave.postgres_schema_snapshot.v3.constraint_timings.v1` without changing frozen v2 or the original v3 constructor digest.
+
+### Key-constraint timing repair lineage
+
+PostgreSQL 18 allows PRIMARY KEY and UNIQUE constraints to be `DEFERRABLE`, with initial timing `IMMEDIATE` or `DEFERRED`; `pg_constraint` persists the state through `condeferrable` and `condeferred`. Before this repair, v3 primary keys carried only name/columns and UNIQUE carried name/columns/NULL semantics, so otherwise identical valid schemas that differed only in key-constraint timing could collapse to the same governed digest.
+
+The active lineage is:
+
+- finding review `5181035661` on exact predecessor `ccd7e245010dab994a6540fe2de5e15db3f742ea`;
+- behavioral RED `0a11a3285e7d5f371494656eac890b5b3a632796`, `constraint_timing_contract.rs`;
+- timing VO `85d462795a462abd11e4c0782a80e0d82a5c7727`, `ConstraintDeferrability` plus exact `ConstraintTimingObservation` coordinate;
+- domain-separated snapshot integration `929451e41b0f977f6bbb01299b843c4bfa2fbc68`, keeping legacy `PostgresSchemaSnapshotV3::new` unchanged and adding explicit timing and array+timing constructors;
+- completeness regression refinement `f0e97b4de53db9bdf6326abad36bfdfc4bf9b12e` so an observed timing family cannot omit any represented PK/UNIQUE;
+- complete-inventory admission `72bdb7752483fc974a09fae0443cbd5ab231e919`;
+- canonical coordinate type repair `8a6092733c2417fd3eae88bd279e0dbdcc880e85`, storing relation-kind tokens rather than requiring an ordering contract from the domain enum.
+
+The timing family is deliberately additive. It does not rename or reinterpret `ForeignKeyDeferrability`, does not mutate `PrimaryKeyObservation`/`UniqueConstraintObservation` shared by frozen v2, and does not alter existing constraint receipt coordinates. Existing `source_receipt` continues to issue the exact constraint coordinate, but binds the public snapshot digest that includes the timing family when it was explicitly observed. The combined array+timing constructor layers the timing digest after the array-aware digest so both catalog families participate in one immutable source-content identity.
 
 ### Primary-key invariant repair lineage
 
@@ -113,11 +130,11 @@ True-array receipts are likewise additive. `SchemaObjectLocation` remains frozen
 
 ## Representation acceptance still required
 
-#46 is source-repaired for the current primary-key, true-array identity and receipt P1s but is **not** native/Product GREEN. One unchanged exact successor must still produce repository-pinned Rust 1.98 and hosted acceptance evidence:
+#46 is source-repaired for the current key-constraint timing, primary-key, true-array identity/receipt and retained index/type P1s but is **not** native/Product GREEN. One unchanged exact successor must still produce repository-pinned Rust 1.98 and hosted acceptance evidence:
 
 - `cargo fmt --all --check`;
 - strict workspace/all-target Clippy with warnings denied;
-- workspace tests including frozen-v2, retained v3 index/namespace/relation-kind/constraint-kind/relation-backed-type contracts, `primary_key_invariants_contract`, `array_type_identity_contract`, `array_type_digest_contract`, `array_type_schema_contract` and `array_type_receipt_contract`;
+- workspace tests including frozen-v2, retained v3 index/namespace/relation-kind/constraint-kind/relation-backed-type contracts, `constraint_timing_contract`, `primary_key_invariants_contract`, `array_type_identity_contract`, `array_type_digest_contract`, `array_type_schema_contract` and `array_type_receipt_contract`;
 - rustdoc/doc tests and release build;
 - owned production docstring/test/edge-case coverage requirements;
 - applicable Product/security/dependency/review workflows on the exact head.
@@ -136,13 +153,14 @@ Do not attach transport before representation acceptance. After exact-head GREEN
 - resolve `pg_type.typarray`/`typelem` for exact associated array/element coordinates without generated-name inference;
 - validate shared schema-local `pg_type` namespace, one-element/one-array reciprocity, no array-of-array interpretation and same-schema array/element reciprocity;
 - emit exact array-type evidence coordinates/receipts only after the array row is part of the immutable snapshot;
+- collect `pg_constraint.condeferrable` and `condeferred` for every represented PRIMARY KEY/UNIQUE, map only the exact three valid timing states, and fail closed on partial timing inventory;
 - validate schema-local `pg_class`, index owning relation kind, derived index `relkind`, index tablespace/options, relation-kind constraint rules, single-primary-key cardinality and primary-key NOT NULL consistency;
 - enforce policy-admitted row/byte/concurrency ceilings and complete-or-fail snapshot construction.
 
 ## Standards and primary authority
 
-- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE TABLE — primary-key cardinality and NOT NULL semantics*.
-- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_constraint*.
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE TABLE — PRIMARY KEY/UNIQUE deferrability, primary-key cardinality and NOT NULL semantics*.
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_constraint — `condeferrable`, `condeferred`, `conindid`, validation/enforcement state*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_type*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: The PostgreSQL Type System*, §36.2.2.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE TYPE — Array Types and Notes*.
@@ -159,7 +177,7 @@ Catalog OIDs are adapter-local join coordinates, never governed semantic identit
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | Canonical owner seams unchanged. |
 | Truth/publication lifecycle | SOURCE_REPAIRED_PENDING_PROTECTED_EVIDENCE | No protected immutable semantic release exists. |
-| Source Observation | REPRESENTATION_V3_SOURCE_REPAIRED | Primary-key + true-array/receipt and retained index/type invariants are source-repaired through `27de693...`; native/Product acceptance still absent. |
+| Source Observation | REPRESENTATION_V3_SOURCE_REPAIRED | Key timing + primary-key + true-array/receipt and retained index/type invariants are source-repaired through `8a609273...`; native/Product acceptance still absent. |
 | Product CI | BLOCKED_OWNER_RECONCILIATION | Protected/default ConceptWeave `main` does not yet contain Product workflow authority; #35 still depends on central backward-compatible handler/current-main reconciliation and exact terminal GREEN. |
 | Quality gate | SOURCE_REPAIRED_NATIVE_ACCEPTANCE_PENDING | Keep #46 Draft until one unchanged exact head has Rust/Product/security/dependency/review evidence. |
 | PostgreSQL adapter | BLOCKED_ON_REPRESENTATION_ACCEPTANCE | No transport before representation GREEN and parent adoption. |
@@ -167,11 +185,11 @@ Catalog OIDs are adapter-local join coordinates, never governed semantic identit
 
 ## Current causal sequence
 
-1. Treat the current primary-key + true-array identity/receipt source delta as repaired, then obtain repository-pinned Rust 1.98 plus applicable hosted Product/security/dependency/review acceptance on one unchanged exact #46 head. Real failures require causal repair and a new exact-head cycle.
+1. Treat the current key-timing + primary-key + true-array identity/receipt source delta as source-repaired, then obtain repository-pinned Rust 1.98 plus applicable hosted Product/security/dependency/review acceptance on one unchanged exact #46 head. Real failures require causal repair and a new exact-head cycle.
 2. Ordinary/non-force adopt verified #46 into #45 and obtain fresh parent acceptance; then adopt #45 into #6. Never transfer predecessor GREEN.
 3. In parallel, central owner must land the backward-compatible protected handler, reconcile #2051/#2056 onto current protected `.github/main`, obtain terminal GREEN, then give unchanged-head #35 fresh acceptance and normal merge so Product workflow authority reaches protected ConceptWeave `main`.
 4. Foundation ordinary/non-force restacks after #35; descendants consume only released/versioned owner contracts.
-5. Only after Source Observation representation and protected prerequisites are current, implement the bounded PostgreSQL adapter and frozen conformance fixture.
+5. Only after Source Observation representation and protected prerequisites are current, implement the bounded PostgreSQL adapter and frozen conformance fixture. The adapter must emit complete PK/UNIQUE timing evidence whenever that catalog family is declared observed.
 6. Continue discovery/alignment/deterministic validation/independent evaluation/steward review/immutable publication under the canonical owner boundaries. Production LLM calls remain behind released `contextual-orchestrator` contracts.
 
 Adapters remain outside the core domain model and external DTOs cross explicit Anti-Corruption Layers. Source Observation facts are evidence, not source-system business truth. Published semantic truth is immutable; corrections create a new release plus supersession evidence.
