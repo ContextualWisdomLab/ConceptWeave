@@ -137,7 +137,7 @@ For the procedural-generation lane, #44 remains a private source-shaped Rust bou
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | PRD/TRD/ADR/context map define canonical ConceptWeave ownership and foreign-owner seams. |
 | Truth/publication lifecycle | SOURCE_REPAIRED_PENDING_PROTECTED_EVIDENCE | No protected immutable semantic release exists. |
-| Client Consumption | RESTACKED_HOSTED_PENDING | #5 remains the current Source Observation parent; exact live evidence must be re-read before Client action. |
+| Client Consumption | RESTACKED_HOSTED_PENDING | #5 remains the current Source Observation parent; its existing `SemanticReleaseClient::verify_detached_artifact` remains current because after admission it hashes the exact caller-supplied detached immutable artifact bytes against the declared digest, keeping digest syntax distinct from byte-integrity evidence; exact live evidence must be re-read before Client action. |
 | Source Observation | REPRESENTATION_V3_SOURCE_REPAIRED_EXECUTION_PENDING | #45/#46 carry the v3 source repairs; exact-head Rust/Product acceptance and ordinary parent adoption remain. |
 | Product CI | BLOCKED_OWNER_RECONCILIATION | #35 waits on central backward-compatible handler/current-main reconciliation and exact terminal GREEN. |
 | Quality gate | ACTIVE | Rust 1.98, unsafe forbidden, public docs, fmt, strict Clippy, tests, rustdoc, release, owned production coverage, fixture/schema/lock/clean-tree checks; every head movement resets acceptance. |
