@@ -99,6 +99,105 @@ impl QualifiedCollationName {
     }
 }
 
+/// Exact schema-qualified PostgreSQL operator-class coordinate.
+///
+/// A PostgreSQL index key binds to one operator class from `pg_opclass`, addressed by its exact
+/// namespace and name. The coordinate never relies on `search_path` resolution and never uses a
+/// catalog OID as governed identity.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct QualifiedOperatorClassName {
+    schema_name: String,
+    operator_class_name: String,
+}
+
+impl QualifiedOperatorClassName {
+    /// Creates a qualified operator-class coordinate while preserving exact source text.
+    pub fn new(
+        schema_name: impl Into<String>,
+        operator_class_name: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        let schema_name = schema_name.into();
+        let operator_class_name = operator_class_name.into();
+        validate_nonblank(&schema_name, "schema_name")?;
+        validate_nonblank(&operator_class_name, "operator_class_name")?;
+        Ok(Self {
+            schema_name,
+            operator_class_name,
+        })
+    }
+
+    /// Returns the exact source schema identifier.
+    #[must_use]
+    pub fn schema_name(&self) -> &str {
+        &self.schema_name
+    }
+
+    /// Returns the exact source operator-class identifier.
+    #[must_use]
+    pub fn operator_class_name(&self) -> &str {
+        &self.operator_class_name
+    }
+}
+
+/// One exact PostgreSQL per-key index semantic record.
+///
+/// PostgreSQL 18 carries one `pg_index.indcollation`, `indclass`, and `indoption` entry for each of
+/// the `indnkeyatts` key positions. The collation is optional because no collation applies to every
+/// type or operator class; the operator class is required for every key. The raw `indoption` bit
+/// pattern is preserved verbatim because its meaning is defined by the owning index access method,
+/// not by this generic representation, so it is never decoded as B-tree-specific behavior.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IndexKeySemantics {
+    position: u32,
+    collation: Option<QualifiedCollationName>,
+    operator_class: QualifiedOperatorClassName,
+    access_method_options: u16,
+}
+
+impl IndexKeySemantics {
+    /// Creates one per-key semantic record at an exact one-based key position.
+    pub fn new(
+        position: u32,
+        collation: Option<QualifiedCollationName>,
+        operator_class: QualifiedOperatorClassName,
+        access_method_options: u16,
+    ) -> Result<Self, ObservationError> {
+        if position == 0 {
+            return Err(ObservationError::InvalidOrdinalPosition);
+        }
+        Ok(Self {
+            position,
+            collation,
+            operator_class,
+            access_method_options,
+        })
+    }
+
+    /// Returns the exact one-based key position this record describes.
+    #[must_use]
+    pub const fn position(&self) -> u32 {
+        self.position
+    }
+
+    /// Returns the exact qualified per-key collation coordinate, or `None` when none applies.
+    #[must_use]
+    pub fn collation(&self) -> Option<&QualifiedCollationName> {
+        self.collation.as_ref()
+    }
+
+    /// Returns the exact qualified per-key operator-class coordinate.
+    #[must_use]
+    pub fn operator_class(&self) -> &QualifiedOperatorClassName {
+        &self.operator_class
+    }
+
+    /// Returns the raw access-method-specific `indoption` bit pattern without interpreting it.
+    #[must_use]
+    pub const fn access_method_options(&self) -> u16 {
+        self.access_method_options
+    }
+}
+
 /// PostgreSQL relation kind reported by `pg_class.relkind`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RelationKind {
@@ -359,6 +458,7 @@ pub struct IndexObservation {
     access_method: Option<String>,
     key_attributes: Vec<IndexAttributeObservation>,
     include_attributes: Vec<IndexAttributeObservation>,
+    key_semantics: Option<Vec<IndexKeySemantics>>,
     predicate: Option<String>,
     ready: Option<bool>,
     valid: Option<bool>,
@@ -396,6 +496,7 @@ impl IndexObservation {
             access_method: None,
             key_attributes,
             include_attributes,
+            key_semantics: None,
             predicate: None,
             ready: None,
             valid: None,
@@ -439,6 +540,31 @@ impl IndexObservation {
     pub fn with_access_method(mut self, access_method: impl Into<String>) -> Self {
         self.access_method = Some(access_method.into());
         self
+    }
+
+    /// Records one exact per-key semantic record for every structural key position.
+    ///
+    /// PostgreSQL 18 stores `indcollation`, `indclass`, and `indoption` as arrays of exactly
+    /// `indnkeyatts` key entries, so the record count and positions must match this index's key
+    /// attributes exactly; INCLUDE payload positions never carry a semantic record.
+    pub fn with_key_semantics(
+        mut self,
+        mut key_semantics: Vec<IndexKeySemantics>,
+    ) -> Result<Self, ObservationError> {
+        let semantics_error = || ObservationError::InvalidObservationField {
+            field: "index_key_semantics",
+        };
+        if key_semantics.len() != self.key_attributes.len() {
+            return Err(semantics_error());
+        }
+        key_semantics.sort_by_key(IndexKeySemantics::position);
+        for (expected_position, semantics) in (1u32..).zip(&key_semantics) {
+            if semantics.position() != expected_position {
+                return Err(semantics_error());
+            }
+        }
+        self.key_semantics = Some(key_semantics);
+        Ok(self)
     }
 
     /// Records an exact server-rendered partial predicate, never original DDL.
@@ -517,6 +643,12 @@ impl IndexObservation {
     #[must_use]
     pub fn include_attributes(&self) -> &[IndexAttributeObservation] {
         &self.include_attributes
+    }
+
+    /// Returns the captured per-key semantic records in key position order, or `None` when absent.
+    #[must_use]
+    pub fn key_semantics(&self) -> Option<&[IndexKeySemantics]> {
+        self.key_semantics.as_deref()
     }
 
     /// Returns the exact server-rendered partial predicate, or `None` for a full index.
@@ -970,6 +1102,9 @@ impl RelationObservation {
     /// key or INCLUDE attribute must resolve to a column on this same relation observation, while
     /// expression attributes stay structurally separate. Index names must be unique; attribute
     /// layout validity is enforced by [`IndexObservation::new`] before an index reaches a relation.
+    /// Because a governed snapshot may only carry complete index semantics, every index must supply
+    /// one per-key semantic record for each key attribute, and an index whose records carry
+    /// access-method option bits must also carry a nonblank observed access method.
     pub fn with_indexes(
         mut self,
         mut indexes: Vec<IndexObservation>,
@@ -977,6 +1112,19 @@ impl RelationObservation {
         let mut index_names = BTreeSet::new();
         for index in &indexes {
             let index_name = index.index_name();
+            if index.key_semantics().is_none() {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "index_key_semantics",
+                });
+            }
+            let has_blank_access_method = index
+                .access_method()
+                .is_none_or(|access_method| access_method.trim().is_empty());
+            if has_blank_access_method {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "access_method",
+                });
+            }
             if !index_names.insert(index_name.to_owned()) {
                 return Err(ObservationError::DuplicateIndexObservation {
                     schema_name: self.schema_name.clone(),
@@ -1920,12 +2068,34 @@ fn encode_index(hasher: &mut Sha256, index: &IndexObservation) {
         encode_index_attribute(hasher, attribute);
     }
 
+    let key_semantics = index.key_semantics().unwrap_or_default();
+    encode_len(hasher, key_semantics.len());
+    for record in key_semantics {
+        encode_index_key_semantics(hasher, record);
+    }
+
     encode_optional_str(hasher, index.predicate());
     encode_optional_bool(hasher, index.ready());
     encode_optional_bool(hasher, index.valid());
     encode_optional_bool(hasher, index.live());
     encode_optional_str(hasher, index.index_definition());
     encode_optional_str(hasher, index.source_comment());
+}
+
+fn encode_index_key_semantics(hasher: &mut Sha256, semantics: &IndexKeySemantics) {
+    hasher.update(semantics.position().to_be_bytes());
+    match semantics.collation() {
+        None => hasher.update([0]),
+        Some(collation) => {
+            hasher.update([1]);
+            encode_str(hasher, collation.schema_name());
+            encode_str(hasher, collation.collation_name());
+        }
+    }
+    let operator_class = semantics.operator_class();
+    encode_str(hasher, operator_class.schema_name());
+    encode_str(hasher, operator_class.operator_class_name());
+    hasher.update(semantics.access_method_options().to_be_bytes());
 }
 
 fn encode_index_attribute(hasher: &mut Sha256, attribute: &IndexAttributeObservation) {

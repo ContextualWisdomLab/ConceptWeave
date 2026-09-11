@@ -2,9 +2,10 @@ use conceptweave_observation::{
     CheckConstraintObservation, ColumnObservationV3, DomainCheckConstraintObservation,
     DomainObservation, EnumObservation, ForeignKeyAction, ForeignKeyDeferrability,
     ForeignKeyMatchType, ForeignKeyObservation, ForeignKeyReferenceBehavior, IndexAttributeKind,
-    IndexAttributeObservation, IndexObservation, ObservationError, PostgresSchemaSnapshot,
-    PostgresSchemaSnapshotV3, PrimaryKeyObservation, QualifiedCollationName, QualifiedTypeName,
-    RelationKind, RelationObservation, SchemaObjectLocation, SchemaObjectLocationKind,
+    IndexAttributeObservation, IndexKeySemantics, IndexObservation, ObservationError,
+    PostgresSchemaSnapshot, PostgresSchemaSnapshotV3, PrimaryKeyObservation,
+    QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
+    RelationObservation, SchemaObjectLocation, SchemaObjectLocationKind,
     TableConstraintObservation, UniqueConstraintObservation,
 };
 
@@ -41,6 +42,9 @@ fn event_index() -> IndexObservation {
         vec![index_attribute(2, IndexAttributeKind::Include, "event_key")],
     )
     .expect("index fixture is valid")
+    .with_access_method("btree")
+    .with_key_semantics(vec![key_semantics(1)])
+    .expect("one semantic record matches the single key position")
     .with_predicate("(parent_key IS NOT NULL)")
     .with_source_comment("observed index comment")
 }
@@ -52,6 +56,26 @@ fn index_attribute(
 ) -> IndexAttributeObservation {
     IndexAttributeObservation::new(position, kind, attribute_name)
         .expect("index attribute fixture is valid")
+}
+
+fn key_operator_class(name: &str) -> QualifiedOperatorClassName {
+    QualifiedOperatorClassName::new("pg_catalog", name)
+        .expect("operator-class coordinate fixture is valid")
+}
+
+fn key_semantics(position: u32) -> IndexKeySemantics {
+    IndexKeySemantics::new(position, None, key_operator_class("uuid_ops"), 0)
+        .expect("key-semantics fixture is valid")
+}
+
+fn observed(index: IndexObservation) -> IndexObservation {
+    let semantics = (1..=index.key_attributes().len() as u32)
+        .map(key_semantics)
+        .collect();
+    index
+        .with_access_method("btree")
+        .with_key_semantics(semantics)
+        .expect("one semantic record per key position")
 }
 
 fn indexed_relation() -> RelationObservation {
@@ -84,6 +108,8 @@ fn expression_index() -> IndexObservation {
     )
     .expect("expression index fixture is valid")
     .with_access_method("btree")
+    .with_key_semantics(vec![key_semantics(1)])
+    .expect("one semantic record matches the single key position")
     .with_predicate("(parent_key IS NOT NULL)")
     .with_ready(true)
     .with_valid(true)
@@ -1574,7 +1600,7 @@ fn index_evidence_is_material_successor_identity() {
     );
     for (index_number, variant) in variants.into_iter().enumerate() {
         let relation = event_relation(RelationKind::Table)
-            .with_indexes(vec![variant])
+            .with_indexes(vec![observed(variant)])
             .expect("variant index references observed columns");
         assert_ne!(
             base,
@@ -1699,7 +1725,7 @@ fn relation_indexes_reject_duplicate_or_unknown_coordinates() {
     );
 
     let unknown_attribute = event_relation(RelationKind::Table)
-        .with_indexes(vec![
+        .with_indexes(vec![observed(
             IndexObservation::new(
                 "event_parent_ix",
                 true,
@@ -1708,7 +1734,7 @@ fn relation_indexes_reject_duplicate_or_unknown_coordinates() {
                 Vec::new(),
             )
             .expect("index fixture"),
-        ])
+        )])
         .expect_err("index attributes must resolve to observed relation columns");
     assert_eq!(
         unknown_attribute,
@@ -1749,6 +1775,31 @@ fn index_value_objects_reject_blank_or_zero_evidence() {
         SchemaObjectLocation::index("public", "event_record", RelationKind::Table, " "),
         Err(ObservationError::InvalidObservationField {
             field: "index_name"
+        })
+    );
+    assert_eq!(
+        IndexKeySemantics::new(0, None, key_operator_class("uuid_ops"), 0),
+        Err(ObservationError::InvalidOrdinalPosition)
+    );
+}
+
+#[test]
+fn key_semantics_require_one_record_per_key_position() {
+    let two_keys = IndexObservation::new(
+        "event_parent_ix",
+        true,
+        None,
+        vec![
+            index_attribute(1, IndexAttributeKind::Key, "parent_key"),
+            index_attribute(2, IndexAttributeKind::Key, "event_key"),
+        ],
+        Vec::new(),
+    )
+    .expect("index fixture is valid");
+    assert_eq!(
+        two_keys.with_key_semantics(vec![key_semantics(1)]),
+        Err(ObservationError::InvalidObservationField {
+            field: "index_key_semantics"
         })
     );
 }
@@ -2047,22 +2098,26 @@ fn domain_and_relation_child_sort_comparators_are_exercised() {
 
     let relation = event_relation(RelationKind::Table)
         .with_indexes(vec![
-            IndexObservation::new(
-                "zzz_ix",
-                true,
-                None,
-                vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
-                Vec::new(),
-            )
-            .expect("index fixture"),
-            IndexObservation::new(
-                "aaa_ix",
-                true,
-                None,
-                vec![index_attribute(1, IndexAttributeKind::Key, "event_key")],
-                Vec::new(),
-            )
-            .expect("index fixture"),
+            observed(
+                IndexObservation::new(
+                    "zzz_ix",
+                    true,
+                    None,
+                    vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
+                    Vec::new(),
+                )
+                .expect("index fixture"),
+            ),
+            observed(
+                IndexObservation::new(
+                    "aaa_ix",
+                    true,
+                    None,
+                    vec![index_attribute(1, IndexAttributeKind::Key, "event_key")],
+                    Vec::new(),
+                )
+                .expect("index fixture"),
+            ),
         ])
         .expect("both indexes reference observed columns");
     let index_names: Vec<&str> = relation

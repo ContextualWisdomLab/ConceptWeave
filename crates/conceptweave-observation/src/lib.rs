@@ -17,9 +17,10 @@ pub use model::{
 };
 pub use representation_v3::{
     ColumnObservationV3, DomainCheckConstraintObservation, DomainObservation, EnumObservation,
-    IndexAttributeKind, IndexAttributeObservation, IndexAttributeSource, IndexObservation,
-    PostgresSchemaSnapshotV3, QualifiedCollationName, QualifiedTypeName, RelationKind,
-    RelationObservation, SchemaObjectLocation, SchemaObjectLocationKind, SuccessorSourceReceipt,
+    IndexAttributeKind, IndexAttributeObservation, IndexAttributeSource, IndexKeySemantics,
+    IndexObservation, PostgresSchemaSnapshotV3, QualifiedCollationName, QualifiedOperatorClassName,
+    QualifiedTypeName, RelationKind, RelationObservation, SchemaObjectLocation,
+    SchemaObjectLocationKind, SuccessorSourceReceipt,
 };
 
 use conceptweave_source_port::AuthorizedObservationRequest;

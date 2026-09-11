@@ -72,6 +72,7 @@ pub fn authorized_source(
     .unwrap()
 }
 
+#[allow(dead_code)]
 pub fn resolved_source(source_connection_key: &str) -> AuthorizedObservationRequest {
     authorized_source(source_connection_key, &["Sales/~North", "audit", "public"])
 }
