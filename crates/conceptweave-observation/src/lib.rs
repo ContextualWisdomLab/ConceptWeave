@@ -235,7 +235,6 @@ fn compute_snapshot_digest(tables: &[TableObservation]) -> String {
                 TableConstraintObservation::Check(observation) => {
                     hasher.update([3]);
                     encode_str(&mut hasher, observation.constraint_name());
-                    encode_str_slice(&mut hasher, observation.column_names());
                     encode_str(&mut hasher, observation.definition());
                     encode_bool(&mut hasher, observation.validated());
                     encode_bool(&mut hasher, observation.enforced());
