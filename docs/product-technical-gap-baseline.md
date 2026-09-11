@@ -26,7 +26,7 @@ Fresh authority entering this update:
 - Foundation #1: `60f14a6e85a83d56c2eea43b34d52b3366bb1735`, OPEN Draft;
 - Source Observation #6: `287165d399c5f54d6c4b4aa3c15497b47de8244b`, OPEN Draft;
 - representation-v3 parent #45: `6b2a8f555725dc79f60432afbc492d6005290a4a`, OPEN Draft on #6;
-- representation/index successor #46 source head before this documentation commit: `bdb9e3e6982f466093625dd76e9098cd1b6b3b8e`, OPEN Draft and mechanically mergeable.
+- representation/index successor #46 source head before this documentation commit: `194612f3ea5586484980f25f51cba133b5b187d1`, OPEN Draft and mechanically mergeable.
 
 Protected central `.github/main` was freshly verified at `cb0872c9a20d5584703dffacca65c096fc034c6c`; `.github#2051@558693e0333e48012beea142f739bc634b0674a7` remains Draft on historical `main@7fd571db...`, with `.github#2056@69ae472562c93cc17674af5e2085a58947d3fab8` stacked on it. The central owner must land a backward-compatible handler, ordinary/non-force reconcile those PRs onto current protected main and obtain terminal GREEN before unchanged #35 can receive fresh acceptance and normal merge.
 
@@ -130,7 +130,9 @@ Finding review `5184299133` on exact `bff3455e9ddd256a7aa9e1ba7eaa6466151b9e82` 
 
 Behavioral RED `6c77cb6fb1664cd7ffeb517ad7bcd85382ebd825` added `constraint_period_reference_timing_contract.rs`, covering unobserved referenced-key timing, explicitly deferrable referenced-key timing, and the exact NOT DEFERRABLE positive control. Review `5184303271` records that the live production seam had no timing-family input and therefore admitted the first two invalid states.
 
-Production repair `fa21b47653192af83627ac77d14c9141f4419cbd` passes the already-observed key-timing family into `canonicalize_constraint_periods()` and requires the exact referenced temporal key coordinate to resolve `ConstraintDeferrability::NotDeferrable`; missing or deferrable timing fails closed as `constraint_period_reference_timing`. Retained action/period fixtures were ordinary-forward currentized at `b501b003fbcbfe612f92aa65d83a7fd82cedb68a` and `8b36c7a67f8a90b24ad2f08c02ead23374dc4c94` so successful PERIOD references carry the now-required explicit timing family. `bdb9e3e6982f466093625dd76e9098cd1b6b3b8e` adds APA-style primary-source doctoring in `docs/doctoring/source-observation-temporal-foreign-key-reference-timing.md`.
+Production repair `fa21b47653192af83627ac77d14c9141f4419cbd` passes the already-observed key-timing family into `canonicalize_constraint_periods()` and requires the exact referenced temporal key coordinate to resolve `ConstraintDeferrability::NotDeferrable`; missing or deferrable timing fails closed as `constraint_period_reference_timing`. Initial retained-fixture updates `b501b003fbcbfe612f92aa65d83a7fd82cedb68a` and `8b36c7a67f8a90b24ad2f08c02ead23374dc4c94` supplied the new timing evidence.
+
+Static review `5184320142` then found a fixture-only compile regression: the integration tests had called private `with_observed_constraint_timings()`. The public API was not widened for tests. Ordinary-forward corrections `90d4ba255ebcc56f4f6eed76b4e6d0d4be5ced15`, `f402b0e39d3a7125476f471edac79fa776e347f2`, and `95074fdff8f3e66c4ed4e54215bd4f59f2cf3e86` move the action, RED, and retained period fixtures onto `new_with_constraint_timings(...)`. Doctoring was correspondingly currentized at `194612f3ea5586484980f25f51cba133b5b187d1`.
 
 This repair deliberately does not infer timing from GiST, exclusion state, or `pg_index.indimmediate`, and it does not require timing evidence for a temporal key that is not acting as an in-snapshot foreign-key reference target. The slice is source-repaired and acceptance-pending, not native/Product GREEN.
 
@@ -152,7 +154,7 @@ This repair deliberately does not infer timing from GiST, exclusion state, or `p
 - `5183681930 -> 76ff202412de9c09b9ebfca60f0a4f1d37eef946 -> 2656b7508fe04e0b325245e49f63df57f941fbd4`: repair timing positive fixtures after the supporting-index invariant became mandatory.
 - `5183704353 -> 39bdccbb9d3cf8a26f46ba05f6ce59896f390f06 -> 69d4c734c5954e3ccf37b6965ca65ff238aa45b7 -> 3f2ecba28fdd5742de5af1cac68227767baadbed -> c1abb9189d9f7c9539a65f87be654a6fe9ddbbc7`: explicit `pg_constraint.conperiod`/PERIOD representation and admission.
 - `5184007447 -> 03e4443b5834383f4d25a8e83786cccb62e003be -> 60b59db961ee35a0a0d5de91422ca68612afb8eb -> 1fee67a5223ecc4f1acb13536204d311684a6a9d -> 1a77e006553a39e3752ee3e9f08c57e9160dac78 -> c8947613d665b5061ea445d1dfd6a7165447483f -> 95d3720625bd029b9b6bc46b1841faac2058cb66 -> 6975d94a51d5dc4793ccfd1d39a4c2a849195ace -> 5184074266`: explicit PERIOD-FK action evidence and PostgreSQL-valid NO ACTION admission, including immediate correction of the contents-write accessor regression.
-- `5184299133 -> 6c77cb6fb1664cd7ffeb517ad7bcd85382ebd825 -> 5184303271 -> fa21b47653192af83627ac77d14c9141f4419cbd -> b501b003fbcbfe612f92aa65d83a7fd82cedb68a -> 8b36c7a67f8a90b24ad2f08c02ead23374dc4c94 -> bdb9e3e6982f466093625dd76e9098cd1b6b3b8e`: PERIOD-FK referenced temporal key must carry exact observed NOT DEFERRABLE timing; no index-shape/default inference.
+- `5184299133 -> 6c77cb6fb1664cd7ffeb517ad7bcd85382ebd825 -> 5184303271 -> fa21b47653192af83627ac77d14c9141f4419cbd -> b501b003fbcbfe612f92aa65d83a7fd82cedb68a -> 8b36c7a67f8a90b24ad2f08c02ead23374dc4c94 -> 5184320142 -> 90d4ba255ebcc56f4f6eed76b4e6d0d4be5ced15 -> f402b0e39d3a7125476f471edac79fa776e347f2 -> 95074fdff8f3e66c4ed4e54215bd4f59f2cf3e86 -> 194612f3ea5586484980f25f51cba133b5b187d1`: PERIOD-FK referenced temporal key requires exact observed NOT DEFERRABLE timing; integration fixtures use the public timing constructor.
 
 ## Acceptance still required
 
@@ -202,7 +204,7 @@ Catalog OIDs are adapter-local joins, never governed semantic identity. `pg_get_
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | Canonical owner seams unchanged. |
 | Truth/publication lifecycle | SOURCE_REPAIRED_NO_PUBLICATION | No protected immutable semantic release exists. |
-| Source Observation | REPRESENTATION_V3_PERIOD_REFERENCE_TIMING_SOURCE_REPAIRED | `fa21b476...` requires exact observed NOT DEFERRABLE timing for an in-snapshot PERIOD target; `b501b003...`/`8b36c7a...` currentize retained fixtures; `bdb9e3e...` adds primary-source doctoring. Exact-head Rust/Product acceptance remains mandatory. |
+| Source Observation | REPRESENTATION_V3_PERIOD_REFERENCE_TIMING_SOURCE_REPAIRED | `fa21b476...` requires exact observed NOT DEFERRABLE timing; `5184320142` caught the private-test-seam misuse; `90d4ba2...`/`f402b0e...`/`95074fd...` restore integration fixtures to public API; `194612f...` currentizes doctoring. Exact-head Rust/Product acceptance remains mandatory. |
 | Product CI | BLOCKED_OWNER_RECONCILIATION | Protected/default ConceptWeave `main` still lacks Product workflow authority; #35 waits on central owner settlement. |
 | Quality gate | ACCEPTANCE_PENDING | No Ready/adoption/merge before unchanged-head Rust/Product/security/dependency/review evidence. |
 | PostgreSQL adapter | BLOCKED_ON_REPRESENTATION_ACCEPTANCE | No transport before representation GREEN and parent adoption. |
