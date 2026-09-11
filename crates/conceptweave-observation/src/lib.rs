@@ -6,9 +6,11 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+mod array_type;
 mod model;
 mod representation_v3;
 
+pub use array_type::ArrayTypeObservation;
 pub use model::{
     CheckConstraintObservation, ColumnObservation, ForeignKeyAction, ForeignKeyDeferrability,
     ForeignKeyMatchType, ForeignKeyObservation, ForeignKeyReferenceBehavior, ObservationError,
@@ -20,7 +22,7 @@ pub use representation_v3::{
     IndexAttributeKind, IndexAttributeObservation, IndexAttributeSource, IndexCatalogFlags,
     IndexKeySemantics, IndexObservation, IndexStorageOption, IndexTablespace, OperatorClassOption,
     QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
-    RelationObservation, SchemaObjectLocation, SchemaObjectLocationKind, SuccessorSourceReceipt,
+    RelationObservation, SchemaObjectLocation, SchemaObjectLocationKind,
 };
 
 use std::collections::BTreeSet;
@@ -29,32 +31,87 @@ use conceptweave_source_port::AuthorizedObservationRequest;
 use sha2::{Digest, Sha256};
 
 const SNAPSHOT_DIGEST_DOMAIN_V2: &[u8] = b"conceptweave.postgres_schema_snapshot.v2";
+const SNAPSHOT_DIGEST_DOMAIN_V3_ARRAY_TYPES_V1: &[u8] =
+    b"conceptweave.postgres_schema_snapshot.v3.array_types.v1";
+const POSTGRES_CATALOG_SCHEMA_NAME: &str = "pg_catalog";
 
-/// Public v3 aggregate enforcing PostgreSQL schema-local relation invariants.
+/// Immutable receipt binding one exact successor source coordinate to snapshot provenance.
+///
+/// The receipt always carries the public aggregate's governed source digest. This matters for
+/// array-aware v3 snapshots because the private representation remains the compatibility validator
+/// for the original v3 constructor while the public owner adds a domain-separated true-array
+/// identity extension.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SuccessorSourceReceipt {
+    source_id: String,
+    connection_policy_binding: String,
+    source_digest: String,
+    extractor_revision: String,
+    observed_at_utc: String,
+    location: SchemaObjectLocation,
+}
+
+impl SuccessorSourceReceipt {
+    /// Returns the stable source reference used by candidate evidence binding.
+    #[must_use]
+    pub fn source_id(&self) -> &str {
+        &self.source_id
+    }
+
+    /// Returns the opaque immutable connection-policy revision used for this observation.
+    #[must_use]
+    pub fn connection_policy_binding(&self) -> &str {
+        &self.connection_policy_binding
+    }
+
+    /// Returns the immutable canonical successor snapshot digest.
+    #[must_use]
+    pub fn source_digest(&self) -> &str {
+        &self.source_digest
+    }
+
+    /// Returns the exact extractor implementation/configuration revision.
+    #[must_use]
+    pub fn extractor_revision(&self) -> &str {
+        &self.extractor_revision
+    }
+
+    /// Returns the exact UTC observation-time evidence supplied by the adapter.
+    #[must_use]
+    pub fn observed_at_utc(&self) -> &str {
+        &self.observed_at_utc
+    }
+
+    /// Returns the verified exact successor source coordinate inside the snapshot.
+    #[must_use]
+    pub const fn location(&self) -> &SchemaObjectLocation {
+        &self.location
+    }
+}
+
+/// Public v3 aggregate enforcing PostgreSQL schema-local relation and type invariants.
 ///
 /// The representation module remains an implementation detail. This owner-level aggregate validates
-/// PostgreSQL's unique `(relname, relnamespace)` catalog namespace, rejects nested index evidence on
-/// relation kinds that cannot own local PostgreSQL indexes, and rejects represented table constraints
-/// on relation kinds that cannot own those PostgreSQL constraints before delegating to the
-/// deterministic v3 representation constructor. Relation names and relation-scoped index names
-/// therefore cannot collide within one schema, while identical names remain legal in different
-/// schemas.
+/// PostgreSQL's unique `(relname, relnamespace)` catalog namespace, relation-kind ownership rules,
+/// exact schema-local `pg_type` identity, and optional observed true-array relationships before
+/// exposing immutable governed evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PostgresSchemaSnapshotV3 {
     inner: representation_v3::PostgresSchemaSnapshotV3,
+    snapshot_digest: String,
+    relations: Vec<RelationObservation>,
+    domains: Vec<DomainObservation>,
+    enums: Vec<EnumObservation>,
+    array_types: Vec<ArrayTypeObservation>,
+    array_types_observed: bool,
 }
 
 impl PostgresSchemaSnapshotV3 {
-    /// Creates a deterministic v3 snapshot after validating modeled PostgreSQL relation invariants.
+    /// Creates the original deterministic v3 snapshot without claiming true-array inventory.
     ///
-    /// All modeled owning relations and nested indexes share PostgreSQL's schema-local `pg_class`
-    /// relation namespace. Nested indexes are admitted only for ordinary tables, partitioned tables,
-    /// and materialized views. Represented primary-key, unique, foreign-key, and CHECK constraints
-    /// are admitted on ordinary and partitioned tables; foreign tables admit only represented CHECK
-    /// constraints; views, materialized views, sequences, and standalone composite-type relations
-    /// admit none of these table-constraint variants. These checks run before digest or receipt
-    /// construction and do not broaden the representation to foreign truth or mutable catalog
-    /// identifiers.
+    /// This constructor deliberately preserves its existing digest contract. Call
+    /// [`Self::new_with_array_types`] only when the adapter has explicitly observed exact
+    /// `pg_type.typarray`/`typelem` relationships.
     pub fn new(
         authorized_request: &AuthorizedObservationRequest,
         extractor_revision: impl Into<String>,
@@ -72,7 +129,95 @@ impl PostgresSchemaSnapshotV3 {
             domains,
             enums,
         )?;
-        Ok(Self { inner })
+        let snapshot_digest = inner.snapshot_digest().to_owned();
+        let relations = inner.relations().to_vec();
+        let domains = inner.domains().to_vec();
+        let enums = inner.enums().to_vec();
+        Ok(Self {
+            inner,
+            snapshot_digest,
+            relations,
+            domains,
+            enums,
+            array_types: Vec::new(),
+            array_types_observed: false,
+        })
+    }
+
+    /// Creates a deterministic v3 snapshot with explicitly observed PostgreSQL true-array identity.
+    ///
+    /// Array names are accepted only as exact catalog coordinates; no underscore convention,
+    /// `search_path`, OID, or display text is used as identity. The constructor validates the shared
+    /// schema-local `pg_type` namespace, exact element resolution, one-element-to-one-true-array
+    /// reciprocity, and PostgreSQL's no-array-of-array type-system invariant. Existing v3 source
+    /// identity remains untouched: this constructor adds a separate domain-separated digest framing
+    /// that also binds the original qualified type references whose private validation projection
+    /// resolves through their array element coordinates.
+    pub fn new_with_array_types(
+        authorized_request: &AuthorizedObservationRequest,
+        extractor_revision: impl Into<String>,
+        observed_at_utc: impl Into<String>,
+        mut relations: Vec<RelationObservation>,
+        mut domains: Vec<DomainObservation>,
+        mut enums: Vec<EnumObservation>,
+        array_types: Vec<ArrayTypeObservation>,
+    ) -> Result<Self, ObservationError> {
+        validate_schema_relation_invariants(&relations)?;
+        let array_types = canonicalize_array_type_observations(
+            authorized_request,
+            &relations,
+            &domains,
+            &enums,
+            array_types,
+        )?;
+        validate_type_bindings_with_arrays(&relations, &domains, &enums, &array_types)?;
+
+        let projected_relations = relations
+            .iter()
+            .map(|relation| project_relation_array_bindings(relation, &array_types))
+            .collect::<Result<Vec<_>, _>>()?;
+        let projected_domains = domains
+            .iter()
+            .map(|domain| project_domain_array_binding(domain, &array_types))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let extractor_revision = extractor_revision.into();
+        let observed_at_utc = observed_at_utc.into();
+        let inner = representation_v3::PostgresSchemaSnapshotV3::new(
+            authorized_request,
+            extractor_revision,
+            observed_at_utc,
+            projected_relations,
+            projected_domains,
+            enums.clone(),
+        )?;
+
+        relations.sort_by(|left, right| {
+            (left.schema_name(), left.relation_name())
+                .cmp(&(right.schema_name(), right.relation_name()))
+        });
+        domains.sort_by(|left, right| {
+            (left.schema_name(), left.domain_name()).cmp(&(right.schema_name(), right.domain_name()))
+        });
+        enums.sort_by(|left, right| {
+            (left.schema_name(), left.enum_name()).cmp(&(right.schema_name(), right.enum_name()))
+        });
+
+        let snapshot_digest = compute_array_aware_snapshot_digest(
+            inner.snapshot_digest(),
+            &relations,
+            &domains,
+            &array_types,
+        );
+        Ok(Self {
+            inner,
+            snapshot_digest,
+            relations,
+            domains,
+            enums,
+            array_types,
+            array_types_observed: true,
+        })
     }
 
     /// Returns the stable source-connection registry reference, never a credential.
@@ -90,7 +235,7 @@ impl PostgresSchemaSnapshotV3 {
     /// Returns the owner-computed canonical SHA-256 successor source-content digest.
     #[must_use]
     pub fn snapshot_digest(&self) -> &str {
-        self.inner.snapshot_digest()
+        &self.snapshot_digest
     }
 
     /// Returns the exact extractor implementation/configuration revision.
@@ -108,19 +253,27 @@ impl PostgresSchemaSnapshotV3 {
     /// Returns qualified relations in deterministic exact-identifier order.
     #[must_use]
     pub fn relations(&self) -> &[RelationObservation] {
-        self.inner.relations()
+        &self.relations
     }
 
     /// Returns qualified domains in deterministic exact-identifier order.
     #[must_use]
     pub fn domains(&self) -> &[DomainObservation] {
-        self.inner.domains()
+        &self.domains
     }
 
     /// Returns qualified enums in deterministic exact-identifier order.
     #[must_use]
     pub fn enums(&self) -> &[EnumObservation] {
-        self.inner.enums()
+        &self.enums
+    }
+
+    /// Returns explicitly observed true-array relationships, or `None` when that catalog family was
+    /// not observed by the constructor.
+    #[must_use]
+    pub fn array_types(&self) -> Option<&[ArrayTypeObservation]> {
+        self.array_types_observed
+            .then_some(self.array_types.as_slice())
     }
 
     /// Issues provenance for an exact successor coordinate only when it exists in this snapshot.
@@ -128,7 +281,15 @@ impl PostgresSchemaSnapshotV3 {
         &self,
         location: SchemaObjectLocation,
     ) -> Result<SuccessorSourceReceipt, ObservationError> {
-        self.inner.source_receipt(location)
+        let verified = self.inner.source_receipt(location.clone())?;
+        Ok(SuccessorSourceReceipt {
+            source_id: verified.source_id().to_owned(),
+            connection_policy_binding: verified.connection_policy_binding().to_owned(),
+            source_digest: self.snapshot_digest.clone(),
+            extractor_revision: verified.extractor_revision().to_owned(),
+            observed_at_utc: verified.observed_at_utc().to_owned(),
+            location,
+        })
     }
 }
 
@@ -184,6 +345,315 @@ fn validate_schema_relation_invariants(
         }
     }
     Ok(())
+}
+
+fn relation_has_row_type(kind: RelationKind) -> bool {
+    !matches!(kind, RelationKind::Sequence)
+}
+
+fn canonicalize_array_type_observations(
+    authorized_request: &AuthorizedObservationRequest,
+    relations: &[RelationObservation],
+    domains: &[DomainObservation],
+    enums: &[EnumObservation],
+    mut array_types: Vec<ArrayTypeObservation>,
+) -> Result<Vec<ArrayTypeObservation>, ObservationError> {
+    let mut scalar_type_names = BTreeSet::new();
+    for domain in domains {
+        scalar_type_names.insert((domain.schema_name().to_owned(), domain.domain_name().to_owned()));
+    }
+    for observed_enum in enums {
+        scalar_type_names.insert((
+            observed_enum.schema_name().to_owned(),
+            observed_enum.enum_name().to_owned(),
+        ));
+    }
+    for relation in relations {
+        if relation_has_row_type(relation.kind()) {
+            scalar_type_names.insert((
+                relation.schema_name().to_owned(),
+                relation.relation_name().to_owned(),
+            ));
+        }
+    }
+
+    array_types.sort_by(|left, right| {
+        (
+            left.array_type().schema_name(),
+            left.array_type().type_name(),
+            left.element_type().schema_name(),
+            left.element_type().type_name(),
+        )
+            .cmp(&(
+                right.array_type().schema_name(),
+                right.array_type().type_name(),
+                right.element_type().schema_name(),
+                right.element_type().type_name(),
+            ))
+    });
+
+    for pair in array_types.windows(2) {
+        if same_type_coordinate(pair[0].array_type(), pair[1].array_type()) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "array_type_coordinate",
+            });
+        }
+    }
+
+    let array_type_names = array_types
+        .iter()
+        .map(|array_type| {
+            (
+                array_type.array_type().schema_name().to_owned(),
+                array_type.array_type().type_name().to_owned(),
+            )
+        })
+        .collect::<BTreeSet<_>>();
+    let mut observed_elements = BTreeSet::new();
+
+    for array_type in &array_types {
+        let array_coordinate = (
+            array_type.array_type().schema_name().to_owned(),
+            array_type.array_type().type_name().to_owned(),
+        );
+        let element_coordinate = (
+            array_type.element_type().schema_name().to_owned(),
+            array_type.element_type().type_name().to_owned(),
+        );
+
+        if !authorized_request
+            .request()
+            .allowed_schema_names()
+            .iter()
+            .any(|schema_name| schema_name == array_type.array_type().schema_name())
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "unauthorized_schema_name",
+            });
+        }
+        if scalar_type_names.contains(&array_coordinate) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "array_type_namespace",
+            });
+        }
+        if !observed_elements.insert(element_coordinate.clone()) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "array_type_reciprocity",
+            });
+        }
+        if array_type_names.contains(&element_coordinate) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "array_type_element",
+            });
+        }
+        if array_type.element_type().schema_name() != POSTGRES_CATALOG_SCHEMA_NAME
+            && !scalar_type_names.contains(&element_coordinate)
+        {
+            return Err(ObservationError::UnknownTypeBinding {
+                schema_name: element_coordinate.0,
+                type_name: element_coordinate.1,
+            });
+        }
+    }
+
+    Ok(array_types)
+}
+
+fn validate_type_bindings_with_arrays(
+    relations: &[RelationObservation],
+    domains: &[DomainObservation],
+    enums: &[EnumObservation],
+    array_types: &[ArrayTypeObservation],
+) -> Result<(), ObservationError> {
+    let mut resolvable = BTreeSet::new();
+    for domain in domains {
+        resolvable.insert((domain.schema_name().to_owned(), domain.domain_name().to_owned()));
+    }
+    for observed_enum in enums {
+        resolvable.insert((
+            observed_enum.schema_name().to_owned(),
+            observed_enum.enum_name().to_owned(),
+        ));
+    }
+    for relation in relations {
+        if relation_has_row_type(relation.kind()) {
+            resolvable.insert((
+                relation.schema_name().to_owned(),
+                relation.relation_name().to_owned(),
+            ));
+        }
+    }
+    for array_type in array_types {
+        resolvable.insert((
+            array_type.array_type().schema_name().to_owned(),
+            array_type.array_type().type_name().to_owned(),
+        ));
+    }
+
+    let validate_binding = |binding: &QualifiedTypeName| -> Result<(), ObservationError> {
+        if binding.schema_name() == POSTGRES_CATALOG_SCHEMA_NAME
+            || resolvable.contains(&(
+                binding.schema_name().to_owned(),
+                binding.type_name().to_owned(),
+            ))
+        {
+            Ok(())
+        } else {
+            Err(ObservationError::UnknownTypeBinding {
+                schema_name: binding.schema_name().to_owned(),
+                type_name: binding.type_name().to_owned(),
+            })
+        }
+    };
+
+    for domain in domains {
+        validate_binding(domain.base_type())?;
+    }
+    for relation in relations {
+        for column in relation.columns() {
+            validate_binding(column.type_binding())?;
+        }
+    }
+    Ok(())
+}
+
+fn same_type_coordinate(left: &QualifiedTypeName, right: &QualifiedTypeName) -> bool {
+    left.schema_name() == right.schema_name() && left.type_name() == right.type_name()
+}
+
+fn projected_type_binding(
+    binding: &QualifiedTypeName,
+    array_types: &[ArrayTypeObservation],
+) -> QualifiedTypeName {
+    array_types
+        .iter()
+        .find(|array_type| same_type_coordinate(array_type.array_type(), binding))
+        .map_or_else(|| binding.clone(), |array_type| array_type.element_type().clone())
+}
+
+fn project_relation_array_bindings(
+    relation: &RelationObservation,
+    array_types: &[ArrayTypeObservation],
+) -> Result<RelationObservation, ObservationError> {
+    let columns = relation
+        .columns()
+        .iter()
+        .map(|column| {
+            ColumnObservationV3::new(
+                column.column_name(),
+                column.ordinal_position(),
+                column.data_type(),
+                projected_type_binding(column.type_binding(), array_types),
+                column.nullable(),
+                column.source_comment().map(str::to_owned),
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut projected = RelationObservation::new(
+        relation.schema_name(),
+        relation.relation_name(),
+        relation.kind(),
+        columns,
+    )?;
+    if !relation.constraints().is_empty() {
+        projected = projected.with_constraints(relation.constraints().to_vec())?;
+    }
+    if !relation.indexes().is_empty() {
+        projected = projected.with_indexes(relation.indexes().to_vec())?;
+    }
+    if let Some(source_comment) = relation.source_comment() {
+        projected = projected.with_source_comment(source_comment.to_owned());
+    }
+    Ok(projected)
+}
+
+fn project_domain_array_binding(
+    domain: &DomainObservation,
+    array_types: &[ArrayTypeObservation],
+) -> Result<DomainObservation, ObservationError> {
+    let mut projected = DomainObservation::new(
+        domain.schema_name(),
+        domain.domain_name(),
+        projected_type_binding(domain.base_type(), array_types),
+    )?;
+    if let Some(type_modifier) = domain.type_modifier() {
+        projected = projected.with_type_modifier(type_modifier);
+    }
+    if let Some(array_dimensions) = domain.array_dimensions() {
+        projected = projected.with_array_dimensions(array_dimensions);
+    }
+    if let Some(collation) = domain.collation() {
+        projected = projected.with_collation(collation.clone());
+    }
+    if let Some(not_null) = domain.not_null() {
+        projected = projected.with_not_null(not_null);
+    }
+    if let Some(default_expression) = domain.default_expression() {
+        projected = projected.with_default_expression(default_expression.to_owned());
+    }
+    if !domain.check_constraints().is_empty() {
+        projected = projected.with_check_constraints(domain.check_constraints().to_vec())?;
+    }
+    if let Some(source_comment) = domain.source_comment() {
+        projected = projected.with_source_comment(source_comment.to_owned());
+    }
+    Ok(projected)
+}
+
+fn compute_array_aware_snapshot_digest(
+    base_snapshot_digest: &str,
+    relations: &[RelationObservation],
+    domains: &[DomainObservation],
+    array_types: &[ArrayTypeObservation],
+) -> String {
+    let mut hasher = Sha256::new();
+    encode_bytes(&mut hasher, SNAPSHOT_DIGEST_DOMAIN_V3_ARRAY_TYPES_V1);
+    encode_str(&mut hasher, base_snapshot_digest);
+
+    encode_len(&mut hasher, array_types.len());
+    for array_type in array_types {
+        encode_str(&mut hasher, array_type.array_type().schema_name());
+        encode_str(&mut hasher, array_type.array_type().type_name());
+        encode_str(&mut hasher, array_type.element_type().schema_name());
+        encode_str(&mut hasher, array_type.element_type().type_name());
+    }
+
+    encode_len(&mut hasher, domains.len());
+    for domain in domains {
+        encode_str(&mut hasher, domain.schema_name());
+        encode_str(&mut hasher, domain.domain_name());
+        encode_str(&mut hasher, domain.base_type().schema_name());
+        encode_str(&mut hasher, domain.base_type().type_name());
+    }
+
+    encode_len(&mut hasher, relations.len());
+    for relation in relations {
+        encode_str(&mut hasher, relation.schema_name());
+        encode_str(&mut hasher, relation.relation_name());
+        encode_str(&mut hasher, relation.kind().token());
+        encode_len(&mut hasher, relation.columns().len());
+        for column in relation.columns() {
+            encode_str(&mut hasher, column.column_name());
+            hasher.update(column.ordinal_position().to_be_bytes());
+            encode_str(&mut hasher, column.type_binding().schema_name());
+            encode_str(&mut hasher, column.type_binding().type_name());
+        }
+    }
+
+    encode_sha256(hasher)
+}
+
+fn encode_sha256(hasher: Sha256) -> String {
+    let digest = hasher.finalize();
+    let mut encoded = String::with_capacity("sha256:".len() + digest.len() * 2);
+    encoded.push_str("sha256:");
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    for byte in digest {
+        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    encoded
 }
 
 /// Immutable receipt binding one exact observed source coordinate to snapshot provenance.
@@ -402,15 +872,7 @@ fn compute_snapshot_digest(tables: &[TableObservation]) -> String {
         }
     }
 
-    let digest = hasher.finalize();
-    let mut encoded = String::with_capacity("sha256:".len() + digest.len() * 2);
-    encoded.push_str("sha256:");
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    for byte in digest {
-        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
-        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
-    }
-    encoded
+    encode_sha256(hasher)
 }
 
 fn encode_reference_behavior(hasher: &mut Sha256, behavior: Option<&ForeignKeyReferenceBehavior>) {
