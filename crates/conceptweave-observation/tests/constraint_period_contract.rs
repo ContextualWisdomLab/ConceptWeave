@@ -203,12 +203,11 @@ fn observed_false_period_state_is_distinct_from_unobserved() {
 
     assert_ne!(unobserved.snapshot_digest(), observed_false.snapshot_digest());
     assert_eq!(unobserved.constraint_periods(), None);
-    assert_eq!(
-        observed_false
+    assert!(
+        !observed_false
             .constraint_periods()
             .expect("period family was observed")[0]
-            .has_period_semantics(),
-        false
+            .has_period_semantics()
     );
 }
 
