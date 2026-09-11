@@ -33,10 +33,12 @@ const SNAPSHOT_DIGEST_DOMAIN_V2: &[u8] = b"conceptweave.postgres_schema_snapshot
 /// Public v3 aggregate enforcing PostgreSQL schema-local relation invariants.
 ///
 /// The representation module remains an implementation detail. This owner-level aggregate validates
-/// PostgreSQL's unique `(relname, relnamespace)` catalog namespace and rejects nested index evidence
-/// on relation kinds that cannot own local PostgreSQL indexes before delegating to the deterministic
-/// v3 representation constructor. Relation names and relation-scoped index names therefore cannot
-/// collide within one schema, while identical names remain legal in different schemas.
+/// PostgreSQL's unique `(relname, relnamespace)` catalog namespace, rejects nested index evidence on
+/// relation kinds that cannot own local PostgreSQL indexes, and rejects represented table constraints
+/// on relation kinds that cannot own those PostgreSQL constraints before delegating to the
+/// deterministic v3 representation constructor. Relation names and relation-scoped index names
+/// therefore cannot collide within one schema, while identical names remain legal in different
+/// schemas.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PostgresSchemaSnapshotV3 {
     inner: representation_v3::PostgresSchemaSnapshotV3,
@@ -47,9 +49,12 @@ impl PostgresSchemaSnapshotV3 {
     ///
     /// All modeled owning relations and nested indexes share PostgreSQL's schema-local `pg_class`
     /// relation namespace. Nested indexes are admitted only for ordinary tables, partitioned tables,
-    /// and materialized views, matching PostgreSQL's local index ownership rules. These checks run
-    /// before digest or receipt construction and do not broaden the representation to foreign truth
-    /// or mutable catalog identifiers.
+    /// and materialized views. Represented primary-key, unique, foreign-key, and CHECK constraints
+    /// are admitted on ordinary and partitioned tables; foreign tables admit only represented CHECK
+    /// constraints; views, materialized views, sequences, and standalone composite-type relations
+    /// admit none of these table-constraint variants. These checks run before digest or receipt
+    /// construction and do not broaden the representation to foreign truth or mutable catalog
+    /// identifiers.
     pub fn new(
         authorized_request: &AuthorizedObservationRequest,
         extractor_revision: impl Into<String>,
@@ -143,6 +148,25 @@ fn validate_schema_relation_invariants(
             return Err(ObservationError::InvalidObservationField {
                 field: "index_relation_kind",
             });
+        }
+
+        if !relation.constraints().is_empty() {
+            let constraints_supported = match relation.kind() {
+                RelationKind::Table | RelationKind::PartitionedTable => true,
+                RelationKind::ForeignTable => relation
+                    .constraints()
+                    .iter()
+                    .all(|constraint| matches!(constraint, TableConstraintObservation::Check(_))),
+                RelationKind::View
+                | RelationKind::MaterializedView
+                | RelationKind::Sequence
+                | RelationKind::CompositeType => false,
+            };
+            if !constraints_supported {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "relation_constraint_kind",
+                });
+            }
         }
 
         let schema_name = relation.schema_name().to_owned();
