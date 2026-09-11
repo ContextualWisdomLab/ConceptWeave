@@ -149,6 +149,22 @@ fn base_snapshot(immediate: bool) -> PostgresSchemaSnapshotV3 {
     .expect("base snapshot fixture is valid")
 }
 
+fn timed_snapshot(
+    immediate: bool,
+    deferrability: ConstraintDeferrability,
+) -> PostgresSchemaSnapshotV3 {
+    PostgresSchemaSnapshotV3::new_with_constraint_timings(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-12T00:00:00Z",
+        vec![temporal_parent_relation(immediate), period_child_relation()],
+        Vec::new(),
+        Vec::new(),
+        vec![timing(deferrability)],
+    )
+    .expect("timed snapshot fixture is internally coherent")
+}
+
 #[test]
 fn period_foreign_key_requires_observed_referenced_key_timing() {
     let error = base_snapshot(true)
@@ -164,11 +180,7 @@ fn period_foreign_key_requires_observed_referenced_key_timing() {
 
 #[test]
 fn period_foreign_key_rejects_deferrable_referenced_temporal_key() {
-    let error = base_snapshot(false)
-        .with_observed_constraint_timings(vec![timing(
-            ConstraintDeferrability::InitiallyImmediate,
-        )])
-        .expect("deferrable key timing is internally coherent")
+    let error = timed_snapshot(false, ConstraintDeferrability::InitiallyImmediate)
         .with_observed_constraint_periods(periods())
         .expect_err("PostgreSQL PERIOD references require a non-deferrable referenced key");
     assert_eq!(
@@ -181,9 +193,7 @@ fn period_foreign_key_rejects_deferrable_referenced_temporal_key() {
 
 #[test]
 fn period_foreign_key_accepts_observed_nondeferrable_referenced_temporal_key() {
-    base_snapshot(true)
-        .with_observed_constraint_timings(vec![timing(ConstraintDeferrability::NotDeferrable)])
-        .expect("non-deferrable temporal key timing is coherent")
+    timed_snapshot(true, ConstraintDeferrability::NotDeferrable)
         .with_observed_constraint_periods(periods())
         .expect("PERIOD reference is backed by explicit non-deferrable temporal-key evidence");
 }
