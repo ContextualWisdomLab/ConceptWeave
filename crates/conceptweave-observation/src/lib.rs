@@ -784,6 +784,18 @@ fn canonicalize_constraint_periods(
                             field: "constraint_period_shape",
                         });
                     }
+                    let Some(reference_behavior) = foreign_key.reference_behavior() else {
+                        return Err(ObservationError::InvalidObservationField {
+                            field: "constraint_period_action",
+                        });
+                    };
+                    if reference_behavior.update_action() != ForeignKeyAction::NoAction
+                        || reference_behavior.delete_action() != ForeignKeyAction::NoAction
+                    {
+                        return Err(ObservationError::InvalidObservationField {
+                            field: "constraint_period_action",
+                        });
+                    }
                     if let Some(referenced_relation) = relations.iter().find(|candidate| {
                         candidate.schema_name() == foreign_key.referenced_schema_name()
                             && candidate.relation_name() == foreign_key.referenced_table_name()
