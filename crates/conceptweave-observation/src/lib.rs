@@ -578,12 +578,37 @@ fn canonicalize_constraint_timings(
                 field: "constraint_backing_index",
             });
         };
+        let (constraint_columns, expected_nulls_not_distinct) = match constraint {
+            TableConstraintObservation::PrimaryKey(primary_key) => {
+                (primary_key.column_names(), None)
+            }
+            TableConstraintObservation::Unique(unique) => {
+                (unique.column_names(), unique.nulls_not_distinct())
+            }
+            TableConstraintObservation::ForeignKey(_) | TableConstraintObservation::Check(_) => {
+                unreachable!("key-constraint kind was validated above")
+            }
+        };
+        let key_columns_match = backing_index.key_attributes().len() == constraint_columns.len()
+            && backing_index
+                .key_attributes()
+                .iter()
+                .zip(constraint_columns)
+                .all(|(attribute, column_name)| {
+                    attribute.attribute_name() == Some(column_name.as_str())
+                });
+        let null_treatment_matches = expected_nulls_not_distinct.is_none_or(|expected| {
+            backing_index.nulls_not_distinct() == Some(expected)
+        });
         let expected_primary = matches!(constraint, TableConstraintObservation::PrimaryKey(_));
         let expected_immediate = matches!(
             timing.deferrability(),
             ConstraintDeferrability::NotDeferrable
         );
         if !backing_index.is_unique()
+            || !key_columns_match
+            || backing_index.predicate().is_some()
+            || !null_treatment_matches
             || catalog_flags.primary() != expected_primary
             || catalog_flags.immediate() != expected_immediate
         {
