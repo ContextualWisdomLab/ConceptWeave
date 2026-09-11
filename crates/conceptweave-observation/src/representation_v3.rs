@@ -370,13 +370,13 @@ pub struct IndexObservation {
 impl IndexObservation {
     /// Creates an index observation from exactly the observed material index evidence.
     ///
-    /// Key and INCLUDE attributes are canonicalized into deterministic position order. Attribute
-    /// roles must agree with their collection (`key_attributes` holds only key positions and
-    /// `include_attributes` holds only payload positions), the combined one-based positions must be
-    /// contiguous with every key position preceding every INCLUDE position, and INCLUDE attributes
-    /// must be simple columns because PostgreSQL `INCLUDE` does not accept expressions. Every simple
-    /// column attribute is validated against the owning relation columns when the index is attached
-    /// to a relation observation.
+    /// At least one key attribute is required. Key and INCLUDE attributes are canonicalized into
+    /// deterministic position order. Attribute roles must agree with their collection
+    /// (`key_attributes` holds only key positions and `include_attributes` holds only payload
+    /// positions), the combined one-based positions must be contiguous with every key position
+    /// preceding every INCLUDE position, and INCLUDE attributes must be simple columns because
+    /// PostgreSQL `INCLUDE` does not accept expressions. Every simple column attribute is validated
+    /// against the owning relation columns when the index is attached to a relation observation.
     pub fn new(
         index_name: impl Into<String>,
         is_unique: bool,
@@ -412,6 +412,9 @@ impl IndexObservation {
         let layout_error = || ObservationError::InvalidObservationField {
             field: "index_attribute_layout",
         };
+        if key_attributes.is_empty() {
+            return Err(layout_error());
+        }
         for (expected_position, attribute) in (1u32..).zip(key_attributes) {
             if attribute.kind() != IndexAttributeKind::Key
                 || attribute.position() != expected_position
