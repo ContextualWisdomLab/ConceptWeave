@@ -177,6 +177,43 @@ impl OperatorClassOption {
     }
 }
 
+/// One exact index access-method storage option from `pg_class.reloptions`.
+///
+/// PostgreSQL exposes index storage configuration as access-method-specific `keyword=value` text.
+/// ConceptWeave preserves exact names and values without decoding provider semantics. Option-array
+/// order is not semantic identity; [`IndexObservation::with_storage_options`] canonicalizes options
+/// by exact name while distinguishing unobserved state from an explicitly observed empty set.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IndexStorageOption {
+    name: String,
+    value: String,
+}
+
+impl IndexStorageOption {
+    /// Creates one exact index storage option without interpreting the access-method-specific value.
+    pub fn new(
+        name: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        let name = name.into();
+        let value = value.into();
+        validate_nonblank(&name, "index_storage_option_name")?;
+        Ok(Self { name, value })
+    }
+
+    /// Returns the exact storage-option name.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Returns the exact storage-option value, including an empty value when observed.
+    #[must_use]
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+}
+
 /// One exact PostgreSQL per-key index semantic record.
 ///
 /// PostgreSQL 18 carries one `pg_index.indcollation`, `indclass`, and `indoption` entry for each of
@@ -600,6 +637,7 @@ pub struct IndexObservation {
     is_unique: bool,
     nulls_not_distinct: Option<bool>,
     catalog_flags: Option<IndexCatalogFlags>,
+    storage_options: Option<Vec<IndexStorageOption>>,
     access_method: Option<String>,
     key_attributes: Vec<IndexAttributeObservation>,
     include_attributes: Vec<IndexAttributeObservation>,
@@ -646,6 +684,7 @@ impl IndexObservation {
             is_unique,
             nulls_not_distinct,
             catalog_flags: None,
+            storage_options: None,
             access_method: None,
             key_attributes,
             include_attributes,
@@ -738,6 +777,31 @@ impl IndexObservation {
         Ok(self)
     }
 
+    /// Records exact observed index `pg_class.reloptions` in deterministic option-name order.
+    ///
+    /// PostgreSQL defines these options at the access-method boundary. This generic contract retains
+    /// exact names and values without interpretation, rejects contradictory duplicate names, and
+    /// keeps `Some([])` distinct from `None` so an observed empty option set does not become
+    /// indistinguishable from unobserved catalog state.
+    pub fn with_storage_options(
+        mut self,
+        mut storage_options: Vec<IndexStorageOption>,
+    ) -> Result<Self, ObservationError> {
+        storage_options.sort_by(|left, right| {
+            (left.name(), left.value()).cmp(&(right.name(), right.value()))
+        });
+        if storage_options
+            .windows(2)
+            .any(|pair| pair[0].name() == pair[1].name())
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "index_storage_options",
+            });
+        }
+        self.storage_options = Some(storage_options);
+        Ok(self)
+    }
+
     /// Records an exact server-rendered partial predicate, never original DDL.
     #[must_use]
     pub fn with_predicate(mut self, predicate: impl Into<String>) -> Self {
@@ -802,6 +866,12 @@ impl IndexObservation {
     #[must_use]
     pub const fn catalog_flags(&self) -> Option<&IndexCatalogFlags> {
         self.catalog_flags.as_ref()
+    }
+
+    /// Returns observed index storage options in deterministic exact-name order.
+    #[must_use]
+    pub fn storage_options(&self) -> Option<&[IndexStorageOption]> {
+        self.storage_options.as_deref()
     }
 
     /// Returns the exact observed access method name, or `None` when it was not captured.
@@ -2243,6 +2313,17 @@ fn encode_index(hasher: &mut Sha256, index: &IndexObservation) {
             encode_bool(hasher, flags.clustered());
             encode_bool(hasher, flags.check_xmin());
             encode_bool(hasher, flags.replica_identity());
+        }
+    }
+    match index.storage_options() {
+        None => hasher.update([0]),
+        Some(options) => {
+            hasher.update([1]);
+            encode_len(hasher, options.len());
+            for option in options {
+                encode_str(hasher, option.name());
+                encode_str(hasher, option.value());
+            }
         }
     }
     encode_optional_str(hasher, index.access_method());
