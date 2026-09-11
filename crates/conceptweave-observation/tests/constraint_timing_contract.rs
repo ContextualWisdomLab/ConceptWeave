@@ -11,7 +11,7 @@ fn catalog_type(type_name: &str) -> QualifiedTypeName {
     QualifiedTypeName::new("pg_catalog", type_name).expect("catalog type coordinate is valid")
 }
 
-fn relation(constraint: TableConstraintObservation) -> RelationObservation {
+fn base_relation() -> RelationObservation {
     RelationObservation::new(
         "public",
         "document",
@@ -27,8 +27,12 @@ fn relation(constraint: TableConstraintObservation) -> RelationObservation {
         .expect("column fixture is valid")],
     )
     .expect("relation fixture is valid")
-    .with_constraints(vec![constraint])
-    .expect("constraint fixture is valid")
+}
+
+fn relation(constraint: TableConstraintObservation) -> RelationObservation {
+    base_relation()
+        .with_constraints(vec![constraint])
+        .expect("constraint fixture is valid")
 }
 
 fn primary_key() -> TableConstraintObservation {
@@ -130,7 +134,7 @@ fn unique_deferrability_changes_governed_identity() {
 
 #[test]
 fn observed_empty_timing_inventory_differs_from_unobserved() {
-    let relations = vec![relation(primary_key())];
+    let relations = vec![base_relation()];
     let unobserved = PostgresSchemaSnapshotV3::new(
         &support::authorized_source("warehouse_primary", &["public"]),
         "postgres_introspector_v3",
@@ -149,11 +153,24 @@ fn observed_empty_timing_inventory_differs_from_unobserved() {
         Vec::new(),
         Vec::new(),
     )
-    .expect("explicitly observed-empty timing family is valid");
+    .expect("explicitly observed-empty timing family is valid when no key constraints exist");
 
     assert_ne!(unobserved.snapshot_digest(), observed_empty.snapshot_digest());
     assert_eq!(unobserved.constraint_timings(), None);
     assert_eq!(observed_empty.constraint_timings(), Some(&[][..]));
+}
+
+#[test]
+fn observed_timing_inventory_must_cover_every_key_constraint() {
+    let error = snapshot(primary_key(), Vec::new())
+        .expect_err("observed timing family cannot silently omit a primary key");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "constraint_timing_completeness",
+        }
+    );
 }
 
 #[test]
