@@ -103,7 +103,8 @@ impl QualifiedCollationName {
 ///
 /// A PostgreSQL index key binds to one operator class from `pg_opclass`, addressed by its exact
 /// namespace and name. The coordinate never relies on `search_path` resolution and never uses a
-/// catalog OID as governed identity.
+/// catalog OID as governed identity. The owning index access method is framed separately by
+/// [`IndexObservation`], matching PostgreSQL's method-relative operator-class namespace.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct QualifiedOperatorClassName {
     schema_name: String,
@@ -139,6 +140,43 @@ impl QualifiedOperatorClassName {
     }
 }
 
+/// One exact PostgreSQL operator-class parameter attached to an index key.
+///
+/// PostgreSQL exposes operator-class parameters as attribute-level `keyword=value` options. The
+/// generic representation preserves the exact option name and value without interpreting
+/// access-method- or extension-specific semantics. Option-array order is not semantic identity;
+/// [`IndexKeySemantics::with_operator_class_options`] canonicalizes options by exact name.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OperatorClassOption {
+    name: String,
+    value: String,
+}
+
+impl OperatorClassOption {
+    /// Creates one operator-class option from exact catalog text.
+    pub fn new(
+        name: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        let name = name.into();
+        let value = value.into();
+        validate_nonblank(&name, "operator_class_option_name")?;
+        Ok(Self { name, value })
+    }
+
+    /// Returns the exact option name.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Returns the exact option value, including an empty value when PostgreSQL reports one.
+    #[must_use]
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+}
+
 /// One exact PostgreSQL per-key index semantic record.
 ///
 /// PostgreSQL 18 carries one `pg_index.indcollation`, `indclass`, and `indoption` entry for each of
@@ -146,12 +184,14 @@ impl QualifiedOperatorClassName {
 /// type or operator class; the operator class is required for every key. The raw `indoption` bit
 /// pattern is preserved verbatim because its meaning is defined by the owning index access method,
 /// not by this generic representation, so it is never decoded as B-tree-specific behavior.
+/// Operator-class parameters are retained separately as exact option name/value evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexKeySemantics {
     position: u32,
     collation: Option<QualifiedCollationName>,
     operator_class: QualifiedOperatorClassName,
     access_method_options: u16,
+    operator_class_options: Vec<OperatorClassOption>,
 }
 
 impl IndexKeySemantics {
@@ -170,7 +210,32 @@ impl IndexKeySemantics {
             collation,
             operator_class,
             access_method_options,
+            operator_class_options: Vec::new(),
         })
+    }
+
+    /// Records exact operator-class parameters in deterministic option-name order.
+    ///
+    /// PostgreSQL's catalog exposes these as an attribute-level option array. Array order does not
+    /// create a second semantic identity, while duplicate option names are contradictory evidence
+    /// and therefore fail closed before snapshot construction.
+    pub fn with_operator_class_options(
+        mut self,
+        mut operator_class_options: Vec<OperatorClassOption>,
+    ) -> Result<Self, ObservationError> {
+        operator_class_options.sort_by(|left, right| {
+            (left.name(), left.value()).cmp(&(right.name(), right.value()))
+        });
+        if operator_class_options
+            .windows(2)
+            .any(|pair| pair[0].name() == pair[1].name())
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "operator_class_options",
+            });
+        }
+        self.operator_class_options = operator_class_options;
+        Ok(self)
     }
 
     /// Returns the exact one-based key position this record describes.
@@ -195,6 +260,12 @@ impl IndexKeySemantics {
     #[must_use]
     pub const fn access_method_options(&self) -> u16 {
         self.access_method_options
+    }
+
+    /// Returns operator-class parameters in deterministic exact-name order.
+    #[must_use]
+    pub fn operator_class_options(&self) -> &[OperatorClassOption] {
+        &self.operator_class_options
     }
 }
 
@@ -2096,6 +2167,11 @@ fn encode_index_key_semantics(hasher: &mut Sha256, semantics: &IndexKeySemantics
     encode_str(hasher, operator_class.schema_name());
     encode_str(hasher, operator_class.operator_class_name());
     hasher.update(semantics.access_method_options().to_be_bytes());
+    encode_len(hasher, semantics.operator_class_options().len());
+    for option in semantics.operator_class_options() {
+        encode_str(hasher, option.name());
+        encode_str(hasher, option.value());
+    }
 }
 
 fn encode_index_attribute(hasher: &mut Sha256, attribute: &IndexAttributeObservation) {
