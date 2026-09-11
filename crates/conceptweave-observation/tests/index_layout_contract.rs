@@ -81,6 +81,37 @@ fn index_layout_rejects_expression_include_attributes() {
 }
 
 #[test]
+fn index_layout_rejects_missing_key_attributes() {
+    let empty_error = IndexObservation::new("event_parent_ix", false, None, Vec::new(), Vec::new())
+        .expect_err("PostgreSQL indexes require at least one key attribute");
+    assert_eq!(
+        empty_error,
+        ObservationError::InvalidObservationField {
+            field: "index_attribute_layout",
+        }
+    );
+
+    let include_only_error = IndexObservation::new(
+        "event_parent_ix",
+        false,
+        None,
+        Vec::new(),
+        vec![column_attribute(
+            1,
+            IndexAttributeKind::Include,
+            "event_key",
+        )],
+    )
+    .expect_err("INCLUDE payload cannot substitute for a PostgreSQL index key");
+    assert_eq!(
+        include_only_error,
+        ObservationError::InvalidObservationField {
+            field: "index_attribute_layout",
+        }
+    );
+}
+
+#[test]
 fn index_layout_accepts_contiguous_key_then_include_ordinals() {
     let index = IndexObservation::new(
         "event_parent_ix",
