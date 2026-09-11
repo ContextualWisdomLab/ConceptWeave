@@ -546,8 +546,10 @@ impl IndexObservation {
     /// (`key_attributes` holds only key positions and `include_attributes` holds only payload
     /// positions), the combined one-based positions must be contiguous with every key position
     /// preceding every INCLUDE position, and INCLUDE attributes must be simple columns because
-    /// PostgreSQL `INCLUDE` does not accept expressions. Every simple column attribute is validated
-    /// against the owning relation columns when the index is attached to a relation observation.
+    /// PostgreSQL `INCLUDE` does not accept expressions. `NULLS NOT DISTINCT = true` is admissible
+    /// only for a unique index, matching the PostgreSQL catalog invariant. Every simple column
+    /// attribute is validated against the owning relation columns when the index is attached to a
+    /// relation observation.
     pub fn new(
         index_name: impl Into<String>,
         is_unique: bool,
@@ -557,6 +559,11 @@ impl IndexObservation {
     ) -> Result<Self, ObservationError> {
         let index_name = index_name.into();
         validate_nonblank(&index_name, "index_name")?;
+        if !is_unique && nulls_not_distinct == Some(true) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "nulls_not_distinct",
+            });
+        }
         key_attributes.sort_by_key(IndexAttributeObservation::position);
         include_attributes.sort_by_key(IndexAttributeObservation::position);
         Self::validate_attribute_layout(&key_attributes, &include_attributes)?;
@@ -956,7 +963,7 @@ impl DomainObservation {
         self.collation.as_ref()
     }
 
-    /// Returns observed NOT NULL state, or `None` when it was not captured.
+    /// Returns observed NOT NULL state when observed, or `None` when it was not captured.
     #[must_use]
     pub const fn not_null(&self) -> Option<bool> {
         self.not_null
