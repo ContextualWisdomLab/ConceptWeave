@@ -26,7 +26,7 @@ Fresh 2026-09-11 authority:
 - Foundation #1: `60f14a6e85a83d56c2eea43b34d52b3366bb1735`, OPEN Draft and must ordinary/non-force restack after #35;
 - Source Observation #6: `287165d399c5f54d6c4b4aa3c15497b47de8244b`, OPEN Draft;
 - representation-v3 parent #45: `6b2a8f555725dc79f60432afbc492d6005290a4a`, OPEN Draft on #6;
-- representation/index successor #46: tablespace RED `1a47d6b16838006e5f7a75407e69464740f368b1` is source-repaired by `5021ed6b6fc8c6af136f8560c5d0c80c5da6c7ce` plus export `b56a38de7f5a1c7419fa0ea2105c9cd7422a59a3`; the provisional index-relkind RED was superseded and removed at `96e2b683ad21ebdd1137f618b6f1d2c56ae544c2`; schema-local `pg_class` namespace review `5177885832` -> RED `b820c7b80b6c95e6ae419515882d850d79e578ec` -> source repair `1bede23588956c11500beb9a54f1f617ceb5429f`; index-owner relation-kind review `5178743508` -> RED `f81ae51af614a39e648a9c314776ba79bf99d64e` -> source repair `a8e9fac16896e3e6d48ec5bc20cafae8c855da39`. Native/Product acceptance remains pending.
+- representation/index successor #46: tablespace RED `1a47d6b16838006e5f7a75407e69464740f368b1` is source-repaired by `5021ed6b6fc8c6af136f8560c5d0c80c5da6c7ce` plus export `b56a38de7f5a1c7419fa0ea2105c9cd7422a59a3`; the provisional index-relkind RED was superseded and removed at `96e2b683ad21ebdd1137f618b6f1d2c56ae544c2`; schema-local `pg_class` namespace review `5177885832` -> RED `b820c7b80b6c95e6ae419515882d850d79e578ec` -> source repair `1bede23588956c11500beb9a54f1f617ceb5429f`; index-owner relation-kind review `5178743508` -> RED `f81ae51af614a39e648a9c314776ba79bf99d64e` -> source repair `a8e9fac16896e3e6d48ec5bc20cafae8c855da39`; relation-constraint-kind review `5179341855` -> RED `089df3d4d59a45cd87afd30c4d86390a96c8c674` -> source repair `50b8d05e286181a3d39e88186116a4af173a4285`. Native/Product acceptance remains pending.
 
 Protected central `.github/main` was freshly verified at `cb0872c9a20d5584703dffacca65c096fc034c6c`. `.github#2051@558693e0333e48012beea142f739bc634b0674a7` and stacked `.github#2056@69ae472562c93cc17674af5e2085a58947d3fab8` remain owner prerequisites: reconcile them ordinary/non-force onto current main, preserve terminal-job-set/atomic-wake behavior, land a backward-compatible protected handler, and obtain fresh exact terminal GREEN before unchanged-head #35 acceptance.
 
@@ -51,6 +51,7 @@ Implemented source repair includes:
 - index `pg_class.reltablespace` as first-class resolved tablespace evidence, preserving unobserved vs observed database-default vs explicit named assignment as distinct states;
 - schema-local `pg_class` relation-name consistency across every modeled owning relation and nested index before v3 digest/receipt construction;
 - fail-closed index ownership admission: nested local index evidence is accepted only for ordinary tables, partitioned tables, and materialized views, not views, foreign tables, sequences, or standalone composite-type relations;
+- fail-closed represented constraint admission: ordinary and partitioned tables admit the modeled table constraints; foreign tables admit only modeled CHECK constraints; views, materialized views, sequences, and standalone composite-type relations reject modeled table constraints;
 - deterministic v3 digest framing for the above while frozen v2 framing remains unchanged.
 
 Recent exact repair lineage:
@@ -61,7 +62,8 @@ Recent exact repair lineage:
 - review `5176975409` -> RED `1a47d6b16838006e5f7a75407e69464740f368b1` -> repair `5021ed6b6fc8c6af136f8560c5d0c80c5da6c7ce` -> export `b56a38de7f5a1c7419fa0ea2105c9cd7422a59a3`: preserve exact resolved index tablespace identity without promoting catalog OIDs into the governed contract;
 - review `5177806003` -> provisional RED `d425bdfb00652321367dd1fef0c77930d2ade327` -> superseding review `5177862263` -> removal `96e2b683ad21ebdd1137f618b6f1d2c56ae544c2`: PostgreSQL 18 source proved index `relkind` is a derived invariant, so the impossible same-owner alternative was removed rather than implemented;
 - review `5177885832` -> RED `b820c7b80b6c95e6ae419515882d850d79e578ec` -> repair `1bede23588956c11500beb9a54f1f617ceb5429f` -> exact-current review `5178298921`: enforce PostgreSQL's schema-local `pg_class` relation-name namespace across modeled owning relations and nested indexes without changing frozen v2 or successor coordinate vocabulary;
-- review `5178743508` -> RED `f81ae51af614a39e648a9c314776ba79bf99d64e` -> repair `a8e9fac16896e3e6d48ec5bc20cafae8c855da39`: reject impossible nested index evidence on non-indexable PostgreSQL relation kinds before governed v3 digest/receipt construction while preserving table, partitioned-table, and materialized-view indexes.
+- review `5178743508` -> RED `f81ae51af614a39e648a9c314776ba79bf99d64e` -> repair `a8e9fac16896e3e6d48ec5bc20cafae8c855da39`: reject impossible nested index evidence on non-indexable PostgreSQL relation kinds before governed v3 digest/receipt construction while preserving table, partitioned-table, and materialized-view indexes;
+- review `5179341855` -> RED `089df3d4d59a45cd87afd30c4d86390a96c8c674` -> repair `50b8d05e286181a3d39e88186116a4af173a4285`: reject impossible represented constraint evidence by owning relation kind while preserving table/partitioned-table constraints and foreign-table CHECK evidence.
 
 ### Tablespace repair source-complete
 
@@ -85,6 +87,12 @@ PostgreSQL 18 `CREATE INDEX` defines an index on a table or materialized view. P
 
 Review `5178743508` records the finding. Behavioral RED `f81ae51af614a39e648a9c314776ba79bf99d64e` admits indexed `Table`, `PartitionedTable`, and `MaterializedView` fixtures while requiring indexed `View`, `ForeignTable`, `Sequence`, and `CompositeType` fixtures to fail with `index_relation_kind` before snapshot identity. Repair `a8e9fac16896e3e6d48ec5bc20cafae8c855da39` extends the public v3 aggregate admission seam so the relation-kind invariant is enforced before deterministic digest or receipt construction. It does not add a second mutable index-kind field and does not alter frozen v2 identity.
 
+### Relation constraint-kind P1 — source repaired, exact-head acceptance pending
+
+The same aggregate seam previously accepted the modeled `PrimaryKey`, `Unique`, `ForeignKey`, and `Check` constraint variants on every `RelationKind`. That admits catalog states PostgreSQL cannot own. Ordinary and partitioned tables can own the modeled table constraints. PostgreSQL 18 foreign tables support CHECK and NOT NULL constraints; because this representation models NOT NULL at the column boundary rather than as a `TableConstraintObservation` variant, CHECK is the only represented table-constraint variant admissible on a foreign table. Views, materialized views, sequences, and standalone composite-type relations do not own these represented table constraints.
+
+Review `5179341855` records the finding. Behavioral RED `089df3d4d59a45cd87afd30c4d86390a96c8c674` requires table/partitioned-table constraint fixtures and foreign-table CHECK evidence to remain admissible while foreign-table primary-key/unique/foreign-key evidence and any represented constraint on a view, materialized view, sequence, or standalone composite-type relation fail with `relation_constraint_kind`. Repair `50b8d05e286181a3d39e88186116a4af173a4285` enforces that invariant at the public v3 aggregate admission seam before deterministic digest or receipt construction. It does not alter frozen v2 behavior or invent provider-specific mutable state.
+
 Repository-pinned Rust 1.98, strict lint/doc/release/coverage and hosted Product/security/dependency/review evidence must still be produced on one unchanged exact successor before adoption or merge.
 
 Authoritative basis:
@@ -96,6 +104,10 @@ Authoritative basis:
 - PostgreSQL 18 source, `src/backend/catalog/index.c`: index relation kind is derived from the partitioned-create flag.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: Table partitioning*. https://www.postgresql.org/docs/18/ddl-partitioning.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_index*. https://www.postgresql.org/docs/18/catalog-pg-index.html
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE TABLE*. https://www.postgresql.org/docs/18/sql-createtable.html
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: ALTER FOREIGN TABLE*. https://www.postgresql.org/docs/18/sql-alterforeigntable.html
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE VIEW*. https://www.postgresql.org/docs/18/sql-createview.html
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: ALTER MATERIALIZED VIEW*. https://www.postgresql.org/docs/18/sql-altermaterializedview.html
 
 Catalog OIDs may be adapter-local join coordinates but are not governed semantic identity. `pg_get_indexdef`/`pg_get_expr` remain reconstructed provenance text, never the sole semantic carrier.
 
@@ -105,7 +117,7 @@ Catalog OIDs may be adapter-local join coordinates but are not governed semantic
 
 - `cargo fmt --all --check`;
 - strict workspace/all-target Clippy with warnings denied;
-- workspace tests including frozen-v2 and all retained v3 index/schema namespace/relation-kind contracts;
+- workspace tests including frozen-v2 and all retained v3 index/schema namespace/relation-kind/constraint-kind contracts;
 - rustdoc/doc tests and release build;
 - owned production docstring/test/edge-case coverage requirements;
 - applicable Product/security/dependency/review workflows bound to the exact head.
@@ -114,7 +126,7 @@ Hosted or local execution produced for predecessor heads does not transfer. Draf
 
 ## Concrete PostgreSQL adapter boundary
 
-Do not attach transport while exact-head representation acceptance is absent. After representation GREEN and ordinary/non-force adoption through #45/#6, the PostgreSQL adapter must use a maintained patched Rust driver pinned by immutable lock coordinate and passing cargo-deny/SBOM review; resolve least-privilege credentials only for the authorized source key+binding; reject stale binding before credential/source I/O; use one explicit `REPEATABLE READ READ ONLY` catalog transaction; resolve catalog OIDs to exact governed coordinates before crossing the Anti-Corruption Layer; preserve complete schema/index evidence including tablespace; validate both index-owning relation kind and catalog index `pg_class.relkind` against the owning relation-derived invariant; consume one non-resetting operation budget across connect/query/cancellation; enforce policy-admitted row/byte/concurrency ceilings; and complete-or-fail snapshot construction.
+Do not attach transport while exact-head representation acceptance is absent. After representation GREEN and ordinary/non-force adoption through #45/#6, the PostgreSQL adapter must use a maintained patched Rust driver pinned by immutable lock coordinate and passing cargo-deny/SBOM review; resolve least-privilege credentials only for the authorized source key+binding; reject stale binding before credential/source I/O; use one explicit `REPEATABLE READ READ ONLY` catalog transaction; resolve catalog OIDs to exact governed coordinates before crossing the Anti-Corruption Layer; preserve complete schema/index evidence including tablespace; validate index-owning relation kind, catalog index `pg_class.relkind` against the owning relation-derived invariant, and represented constraints against relation-kind rules; consume one non-resetting operation budget across connect/query/cancellation; enforce policy-admitted row/byte/concurrency ceilings; and complete-or-fail snapshot construction.
 
 ## Capability status
 
@@ -122,7 +134,7 @@ Do not attach transport while exact-head representation acceptance is absent. Af
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | Canonical owner seams remain unchanged. |
 | Truth/publication lifecycle | SOURCE_REPAIRED_PENDING_PROTECTED_EVIDENCE | No protected immutable semantic release exists. |
-| Source Observation | REPRESENTATION_V3_RELATION_INVARIANTS_SOURCE_REPAIRED | Namespace RED `b820c7b...` and index-owner RED `f81ae51...` have production repairs; exact-head Rust/Product/security/dependency/review evidence remains required. |
+| Source Observation | REPRESENTATION_V3_RELATION_INVARIANTS_SOURCE_REPAIRED | Namespace RED `b820c7b...`, index-owner RED `f81ae51...`, and constraint-kind RED `089df3d...` have production repairs; exact-head Rust/Product/security/dependency/review evidence remains required. |
 | Product CI | BLOCKED_OWNER_RECONCILIATION | #35 waits on central backward-compatible handler/current-main reconciliation and exact terminal GREEN. |
 | Quality gate | EXACT_HEAD_PENDING | Keep #46 Draft until one unchanged successor produces required Rust/Product/security/review acceptance. |
 | Release | NOT_STARTED | Version/CHANGELOG/tag/package/immutable semantic release/SBOM/provenance/reproducibility/rollback remain mandatory. |
