@@ -26,7 +26,7 @@ Fresh 2026-09-11 authority:
 - Foundation #1: `60f14a6e85a83d56c2eea43b34d52b3366bb1735`, OPEN Draft and must ordinary/non-force restack after #35;
 - Source Observation #6: `287165d399c5f54d6c4b4aa3c15497b47de8244b`, OPEN Draft;
 - representation-v3 parent #45: `6b2a8f555725dc79f60432afbc492d6005290a4a`, OPEN Draft on #6;
-- representation/index successor #46: tablespace RED `1a47d6b16838006e5f7a75407e69464740f368b1` is source-repaired by `5021ed6b6fc8c6af136f8560c5d0c80c5da6c7ce` plus export `b56a38de7f5a1c7419fa0ea2105c9cd7422a59a3`; the provisional index-relkind RED was superseded and removed at `96e2b683ad21ebdd1137f618b6f1d2c56ae544c2`; review `5177885832` then identified a real schema-local `pg_class` namespace invariant gap and RED `b820c7b80b6c95e6ae419515882d850d79e578ec` now exercises it.
+- representation/index successor #46: tablespace RED `1a47d6b16838006e5f7a75407e69464740f368b1` is source-repaired by `5021ed6b6fc8c6af136f8560c5d0c80c5da6c7ce` plus export `b56a38de7f5a1c7419fa0ea2105c9cd7422a59a3`; the provisional index-relkind RED was superseded and removed at `96e2b683ad21ebdd1137f618b6f1d2c56ae544c2`; review `5177885832` identified the real schema-local `pg_class` namespace gap, RED `b820c7b80b6c95e6ae419515882d850d79e578ec` exercised it, and source repair `1bede23588956c11500beb9a54f1f617ceb5429f` now enforces one schema-local relation/index namespace at the public v3 aggregate seam. Exact-current review `5178298921` keeps native/Product acceptance pending.
 
 Protected central `.github/main` was freshly verified at `cb0872c9a20d5584703dffacca65c096fc034c6c`. `.github#2051@558693e0333e48012beea142f739bc634b0674a7` and stacked `.github#2056@69ae472562c93cc17674af5e2085a58947d3fab8` remain owner prerequisites: reconcile them ordinary/non-force onto current main, preserve terminal-job-set/atomic-wake behavior, land a backward-compatible protected handler, and obtain fresh exact terminal GREEN before unchanged-head #35 acceptance.
 
@@ -49,6 +49,7 @@ Implemented source repair includes:
 - first-class `pg_index` flags `indisprimary`, `indisexclusion`, `indimmediate`, `indisclustered`, `indcheckxmin`, `indisreplident`;
 - index `pg_class.reloptions` as canonical exact name/value evidence with unobserved state distinct from an observed empty set;
 - index `pg_class.reltablespace` as first-class resolved tablespace evidence, preserving unobserved vs observed database-default vs explicit named assignment as distinct states;
+- schema-local `pg_class` relation-name consistency across every modeled owning relation and nested index before v3 digest/receipt construction;
 - deterministic v3 digest framing for the above while frozen v2 framing remains unchanged.
 
 Recent exact repair lineage:
@@ -58,7 +59,7 @@ Recent exact repair lineage:
 - RED `f796bf51110863e98e5d4d16a7f7bbea689b4705` -> repair `70455fdfbc28dffc8f306619e806b79ca9678693` -> public export `3eab943ad85584b535417b770f05c67192a7a081`: preserve `pg_class.reloptions` identity, canonicalize option order, reject duplicate names, and distinguish unobserved from observed-empty state;
 - review `5176975409` -> RED `1a47d6b16838006e5f7a75407e69464740f368b1` -> repair `5021ed6b6fc8c6af136f8560c5d0c80c5da6c7ce` -> export `b56a38de7f5a1c7419fa0ea2105c9cd7422a59a3`: preserve exact resolved index tablespace identity without promoting catalog OIDs into the governed contract;
 - review `5177806003` -> provisional RED `d425bdfb00652321367dd1fef0c77930d2ade327` -> superseding review `5177862263` -> removal `96e2b683ad21ebdd1137f618b6f1d2c56ae544c2`: PostgreSQL 18 source proved index `relkind` is a derived invariant, so the impossible same-owner alternative was removed rather than implemented;
-- review `5177885832` -> RED `b820c7b80b6c95e6ae419515882d850d79e578ec`: require the successor snapshot to enforce PostgreSQL's schema-local `pg_class` relation-name namespace across owning relations and nested indexes.
+- review `5177885832` -> RED `b820c7b80b6c95e6ae419515882d850d79e578ec` -> repair `1bede23588956c11500beb9a54f1f617ceb5429f` -> exact-current review `5178298921`: enforce PostgreSQL's schema-local `pg_class` relation-name namespace across modeled owning relations and nested indexes without changing frozen v2 or successor coordinate vocabulary.
 
 ### Tablespace repair source-complete
 
@@ -68,15 +69,15 @@ PostgreSQL 18 `pg_class.reltablespace` is material index configuration. The prod
 
 PostgreSQL 18 `DefineIndex` derives the partitioned-index decision from the owning relation's `RELKIND_PARTITIONED_TABLE`, sets `INDEX_CREATE_PARTITIONED`, and `index_create` maps that flag to `RELKIND_PARTITIONED_INDEX` versus `RELKIND_INDEX`. Because `RelationObservation.kind` is already first-class and framed into v3 identity, adding an independently mutable `IndexRelationKind` would duplicate a derived invariant and admit contradictory state. The future adapter must observe the catalog index `relkind` and fail closed if it disagrees with the owning relation-derived invariant, rather than persisting a redundant second source of truth.
 
-### Schema-local pg_class namespace P1 — executable RED active
+### Schema-local pg_class namespace P1 — source repaired, exact-head acceptance pending
 
 PostgreSQL stores tables, indexes, sequences, views, materialized views, partitioned relations and other relation-like objects in `pg_class`. PostgreSQL's catalog declares a unique index `pg_class_relname_nsp_index` over `(relname, relnamespace)`. Consequently an index name cannot be duplicated under two different tables in the same schema, and an index cannot share a schema-local `pg_class` name with another relation. The same name remains legal in a different schema.
 
-Current v3 validation checks duplicate owning relation names and duplicate index names only inside one `RelationObservation`; it does not validate the shared PostgreSQL namespace across all relation names plus nested index names. That allows governed snapshots which PostgreSQL cannot contain.
+Review `5177885832` recorded that the prior v3 constructor validated duplicate owning relation names and duplicate indexes only inside one `RelationObservation`. Behavioral RED `b820c7b80b6c95e6ae419515882d850d79e578ec` requires two same-schema collision cases to fail while preserving same-name indexes across different schemas.
 
-Review `5177885832` records the finding. RED `b820c7b80b6c95e6ae419515882d850d79e578ec` adds `schema_relation_namespace_contract.rs` using existing public APIs only. It requires snapshot construction to fail when two relations in one schema each carry `shared_idx`, and when an index name collides with another relation name in that schema; the same `shared_idx` in `public` and `archive` must remain valid. This is a behavioral RED, not a compile-only placeholder.
+Repair `1bede23588956c11500beb9a54f1f617ceb5429f` makes the public `PostgresSchemaSnapshotV3` the owner-level aggregate seam instead of directly re-exporting the private representation constructor. Before delegating to deterministic v3 canonicalization it builds one exact `(schema_name, relation_or_index_name)` set from every owning relation and nested index. A duplicate fails closed before digest or receipt construction; identical names in different schemas remain legal. The private representation type remains inaccessible to consumers, matching the existing v2 owner-wrapper pattern. Frozen v2 identity and successor coordinate vocabulary are unchanged.
 
-The minimal causal repair belongs in snapshot canonicalization: validate one schema-local set containing every modeled `pg_class` relation name and every nested index name, reject duplicate coordinates before digest/receipt construction, and keep identical names legal across different schemas. Do not change successor coordinate vocabulary, source object ownership or frozen v2.
+Exact-current review `5178298921` recognizes source repair only. Repository-pinned Rust 1.98, strict lint/doc/release/coverage and hosted Product/security/dependency/review evidence must still be produced on one unchanged exact successor before adoption or merge.
 
 Authoritative basis:
 
@@ -91,7 +92,7 @@ Catalog OIDs may be adapter-local join coordinates but are not governed semantic
 
 ## Representation acceptance still required
 
-#46/#45/#6 cannot claim representation GREEN while the schema-local namespace RED is active. After its minimal production repair, one unchanged exact successor must pass repository-pinned Rust 1.98:
+#46/#45/#6 cannot claim representation GREEN merely because the schema-local namespace source is repaired. One unchanged exact #46 successor must pass repository-pinned Rust 1.98:
 
 - `cargo fmt --all --check`;
 - strict workspace/all-target Clippy with warnings denied;
@@ -104,7 +105,7 @@ Hosted or local execution produced for predecessor heads does not transfer. Draf
 
 ## Concrete PostgreSQL adapter boundary
 
-Do not attach transport while representation is RED-active or exact-head acceptance is absent. After representation GREEN and ordinary/non-force adoption through #45/#6, the PostgreSQL adapter must use a maintained patched Rust driver pinned by immutable lock coordinate and passing cargo-deny/SBOM review; resolve least-privilege credentials only for the authorized source key+binding; reject stale binding before credential/source I/O; use one explicit `REPEATABLE READ READ ONLY` catalog transaction; resolve catalog OIDs to exact governed coordinates before crossing the Anti-Corruption Layer; preserve complete schema/index evidence including tablespace; validate index `pg_class.relkind` against the owning relation-derived invariant; consume one non-resetting operation budget across connect/query/cancellation; enforce policy-admitted row/byte/concurrency ceilings; and complete-or-fail snapshot construction.
+Do not attach transport while exact-head representation acceptance is absent. After representation GREEN and ordinary/non-force adoption through #45/#6, the PostgreSQL adapter must use a maintained patched Rust driver pinned by immutable lock coordinate and passing cargo-deny/SBOM review; resolve least-privilege credentials only for the authorized source key+binding; reject stale binding before credential/source I/O; use one explicit `REPEATABLE READ READ ONLY` catalog transaction; resolve catalog OIDs to exact governed coordinates before crossing the Anti-Corruption Layer; preserve complete schema/index evidence including tablespace; validate index `pg_class.relkind` against the owning relation-derived invariant; consume one non-resetting operation budget across connect/query/cancellation; enforce policy-admitted row/byte/concurrency ceilings; and complete-or-fail snapshot construction.
 
 ## Capability status
 
@@ -112,19 +113,18 @@ Do not attach transport while representation is RED-active or exact-head accepta
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | Canonical owner seams remain unchanged. |
 | Truth/publication lifecycle | SOURCE_REPAIRED_PENDING_PROTECTED_EVIDENCE | No protected immutable semantic release exists. |
-| Source Observation | REPRESENTATION_V3_PG_CLASS_NAMESPACE_RED_ACTIVE | Existing index/tablespace repairs are retained; RED `b820c7b...` requires schema-local `pg_class` name consistency before representation can return to GREEN. |
+| Source Observation | REPRESENTATION_V3_NAMESPACE_SOURCE_REPAIRED | RED `b820c7b...` has production repair `1bede235...`; exact-head Rust/Product/security/dependency/review evidence remains required. |
 | Product CI | BLOCKED_OWNER_RECONCILIATION | #35 waits on central backward-compatible handler/current-main reconciliation and exact terminal GREEN. |
-| Quality gate | RED_ACTIVE_THEN_EXACT_HEAD | Repair namespace canonicalization first; every later head movement resets Rust/Product/security/review acceptance. |
+| Quality gate | EXACT_HEAD_PENDING | Keep #46 Draft until one unchanged successor produces required Rust/Product/security/review acceptance. |
 | Release | NOT_STARTED | Version/CHANGELOG/tag/package/immutable semantic release/SBOM/provenance/reproducibility/rollback remain mandatory. |
 
 ## Current causal sequence
 
-1. Repair #46's schema-local `pg_class` namespace RED in snapshot canonicalization without changing frozen v2 or coordinate vocabulary.
-2. On that unchanged exact #46 successor, obtain repository-pinned Rust 1.98 plus applicable hosted Product/security/dependency/review acceptance. If any test/lint/doc failure is real, repair causally and restart exact-head evidence.
-3. Ordinary/non-force adopt verified #46 into #45 and then #6; do not transfer predecessor GREEN.
-4. In parallel, central owner lands the backward-compatible handler, reconciles #2051/#2056 onto current protected `.github/main`, obtains terminal GREEN, then unchanged-head #35 receives fresh acceptance and merges normally.
-5. Foundation ordinary/non-force restacks after #35; descendants consume only released/versioned owner contracts.
-6. Only after Source Observation representation and protected prerequisites are current, add the bounded PostgreSQL adapter and frozen conformance fixture.
-7. Continue ontology/semantic discovery, alignment, deterministic validation, independent evaluation, steward review and immutable publication under canonical owner boundaries. Production LLM calls remain behind released `contextual-orchestrator` contracts.
+1. Hold #46 source stable and obtain repository-pinned Rust 1.98 plus applicable hosted Product/security/dependency/review acceptance on the unchanged exact successor. If any test/lint/doc failure is real, repair causally and restart exact-head evidence.
+2. Ordinary/non-force adopt verified #46 into #45 and then #6; do not transfer predecessor GREEN.
+3. In parallel, central owner lands the backward-compatible handler, reconciles #2051/#2056 onto current protected `.github/main`, obtains terminal GREEN, then unchanged-head #35 receives fresh acceptance and merges normally.
+4. Foundation ordinary/non-force restacks after #35; descendants consume only released/versioned owner contracts.
+5. Only after Source Observation representation and protected prerequisites are current, add the bounded PostgreSQL adapter and frozen conformance fixture.
+6. Continue ontology/semantic discovery, alignment, deterministic validation, independent evaluation, steward review and immutable publication under canonical owner boundaries. Production LLM calls remain behind released `contextual-orchestrator` contracts.
 
 Adapters stay outside the core domain model and external DTOs cross explicit Anti-Corruption Layers. Source Observation facts are evidence, not source-system business truth. Published semantic truth is immutable; corrections create a new release plus supersession evidence.
