@@ -3,15 +3,43 @@ use conceptweave_observation::{
     ConstraintPeriodObservation, ConstraintTimingObservation, ForeignKeyAction,
     ForeignKeyDeferrability, ForeignKeyMatchType, ForeignKeyObservation,
     ForeignKeyReferenceBehavior, IndexAttributeKind, IndexAttributeObservation, IndexCatalogFlags,
-    IndexObservation, ObservationError, PostgresSchemaSnapshotV3, PostgresTypeKind,
-    PrimaryKeyObservation, QualifiedTypeName, RelationKind, RelationObservation,
-    TableConstraintObservation, TypeKindObservation, UniqueConstraintObservation,
+    IndexKeySemantics, IndexObservation, ObservationError, PostgresSchemaSnapshotV3,
+    PostgresTypeKind, PrimaryKeyObservation, QualifiedOperatorClassName, QualifiedTypeName,
+    RelationKind, RelationObservation, TableConstraintObservation, TypeKindObservation,
+    UniqueConstraintObservation,
 };
 
 mod support;
 
 fn catalog_type(type_name: &str) -> QualifiedTypeName {
     QualifiedTypeName::new("pg_catalog", type_name).expect("catalog type coordinate is valid")
+}
+
+fn operator_class(schema_name: &str, operator_class_name: &str) -> QualifiedOperatorClassName {
+    QualifiedOperatorClassName::new(schema_name, operator_class_name)
+        .expect("operator-class coordinate is valid")
+}
+
+fn key_semantics(columns: &[&str], access_method: &str) -> Vec<IndexKeySemantics> {
+    columns
+        .iter()
+        .enumerate()
+        .map(|(index, column_name)| {
+            let operator_class = match (*column_name, access_method) {
+                ("document_id", "gist") => operator_class("public", "gist_int8_ops"),
+                ("document_id", _) => operator_class("pg_catalog", "int8_ops"),
+                ("valid_during", _) => operator_class("pg_catalog", "range_ops"),
+                _ => panic!("unsupported fixture key column {column_name}"),
+            };
+            IndexKeySemantics::new(
+                u32::try_from(index + 1).expect("fixture position fits u32"),
+                None,
+                operator_class,
+                0,
+            )
+            .expect("key-semantics fixture is valid")
+        })
+        .collect()
 }
 
 fn temporal_type_kinds() -> Vec<TypeKindObservation> {
@@ -83,6 +111,8 @@ fn backing_index(
     IndexObservation::new(name, true, Some(false), attributes, Vec::new())
         .expect("backing-index fixture is structurally valid")
         .with_access_method(access_method)
+        .with_key_semantics(key_semantics(columns, access_method))
+        .expect("one semantic record matches each backing-index key")
         .with_catalog_flags(IndexCatalogFlags::new(
             primary,
             exclusion,
@@ -92,6 +122,9 @@ fn backing_index(
             false,
         ))
         .expect("catalog-flag fixture is coherent")
+        .with_ready(true)
+        .with_valid(true)
+        .with_live(true)
 }
 
 fn ordinary_unique_relation() -> RelationObservation {
