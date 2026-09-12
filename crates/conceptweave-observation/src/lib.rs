@@ -171,10 +171,10 @@ impl PostgresSchemaSnapshotV3 {
 
     /// Creates a deterministic v3 snapshot with explicitly observed PostgreSQL type-kind evidence.
     ///
-    /// This constructor is the compatibility seam for direct user-defined range and multirange
-    /// coordinates. Public evidence retains the exact source binding while the private legacy v3
-    /// validator receives a bounded projection for type kinds it did not originally model. The
-    /// original binding, direct `pg_type.typtype`, domain base, and `pg_range` reciprocity are all
+    /// This constructor is the compatibility seam for direct user-defined range, multirange, and
+    /// base-type coordinates. Public evidence retains the exact source binding while the private
+    /// legacy v3 validator receives a bounded projection for type kinds it did not originally model.
+    /// The original binding, direct `pg_type.typtype`, domain base, and `pg_range` reciprocity are all
     /// bound into a separate successor digest domain before any temporal semantics can be admitted.
     pub fn new_with_type_kinds(
         authorized_request: &AuthorizedObservationRequest,
@@ -186,7 +186,8 @@ impl PostgresSchemaSnapshotV3 {
         type_kinds: Vec<TypeKindObservation>,
     ) -> Result<Self, ObservationError> {
         validate_schema_relation_invariants(&relations)?;
-        let type_kinds = canonicalize_type_kind_observations(&relations, &domains, &enums, type_kinds)?;
+        let type_kinds =
+            canonicalize_type_kind_observations(&relations, &domains, &enums, type_kinds)?;
         validate_type_bindings_with_type_kinds(&relations, &domains, &enums, &type_kinds)?;
 
         let projected_relations = relations
@@ -214,7 +215,8 @@ impl PostgresSchemaSnapshotV3 {
                 .cmp(&(right.schema_name(), right.relation_name()))
         });
         domains.sort_by(|left, right| {
-            (left.schema_name(), left.domain_name()).cmp(&(right.schema_name(), right.domain_name()))
+            (left.schema_name(), left.domain_name())
+                .cmp(&(right.schema_name(), right.domain_name()))
         });
         enums.sort_by(|left, right| {
             (left.schema_name(), left.enum_name()).cmp(&(right.schema_name(), right.enum_name()))
@@ -344,7 +346,8 @@ impl PostgresSchemaSnapshotV3 {
                 .cmp(&(right.schema_name(), right.relation_name()))
         });
         domains.sort_by(|left, right| {
-            (left.schema_name(), left.domain_name()).cmp(&(right.schema_name(), right.domain_name()))
+            (left.schema_name(), left.domain_name())
+                .cmp(&(right.schema_name(), right.domain_name()))
         });
         enums.sort_by(|left, right| {
             (left.schema_name(), left.enum_name()).cmp(&(right.schema_name(), right.enum_name()))
@@ -403,9 +406,9 @@ impl PostgresSchemaSnapshotV3 {
     /// Adds source-authoritative PostgreSQL type-kind/domain-base/range-pair evidence.
     ///
     /// The family must be attached before constraint timing or period evidence so optional family
-    /// order cannot create a second identity for the same source facts. Direct user-defined range or
-    /// multirange column bindings that the private compatibility validator cannot represent must use
-    /// [`Self::new_with_type_kinds`] instead.
+    /// order cannot create a second identity for the same source facts. Direct user-defined base,
+    /// range, or multirange column bindings that the private compatibility validator cannot represent
+    /// must use [`Self::new_with_type_kinds`] instead.
     pub fn with_observed_type_kinds(
         mut self,
         type_kinds: Vec<TypeKindObservation>,
@@ -556,7 +559,8 @@ impl PostgresSchemaSnapshotV3 {
     /// family was not observed.
     #[must_use]
     pub fn type_kinds(&self) -> Option<&[TypeKindObservation]> {
-        self.type_kinds_observed.then_some(self.type_kinds.as_slice())
+        self.type_kinds_observed
+            .then_some(self.type_kinds.as_slice())
     }
 
     /// Returns explicitly observed PRIMARY KEY/UNIQUE timing, or `None` when that catalog family was
@@ -787,15 +791,19 @@ fn canonicalize_type_kind_observations(
             });
         }
 
-        if matches!(type_kind.kind(), PostgresTypeKind::Range | PostgresTypeKind::Multirange) {
+        if matches!(
+            type_kind.kind(),
+            PostgresTypeKind::Range | PostgresTypeKind::Multirange
+        ) {
             let Some(counterpart) = type_kind.range_counterpart() else {
                 return Err(ObservationError::InvalidObservationField {
                     field: "type_kind_range_reciprocity",
                 });
             };
-            let Some(counterpart_observation) = type_kinds.iter().find(|candidate| {
-                same_type_coordinate(candidate.type_name(), counterpart)
-            }) else {
+            let Some(counterpart_observation) = type_kinds
+                .iter()
+                .find(|candidate| same_type_coordinate(candidate.type_name(), counterpart))
+            else {
                 return Err(ObservationError::InvalidObservationField {
                     field: "type_kind_range_reciprocity",
                 });
@@ -868,7 +876,12 @@ fn type_binding_is_resolvable_with_type_kinds(
             && relation.relation_name() == binding.type_name()
     }) || type_kinds.iter().any(|type_kind| {
         same_type_coordinate(type_kind.type_name(), binding)
-            && matches!(type_kind.kind(), PostgresTypeKind::Range | PostgresTypeKind::Multirange)
+            && matches!(
+                type_kind.kind(),
+                PostgresTypeKind::Base
+                    | PostgresTypeKind::Range
+                    | PostgresTypeKind::Multirange
+            )
     })
 }
 
@@ -980,7 +993,12 @@ fn projected_type_kind_binding(
     let needs_projection = binding.schema_name() != POSTGRES_CATALOG_SCHEMA_NAME
         && type_kinds.iter().any(|type_kind| {
             same_type_coordinate(type_kind.type_name(), binding)
-                && matches!(type_kind.kind(), PostgresTypeKind::Range | PostgresTypeKind::Multirange)
+                && matches!(
+                    type_kind.kind(),
+                    PostgresTypeKind::Base
+                        | PostgresTypeKind::Range
+                        | PostgresTypeKind::Multirange
+                )
         });
     if needs_projection {
         QualifiedTypeName::new(POSTGRES_CATALOG_SCHEMA_NAME, "text")
@@ -1164,7 +1182,8 @@ fn canonicalize_constraint_timings(
             relation.constraints().iter().filter_map(move |constraint| {
                 matches!(
                     constraint,
-                    TableConstraintObservation::PrimaryKey(_) | TableConstraintObservation::Unique(_)
+                    TableConstraintObservation::PrimaryKey(_)
+                        | TableConstraintObservation::Unique(_)
                 )
                 .then(|| {
                     (
@@ -1240,9 +1259,8 @@ fn canonicalize_constraint_timings(
                 .all(|(attribute, column_name)| {
                     attribute.attribute_name() == Some(column_name.as_str())
                 });
-        let null_treatment_matches = expected_nulls_not_distinct.is_none_or(|expected| {
-            backing_index.nulls_not_distinct() == Some(expected)
-        });
+        let null_treatment_matches = expected_nulls_not_distinct
+            .is_none_or(|expected| backing_index.nulls_not_distinct() == Some(expected));
         let expected_primary = matches!(constraint, TableConstraintObservation::PrimaryKey(_));
         let expected_immediate = matches!(
             timing.deferrability(),
@@ -1487,7 +1505,10 @@ fn canonicalize_array_type_observations(
 ) -> Result<Vec<ArrayTypeObservation>, ObservationError> {
     let mut scalar_type_names = BTreeSet::new();
     for domain in domains {
-        scalar_type_names.insert((domain.schema_name().to_owned(), domain.domain_name().to_owned()));
+        scalar_type_names.insert((
+            domain.schema_name().to_owned(),
+            domain.domain_name().to_owned(),
+        ));
     }
     for observed_enum in enums {
         scalar_type_names.insert((
@@ -1594,7 +1615,10 @@ fn validate_type_bindings_with_arrays(
 ) -> Result<(), ObservationError> {
     let mut resolvable = BTreeSet::new();
     for domain in domains {
-        resolvable.insert((domain.schema_name().to_owned(), domain.domain_name().to_owned()));
+        resolvable.insert((
+            domain.schema_name().to_owned(),
+            domain.domain_name().to_owned(),
+        ));
     }
     for observed_enum in enums {
         resolvable.insert((
@@ -1655,7 +1679,10 @@ fn projected_type_binding(
     array_types
         .iter()
         .find(|array_type| same_type_coordinate(array_type.array_type(), binding))
-        .map_or_else(|| binding.clone(), |array_type| array_type.element_type().clone())
+        .map_or_else(
+            || binding.clone(),
+            |array_type| array_type.element_type().clone(),
+        )
 }
 
 fn project_relation_array_bindings(
