@@ -1,14 +1,41 @@
 use conceptweave_observation::{
     ColumnObservationV3, ConstraintPeriodObservation, IndexAttributeKind,
-    IndexAttributeObservation, IndexCatalogFlags, IndexObservation, ObservationError,
-    PostgresSchemaSnapshotV3, PrimaryKeyObservation, QualifiedTypeName, RelationKind,
-    RelationObservation, TableConstraintObservation, TypeKindObservation,
+    IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics, IndexObservation,
+    ObservationError, PostgresSchemaSnapshotV3, PrimaryKeyObservation,
+    QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
+    TableConstraintObservation, TypeKindObservation,
 };
 
 mod support;
 
 fn catalog_type(type_name: &str) -> QualifiedTypeName {
     QualifiedTypeName::new("pg_catalog", type_name).expect("catalog type coordinate is valid")
+}
+
+fn operator_class(schema_name: &str, operator_class_name: &str) -> QualifiedOperatorClassName {
+    QualifiedOperatorClassName::new(schema_name, operator_class_name)
+        .expect("operator-class coordinate is valid")
+}
+
+fn key_semantics(key_columns: &[&str]) -> Vec<IndexKeySemantics> {
+    key_columns
+        .iter()
+        .enumerate()
+        .map(|(index, column_name)| {
+            let operator_class = match *column_name {
+                "document_id" => operator_class("public", "gist_int8_ops"),
+                "valid_during" => operator_class("pg_catalog", "range_ops"),
+                _ => panic!("unsupported fixture key column {column_name}"),
+            };
+            IndexKeySemantics::new(
+                u32::try_from(index + 1).expect("fixture position fits u32"),
+                None,
+                operator_class,
+                0,
+            )
+            .expect("key-semantics fixture is valid")
+        })
+        .collect()
 }
 
 fn column(
@@ -90,7 +117,9 @@ fn temporal_backing_index_for_columns(
         Vec::new(),
     )
     .expect("backing-index fixture is structurally valid")
-    .with_access_method("gist");
+    .with_access_method("gist")
+    .with_key_semantics(key_semantics(key_columns))
+    .expect("one semantic record matches each temporal key position");
 
     if with_catalog_flags {
         index
@@ -176,7 +205,11 @@ fn temporal_key_rejects_missing_same_name_backing_index_evidence() {
 
 #[test]
 fn temporal_key_rejects_backing_index_without_material_catalog_flags() {
-    let error = snapshot(temporal_key_relation(Some(temporal_backing_index(false))))
+    let index = temporal_backing_index(false)
+        .with_ready(true)
+        .with_valid(true)
+        .with_live(true);
+    let error = snapshot(temporal_key_relation(Some(index)))
         .with_observed_constraint_periods(vec![temporal_period()])
         .expect_err("WITHOUT OVERLAPS cannot be governed without material pg_index flags");
 
@@ -190,8 +223,13 @@ fn temporal_key_rejects_backing_index_without_material_catalog_flags() {
 
 #[test]
 fn temporal_key_rejects_same_name_gist_exclusion_with_mismatched_key_shape() {
-    let mismatched =
-        temporal_backing_index_for_columns(true, &["valid_during", "document_id"]);
+    let mismatched = temporal_backing_index_for_columns(
+        true,
+        &["valid_during", "document_id"],
+    )
+    .with_ready(true)
+    .with_valid(true)
+    .with_live(true);
     let error = snapshot(temporal_key_relation(Some(mismatched)))
         .with_observed_constraint_periods(vec![temporal_period()])
         .expect_err(
