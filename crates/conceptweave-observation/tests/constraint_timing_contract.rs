@@ -74,6 +74,9 @@ fn backing_index(
         false,
     ))
     .expect("catalog-flag fixture is coherent")
+    .with_ready(true)
+    .with_valid(true)
+    .with_live(true)
 }
 
 fn primary_key() -> TableConstraintObservation {
