@@ -1,6 +1,6 @@
 # Product / Technical Gap Baseline
 
-**Snapshot:** 2026-09-12
+**Snapshot:** 2026-09-13
 
 This is the code-current authority for the active ConceptWeave Source Observation lane. Exact SHAs, reviews, checks, and runs are evidence coordinates, not mutable dependencies. Evidence from an earlier PR head does not transfer after head movement unless the successor reproduces it.
 
@@ -18,7 +18,7 @@ Protected/default ConceptWeave `main` remains `f4f440dd58c77d7cd90dff8a1eb2eeb9a
 
 #46 stays Draft until one unchanged exact head has repository-pinned Rust 1.98 plus applicable Product/security/dependency/review terminal evidence. #45/#6 ordinary/non-force adopt the complete verified child only after #46 exact-head GREEN; partial cherry-picks and duplicate fixes are invalid succession.
 
-Product bootstrap #35 remains `9bb82f041483cb4e0cf1aa1f5450b413309f9a05`, OPEN/non-Draft/mergeable. Central workflow settlement remains owned outside ConceptWeave. Current owner bootstrap `.github#2106@24bb6591ab7df23558cb793b4af60c567ff9da97` is OPEN/non-Draft/mergeable on protected `.github/main@fb17ef556f94f673234aa557254ae52779e9a7b0`. Repository-owned CodeQL/SAST/Python Security/Security/Runtime Quality are GREEN on that exact head, but Required Noema Review and Strix are terminal failures and independent qualifying approval is absent. Central #2115 owns the redaction-safe provider-failure provenance repair exposed by review. No central predecessor GREEN transfers to ConceptWeave and no leaf workflow copy/bypass is permitted.
+Product bootstrap #35 remains `9bb82f041483cb4e0cf1aa1f5450b413309f9a05`, OPEN/non-Draft/mergeable. Central workflow settlement remains owned outside ConceptWeave. Current owner bootstrap `.github#2106@24bb6591ab7df23558cb793b4af60c567ff9da97` remains OPEN/non-Draft/mergeable on protected `.github/main@fb17ef556f94f673234aa557254ae52779e9a7b0`; its repository-owned CodeQL/SAST/Python Security/Security/Runtime Quality gates are GREEN, while Required Noema Review and Strix remain failed and qualifying independent approval is absent. Provider-failure provenance predecessor `.github#2115` is now closed only after verified complete successor carryover. Canonical successor `.github#2114@2a0154bfd0b010e7ac4b2b0a8d085516dbf5f4d9` is OPEN/non-Draft/mergeable: Runtime Quality, Python Security, Security Scan, and Semgrep are GREEN, while its exact-head CodeQL terminal-dispatch cycle and fresh independent review remain gates before ordinary protected integration and #2106 replay. No central predecessor GREEN transfers to ConceptWeave and no leaf workflow copy/bypass is permitted.
 
 ## Source Observation boundary
 
@@ -50,7 +50,7 @@ Review `5186802339` found a remaining cross-family contradiction. `IndexObservat
 
 Behavioral RED commits `681e280fa608b90495a035c04272bc89c546eaca` and `ed4882e7138f8b055b2913a7b25b8089ddc1b95c` cover both positive `conperiod=true` backing evidence and explicitly observed PK/UNIQUE timing. They require each explicitly false lifecycle flag to fail closed while preserving an explicitly ready + valid + live control. Primary-source doctoring is `docs/doctoring/source-observation-key-backing-index-lifecycle.md`.
 
-The minimum causal repair belongs in the shared static backing-index coherence predicate: reject an observed false `ready`, `valid`, or `live` state for a supporting PK/UNIQUE index, so timing and temporal period admission cannot drift. This slice intentionally leaves `None` as unobserved rather than silently treating absence as false or true; lifecycle-family completeness is a separate evidence-contract decision. Constraint timing and `conperiod` remain their own semantic authorities.
+Fresh exact-head source verification on 2026-09-13 reconfirmed that the shared predicate still omits lifecycle state and that `IndexObservation::{ready, valid, live}` each return `Option<bool>`. Coordination comment `5646966886` fixes the minimum causal repair boundary: reject only `Some(false)` in the shared predicate, preserve `None` as unobserved, and let both timing and positive `conperiod` admission inherit the same repair rather than duplicating checks in their callers.
 
 Current state is **behavioral RED active**. Do not classify #46 as source-repaired, native/Product GREEN, Ready, merge-authorized, or released until this contradiction is repaired and exact-head acceptance is regenerated.
 
@@ -79,8 +79,8 @@ Catalog OIDs may only join the captured snapshot. The ACL must cross with exact 
 
 | Area | Status | Evidence / next verification |
 | --- | --- | --- |
-| Source Observation | BEHAVIORAL_RED_ACTIVE | `5186802339 -> 681e280f... -> ed4882e...`; explicit unusable supporting-index lifecycle must fail closed; production repair pending. |
-| Product CI | CENTRAL_REVIEW_REPAIR_PENDING | #35 unchanged; central #2106 has core hosted gates GREEN but Noema/Strix failures and missing independent approval remain. #2115 owns provider-failure provenance repair. |
+| Source Observation | BEHAVIORAL_RED_ACTIVE | `5186802339 -> 681e280f... -> ed4882e... -> 5646966886`; explicit unusable supporting-index lifecycle must fail closed; production repair pending. |
+| Product CI | CENTRAL_REVIEW_REPAIR_PENDING | #35 unchanged; #2106 core hosted gates are GREEN but Noema/Strix failures and independent approval remain. #2115 is retired by verified successor; #2114 now owns bounded provider-failure provenance and still needs exact-head CodeQL terminal success plus fresh independent review. |
 | Quality gate | EXACT_HEAD_ACCEPTANCE_BLOCKED_ON_P1 | Repair the active lifecycle contradiction first; then reacquire unchanged-head Rust 1.98 and hosted gates. |
 | PostgreSQL adapter | BLOCKED_ON_REPRESENTATION_ACCEPTANCE | No transport before representation GREEN and parent adoption. |
 | Publication | NO_PUBLICATION | No protected immutable semantic release exists. |
@@ -91,5 +91,5 @@ Catalog OIDs may only join the captured snapshot. The ACL must cross with exact 
 1. Repair the shared backing-index coherence seam so explicitly observed `indisready=false`, `indisvalid=false`, or `indislive=false` cannot authorize PK/UNIQUE timing or positive `conperiod` evidence; preserve unobserved lifecycle state as unobserved for this slice.
 2. Keep #46 Draft and obtain one unchanged exact-head Rust 1.98/Product/security/dependency/review acceptance; repair only real failures ordinary-forward and restart exact-head acceptance whenever the head moves.
 3. Adopt the complete verified #46 delta ordinary/non-force into #45, obtain fresh parent acceptance, then adopt #45 into #6.
-4. Independently, central `.github#2106@24bb659...` must resolve its Noema/Strix owner-path failures, obtain qualifying independent approval, and land normally; #35 then reacquires fresh unchanged-head acceptance without copied workflows or leaf-side provider workarounds.
+4. Independently, central `.github#2114@2a0154bf...` must finish exact-head CodeQL settlement and fresh independent review, land normally, and reconcile the canonical successor before `.github#2106@24bb659...` is replayed; #2106 still requires Noema/Strix owner-path convergence and qualifying independent approval before landing. #35 then reacquires fresh unchanged-head acceptance without copied workflows or leaf-side provider workarounds.
 5. Only after representation/Product prerequisites are GREEN may the bounded PostgreSQL adapter proceed, followed by deterministic validation, independent evaluation, steward review, and immutable publication under canonical owner boundaries.
