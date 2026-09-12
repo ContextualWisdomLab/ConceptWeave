@@ -496,6 +496,18 @@ fn validate_schema_relation_invariants(
             }
         }
 
+        for constraint in relation.constraints() {
+            if let TableConstraintObservation::ForeignKey(foreign_key) = constraint
+                && foreign_key.reference_behavior().is_some_and(|behavior| {
+                    behavior.match_type() == ForeignKeyMatchType::Partial
+                })
+            {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "foreign_key_match_type",
+                });
+            }
+        }
+
         let mut primary_keys = relation.constraints().iter().filter_map(|constraint| {
             if let TableConstraintObservation::PrimaryKey(primary_key) = constraint {
                 Some(primary_key)
