@@ -12,13 +12,15 @@ ConceptWeave does not yet retain `pg_constraint.conindid` as a durable relations
 
 Review `5185780899` found that the earlier implementation checked backing evidence only inside an optional branch. Behavioral RED `c80d07816863f814e9b8fbb716661310d8b2b150` required missing same-name index or missing material `pg_index` flags to fail. The retained production repair requires same-name backing-index evidence, material catalog flags, `indisexclusion=true`, and access method `gist` for every positive `WITHOUT OVERLAPS` key while leaving ordinary `conperiod=false` keys independent of unrelated optional index evidence.
 
-## Current finding and RED
+## Key-shape finding, RED, and repair
 
-Review `5186585545` on PR #46 exact `c0c123178794fbd28b4d93008c071aea21dac6fb` found a second fail-open seam. `canonicalize_constraint_periods()` now requires the same-name GiST/exclusion index, but it does not validate that the index key attributes actually match the PRIMARY KEY/UNIQUE constrained columns unless the separate optional constraint-timing family was observed first. A same-name GiST exclusion index over a different column order can therefore be admitted as governed temporal evidence.
+Review `5186585545` on PR #46 exact `c0c123178794fbd28b4d93008c071aea21dac6fb` found a second fail-open seam. `canonicalize_constraint_periods()` required the same-name GiST/exclusion index but did not validate that its key attributes actually matched the PRIMARY KEY/UNIQUE constrained columns unless the separate optional constraint-timing family had been observed first. A same-name GiST exclusion index over a different column order could therefore be admitted as governed temporal evidence.
 
 Behavioral RED `ffe75eddf530ad3963c087afdfe1109da15bad14` extends `constraint_period_backing_index_presence_contract.rs` with a hostile witness whose constraint is `(document_id, valid_during WITHOUT OVERLAPS)` while the same-name GiST/exclusion index key order is `(valid_during, document_id)`. The snapshot must reject this as `constraint_period_backing_index`; the coherent positive control remains admissible.
 
-The causal repair is intentionally narrower than making timing mandatory. Positive PRIMARY KEY/UNIQUE period admission must validate the static backing-index facts it consumes directly: exact ordered key-column equality, uniqueness, no partial predicate, PK/UNIQUE catalog role, and UNIQUE null-treatment when observed, in addition to the already-required exclusion/GiST evidence. `indimmediate` remains owned by explicit constraint-timing evidence because it depends on deferrability. Prefer one reusable backing-index-shape predicate shared with `canonicalize_constraint_timings()` so the two families cannot drift.
+Production repair `e258b39474454b4c84f51f23dcfb6b00285f4db3` introduces one shared static backing-index predicate used by both `canonicalize_constraint_timings()` and `canonicalize_constraint_periods()`. It verifies exact ordered key-column equality, uniqueness, absence of a partial predicate, PK versus UNIQUE catalog role, and UNIQUE null treatment when that constraint fact was observed. Positive period admission then adds its already-required `indisexclusion=true` and `gist` checks. Timing admission separately retains `indimmediate` validation and its exclusion-access-method coherence. The timing family therefore remains optional rather than becoming a prerequisite for static temporal-key coherence.
+
+The repair is deliberately one-way. It does not derive `conperiod` from index shape, does not use OIDs as durable identity, and does not require ordinary `conperiod=false` keys to provide unrelated temporal backing evidence.
 
 ## Alternatives rejected
 
@@ -28,7 +30,7 @@ Inferring `conperiod` from a GiST index or `indisexclusion` is rejected because 
 
 Owner: Source Observation bounded context, PR #46.
 
-Production seam: `crates/conceptweave-observation/src/lib.rs` → `canonicalize_constraint_periods()` and `canonicalize_constraint_timings()`.
+Production seam: `crates/conceptweave-observation/src/lib.rs` → `key_constraint_backing_index_static_shape_matches()`, `canonicalize_constraint_periods()`, and `canonicalize_constraint_timings()`.
 
 Behavioral contract: `crates/conceptweave-observation/tests/constraint_period_backing_index_presence_contract.rs`.
 
@@ -38,4 +40,4 @@ Primary sources:
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_constraint*. https://www.postgresql.org/docs/18/catalog-pg-constraint.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_index*. https://www.postgresql.org/docs/18/catalog-pg-index.html
 
-Status: backing-index presence repair retained; exact key-shape behavioral RED active; production repair and unchanged-head native/Product acceptance are pending.
+Status: source repaired through `e258b39474454b4c84f51f23dcfb6b00285f4db3`; unchanged-head native/Product acceptance is pending.
