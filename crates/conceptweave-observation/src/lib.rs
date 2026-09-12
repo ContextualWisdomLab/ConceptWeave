@@ -11,6 +11,7 @@ mod constraint_period;
 mod constraint_timing;
 mod model;
 mod representation_v3;
+mod type_kind;
 
 pub use array_type::{ArrayTypeLocation, ArrayTypeObservation, ArrayTypeSourceReceipt};
 pub use constraint_period::ConstraintPeriodObservation;
@@ -28,6 +29,7 @@ pub use representation_v3::{
     QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
     RelationObservation, SchemaObjectLocation, SchemaObjectLocationKind,
 };
+pub use type_kind::{PostgresTypeKind, TypeKindObservation};
 
 use std::collections::BTreeSet;
 
@@ -37,6 +39,8 @@ use sha2::{Digest, Sha256};
 const SNAPSHOT_DIGEST_DOMAIN_V2: &[u8] = b"conceptweave.postgres_schema_snapshot.v2";
 const SNAPSHOT_DIGEST_DOMAIN_V3_ARRAY_TYPES_V1: &[u8] =
     b"conceptweave.postgres_schema_snapshot.v3.array_types.v1";
+const SNAPSHOT_DIGEST_DOMAIN_V3_TYPE_KINDS_V1: &[u8] =
+    b"conceptweave.postgres_schema_snapshot.v3.type_kinds.v1";
 const SNAPSHOT_DIGEST_DOMAIN_V3_CONSTRAINT_TIMINGS_V1: &[u8] =
     b"conceptweave.postgres_schema_snapshot.v3.constraint_timings.v1";
 const SNAPSHOT_DIGEST_DOMAIN_V3_CONSTRAINT_PERIODS_V1: &[u8] =
@@ -59,7 +63,7 @@ pub struct SuccessorSourceReceipt {
 }
 
 impl SuccessorSourceReceipt {
-    /// Returns the stable source reference used by candidate evidence binding.
+    /// Returns the stable source-connection registry reference, never a credential.
     #[must_use]
     pub fn source_id(&self) -> &str {
         &self.source_id
@@ -100,9 +104,9 @@ impl SuccessorSourceReceipt {
 ///
 /// The representation module remains an implementation detail. This owner-level aggregate validates
 /// PostgreSQL's unique `(relname, relnamespace)` catalog namespace, relation-kind ownership rules,
-/// exact schema-local `pg_type` identity, optional observed true-array relationships, optional
-/// PRIMARY KEY/UNIQUE timing evidence, and optional explicit temporal-constraint state before
-/// exposing immutable governed evidence.
+/// exact schema-local `pg_type` identity, optional observed true-array and type-kind relationships,
+/// optional PRIMARY KEY/UNIQUE timing evidence, and optional explicit temporal-constraint state
+/// before exposing immutable governed evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PostgresSchemaSnapshotV3 {
     inner: representation_v3::PostgresSchemaSnapshotV3,
@@ -112,6 +116,8 @@ pub struct PostgresSchemaSnapshotV3 {
     enums: Vec<EnumObservation>,
     array_types: Vec<ArrayTypeObservation>,
     array_types_observed: bool,
+    type_kinds: Vec<TypeKindObservation>,
+    type_kinds_observed: bool,
     constraint_timings: Vec<ConstraintTimingObservation>,
     constraint_timings_observed: bool,
     constraint_periods: Vec<ConstraintPeriodObservation>,
@@ -119,8 +125,8 @@ pub struct PostgresSchemaSnapshotV3 {
 }
 
 impl PostgresSchemaSnapshotV3 {
-    /// Creates the original deterministic v3 snapshot without claiming true-array, key-constraint
-    /// timing, or temporal-constraint inventory.
+    /// Creates the original deterministic v3 snapshot without claiming true-array, type-kind,
+    /// key-constraint timing, or temporal-constraint inventory.
     ///
     /// This constructor deliberately preserves its existing digest contract. Use the explicit
     /// observed-family constructors or consuming family methods only when the adapter captured those
@@ -154,11 +160,109 @@ impl PostgresSchemaSnapshotV3 {
             enums,
             array_types: Vec::new(),
             array_types_observed: false,
+            type_kinds: Vec::new(),
+            type_kinds_observed: false,
             constraint_timings: Vec::new(),
             constraint_timings_observed: false,
             constraint_periods: Vec::new(),
             constraint_periods_observed: false,
         })
+    }
+
+    /// Creates a deterministic v3 snapshot with explicitly observed PostgreSQL type-kind evidence.
+    ///
+    /// This constructor is the compatibility seam for direct user-defined range and multirange
+    /// coordinates. Public evidence retains the exact source binding while the private legacy v3
+    /// validator receives a bounded projection for type kinds it did not originally model. The
+    /// original binding, direct `pg_type.typtype`, domain base, and `pg_range` reciprocity are all
+    /// bound into a separate successor digest domain before any temporal semantics can be admitted.
+    pub fn new_with_type_kinds(
+        authorized_request: &AuthorizedObservationRequest,
+        extractor_revision: impl Into<String>,
+        observed_at_utc: impl Into<String>,
+        mut relations: Vec<RelationObservation>,
+        mut domains: Vec<DomainObservation>,
+        mut enums: Vec<EnumObservation>,
+        type_kinds: Vec<TypeKindObservation>,
+    ) -> Result<Self, ObservationError> {
+        validate_schema_relation_invariants(&relations)?;
+        let type_kinds = canonicalize_type_kind_observations(&relations, &domains, &enums, type_kinds)?;
+        validate_type_bindings_with_type_kinds(&relations, &domains, &enums, &type_kinds)?;
+
+        let projected_relations = relations
+            .iter()
+            .map(|relation| project_relation_type_kind_bindings(relation, &type_kinds))
+            .collect::<Result<Vec<_>, _>>()?;
+        let projected_domains = domains
+            .iter()
+            .map(|domain| project_domain_type_kind_binding(domain, &type_kinds))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let extractor_revision = extractor_revision.into();
+        let observed_at_utc = observed_at_utc.into();
+        let inner = representation_v3::PostgresSchemaSnapshotV3::new(
+            authorized_request,
+            extractor_revision,
+            observed_at_utc,
+            projected_relations,
+            projected_domains,
+            enums.clone(),
+        )?;
+
+        relations.sort_by(|left, right| {
+            (left.schema_name(), left.relation_name())
+                .cmp(&(right.schema_name(), right.relation_name()))
+        });
+        domains.sort_by(|left, right| {
+            (left.schema_name(), left.domain_name()).cmp(&(right.schema_name(), right.domain_name()))
+        });
+        enums.sort_by(|left, right| {
+            (left.schema_name(), left.enum_name()).cmp(&(right.schema_name(), right.enum_name()))
+        });
+        let snapshot_digest = compute_type_kind_aware_snapshot_digest(
+            inner.snapshot_digest(),
+            &relations,
+            &domains,
+            &type_kinds,
+        );
+        Ok(Self {
+            inner,
+            snapshot_digest,
+            relations,
+            domains,
+            enums,
+            array_types: Vec::new(),
+            array_types_observed: false,
+            type_kinds,
+            type_kinds_observed: true,
+            constraint_timings: Vec::new(),
+            constraint_timings_observed: false,
+            constraint_periods: Vec::new(),
+            constraint_periods_observed: false,
+        })
+    }
+
+    /// Creates a type-kind-aware v3 snapshot with explicit PRIMARY KEY/UNIQUE timing evidence.
+    pub fn new_with_type_kinds_and_constraint_timings(
+        authorized_request: &AuthorizedObservationRequest,
+        extractor_revision: impl Into<String>,
+        observed_at_utc: impl Into<String>,
+        relations: Vec<RelationObservation>,
+        domains: Vec<DomainObservation>,
+        enums: Vec<EnumObservation>,
+        type_kinds: Vec<TypeKindObservation>,
+        constraint_timings: Vec<ConstraintTimingObservation>,
+    ) -> Result<Self, ObservationError> {
+        Self::new_with_type_kinds(
+            authorized_request,
+            extractor_revision,
+            observed_at_utc,
+            relations,
+            domains,
+            enums,
+            type_kinds,
+        )?
+        .with_observed_constraint_timings(constraint_timings)
     }
 
     /// Creates a deterministic v3 snapshot with explicitly observed PRIMARY KEY/UNIQUE timing.
@@ -260,6 +364,8 @@ impl PostgresSchemaSnapshotV3 {
             enums,
             array_types,
             array_types_observed: true,
+            type_kinds: Vec::new(),
+            type_kinds_observed: false,
             constraint_timings: Vec::new(),
             constraint_timings_observed: false,
             constraint_periods: Vec::new(),
@@ -294,6 +400,49 @@ impl PostgresSchemaSnapshotV3 {
         .with_observed_constraint_timings(constraint_timings)
     }
 
+    /// Adds source-authoritative PostgreSQL type-kind/domain-base/range-pair evidence.
+    ///
+    /// The family must be attached before constraint timing or period evidence so optional family
+    /// order cannot create a second identity for the same source facts. Direct user-defined range or
+    /// multirange column bindings that the private compatibility validator cannot represent must use
+    /// [`Self::new_with_type_kinds`] instead.
+    pub fn with_observed_type_kinds(
+        mut self,
+        type_kinds: Vec<TypeKindObservation>,
+    ) -> Result<Self, ObservationError> {
+        if self.type_kinds_observed {
+            return Err(ObservationError::InvalidObservationField {
+                field: "type_kind_already_observed",
+            });
+        }
+        if self.constraint_timings_observed || self.constraint_periods_observed {
+            return Err(ObservationError::InvalidObservationField {
+                field: "type_kind_observation_order",
+            });
+        }
+        let type_kinds = canonicalize_type_kind_observations(
+            &self.relations,
+            &self.domains,
+            &self.enums,
+            type_kinds,
+        )?;
+        validate_type_bindings_with_type_kinds(
+            &self.relations,
+            &self.domains,
+            &self.enums,
+            &type_kinds,
+        )?;
+        self.snapshot_digest = compute_type_kind_aware_snapshot_digest(
+            &self.snapshot_digest,
+            &self.relations,
+            &self.domains,
+            &type_kinds,
+        );
+        self.type_kinds = type_kinds;
+        self.type_kinds_observed = true;
+        Ok(self)
+    }
+
     fn with_observed_constraint_timings(
         mut self,
         constraint_timings: Vec<ConstraintTimingObservation>,
@@ -311,12 +460,13 @@ impl PostgresSchemaSnapshotV3 {
     ///
     /// The family is domain-separated from prior v3 identity and must cover every PRIMARY KEY,
     /// UNIQUE, and FOREIGN KEY constraint in the bounded snapshot. Explicit `false` therefore remains
-    /// distinct from an unobserved family. PRIMARY KEY/UNIQUE values are cross-checked against any
-    /// already-observed same-name backing-index exclusion flags, while those index facts are never
-    /// used to invent `conperiod`. A PERIOD foreign key targeting a relation inside the same bounded
-    /// snapshot must resolve to an explicitly observed `WITHOUT OVERLAPS`, `NOT DEFERRABLE` key on
-    /// the referenced columns; referenced-key timing is never inferred from index shape. This
-    /// consuming method may be applied only once.
+    /// distinct from an unobserved family. Every `conperiod=true` local final column must resolve,
+    /// through source-authoritative observed type-kind/domain-base evidence, to a range or multirange.
+    /// PRIMARY KEY/UNIQUE values are cross-checked against any already-observed same-name backing-
+    /// index exclusion flags, while those index facts are never used to invent `conperiod`. A PERIOD
+    /// foreign key targeting a relation inside the same bounded snapshot must resolve to an explicitly
+    /// observed `WITHOUT OVERLAPS`, `NOT DEFERRABLE` key on the referenced columns; referenced-key
+    /// timing is never inferred from index shape. This consuming method may be applied only once.
     pub fn with_observed_constraint_periods(
         mut self,
         constraint_periods: Vec<ConstraintPeriodObservation>,
@@ -329,9 +479,13 @@ impl PostgresSchemaSnapshotV3 {
         let constraint_timings = self
             .constraint_timings_observed
             .then_some(self.constraint_timings.as_slice());
+        let type_kinds = self
+            .type_kinds_observed
+            .then_some(self.type_kinds.as_slice());
         let constraint_periods = canonicalize_constraint_periods(
             &self.relations,
             constraint_timings,
+            type_kinds,
             constraint_periods,
         )?;
         self.snapshot_digest =
@@ -395,6 +549,13 @@ impl PostgresSchemaSnapshotV3 {
     pub fn array_types(&self) -> Option<&[ArrayTypeObservation]> {
         self.array_types_observed
             .then_some(self.array_types.as_slice())
+    }
+
+    /// Returns explicitly observed PostgreSQL `pg_type`/`pg_range` evidence, or `None` when that
+    /// family was not observed.
+    #[must_use]
+    pub fn type_kinds(&self) -> Option<&[TypeKindObservation]> {
+        self.type_kinds_observed.then_some(self.type_kinds.as_slice())
     }
 
     /// Returns explicitly observed PRIMARY KEY/UNIQUE timing, or `None` when that catalog family was
@@ -546,6 +707,359 @@ fn validate_schema_relation_invariants(
                 });
             }
         }
+    }
+    Ok(())
+}
+
+fn canonicalize_type_kind_observations(
+    relations: &[RelationObservation],
+    domains: &[DomainObservation],
+    enums: &[EnumObservation],
+    mut type_kinds: Vec<TypeKindObservation>,
+) -> Result<Vec<TypeKindObservation>, ObservationError> {
+    type_kinds.sort_by(|left, right| {
+        (
+            left.type_name().schema_name(),
+            left.type_name().type_name(),
+        )
+            .cmp(&(
+                right.type_name().schema_name(),
+                right.type_name().type_name(),
+            ))
+    });
+    for pair in type_kinds.windows(2) {
+        if same_type_coordinate(pair[0].type_name(), pair[1].type_name()) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "type_kind_coordinate",
+            });
+        }
+    }
+
+    let observed_schemas = relations
+        .iter()
+        .map(|relation| relation.schema_name())
+        .chain(domains.iter().map(|domain| domain.schema_name()))
+        .chain(enums.iter().map(|observed_enum| observed_enum.schema_name()))
+        .collect::<BTreeSet<_>>();
+
+    for type_kind in &type_kinds {
+        let coordinate = type_kind.type_name();
+        if coordinate.schema_name() != POSTGRES_CATALOG_SCHEMA_NAME
+            && !observed_schemas.contains(coordinate.schema_name())
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "type_kind_schema",
+            });
+        }
+
+        if let Some(domain) = domains.iter().find(|domain| {
+            domain.schema_name() == coordinate.schema_name()
+                && domain.domain_name() == coordinate.type_name()
+        }) {
+            if type_kind.kind() != PostgresTypeKind::Domain
+                || !type_kind
+                    .domain_base_type()
+                    .is_some_and(|base| same_type_coordinate(base, domain.base_type()))
+            {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "type_kind_domain_base",
+                });
+            }
+        }
+        if enums.iter().any(|observed_enum| {
+            observed_enum.schema_name() == coordinate.schema_name()
+                && observed_enum.enum_name() == coordinate.type_name()
+        }) && type_kind.kind() != PostgresTypeKind::Enum
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "type_kind_coordinate",
+            });
+        }
+        if relations.iter().any(|relation| {
+            relation_has_row_type(relation.kind())
+                && relation.schema_name() == coordinate.schema_name()
+                && relation.relation_name() == coordinate.type_name()
+        }) && type_kind.kind() != PostgresTypeKind::Composite
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "type_kind_coordinate",
+            });
+        }
+
+        if matches!(type_kind.kind(), PostgresTypeKind::Range | PostgresTypeKind::Multirange) {
+            let Some(counterpart) = type_kind.range_counterpart() else {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "type_kind_range_reciprocity",
+                });
+            };
+            let Some(counterpart_observation) = type_kinds.iter().find(|candidate| {
+                same_type_coordinate(candidate.type_name(), counterpart)
+            }) else {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "type_kind_range_reciprocity",
+                });
+            };
+            let expected_counterpart_kind = match type_kind.kind() {
+                PostgresTypeKind::Range => PostgresTypeKind::Multirange,
+                PostgresTypeKind::Multirange => PostgresTypeKind::Range,
+                _ => unreachable!("range-kind branch was validated"),
+            };
+            if counterpart_observation.kind() != expected_counterpart_kind
+                || !counterpart_observation
+                    .range_counterpart()
+                    .is_some_and(|back| same_type_coordinate(back, coordinate))
+            {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "type_kind_range_reciprocity",
+                });
+            }
+        }
+    }
+
+    for type_kind in &type_kinds {
+        if type_kind.kind() != PostgresTypeKind::Domain {
+            continue;
+        }
+        let mut current = Some(type_kind.type_name());
+        let mut visited = BTreeSet::new();
+        while let Some(coordinate) = current {
+            let key = (
+                coordinate.schema_name().to_owned(),
+                coordinate.type_name().to_owned(),
+            );
+            if !visited.insert(key) {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "type_kind_domain_cycle",
+                });
+            }
+            current = type_kinds
+                .iter()
+                .find(|candidate| same_type_coordinate(candidate.type_name(), coordinate))
+                .and_then(|candidate| {
+                    (candidate.kind() == PostgresTypeKind::Domain)
+                        .then(|| candidate.domain_base_type())
+                        .flatten()
+                });
+        }
+    }
+
+    Ok(type_kinds)
+}
+
+fn type_binding_is_resolvable_with_type_kinds(
+    binding: &QualifiedTypeName,
+    relations: &[RelationObservation],
+    domains: &[DomainObservation],
+    enums: &[EnumObservation],
+    type_kinds: &[TypeKindObservation],
+) -> bool {
+    if binding.schema_name() == POSTGRES_CATALOG_SCHEMA_NAME {
+        return true;
+    }
+    domains.iter().any(|domain| {
+        domain.schema_name() == binding.schema_name() && domain.domain_name() == binding.type_name()
+    }) || enums.iter().any(|observed_enum| {
+        observed_enum.schema_name() == binding.schema_name()
+            && observed_enum.enum_name() == binding.type_name()
+    }) || relations.iter().any(|relation| {
+        relation_has_row_type(relation.kind())
+            && relation.schema_name() == binding.schema_name()
+            && relation.relation_name() == binding.type_name()
+    }) || type_kinds.iter().any(|type_kind| {
+        same_type_coordinate(type_kind.type_name(), binding)
+            && matches!(type_kind.kind(), PostgresTypeKind::Range | PostgresTypeKind::Multirange)
+    })
+}
+
+fn validate_type_bindings_with_type_kinds(
+    relations: &[RelationObservation],
+    domains: &[DomainObservation],
+    enums: &[EnumObservation],
+    type_kinds: &[TypeKindObservation],
+) -> Result<(), ObservationError> {
+    for domain in domains {
+        if !type_binding_is_resolvable_with_type_kinds(
+            domain.base_type(),
+            relations,
+            domains,
+            enums,
+            type_kinds,
+        ) {
+            return Err(ObservationError::UnknownTypeBinding {
+                schema_name: domain.base_type().schema_name().to_owned(),
+                type_name: domain.base_type().type_name().to_owned(),
+            });
+        }
+    }
+    for relation in relations {
+        for column in relation.columns() {
+            if !type_binding_is_resolvable_with_type_kinds(
+                column.type_binding(),
+                relations,
+                domains,
+                enums,
+                type_kinds,
+            ) {
+                return Err(ObservationError::UnknownTypeBinding {
+                    schema_name: column.type_binding().schema_name().to_owned(),
+                    type_name: column.type_binding().type_name().to_owned(),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn projected_type_kind_binding(
+    binding: &QualifiedTypeName,
+    type_kinds: &[TypeKindObservation],
+) -> QualifiedTypeName {
+    let needs_projection = binding.schema_name() != POSTGRES_CATALOG_SCHEMA_NAME
+        && type_kinds.iter().any(|type_kind| {
+            same_type_coordinate(type_kind.type_name(), binding)
+                && matches!(type_kind.kind(), PostgresTypeKind::Range | PostgresTypeKind::Multirange)
+        });
+    if needs_projection {
+        QualifiedTypeName::new(POSTGRES_CATALOG_SCHEMA_NAME, "text")
+            .expect("fixed PostgreSQL compatibility projection is valid")
+    } else {
+        binding.clone()
+    }
+}
+
+fn project_relation_type_kind_bindings(
+    relation: &RelationObservation,
+    type_kinds: &[TypeKindObservation],
+) -> Result<RelationObservation, ObservationError> {
+    let columns = relation
+        .columns()
+        .iter()
+        .map(|column| {
+            ColumnObservationV3::new(
+                column.column_name(),
+                column.ordinal_position(),
+                column.data_type(),
+                projected_type_kind_binding(column.type_binding(), type_kinds),
+                column.nullable(),
+                column.source_comment().map(str::to_owned),
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut projected = RelationObservation::new(
+        relation.schema_name(),
+        relation.relation_name(),
+        relation.kind(),
+        columns,
+    )?;
+    if !relation.constraints().is_empty() {
+        projected = projected.with_constraints(relation.constraints().to_vec())?;
+    }
+    if !relation.indexes().is_empty() {
+        projected = projected.with_indexes(relation.indexes().to_vec())?;
+    }
+    if let Some(source_comment) = relation.source_comment() {
+        projected = projected.with_source_comment(source_comment.to_owned());
+    }
+    Ok(projected)
+}
+
+fn project_domain_type_kind_binding(
+    domain: &DomainObservation,
+    type_kinds: &[TypeKindObservation],
+) -> Result<DomainObservation, ObservationError> {
+    let mut projected = DomainObservation::new(
+        domain.schema_name(),
+        domain.domain_name(),
+        projected_type_kind_binding(domain.base_type(), type_kinds),
+    )?;
+    if let Some(type_modifier) = domain.type_modifier() {
+        projected = projected.with_type_modifier(type_modifier);
+    }
+    if let Some(array_dimensions) = domain.array_dimensions() {
+        projected = projected.with_array_dimensions(array_dimensions);
+    }
+    if let Some(collation) = domain.collation() {
+        projected = projected.with_collation(collation.clone());
+    }
+    if let Some(not_null) = domain.not_null() {
+        projected = projected.with_not_null(not_null);
+    }
+    if let Some(default_expression) = domain.default_expression() {
+        projected = projected.with_default_expression(default_expression.to_owned());
+    }
+    if !domain.check_constraints().is_empty() {
+        projected = projected.with_check_constraints(domain.check_constraints().to_vec())?;
+    }
+    if let Some(source_comment) = domain.source_comment() {
+        projected = projected.with_source_comment(source_comment.to_owned());
+    }
+    Ok(projected)
+}
+
+fn resolves_to_range_or_multirange(
+    binding: &QualifiedTypeName,
+    type_kinds: &[TypeKindObservation],
+) -> bool {
+    let mut current = (
+        binding.schema_name().to_owned(),
+        binding.type_name().to_owned(),
+    );
+    let mut visited = BTreeSet::new();
+    for _ in 0..=type_kinds.len() {
+        if !visited.insert(current.clone()) {
+            return false;
+        }
+        let Some(type_kind) = type_kinds.iter().find(|candidate| {
+            candidate.type_name().schema_name() == current.0
+                && candidate.type_name().type_name() == current.1
+        }) else {
+            return false;
+        };
+        match type_kind.kind() {
+            PostgresTypeKind::Range | PostgresTypeKind::Multirange => return true,
+            PostgresTypeKind::Domain => {
+                let Some(base_type) = type_kind.domain_base_type() else {
+                    return false;
+                };
+                current = (
+                    base_type.schema_name().to_owned(),
+                    base_type.type_name().to_owned(),
+                );
+            }
+            PostgresTypeKind::Base
+            | PostgresTypeKind::Composite
+            | PostgresTypeKind::Enum
+            | PostgresTypeKind::Pseudo => return false,
+        }
+    }
+    false
+}
+
+fn validate_constraint_period_column_type(
+    relation: &RelationObservation,
+    constraint: &TableConstraintObservation,
+    type_kinds: Option<&[TypeKindObservation]>,
+) -> Result<(), ObservationError> {
+    let Some(final_column_name) = constraint.column_names().last() else {
+        return Err(ObservationError::InvalidObservationField {
+            field: "constraint_period_column_type",
+        });
+    };
+    let Some(final_column) = relation
+        .columns()
+        .iter()
+        .find(|column| column.column_name() == final_column_name)
+    else {
+        return Err(ObservationError::InvalidObservationField {
+            field: "constraint_period_column_type",
+        });
+    };
+    if !type_kinds.is_some_and(|observations| {
+        resolves_to_range_or_multirange(final_column.type_binding(), observations)
+    }) {
+        return Err(ObservationError::InvalidObservationField {
+            field: "constraint_period_column_type",
+        });
     }
     Ok(())
 }
@@ -706,6 +1220,7 @@ fn canonicalize_constraint_timings(
 fn canonicalize_constraint_periods(
     relations: &[RelationObservation],
     constraint_timings: Option<&[ConstraintTimingObservation]>,
+    type_kinds: Option<&[TypeKindObservation]>,
     mut constraint_periods: Vec<ConstraintPeriodObservation>,
 ) -> Result<Vec<ConstraintPeriodObservation>, ObservationError> {
     constraint_periods.sort_by(|left, right| {
@@ -780,6 +1295,9 @@ fn canonicalize_constraint_periods(
 
         match constraint {
             TableConstraintObservation::PrimaryKey(_) | TableConstraintObservation::Unique(_) => {
+                if period.has_period_semantics() {
+                    validate_constraint_period_column_type(relation, constraint, type_kinds)?;
+                }
                 if let Some(backing_index) = relation
                     .indexes()
                     .iter()
@@ -804,6 +1322,7 @@ fn canonicalize_constraint_periods(
                             field: "constraint_period_shape",
                         });
                     }
+                    validate_constraint_period_column_type(relation, constraint, type_kinds)?;
                     let Some(reference_behavior) = foreign_key.reference_behavior() else {
                         return Err(ObservationError::InvalidObservationField {
                             field: "constraint_period_action",
@@ -1162,6 +1681,64 @@ fn compute_array_aware_snapshot_digest(
         encode_str(&mut hasher, array_type.array_type().type_name());
         encode_str(&mut hasher, array_type.element_type().schema_name());
         encode_str(&mut hasher, array_type.element_type().type_name());
+    }
+
+    encode_len(&mut hasher, domains.len());
+    for domain in domains {
+        encode_str(&mut hasher, domain.schema_name());
+        encode_str(&mut hasher, domain.domain_name());
+        encode_str(&mut hasher, domain.base_type().schema_name());
+        encode_str(&mut hasher, domain.base_type().type_name());
+    }
+
+    encode_len(&mut hasher, relations.len());
+    for relation in relations {
+        encode_str(&mut hasher, relation.schema_name());
+        encode_str(&mut hasher, relation.relation_name());
+        encode_str(&mut hasher, relation.kind().token());
+        encode_len(&mut hasher, relation.columns().len());
+        for column in relation.columns() {
+            encode_str(&mut hasher, column.column_name());
+            hasher.update(column.ordinal_position().to_be_bytes());
+            encode_str(&mut hasher, column.type_binding().schema_name());
+            encode_str(&mut hasher, column.type_binding().type_name());
+        }
+    }
+
+    encode_sha256(hasher)
+}
+
+fn compute_type_kind_aware_snapshot_digest(
+    base_snapshot_digest: &str,
+    relations: &[RelationObservation],
+    domains: &[DomainObservation],
+    type_kinds: &[TypeKindObservation],
+) -> String {
+    let mut hasher = Sha256::new();
+    encode_bytes(&mut hasher, SNAPSHOT_DIGEST_DOMAIN_V3_TYPE_KINDS_V1);
+    encode_str(&mut hasher, base_snapshot_digest);
+
+    encode_len(&mut hasher, type_kinds.len());
+    for type_kind in type_kinds {
+        encode_str(&mut hasher, type_kind.type_name().schema_name());
+        encode_str(&mut hasher, type_kind.type_name().type_name());
+        hasher.update([type_kind.kind().tag()]);
+        match type_kind.domain_base_type() {
+            None => hasher.update([0]),
+            Some(base_type) => {
+                hasher.update([1]);
+                encode_str(&mut hasher, base_type.schema_name());
+                encode_str(&mut hasher, base_type.type_name());
+            }
+        }
+        match type_kind.range_counterpart() {
+            None => hasher.update([0]),
+            Some(counterpart) => {
+                hasher.update([1]);
+                encode_str(&mut hasher, counterpart.schema_name());
+                encode_str(&mut hasher, counterpart.type_name());
+            }
+        }
     }
 
     encode_len(&mut hasher, domains.len());
