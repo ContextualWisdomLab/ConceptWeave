@@ -1,8 +1,8 @@
 use conceptweave_observation::{
     ColumnObservationV3, ConstraintDeferrability, ConstraintTimingObservation, IndexAttributeKind,
-    IndexAttributeObservation, IndexCatalogFlags, IndexObservation, ObservationError,
-    PostgresSchemaSnapshotV3, QualifiedTypeName, RelationKind, RelationObservation,
-    TableConstraintObservation, UniqueConstraintObservation,
+    IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics, IndexObservation,
+    ObservationError, PostgresSchemaSnapshotV3, QualifiedOperatorClassName, QualifiedTypeName,
+    RelationKind, RelationObservation, TableConstraintObservation, UniqueConstraintObservation,
 };
 
 mod support;
@@ -62,11 +62,27 @@ fn include(position: u32, column: &str) -> IndexAttributeObservation {
         .expect("include fixture is valid")
 }
 
+fn key_semantics(key_count: usize) -> Vec<IndexKeySemantics> {
+    (1..=key_count)
+        .map(|position| {
+            IndexKeySemantics::new(
+                u32::try_from(position).expect("fixture position fits u32"),
+                None,
+                QualifiedOperatorClassName::new("pg_catalog", "int8_ops")
+                    .expect("operator-class fixture is valid"),
+                0,
+            )
+            .expect("key-semantics fixture is valid")
+        })
+        .collect()
+}
+
 fn backing_index(
     key_attributes: Vec<IndexAttributeObservation>,
     include_attributes: Vec<IndexAttributeObservation>,
     nulls_not_distinct: Option<bool>,
 ) -> IndexObservation {
+    let key_count = key_attributes.len();
     IndexObservation::new(
         "document_key",
         true,
@@ -76,8 +92,13 @@ fn backing_index(
     )
     .expect("backing-index fixture is structurally valid")
     .with_access_method("btree")
+    .with_key_semantics(key_semantics(key_count))
+    .expect("one semantic record matches each structural key")
     .with_catalog_flags(IndexCatalogFlags::new(false, false, true, false, false, false))
     .expect("unique non-primary catalog flags are valid")
+    .with_ready(true)
+    .with_valid(true)
+    .with_live(true)
 }
 
 fn snapshot(
