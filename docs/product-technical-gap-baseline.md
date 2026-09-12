@@ -18,7 +18,7 @@ Protected/default ConceptWeave `main` remains `f4f440dd58c77d7cd90dff8a1eb2eeb9a
 
 #46 stays Draft until one unchanged exact head has repository-pinned Rust 1.98 plus applicable Product/security/dependency/review terminal evidence. #45/#6 ordinary/non-force adopt the complete verified child only after #46 exact-head GREEN; partial cherry-picks and duplicate fixes are invalid succession.
 
-Product bootstrap #35 remains `9bb82f041483cb4e0cf1aa1f5450b413309f9a05`, OPEN/non-Draft/mergeable. Central workflow settlement remains owned outside ConceptWeave. The current protected-handler bootstrap is `.github#2106@24bb6591ab7df23558cb793b4af60c567ff9da97` on protected `.github/main@fb17ef556f94f673234aa557254ae52779e9a7b0`. Fresh Ready-triggered SAST `34692079701`, Python Security `34692079678`, and Security Scan `34692079700` are terminal GREEN. Fresh CodeQL PR `34692079677` is terminal FAILURE: Python compatibility analysis and dispatch succeeded, while the Actions compatibility analysis failed at `Read current-head CodeQL dispatch verdict`. That owner-side gate remains unresolved, so no Product acceptance transfers to ConceptWeave and this repository must not copy, weaken, synthetically satisfy, or manually retrigger it.
+Product bootstrap #35 remains `9bb82f041483cb4e0cf1aa1f5450b413309f9a05`, OPEN/non-Draft/mergeable. Central workflow settlement remains owned outside ConceptWeave. The current protected-handler bootstrap is `.github#2106@24bb6591ab7df23558cb793b4af60c567ff9da97` on protected `.github/main@fb17ef556f94f673234aa557254ae52779e9a7b0`. Ready-triggered SAST `34692079701`, Python Security `34692079678`, Security Scan `34692079700`, and CodeQL PR `34692079677` are now terminal GREEN on that unchanged head; CodeQL attempt 4 has Detect languages, both Actions/Python compatibility analyses, and dispatch all successful. This clears the previously observed owner-side execution failure, but independent qualifying approval and normal protected landing remain separate prerequisites. No central GREEN transfers to an unchanged ConceptWeave leaf until its own required workflow path is available and rerun normally.
 
 ## Source Observation boundary
 
@@ -46,7 +46,7 @@ This repair is **source-repaired / exact-head acceptance pending**. It is not na
 
 One unchanged exact #46 successor must produce repository-pinned Rust 1.98 `cargo fmt --all --check`, strict workspace/all-target Clippy with warnings denied, workspace/doc tests including the outbound PERIOD reference witness and retained temporal/type/index contracts, release build, owned production docstring/test/edge-case coverage, and applicable Product/security/dependency/review workflows terminal on the same head. Draft state, bot-only status, mechanical mergeability, predecessor GREEN, manual/no-op reruns, and synthetic statuses are not evidence.
 
-The current source-repair exact head has no pull-request workflow runs and only CodeRabbit commit status. Local execution is not an evidence substitute when the required repository-pinned toolchain is unavailable.
+The current successor has no pull-request workflow runs and only CodeRabbit commit status. The available execution host also has no Rust toolchain and cannot reach GitHub for an independent exact-tree clone, so local execution cannot substitute for the repository-pinned hosted evidence.
 
 ## PostgreSQL adapter boundary
 
@@ -67,8 +67,8 @@ Catalog OIDs may only join the captured snapshot. The ACL must cross with exact 
 | Area | Status | Evidence / next verification |
 | --- | --- | --- |
 | Source Observation | SOURCE_REPAIRED_ACCEPTANCE_PENDING | `5186323924 -> d692773... -> 6ae821d... -> 1462105...`; fail-closed production repair is present, exact-head native/Product acceptance is not. |
-| Product CI | BLOCKED_OWNER_ACCEPTANCE | #35 unchanged; central #2106 exact `24bb659...` has fresh SAST/Python Security/Security GREEN but fresh CodeQL `34692079677` fails in Actions compatibility verdict reading. |
-| Quality gate | EXACT_HEAD_ACCEPTANCE_REQUIRED | No Ready/adoption/merge before one unchanged head passes Rust 1.98 plus hosted gates. |
+| Product CI | CENTRAL_EXECUTION_GREEN_REVIEW_PENDING | #35 unchanged; central #2106 exact `24bb659...` now has Ready-triggered CodeQL/SAST/Python Security/Security terminal GREEN, but independent qualifying approval and protected landing still remain. |
+| Quality gate | EXACT_HEAD_ACCEPTANCE_REQUIRED | No Ready/adoption/merge before one unchanged #46 head passes Rust 1.98 plus hosted gates. |
 | PostgreSQL adapter | BLOCKED_ON_REPRESENTATION_ACCEPTANCE | No transport before representation GREEN and parent adoption; explicit referenced-key completeness remains an ACL requirement. |
 | Publication | NO_PUBLICATION | No protected immutable semantic release exists. |
 | Release | NOT_STARTED | Version/CHANGELOG/tag/package/semantic release/SBOM/provenance/reproducibility/rollback remain mandatory. |
@@ -77,5 +77,5 @@ Catalog OIDs may only join the captured snapshot. The ACL must cross with exact 
 
 1. Keep #46 Draft and obtain one unchanged exact-head Rust 1.98/Product/security/dependency/review acceptance; repair only real failures ordinary-forward and restart exact-head acceptance whenever the head moves.
 2. Adopt the complete verified #46 delta ordinary/non-force into #45, obtain fresh parent acceptance, then adopt #45 into #6.
-3. Independently, central `.github#2106@24bb659...` must repair the fresh CodeQL Actions compatibility-verdict failure, obtain independent acceptance, and land normally before Product bootstrap can converge.
+3. Independently, central `.github#2106@24bb659...` must obtain qualifying independent approval and land normally; then #2040/#35 can follow their documented owner sequence without leaf churn or copied workflows.
 4. Only after representation/Product prerequisites are GREEN may the bounded PostgreSQL adapter proceed, followed by deterministic validation, independent evaluation, steward review, and immutable publication under canonical owner boundaries.
