@@ -66,8 +66,11 @@ fn temporal_key_relation(index: Option<IndexObservation>) -> RelationObservation
     }
 }
 
-fn temporal_backing_index(with_catalog_flags: bool) -> IndexObservation {
-    let attributes = ["document_id", "valid_during"]
+fn temporal_backing_index_for_columns(
+    with_catalog_flags: bool,
+    key_columns: &[&str],
+) -> IndexObservation {
+    let attributes = key_columns
         .iter()
         .enumerate()
         .map(|(index, column_name)| {
@@ -98,6 +101,10 @@ fn temporal_backing_index(with_catalog_flags: bool) -> IndexObservation {
     } else {
         index
     }
+}
+
+fn temporal_backing_index(with_catalog_flags: bool) -> IndexObservation {
+    temporal_backing_index_for_columns(with_catalog_flags, &["document_id", "valid_during"])
 }
 
 fn temporal_period() -> ConstraintPeriodObservation {
@@ -161,6 +168,26 @@ fn temporal_key_rejects_backing_index_without_material_catalog_flags() {
     let error = snapshot(temporal_key_relation(Some(temporal_backing_index(false))))
         .with_observed_constraint_periods(vec![temporal_period()])
         .expect_err("WITHOUT OVERLAPS cannot be governed without material pg_index flags");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "constraint_period_backing_index",
+        }
+    );
+}
+
+#[test]
+fn temporal_key_rejects_same_name_gist_exclusion_with_mismatched_key_shape() {
+    let mismatched = temporal_backing_index_for_columns(
+        true,
+        &["valid_during", "document_id"],
+    );
+    let error = snapshot(temporal_key_relation(Some(mismatched)))
+        .with_observed_constraint_periods(vec![temporal_period()])
+        .expect_err(
+            "WITHOUT OVERLAPS backing evidence must preserve the exact constrained-column order",
+        );
 
     assert_eq!(
         error,
