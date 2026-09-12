@@ -107,6 +107,17 @@ fn temporal_backing_index(with_catalog_flags: bool) -> IndexObservation {
     temporal_backing_index_for_columns(with_catalog_flags, &["document_id", "valid_during"])
 }
 
+fn temporal_backing_index_with_lifecycle(
+    ready: bool,
+    valid: bool,
+    live: bool,
+) -> IndexObservation {
+    temporal_backing_index(true)
+        .with_ready(ready)
+        .with_valid(valid)
+        .with_live(live)
+}
+
 fn temporal_period() -> ConstraintPeriodObservation {
     ConstraintPeriodObservation::new(
         "public",
@@ -179,10 +190,8 @@ fn temporal_key_rejects_backing_index_without_material_catalog_flags() {
 
 #[test]
 fn temporal_key_rejects_same_name_gist_exclusion_with_mismatched_key_shape() {
-    let mismatched = temporal_backing_index_for_columns(
-        true,
-        &["valid_during", "document_id"],
-    );
+    let mismatched =
+        temporal_backing_index_for_columns(true, &["valid_during", "document_id"]);
     let error = snapshot(temporal_key_relation(Some(mismatched)))
         .with_observed_constraint_periods(vec![temporal_period()])
         .expect_err(
@@ -194,6 +203,51 @@ fn temporal_key_rejects_same_name_gist_exclusion_with_mismatched_key_shape() {
         ObservationError::InvalidObservationField {
             field: "constraint_period_backing_index",
         }
+    );
+}
+
+#[test]
+fn temporal_key_rejects_explicitly_unusable_backing_index_lifecycle() {
+    for (state_name, index) in [
+        (
+            "not ready",
+            temporal_backing_index_with_lifecycle(false, true, true),
+        ),
+        (
+            "not valid",
+            temporal_backing_index_with_lifecycle(true, false, true),
+        ),
+        (
+            "not live",
+            temporal_backing_index_with_lifecycle(true, true, false),
+        ),
+    ] {
+        let error = snapshot(temporal_key_relation(Some(index)))
+            .with_observed_constraint_periods(vec![temporal_period()])
+            .expect_err(state_name);
+
+        assert_eq!(
+            error,
+            ObservationError::InvalidObservationField {
+                field: "constraint_period_backing_index",
+            }
+        );
+    }
+}
+
+#[test]
+fn temporal_key_accepts_explicitly_ready_valid_live_backing_index() {
+    let accepted = snapshot(temporal_key_relation(Some(
+        temporal_backing_index_with_lifecycle(true, true, true),
+    )))
+    .with_observed_constraint_periods(vec![temporal_period()])
+    .expect("usable WITHOUT OVERLAPS backing-index evidence is admissible");
+
+    assert!(
+        accepted
+            .constraint_periods()
+            .expect("period family was explicitly observed")[0]
+            .has_period_semantics()
     );
 }
 
