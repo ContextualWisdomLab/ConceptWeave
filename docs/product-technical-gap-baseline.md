@@ -26,9 +26,9 @@ Fresh authority entering this update:
 - Foundation #1: `60f14a6e85a83d56c2eea43b34d52b3366bb1735`, OPEN Draft;
 - Source Observation #6: `287165d399c5f54d6c4b4aa3c15497b47de8244b`, OPEN Draft;
 - representation-v3 parent #45: `6b2a8f555725dc79f60432afbc492d6005290a4a`, OPEN Draft on #6;
-- representation/index successor #46 source head before this documentation commit: `d60de513d559c6359d55149ddc8707d1520cd6b0`, OPEN Draft/mergeable; mergeability is not acceptance evidence.
+- representation/index successor #46: `c10a5d2cd5f1906c4318f1fb4d7aaaabd6bef63f`, OPEN Draft/mergeable and temporal-value-type RED-active; last production-source repair remains `d60de513d559c6359d55149ddc8707d1520cd6b0`.
 
-Protected central `.github/main` was last freshly verified at `cb0872c9a20d5584703dffacca65c096fc034c6c`; `.github#2051@558693e0333e48012beea142f739bc634b0674a7` remains Draft on historical `main@7fd571db...`, with `.github#2056@69ae472562c93cc17674af5e2085a58947d3fab8` stacked on it. The central owner must land a backward-compatible handler, ordinary/non-force reconcile those PRs onto current protected main and obtain terminal GREEN before unchanged #35 can receive fresh acceptance and normal merge.
+Protected central `.github/main` is freshly verified at `cb0872c9a20d5584703dffacca65c096fc034c6c`; `.github#2051@558693e0333e48012beea142f739bc634b0674a7` remains Draft on historical `main@7fd571db...`, with `.github#2056@69ae472562c93cc17674af5e2085a58947d3fab8` stacked on it. The central owner must land a backward-compatible handler, ordinary/non-force reconcile those PRs onto current protected main and obtain terminal GREEN before unchanged #35 can receive fresh acceptance and normal merge.
 
 Protected/default ConceptWeave `main` still lacks repository-local `.github/workflows` authority for the Product `pull_request` workflow. A PR branch cannot bootstrap its own default-branch trigger. Draft/Ready toggles, no-op commits and manual retriggers are not acceptance evidence.
 
@@ -62,6 +62,8 @@ Preserved source repairs include:
 - a represented PERIOD foreign key additionally requires observed `ForeignKeyReferenceBehavior` with exact `NO ACTION` for both update and delete; missing action evidence and `RESTRICT`/`CASCADE`/`SET NULL`/`SET DEFAULT` fail closed as `constraint_period_action`, while ordinary non-temporal foreign keys retain their existing behavior;
 - when that PERIOD foreign key targets a relation inside the same bounded snapshot, the referenced temporal PK/UNIQUE must also have exact observed `ConstraintTimingObservation::NotDeferrable`; missing timing evidence or either deferrable state fails closed as `constraint_period_reference_timing`, and GiST/`indimmediate` is never substituted for `pg_constraint.condeferrable`/`condeferred` truth;
 - governed v3 foreign-key evidence admits PostgreSQL 18 `MATCH SIMPLE` and `MATCH FULL` but rejects reserved-yet-unimplemented `MATCH PARTIAL` as `foreign_key_match_type`; frozen shared/v2 vocabulary and digest tags remain unchanged for historical reproduction.
+
+The next unresolved P1 is the temporal final-column type contract: explicit `conperiod=true` currently does not prove that the final `WITHOUT OVERLAPS`/`PERIOD` column resolves to PostgreSQL range or multirange semantics. PostgreSQL 18.4+ also permits a domain over range/multirange, so the repair cannot be a direct-only `typtype = r/m` check.
 
 ### Key-constraint timing lineage
 
@@ -152,6 +154,16 @@ Behavioral RED `e367b81bd1af07ea28f3a044a92e8dd39239048e` adds `foreign_key_matc
 
 Production repair `d60de513d559c6359d55149ddc8707d1520cd6b0` adds only a v3 owner-level admission check in `validate_schema_relation_invariants`; predecessor comparison is +12/-0 in `lib.rs`. Static review `5184707338` found the causal delta isolated. The shared enum and frozen-v2 tag remain intact, so historical evidence can still be decoded/reproduced without allowing a new governed v3 snapshot to promote an unimplemented runtime state.
 
+### PostgreSQL 18 temporal period-value type gap
+
+Finding review `5184917000` on `5051f8d2262851ebfd9119518ceb633d92bbef40` identified that `canonicalize_constraint_periods()` validates explicit `conperiod`, GiST/exclusion coherence, PERIOD-FK action/reference/timing semantics and shape, but never proves the final temporal column's PostgreSQL type semantics. Behavioral RED `ef86be21c06477d210a9725874f10a969f4f37a9` adds `constraint_period_type_contract.rs`: an otherwise coherent temporal primary key using scalar `pg_catalog.text` as its last column must fail closed as `constraint_period_column_type`.
+
+Current PostgreSQL 18.x materially constrains the fix. PostgreSQL 18.4 repaired `WITHOUT OVERLAPS` to allow a domain over a range or multirange. Exact-head review `5185079749` therefore rejects a direct-only `pg_type.typtype IN ('r','m')` implementation. Ordinary-forward `558fb3c880b03dcac6456d168b460c4619dbac86` adds a retained domain-over-`tstzrange` positive control, and `46a77be635ece833611ee677664d15d7e35627de` updates `docs/doctoring/source-observation-temporal-period-value-type.md` with the current source contract.
+
+The minimum causal production repair now requires a versioned observed type-kind family that preserves exact qualified type coordinates, direct `pg_type.typtype`, and exact qualified `pg_type.typbasetype` for domains; `pg_range` may supply reciprocal range/multirange evidence while raw OIDs remain adapter-local joins. Temporal admission must resolve the final local value—and same-snapshot referenced temporal key where applicable—directly or through an explicitly observed domain chain to range/multirange, fail closed on missing/cyclic/scalar evidence, retain direct user-defined range/multirange coordinates, and keep `pg_constraint.conperiod` as the sole authority for whether temporal semantics were declared. This family must be domain-separated in successor identity and distinguish unobserved from explicitly observed evidence.
+
+`cf5aa6d1b3239b2b34eb9707c425708d7f2c86eb -> c10a5d2cd5f1906c4318f1fb4d7aaaabd6bef63f` is ordinary-forward, 4 commits ahead / 0 behind, with net changes only in the temporal-type contract test and doctoring. Production source remains unrepaired for this P1. Review `5185086381` records the exact-current boundary. No native/Product GREEN is claimed.
+
 ### Preserved high-value repair lineage
 
 - `5176683395 -> 908d1b10e63254aa4cb85eda9c078ee79f950c0c -> 68efaf0fc735faa74202b420df9bf031069e5116`: reject impossible non-unique + `NULLS NOT DISTINCT=true` state.
@@ -173,14 +185,16 @@ Production repair `d60de513d559c6359d55149ddc8707d1520cd6b0` adds only a v3 owne
 - `5184299133 -> 6c77cb6fb1664cd7ffeb517ad7bcd85382ebd825 -> 5184303271 -> fa21b47653192af83627ac77d14c9141f4419cbd -> b501b003fbcbfe612f92aa65d83a7fd82cedb68a -> 8b36c7a67f8a90b24ad2f08c02ead23374dc4c94 -> 5184320142 -> 90d4ba255ebcc56f4f6eed76b4e6d0d4be5ced15 -> f402b0e39d3a7125476f471edac79fa776e347f2 -> 95074fdff8f3e66c4ed4e54215bd4f59f2cf3e86 -> 194612f3ea5586484980f25f51cba133b5b187d1`: PERIOD-FK referenced temporal key requires exact observed NOT DEFERRABLE timing; integration fixtures use the public timing constructor.
 - `5184492366 -> ccf1a0558389dcf6b7d5af456c83f58f018a8704 -> 635a9ea05af9daffd78a469bc72e69df4633317e -> 67da1f9d7ac34e9aa75eb92696c7ec695553e481 -> 8581766af558a596c8548fde11742bea829ce90a -> 5184498366`: direct successor timing/period value objects reject relation kinds that cannot own those PostgreSQL table-constraint families.
 - `5184685945 -> e367b81bd1af07ea28f3a044a92e8dd39239048e -> 653da9f34345471178e99ca45c84835c92d5166d -> d60de513d559c6359d55149ddc8707d1520cd6b0 -> 5184707338`: PostgreSQL 18 governed v3 rejects unimplemented `MATCH PARTIAL` while retaining shared historical vocabulary.
+- `5184917000 -> ef86be21c06477d210a9725874f10a969f4f37a9 -> 5185079749 -> 558fb3c880b03dcac6456d168b460c4619dbac86 -> 46a77be635ece833611ee677664d15d7e35627de -> 5185086381`: temporal final-column scalar RED plus PostgreSQL 18.4+ domain-over-range compatibility control and current type-kind/domain-base repair contract.
 
 ## Acceptance still required
 
-The current #46 lineage is source-repaired but not native/Product GREEN. One unchanged exact successor must produce:
+The current #46 lineage is **behavioral RED-active**, not source/native/Product GREEN. Before any Ready/adoption/merge claim, the temporal type-kind/domain-base production repair must land and one unchanged exact successor must produce:
 
 - repository-pinned Rust 1.98 `cargo fmt --all --check`;
 - strict workspace/all-target Clippy with warnings denied;
-- workspace tests including frozen-v2 and retained v3 index/type/array/constraint contracts plus `foreign_key_match_contract`, `constraint_catalog_relation_kind_contract`, `constraint_timing_contract`, `constraint_backing_index_contract`, `constraint_backing_index_shape_contract`, `constraint_temporal_index_contract`, `constraint_period_contract`, `constraint_period_action_contract`, `constraint_period_reference_timing_contract`, `primary_key_invariants_contract`, `array_type_identity_contract`, `array_type_digest_contract`, `array_type_schema_contract` and `array_type_receipt_contract`;
+- workspace tests including frozen-v2 and retained v3 index/type/array/constraint contracts plus `foreign_key_match_contract`, `constraint_catalog_relation_kind_contract`, `constraint_timing_contract`, `constraint_backing_index_contract`, `constraint_backing_index_shape_contract`, `constraint_temporal_index_contract`, `constraint_period_contract`, `constraint_period_action_contract`, `constraint_period_reference_timing_contract`, `constraint_period_type_contract`, `primary_key_invariants_contract`, `array_type_identity_contract`, `array_type_digest_contract`, `array_type_schema_contract` and `array_type_receipt_contract`;
+- temporal type coverage proving scalar rejection, built-in and direct user-defined range/multirange admission from exact catalog evidence, domain-over-range/multirange admission, domain-over-scalar rejection, missing/cyclic evidence rejection, and digest order stability;
 - rustdoc/doc tests, release build and owned production docstring/test/edge-case coverage;
 - applicable Product/security/dependency/review workflows terminal on the same exact head.
 
@@ -194,14 +208,15 @@ No transport is admitted before representation exact-head GREEN and ordinary/non
 - resolve least-privilege credentials only for the authorized source key and immutable policy binding;
 - use one explicit `REPEATABLE READ READ ONLY` catalog transaction and one non-resetting connect/query/cancellation budget;
 - use catalog OIDs only for adapter-local joins, then cross the ACL with exact names/coordinates;
-- resolve `pg_class.reltype`/`pg_type.typrelid`, `pg_type.typarray`/`typelem`, and exact relation/type namespaces;
+- resolve `pg_class.reltype`/`pg_type.typrelid`, `pg_type.typarray`/`typelem`, exact relation/type namespaces, direct `pg_type.typtype`, exact qualified domain `typbasetype`, and `pg_range.rngtypid`/`rngmultitypid` relationships required by the released successor contract;
 - collect complete `pg_constraint` PK/UNIQUE timing, `conindid` support relationships, exact `conperiod`, `confupdtype`, `confdeltype`, and `confmatchtype` values for every represented relevant constraint before crossing the ACL;
 - reject `confmatchtype = 'p'` for governed PostgreSQL 18 v3 evidence even though the catalog vocabulary reserves it, because PostgreSQL 18 does not implement `MATCH PARTIAL`; preserve SIMPLE/FULL exactly;
 - validate `condeferrable`/`condeferred` against `pg_index.indimmediate`, PK against `indisprimary`/`indisunique`, exact constraint/index names, exact key columns/order, no partial predicate and observed UNIQUE null treatment rather than persisting OIDs;
 - where a represented key constraint has backing `indisexclusion = true`, require exact observed GiST access method while separately carrying authoritative `pg_constraint.conperiod`; never synthesize `conperiod` from the index;
+- for temporal constraints, resolve the exact final constrained type through observed direct type kind and any domain-base chain to range/multirange; do not infer from type names, display text, GiST, reconstructed DDL or built-in allowlists;
 - for PERIOD foreign keys, preserve the exact final period-column position, require at least one preceding equality-key column, require observed update/delete actions and exact `NO ACTION`/`NO ACTION`, and when the referenced relation is present in the same bounded snapshot require both an explicitly observed `conperiod=true` PK/UNIQUE on the exact referenced columns and exact observed `NOT DEFERRABLE` key timing from `condeferrable`/`condeferred`;
 - validate schema-local `pg_class`, derived index `relkind`, tablespace/options, relation-kind constraint rules, single-PK cardinality and PK NOT NULL consistency;
-- never infer temporal-key truth, referenced-key timing, referential-action defaults or unsupported match semantics from reconstructed DDL/index shape/conventions when direct catalog evidence exists;
+- never infer temporal-key truth, temporal type semantics, referenced-key timing, referential-action defaults or unsupported match semantics from reconstructed DDL/index shape/conventions when direct catalog evidence exists;
 - enforce policy-admitted row/byte/concurrency ceilings and complete-or-fail snapshot construction.
 
 ## Standards and primary authority
@@ -211,9 +226,11 @@ No transport is admitted before representation exact-head GREEN and ordinary/non
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: ALTER TABLE — constraint ownership of supporting indexes; expression/partial-index restrictions for USING INDEX*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_constraint — `condeferrable`, `condeferred`, `conindid`, `conperiod`, `confupdtype`, `confdeltype`, `confmatchtype`*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_index — `indisunique`, `indisprimary`, `indisexclusion`, `indimmediate`, `indnullsnotdistinct`, `indkey`, `indpred` and index state*.
-- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_type and the PostgreSQL Type System*.
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_type — direct type kind and domain base type*.
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_range — range and associated multirange catalog relationships*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_class and CREATE INDEX*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 release notes — temporal constraints using WITHOUT OVERLAPS and PERIOD*.
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18.4 release notes — allow domains over range/multirange for WITHOUT OVERLAPS*.
 - PostgreSQL 18 source `src/backend/catalog/index.c` for supporting-index state and `src/backend/parser/parse_utilcmd.c` for deferrable-index/constraint compatibility.
 
 Catalog OIDs are adapter-local joins, never governed semantic identity. `pg_get_indexdef`/`pg_get_expr` are reconstructed provenance text, never the sole semantic carrier.
@@ -223,22 +240,22 @@ Catalog OIDs are adapter-local joins, never governed semantic identity. `pg_get_
 | Area | Status | Evidence / next verification |
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | Canonical owner seams unchanged. |
-| Truth/publication lifecycle | SOURCE_REPAIRED_NO_PUBLICATION | No protected immutable semantic release exists. |
-| Source Observation | REPRESENTATION_V3_FK_MATCH_SOURCE_REPAIRED | `e367b81...` RED plus `d60de513...` v3 admission repair reject unimplemented PostgreSQL 18 `MATCH PARTIAL`; `653da9f...` doctoring and `5184707338` static review preserve frozen-v2 compatibility. Exact-head Rust/Product acceptance remains mandatory. |
+| Truth/publication lifecycle | RED_ACTIVE_NO_PUBLICATION | No protected immutable semantic release exists; current Source Observation successor has an unresolved temporal-type RED. |
+| Source Observation | REPRESENTATION_V3_TEMPORAL_TYPE_RED_ACTIVE | Scalar temporal-column RED `ef86be21...` remains unrepaired in production source; review `5185079749`, positive control `558fb3c...` and doctoring `46a77be...` require PostgreSQL 18.4+ domain-over-range compatibility and source-authoritative type-kind/domain-base evidence. |
 | Product CI | BLOCKED_OWNER_RECONCILIATION | Protected/default ConceptWeave `main` still lacks Product workflow authority; #35 waits on central owner settlement. |
-| Quality gate | ACCEPTANCE_PENDING | No Ready/adoption/merge before unchanged-head Rust/Product/security/dependency/review evidence. |
+| Quality gate | SOURCE_REPAIR_REQUIRED | No Ready/adoption/merge before the temporal type-kind repair and unchanged-head Rust/Product/security/dependency/review evidence. |
 | PostgreSQL adapter | BLOCKED_ON_REPRESENTATION_ACCEPTANCE | No transport before representation GREEN and parent adoption. |
-| PostgreSQL 18 temporal keys | PERIOD_FK_REFERENCE_TIMING_AND_COORDINATE_SOURCE_REPAIRED_ACCEPTANCE_PENDING | Explicit `conperiod`, referential-action evidence, referenced-key NOT DEFERRABLE timing and table-backed coordinate invariants are first-class source contracts; native/Product acceptance is still absent. |
+| PostgreSQL 18 temporal keys | PERIOD_VALUE_TYPE_RED_ACTIVE | Existing conperiod/action/reference/timing/coordinate repairs are preserved, but temporal final-column type semantics are not yet governed. |
 | PostgreSQL 18 FK match | MATCH_PARTIAL_FAIL_CLOSED_ACCEPTANCE_PENDING | Reserved catalog code remains historical vocabulary; governed v3 admits only implemented SIMPLE/FULL semantics. |
 | Release | NOT_STARTED | Version/CHANGELOG/tag/package/immutable semantic release/SBOM/provenance/reproducibility/rollback remain mandatory. |
 
 ## Current causal sequence
 
-1. On the current unchanged #46 successor, produce repository-pinned Rust 1.98 and applicable hosted Product/security/dependency/review acceptance; causally repair any real failure.
-2. Ordinary/non-force adopt verified #46 into #45 and obtain fresh parent acceptance; then adopt #45 into #6. Never transfer predecessor GREEN.
-3. In parallel, central owner lands the backward-compatible protected handler, reconciles #2051/#2056 onto current protected `.github/main`, obtains terminal GREEN, then unchanged #35 gets fresh acceptance and normal merge.
-4. Foundation ordinary/non-force restacks after #35; descendants consume only released/versioned owner contracts.
-5. After representation acceptance, re-sweep PostgreSQL 18 catalog semantics and buyer-facing Source Observation gaps before choosing the next representation slice; do not bypass exact-head acceptance by piling unrelated transport work onto #46.
+1. On #46, implement the minimum source-authoritative PostgreSQL type-kind/domain-base family and temporal admission repair: exact qualified coordinates, direct `typtype`, exact domain `typbasetype` chain, direct user-defined range/multirange support, observed/unobserved digest distinction, and fail-closed missing/cyclic/scalar behavior. Keep `conperiod` authoritative for temporal declaration.
+2. On the resulting unchanged exact #46 head, run repository-pinned Rust 1.98 plus applicable hosted Product/security/dependency/review acceptance and causally repair any real failure.
+3. Ordinary/non-force adopt verified #46 into #45 and obtain fresh parent acceptance; then adopt #45 into #6. Never transfer predecessor GREEN.
+4. In parallel, central owner lands the backward-compatible protected handler, reconciles #2051/#2056 onto current protected `.github/main`, obtains terminal GREEN, then unchanged #35 gets fresh acceptance and normal merge.
+5. Foundation ordinary/non-force restacks after #35; descendants consume only released/versioned owner contracts.
 6. Only after representation/adapter prerequisites are GREEN implement the bounded PostgreSQL adapter and frozen conformance fixture, followed by discovery/alignment/deterministic validation/independent evaluation/steward review/immutable publication under the canonical owner boundaries.
 
 Adapters remain outside the core domain model and external DTOs cross explicit Anti-Corruption Layers. Source Observation facts are evidence, not source-system business truth. Published semantic truth is immutable; corrections create a new release plus supersession evidence.
