@@ -1,7 +1,6 @@
 use conceptweave_observation::{
-    ArrayTypeObservation, ColumnObservationV3, EnumObservation, ObservationError,
-    PostgresSchemaSnapshotV3, PostgresTypeKind, QualifiedTypeName, RelationKind,
-    RelationObservation, TypeKindObservation,
+    ArrayTypeObservation, ColumnObservationV3, EnumObservation, PostgresSchemaSnapshotV3,
+    PostgresTypeKind, QualifiedTypeName, RelationKind, RelationObservation, TypeKindObservation,
 };
 
 mod support;
@@ -33,6 +32,24 @@ fn ticket_with_status_array_binding() -> RelationObservation {
             None,
         )
         .expect("array-bound column fixture is valid")],
+    )
+    .expect("relation fixture is valid")
+}
+
+fn ticket_with_custom_base_binding() -> RelationObservation {
+    RelationObservation::new(
+        "public",
+        "vector_ticket",
+        RelationKind::Table,
+        vec![ColumnObservationV3::new(
+            "embedding",
+            1,
+            "public.vector3",
+            type_name("public", "vector3"),
+            false,
+            None,
+        )
+        .expect("custom base-bound column fixture is valid")],
     )
     .expect("relation fixture is valid")
 }
@@ -81,8 +98,8 @@ fn observed_type_kinds_preserve_an_already_observed_custom_true_array_binding() 
 }
 
 #[test]
-fn base_type_kind_alone_does_not_invent_true_array_identity() {
-    let error = PostgresSchemaSnapshotV3::new_with_type_kinds(
+fn base_type_kind_resolves_exact_binding_without_inventing_true_array_identity() {
+    let snapshot = PostgresSchemaSnapshotV3::new_with_type_kinds(
         &support::authorized_source("warehouse_primary", &["public"]),
         "postgres_introspector_v3",
         "2026-09-12T05:11:00Z",
@@ -91,13 +108,29 @@ fn base_type_kind_alone_does_not_invent_true_array_identity() {
         vec![status_enum()],
         status_type_kinds(),
     )
-    .expect_err("Base kind alone is not evidence of pg_type.typarray/typelem identity");
+    .expect("Base kind proves the exact pg_type coordinate, not true-array identity");
 
-    assert_eq!(
-        error,
-        ObservationError::UnknownTypeBinding {
-            schema_name: "public".to_owned(),
-            type_name: "_status".to_owned(),
-        }
-    );
+    assert!(snapshot.type_kinds().is_some());
+    assert!(snapshot.array_types().is_none());
+}
+
+#[test]
+fn ordinary_user_defined_base_type_kind_resolves_its_exact_binding() {
+    let snapshot = PostgresSchemaSnapshotV3::new_with_type_kinds(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-12T05:12:00Z",
+        vec![ticket_with_custom_base_binding()],
+        Vec::new(),
+        Vec::new(),
+        vec![TypeKindObservation::plain(
+            type_name("public", "vector3"),
+            PostgresTypeKind::Base,
+        )
+        .expect("custom base type-kind fixture is valid")],
+    )
+    .expect("an exact user-defined base type coordinate must be a resolvable binding");
+
+    assert!(snapshot.type_kinds().is_some());
+    assert!(snapshot.array_types().is_none());
 }
