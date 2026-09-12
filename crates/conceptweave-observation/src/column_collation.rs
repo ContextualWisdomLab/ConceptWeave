@@ -135,10 +135,10 @@ impl ColumnCollationObservation {
 
     /// Returns `collisdeterministic` for a collatable column, or `None` when it is uncollatable.
     #[must_use]
-    pub const fn deterministic(&self) -> Option<bool> {
-        match self.state {
+    pub fn deterministic(&self) -> Option<bool> {
+        match &self.state {
             ColumnCollationState::Uncollatable => None,
-            ColumnCollationState::Collatable { deterministic, .. } => Some(deterministic),
+            ColumnCollationState::Collatable { deterministic, .. } => Some(*deterministic),
         }
     }
 }
