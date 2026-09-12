@@ -191,8 +191,8 @@ fn coherent_temporal_key_preserves_exact_exclusion_operator_signatures() {
 
 #[test]
 fn temporal_key_rejects_non_equality_operator_before_without_overlaps_column() {
-    let error = base_snapshot()
-        .with_observed_constraint_periods(vec![period_with_operators(expected_operators("=#"))])
+    let error = period_without_operators()
+        .with_exclusion_operator_signatures(expected_operators("=#"))
         .expect_err("WITHOUT OVERLAPS prefix columns must use equality semantics");
 
     assert_eq!(
@@ -205,11 +205,11 @@ fn temporal_key_rejects_non_equality_operator_before_without_overlaps_column() {
 
 #[test]
 fn temporal_key_rejects_non_overlap_operator_for_without_overlaps_column() {
-    let error = base_snapshot()
-        .with_observed_constraint_periods(vec![period_with_operators(vec![
+    let error = period_without_operators()
+        .with_exclusion_operator_signatures(vec![
             exclusion_operator(1, "=", "int8"),
             exclusion_operator(2, "=", "tstzrange"),
-        ])])
+        ])
         .expect_err("WITHOUT OVERLAPS final column must use overlap semantics");
 
     assert_eq!(
