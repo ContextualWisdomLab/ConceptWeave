@@ -26,7 +26,7 @@ Fresh authority entering this update:
 - Foundation #1: `60f14a6e85a83d56c2eea43b34d52b3366bb1735`, OPEN Draft;
 - Source Observation #6: `287165d399c5f54d6c4b4aa3c15497b47de8244b`, OPEN Draft;
 - representation-v3 parent #45: `6b2a8f555725dc79f60432afbc492d6005290a4a`, OPEN Draft on #6;
-- representation/index successor #46 source head before this documentation commit: `8581766af558a596c8548fde11742bea829ce90a`, OPEN Draft; GitHub mergeability was recalculating immediately after the ordinary-forward commits and is not acceptance evidence.
+- representation/index successor #46 source head before this documentation commit: `d60de513d559c6359d55149ddc8707d1520cd6b0`, OPEN Draft/mergeable; mergeability is not acceptance evidence.
 
 Protected central `.github/main` was last freshly verified at `cb0872c9a20d5584703dffacca65c096fc034c6c`; `.github#2051@558693e0333e48012beea142f739bc634b0674a7` remains Draft on historical `main@7fd571db...`, with `.github#2056@69ae472562c93cc17674af5e2085a58947d3fab8` stacked on it. The central owner must land a backward-compatible handler, ordinary/non-force reconcile those PRs onto current protected main and obtain terminal GREEN before unchanged #35 can receive fresh acceptance and normal merge.
 
@@ -54,13 +54,14 @@ Preserved source repairs include:
 - represented table constraints on ordinary/partitioned tables, CHECK-only on foreign tables, and no modeled table constraints on views/materialized views/sequences/standalone composite-type relations;
 - at most one represented primary key per relation and exact `nullable = false` evidence for every primary-key column;
 - explicitly observed PRIMARY KEY/UNIQUE timing as `NotDeferrable`, `InitiallyImmediate` or `InitiallyDeferred`, with exact relation/constraint coordinates, complete inventory, observed-empty versus unobserved state and a separate `conceptweave.postgres_schema_snapshot.v3.constraint_timings.v1` digest layer;
-- `ConstraintTimingObservation` and `ConstraintPeriodObservation` themselves now reject non-table relation kinds, so impossible view/materialized-view/foreign-table/sequence/composite-type catalog coordinates are not representable before aggregate admission; ordinary and partitioned tables remain valid;
+- `ConstraintTimingObservation` and `ConstraintPeriodObservation` themselves reject non-table relation kinds, so impossible view/materialized-view/foreign-table/sequence/composite-type catalog coordinates are not representable before aggregate admission; ordinary and partitioned tables remain valid;
 - explicitly observed PRIMARY KEY/UNIQUE timing binds to same-relation/same-name supporting-index evidence and requires uniqueness, PK/non-PK role, `indimmediate`, exact ordered simple key columns, non-partial shape and explicitly observed UNIQUE null-treatment coherence before immutable timing evidence is admitted;
 - when a represented PRIMARY KEY/UNIQUE backing index carries `pg_index.indisexclusion = true`, its exact observed access method must be `gist`; contradictory non-GiST catalog shapes fail closed as `constraint_backing_index` without inferring `pg_constraint.conperiod`;
 - explicit PostgreSQL 18 `pg_constraint.conperiod` evidence as a separate domain-separated family covering every represented PRIMARY KEY, UNIQUE and FOREIGN KEY constraint, preserving unobserved versus observed `false` versus observed `true` without deriving truth from index shape or reconstructed DDL;
 - represented key-constraint `conperiod` is checked for coherence with already-observed same-name backing-index exclusion/GiST facts, and same-snapshot PERIOD foreign keys require a non-PERIOD equality-key prefix plus an explicitly observed referenced `WITHOUT OVERLAPS` PK/UNIQUE on the exact referenced columns;
 - a represented PERIOD foreign key additionally requires observed `ForeignKeyReferenceBehavior` with exact `NO ACTION` for both update and delete; missing action evidence and `RESTRICT`/`CASCADE`/`SET NULL`/`SET DEFAULT` fail closed as `constraint_period_action`, while ordinary non-temporal foreign keys retain their existing behavior;
-- when that PERIOD foreign key targets a relation inside the same bounded snapshot, the referenced temporal PK/UNIQUE must also have exact observed `ConstraintTimingObservation::NotDeferrable`; missing timing evidence or either deferrable state fails closed as `constraint_period_reference_timing`, and GiST/`indimmediate` is never substituted for `pg_constraint.condeferrable`/`condeferred` truth.
+- when that PERIOD foreign key targets a relation inside the same bounded snapshot, the referenced temporal PK/UNIQUE must also have exact observed `ConstraintTimingObservation::NotDeferrable`; missing timing evidence or either deferrable state fails closed as `constraint_period_reference_timing`, and GiST/`indimmediate` is never substituted for `pg_constraint.condeferrable`/`condeferred` truth;
+- governed v3 foreign-key evidence admits PostgreSQL 18 `MATCH SIMPLE` and `MATCH FULL` but rejects reserved-yet-unimplemented `MATCH PARTIAL` as `foreign_key_match_type`; frozen shared/v2 vocabulary and digest tags remain unchanged for historical reproduction.
 
 ### Key-constraint timing lineage
 
@@ -143,6 +144,14 @@ Finding review `5184492366` on exact `db879504dce68dc532a8b09ed2d4fec71f68d244` 
 
 Behavioral RED `ccf1a0558389dcf6b7d5af456c83f58f018a8704` added `constraint_catalog_relation_kind_contract.rs`. Production repairs `635a9ea05af9daffd78a469bc72e69df4633317e` and `67da1f9d7ac34e9aa75eb92696c7ec695553e481` restrict `ConstraintPeriodObservation` and `ConstraintTimingObservation` to `RelationKind::Table` and `RelationKind::PartitionedTable`. Primary-source doctoring `8581766af558a596c8548fde11742bea829ce90a` records the decision, PostgreSQL 18 `CREATE TABLE`/`CREATE FOREIGN TABLE`/`pg_constraint` authority and rejected alternative. Exact-head static review `5184498366` found the source delta causal and isolated; native/Product acceptance remains pending.
 
+### PostgreSQL 18 foreign-key match support
+
+Finding review `5184685945` on `5d70535e8fa420ca1814c0fa9287d715bf3f32e7` found a catalog/runtime-support mismatch: the shared model preserves `ForeignKeyMatchType::Partial` and v3 admitted it, while PostgreSQL 18 `CREATE TABLE` explicitly says `MATCH PARTIAL` is not implemented even though `pg_constraint.confmatchtype` reserves the `p` code.
+
+Behavioral RED `e367b81bd1af07ea28f3a044a92e8dd39239048e` adds `foreign_key_match_contract.rs`: governed v3 must reject `Partial` as `foreign_key_match_type`, while `Simple` and `Full` remain positive controls. Primary-source doctoring `653da9f34345471178e99ca45c84835c92d5166d` records the distinction between reserved catalog vocabulary and executable PostgreSQL support.
+
+Production repair `d60de513d559c6359d55149ddc8707d1520cd6b0` adds only a v3 owner-level admission check in `validate_schema_relation_invariants`; predecessor comparison is +12/-0 in `lib.rs`. Static review `5184707338` found the causal delta isolated. The shared enum and frozen-v2 tag remain intact, so historical evidence can still be decoded/reproduced without allowing a new governed v3 snapshot to promote an unimplemented runtime state.
+
 ### Preserved high-value repair lineage
 
 - `5176683395 -> 908d1b10e63254aa4cb85eda9c078ee79f950c0c -> 68efaf0fc735faa74202b420df9bf031069e5116`: reject impossible non-unique + `NULLS NOT DISTINCT=true` state.
@@ -163,6 +172,7 @@ Behavioral RED `ccf1a0558389dcf6b7d5af456c83f58f018a8704` added `constraint_cata
 - `5184007447 -> 03e4443b5834383f4d25a8e83786cccb62e003be -> 60b59db961ee35a0a0d5de91422ca68612afb8eb -> 1fee67a5223ecc4f1acb13536204d311684a6a9d -> 1a77e006553a39e3752ee3e9f08c57e9160dac78 -> c8947613d665b5061ea445d1dfd6a7165447483f -> 95d3720625bd029b9b6bc46b1841faac2058cb66 -> 6975d94a51d5dc4793ccfd1d39a4c2a849195ace -> 5184074266`: explicit PERIOD-FK action evidence and PostgreSQL-valid NO ACTION admission, including immediate correction of the contents-write accessor regression.
 - `5184299133 -> 6c77cb6fb1664cd7ffeb517ad7bcd85382ebd825 -> 5184303271 -> fa21b47653192af83627ac77d14c9141f4419cbd -> b501b003fbcbfe612f92aa65d83a7fd82cedb68a -> 8b36c7a67f8a90b24ad2f08c02ead23374dc4c94 -> 5184320142 -> 90d4ba255ebcc56f4f6eed76b4e6d0d4be5ced15 -> f402b0e39d3a7125476f471edac79fa776e347f2 -> 95074fdff8f3e66c4ed4e54215bd4f59f2cf3e86 -> 194612f3ea5586484980f25f51cba133b5b187d1`: PERIOD-FK referenced temporal key requires exact observed NOT DEFERRABLE timing; integration fixtures use the public timing constructor.
 - `5184492366 -> ccf1a0558389dcf6b7d5af456c83f58f018a8704 -> 635a9ea05af9daffd78a469bc72e69df4633317e -> 67da1f9d7ac34e9aa75eb92696c7ec695553e481 -> 8581766af558a596c8548fde11742bea829ce90a -> 5184498366`: direct successor timing/period value objects reject relation kinds that cannot own those PostgreSQL table-constraint families.
+- `5184685945 -> e367b81bd1af07ea28f3a044a92e8dd39239048e -> 653da9f34345471178e99ca45c84835c92d5166d -> d60de513d559c6359d55149ddc8707d1520cd6b0 -> 5184707338`: PostgreSQL 18 governed v3 rejects unimplemented `MATCH PARTIAL` while retaining shared historical vocabulary.
 
 ## Acceptance still required
 
@@ -170,7 +180,7 @@ The current #46 lineage is source-repaired but not native/Product GREEN. One unc
 
 - repository-pinned Rust 1.98 `cargo fmt --all --check`;
 - strict workspace/all-target Clippy with warnings denied;
-- workspace tests including frozen-v2 and retained v3 index/type/array/constraint contracts plus `constraint_catalog_relation_kind_contract`, `constraint_timing_contract`, `constraint_backing_index_contract`, `constraint_backing_index_shape_contract`, `constraint_temporal_index_contract`, `constraint_period_contract`, `constraint_period_action_contract`, `constraint_period_reference_timing_contract`, `primary_key_invariants_contract`, `array_type_identity_contract`, `array_type_digest_contract`, `array_type_schema_contract` and `array_type_receipt_contract`;
+- workspace tests including frozen-v2 and retained v3 index/type/array/constraint contracts plus `foreign_key_match_contract`, `constraint_catalog_relation_kind_contract`, `constraint_timing_contract`, `constraint_backing_index_contract`, `constraint_backing_index_shape_contract`, `constraint_temporal_index_contract`, `constraint_period_contract`, `constraint_period_action_contract`, `constraint_period_reference_timing_contract`, `primary_key_invariants_contract`, `array_type_identity_contract`, `array_type_digest_contract`, `array_type_schema_contract` and `array_type_receipt_contract`;
 - rustdoc/doc tests, release build and owned production docstring/test/edge-case coverage;
 - applicable Product/security/dependency/review workflows terminal on the same exact head.
 
@@ -185,20 +195,21 @@ No transport is admitted before representation exact-head GREEN and ordinary/non
 - use one explicit `REPEATABLE READ READ ONLY` catalog transaction and one non-resetting connect/query/cancellation budget;
 - use catalog OIDs only for adapter-local joins, then cross the ACL with exact names/coordinates;
 - resolve `pg_class.reltype`/`pg_type.typrelid`, `pg_type.typarray`/`typelem`, and exact relation/type namespaces;
-- collect complete `pg_constraint` PK/UNIQUE timing, `conindid` support relationships, exact `conperiod`, `confupdtype`, and `confdeltype` values for every represented PK/UNIQUE/FK before crossing the ACL;
+- collect complete `pg_constraint` PK/UNIQUE timing, `conindid` support relationships, exact `conperiod`, `confupdtype`, `confdeltype`, and `confmatchtype` values for every represented relevant constraint before crossing the ACL;
+- reject `confmatchtype = 'p'` for governed PostgreSQL 18 v3 evidence even though the catalog vocabulary reserves it, because PostgreSQL 18 does not implement `MATCH PARTIAL`; preserve SIMPLE/FULL exactly;
 - validate `condeferrable`/`condeferred` against `pg_index.indimmediate`, PK against `indisprimary`/`indisunique`, exact constraint/index names, exact key columns/order, no partial predicate and observed UNIQUE null treatment rather than persisting OIDs;
 - where a represented key constraint has backing `indisexclusion = true`, require exact observed GiST access method while separately carrying authoritative `pg_constraint.conperiod`; never synthesize `conperiod` from the index;
 - for PERIOD foreign keys, preserve the exact final period-column position, require at least one preceding equality-key column, require observed update/delete actions and exact `NO ACTION`/`NO ACTION`, and when the referenced relation is present in the same bounded snapshot require both an explicitly observed `conperiod=true` PK/UNIQUE on the exact referenced columns and exact observed `NOT DEFERRABLE` key timing from `condeferrable`/`condeferred`;
 - validate schema-local `pg_class`, derived index `relkind`, tablespace/options, relation-kind constraint rules, single-PK cardinality and PK NOT NULL consistency;
-- never infer temporal-key truth, referenced-key timing, or referential-action defaults from reconstructed DDL/index shape/conventions when direct catalog evidence exists;
+- never infer temporal-key truth, referenced-key timing, referential-action defaults or unsupported match semantics from reconstructed DDL/index shape/conventions when direct catalog evidence exists;
 - enforce policy-admitted row/byte/concurrency ceilings and complete-or-fail snapshot construction.
 
 ## Standards and primary authority
 
-- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE TABLE — UNIQUE/PRIMARY KEY indexes, INCLUDE, NULLS NOT DISTINCT, WITHOUT OVERLAPS, PERIOD foreign keys, referential actions, deferrability and constraint naming*.
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE TABLE — UNIQUE/PRIMARY KEY indexes, INCLUDE, NULLS NOT DISTINCT, WITHOUT OVERLAPS, PERIOD foreign keys, match types, referential actions, deferrability and constraint naming*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE FOREIGN TABLE — supported foreign-table constraint families*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: ALTER TABLE — constraint ownership of supporting indexes; expression/partial-index restrictions for USING INDEX*.
-- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_constraint — `condeferrable`, `condeferred`, `conindid`, `conperiod`, `confupdtype`, `confdeltype`*.
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_constraint — `condeferrable`, `condeferred`, `conindid`, `conperiod`, `confupdtype`, `confdeltype`, `confmatchtype`*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_index — `indisunique`, `indisprimary`, `indisexclusion`, `indimmediate`, `indnullsnotdistinct`, `indkey`, `indpred` and index state*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_type and the PostgreSQL Type System*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_class and CREATE INDEX*.
@@ -213,11 +224,12 @@ Catalog OIDs are adapter-local joins, never governed semantic identity. `pg_get_
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | Canonical owner seams unchanged. |
 | Truth/publication lifecycle | SOURCE_REPAIRED_NO_PUBLICATION | No protected immutable semantic release exists. |
-| Source Observation | REPRESENTATION_V3_CONSTRAINT_RELATION_KIND_SOURCE_REPAIRED | `ccf1a055...` RED plus `635a9ea...`/`67da1f9...` constructor repairs align direct timing/period VO invariants with PostgreSQL relation capabilities; `8581766...` doctoring and `5184498366` static review currentize the slice. Exact-head Rust/Product acceptance remains mandatory. |
+| Source Observation | REPRESENTATION_V3_FK_MATCH_SOURCE_REPAIRED | `e367b81...` RED plus `d60de513...` v3 admission repair reject unimplemented PostgreSQL 18 `MATCH PARTIAL`; `653da9f...` doctoring and `5184707338` static review preserve frozen-v2 compatibility. Exact-head Rust/Product acceptance remains mandatory. |
 | Product CI | BLOCKED_OWNER_RECONCILIATION | Protected/default ConceptWeave `main` still lacks Product workflow authority; #35 waits on central owner settlement. |
 | Quality gate | ACCEPTANCE_PENDING | No Ready/adoption/merge before unchanged-head Rust/Product/security/dependency/review evidence. |
 | PostgreSQL adapter | BLOCKED_ON_REPRESENTATION_ACCEPTANCE | No transport before representation GREEN and parent adoption. |
 | PostgreSQL 18 temporal keys | PERIOD_FK_REFERENCE_TIMING_AND_COORDINATE_SOURCE_REPAIRED_ACCEPTANCE_PENDING | Explicit `conperiod`, referential-action evidence, referenced-key NOT DEFERRABLE timing and table-backed coordinate invariants are first-class source contracts; native/Product acceptance is still absent. |
+| PostgreSQL 18 FK match | MATCH_PARTIAL_FAIL_CLOSED_ACCEPTANCE_PENDING | Reserved catalog code remains historical vocabulary; governed v3 admits only implemented SIMPLE/FULL semantics. |
 | Release | NOT_STARTED | Version/CHANGELOG/tag/package/immutable semantic release/SBOM/provenance/reproducibility/rollback remain mandatory. |
 
 ## Current causal sequence
