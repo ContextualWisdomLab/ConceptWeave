@@ -1,14 +1,34 @@
 use conceptweave_observation::{
     ColumnObservationV3, ConstraintDeferrability, ConstraintTimingObservation, IndexAttributeKind,
-    IndexAttributeObservation, IndexCatalogFlags, IndexObservation, ObservationError,
-    PostgresSchemaSnapshotV3, PrimaryKeyObservation, QualifiedTypeName, RelationKind,
-    RelationObservation, TableConstraintObservation, UniqueConstraintObservation,
+    IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics, IndexObservation,
+    ObservationError, PostgresSchemaSnapshotV3, PrimaryKeyObservation,
+    QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
+    TableConstraintObservation, UniqueConstraintObservation,
 };
 
 mod support;
 
 fn catalog_type(type_name: &str) -> QualifiedTypeName {
     QualifiedTypeName::new("pg_catalog", type_name).expect("catalog type coordinate is valid")
+}
+
+fn operator_class(schema_name: &str, operator_class_name: &str) -> QualifiedOperatorClassName {
+    QualifiedOperatorClassName::new(schema_name, operator_class_name)
+        .expect("operator-class coordinate is valid")
+}
+
+fn key_semantics(access_method: &str) -> Vec<IndexKeySemantics> {
+    let integer_opclass = if access_method == "gist" {
+        operator_class("public", "gist_int8_ops")
+    } else {
+        operator_class("pg_catalog", "int8_ops")
+    };
+    vec![
+        IndexKeySemantics::new(1, None, integer_opclass, 0)
+            .expect("identifier key semantics are valid"),
+        IndexKeySemantics::new(2, None, operator_class("pg_catalog", "range_ops"), 0)
+            .expect("period key semantics are valid"),
+    ]
 }
 
 fn constraint(primary: bool) -> TableConstraintObservation {
@@ -31,7 +51,7 @@ fn backing_index(
     exclusion: bool,
     access_method: &str,
 ) -> Result<IndexObservation, ObservationError> {
-    IndexObservation::new(
+    Ok(IndexObservation::new(
         "document_temporal_key",
         true,
         Some(false),
@@ -52,6 +72,7 @@ fn backing_index(
         Vec::new(),
     )?
     .with_access_method(access_method)
+    .with_key_semantics(key_semantics(access_method))?
     .with_catalog_flags(IndexCatalogFlags::new(
         primary,
         exclusion,
@@ -59,7 +80,10 @@ fn backing_index(
         false,
         false,
         false,
-    ))
+    ))?
+    .with_ready(true)
+    .with_valid(true)
+    .with_live(true))
 }
 
 fn relation(
