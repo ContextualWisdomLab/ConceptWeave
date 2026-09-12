@@ -1,12 +1,14 @@
 use conceptweave_observation::{
-    ColumnObservationV3, ConstraintDeferrability, ConstraintExclusionOperatorObservation,
-    ConstraintPeriodObservation, ConstraintTimingObservation, IndexAttributeKind,
-    IndexAttributeObservation, IndexCatalogFlags, IndexObservation, ObservationError,
-    PostgresSchemaSnapshotV3, PrimaryKeyObservation, QualifiedTypeName, RelationKind,
-    RelationObservation, TableConstraintObservation, TypeKindObservation,
+    ColumnObservationV3, ConstraintDeferrability, ConstraintPeriodObservation,
+    ConstraintTimingObservation, IndexAttributeKind, IndexAttributeObservation, IndexCatalogFlags,
+    IndexObservation, ObservationError, PostgresSchemaSnapshotV3, PrimaryKeyObservation,
+    QualifiedTypeName, RelationKind, RelationObservation, TableConstraintObservation,
+    TypeKindObservation,
 };
 
 mod support;
+
+type OperatorSignature = (u32, String, String, QualifiedTypeName, QualifiedTypeName);
 
 fn catalog_type(type_name: &str) -> QualifiedTypeName {
     QualifiedTypeName::new("pg_catalog", type_name).expect("catalog type coordinate is valid")
@@ -88,22 +90,17 @@ fn timing() -> ConstraintTimingObservation {
     .expect("timing fixture is valid")
 }
 
-fn exclusion_operator(
-    position: u32,
-    operator_name: &str,
-    operand_type: &str,
-) -> ConstraintExclusionOperatorObservation {
-    ConstraintExclusionOperatorObservation::new(
+fn exclusion_operator(position: u32, operator_name: &str, operand_type: &str) -> OperatorSignature {
+    (
         position,
-        "pg_catalog",
-        operator_name,
+        "pg_catalog".to_owned(),
+        operator_name.to_owned(),
         catalog_type(operand_type),
         catalog_type(operand_type),
     )
-    .expect("operator fixture is valid")
 }
 
-fn expected_operators(first_operator_name: &str) -> Vec<ConstraintExclusionOperatorObservation> {
+fn expected_operators(first_operator_name: &str) -> Vec<OperatorSignature> {
     vec![
         exclusion_operator(1, first_operator_name, "int8"),
         exclusion_operator(2, "&&", "tstzrange"),
@@ -121,11 +118,9 @@ fn period_without_operators() -> ConstraintPeriodObservation {
     .expect("period fixture is valid")
 }
 
-fn period_with_operators(
-    operators: Vec<ConstraintExclusionOperatorObservation>,
-) -> ConstraintPeriodObservation {
+fn period_with_operators(operators: Vec<OperatorSignature>) -> ConstraintPeriodObservation {
     period_without_operators()
-        .with_exclusion_operators(operators)
+        .with_exclusion_operator_signatures(operators)
         .expect("temporal exclusion operator fixture is valid")
 }
 
@@ -179,15 +174,19 @@ fn coherent_temporal_key_preserves_exact_exclusion_operator_signatures() {
         .with_observed_constraint_periods(vec![period_with_operators(expected_operators("="))])
         .expect("complete temporal exclusion operator evidence is admissible");
 
-    let operators = snapshot.constraint_periods().expect("period family is observed")[0]
-        .exclusion_operators()
-        .expect("temporal key operator vector is observed");
-    assert_eq!(operators.len(), 2);
-    assert_eq!(operators[0].position(), 1);
-    assert_eq!(operators[0].operator_schema_name(), "pg_catalog");
-    assert_eq!(operators[0].operator_name(), "=");
-    assert_eq!(operators[1].position(), 2);
-    assert_eq!(operators[1].operator_name(), "&&");
+    let period = &snapshot.constraint_periods().expect("period family is observed")[0];
+    let first = period
+        .exclusion_operator_signature(1)
+        .expect("first operator signature is retained");
+    let second = period
+        .exclusion_operator_signature(2)
+        .expect("second operator signature is retained");
+    assert_eq!(first.0, "pg_catalog");
+    assert_eq!(first.1, "=");
+    assert_eq!(first.2, &catalog_type("int8"));
+    assert_eq!(first.3, &catalog_type("int8"));
+    assert_eq!(second.0, "pg_catalog");
+    assert_eq!(second.1, "&&");
 }
 
 #[test]
