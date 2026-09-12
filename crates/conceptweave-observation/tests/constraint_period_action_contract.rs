@@ -4,13 +4,23 @@ use conceptweave_observation::{
     ForeignKeyObservation, ForeignKeyReferenceBehavior, IndexAttributeKind,
     IndexAttributeObservation, IndexCatalogFlags, IndexObservation, ObservationError,
     PostgresSchemaSnapshotV3, PrimaryKeyObservation, QualifiedTypeName, RelationKind,
-    RelationObservation, TableConstraintObservation,
+    RelationObservation, TableConstraintObservation, TypeKindObservation,
 };
 
 mod support;
 
 fn catalog_type(type_name: &str) -> QualifiedTypeName {
     QualifiedTypeName::new("pg_catalog", type_name).expect("catalog type coordinate is valid")
+}
+
+fn temporal_type_kinds() -> Vec<TypeKindObservation> {
+    vec![
+        TypeKindObservation::range(catalog_type("tstzrange"), catalog_type("tstzmultirange")),
+        TypeKindObservation::multirange(
+            catalog_type("tstzmultirange"),
+            catalog_type("tstzrange"),
+        ),
+    ]
 }
 
 fn column(name: &str, position: u32, type_name: &str) -> ColumnObservationV3 {
@@ -149,7 +159,7 @@ fn period(relation_name: &str, constraint_name: &str) -> ConstraintPeriodObserva
 fn snapshot_with_temporal_fk(
     reference_behavior: Option<ForeignKeyReferenceBehavior>,
 ) -> Result<PostgresSchemaSnapshotV3, ObservationError> {
-    PostgresSchemaSnapshotV3::new_with_constraint_timings(
+    PostgresSchemaSnapshotV3::new_with_type_kinds_and_constraint_timings(
         &support::authorized_source("warehouse_primary", &["public"]),
         "postgres_introspector_v3",
         "2026-09-11T23:00:00Z",
@@ -159,6 +169,7 @@ fn snapshot_with_temporal_fk(
         ],
         Vec::new(),
         Vec::new(),
+        temporal_type_kinds(),
         vec![timing()],
     )?
     .with_observed_constraint_periods(vec![
