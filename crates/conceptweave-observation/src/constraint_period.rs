@@ -1,11 +1,87 @@
 use crate::model::validate_nonblank;
-use crate::{ObservationError, RelationKind};
+use crate::{ObservationError, QualifiedTypeName, RelationKind};
+
+/// Stable resolved identity for one `pg_constraint.conexclop` entry.
+///
+/// PostgreSQL stores exclusion operators as catalog OIDs. OIDs are capture-time join coordinates,
+/// not durable semantic identity, and operator names can be overloaded. ConceptWeave therefore
+/// preserves the one-based constrained-column position together with the exact operator namespace,
+/// name, and qualified binary operand types resolved from the same bounded catalog snapshot.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ConstraintExclusionOperatorObservation {
+    position: u32,
+    operator_schema_name: String,
+    operator_name: String,
+    left_type: QualifiedTypeName,
+    right_type: QualifiedTypeName,
+}
+
+impl ConstraintExclusionOperatorObservation {
+    /// Creates one resolved binary exclusion-operator signature at its exact constraint position.
+    pub fn new(
+        position: u32,
+        operator_schema_name: impl Into<String>,
+        operator_name: impl Into<String>,
+        left_type: QualifiedTypeName,
+        right_type: QualifiedTypeName,
+    ) -> Result<Self, ObservationError> {
+        if position == 0 {
+            return Err(ObservationError::InvalidOrdinalPosition);
+        }
+        let operator_schema_name = operator_schema_name.into();
+        let operator_name = operator_name.into();
+        validate_nonblank(
+            &operator_schema_name,
+            "constraint_exclusion_operator_schema_name",
+        )?;
+        validate_nonblank(&operator_name, "constraint_exclusion_operator_name")?;
+        Ok(Self {
+            position,
+            operator_schema_name,
+            operator_name,
+            left_type,
+            right_type,
+        })
+    }
+
+    /// Returns the one-based constrained-column position corresponding to this operator.
+    #[must_use]
+    pub const fn position(&self) -> u32 {
+        self.position
+    }
+
+    /// Returns the exact resolved operator namespace name.
+    #[must_use]
+    pub fn operator_schema_name(&self) -> &str {
+        &self.operator_schema_name
+    }
+
+    /// Returns the exact resolved operator name.
+    #[must_use]
+    pub fn operator_name(&self) -> &str {
+        &self.operator_name
+    }
+
+    /// Returns the exact qualified left operand type of the resolved binary operator.
+    #[must_use]
+    pub const fn left_type(&self) -> &QualifiedTypeName {
+        &self.left_type
+    }
+
+    /// Returns the exact qualified right operand type of the resolved binary operator.
+    #[must_use]
+    pub const fn right_type(&self) -> &QualifiedTypeName {
+        &self.right_type
+    }
+}
 
 /// Exact observed PostgreSQL temporal-constraint state for one table constraint.
 ///
 /// PostgreSQL 18 exposes `pg_constraint.conperiod` directly. `true` means `WITHOUT OVERLAPS` for
 /// PRIMARY KEY/UNIQUE constraints and `PERIOD` for FOREIGN KEY constraints. `false` remains material
 /// observed evidence; absence of this value object means the catalog family was not observed.
+/// `WITHOUT OVERLAPS` key observations additionally retain the exact resolved per-column
+/// `pg_constraint.conexclop` vector; PERIOD foreign keys do not carry that key-only catalog field.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ConstraintPeriodObservation {
     schema_name: String,
@@ -13,6 +89,7 @@ pub struct ConstraintPeriodObservation {
     relation_kind: RelationKind,
     constraint_name: String,
     has_period_semantics: bool,
+    exclusion_operators: Option<Vec<ConstraintExclusionOperatorObservation>>,
 }
 
 impl ConstraintPeriodObservation {
@@ -44,7 +121,35 @@ impl ConstraintPeriodObservation {
             relation_kind,
             constraint_name,
             has_period_semantics,
+            exclusion_operators: None,
         })
+    }
+
+    /// Records the exact resolved `conexclop` vector for a `WITHOUT OVERLAPS` key.
+    ///
+    /// The input is canonicalized by explicit one-based position. Positions must be complete and
+    /// contiguous. Constraint-kind applicability and arity are checked only when the observation is
+    /// joined to its owning relation, because this value object deliberately does not duplicate the
+    /// PRIMARY KEY/UNIQUE/FOREIGN KEY discriminator.
+    pub fn with_exclusion_operators(
+        mut self,
+        mut exclusion_operators: Vec<ConstraintExclusionOperatorObservation>,
+    ) -> Result<Self, ObservationError> {
+        if !self.has_period_semantics || exclusion_operators.is_empty() {
+            return Err(ObservationError::InvalidObservationField {
+                field: "constraint_period_exclusion_operators",
+            });
+        }
+        exclusion_operators.sort_by_key(ConstraintExclusionOperatorObservation::position);
+        for (expected_position, operator) in (1u32..).zip(&exclusion_operators) {
+            if operator.position() != expected_position {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "constraint_period_exclusion_operators",
+                });
+            }
+        }
+        self.exclusion_operators = Some(exclusion_operators);
+        Ok(self)
     }
 
     /// Returns the exact owning schema identifier.
@@ -75,5 +180,11 @@ impl ConstraintPeriodObservation {
     #[must_use]
     pub const fn has_period_semantics(&self) -> bool {
         self.has_period_semantics
+    }
+
+    /// Returns the resolved ordered `conexclop` vector when observed for a temporal key.
+    #[must_use]
+    pub fn exclusion_operators(&self) -> Option<&[ConstraintExclusionOperatorObservation]> {
+        self.exclusion_operators.as_deref()
     }
 }
