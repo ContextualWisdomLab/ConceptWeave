@@ -191,6 +191,47 @@ fn deferrable_key_constraint_requires_nonimmediate_backing_index() {
 }
 
 #[test]
+fn observed_key_constraint_rejects_explicitly_unusable_backing_index_lifecycle() {
+    for (state_name, index) in [
+        (
+            "not ready",
+            backing_index("document_pkey", true, true)
+                .expect("primary index fixture is valid")
+                .with_ready(false)
+                .with_valid(true)
+                .with_live(true),
+        ),
+        (
+            "not valid",
+            backing_index("document_pkey", true, true)
+                .expect("primary index fixture is valid")
+                .with_ready(true)
+                .with_valid(false)
+                .with_live(true),
+        ),
+        (
+            "not live",
+            backing_index("document_pkey", true, true)
+                .expect("primary index fixture is valid")
+                .with_ready(true)
+                .with_valid(true)
+                .with_live(false),
+        ),
+    ] {
+        let result = snapshot(
+            relation(primary_key(), vec![index]),
+            timing("document_pkey", ConstraintDeferrability::NotDeferrable),
+        );
+        assert_eq!(
+            result.expect_err(state_name),
+            ObservationError::InvalidObservationField {
+                field: "constraint_backing_index",
+            }
+        );
+    }
+}
+
+#[test]
 fn coherent_key_constraint_and_backing_index_evidence_is_admitted() {
     snapshot(
         relation(
@@ -214,4 +255,17 @@ fn coherent_key_constraint_and_backing_index_evidence_is_admitted() {
         ),
     )
     .expect("deferrable unique constraint must bind a non-immediate unique index");
+
+    snapshot(
+        relation(
+            primary_key(),
+            vec![backing_index("document_pkey", true, true)
+                .expect("primary index fixture is valid")
+                .with_ready(true)
+                .with_valid(true)
+                .with_live(true)],
+        ),
+        timing("document_pkey", ConstraintDeferrability::NotDeferrable),
+    )
+    .expect("explicitly ready, valid and live backing-index evidence is admissible");
 }
