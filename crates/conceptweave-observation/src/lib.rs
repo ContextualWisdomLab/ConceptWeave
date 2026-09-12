@@ -1192,6 +1192,9 @@ fn key_constraint_backing_index_static_shape_matches(
         && backing_index.predicate().is_none()
         && null_treatment_matches
         && catalog_flags.primary() == expected_primary
+        && backing_index.ready().is_none_or(|value| value)
+        && backing_index.valid().is_none_or(|value| value)
+        && backing_index.live().is_none_or(|value| value)
 }
 
 fn canonicalize_constraint_timings(
