@@ -131,6 +131,15 @@ impl ConstraintPeriodObservation {
                 });
             }
         }
+        let last_index = exclusion_operators.len() - 1;
+        for (index, operator) in exclusion_operators.iter().enumerate() {
+            let expected_operator_name = if index == last_index { "&&" } else { "=" };
+            if operator.operator_name() != expected_operator_name {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "constraint_period_exclusion_operators",
+                });
+            }
+        }
         self.exclusion_operators = Some(exclusion_operators);
         Ok(self)
     }
@@ -138,7 +147,9 @@ impl ConstraintPeriodObservation {
     /// Records resolved operator signatures without exposing source catalog OIDs as governed input.
     ///
     /// Each tuple is `(position, operator_schema, operator_name, left_type, right_type)`. Exact
-    /// qualified operand types disambiguate overloaded PostgreSQL operator names.
+    /// qualified operand types disambiguate overloaded PostgreSQL operator names. For a
+    /// `WITHOUT OVERLAPS` key, every non-final operator must be `=` and the final operator must be
+    /// `&&`, matching PostgreSQL's exclusion-constraint semantics.
     pub fn with_exclusion_operator_signatures(
         self,
         signatures: Vec<(u32, String, String, QualifiedTypeName, QualifiedTypeName)>,
