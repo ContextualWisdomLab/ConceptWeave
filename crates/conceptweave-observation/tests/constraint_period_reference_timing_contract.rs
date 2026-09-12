@@ -23,6 +23,25 @@ fn temporal_type_kinds() -> Vec<TypeKindObservation> {
     ]
 }
 
+fn temporal_key_operator_signatures() -> Vec<(u32, String, String, QualifiedTypeName, QualifiedTypeName)> {
+    vec![
+        (
+            1,
+            "pg_catalog".to_owned(),
+            "=".to_owned(),
+            catalog_type("int8"),
+            catalog_type("int8"),
+        ),
+        (
+            2,
+            "pg_catalog".to_owned(),
+            "&&".to_owned(),
+            catalog_type("tstzrange"),
+            catalog_type("tstzrange"),
+        ),
+    ]
+}
+
 fn column(name: &str, position: u32, type_name: &str) -> ColumnObservationV3 {
     ColumnObservationV3::new(
         name,
@@ -126,18 +145,22 @@ fn timing(deferrability: ConstraintDeferrability) -> ConstraintTimingObservation
     .expect("constraint timing fixture is valid")
 }
 
-fn period(
-    relation_name: &str,
-    constraint_name: &str,
-) -> ConstraintPeriodObservation {
-    ConstraintPeriodObservation::new(
+fn period(relation_name: &str, constraint_name: &str) -> ConstraintPeriodObservation {
+    let observation = ConstraintPeriodObservation::new(
         "public",
         relation_name,
         RelationKind::Table,
         constraint_name,
         true,
     )
-    .expect("constraint period fixture is valid")
+    .expect("constraint period fixture is valid");
+    if relation_name == "document" && constraint_name == "document_temporal_key" {
+        observation
+            .with_exclusion_operator_signatures(temporal_key_operator_signatures())
+            .expect("temporal key exclusion operators are valid")
+    } else {
+        observation
+    }
 }
 
 fn periods() -> Vec<ConstraintPeriodObservation> {
