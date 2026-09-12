@@ -48,6 +48,17 @@ fn backing_index(
     ))
 }
 
+fn usable_backing_index(
+    name: &str,
+    primary: bool,
+    immediate: bool,
+) -> Result<IndexObservation, ObservationError> {
+    Ok(backing_index(name, primary, immediate)?
+        .with_ready(true)
+        .with_valid(true)
+        .with_live(true))
+}
+
 fn relation(
     constraint: TableConstraintObservation,
     indexes: Vec<IndexObservation>,
@@ -135,7 +146,7 @@ fn observed_primary_key_requires_same_name_primary_unique_backing_index() {
     assert_backing_index_error(snapshot(
         relation(
             primary_key(),
-            vec![backing_index("document_pkey", false, true)
+            vec![usable_backing_index("document_pkey", false, true)
                 .expect("non-primary unique index is structurally valid")],
         ),
         timing("document_pkey", ConstraintDeferrability::NotDeferrable),
@@ -147,7 +158,7 @@ fn observed_unique_constraint_requires_same_name_unique_nonprimary_backing_index
     assert_backing_index_error(snapshot(
         relation(
             unique_key(),
-            vec![backing_index("other_unique_index", false, true)
+            vec![usable_backing_index("other_unique_index", false, true)
                 .expect("differently named unique index is structurally valid")],
         ),
         timing("document_id_key", ConstraintDeferrability::NotDeferrable),
@@ -156,7 +167,7 @@ fn observed_unique_constraint_requires_same_name_unique_nonprimary_backing_index
     assert_backing_index_error(snapshot(
         relation(
             unique_key(),
-            vec![backing_index("document_id_key", true, true)
+            vec![usable_backing_index("document_id_key", true, true)
                 .expect("primary unique index is structurally valid")],
         ),
         timing("document_id_key", ConstraintDeferrability::NotDeferrable),
@@ -168,7 +179,7 @@ fn deferrable_key_constraint_requires_nonimmediate_backing_index() {
     assert_backing_index_error(snapshot(
         relation(
             primary_key(),
-            vec![backing_index("document_pkey", true, true)
+            vec![usable_backing_index("document_pkey", true, true)
                 .expect("immediate primary index is structurally valid")],
         ),
         timing(
@@ -180,7 +191,7 @@ fn deferrable_key_constraint_requires_nonimmediate_backing_index() {
     assert_backing_index_error(snapshot(
         relation(
             unique_key(),
-            vec![backing_index("document_id_key", false, true)
+            vec![usable_backing_index("document_id_key", false, true)
                 .expect("immediate unique index is structurally valid")],
         ),
         timing(
@@ -232,11 +243,23 @@ fn observed_key_constraint_rejects_explicitly_unusable_backing_index_lifecycle()
 }
 
 #[test]
+fn observed_key_constraint_rejects_unobserved_backing_index_lifecycle() {
+    assert_backing_index_error(snapshot(
+        relation(
+            primary_key(),
+            vec![backing_index("document_pkey", true, true)
+                .expect("lifecycle-unobserved primary index fixture is structurally valid")],
+        ),
+        timing("document_pkey", ConstraintDeferrability::NotDeferrable),
+    ));
+}
+
+#[test]
 fn coherent_key_constraint_and_backing_index_evidence_is_admitted() {
     snapshot(
         relation(
             primary_key(),
-            vec![backing_index("document_pkey", true, true)
+            vec![usable_backing_index("document_pkey", true, true)
                 .expect("nondeferrable primary index fixture is valid")],
         ),
         timing("document_pkey", ConstraintDeferrability::NotDeferrable),
@@ -246,7 +269,7 @@ fn coherent_key_constraint_and_backing_index_evidence_is_admitted() {
     snapshot(
         relation(
             unique_key(),
-            vec![backing_index("document_id_key", false, false)
+            vec![usable_backing_index("document_id_key", false, false)
                 .expect("deferrable unique index fixture is valid")],
         ),
         timing(
@@ -259,11 +282,8 @@ fn coherent_key_constraint_and_backing_index_evidence_is_admitted() {
     snapshot(
         relation(
             primary_key(),
-            vec![backing_index("document_pkey", true, true)
-                .expect("primary index fixture is valid")
-                .with_ready(true)
-                .with_valid(true)
-                .with_live(true)],
+            vec![usable_backing_index("document_pkey", true, true)
+                .expect("primary index fixture is valid")],
         ),
         timing("document_pkey", ConstraintDeferrability::NotDeferrable),
     )

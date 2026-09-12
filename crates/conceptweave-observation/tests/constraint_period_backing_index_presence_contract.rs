@@ -236,26 +236,28 @@ fn temporal_key_rejects_explicitly_unusable_backing_index_lifecycle() {
 }
 
 #[test]
+fn temporal_key_rejects_unobserved_backing_index_lifecycle() {
+    let error = snapshot(temporal_key_relation(Some(temporal_backing_index(true))))
+        .with_observed_constraint_periods(vec![temporal_period()])
+        .expect_err(
+            "WITHOUT OVERLAPS backing evidence must prove ready, valid, and live lifecycle state",
+        );
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "constraint_period_backing_index",
+        }
+    );
+}
+
+#[test]
 fn temporal_key_accepts_explicitly_ready_valid_live_backing_index() {
     let accepted = snapshot(temporal_key_relation(Some(
         temporal_backing_index_with_lifecycle(true, true, true),
     )))
     .with_observed_constraint_periods(vec![temporal_period()])
     .expect("usable WITHOUT OVERLAPS backing-index evidence is admissible");
-
-    assert!(
-        accepted
-            .constraint_periods()
-            .expect("period family was explicitly observed")[0]
-            .has_period_semantics()
-    );
-}
-
-#[test]
-fn temporal_key_accepts_explicit_same_name_gist_exclusion_evidence() {
-    let accepted = snapshot(temporal_key_relation(Some(temporal_backing_index(true))))
-        .with_observed_constraint_periods(vec![temporal_period()])
-        .expect("coherent WITHOUT OVERLAPS backing-index evidence is admissible");
 
     assert!(
         accepted
