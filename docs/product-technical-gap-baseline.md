@@ -43,19 +43,29 @@ Repair coordinates:
 - `546d5efda56e151bb316b741e416d9d595c9c78a` — temporal period-type controls;
 - `7f8416dfee4fca20db9a027b4aadf60f26260061` — key backing-index shape controls.
 
-Current Source Observation state is **FIXTURE_REPAIRED / EXACT-HEAD EXECUTION ACCEPTANCE PENDING**. It is not native/Product GREEN, Ready, merge-authorized, published, or released.
+## P1 active — column collation identity and foreign-key collation consistency
+
+Review `5187855669` verified a new Source Observation gap on predecessor exact `fcb75659c4c7ffc046c4c7187789ef3b5d53715d`. `ColumnObservationV3` preserves exact qualified type identity but not `pg_attribute.attcollation`. `QualifiedCollationName` exists for domain/index evidence, yet there is no column-collation evidence family. Two valid schemas that differ only in a collatable column's exact deterministic collation can therefore collapse at the column-observation layer.
+
+This omission also prevents PostgreSQL foreign-key collation validation. PostgreSQL 18 requires every collatable referencing/referenced pair to have collations that are either both deterministic or exactly the same. The current governed FK/PERIOD representation cannot prove that rule because it lacks both the effective column collation binding and resolved `pg_collation.collisdeterministic` evidence.
+
+Source-level RED `8006b24fd4409bc092d80640084a64892190ea4a` adds `column_collation_contract.rs`. It requires exact column-collation changes to affect governed source identity, observed `attcollation=0` to remain distinct from an unobserved collation family, differing nondeterministic FK collations to fail closed, and both-deterministic / exact-same nondeterministic controls to remain valid. Doctoring `313f27c35be2b1bf834ad98c43e162ae874c9107` records the source boundary, rejected inference paths, and compatibility requirement. Production does not yet provide the observed column-collation family or FK validation API, so this lane is deliberately RED-active.
+
+The causal repair must preserve the original v3 compatibility digest when the family is unobserved, retain exact schema-qualified collation identity plus source-authoritative determinism for collatable columns, represent explicitly uncollatable columns without inventing a collation, and validate the family against exact relation-kind/column coordinates. Repeated observations of one exact qualified collation must not disagree about determinism. Foreign-key validation compares local/referenced column evidence directly; index `indcollation`, type/domain defaults, locale text, `search_path`, and OIDs are not substitutes.
+
+Current Source Observation state is **COLUMN_COLLATION_RED_ACTIVE**. It is not source GREEN, native/Product GREEN, Ready, merge-authorized, published, or released.
 
 ## Exact-head acceptance
 
-One unchanged exact #46 successor must pass repository-pinned Rust 1.98 `cargo fmt --all --check`, strict workspace/all-target Clippy with warnings denied, lifecycle-completeness plus all retained temporal/type/index contracts, workspace/doc tests, release build, owned production docstring/test/edge-case coverage, and applicable Product/security/dependency/review terminal evidence. Any head movement restarts exact-head acceptance.
+After the column-collation source repair, one unchanged exact #46 successor must pass repository-pinned Rust 1.98 `cargo fmt --all --check`, strict workspace/all-target Clippy with warnings denied, the new `column_collation_contract` plus lifecycle-completeness and all retained temporal/type/index contracts, workspace/doc tests, release build, owned production docstring/test/edge-case coverage, and applicable Product/security/dependency/review terminal evidence. Any head movement restarts exact-head acceptance.
 
 The available execution host does not provide `cargo`/`rustc`; therefore repository-pinned Rust execution cannot be substituted locally. This is not a reason to toggle Draft/Ready, synthesize status, copy central workflows, manually/no-op retrigger, transfer predecessor evidence, or weaken a gate.
 
 ## Central Product-CI owner
 
-Central workflow ownership remains outside ConceptWeave. At this snapshot the canonical owner is `ContextualWisdomLab/.github#2114` exact `5fb9c987c32620da63546fe69335b58f3a230cad`, OPEN/non-Draft/mergeable, based on protected `.github/main@fb17ef556f94f673234aa557254ae52779e9a7b0`. On that exact head Security Scan `34715843292` is terminal GREEN while CodeQL `34715843331`, SAST `34715843295`, Runtime Quality `34715843461`, and Python Security `34715843306` are still in progress.
+Central workflow ownership remains outside ConceptWeave. Fresh owner state is `ContextualWisdomLab/.github#2114` exact `e7c58c04ed7e59c23cbe4a5f38d4c522ae712712`, OPEN/non-Draft/mergeable, based on protected `.github/main@fb17ef556f94f673234aa557254ae52779e9a7b0`. On that exact head SAST Semgrep `34716210489`, Python Security `34716210535`, Security Scan `34716210462`, and Runtime Quality `34716210506` are terminal GREEN; CodeQL PR `34716210555` is still in progress at this snapshot.
 
-Three current, unresolved owner-path review findings also remain in `scripts/ci/opencode_failure_envelope.py`: present-but-non-object `error`/`error.data` containers can be misclassified instead of treated as malformed; gateway HTTP status and last-provider HTTP status are being conflated as one authority; and specific structured terminal reasons can be rejected merely because they refine a generic 5xx status. These are `.github` owner repairs. ConceptWeave must not copy the workflow, bypass providers, synthesize settlement, or treat central evidence as leaf evidence.
+The `.github` parser/settlement lane remains central-owner work. ConceptWeave must not copy the workflow, bypass providers, synthesize settlement, or treat central evidence as leaf evidence.
 
 ## PostgreSQL adapter boundary
 
@@ -63,10 +73,14 @@ Transport remains blocked until representation exact-head GREEN and ordinary/non
 
 Catalog OIDs may only join the captured snapshot. When the adapter claims an index supports PK/UNIQUE timing or a temporal key, it must bind `pg_constraint.conindid` to the exact `pg_index` row inside the same authorized snapshot and explicitly capture `indisready=true`, `indisvalid=true`, and `indislive=true`. It must retain exact key layout/static flags, `conexclop`, operator-class/operator-family compare-type evidence, temporal type/domain chain, timing/action/match facts, and policy-admitted row/byte/concurrency ceilings. Referenced temporal keys outside the bounded relation set require explicitly authorized evidence expansion or remain fail-closed.
 
+For column collation, the adapter must capture `pg_attribute.attcollation` for every bounded column when claiming that family. Zero is explicit uncollatable evidence; nonzero OIDs must be resolved within the same bounded catalog snapshot to exact `pg_collation` namespace/name plus `collisdeterministic`. OIDs stay adapter-local. Column collation must not be reconstructed from the type, domain, index, rendered DDL, locale text, or `search_path`.
+
 ## Primary authority
 
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_index*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_constraint*.
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_attribute*.
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_collation*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE TABLE*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL source: ComputeIndexAttrs()*.
 
@@ -74,17 +88,18 @@ Catalog OIDs may only join the captured snapshot. When the adapter claims an ind
 
 | Area | Status | Evidence / next verification |
 | --- | --- | --- |
-| Source Observation | FIXTURE_REPAIRED / EXECUTION_PENDING | Production lifecycle repair retained; `5187787381` and fixture-only series through `d704bf92...` restore retained-test admission without weakening invariants. |
-| Product CI | CENTRAL_OWNER_REPAIR_IN_PROGRESS | `.github#2114@5fb9c987...`: Security GREEN; four hosted suites in progress; three current review findings remain. |
-| Quality gate | BLOCKED_ON_EXACT_HEAD_EXECUTION | Rust 1.98/native acceptance must be generated on one unchanged #46 head. |
+| Source Observation | COLUMN_COLLATION_RED_ACTIVE | `5187855669 -> 8006b24f... -> 313f27c...`; production observed-family/digest/FK repair still missing. |
+| Product CI | CENTRAL_OWNER_SETTLING | `.github#2114@e7c58c04...`: SAST/Python Security/Security/Runtime Quality GREEN; CodeQL in progress. |
+| Quality gate | BLOCKED_ON_SOURCE_REPAIR_THEN_EXACT_HEAD_EXECUTION | Repair the collation family first, then generate Rust 1.98/native acceptance on one unchanged head. |
 | PostgreSQL adapter | BLOCKED_ON_REPRESENTATION_ACCEPTANCE | No transport before #46 GREEN and parent adoption. |
 | Publication | NO_PUBLICATION | No protected immutable semantic release exists. |
 | Release | NOT_STARTED | Version/CHANGELOG/tag/package/semantic release/SBOM/provenance/reproducibility/rollback remain mandatory. |
 
 ## Current causal sequence
 
-1. Keep both the production lifecycle-completeness repair and the retained-test fixture repair intact; repair only newly verified failures ordinary-forward.
-2. Reacquire one unchanged exact-head Rust 1.98 and hosted Product/security/dependency/review acceptance. Head movement restarts the acceptance set.
-3. Adopt the complete verified #46 delta ordinary/non-force into #45, obtain fresh parent acceptance, then adopt #45 into #6.
-4. Independently, `ContextualWisdomLab/.github#2114` must resolve its current parser findings and reach terminal owner-path settlement/independent review before the central path is treated as settled. No central evidence transfers to ConceptWeave.
-5. Only after representation/Product prerequisites are GREEN may the bounded PostgreSQL adapter proceed, followed by deterministic validation, independent evaluation, steward review, immutable publication, and release evidence.
+1. Keep all retained Source Observation repairs and fixture corrections intact; do not weaken index/lifecycle/temporal invariants to satisfy the new RED.
+2. Repair the column-collation observed family and domain-separated digest, exact coordinate/completeness validation, deterministic-collation consistency, and FK pair rule. The original v3 constructor remains the family-unobserved compatibility boundary.
+3. Run the new collation contract plus retained contracts, then reacquire one unchanged exact-head Rust 1.98 and hosted Product/security/dependency/review acceptance. Head movement restarts the acceptance set.
+4. Adopt the complete verified #46 delta ordinary/non-force into #45, obtain fresh parent acceptance, then adopt #45 into #6.
+5. Independently, `ContextualWisdomLab/.github#2114` must reach terminal owner-path settlement/independent review. No central evidence transfers to ConceptWeave.
+6. Only after representation/Product prerequisites are GREEN may the bounded PostgreSQL adapter proceed, followed by deterministic validation, independent evaluation, steward review, immutable publication, and release evidence.
