@@ -26,7 +26,7 @@ Fresh authority entering this update:
 - Foundation #1: `60f14a6e85a83d56c2eea43b34d52b3366bb1735`, OPEN Draft;
 - Source Observation #6: `287165d399c5f54d6c4b4aa3c15497b47de8244b`, OPEN Draft;
 - representation-v3 parent #45: `6b2a8f555725dc79f60432afbc492d6005290a4a`, OPEN Draft on #6;
-- representation/index successor #46: source/test/doctoring predecessor `22b6577979a03e2622648d5a63851f1ec9cfe2ba`, OPEN Draft/mergeable, with the temporal value-type source repair implemented and exact-head native/Product acceptance still pending.
+- representation/index successor #46: source repair `e96367b2944ce3bb33f2b33be04dd36bb0f84e33`, OPEN Draft/mergeable, with the array/type-kind observed-family composition RED repaired in source and exact-head native/Product acceptance still pending.
 
 Protected central `.github/main` was most recently verified at `cb0872c9a20d5584703dffacca65c096fc034c6c`; `.github#2051@558693e0333e48012beea142f739bc634b0674a7` remains Draft on historical `main@7fd571db...`, with `.github#2056@69ae472562c93cc17674af5e2085a58947d3fab8` stacked on it. The central owner must land a backward-compatible handler, ordinary/non-force reconcile those PRs onto current protected main and obtain terminal GREEN before unchanged #35 can receive fresh acceptance and normal merge.
 
@@ -48,6 +48,7 @@ Preserved source repairs include:
 - exact `pg_type.typarray`/`typelem` true-array observations without underscore-name inference, OID identity or `search_path` dependence;
 - one element -> one associated true array, no observed array-of-array relation, same-schema reciprocity and observed-empty versus unobserved array state;
 - exact array evidence receipts through `ArrayTypeLocation`/`ArrayTypeSourceReceipt`, binding the public array-aware digest while leaving previous `SchemaObjectLocation` meanings frozen;
+- independently observed true-array and type-kind families now compose: `with_observed_type_kinds(...)` preserves exact array coordinates already established by `ArrayTypeObservation`, while direct `new_with_type_kinds(...)` still rejects a `PostgresTypeKind::Base` coordinate that lacks true-array evidence;
 - relation-scoped index evidence for key/`INCLUDE` layout, expression keys, per-key collation/operator class/opaque `indoption`, operator-class parameters, `NULLS NOT DISTINCT`, material `pg_index` flags, `pg_class.reloptions`, resolved tablespace state and reconstructed-definition/comment provenance;
 - schema-local `pg_class` namespace consistency across owning relations and nested indexes;
 - local index admission only on ordinary tables, partitioned tables and materialized views;
@@ -62,12 +63,20 @@ Preserved source repairs include:
 - a represented PERIOD foreign key additionally requires observed `ForeignKeyReferenceBehavior` with exact `NO ACTION` for both update and delete; missing action evidence and `RESTRICT`/`CASCADE`/`SET NULL`/`SET DEFAULT` fail closed as `constraint_period_action`, while ordinary non-temporal foreign keys retain their existing behavior;
 - when that PERIOD foreign key targets a relation inside the same bounded snapshot, the referenced temporal PK/UNIQUE must also have exact observed `ConstraintTimingObservation::NotDeferrable`; missing timing evidence or either deferrable state fails closed as `constraint_period_reference_timing`, and GiST/`indimmediate` is never substituted for `pg_constraint.condeferrable`/`condeferred` truth;
 - governed v3 foreign-key evidence admits PostgreSQL 18 `MATCH SIMPLE` and `MATCH FULL` but rejects reserved-yet-unimplemented `MATCH PARTIAL` as `foreign_key_match_type`; frozen shared/v2 vocabulary and digest tags remain unchanged for historical reproduction;
-- source-authoritative PostgreSQL type-kind evidence is now represented by exact qualified `pg_type` coordinates plus direct `typtype`, exact qualified `typbasetype` for domains and reciprocal exact range/multirange coordinates from `pg_range`, behind `conceptweave.postgres_schema_snapshot.v3.type_kinds.v1`;
+- source-authoritative PostgreSQL type-kind evidence is represented by exact qualified `pg_type` coordinates plus direct `typtype`, exact qualified `typbasetype` for domains and reciprocal exact range/multirange coordinates from `pg_range`, behind `conceptweave.postgres_schema_snapshot.v3.type_kinds.v1`;
 - unobserved type-kind evidence remains distinct from explicitly observed evidence, input order is canonicalized, duplicate coordinates and domain cycles fail closed, and range/multirange evidence must be reciprocal;
 - direct user-defined range/multirange coordinates remain exact in the public aggregate; a bounded private compatibility projection exists only to traverse the frozen legacy v3 validator, while the successor digest binds the original qualified source coordinates and catalog evidence;
 - every represented `conperiod=true` local final constraint column must resolve directly or through explicitly observed domain-base evidence to range or multirange; missing evidence, scalar values and domains over scalars fail closed as `constraint_period_column_type`, while built-in/user-defined range and multirange values and PostgreSQL 18.4+ domains over range/multirange remain admissible.
 
-The temporal final-column type P1 is now **source-repaired / native-acceptance-pending** rather than behavioral-RED-active. No merge, parent adoption, PostgreSQL transport or publication is authorized until one unchanged exact #46 head produces the repository-pinned Rust/Product/security/dependency/review evidence described below.
+The current array/type-kind composition P1 is **source-repaired / native-acceptance-pending**. No merge, parent adoption, PostgreSQL transport or publication is authorized until one unchanged exact #46 head produces the repository-pinned Rust/Product/security/dependency/review evidence described below.
+
+### Array/type-kind observed-family composition
+
+Finding review `5185362949` identified an observed-family composition defect after the temporal type-kind repair. A snapshot produced by `new_with_array_types(...)` could carry an exact custom true-array coordinate such as `public._status`, but a later `with_observed_type_kinds(...)` call revalidated relation/domain bindings using only scalar/domain/enum/relation-row/range/multirange resolution. The already-authoritative `ArrayTypeObservation` inventory was ignored, so a valid exact array coordinate became `UnknownTypeBinding` merely because an independent catalog family was attached.
+
+Behavioral RED `ef9c8d61d0864e7b867902746969ea4d33592407`, refined at `1cd78d9a9561aea9dc6d980bee59f31b9086b0d9`, added `array_type_kind_composition_contract.rs`. It proves both sides of the boundary: exact array evidence plus coherent type-kind evidence must compose and retain both observed families with a changed digest, while `PostgresTypeKind::Base` alone must not invent true-array identity. Primary-source doctoring is `f67273f887cbb70b2b7edfd296b8588ec98991ab`.
+
+Production repair `e96367b2944ce3bb33f2b33be04dd36bb0f84e33` changes only the consuming type-kind attachment path. It permits a binding when that exact qualified coordinate is already present as an observed array coordinate, otherwise falling back to the existing type-kind resolver. Direct `new_with_type_kinds(...)` remains unchanged, underscore/search-path inference remains forbidden, and the array/type-kind digest layers remain separate and deterministic. Exact-source review `5185490815` records the one-commit one-file `+64/-1` repair and the fact that native/Product acceptance has not yet been produced.
 
 ### Key-constraint timing lineage
 
@@ -170,7 +179,7 @@ Review `5185263151` on exact `1506e26cd5e608e47877d4093b4ebaee1ee3a916` then fou
 
 Test repair/coverage is ordinary-forward at `15e8b1949834ace8eb3cd99834d3c7157316579d`, `23cde04c62dcb8c3b967913f3e3147275a51466e`, `da916f06fd39679800cc66701dbc5c3cba61731d`, `67318b4edf1555297db1e8cecca2371e9eb5e92c`, and `e36d5ff9cc40eaf55f2308245adbb20ad0c9b11a`. The resulting contracts cover missing evidence, scalar rejection, built-in range/multirange, direct user-defined range/multirange, domain-over-built-in/user-defined range, domain-over-scalar rejection, reciprocal range-pair failure, cyclic domain failure, observed/unobserved digest distinction and input-order stability. Doctoring is currentized at `22b6577979a03e2622648d5a63851f1ec9cfe2ba`.
 
-This is source-repaired, not native/Product GREEN. Repository-pinned Rust 1.98, strict Clippy, workspace/doc tests, release/coverage and hosted Product/security/dependency/review evidence are still required on one unchanged exact head.
+This temporal slice is source-repaired, not native/Product GREEN. Repository-pinned Rust 1.98, strict Clippy, workspace/doc tests, release/coverage and hosted Product/security/dependency/review evidence are still required on one unchanged exact head.
 
 ### Preserved high-value repair lineage
 
@@ -194,6 +203,7 @@ This is source-repaired, not native/Product GREEN. Repository-pinned Rust 1.98, 
 - `5184492366 -> ccf1a0558389dcf6b7d5af456c83f58f018a8704 -> 635a9ea05af9daffd78a469bc72e69df4633317e -> 67da1f9d7ac34e9aa75eb92696c7ec695553e481 -> 8581766af558a596c8548fde11742bea829ce90a -> 5184498366`: direct successor timing/period value objects reject relation kinds that cannot own those PostgreSQL table-constraint families.
 - `5184685945 -> e367b81bd1af07ea28f3a044a92e8dd39239048e -> 653da9f34345471178e99ca45c84835c92d5166d -> d60de513d559c6359d55149ddc8707d1520cd6b0 -> 5184707338`: PostgreSQL 18 governed v3 rejects unimplemented `MATCH PARTIAL` while retaining shared historical vocabulary.
 - `5184917000 -> ef86be21c06477d210a9725874f10a969f4f37a9 -> 5185079749 -> 558fb3c880b03dcac6456d168b460c4619dbac86 -> 46a77be635ece833611ee677664d15d7e35627de -> 5185263151 -> 375242bb02cc165a410e72e318f9abec712764bf -> 7bfe5eb46a38e3a4bcfe91aac2688b956526b8b7 -> 15e8b1949834ace8eb3cd99834d3c7157316579d -> 23cde04c62dcb8c3b967913f3e3147275a51466e -> da916f06fd39679800cc66701dbc5c3cba61731d -> 67318b4edf1555297db1e8cecca2371e9eb5e92c -> e36d5ff9cc40eaf55f2308245adbb20ad0c9b11a -> 22b6577979a03e2622648d5a63851f1ec9cfe2ba`: temporal final-column type-kind/domain-base/range-pair source repair and edge-contract coverage; native/Product acceptance pending.
+- `5185362949 -> ef9c8d61d0864e7b867902746969ea4d33592407 -> 1cd78d9a9561aea9dc6d980bee59f31b9086b0d9 -> f67273f887cbb70b2b7edfd296b8588ec98991ab -> e96367b2944ce3bb33f2b33be04dd36bb0f84e33 -> 5185490815`: exact observed true-array evidence composes with type-kind evidence without allowing `Base` alone to invent array identity.
 
 ## Acceptance still required
 
@@ -201,7 +211,8 @@ The current #46 lineage is **source-repaired / acceptance-pending**, not native/
 
 - repository-pinned Rust 1.98 `cargo fmt --all --check`;
 - strict workspace/all-target Clippy with warnings denied;
-- workspace tests including frozen-v2 and retained v3 index/type/array/constraint contracts plus `foreign_key_match_contract`, `constraint_catalog_relation_kind_contract`, `constraint_timing_contract`, `constraint_backing_index_contract`, `constraint_backing_index_shape_contract`, `constraint_temporal_index_contract`, `constraint_period_contract`, `constraint_period_action_contract`, `constraint_period_reference_timing_contract`, `constraint_period_type_contract`, `primary_key_invariants_contract`, `array_type_identity_contract`, `array_type_digest_contract`, `array_type_schema_contract` and `array_type_receipt_contract`;
+- workspace tests including frozen-v2 and retained v3 index/type/array/constraint contracts plus `array_type_kind_composition_contract`, `foreign_key_match_contract`, `constraint_catalog_relation_kind_contract`, `constraint_timing_contract`, `constraint_backing_index_contract`, `constraint_backing_index_shape_contract`, `constraint_temporal_index_contract`, `constraint_period_contract`, `constraint_period_action_contract`, `constraint_period_reference_timing_contract`, `constraint_period_type_contract`, `primary_key_invariants_contract`, `array_type_identity_contract`, `array_type_digest_contract`, `array_type_schema_contract` and `array_type_receipt_contract`;
+- array/type-kind composition coverage proving exact observed arrays survive later type-kind attachment while the direct type-kind-only path still rejects a Base coordinate that lacks explicit `typarray`/`typelem` evidence;
 - temporal type coverage proving missing-evidence and scalar rejection, built-in and direct user-defined range/multirange admission from exact catalog evidence, domain-over-built-in/user-defined range admission, domain-over-scalar rejection, cyclic evidence rejection, reciprocal range-pair validation, observed/unobserved identity separation and input-order stability;
 - rustdoc/doc tests, release build and owned production docstring/test/edge-case coverage;
 - applicable Product/security/dependency/review workflows terminal on the same exact head.
@@ -224,7 +235,7 @@ No transport is admitted before representation exact-head GREEN and ordinary/non
 - for temporal constraints, resolve the exact final constrained type through observed direct type kind and any domain-base chain to range/multirange; do not infer from type names, display text, GiST, reconstructed DDL or built-in allowlists;
 - for PERIOD foreign keys, preserve the exact final period-column position, require at least one preceding equality-key column, require observed update/delete actions and exact `NO ACTION`/`NO ACTION`, and when the referenced relation is present in the same bounded snapshot require both an explicitly observed `conperiod=true` PK/UNIQUE on the exact referenced columns and exact observed `NOT DEFERRABLE` key timing from `condeferrable`/`condeferred`;
 - validate schema-local `pg_class`, derived index `relkind`, tablespace/options, relation-kind constraint rules, single-PK cardinality and PK NOT NULL consistency;
-- never infer temporal-key truth, temporal type semantics, referenced-key timing, referential-action defaults or unsupported match semantics from reconstructed DDL/index shape/conventions when direct catalog evidence exists;
+- never infer temporal-key truth, temporal type semantics, referenced-key timing, referential-action defaults, true-array identity or unsupported match semantics from reconstructed DDL/index shape/type-name conventions when direct catalog evidence exists;
 - enforce policy-admitted row/byte/concurrency ceilings and complete-or-fail snapshot construction.
 
 ## Standards and primary authority
@@ -234,7 +245,7 @@ No transport is admitted before representation exact-head GREEN and ordinary/non
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: ALTER TABLE — constraint ownership of supporting indexes; expression/partial-index restrictions for USING INDEX*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_constraint — `condeferrable`, `condeferred`, `conindid`, `conperiod`, `confupdtype`, `confdeltype`, `confmatchtype`*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_index — `indisunique`, `indisprimary`, `indisexclusion`, `indimmediate`, `indnullsnotdistinct`, `indkey`, `indpred` and index state*.
-- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_type — direct type kind and domain base type*.
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_type — direct type kind, `typarray`/`typelem`, and domain base type*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_range — range and associated multirange catalog relationships*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_class and CREATE INDEX*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 release notes — temporal constraints using WITHOUT OVERLAPS and PERIOD*.
@@ -248,18 +259,18 @@ Catalog OIDs are adapter-local joins, never governed semantic identity. `pg_get_
 | Area | Status | Evidence / next verification |
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | Canonical owner seams unchanged. |
-| Truth/publication lifecycle | SOURCE_REPAIR_ACCEPTANCE_PENDING_NO_PUBLICATION | No protected immutable semantic release exists; the Source Observation temporal type repair is implemented but not exact-head accepted. |
-| Source Observation | REPRESENTATION_V3_TEMPORAL_TYPE_SOURCE_REPAIRED | `PostgresTypeKind`/`TypeKindObservation`, type-kind digest, temporal resolver and edge contracts are present through `22b6577979a03e2622648d5a63851f1ec9cfe2ba`; unchanged-head native/Product acceptance remains required. |
+| Truth/publication lifecycle | SOURCE_REPAIR_ACCEPTANCE_PENDING_NO_PUBLICATION | No protected immutable semantic release exists; the current Source Observation array/type-kind composition repair is implemented but not exact-head accepted. |
+| Source Observation | ARRAY_TYPE_KIND_COMPOSITION_SOURCE_REPAIRED | `array_type_kind_composition_contract.rs` is represented by source repair `e96367b2944ce3bb33f2b33be04dd36bb0f84e33`; unchanged-head native/Product acceptance remains required. |
 | Product CI | BLOCKED_OWNER_RECONCILIATION | Protected/default ConceptWeave `main` still lacks Product workflow authority; #35 waits on central owner settlement. |
 | Quality gate | NATIVE_ACCEPTANCE_REQUIRED | No Ready/adoption/merge before one unchanged head passes Rust 1.98 plus hosted Product/security/dependency/review gates. |
 | PostgreSQL adapter | BLOCKED_ON_REPRESENTATION_ACCEPTANCE | No transport before representation GREEN and parent adoption. |
-| PostgreSQL 18 temporal keys | TYPE_KIND_SOURCE_REPAIRED_ACCEPTANCE_PENDING | `conperiod` remains declaration authority; explicit type-kind/domain-base/range-pair evidence now governs the final temporal value type. |
+| PostgreSQL 18 temporal keys | TYPE_KIND_SOURCE_REPAIRED_ACCEPTANCE_PENDING | `conperiod` remains declaration authority; explicit type-kind/domain-base/range-pair evidence governs the final temporal value type. |
 | PostgreSQL 18 FK match | MATCH_PARTIAL_FAIL_CLOSED_ACCEPTANCE_PENDING | Reserved catalog code remains historical vocabulary; governed v3 admits only implemented SIMPLE/FULL semantics. |
 | Release | NOT_STARTED | Version/CHANGELOG/tag/package/immutable semantic release/SBOM/provenance/reproducibility/rollback remain mandatory. |
 
 ## Current causal sequence
 
-1. Freeze #46 source semantics and obtain one unchanged exact-head repository-pinned Rust 1.98/Product/security/dependency/review acceptance. Do not add another semantic slice ahead of real acceptance unless review finds a correctness defect in the current type-kind repair.
+1. Keep #46 Draft and obtain one unchanged exact-head repository-pinned Rust 1.98/Product/security/dependency/review acceptance for the array/type-kind composition repair. Do not add another semantic slice ahead of real acceptance unless review finds a correctness defect in the current repair.
 2. If native/hosted checks expose a real failure, repair only that causal failure ordinary-forward, then restart exact-head acceptance; no predecessor GREEN transfers.
 3. Ordinary/non-force adopt verified #46 into #45 and obtain fresh parent acceptance; then adopt #45 into #6.
 4. In parallel, central owner lands the backward-compatible protected handler, reconciles #2051/#2056 onto current protected `.github/main`, obtains terminal GREEN, then unchanged #35 gets fresh acceptance and normal merge.
