@@ -162,12 +162,101 @@ fn observed_uncollatable_is_distinct_from_unobserved_collation_family() {
         )
         .expect("explicit uncollatable evidence is valid")],
     )
-    .expect("observed-uncolllatable snapshot is valid");
+    .expect("observed-uncollatable snapshot is valid");
 
     assert_ne!(
         unobserved.snapshot_digest(),
         observed.snapshot_digest(),
         "an explicitly observed attcollation=0 family must not collapse into unobserved evidence"
+    );
+    let evidence = observed
+        .column_collations()
+        .expect("observed family remains queryable");
+    assert_eq!(evidence.len(), 1);
+    assert_eq!(evidence[0].schema_name(), "public");
+    assert_eq!(evidence[0].relation_name(), "metric");
+    assert_eq!(evidence[0].column_name(), "value");
+    assert_eq!(evidence[0].collation(), None);
+    assert_eq!(evidence[0].deterministic(), None);
+}
+
+#[test]
+fn observed_family_must_cover_every_bounded_column() {
+    let error = snapshot(
+        vec![parent_relation(), child_relation()],
+        vec![collatable("parent", "id", "shared", true)],
+    )
+    .expect_err("an observed family with a missing bounded column must fail closed");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "column_collation_completeness",
+        }
+    );
+}
+
+#[test]
+fn duplicate_column_collation_coordinate_fails_closed() {
+    let error = snapshot(
+        vec![parent_relation()],
+        vec![
+            collatable("parent", "id", "first", true),
+            collatable("parent", "id", "second", true),
+        ],
+    )
+    .expect_err("two observations for one exact column coordinate are contradictory");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "column_collation_coordinate",
+        }
+    );
+}
+
+#[test]
+fn one_qualified_collation_cannot_claim_conflicting_determinism() {
+    let error = snapshot(
+        vec![parent_relation(), child_relation()],
+        vec![
+            collatable("parent", "id", "shared", true),
+            collatable("child", "parent_id", "shared", false),
+        ],
+    )
+    .expect_err("one pg_collation coordinate cannot carry two deterministic states");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "column_collation_determinism",
+        }
+    );
+}
+
+#[test]
+fn column_collation_input_order_does_not_change_identity() {
+    let first = snapshot(
+        vec![parent_relation(), child_relation()],
+        vec![
+            collatable("parent", "id", "parent_deterministic", true),
+            collatable("child", "parent_id", "child_deterministic", true),
+        ],
+    )
+    .expect("first input ordering is valid");
+    let second = snapshot(
+        vec![child_relation(), parent_relation()],
+        vec![
+            collatable("child", "parent_id", "child_deterministic", true),
+            collatable("parent", "id", "parent_deterministic", true),
+        ],
+    )
+    .expect("second input ordering is valid");
+
+    assert_eq!(
+        first.snapshot_digest(),
+        second.snapshot_digest(),
+        "input order must not create a second governed source identity"
     );
 }
 
@@ -181,6 +270,25 @@ fn foreign_key_rejects_different_collations_when_either_side_is_nondeterministic
         ],
     )
     .expect_err("different nondeterministic FK collations must fail closed");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "foreign_key_collation",
+        }
+    );
+}
+
+#[test]
+fn foreign_key_rejects_different_collations_when_only_one_side_is_nondeterministic() {
+    let error = snapshot(
+        vec![parent_relation(), child_relation()],
+        vec![
+            collatable("parent", "id", "parent_deterministic", true),
+            collatable("child", "parent_id", "child_nd", false),
+        ],
+    )
+    .expect_err("different FK collations with one nondeterministic side must fail closed");
 
     assert_eq!(
         error,
