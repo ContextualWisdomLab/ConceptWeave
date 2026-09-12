@@ -3,15 +3,25 @@ use conceptweave_observation::{
     ConstraintPeriodObservation, ConstraintTimingObservation, ForeignKeyAction,
     ForeignKeyDeferrability, ForeignKeyMatchType, ForeignKeyObservation,
     ForeignKeyReferenceBehavior, IndexAttributeKind, IndexAttributeObservation, IndexCatalogFlags,
-    IndexObservation, ObservationError, PostgresSchemaSnapshotV3, PrimaryKeyObservation,
-    QualifiedTypeName, RelationKind, RelationObservation, TableConstraintObservation,
-    UniqueConstraintObservation,
+    IndexObservation, ObservationError, PostgresSchemaSnapshotV3, PostgresTypeKind,
+    PrimaryKeyObservation, QualifiedTypeName, RelationKind, RelationObservation,
+    TableConstraintObservation, TypeKindObservation, UniqueConstraintObservation,
 };
 
 mod support;
 
 fn catalog_type(type_name: &str) -> QualifiedTypeName {
     QualifiedTypeName::new("pg_catalog", type_name).expect("catalog type coordinate is valid")
+}
+
+fn temporal_type_kinds() -> Vec<TypeKindObservation> {
+    vec![
+        TypeKindObservation::range(catalog_type("tstzrange"), catalog_type("tstzmultirange")),
+        TypeKindObservation::multirange(
+            catalog_type("tstzmultirange"),
+            catalog_type("tstzrange"),
+        ),
+    ]
 }
 
 fn column(
@@ -211,16 +221,19 @@ fn base_snapshot(relations: Vec<RelationObservation>) -> PostgresSchemaSnapshotV
         Vec::new(),
     )
     .expect("base snapshot fixture is valid")
+    .with_observed_type_kinds(temporal_type_kinds())
+    .expect("temporal type-kind evidence fixture is coherent")
 }
 
 fn timed_base_snapshot(relations: Vec<RelationObservation>) -> PostgresSchemaSnapshotV3 {
-    PostgresSchemaSnapshotV3::new_with_constraint_timings(
+    PostgresSchemaSnapshotV3::new_with_type_kinds_and_constraint_timings(
         &support::authorized_source("warehouse_primary", &["public"]),
         "postgres_introspector_v3",
         "2026-09-11T22:00:00Z",
         relations,
         Vec::new(),
         Vec::new(),
+        temporal_type_kinds(),
         vec![temporal_key_timing()],
     )
     .expect("timed base snapshot fixture is valid")
