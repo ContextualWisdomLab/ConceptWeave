@@ -54,6 +54,14 @@ impl ConstraintTimingObservation {
         validate_nonblank(&schema_name, "constraint_timing_schema_name")?;
         validate_nonblank(&relation_name, "constraint_timing_relation_name")?;
         validate_nonblank(&constraint_name, "constraint_timing_constraint_name")?;
+        if !matches!(
+            relation_kind,
+            RelationKind::Table | RelationKind::PartitionedTable
+        ) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "constraint_timing_relation_kind",
+            });
+        }
         Ok(Self {
             schema_name,
             relation_name,
