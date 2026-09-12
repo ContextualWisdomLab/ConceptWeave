@@ -18,7 +18,7 @@ Protected/default ConceptWeave `main` remains `f4f440dd58c77d7cd90dff8a1eb2eeb9a
 
 #46 stays Draft until one unchanged exact head has repository-pinned Rust 1.98 plus applicable Product/security/dependency/review terminal evidence. #45/#6 ordinary/non-force adopt the complete verified child only after #46 exact-head GREEN; partial cherry-picks and duplicate fixes are invalid succession.
 
-Product bootstrap #35 remains `9bb82f041483cb4e0cf1aa1f5450b413309f9a05`, OPEN/non-Draft/mergeable. Central workflow settlement remains owned outside ConceptWeave. The current protected-handler bootstrap is `.github#2106@24bb6591ab7df23558cb793b4af60c567ff9da97` on protected `.github/main@fb17ef556f94f673234aa557254ae52779e9a7b0`; SAST Semgrep, Python Security, and Runtime Quality have current-head success, while Security Scan remains queued and CodeQL PR remains in progress. #2106 must reach exact-head terminal acceptance and land normally before #2040 can reconcile/switch protocol; unchanged #35 then needs fresh Product acceptance. ConceptWeave must not copy, weaken, synthetically satisfy, or manually retrigger that owner gate.
+Product bootstrap #35 remains `9bb82f041483cb4e0cf1aa1f5450b413309f9a05`, OPEN/non-Draft/mergeable. Central workflow settlement remains owned outside ConceptWeave. The current protected-handler bootstrap is `.github#2106@24bb6591ab7df23558cb793b4af60c567ff9da97` on protected `.github/main@fb17ef556f94f673234aa557254ae52779e9a7b0`; SAST Semgrep, Python Security, Security Scan, and Runtime Quality have current-head success, while CodeQL PR remains queued. #2106 must reach exact-head terminal acceptance and land normally before #2040 can reconcile/switch protocol; unchanged #35 then needs fresh Product acceptance. ConceptWeave must not copy, weaken, synthetically satisfy, or manually retrigger that owner gate.
 
 ## Source Observation boundary
 
@@ -70,7 +70,7 @@ Catalog OIDs may only join the captured snapshot. The ACL must cross with exact 
 | Area | Status | Evidence / next verification |
 | --- | --- | --- |
 | Source Observation | TEMPORAL_OPERATOR_SOURCE_REPAIRED | `5186175514 -> a9065d4... -> e286c35... -> eef825e...`; exact-head native/Product acceptance required. |
-| Product CI | BLOCKED_OWNER_ACCEPTANCE | #35 unchanged; central #2106 exact `24bb659...` has partial current-head success, Security Scan queued and CodeQL PR in progress. |
+| Product CI | BLOCKED_OWNER_ACCEPTANCE | #35 unchanged; central #2106 exact `24bb659...` has SAST/Python Security/Security Scan/Runtime Quality success and CodeQL PR queued. |
 | Quality gate | NATIVE_ACCEPTANCE_REQUIRED | No Ready/adoption/merge before one unchanged head passes Rust 1.98 and hosted gates. |
 | PostgreSQL adapter | BLOCKED_ON_REPRESENTATION_ACCEPTANCE | No transport before representation GREEN and parent adoption; compare-type/opclass verification is an explicit ACL requirement. |
 | Publication | NO_PUBLICATION | No protected immutable semantic release exists. |
