@@ -30,6 +30,14 @@ impl ConstraintPeriodObservation {
         validate_nonblank(&schema_name, "constraint_period_schema_name")?;
         validate_nonblank(&relation_name, "constraint_period_relation_name")?;
         validate_nonblank(&constraint_name, "constraint_period_constraint_name")?;
+        if !matches!(
+            relation_kind,
+            RelationKind::Table | RelationKind::PartitionedTable
+        ) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "constraint_period_relation_kind",
+            });
+        }
         Ok(Self {
             schema_name,
             relation_name,
