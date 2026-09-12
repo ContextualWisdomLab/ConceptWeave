@@ -62,7 +62,10 @@ fn temporal_backing_index() -> IndexObservation {
     .expect("catalog flags fixture is coherent")
 }
 
-fn temporal_primary_key_with_binding(type_binding: QualifiedTypeName, data_type: &str) -> RelationObservation {
+fn temporal_primary_key_with_binding(
+    type_binding: QualifiedTypeName,
+    data_type: &str,
+) -> RelationObservation {
     RelationObservation::new(
         "public",
         "document",
@@ -214,6 +217,35 @@ fn without_overlaps_preserves_domain_over_range_positive_control() {
 }
 
 #[test]
+fn without_overlaps_preserves_domain_over_user_defined_range() {
+    let period_domain = DomainObservation::new(
+        "public",
+        "active_period",
+        user_type("public", "business_period"),
+    )
+    .expect("domain-over-user-range fixture is valid");
+    let mut type_kinds = user_range_family("business_period", "business_period_set");
+    type_kinds.push(TypeKindObservation::domain(
+        user_type("public", "active_period"),
+        user_type("public", "business_period"),
+    ));
+    let snapshot = PostgresSchemaSnapshotV3::new_with_type_kinds(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-12T03:27:00Z",
+        vec![temporal_primary_key_with_domain_period()],
+        vec![period_domain],
+        Vec::new(),
+        type_kinds,
+    )
+    .expect("domain over a user-defined range remains representable through the compatibility seam");
+
+    snapshot
+        .with_observed_constraint_periods(vec![temporal_period()])
+        .expect("domain-over-user-range satisfies WITHOUT OVERLAPS type semantics");
+}
+
+#[test]
 fn without_overlaps_rejects_domain_over_scalar() {
     let period_domain = DomainObservation::new(
         "public",
@@ -324,4 +356,93 @@ fn range_and_multirange_evidence_must_be_reciprocal() {
             field: "type_kind_range_reciprocity",
         }
     );
+}
+
+#[test]
+fn cyclic_domain_type_kind_evidence_fails_closed() {
+    let first_domain = DomainObservation::new(
+        "public",
+        "active_period",
+        user_type("public", "active_period_alias"),
+    )
+    .expect("first cyclic domain fixture is structurally valid");
+    let second_domain = DomainObservation::new(
+        "public",
+        "active_period_alias",
+        user_type("public", "active_period"),
+    )
+    .expect("second cyclic domain fixture is structurally valid");
+    let snapshot = PostgresSchemaSnapshotV3::new(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-12T03:50:00Z",
+        vec![temporal_primary_key_with_domain_period()],
+        vec![first_domain, second_domain],
+        Vec::new(),
+    )
+    .expect("base representation preserves the explicit domain coordinates");
+
+    let error = snapshot
+        .with_observed_type_kinds(vec![
+            TypeKindObservation::domain(
+                user_type("public", "active_period"),
+                user_type("public", "active_period_alias"),
+            ),
+            TypeKindObservation::domain(
+                user_type("public", "active_period_alias"),
+                user_type("public", "active_period"),
+            ),
+        ])
+        .expect_err("domain-base evidence must not contain a cycle");
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "type_kind_domain_cycle",
+        }
+    );
+}
+
+#[test]
+fn type_kind_identity_distinguishes_unobserved_and_is_input_order_stable() {
+    let relation = temporal_primary_key_with_scalar_period();
+    let unobserved = PostgresSchemaSnapshotV3::new(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-12T03:55:00Z",
+        vec![relation.clone()],
+        Vec::new(),
+        Vec::new(),
+    )
+    .expect("unobserved type-kind snapshot is valid");
+
+    let forward = PostgresSchemaSnapshotV3::new(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-12T03:55:00Z",
+        vec![relation.clone()],
+        Vec::new(),
+        Vec::new(),
+    )
+    .expect("forward base snapshot is valid")
+    .with_observed_type_kinds(catalog_range_family("tstzrange", "tstzmultirange"))
+    .expect("forward type-kind family is coherent");
+
+    let mut reverse_types = catalog_range_family("tstzrange", "tstzmultirange");
+    reverse_types.reverse();
+    let reverse = PostgresSchemaSnapshotV3::new(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-12T03:55:00Z",
+        vec![relation],
+        Vec::new(),
+        Vec::new(),
+    )
+    .expect("reverse base snapshot is valid")
+    .with_observed_type_kinds(reverse_types)
+    .expect("reverse type-kind family is coherent");
+
+    assert_ne!(unobserved.snapshot_digest(), forward.snapshot_digest());
+    assert_eq!(forward.snapshot_digest(), reverse.snapshot_digest());
+    assert_eq!(unobserved.type_kinds(), None);
+    assert!(forward.type_kinds().is_some());
 }
