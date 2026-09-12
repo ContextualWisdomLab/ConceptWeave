@@ -24,6 +24,25 @@ fn temporal_type_kinds() -> Vec<TypeKindObservation> {
     ]
 }
 
+fn temporal_key_operator_signatures() -> Vec<(u32, String, String, QualifiedTypeName, QualifiedTypeName)> {
+    vec![
+        (
+            1,
+            "pg_catalog".to_owned(),
+            "=".to_owned(),
+            catalog_type("int8"),
+            catalog_type("int8"),
+        ),
+        (
+            2,
+            "pg_catalog".to_owned(),
+            "&&".to_owned(),
+            catalog_type("tstzrange"),
+            catalog_type("tstzrange"),
+        ),
+    ]
+}
+
 fn column(
     name: &str,
     position: u32,
@@ -201,14 +220,24 @@ fn period(
     constraint_name: &str,
     has_period_semantics: bool,
 ) -> ConstraintPeriodObservation {
-    ConstraintPeriodObservation::new(
+    let observation = ConstraintPeriodObservation::new(
         "public",
         relation_name,
         RelationKind::Table,
         constraint_name,
         has_period_semantics,
     )
-    .expect("constraint-period fixture is valid")
+    .expect("constraint-period fixture is valid");
+    if has_period_semantics
+        && relation_name == "document"
+        && constraint_name == "document_temporal_key"
+    {
+        observation
+            .with_exclusion_operator_signatures(temporal_key_operator_signatures())
+            .expect("temporal key exclusion operators are valid")
+    } else {
+        observation
+    }
 }
 
 fn base_snapshot(relations: Vec<RelationObservation>) -> PostgresSchemaSnapshotV3 {
