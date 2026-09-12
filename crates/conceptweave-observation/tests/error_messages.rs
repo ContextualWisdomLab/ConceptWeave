@@ -78,6 +78,74 @@ fn every_observation_error_has_a_stable_operator_message() {
             },
             "unobserved source location: public.events.missing",
         ),
+        (
+            ObservationError::DuplicateIndexObservation {
+                schema_name: "public".into(),
+                relation_name: "events".into(),
+                index_name: "events_parent_ix".into(),
+            },
+            "duplicate index observation on public.events: events_parent_ix",
+        ),
+        (
+            ObservationError::UnknownIndexAttribute {
+                schema_name: "public".into(),
+                relation_name: "events".into(),
+                index_name: "events_parent_ix".into(),
+                attribute_name: "missing_key".into(),
+            },
+            "unknown index attribute on public.events: events_parent_ix refers to missing_key",
+        ),
+        (
+            ObservationError::DuplicateRelationObservation {
+                schema_name: "public".into(),
+                relation_name: "events".into(),
+            },
+            "duplicate relation observation: public.events",
+        ),
+        (
+            ObservationError::DuplicateDomainObservation {
+                schema_name: "public".into(),
+                domain_name: "status_kind".into(),
+            },
+            "duplicate domain observation: public.status_kind",
+        ),
+        (
+            ObservationError::DuplicateEnumObservation {
+                schema_name: "public".into(),
+                enum_name: "status".into(),
+            },
+            "duplicate enum observation: public.status",
+        ),
+        (
+            ObservationError::DuplicateSchemaTypeName {
+                schema_name: "public".into(),
+                type_name: "status".into(),
+            },
+            "duplicate schema-scoped type name: public.status",
+        ),
+        (
+            ObservationError::DuplicateEnumLabel {
+                schema_name: "public".into(),
+                enum_name: "status".into(),
+                label: "pending".into(),
+            },
+            "duplicate enum label on public.status: pending",
+        ),
+        (
+            ObservationError::DuplicateDomainCheckConstraint {
+                schema_name: "public".into(),
+                domain_name: "status_kind".into(),
+                constraint_name: "status_kind_allowed".into(),
+            },
+            "duplicate domain constraint on public.status_kind: status_kind_allowed",
+        ),
+        (
+            ObservationError::UnknownTypeBinding {
+                schema_name: "public".into(),
+                type_name: "missing_kind".into(),
+            },
+            "unresolved qualified type binding: public.missing_kind",
+        ),
     ];
 
     for (error, expected) in cases {

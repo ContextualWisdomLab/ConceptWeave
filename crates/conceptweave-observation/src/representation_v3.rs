@@ -1,9 +1,10 @@
 //! Versioned successor observation value objects for PostgreSQL schema evidence.
 //!
 //! These contracts form the successor evidence family to the frozen v2 representation: relation
-//! kind and relation comments, schema-scoped domains and enums, qualified column type bindings,
-//! domain semantics, and enum label order. The successor framing is domain-separated from v2, so no
-//! v2 digest, receipt, or coordinate changes meaning because of this module.
+//! kind and relation comments, relation-scoped index evidence, schema-scoped domains and enums,
+//! qualified column type bindings, domain semantics, and enum label order. The successor framing is
+//! domain-separated from v2, so no v2 digest, receipt, or coordinate changes meaning because of this
+//! module.
 
 use std::collections::BTreeSet;
 
@@ -24,9 +25,9 @@ const POSTGRES_CATALOG_SCHEMA_NAME: &str = "pg_catalog";
 
 /// Exact schema-qualified PostgreSQL type coordinate.
 ///
-/// The coordinate identifies a built-in, domain, or enum type without relying on `search_path`
-/// resolution. Exact source text is preserved, including case and characters that would require
-/// quoting in PostgreSQL.
+/// The coordinate identifies a built-in, domain, enum, or relation-backed composite row type
+/// without relying on `search_path` resolution. Exact source text is preserved, including case and
+/// characters that would require quoting in PostgreSQL.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct QualifiedTypeName {
     schema_name: String,
@@ -98,6 +99,258 @@ impl QualifiedCollationName {
     }
 }
 
+/// Exact schema-qualified PostgreSQL operator-class coordinate.
+///
+/// A PostgreSQL index key binds to one operator class from `pg_opclass`, addressed by its exact
+/// namespace and name. The coordinate never relies on `search_path` resolution and never uses a
+/// catalog OID as governed identity. The owning index access method is framed separately by
+/// [`IndexObservation`], matching PostgreSQL's method-relative operator-class namespace.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct QualifiedOperatorClassName {
+    schema_name: String,
+    operator_class_name: String,
+}
+
+impl QualifiedOperatorClassName {
+    /// Creates a qualified operator-class coordinate while preserving exact source text.
+    pub fn new(
+        schema_name: impl Into<String>,
+        operator_class_name: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        let schema_name = schema_name.into();
+        let operator_class_name = operator_class_name.into();
+        validate_nonblank(&schema_name, "schema_name")?;
+        validate_nonblank(&operator_class_name, "operator_class_name")?;
+        Ok(Self {
+            schema_name,
+            operator_class_name,
+        })
+    }
+
+    /// Returns the exact source schema identifier.
+    #[must_use]
+    pub fn schema_name(&self) -> &str {
+        &self.schema_name
+    }
+
+    /// Returns the exact source operator-class identifier.
+    #[must_use]
+    pub fn operator_class_name(&self) -> &str {
+        &self.operator_class_name
+    }
+}
+
+/// One exact PostgreSQL operator-class parameter attached to an index key.
+///
+/// PostgreSQL exposes operator-class parameters as attribute-level `keyword=value` options. The
+/// generic representation preserves the exact option name and value without interpreting
+/// access-method- or extension-specific semantics. Option-array order is not semantic identity;
+/// [`IndexKeySemantics::with_operator_class_options`] canonicalizes options by exact name.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OperatorClassOption {
+    name: String,
+    value: String,
+}
+
+impl OperatorClassOption {
+    /// Creates one operator-class option from exact catalog text.
+    pub fn new(
+        name: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        let name = name.into();
+        let value = value.into();
+        validate_nonblank(&name, "operator_class_option_name")?;
+        Ok(Self { name, value })
+    }
+
+    /// Returns the exact option name.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Returns the exact option value, including an empty value when PostgreSQL reports one.
+    #[must_use]
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+}
+
+/// One exact index access-method storage option from `pg_class.reloptions`.
+///
+/// PostgreSQL exposes index storage configuration as access-method-specific `keyword=value` text.
+/// ConceptWeave preserves exact names and values without decoding provider semantics. Option-array
+/// order is not semantic identity; [`IndexObservation::with_storage_options`] canonicalizes options
+/// by exact name while distinguishing unobserved state from an explicitly observed empty set.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IndexStorageOption {
+    name: String,
+    value: String,
+}
+
+impl IndexStorageOption {
+    /// Creates one exact index storage option without interpreting the access-method-specific value.
+    pub fn new(
+        name: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        let name = name.into();
+        let value = value.into();
+        validate_nonblank(&name, "index_storage_option_name")?;
+        Ok(Self { name, value })
+    }
+
+    /// Returns the exact storage-option name.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Returns the exact storage-option value, including an empty value when observed.
+    #[must_use]
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+}
+
+/// Exact resolved PostgreSQL tablespace evidence for one index.
+///
+/// `pg_class.reltablespace = 0` means that the relation uses its database's default tablespace, not
+/// that tablespace evidence was absent. The adapter therefore resolves both explicit and database-
+/// default catalog state to an exact tablespace name before entering this domain contract. Catalog
+/// OIDs are join coordinates only and never participate in governed identity.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IndexTablespace {
+    name: String,
+    database_default: bool,
+}
+
+impl IndexTablespace {
+    /// Records an explicitly assigned named tablespace.
+    pub fn named(name: impl Into<String>) -> Result<Self, ObservationError> {
+        Self::new(name, false)
+    }
+
+    /// Records the resolved database-default tablespace used by `reltablespace = 0`.
+    pub fn database_default(name: impl Into<String>) -> Result<Self, ObservationError> {
+        Self::new(name, true)
+    }
+
+    fn new(name: impl Into<String>, database_default: bool) -> Result<Self, ObservationError> {
+        let name = name.into();
+        validate_nonblank(&name, "index_tablespace_name")?;
+        Ok(Self {
+            name,
+            database_default,
+        })
+    }
+
+    /// Returns the exact resolved tablespace name.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Returns whether the source catalog used its database-default tablespace marker.
+    #[must_use]
+    pub const fn is_database_default(&self) -> bool {
+        self.database_default
+    }
+}
+
+/// One exact PostgreSQL per-key index semantic record.
+///
+/// PostgreSQL 18 carries one `pg_index.indcollation`, `indclass`, and `indoption` entry for each of
+/// the `indnkeyatts` key positions. The collation is optional because no collation applies to every
+/// type or operator class; the operator class is required for every key. The raw `indoption` bit
+/// pattern is preserved verbatim because its meaning is defined by the owning index access method,
+/// not by this generic representation, so it is never decoded as B-tree-specific behavior.
+/// Operator-class parameters are retained separately as exact option name/value evidence.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IndexKeySemantics {
+    position: u32,
+    collation: Option<QualifiedCollationName>,
+    operator_class: QualifiedOperatorClassName,
+    access_method_options: u16,
+    operator_class_options: Vec<OperatorClassOption>,
+}
+
+impl IndexKeySemantics {
+    /// Creates one per-key semantic record at an exact one-based key position.
+    pub fn new(
+        position: u32,
+        collation: Option<QualifiedCollationName>,
+        operator_class: QualifiedOperatorClassName,
+        access_method_options: u16,
+    ) -> Result<Self, ObservationError> {
+        if position == 0 {
+            return Err(ObservationError::InvalidOrdinalPosition);
+        }
+        Ok(Self {
+            position,
+            collation,
+            operator_class,
+            access_method_options,
+            operator_class_options: Vec::new(),
+        })
+    }
+
+    /// Records exact operator-class parameters in deterministic option-name order.
+    ///
+    /// PostgreSQL's catalog exposes these as an attribute-level option array. Array order does not
+    /// create a second semantic identity, while duplicate option names are contradictory evidence
+    /// and therefore fail closed before snapshot construction.
+    pub fn with_operator_class_options(
+        mut self,
+        mut operator_class_options: Vec<OperatorClassOption>,
+    ) -> Result<Self, ObservationError> {
+        operator_class_options.sort_by(|left, right| {
+            (left.name(), left.value()).cmp(&(right.name(), right.value()))
+        });
+        if operator_class_options
+            .windows(2)
+            .any(|pair| pair[0].name() == pair[1].name())
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "operator_class_options",
+            });
+        }
+        self.operator_class_options = operator_class_options;
+        Ok(self)
+    }
+
+    /// Returns the exact one-based key position this record describes.
+    #[must_use]
+    pub const fn position(&self) -> u32 {
+        self.position
+    }
+
+    /// Returns the exact qualified per-key collation coordinate, or `None` when none applies.
+    #[must_use]
+    pub fn collation(&self) -> Option<&QualifiedCollationName> {
+        self.collation.as_ref()
+    }
+
+    /// Returns the exact qualified per-key operator-class coordinate.
+    #[must_use]
+    pub fn operator_class(&self) -> &QualifiedOperatorClassName {
+        &self.operator_class
+    }
+
+    /// Returns the raw access-method-specific `indoption` bit pattern without interpreting it.
+    #[must_use]
+    pub const fn access_method_options(&self) -> u16 {
+        self.access_method_options
+    }
+
+    /// Returns operator-class parameters in deterministic exact-name order.
+    #[must_use]
+    pub fn operator_class_options(&self) -> &[OperatorClassOption] {
+        &self.operator_class_options
+    }
+}
+
 /// PostgreSQL relation kind reported by `pg_class.relkind`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RelationKind {
@@ -127,6 +380,20 @@ impl RelationKind {
             Self::ForeignTable => 4,
             Self::Sequence => 5,
             Self::CompositeType => 6,
+        }
+    }
+
+    /// Exact stable coordinate token preserving the relation kind without loss.
+    #[must_use]
+    pub const fn token(self) -> &'static str {
+        match self {
+            Self::Table => "table",
+            Self::PartitionedTable => "partitioned_table",
+            Self::View => "view",
+            Self::MaterializedView => "materialized_view",
+            Self::ForeignTable => "foreign_table",
+            Self::Sequence => "sequence",
+            Self::CompositeType => "composite_type",
         }
     }
 }
@@ -201,6 +468,524 @@ impl ColumnObservationV3 {
     #[must_use]
     pub const fn nullable(&self) -> bool {
         self.nullable
+    }
+
+    /// Returns the exact optional source comment without inventing missing metadata.
+    #[must_use]
+    pub fn source_comment(&self) -> Option<&str> {
+        self.source_comment.as_deref()
+    }
+}
+
+/// PostgreSQL index attribute role within one index observation.
+///
+/// Key attributes participate in the index key and uniqueness, while INCLUDE attributes are
+/// payload-only. The role is material identity: the same exact attribute in a different role is a
+/// different observation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum IndexAttributeKind {
+    /// A key attribute of the index.
+    Key,
+    /// A non-key payload attribute carried by `INCLUDE`.
+    Include,
+}
+
+impl IndexAttributeKind {
+    fn tag(self) -> u8 {
+        match self {
+            Self::Key => 0,
+            Self::Include => 1,
+        }
+    }
+}
+
+/// One immutable index attribute in exact `indkey` position order.
+///
+/// A zero `indkey` position denotes a server-rendered expression rather than a simple column
+/// reference, so the two forms are structurally distinct and never collapse into one string.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IndexAttributeObservation {
+    position: u32,
+    kind: IndexAttributeKind,
+    source: IndexAttributeSource,
+}
+
+/// Exact source of one index attribute position.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum IndexAttributeSource {
+    /// A simple column reference addressed by exact attribute name.
+    Column(String),
+    /// An exact server-rendered expression occupying a zero `indkey` position.
+    Expression(String),
+}
+
+impl IndexAttributeObservation {
+    /// Creates a simple column index attribute from exact source attribute text.
+    pub fn new(
+        position: u32,
+        kind: IndexAttributeKind,
+        attribute_name: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        Self::column(position, kind, attribute_name)
+    }
+
+    /// Creates a simple column index attribute from exact source attribute text.
+    pub fn column(
+        position: u32,
+        kind: IndexAttributeKind,
+        attribute_name: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        let attribute_name = attribute_name.into();
+        if position == 0 {
+            return Err(ObservationError::InvalidOrdinalPosition);
+        }
+        validate_nonblank(&attribute_name, "attribute_name")?;
+        Ok(Self {
+            position,
+            kind,
+            source: IndexAttributeSource::Column(attribute_name),
+        })
+    }
+
+    /// Creates an expression index attribute from exact server-rendered expression text.
+    pub fn expression(
+        position: u32,
+        kind: IndexAttributeKind,
+        expression: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        let expression = expression.into();
+        if position == 0 {
+            return Err(ObservationError::InvalidOrdinalPosition);
+        }
+        validate_nonblank(&expression, "expression")?;
+        Ok(Self {
+            position,
+            kind,
+            source: IndexAttributeSource::Expression(expression),
+        })
+    }
+
+    /// Returns the one-based source attribute position.
+    #[must_use]
+    pub const fn position(&self) -> u32 {
+        self.position
+    }
+
+    /// Returns the key or INCLUDE role of this attribute.
+    #[must_use]
+    pub const fn kind(&self) -> IndexAttributeKind {
+        self.kind
+    }
+
+    /// Returns the exact source column name for a simple column attribute.
+    #[must_use]
+    pub fn attribute_name(&self) -> Option<&str> {
+        match &self.source {
+            IndexAttributeSource::Column(attribute_name) => Some(attribute_name),
+            IndexAttributeSource::Expression(_) => None,
+        }
+    }
+
+    /// Returns the exact server-rendered expression for an expression attribute.
+    #[must_use]
+    pub fn expression_text(&self) -> Option<&str> {
+        match &self.source {
+            IndexAttributeSource::Expression(expression) => Some(expression),
+            IndexAttributeSource::Column(_) => None,
+        }
+    }
+}
+
+/// Remaining exact PostgreSQL `pg_index` catalog flags not modeled by the dedicated index fields.
+///
+/// These booleans preserve source state without deriving defaults or interpreting provider runtime
+/// behavior. Readiness, validity, and liveness remain dedicated [`IndexObservation`] fields because
+/// they predate this grouped successor state and have distinct lifecycle semantics in the public API.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct IndexCatalogFlags {
+    primary: bool,
+    exclusion: bool,
+    immediate: bool,
+    clustered: bool,
+    check_xmin: bool,
+    replica_identity: bool,
+}
+
+impl IndexCatalogFlags {
+    /// Creates the exact observed remaining `pg_index` flag vector.
+    #[must_use]
+    pub const fn new(
+        primary: bool,
+        exclusion: bool,
+        immediate: bool,
+        clustered: bool,
+        check_xmin: bool,
+        replica_identity: bool,
+    ) -> Self {
+        Self {
+            primary,
+            exclusion,
+            immediate,
+            clustered,
+            check_xmin,
+            replica_identity,
+        }
+    }
+
+    /// Returns observed `pg_index.indisprimary`.
+    #[must_use]
+    pub const fn primary(self) -> bool {
+        self.primary
+    }
+
+    /// Returns observed `pg_index.indisexclusion`.
+    #[must_use]
+    pub const fn exclusion(self) -> bool {
+        self.exclusion
+    }
+
+    /// Returns observed `pg_index.indimmediate`.
+    #[must_use]
+    pub const fn immediate(self) -> bool {
+        self.immediate
+    }
+
+    /// Returns observed `pg_index.indisclustered`.
+    #[must_use]
+    pub const fn clustered(self) -> bool {
+        self.clustered
+    }
+
+    /// Returns observed `pg_index.indcheckxmin`.
+    #[must_use]
+    pub const fn check_xmin(self) -> bool {
+        self.check_xmin
+    }
+
+    /// Returns observed `pg_index.indisreplident`.
+    #[must_use]
+    pub const fn replica_identity(self) -> bool {
+        self.replica_identity
+    }
+}
+
+/// Immutable observation of one relation-scoped PostgreSQL index.
+///
+/// Key attributes are held separately from INCLUDE payload attributes because the two roles are
+/// materially distinct. A partial index carries its exact server-rendered predicate, while a
+/// non-partial index carries no predicate so the two never collapse. Readiness, validity, and
+/// liveness remain independently optional because the adapter may not observe every catalog flag.
+/// Reconstructed definition text is exact server output (`pg_get_indexdef`), never original DDL.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IndexObservation {
+    index_name: String,
+    is_unique: bool,
+    nulls_not_distinct: Option<bool>,
+    catalog_flags: Option<IndexCatalogFlags>,
+    storage_options: Option<Vec<IndexStorageOption>>,
+    tablespace: Option<IndexTablespace>,
+    access_method: Option<String>,
+    key_attributes: Vec<IndexAttributeObservation>,
+    include_attributes: Vec<IndexAttributeObservation>,
+    key_semantics: Option<Vec<IndexKeySemantics>>,
+    predicate: Option<String>,
+    ready: Option<bool>,
+    valid: Option<bool>,
+    live: Option<bool>,
+    index_definition: Option<String>,
+    source_comment: Option<String>,
+}
+
+impl IndexObservation {
+    /// Creates an index observation from exactly the observed material index evidence.
+    ///
+    /// At least one key attribute is required. Key and INCLUDE attributes are canonicalized into
+    /// deterministic position order. Attribute roles must agree with their collection
+    /// (`key_attributes` holds only key positions and `include_attributes` holds only payload
+    /// positions), the combined one-based positions must be contiguous with every key position
+    /// preceding every INCLUDE position, and INCLUDE attributes must be simple columns because
+    /// PostgreSQL `INCLUDE` does not accept expressions. `NULLS NOT DISTINCT = true` is admissible
+    /// only for a unique index, matching the PostgreSQL catalog invariant. Every simple column
+    /// attribute is validated against the owning relation columns when the index is attached to a
+    /// relation observation.
+    pub fn new(
+        index_name: impl Into<String>,
+        is_unique: bool,
+        nulls_not_distinct: Option<bool>,
+        mut key_attributes: Vec<IndexAttributeObservation>,
+        mut include_attributes: Vec<IndexAttributeObservation>,
+    ) -> Result<Self, ObservationError> {
+        let index_name = index_name.into();
+        validate_nonblank(&index_name, "index_name")?;
+        if !is_unique && nulls_not_distinct == Some(true) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "nulls_not_distinct",
+            });
+        }
+        key_attributes.sort_by_key(IndexAttributeObservation::position);
+        include_attributes.sort_by_key(IndexAttributeObservation::position);
+        Self::validate_attribute_layout(&key_attributes, &include_attributes)?;
+        Ok(Self {
+            index_name,
+            is_unique,
+            nulls_not_distinct,
+            catalog_flags: None,
+            storage_options: None,
+            tablespace: None,
+            access_method: None,
+            key_attributes,
+            include_attributes,
+            key_semantics: None,
+            predicate: None,
+            ready: None,
+            valid: None,
+            live: None,
+            index_definition: None,
+            source_comment: None,
+        })
+    }
+
+    fn validate_attribute_layout(
+        key_attributes: &[IndexAttributeObservation],
+        include_attributes: &[IndexAttributeObservation],
+    ) -> Result<(), ObservationError> {
+        let layout_error = || ObservationError::InvalidObservationField {
+            field: "index_attribute_layout",
+        };
+        if key_attributes.is_empty() {
+            return Err(layout_error());
+        }
+        for (expected_position, attribute) in (1u32..).zip(key_attributes) {
+            if attribute.kind() != IndexAttributeKind::Key
+                || attribute.position() != expected_position
+            {
+                return Err(layout_error());
+            }
+        }
+        let key_count = key_attributes.len() as u32;
+        for (offset, attribute) in include_attributes.iter().enumerate() {
+            if attribute.kind() != IndexAttributeKind::Include
+                || attribute.position() != key_count + offset as u32 + 1
+                || attribute.attribute_name().is_none()
+            {
+                return Err(layout_error());
+            }
+        }
+        Ok(())
+    }
+
+    /// Records the exact observed access method name, such as `btree` or `gin`.
+    #[must_use]
+    pub fn with_access_method(mut self, access_method: impl Into<String>) -> Self {
+        self.access_method = Some(access_method.into());
+        self
+    }
+
+    /// Records one exact per-key semantic record for every structural key position.
+    ///
+    /// PostgreSQL 18 stores `indcollation`, `indclass`, and `indoption` as arrays of exactly
+    /// `indnkeyatts` key entries, so the record count and positions must match this index's key
+    /// attributes exactly; INCLUDE payload positions never carry a semantic record.
+    pub fn with_key_semantics(
+        mut self,
+        mut key_semantics: Vec<IndexKeySemantics>,
+    ) -> Result<Self, ObservationError> {
+        let semantics_error = || ObservationError::InvalidObservationField {
+            field: "index_key_semantics",
+        };
+        if key_semantics.len() != self.key_attributes.len() {
+            return Err(semantics_error());
+        }
+        key_semantics.sort_by_key(IndexKeySemantics::position);
+        for (expected_position, semantics) in (1u32..).zip(&key_semantics) {
+            if semantics.position() != expected_position {
+                return Err(semantics_error());
+            }
+        }
+        self.key_semantics = Some(key_semantics);
+        Ok(self)
+    }
+
+    /// Records the remaining exact `pg_index` catalog flags as one observed vector.
+    ///
+    /// PostgreSQL requires a primary-key index to be unique. Other flags are preserved exactly even
+    /// when PostgreSQL documents them as irrelevant in a particular state; this representation does
+    /// not invent or normalize provider values.
+    pub fn with_catalog_flags(
+        mut self,
+        catalog_flags: IndexCatalogFlags,
+    ) -> Result<Self, ObservationError> {
+        if catalog_flags.primary() && !self.is_unique {
+            return Err(ObservationError::InvalidObservationField {
+                field: "index_catalog_flags",
+            });
+        }
+        self.catalog_flags = Some(catalog_flags);
+        Ok(self)
+    }
+
+    /// Records exact observed index `pg_class.reloptions` in deterministic option-name order.
+    ///
+    /// PostgreSQL defines these options at the access-method boundary. This generic contract retains
+    /// exact names and values without interpretation, rejects contradictory duplicate names, and
+    /// keeps `Some([])` distinct from `None` so an observed empty option set does not become
+    /// indistinguishable from unobserved catalog state.
+    pub fn with_storage_options(
+        mut self,
+        mut storage_options: Vec<IndexStorageOption>,
+    ) -> Result<Self, ObservationError> {
+        storage_options.sort_by(|left, right| {
+            (left.name(), left.value()).cmp(&(right.name(), right.value()))
+        });
+        if storage_options
+            .windows(2)
+            .any(|pair| pair[0].name() == pair[1].name())
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "index_storage_options",
+            });
+        }
+        self.storage_options = Some(storage_options);
+        Ok(self)
+    }
+
+    /// Records the exact resolved tablespace and whether PostgreSQL used the database-default marker.
+    #[must_use]
+    pub fn with_tablespace(mut self, tablespace: IndexTablespace) -> Self {
+        self.tablespace = Some(tablespace);
+        self
+    }
+
+    /// Records an exact server-rendered partial predicate, never original DDL.
+    #[must_use]
+    pub fn with_predicate(mut self, predicate: impl Into<String>) -> Self {
+        self.predicate = Some(predicate.into());
+        self
+    }
+
+    /// Records observed `pg_index.indisready` state, or leaves `None` when it was not captured.
+    #[must_use]
+    pub const fn with_ready(mut self, ready: bool) -> Self {
+        self.ready = Some(ready);
+        self
+    }
+
+    /// Records observed `pg_index.indisvalid` state, or leaves `None` when it was not captured.
+    #[must_use]
+    pub const fn with_valid(mut self, valid: bool) -> Self {
+        self.valid = Some(valid);
+        self
+    }
+
+    /// Records observed `pg_index.indislive` state, or leaves `None` when it was not captured.
+    #[must_use]
+    pub const fn with_live(mut self, live: bool) -> Self {
+        self.live = Some(live);
+        self
+    }
+
+    /// Records exact server-rendered `pg_get_indexdef` text, never original DDL.
+    #[must_use]
+    pub fn with_index_definition(mut self, index_definition: impl Into<String>) -> Self {
+        self.index_definition = Some(index_definition.into());
+        self
+    }
+
+    /// Records the exact optional index comment without inventing missing metadata.
+    #[must_use]
+    pub fn with_source_comment(mut self, source_comment: impl Into<String>) -> Self {
+        self.source_comment = Some(source_comment.into());
+        self
+    }
+
+    /// Returns the exact source index identifier.
+    #[must_use]
+    pub fn index_name(&self) -> &str {
+        &self.index_name
+    }
+
+    /// Returns whether the index enforces uniqueness.
+    #[must_use]
+    pub const fn is_unique(&self) -> bool {
+        self.is_unique
+    }
+
+    /// Returns observed `NULLS NOT DISTINCT` state, or `None` when it was not captured.
+    #[must_use]
+    pub const fn nulls_not_distinct(&self) -> Option<bool> {
+        self.nulls_not_distinct
+    }
+
+    /// Returns the observed remaining `pg_index` catalog flag vector, or `None` when unobserved.
+    #[must_use]
+    pub const fn catalog_flags(&self) -> Option<&IndexCatalogFlags> {
+        self.catalog_flags.as_ref()
+    }
+
+    /// Returns observed index storage options in deterministic exact-name order.
+    #[must_use]
+    pub fn storage_options(&self) -> Option<&[IndexStorageOption]> {
+        self.storage_options.as_deref()
+    }
+
+    /// Returns the resolved index tablespace evidence, or `None` when it was not observed.
+    #[must_use]
+    pub const fn tablespace(&self) -> Option<&IndexTablespace> {
+        self.tablespace.as_ref()
+    }
+
+    /// Returns the exact observed access method name, or `None` when it was not captured.
+    #[must_use]
+    pub fn access_method(&self) -> Option<&str> {
+        self.access_method.as_deref()
+    }
+
+    /// Returns key attributes in deterministic source position order.
+    #[must_use]
+    pub fn key_attributes(&self) -> &[IndexAttributeObservation] {
+        &self.key_attributes
+    }
+
+    /// Returns INCLUDE payload attributes in deterministic source position order.
+    #[must_use]
+    pub fn include_attributes(&self) -> &[IndexAttributeObservation] {
+        &self.include_attributes
+    }
+
+    /// Returns the captured per-key semantic records in key position order, or `None` when absent.
+    #[must_use]
+    pub fn key_semantics(&self) -> Option<&[IndexKeySemantics]> {
+        self.key_semantics.as_deref()
+    }
+
+    /// Returns the exact server-rendered partial predicate, or `None` for a full index.
+    #[must_use]
+    pub fn predicate(&self) -> Option<&str> {
+        self.predicate.as_deref()
+    }
+
+    /// Returns observed `pg_index.indisready` state, or `None` when it was not captured.
+    #[must_use]
+    pub const fn ready(&self) -> Option<bool> {
+        self.ready
+    }
+
+    /// Returns observed `pg_index.indisvalid` state, or `None` when it was not captured.
+    #[must_use]
+    pub const fn valid(&self) -> Option<bool> {
+        self.valid
+    }
+
+    /// Returns observed `pg_index.indislive` state, or `None` when it was not captured.
+    #[must_use]
+    pub const fn live(&self) -> Option<bool> {
+        self.live
+    }
+
+    /// Returns exact server-rendered `pg_get_indexdef` text, or `None` when it was not captured.
+    #[must_use]
+    pub fn index_definition(&self) -> Option<&str> {
+        self.index_definition.as_deref()
     }
 
     /// Returns the exact optional source comment without inventing missing metadata.
@@ -510,7 +1295,8 @@ impl EnumObservation {
 /// Immutable observation of one schema-scoped PostgreSQL relation.
 ///
 /// The relation carries its exact `pg_class.relkind`, optional relation comment, columns bound to
-/// qualified type coordinates, and the same deterministic constraint vocabulary used by v2.
+/// qualified type coordinates, relation-scoped index evidence, and the same deterministic
+/// constraint vocabulary used by v2.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RelationObservation {
     schema_name: String,
@@ -518,6 +1304,7 @@ pub struct RelationObservation {
     kind: RelationKind,
     columns: Vec<ColumnObservationV3>,
     constraints: Vec<TableConstraintObservation>,
+    indexes: Vec<IndexObservation>,
     source_comment: Option<String>,
 }
 
@@ -566,6 +1353,7 @@ impl RelationObservation {
             kind,
             columns,
             constraints: Vec::new(),
+            indexes: Vec::new(),
             source_comment: None,
         })
     }
@@ -615,6 +1403,69 @@ impl RelationObservation {
         self
     }
 
+    /// Replaces relation-scoped index evidence, preserving exact local-column coordinates.
+    ///
+    /// Indexes are canonicalized into deterministic exact source-name order. Every simple column
+    /// key or INCLUDE attribute must resolve to a column on this same relation observation, while
+    /// expression attributes stay structurally separate. Index names must be unique; attribute
+    /// layout validity is enforced by [`IndexObservation::new`] before an index reaches a relation.
+    /// Because a governed snapshot may only carry complete index semantics, every index must supply
+    /// one per-key semantic record for each key attribute, and an index whose records carry
+    /// access-method option bits must also carry a nonblank observed access method.
+    pub fn with_indexes(
+        mut self,
+        mut indexes: Vec<IndexObservation>,
+    ) -> Result<Self, ObservationError> {
+        let mut index_names = BTreeSet::new();
+        for index in &indexes {
+            let index_name = index.index_name();
+            if index.key_semantics().is_none() {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "index_key_semantics",
+                });
+            }
+            let has_blank_access_method = index
+                .access_method()
+                .is_none_or(|access_method| access_method.trim().is_empty());
+            if has_blank_access_method {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "access_method",
+                });
+            }
+            if !index_names.insert(index_name.to_owned()) {
+                return Err(ObservationError::DuplicateIndexObservation {
+                    schema_name: self.schema_name.clone(),
+                    relation_name: self.relation_name.clone(),
+                    index_name: index_name.to_owned(),
+                });
+            }
+            for attribute in index
+                .key_attributes()
+                .iter()
+                .chain(index.include_attributes())
+            {
+                let Some(attribute_name) = attribute.attribute_name() else {
+                    continue;
+                };
+                if !self
+                    .columns
+                    .iter()
+                    .any(|column| column.column_name() == attribute_name)
+                {
+                    return Err(ObservationError::UnknownIndexAttribute {
+                        schema_name: self.schema_name.clone(),
+                        relation_name: self.relation_name.clone(),
+                        index_name: index_name.to_owned(),
+                        attribute_name: attribute_name.to_owned(),
+                    });
+                }
+            }
+        }
+        indexes.sort_by(|left, right| left.index_name().cmp(right.index_name()));
+        self.indexes = indexes;
+        Ok(self)
+    }
+
     /// Returns the exact source schema identifier.
     #[must_use]
     pub fn schema_name(&self) -> &str {
@@ -645,6 +1496,12 @@ impl RelationObservation {
         &self.constraints
     }
 
+    /// Returns relation-scoped indexes in deterministic exact source-name order.
+    #[must_use]
+    pub fn indexes(&self) -> &[IndexObservation] {
+        &self.indexes
+    }
+
     /// Returns the exact optional source comment without inventing missing metadata.
     #[must_use]
     pub fn source_comment(&self) -> Option<&str> {
@@ -655,12 +1512,14 @@ impl RelationObservation {
 /// Stable kind discriminator for one schema-scoped evidence coordinate.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SchemaObjectLocationKind {
-    /// A schema-scoped relation observation.
-    Table,
+    /// A schema-scoped relation observation of any `pg_class.relkind`.
+    Relation,
     /// A relation column observation.
     Column,
     /// A relation table-constraint observation.
     Constraint,
+    /// A relation-scoped index observation.
+    Index,
     /// A schema-scoped domain observation.
     Domain,
     /// A schema-scoped enum observation.
@@ -669,14 +1528,24 @@ pub enum SchemaObjectLocationKind {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum SchemaObjectElement {
-    Table(String),
+    Relation {
+        relation_name: String,
+        kind: RelationKind,
+    },
     Column {
-        table_name: String,
+        relation_name: String,
+        kind: RelationKind,
         column_name: String,
     },
     Constraint {
-        table_name: String,
+        relation_name: String,
+        kind: RelationKind,
         constraint_name: String,
+    },
+    Index {
+        relation_name: String,
+        kind: RelationKind,
+        index_name: String,
     },
     Domain(String),
     Enum(String),
@@ -684,10 +1553,13 @@ enum SchemaObjectElement {
 
 /// Exact structured location inside an immutable successor schema snapshot.
 ///
-/// Table, column, and constraint coordinates keep the historical v2 canonical shape so v2 evidence
-/// stays comparable. Domain and enum coordinates use the successor schema-scoped vocabulary
-/// `/schemas/{schema}/domains/{name}` and `/schemas/{schema}/enums/{name}`. Every identifier token
-/// applies RFC 6901 escaping (`~` -> `~0`, `/` -> `~1`) without case or Unicode normalization.
+/// Relation-level coordinates use the successor vocabulary
+/// `/schemas/{schema}/relations/{kind}/{name}` so the exact `pg_class.relkind` is carried in the
+/// coordinate. Relation children append `/columns/{name}`, `/constraints/{name}`, or
+/// `/indexes/{name}` under that kind-aware relation segment. Domain and enum coordinates use the
+/// schema-scoped vocabulary `/schemas/{schema}/domains/{name}` and `/schemas/{schema}/enums/{name}`.
+/// Every identifier token applies RFC 6901 escaping (`~` -> `~0`, `/` -> `~1`) without case or
+/// Unicode normalization. Frozen v2 `/schemas/{schema}/tables/{table}` meaning is unchanged.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SchemaObjectLocation {
     schema_name: String,
@@ -695,30 +1567,39 @@ pub struct SchemaObjectLocation {
 }
 
 impl SchemaObjectLocation {
-    /// Creates a location for an exact schema-qualified relation.
-    pub fn table(
+    /// Creates a location for an exact schema-qualified relation of any observed kind.
+    pub fn relation(
         schema_name: impl Into<String>,
-        table_name: impl Into<String>,
+        relation_name: impl Into<String>,
+        kind: RelationKind,
     ) -> Result<Self, ObservationError> {
-        let table_name = table_name.into();
-        validate_nonblank(&table_name, "table_name")?;
-        Self::new(schema_name, SchemaObjectElement::Table(table_name))
+        let relation_name = relation_name.into();
+        validate_nonblank(&relation_name, "relation_name")?;
+        Self::new(
+            schema_name,
+            SchemaObjectElement::Relation {
+                relation_name,
+                kind,
+            },
+        )
     }
 
     /// Creates a location for an exact schema-qualified relation column.
     pub fn column(
         schema_name: impl Into<String>,
-        table_name: impl Into<String>,
+        relation_name: impl Into<String>,
+        kind: RelationKind,
         column_name: impl Into<String>,
     ) -> Result<Self, ObservationError> {
-        let table_name = table_name.into();
+        let relation_name = relation_name.into();
         let column_name = column_name.into();
-        validate_nonblank(&table_name, "table_name")?;
+        validate_nonblank(&relation_name, "relation_name")?;
         validate_nonblank(&column_name, "column_name")?;
         Self::new(
             schema_name,
             SchemaObjectElement::Column {
-                table_name,
+                relation_name,
+                kind,
                 column_name,
             },
         )
@@ -727,18 +1608,41 @@ impl SchemaObjectLocation {
     /// Creates a location for an exact schema-qualified relation table constraint.
     pub fn constraint(
         schema_name: impl Into<String>,
-        table_name: impl Into<String>,
+        relation_name: impl Into<String>,
+        kind: RelationKind,
         constraint_name: impl Into<String>,
     ) -> Result<Self, ObservationError> {
-        let table_name = table_name.into();
+        let relation_name = relation_name.into();
         let constraint_name = constraint_name.into();
-        validate_nonblank(&table_name, "table_name")?;
+        validate_nonblank(&relation_name, "relation_name")?;
         validate_nonblank(&constraint_name, "constraint_name")?;
         Self::new(
             schema_name,
             SchemaObjectElement::Constraint {
-                table_name,
+                relation_name,
+                kind,
                 constraint_name,
+            },
+        )
+    }
+
+    /// Creates a location for an exact relation-scoped index.
+    pub fn index(
+        schema_name: impl Into<String>,
+        relation_name: impl Into<String>,
+        kind: RelationKind,
+        index_name: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        let relation_name = relation_name.into();
+        let index_name = index_name.into();
+        validate_nonblank(&relation_name, "relation_name")?;
+        validate_nonblank(&index_name, "index_name")?;
+        Self::new(
+            schema_name,
+            SchemaObjectElement::Index {
+                relation_name,
+                kind,
+                index_name,
             },
         )
     }
@@ -753,7 +1657,7 @@ impl SchemaObjectLocation {
         Self::new(schema_name, SchemaObjectElement::Domain(domain_name))
     }
 
-    /// Creates a location for an exact schema-scoped enum.
+    /// Creates a location for an exact schema-scoped PostgreSQL enum.
     ///
     /// The trailing underscore keeps the constructor name legal Rust; the coordinate semantics are
     /// still the PostgreSQL `ENUM` type at `/schemas/{schema}/enums/{name}`.
@@ -782,9 +1686,10 @@ impl SchemaObjectLocation {
     #[must_use]
     pub fn kind(&self) -> SchemaObjectLocationKind {
         match self.element {
-            SchemaObjectElement::Table(_) => SchemaObjectLocationKind::Table,
+            SchemaObjectElement::Relation { .. } => SchemaObjectLocationKind::Relation,
             SchemaObjectElement::Column { .. } => SchemaObjectLocationKind::Column,
             SchemaObjectElement::Constraint { .. } => SchemaObjectLocationKind::Constraint,
+            SchemaObjectElement::Index { .. } => SchemaObjectLocationKind::Index,
             SchemaObjectElement::Domain(_) => SchemaObjectLocationKind::Domain,
             SchemaObjectElement::Enum(_) => SchemaObjectLocationKind::Enum,
         }
@@ -796,13 +1701,29 @@ impl SchemaObjectLocation {
         &self.schema_name
     }
 
+    /// Returns the exact owning relation kind for relation-scoped coordinates.
+    ///
+    /// The kind is carried by every relation-level coordinate so a view, materialized view,
+    /// sequence, composite type, or foreign table is never addressed with table vocabulary.
+    #[must_use]
+    pub fn relation_kind(&self) -> Option<RelationKind> {
+        match &self.element {
+            SchemaObjectElement::Relation { kind, .. }
+            | SchemaObjectElement::Column { kind, .. }
+            | SchemaObjectElement::Constraint { kind, .. }
+            | SchemaObjectElement::Index { kind, .. } => Some(*kind),
+            SchemaObjectElement::Domain(_) | SchemaObjectElement::Enum(_) => None,
+        }
+    }
+
     /// Returns the owning relation identifier when this coordinate has one.
     #[must_use]
-    pub fn table_name(&self) -> Option<&str> {
+    pub fn relation_name(&self) -> Option<&str> {
         match &self.element {
-            SchemaObjectElement::Table(table_name) => Some(table_name),
-            SchemaObjectElement::Column { table_name, .. }
-            | SchemaObjectElement::Constraint { table_name, .. } => Some(table_name),
+            SchemaObjectElement::Relation { relation_name, .. } => Some(relation_name),
+            SchemaObjectElement::Column { relation_name, .. }
+            | SchemaObjectElement::Constraint { relation_name, .. }
+            | SchemaObjectElement::Index { relation_name, .. } => Some(relation_name),
             SchemaObjectElement::Domain(_) | SchemaObjectElement::Enum(_) => None,
         }
     }
@@ -812,8 +1733,9 @@ impl SchemaObjectLocation {
     pub fn column_name(&self) -> Option<&str> {
         match &self.element {
             SchemaObjectElement::Column { column_name, .. } => Some(column_name),
-            SchemaObjectElement::Table(_)
+            SchemaObjectElement::Relation { .. }
             | SchemaObjectElement::Constraint { .. }
+            | SchemaObjectElement::Index { .. }
             | SchemaObjectElement::Domain(_)
             | SchemaObjectElement::Enum(_) => None,
         }
@@ -826,8 +1748,22 @@ impl SchemaObjectLocation {
             SchemaObjectElement::Constraint {
                 constraint_name, ..
             } => Some(constraint_name),
-            SchemaObjectElement::Table(_)
+            SchemaObjectElement::Relation { .. }
             | SchemaObjectElement::Column { .. }
+            | SchemaObjectElement::Index { .. }
+            | SchemaObjectElement::Domain(_)
+            | SchemaObjectElement::Enum(_) => None,
+        }
+    }
+
+    /// Returns the exact source index identifier for an index coordinate.
+    #[must_use]
+    pub fn index_name(&self) -> Option<&str> {
+        match &self.element {
+            SchemaObjectElement::Index { index_name, .. } => Some(index_name),
+            SchemaObjectElement::Relation { .. }
+            | SchemaObjectElement::Column { .. }
+            | SchemaObjectElement::Constraint { .. }
             | SchemaObjectElement::Domain(_)
             | SchemaObjectElement::Enum(_) => None,
         }
@@ -838,9 +1774,10 @@ impl SchemaObjectLocation {
     pub fn domain_name(&self) -> Option<&str> {
         match &self.element {
             SchemaObjectElement::Domain(domain_name) => Some(domain_name),
-            SchemaObjectElement::Table(_)
+            SchemaObjectElement::Relation { .. }
             | SchemaObjectElement::Column { .. }
             | SchemaObjectElement::Constraint { .. }
+            | SchemaObjectElement::Index { .. }
             | SchemaObjectElement::Enum(_) => None,
         }
     }
@@ -850,9 +1787,10 @@ impl SchemaObjectLocation {
     pub fn enum_name(&self) -> Option<&str> {
         match &self.element {
             SchemaObjectElement::Enum(enum_name) => Some(enum_name),
-            SchemaObjectElement::Table(_)
+            SchemaObjectElement::Relation { .. }
             | SchemaObjectElement::Column { .. }
             | SchemaObjectElement::Constraint { .. }
+            | SchemaObjectElement::Index { .. }
             | SchemaObjectElement::Domain(_) => None,
         }
     }
@@ -860,32 +1798,52 @@ impl SchemaObjectLocation {
     /// Returns a deterministic collision-safe successor evidence location string.
     ///
     /// The vocabulary segments are ConceptWeave coordinate labels; identifier tokens use RFC 6901
-    /// escaping and retain exact case and text.
+    /// escaping and retain exact case and text. Relation-level coordinates carry the exact relation
+    /// kind so non-table relations never receive table vocabulary.
     #[must_use]
     pub fn canonical_location(&self) -> String {
         match &self.element {
-            SchemaObjectElement::Table(table_name) => format!(
-                "/schemas/{}/tables/{}",
+            SchemaObjectElement::Relation {
+                relation_name,
+                kind,
+            } => format!(
+                "/schemas/{}/relations/{}/{}",
                 escape_json_pointer_token(&self.schema_name),
-                escape_json_pointer_token(table_name)
+                kind.token(),
+                escape_json_pointer_token(relation_name)
             ),
             SchemaObjectElement::Column {
-                table_name,
+                relation_name,
+                kind,
                 column_name,
             } => format!(
-                "/schemas/{}/tables/{}/columns/{}",
+                "/schemas/{}/relations/{}/{}/columns/{}",
                 escape_json_pointer_token(&self.schema_name),
-                escape_json_pointer_token(table_name),
+                kind.token(),
+                escape_json_pointer_token(relation_name),
                 escape_json_pointer_token(column_name)
             ),
             SchemaObjectElement::Constraint {
-                table_name,
+                relation_name,
+                kind,
                 constraint_name,
             } => format!(
-                "/schemas/{}/tables/{}/constraints/{}",
+                "/schemas/{}/relations/{}/{}/constraints/{}",
                 escape_json_pointer_token(&self.schema_name),
-                escape_json_pointer_token(table_name),
+                kind.token(),
+                escape_json_pointer_token(relation_name),
                 escape_json_pointer_token(constraint_name)
+            ),
+            SchemaObjectElement::Index {
+                relation_name,
+                kind,
+                index_name,
+            } => format!(
+                "/schemas/{}/relations/{}/{}/indexes/{}",
+                escape_json_pointer_token(&self.schema_name),
+                kind.token(),
+                escape_json_pointer_token(relation_name),
+                escape_json_pointer_token(index_name)
             ),
             SchemaObjectElement::Domain(domain_name) => format!(
                 "/schemas/{}/domains/{}",
@@ -908,12 +1866,22 @@ struct CanonicalSnapshotObjects {
     enums: Vec<EnumObservation>,
 }
 
+/// Returns whether a modeled `pg_class` relation owns a composite row type in `pg_type`.
+///
+/// PostgreSQL 18 reports `reltype = 0` for indexes, sequences, and TOAST relations. Indexes are
+/// modeled as relation children here and TOAST is outside this contract, so Sequence is the only
+/// modeled owning relation kind without a relation-backed row type.
+fn relation_has_row_type(kind: RelationKind) -> bool {
+    !matches!(kind, RelationKind::Sequence)
+}
+
 /// Canonicalizes successor collections and enforces every cross-object invariant.
 ///
-/// Collections are sorted by exact qualified identifier, duplicates fail closed, domain and enum
-/// type coordinates must not collide, and every column type binding must resolve to the PostgreSQL
-/// built-in namespace or to a domain or enum observed in the same snapshot. Type resolution never
-/// consults `search_path`.
+/// Collections are sorted by exact qualified identifier, duplicates fail closed, domain, enum, and
+/// relation-backed composite type coordinates must not collide, and every column type binding and
+/// domain base type must resolve to the PostgreSQL built-in namespace or to an observed domain,
+/// enum, or relation-backed composite row type in the same snapshot. Type resolution never consults
+/// `search_path`.
 fn canonicalize_snapshot_objects(
     mut relations: Vec<RelationObservation>,
     mut domains: Vec<DomainObservation>,
@@ -971,20 +1939,52 @@ fn canonicalize_snapshot_objects(
         });
     }
 
+    if let Some(relation) = relations.iter().find(|relation| {
+        relation_has_row_type(relation.kind)
+            && (domains.iter().any(|domain| {
+                domain.schema_name == relation.schema_name
+                    && domain.domain_name == relation.relation_name
+            }) || enums.iter().any(|observed_enum| {
+                observed_enum.schema_name == relation.schema_name
+                    && observed_enum.enum_name == relation.relation_name
+            }))
+    }) {
+        return Err(ObservationError::DuplicateSchemaTypeName {
+            schema_name: relation.schema_name.clone(),
+            type_name: relation.relation_name.clone(),
+        });
+    }
+
+    let resolves = |binding: &QualifiedTypeName| {
+        if binding.schema_name == POSTGRES_CATALOG_SCHEMA_NAME {
+            return true;
+        }
+        domains.iter().any(|domain| {
+            domain.schema_name == binding.schema_name && domain.domain_name == binding.type_name
+        }) || enums.iter().any(|observed_enum| {
+            observed_enum.schema_name == binding.schema_name
+                && observed_enum.enum_name == binding.type_name
+        }) || relations.iter().any(|relation| {
+            relation_has_row_type(relation.kind)
+                && relation.schema_name == binding.schema_name
+                && relation.relation_name == binding.type_name
+        })
+    };
+
+    for domain in &domains {
+        let binding = domain.base_type();
+        if !resolves(binding) {
+            return Err(ObservationError::UnknownTypeBinding {
+                schema_name: binding.schema_name.clone(),
+                type_name: binding.type_name.clone(),
+            });
+        }
+    }
+
     for relation in &relations {
         for column in &relation.columns {
             let binding = &column.type_binding;
-            if binding.schema_name == POSTGRES_CATALOG_SCHEMA_NAME {
-                continue;
-            }
-            let is_observed_domain = domains.iter().any(|domain| {
-                domain.schema_name == binding.schema_name && domain.domain_name == binding.type_name
-            });
-            let is_observed_enum = enums.iter().any(|observed_enum| {
-                observed_enum.schema_name == binding.schema_name
-                    && observed_enum.enum_name == binding.type_name
-            });
-            if !is_observed_domain && !is_observed_enum {
+            if !resolves(binding) {
                 return Err(ObservationError::UnknownTypeBinding {
                     schema_name: binding.schema_name.clone(),
                     type_name: binding.type_name.clone(),
@@ -1141,7 +2141,7 @@ impl PostgresSchemaSnapshotV3 {
         })
     }
 
-    /// Returns the stable source-connection reference, never a credential.
+    /// Returns the stable source-connection registry reference, never a credential.
     #[must_use]
     pub fn source_connection_key(&self) -> &str {
         &self.source_connection_key
@@ -1210,43 +2210,56 @@ impl PostgresSchemaSnapshotV3 {
     }
 
     fn contains_location(&self, location: &SchemaObjectLocation) -> bool {
-        match &location.element {
-            SchemaObjectElement::Table(table_name) => self.relations.iter().any(|relation| {
+        let relation_matches = |relation_name: &str, kind: RelationKind| {
+            self.relations.iter().any(|relation| {
                 relation.schema_name == location.schema_name
-                    && relation.relation_name == *table_name
-            }),
+                    && relation.relation_name == relation_name
+                    && relation.kind == kind
+            })
+        };
+        let find_relation = |relation_name: &str, kind: RelationKind| {
+            self.relations.iter().find(|relation| {
+                relation.schema_name == location.schema_name
+                    && relation.relation_name == relation_name
+                    && relation.kind == kind
+            })
+        };
+
+        match &location.element {
+            SchemaObjectElement::Relation {
+                relation_name,
+                kind,
+            } => relation_matches(relation_name, *kind),
             SchemaObjectElement::Column {
-                table_name,
+                relation_name,
+                kind,
                 column_name,
-            } => self
-                .relations
-                .iter()
-                .find(|relation| {
-                    relation.schema_name == location.schema_name
-                        && relation.relation_name == *table_name
-                })
-                .is_some_and(|relation| {
-                    relation
-                        .columns
-                        .iter()
-                        .any(|column| column.column_name == *column_name)
-                }),
+            } => find_relation(relation_name, *kind).is_some_and(|relation| {
+                relation
+                    .columns
+                    .iter()
+                    .any(|column| column.column_name == *column_name)
+            }),
             SchemaObjectElement::Constraint {
-                table_name,
+                relation_name,
+                kind,
                 constraint_name,
-            } => self
-                .relations
-                .iter()
-                .find(|relation| {
-                    relation.schema_name == location.schema_name
-                        && relation.relation_name == *table_name
-                })
-                .is_some_and(|relation| {
-                    relation
-                        .constraints
-                        .iter()
-                        .any(|constraint| constraint.constraint_name() == constraint_name)
-                }),
+            } => find_relation(relation_name, *kind).is_some_and(|relation| {
+                relation
+                    .constraints
+                    .iter()
+                    .any(|constraint| constraint.constraint_name() == constraint_name)
+            }),
+            SchemaObjectElement::Index {
+                relation_name,
+                kind,
+                index_name,
+            } => find_relation(relation_name, *kind).is_some_and(|relation| {
+                relation
+                    .indexes
+                    .iter()
+                    .any(|index| index.index_name() == index_name)
+            }),
             SchemaObjectElement::Domain(domain_name) => self.domains.iter().any(|domain| {
                 domain.schema_name == location.schema_name && domain.domain_name == *domain_name
             }),
@@ -1287,6 +2300,11 @@ fn compute_snapshot_digest_v3(
         encode_len(&mut hasher, relation.constraints().len());
         for constraint in relation.constraints() {
             encode_constraint(&mut hasher, constraint);
+        }
+
+        encode_len(&mut hasher, relation.indexes().len());
+        for index in relation.indexes() {
+            encode_index(&mut hasher, index);
         }
     }
 
@@ -1367,6 +2385,103 @@ fn encode_constraint(hasher: &mut Sha256, constraint: &TableConstraintObservatio
             encode_bool(hasher, observation.validated());
             encode_bool(hasher, observation.enforced());
             encode_bool(hasher, observation.no_inherit());
+        }
+    }
+}
+
+fn encode_index(hasher: &mut Sha256, index: &IndexObservation) {
+    encode_str(hasher, index.index_name());
+    encode_bool(hasher, index.is_unique());
+    encode_optional_bool(hasher, index.nulls_not_distinct());
+    match index.catalog_flags() {
+        None => hasher.update([0]),
+        Some(flags) => {
+            hasher.update([1]);
+            encode_bool(hasher, flags.primary());
+            encode_bool(hasher, flags.exclusion());
+            encode_bool(hasher, flags.immediate());
+            encode_bool(hasher, flags.clustered());
+            encode_bool(hasher, flags.check_xmin());
+            encode_bool(hasher, flags.replica_identity());
+        }
+    }
+    match index.storage_options() {
+        None => hasher.update([0]),
+        Some(options) => {
+            hasher.update([1]);
+            encode_len(hasher, options.len());
+            for option in options {
+                encode_str(hasher, option.name());
+                encode_str(hasher, option.value());
+            }
+        }
+    }
+    match index.tablespace() {
+        None => hasher.update([0]),
+        Some(tablespace) => {
+            hasher.update([1]);
+            encode_bool(hasher, tablespace.is_database_default());
+            encode_str(hasher, tablespace.name());
+        }
+    }
+    encode_optional_str(hasher, index.access_method());
+
+    encode_len(hasher, index.key_attributes().len());
+    for attribute in index.key_attributes() {
+        encode_index_attribute(hasher, attribute);
+    }
+
+    encode_len(hasher, index.include_attributes().len());
+    for attribute in index.include_attributes() {
+        encode_index_attribute(hasher, attribute);
+    }
+
+    let key_semantics = index.key_semantics().unwrap_or_default();
+    encode_len(hasher, key_semantics.len());
+    for record in key_semantics {
+        encode_index_key_semantics(hasher, record);
+    }
+
+    encode_optional_str(hasher, index.predicate());
+    encode_optional_bool(hasher, index.ready());
+    encode_optional_bool(hasher, index.valid());
+    encode_optional_bool(hasher, index.live());
+    encode_optional_str(hasher, index.index_definition());
+    encode_optional_str(hasher, index.source_comment());
+}
+
+fn encode_index_key_semantics(hasher: &mut Sha256, semantics: &IndexKeySemantics) {
+    hasher.update(semantics.position().to_be_bytes());
+    match semantics.collation() {
+        None => hasher.update([0]),
+        Some(collation) => {
+            hasher.update([1]);
+            encode_str(hasher, collation.schema_name());
+            encode_str(hasher, collation.collation_name());
+        }
+    }
+    let operator_class = semantics.operator_class();
+    encode_str(hasher, operator_class.schema_name());
+    encode_str(hasher, operator_class.operator_class_name());
+    hasher.update(semantics.access_method_options().to_be_bytes());
+    encode_len(hasher, semantics.operator_class_options().len());
+    for option in semantics.operator_class_options() {
+        encode_str(hasher, option.name());
+        encode_str(hasher, option.value());
+    }
+}
+
+fn encode_index_attribute(hasher: &mut Sha256, attribute: &IndexAttributeObservation) {
+    hasher.update(attribute.position().to_be_bytes());
+    hasher.update([attribute.kind().tag()]);
+    match &attribute.source {
+        IndexAttributeSource::Column(attribute_name) => {
+            hasher.update([0]);
+            encode_str(hasher, attribute_name);
+        }
+        IndexAttributeSource::Expression(expression) => {
+            hasher.update([1]);
+            encode_str(hasher, expression);
         }
     }
 }
