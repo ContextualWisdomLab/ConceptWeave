@@ -192,32 +192,29 @@ fn coherent_temporal_key_preserves_exact_exclusion_operator_signatures() {
 }
 
 #[test]
-fn temporal_key_rejects_non_equality_operator_before_without_overlaps_column() {
-    let error = period_without_operators()
-        .with_exclusion_operator_signatures(expected_operators("=#"))
-        .expect_err("WITHOUT OVERLAPS prefix columns must use equality semantics");
+fn temporal_key_preserves_custom_operator_names_selected_by_opclass_compare_translation() {
+    let custom_operators = vec![
+        exclusion_operator(1, "temporal_eq", "int8"),
+        exclusion_operator(2, "temporal_overlap", "tstzrange"),
+    ];
 
+    let snapshot = base_snapshot()
+        .with_observed_constraint_periods(vec![period_with_operators(custom_operators)])
+        .expect("operator spelling is provenance, not temporal semantic authority");
+
+    let period = &snapshot.constraint_periods().expect("period family is observed")[0];
     assert_eq!(
-        error,
-        ObservationError::InvalidObservationField {
-            field: "constraint_period_exclusion_operators",
-        }
+        period
+            .exclusion_operator_signature(1)
+            .expect("prefix operator is retained")
+            .1,
+        "temporal_eq"
     );
-}
-
-#[test]
-fn temporal_key_rejects_non_overlap_operator_for_without_overlaps_column() {
-    let error = period_without_operators()
-        .with_exclusion_operator_signatures(vec![
-            exclusion_operator(1, "=", "int8"),
-            exclusion_operator(2, "=", "tstzrange"),
-        ])
-        .expect_err("WITHOUT OVERLAPS final column must use overlap semantics");
-
     assert_eq!(
-        error,
-        ObservationError::InvalidObservationField {
-            field: "constraint_period_exclusion_operators",
-        }
+        period
+            .exclusion_operator_signature(2)
+            .expect("final operator is retained")
+            .1,
+        "temporal_overlap"
     );
 }
