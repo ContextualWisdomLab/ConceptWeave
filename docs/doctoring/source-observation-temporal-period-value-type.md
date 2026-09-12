@@ -33,8 +33,9 @@ Production lineage:
 - `375242bb02cc165a410e72e318f9abec712764bf` introduces `type_kind.rs` and the source-authoritative value objects;
 - `7bfe5eb46a38e3a4bcfe91aac2688b956526b8b7` integrates the family into `PostgresSchemaSnapshotV3`, adds the domain-separated `conceptweave.postgres_schema_snapshot.v3.type_kinds.v1` digest, preserves unobserved versus explicitly observed state, validates reciprocal range/multirange evidence and domain cycles, and requires every `conperiod=true` final local column to resolve through explicit type-kind/domain-base evidence to range or multirange;
 - the same integration adds `new_with_type_kinds(...)` so direct user-defined range/multirange bindings remain exact in the public aggregate while the legacy private validator receives only a bounded compatibility projection; the outer successor digest binds the original qualified source coordinate, not the projection;
-- `15e8b1949834ace8eb3cd99834d3c7157316579d` expands `constraint_period_type_contract.rs` with missing-evidence and scalar rejection, domain-over-range acceptance, domain-over-scalar rejection, direct user-defined range and multirange positive controls, and reciprocal `pg_range` failure;
-- retained temporal contracts are ordinary-forward repaired at `23cde04c62dcb8c3b967913f3e3147275a51466e`, `da916f06fd39679800cc66701dbc5c3cba61731d`, and `67318b4edf1555297db1e8cecca2371e9eb5e92c` so their positive temporal fixtures provide explicit type-kind evidence rather than relying on type-name inference.
+- `15e8b1949834ace8eb3cd99834d3c7157316579d` first expands `constraint_period_type_contract.rs` with missing-evidence and scalar rejection, domain-over-range acceptance, domain-over-scalar rejection, direct user-defined range and multirange positive controls, and reciprocal `pg_range` failure;
+- retained temporal contracts are ordinary-forward repaired at `23cde04c62dcb8c3b967913f3e3147275a51466e`, `da916f06fd39679800cc66701dbc5c3cba61731d`, and `67318b4edf1555297db1e8cecca2371e9eb5e92c` so their positive temporal fixtures provide explicit type-kind evidence rather than relying on type-name inference;
+- `e36d5ff9cc40eaf55f2308245adbb20ad0c9b11a` closes the remaining behavioral edge cases: domain-over-user-defined-range acceptance, domain-cycle rejection, unobserved-versus-observed digest distinction, and input-order-stable type-kind identity.
 
 Temporal admission deliberately does not make the type-kind family authoritative for whether temporal syntax was declared. `conperiod` remains that authority. Type-kind evidence only proves that a declared temporal constraint has a PostgreSQL-valid final value type.
 
@@ -54,7 +55,7 @@ The source repair is implemented but is not yet native/Product GREEN evidence. E
 - scalar final columns fail closed;
 - built-in range/multirange coordinates are admitted only from explicit catalog evidence;
 - direct user-defined range and multirange coordinates remain exact and are admitted;
-- domain-over-range/multirange remains admissible, including PostgreSQL 18.4+ behavior;
+- domain-over-range/multirange remains admissible, including PostgreSQL 18.4+ behavior and domains over user-defined ranges;
 - domain-over-scalar and cyclic/missing domain evidence fail closed;
 - range/multirange evidence is reciprocal;
 - type-kind input order is digest-stable and unobserved versus observed evidence remains distinct;
