@@ -1462,55 +1462,57 @@ fn canonicalize_constraint_periods(
                             field: "constraint_period_action",
                         });
                     }
-                    if let Some(referenced_relation) = relations.iter().find(|candidate| {
+                    let Some(referenced_relation) = relations.iter().find(|candidate| {
                         candidate.schema_name() == foreign_key.referenced_schema_name()
                             && candidate.relation_name() == foreign_key.referenced_table_name()
-                    }) {
-                        let referenced_temporal_key = referenced_relation.constraints().iter().find(
-                            |candidate_constraint| {
-                                matches!(
-                                    candidate_constraint,
-                                    TableConstraintObservation::PrimaryKey(_)
-                                        | TableConstraintObservation::Unique(_)
-                                ) && candidate_constraint.column_names()
-                                    == foreign_key.referenced_column_names()
-                                    && constraint_periods.iter().any(|candidate_period| {
-                                        candidate_period.schema_name()
-                                            == referenced_relation.schema_name()
-                                            && candidate_period.relation_name()
-                                                == referenced_relation.relation_name()
-                                            && candidate_period.relation_kind()
-                                                == referenced_relation.kind()
-                                            && candidate_period.constraint_name()
-                                                == candidate_constraint.constraint_name()
-                                            && candidate_period.has_period_semantics()
-                                    })
-                            },
-                        );
-                        let Some(referenced_temporal_key) = referenced_temporal_key else {
-                            return Err(ObservationError::InvalidObservationField {
-                                field: "constraint_period_reference",
-                            });
-                        };
-                        let referenced_key_is_nondeferrable = constraint_timings
-                            .and_then(|timings| {
-                                timings.iter().find(|timing| {
-                                    timing.schema_name() == referenced_relation.schema_name()
-                                        && timing.relation_name()
+                    }) else {
+                        return Err(ObservationError::InvalidObservationField {
+                            field: "constraint_period_reference",
+                        });
+                    };
+                    let referenced_temporal_key = referenced_relation.constraints().iter().find(
+                        |candidate_constraint| {
+                            matches!(
+                                candidate_constraint,
+                                TableConstraintObservation::PrimaryKey(_)
+                                    | TableConstraintObservation::Unique(_)
+                            ) && candidate_constraint.column_names()
+                                == foreign_key.referenced_column_names()
+                                && constraint_periods.iter().any(|candidate_period| {
+                                    candidate_period.schema_name()
+                                        == referenced_relation.schema_name()
+                                        && candidate_period.relation_name()
                                             == referenced_relation.relation_name()
-                                        && timing.relation_kind() == referenced_relation.kind()
-                                        && timing.constraint_name()
-                                            == referenced_temporal_key.constraint_name()
+                                        && candidate_period.relation_kind()
+                                            == referenced_relation.kind()
+                                        && candidate_period.constraint_name()
+                                            == candidate_constraint.constraint_name()
+                                        && candidate_period.has_period_semantics()
                                 })
+                        },
+                    );
+                    let Some(referenced_temporal_key) = referenced_temporal_key else {
+                        return Err(ObservationError::InvalidObservationField {
+                            field: "constraint_period_reference",
+                        });
+                    };
+                    let referenced_key_is_nondeferrable = constraint_timings
+                        .and_then(|timings| {
+                            timings.iter().find(|timing| {
+                                timing.schema_name() == referenced_relation.schema_name()
+                                    && timing.relation_name() == referenced_relation.relation_name()
+                                    && timing.relation_kind() == referenced_relation.kind()
+                                    && timing.constraint_name()
+                                        == referenced_temporal_key.constraint_name()
                             })
-                            .is_some_and(|timing| {
-                                timing.deferrability() == ConstraintDeferrability::NotDeferrable
-                            });
-                        if !referenced_key_is_nondeferrable {
-                            return Err(ObservationError::InvalidObservationField {
-                                field: "constraint_period_reference_timing",
-                            });
-                        }
+                        })
+                        .is_some_and(|timing| {
+                            timing.deferrability() == ConstraintDeferrability::NotDeferrable
+                        });
+                    if !referenced_key_is_nondeferrable {
+                        return Err(ObservationError::InvalidObservationField {
+                            field: "constraint_period_reference_timing",
+                        });
                     }
                 }
             }
