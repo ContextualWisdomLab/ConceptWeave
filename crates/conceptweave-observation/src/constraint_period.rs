@@ -8,7 +8,7 @@ use crate::{ObservationError, QualifiedTypeName, RelationKind};
 /// preserves the one-based constrained-column position together with the exact operator namespace,
 /// name, and qualified binary operand types resolved from the same bounded catalog snapshot.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ConstraintExclusionOperatorObservation {
+pub(crate) struct ConstraintExclusionOperatorObservation {
     position: u32,
     operator_schema_name: String,
     operator_name: String,
@@ -17,8 +17,7 @@ pub struct ConstraintExclusionOperatorObservation {
 }
 
 impl ConstraintExclusionOperatorObservation {
-    /// Creates one resolved binary exclusion-operator signature at its exact constraint position.
-    pub fn new(
+    pub(crate) fn new(
         position: u32,
         operator_schema_name: impl Into<String>,
         operator_name: impl Into<String>,
@@ -44,33 +43,23 @@ impl ConstraintExclusionOperatorObservation {
         })
     }
 
-    /// Returns the one-based constrained-column position corresponding to this operator.
-    #[must_use]
-    pub const fn position(&self) -> u32 {
+    pub(crate) const fn position(&self) -> u32 {
         self.position
     }
 
-    /// Returns the exact resolved operator namespace name.
-    #[must_use]
-    pub fn operator_schema_name(&self) -> &str {
+    pub(crate) fn operator_schema_name(&self) -> &str {
         &self.operator_schema_name
     }
 
-    /// Returns the exact resolved operator name.
-    #[must_use]
-    pub fn operator_name(&self) -> &str {
+    pub(crate) fn operator_name(&self) -> &str {
         &self.operator_name
     }
 
-    /// Returns the exact qualified left operand type of the resolved binary operator.
-    #[must_use]
-    pub const fn left_type(&self) -> &QualifiedTypeName {
+    pub(crate) const fn left_type(&self) -> &QualifiedTypeName {
         &self.left_type
     }
 
-    /// Returns the exact qualified right operand type of the resolved binary operator.
-    #[must_use]
-    pub const fn right_type(&self) -> &QualifiedTypeName {
+    pub(crate) const fn right_type(&self) -> &QualifiedTypeName {
         &self.right_type
     }
 }
@@ -125,13 +114,7 @@ impl ConstraintPeriodObservation {
         })
     }
 
-    /// Records the exact resolved `conexclop` vector for a `WITHOUT OVERLAPS` key.
-    ///
-    /// The input is canonicalized by explicit one-based position. Positions must be complete and
-    /// contiguous. Constraint-kind applicability and arity are checked only when the observation is
-    /// joined to its owning relation, because this value object deliberately does not duplicate the
-    /// PRIMARY KEY/UNIQUE/FOREIGN KEY discriminator.
-    pub fn with_exclusion_operators(
+    pub(crate) fn with_exclusion_operators(
         mut self,
         mut exclusion_operators: Vec<ConstraintExclusionOperatorObservation>,
     ) -> Result<Self, ObservationError> {
@@ -207,9 +190,7 @@ impl ConstraintPeriodObservation {
         self.has_period_semantics
     }
 
-    /// Returns the resolved ordered `conexclop` vector when observed for a temporal key.
-    #[must_use]
-    pub fn exclusion_operators(&self) -> Option<&[ConstraintExclusionOperatorObservation]> {
+    pub(crate) fn exclusion_operators(&self) -> Option<&[ConstraintExclusionOperatorObservation]> {
         self.exclusion_operators.as_deref()
     }
 
