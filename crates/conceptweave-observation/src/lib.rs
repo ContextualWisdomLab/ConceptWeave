@@ -1159,6 +1159,41 @@ fn validate_constraint_period_column_type(
     Ok(())
 }
 
+fn key_constraint_backing_index_static_shape_matches(
+    constraint: &TableConstraintObservation,
+    backing_index: &IndexObservation,
+    catalog_flags: IndexCatalogFlags,
+) -> bool {
+    let (constraint_columns, expected_nulls_not_distinct) = match constraint {
+        TableConstraintObservation::PrimaryKey(primary_key) => {
+            (primary_key.column_names(), None)
+        }
+        TableConstraintObservation::Unique(unique) => {
+            (unique.column_names(), unique.nulls_not_distinct())
+        }
+        TableConstraintObservation::ForeignKey(_) | TableConstraintObservation::Check(_) => {
+            return false;
+        }
+    };
+    let key_columns_match = backing_index.key_attributes().len() == constraint_columns.len()
+        && backing_index
+            .key_attributes()
+            .iter()
+            .zip(constraint_columns)
+            .all(|(attribute, column_name)| {
+                attribute.attribute_name() == Some(column_name.as_str())
+            });
+    let null_treatment_matches = expected_nulls_not_distinct
+        .is_none_or(|expected| backing_index.nulls_not_distinct() == Some(expected));
+    let expected_primary = matches!(constraint, TableConstraintObservation::PrimaryKey(_));
+
+    backing_index.is_unique()
+        && key_columns_match
+        && backing_index.predicate().is_none()
+        && null_treatment_matches
+        && catalog_flags.primary() == expected_primary
+}
+
 fn canonicalize_constraint_timings(
     relations: &[RelationObservation],
     mut constraint_timings: Vec<ConstraintTimingObservation>,
@@ -1254,40 +1289,17 @@ fn canonicalize_constraint_timings(
                 field: "constraint_backing_index",
             });
         };
-        let (constraint_columns, expected_nulls_not_distinct) = match constraint {
-            TableConstraintObservation::PrimaryKey(primary_key) => {
-                (primary_key.column_names(), None)
-            }
-            TableConstraintObservation::Unique(unique) => {
-                (unique.column_names(), unique.nulls_not_distinct())
-            }
-            TableConstraintObservation::ForeignKey(_) | TableConstraintObservation::Check(_) => {
-                unreachable!("key-constraint kind was validated above")
-            }
-        };
-        let key_columns_match = backing_index.key_attributes().len() == constraint_columns.len()
-            && backing_index
-                .key_attributes()
-                .iter()
-                .zip(constraint_columns)
-                .all(|(attribute, column_name)| {
-                    attribute.attribute_name() == Some(column_name.as_str())
-                });
-        let null_treatment_matches = expected_nulls_not_distinct
-            .is_none_or(|expected| backing_index.nulls_not_distinct() == Some(expected));
-        let expected_primary = matches!(constraint, TableConstraintObservation::PrimaryKey(_));
         let expected_immediate = matches!(
             timing.deferrability(),
             ConstraintDeferrability::NotDeferrable
         );
         let exclusion_access_method_matches =
             !catalog_flags.exclusion() || backing_index.access_method() == Some("gist");
-        if !backing_index.is_unique()
-            || !key_columns_match
-            || backing_index.predicate().is_some()
-            || !null_treatment_matches
-            || !exclusion_access_method_matches
-            || catalog_flags.primary() != expected_primary
+        if !key_constraint_backing_index_static_shape_matches(
+            constraint,
+            backing_index,
+            catalog_flags,
+        ) || !exclusion_access_method_matches
             || catalog_flags.immediate() != expected_immediate
         {
             return Err(ObservationError::InvalidObservationField {
@@ -1416,7 +1428,13 @@ fn canonicalize_constraint_periods(
                             field: "constraint_period_backing_index",
                         });
                     };
-                    if !catalog_flags.exclusion() || backing_index.access_method() != Some("gist") {
+                    if !key_constraint_backing_index_static_shape_matches(
+                        constraint,
+                        backing_index,
+                        catalog_flags,
+                    ) || !catalog_flags.exclusion()
+                        || backing_index.access_method() != Some("gist")
+                    {
                         return Err(ObservationError::InvalidObservationField {
                             field: "constraint_period_backing_index",
                         });
