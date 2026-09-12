@@ -1,6 +1,7 @@
 use conceptweave_observation::{
-    ArrayTypeObservation, ColumnObservationV3, EnumObservation, PostgresSchemaSnapshotV3,
-    PostgresTypeKind, QualifiedTypeName, RelationKind, RelationObservation, TypeKindObservation,
+    ArrayTypeObservation, ColumnObservationV3, EnumObservation, ObservationError,
+    PostgresSchemaSnapshotV3, PostgresTypeKind, QualifiedTypeName, RelationKind,
+    RelationObservation, TypeKindObservation,
 };
 
 mod support;
@@ -50,6 +51,24 @@ fn ticket_with_custom_base_binding() -> RelationObservation {
             None,
         )
         .expect("custom base-bound column fixture is valid")],
+    )
+    .expect("relation fixture is valid")
+}
+
+fn ticket_with_cross_schema_custom_base_binding() -> RelationObservation {
+    RelationObservation::new(
+        "app",
+        "vector_ticket",
+        RelationKind::Table,
+        vec![ColumnObservationV3::new(
+            "embedding",
+            1,
+            "types.vector3",
+            type_name("types", "vector3"),
+            false,
+            None,
+        )
+        .expect("cross-schema base-bound column fixture is valid")],
     )
     .expect("relation fixture is valid")
 }
@@ -133,4 +152,62 @@ fn ordinary_user_defined_base_type_kind_resolves_its_exact_binding() {
 
     assert!(snapshot.type_kinds().is_some());
     assert!(snapshot.array_types().is_none());
+}
+
+#[test]
+fn authorized_cross_schema_user_defined_base_type_resolves_without_local_schema_inventory() {
+    let snapshot = PostgresSchemaSnapshotV3::new_with_type_kinds(
+        &support::authorized_source("warehouse_primary", &["app", "types"]),
+        "postgres_introspector_v3",
+        "2026-09-12T07:10:00Z",
+        vec![ticket_with_cross_schema_custom_base_binding()],
+        Vec::new(),
+        Vec::new(),
+        vec![TypeKindObservation::plain(
+            type_name("types", "vector3"),
+            PostgresTypeKind::Base,
+        )
+        .expect("cross-schema custom base type-kind fixture is valid")],
+    )
+    .expect("an explicitly authorized qualified type schema must not require unrelated local objects");
+
+    let type_kinds = snapshot
+        .type_kinds()
+        .expect("type-kind family was explicitly observed");
+    assert!(type_kinds.iter().any(|observation| {
+        observation.type_name().schema_name() == "types"
+            && observation.type_name().type_name() == "vector3"
+            && observation.kind() == PostgresTypeKind::Base
+    }));
+    assert_eq!(
+        snapshot.relations()[0].columns()[0]
+            .type_binding()
+            .schema_name(),
+        "types"
+    );
+}
+
+#[test]
+fn unapproved_cross_schema_type_kind_coordinate_still_fails_closed() {
+    let error = PostgresSchemaSnapshotV3::new_with_type_kinds(
+        &support::authorized_source("warehouse_primary", &["app"]),
+        "postgres_introspector_v3",
+        "2026-09-12T07:11:00Z",
+        vec![ticket_with_cross_schema_custom_base_binding()],
+        Vec::new(),
+        Vec::new(),
+        vec![TypeKindObservation::plain(
+            type_name("types", "vector3"),
+            PostgresTypeKind::Base,
+        )
+        .expect("cross-schema custom base type-kind fixture is valid")],
+    )
+    .expect_err("an unapproved type schema must not enter governed source evidence");
+
+    assert!(matches!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "type_kind_schema"
+        }
+    ));
 }
