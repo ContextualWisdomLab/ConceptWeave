@@ -1389,24 +1389,34 @@ fn canonicalize_constraint_periods(
 
         match constraint {
             TableConstraintObservation::PrimaryKey(_) | TableConstraintObservation::Unique(_) => {
-                if period.has_period_semantics() {
-                    validate_constraint_period_column_type(relation, constraint, type_kinds)?;
-                }
-                if let Some(backing_index) = relation
+                let backing_index = relation
                     .indexes()
                     .iter()
-                    .find(|index| index.index_name() == period.constraint_name())
-                    && let Some(catalog_flags) = backing_index.catalog_flags()
-                {
-                    let period_matches_exclusion =
-                        catalog_flags.exclusion() == period.has_period_semantics();
-                    let temporal_access_method_matches = !period.has_period_semantics()
-                        || backing_index.access_method() == Some("gist");
-                    if !period_matches_exclusion || !temporal_access_method_matches {
+                    .find(|index| index.index_name() == period.constraint_name());
+                if period.has_period_semantics() {
+                    validate_constraint_period_column_type(relation, constraint, type_kinds)?;
+                    let Some(backing_index) = backing_index else {
+                        return Err(ObservationError::InvalidObservationField {
+                            field: "constraint_period_backing_index",
+                        });
+                    };
+                    let Some(catalog_flags) = backing_index.catalog_flags() else {
+                        return Err(ObservationError::InvalidObservationField {
+                            field: "constraint_period_backing_index",
+                        });
+                    };
+                    if !catalog_flags.exclusion() || backing_index.access_method() != Some("gist") {
                         return Err(ObservationError::InvalidObservationField {
                             field: "constraint_period_backing_index",
                         });
                     }
+                } else if let Some(backing_index) = backing_index
+                    && let Some(catalog_flags) = backing_index.catalog_flags()
+                    && catalog_flags.exclusion()
+                {
+                    return Err(ObservationError::InvalidObservationField {
+                        field: "constraint_period_backing_index",
+                    });
                 }
             }
             TableConstraintObservation::ForeignKey(foreign_key) => {
