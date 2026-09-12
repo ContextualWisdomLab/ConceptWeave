@@ -1,8 +1,8 @@
 use conceptweave_observation::{
     ColumnObservationV3, ConstraintPeriodObservation, IndexAttributeKind,
     IndexAttributeObservation, IndexCatalogFlags, IndexObservation, ObservationError,
-    PostgresSchemaSnapshotV3, PostgresTypeKind, PrimaryKeyObservation, QualifiedTypeName,
-    RelationKind, RelationObservation, TableConstraintObservation, TypeKindObservation,
+    PostgresSchemaSnapshotV3, PrimaryKeyObservation, QualifiedTypeName, RelationKind,
+    RelationObservation, TableConstraintObservation, TypeKindObservation,
 };
 
 mod support;
@@ -58,11 +58,12 @@ fn temporal_key_relation(index: Option<IndexObservation>) -> RelationObservation
     )])
     .expect("constraint fixture is valid");
 
-    index.map_or(relation.clone(), |index| {
-        relation
+    match index {
+        None => relation,
+        Some(index) => relation
             .with_indexes(vec![index])
-            .expect("index fixture is valid")
-    })
+            .expect("index fixture is valid"),
+    }
 }
 
 fn temporal_backing_index(with_catalog_flags: bool) -> IndexObservation {
