@@ -40,15 +40,23 @@ The earlier `WITHOUT OVERLAPS` backing-index presence repair also remains active
 
 Review `5186585545` found that `canonicalize_constraint_periods()` stopped its positive temporal-key backing check at same-name index + exclusion + GiST. Exact ordered key-column shape and other static PK/UNIQUE backing facts were checked only by the separate optional timing family. Consequently a snapshot observing `conperiod=true` without timings could admit a same-name GiST/exclusion index whose key order did not match the temporal constraint.
 
-Behavioral RED `ffe75eddf530ad3963c087afdfe1109da15bad14` extends `constraint_period_backing_index_presence_contract.rs`: a constraint `(document_id, valid_during WITHOUT OVERLAPS)` paired with same-name GiST/exclusion key `(valid_during, document_id)` must fail `constraint_period_backing_index`. Doctoring was first recorded at `36d462b4e5a34c2c6d1c68e19234f89110a4bc82` and is currentized after the repair.
+Behavioral RED `ffe75eddf530ad3963c087afdfe1109da15bad14` extends `constraint_period_backing_index_presence_contract.rs`: a constraint `(document_id, valid_during WITHOUT OVERLAPS)` paired with same-name GiST/exclusion key `(valid_during, document_id)` must fail `constraint_period_backing_index`.
 
 Production repair `e258b39474454b4c84f51f23dcfb6b00285f4db3` adds one shared `key_constraint_backing_index_static_shape_matches()` predicate and uses it from both timing and period canonicalization. It verifies exact ordered key-column equality, uniqueness, no partial predicate, PK versus UNIQUE catalog role, and observed UNIQUE null treatment. Positive period admission additionally retains `indisexclusion=true` and `gist`; timing admission separately retains `indimmediate` and exclusion-access-method coherence. Optional-family composition is preserved: static temporal backing coherence no longer depends on timing evidence, while timing-specific facts remain timing-owned.
 
-This repair is **source-repaired / exact-head acceptance pending**. It is not native/Product GREEN, Ready, merge-authorized, or released.
+## Active P1 — explicit unusable backing-index lifecycle
+
+Review `5186802339` found a remaining cross-family contradiction. `IndexObservation` already preserves exact observed `pg_index.indisready`, `indisvalid`, and `indislive`, but `key_constraint_backing_index_static_shape_matches()` ignores those fields. PostgreSQL 18 states that `indisvalid=false` can leave a unique index without a guaranteed uniqueness property, `indisready=false` makes INSERT/UPDATE ignore the index, and `indislive=false` means the index is being dropped and must be ignored for all purposes. An explicitly unusable index therefore cannot coherently serve as governed PK/UNIQUE backing evidence.
+
+Behavioral RED commits `681e280fa608b90495a035c04272bc89c546eaca` and `ed4882e7138f8b055b2913a7b25b8089ddc1b95c` cover both positive `conperiod=true` backing evidence and explicitly observed PK/UNIQUE timing. They require each explicitly false lifecycle flag to fail closed while preserving an explicitly ready + valid + live control. Primary-source doctoring is `docs/doctoring/source-observation-key-backing-index-lifecycle.md`.
+
+The minimum causal repair belongs in the shared static backing-index coherence predicate: reject an observed false `ready`, `valid`, or `live` state for a supporting PK/UNIQUE index, so timing and temporal period admission cannot drift. This slice intentionally leaves `None` as unobserved rather than silently treating absence as false or true; lifecycle-family completeness is a separate evidence-contract decision. Constraint timing and `conperiod` remain their own semantic authorities.
+
+Current state is **behavioral RED active**. Do not classify #46 as source-repaired, native/Product GREEN, Ready, merge-authorized, or released until this contradiction is repaired and exact-head acceptance is regenerated.
 
 ## Acceptance still required
 
-One unchanged exact #46 successor must produce repository-pinned Rust 1.98 `cargo fmt --all --check`, strict workspace/all-target Clippy with warnings denied, workspace/doc tests including the temporal backing-index shape witness and retained temporal/type/index contracts, release build, owned production docstring/test/edge-case coverage, and applicable Product/security/dependency/review workflows terminal on the same head. Draft state, bot-only status, mechanical mergeability, predecessor GREEN, manual/no-op reruns, and synthetic statuses are not evidence.
+After the active P1 is repaired, one unchanged exact #46 successor must produce repository-pinned Rust 1.98 `cargo fmt --all --check`, strict workspace/all-target Clippy with warnings denied, workspace/doc tests including both backing-index lifecycle RED contracts and retained temporal/type/index contracts, release build, owned production docstring/test/edge-case coverage, and applicable Product/security/dependency/review workflows terminal on the same head. Draft state, bot-only status, mechanical mergeability, predecessor GREEN, manual/no-op reruns, and synthetic statuses are not evidence.
 
 The current successor has no pull-request workflow runs. The available execution host has no Rust toolchain and cannot reach GitHub for an independent exact-tree clone, so local execution cannot substitute for repository-pinned hosted evidence.
 
@@ -56,13 +64,13 @@ The current successor has no pull-request workflow runs. The available execution
 
 Transport remains blocked until representation exact-head GREEN and ordinary/non-force adoption through #45/#6. The later adapter must use a maintained patched Rust PostgreSQL driver pinned by immutable lock coordinate; resolve least-privilege credentials only through the authorized source/policy binding; use bounded `REPEATABLE READ READ ONLY` catalog capture; and never keep an explicit database transaction/lock open while waiting on LLM or long external computation.
 
-Catalog OIDs may only join the captured snapshot. The ACL must cross with exact qualified names and complete evidence from `pg_type`, `pg_range`, `pg_class`, `pg_index`, `pg_constraint`, `pg_opclass`/operator-family catalogs, and `pg_operator`. `pg_constraint.conindid` may bind a constraint to its backing index during capture but must not become durable semantic identity. A represented temporal key must preserve the complete per-column `conexclop` vector and durable namespace/name/type signatures, verify the appropriate `COMPARE_EQ` or `COMPARE_OVERLAP` mapping through each resolved backing-index operator class, retain exact backing-index key layout and static flags, temporal type/domain chain, exact timing/action/match facts, and policy-admitted row/byte/concurrency ceilings. Referenced temporal keys outside the initially bounded relation set must trigger an explicitly authorized evidence-expansion flow or remain fail-closed; the adapter must never silently widen schema authorization. Reconstructed DDL is provenance text, never the sole semantic carrier.
+Catalog OIDs may only join the captured snapshot. The ACL must cross with exact qualified names and complete evidence from `pg_type`, `pg_range`, `pg_class`, `pg_index`, `pg_constraint`, `pg_opclass`/operator-family catalogs, and `pg_operator`. `pg_constraint.conindid` may bind a constraint to its backing index during capture but must not become durable semantic identity. A represented temporal key must preserve the complete per-column `conexclop` vector and durable namespace/name/type signatures, verify the appropriate `COMPARE_EQ` or `COMPARE_OVERLAP` mapping through each resolved backing-index operator class, retain exact backing-index key layout and static flags, temporal type/domain chain, exact timing/action/match facts, and policy-admitted row/byte/concurrency ceilings. Explicitly observed backing-index `indisready`, `indisvalid`, and `indislive` must not contradict supporting-index admission. Referenced temporal keys outside the initially bounded relation set must trigger an explicitly authorized evidence-expansion flow or remain fail-closed; the adapter must never silently widen schema authorization. Reconstructed DDL is provenance text, never the sole semantic carrier.
 
 ## Primary authority
 
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE TABLE* — `WITHOUT OVERLAPS` and PERIOD FK requirements, referenced-key eligibility, generated backing-index name/key semantics.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_constraint* — `conperiod`, `conindid`, `conkey`, `confkey`, and `conexclop` catalog facts.
-- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_index* — `indisunique`, `indisprimary`, `indisexclusion`, key positions, predicate, and related material index facts.
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_index* — `indisunique`, `indisprimary`, `indisexclusion`, `indisready`, `indisvalid`, `indislive`, key positions, predicate, and related material index facts.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: GiST indexes* — operator-class extensibility and compare-type translation for temporal constraints.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL source: `ComputeIndexAttrs()`* — `COMPARE_EQ`/`COMPARE_OVERLAP` operator lookup for `WITHOUT OVERLAPS`.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18.4 release notes* — domains over range/multirange for `WITHOUT OVERLAPS`.
@@ -71,16 +79,17 @@ Catalog OIDs may only join the captured snapshot. The ACL must cross with exact 
 
 | Area | Status | Evidence / next verification |
 | --- | --- | --- |
-| Source Observation | SOURCE_REPAIRED_ACCEPTANCE_PENDING | `5186585545 -> ffe75edd... -> e258b394...`; static temporal backing shape is now shared across timing/period validation, exact-head execution evidence pending. |
+| Source Observation | BEHAVIORAL_RED_ACTIVE | `5186802339 -> 681e280f... -> ed4882e...`; explicit unusable supporting-index lifecycle must fail closed; production repair pending. |
 | Product CI | CENTRAL_REVIEW_REPAIR_PENDING | #35 unchanged; central #2106 has core hosted gates GREEN but Noema/Strix failures and missing independent approval remain. #2115 owns provider-failure provenance repair. |
-| Quality gate | EXACT_HEAD_ACCEPTANCE_REQUIRED | Reacquire unchanged-head Rust 1.98 and hosted gates after the production/docs successor settles. |
+| Quality gate | EXACT_HEAD_ACCEPTANCE_BLOCKED_ON_P1 | Repair the active lifecycle contradiction first; then reacquire unchanged-head Rust 1.98 and hosted gates. |
 | PostgreSQL adapter | BLOCKED_ON_REPRESENTATION_ACCEPTANCE | No transport before representation GREEN and parent adoption. |
 | Publication | NO_PUBLICATION | No protected immutable semantic release exists. |
 | Release | NOT_STARTED | Version/CHANGELOG/tag/package/semantic release/SBOM/provenance/reproducibility/rollback remain mandatory. |
 
 ## Current causal sequence
 
-1. Keep #46 Draft and obtain one unchanged exact-head Rust 1.98/Product/security/dependency/review acceptance; repair only real failures ordinary-forward and restart exact-head acceptance whenever the head moves.
-2. Adopt the complete verified #46 delta ordinary/non-force into #45, obtain fresh parent acceptance, then adopt #45 into #6.
-3. Independently, central `.github#2106@24bb659...` must resolve its Noema/Strix owner-path failures, obtain qualifying independent approval, and land normally; #35 then reacquires fresh unchanged-head acceptance without copied workflows or leaf-side provider workarounds.
-4. Only after representation/Product prerequisites are GREEN may the bounded PostgreSQL adapter proceed, followed by deterministic validation, independent evaluation, steward review, and immutable publication under canonical owner boundaries.
+1. Repair the shared backing-index coherence seam so explicitly observed `indisready=false`, `indisvalid=false`, or `indislive=false` cannot authorize PK/UNIQUE timing or positive `conperiod` evidence; preserve unobserved lifecycle state as unobserved for this slice.
+2. Keep #46 Draft and obtain one unchanged exact-head Rust 1.98/Product/security/dependency/review acceptance; repair only real failures ordinary-forward and restart exact-head acceptance whenever the head moves.
+3. Adopt the complete verified #46 delta ordinary/non-force into #45, obtain fresh parent acceptance, then adopt #45 into #6.
+4. Independently, central `.github#2106@24bb659...` must resolve its Noema/Strix owner-path failures, obtain qualifying independent approval, and land normally; #35 then reacquires fresh unchanged-head acceptance without copied workflows or leaf-side provider workarounds.
+5. Only after representation/Product prerequisites are GREEN may the bounded PostgreSQL adapter proceed, followed by deterministic validation, independent evaluation, steward review, and immutable publication under canonical owner boundaries.
