@@ -46,19 +46,19 @@ The active successor preserves these source-authoritative invariants:
 
 ## Current temporal exclusion-operator repair
 
-Concurrent ordinary-forward work after the previous baseline added resolved `pg_constraint.conexclop` signatures to `ConstraintPeriodObservation`, including position, operator namespace/name, and qualified binary operand types. That delta is adopted rather than rewritten.
+Concurrent ordinary-forward work after the previous baseline added resolved `pg_constraint.conexclop` signatures to `ConstraintPeriodObservation`, including position, operator namespace/name, and qualified binary operand types. That delta was adopted rather than rewritten.
 
-Finding review `5186120516` identified a remaining P1: the operator family enforced presence, contiguous positions, arity, and digest materiality but admitted arbitrary operator names. The regression itself treated a prefix `=#` operator as a coherent `WITHOUT OVERLAPS` temporal key.
-
-PostgreSQL 18 defines `UNIQUE/PRIMARY KEY (..., valid_at WITHOUT OVERLAPS)` as exclusion semantics equivalent to prefix key columns `WITH =` and the final range/multirange column `WITH &&`. `pg_constraint.conexclop` is the per-column operator vector. Therefore operator arity alone is insufficient source validation.
+Finding review `5186120516` identified a remaining P1: the operator family enforced presence, contiguous positions, arity, and digest materiality but admitted arbitrary operator names. PostgreSQL 18 defines `UNIQUE/PRIMARY KEY (..., valid_at WITHOUT OVERLAPS)` as exclusion semantics equivalent to prefix key columns `WITH =` and the final range/multirange column `WITH &&`; `pg_constraint.conexclop` is the per-column operator vector.
 
 Causal lineage:
 
-- finding review `5186120516` on #46 exact predecessor `6679cd3c29d6457a644dec358ea8f9003cca8ee5`;
-- behavioral RED `8b5c3ba74fc9f8dfb0c8f6500634d62c8feaf14f` in `constraint_period_exclusion_operator_contract.rs`;
+- finding review `5186120516` on #46 predecessor `6679cd3c29d6457a644dec358ea8f9003cca8ee5`;
+- behavioral RED `8b5c3ba74fc9f8dfb0c8f6500634d62c8feaf14f`;
 - production repair `2333d7f7640931ab158734e12dacd8729aa9983f` in `constraint_period.rs`;
-- regression-boundary adjustment `5fa8112359a28850e73cf6912223b883d2c7f21d`;
-- primary-source doctoring `ef289379d842f366674bc4ba54306df7b5a7cd61` at `docs/doctoring/source-observation-without-overlaps-exclusion-operator-semantics.md`.
+- validation-boundary regression `5fa8112359a28850e73cf6912223b883d2c7f21d`;
+- primary-source doctoring `ef289379d842f366674bc4ba54306df7b5a7cd61`;
+- canonical baseline predecessor `d7d805a5609190dc6d15d433efb0ea7ecbd95ea0`;
+- arity witness repair `ba40e6078461685e38bc2a7a2c2206ea1b37fb5c`, which keeps the one-operator arity-negative case semantically valid at the value-object boundary (`&&` as the sole/final operator) so the aggregate still tests the intended two-column arity mismatch rather than failing earlier for the wrong reason.
 
 The repaired value-object boundary requires every non-final resolved operator name to be `=` and the final operator name to be `&&`. Namespace and qualified operand types remain retained/digested evidence because operator names are overloadable. This validation does not infer `conperiod`, does not collapse OIDs into governed identity, and does not hard-code operator namespace.
 
@@ -68,13 +68,7 @@ This lane is **source-repaired / exact-head native-and-Product-acceptance-pendin
 
 ## Acceptance still required
 
-Before Ready/adoption/merge, one unchanged exact #46 successor must produce:
-
-- repository-pinned Rust 1.98 `cargo fmt --all --check`;
-- strict workspace/all-target Clippy with warnings denied;
-- workspace and doc tests, including `constraint_period_exclusion_operator_contract`, `constraint_period_backing_index_presence_contract`, retained period/action/reference/type/timing/index contracts, frozen-v2 regressions, and array/type-kind contracts;
-- release build and owned production docstring/test/edge-case coverage;
-- applicable Product/security/dependency/review workflows terminal on the same exact head.
+Before Ready/adoption/merge, one unchanged exact #46 successor must produce repository-pinned Rust 1.98 `cargo fmt --all --check`, strict workspace/all-target Clippy with warnings denied, workspace/doc tests including the temporal operator/backing-index witnesses and retained v2/v3 contracts, release build, owned production docstring/test/edge-case coverage, and applicable Product/security/dependency/review workflows terminal on the same exact head.
 
 Draft state, bot-only status, mechanical mergeability, predecessor GREEN, manual/no-op reruns, or synthetic statuses are not acceptance evidence.
 
@@ -82,7 +76,7 @@ Draft state, bot-only status, mechanical mergeability, predecessor GREEN, manual
 
 Transport remains blocked until representation exact-head GREEN and ordinary/non-force adoption through #45/#6. The later adapter must use a maintained patched Rust PostgreSQL driver pinned by immutable lock coordinate; obtain least-privilege credentials only through the authorized source/policy binding; execute bounded catalog capture in one `REPEATABLE READ READ ONLY` transaction; and never hold an explicit database transaction/lock while waiting on LLM or long external computation.
 
-Catalog OIDs may be used only for adapter-local joins. The ACL must cross with exact qualified names and complete bounded evidence from `pg_type`, `pg_range`, `pg_class`, `pg_index`, `pg_constraint`, and the operator catalogs needed to resolve `conexclop`. For represented `conperiod=true` keys the adapter must preserve the complete per-column operator vector, resolve each OID to durable namespace/name/type evidence, and fail closed unless prefix operators are equality and the final temporal operator is overlap. It must also retain the same-name GiST/exclusion backing index, temporal type/domain chain, exact constraint timing/action/match evidence, and policy-admitted row/byte/concurrency ceilings. Reconstructed DDL is provenance text, never the sole semantic carrier.
+Catalog OIDs may be used only for adapter-local joins. The ACL must cross with exact qualified names and complete bounded evidence from `pg_type`, `pg_range`, `pg_class`, `pg_index`, `pg_constraint`, and the operator catalogs needed to resolve `conexclop`. For represented `conperiod=true` keys the adapter must preserve the complete per-column operator vector, resolve each OID to durable namespace/name/type evidence, and fail closed unless prefix operators are equality and the final temporal operator is overlap. It must also retain same-name GiST/exclusion backing-index evidence, temporal type/domain chains, exact constraint timing/action/match evidence, and policy-admitted row/byte/concurrency ceilings. Reconstructed DDL is provenance text, never the sole semantic carrier.
 
 ## Standards and primary authority
 
@@ -96,7 +90,7 @@ Catalog OIDs may be used only for adapter-local joins. The ACL must cross with e
 | Area | Status | Evidence / next verification |
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | Canonical owner seams unchanged. |
-| Source Observation | TEMPORAL_OPERATOR_SOURCE_REPAIRED | `5186120516 -> 8b5c3ba... -> 2333d7f... -> 5fa8112... -> ef28937...`; exact-head native/Product acceptance required. |
+| Source Observation | TEMPORAL_OPERATOR_SOURCE_REPAIRED | `5186120516 -> 8b5c3ba... -> 2333d7f... -> 5fa8112... -> ef28937... -> d7d805a... -> ba40e60...`; exact-head native/Product acceptance required. |
 | Product CI | BLOCKED_OWNER_ACCEPTANCE | #35 unchanged; `.github#2040@8552230...` remains Draft with non-GREEN CodeQL settlement. |
 | Quality gate | NATIVE_ACCEPTANCE_REQUIRED | No Ready/adoption/merge before one unchanged head passes Rust 1.98 and hosted gates. |
 | PostgreSQL adapter | BLOCKED_ON_REPRESENTATION_ACCEPTANCE | No transport before representation GREEN and parent adoption. |
