@@ -426,10 +426,11 @@ impl PostgresSchemaSnapshotV3 {
             &self.enums,
             type_kinds,
         )?;
-        validate_type_bindings_with_type_kinds(
+        validate_type_bindings_with_type_kinds_and_arrays(
             &self.relations,
             &self.domains,
             &self.enums,
+            &self.array_types,
             &type_kinds,
         )?;
         self.snapshot_digest = compute_type_kind_aware_snapshot_digest(
@@ -898,6 +899,68 @@ fn validate_type_bindings_with_type_kinds(
                 relations,
                 domains,
                 enums,
+                type_kinds,
+            ) {
+                return Err(ObservationError::UnknownTypeBinding {
+                    schema_name: column.type_binding().schema_name().to_owned(),
+                    type_name: column.type_binding().type_name().to_owned(),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn type_binding_is_resolvable_with_type_kinds_and_arrays(
+    binding: &QualifiedTypeName,
+    relations: &[RelationObservation],
+    domains: &[DomainObservation],
+    enums: &[EnumObservation],
+    array_types: &[ArrayTypeObservation],
+    type_kinds: &[TypeKindObservation],
+) -> bool {
+    array_types
+        .iter()
+        .any(|array_type| same_type_coordinate(array_type.array_type(), binding))
+        || type_binding_is_resolvable_with_type_kinds(
+            binding,
+            relations,
+            domains,
+            enums,
+            type_kinds,
+        )
+}
+
+fn validate_type_bindings_with_type_kinds_and_arrays(
+    relations: &[RelationObservation],
+    domains: &[DomainObservation],
+    enums: &[EnumObservation],
+    array_types: &[ArrayTypeObservation],
+    type_kinds: &[TypeKindObservation],
+) -> Result<(), ObservationError> {
+    for domain in domains {
+        if !type_binding_is_resolvable_with_type_kinds_and_arrays(
+            domain.base_type(),
+            relations,
+            domains,
+            enums,
+            array_types,
+            type_kinds,
+        ) {
+            return Err(ObservationError::UnknownTypeBinding {
+                schema_name: domain.base_type().schema_name().to_owned(),
+                type_name: domain.base_type().type_name().to_owned(),
+            });
+        }
+    }
+    for relation in relations {
+        for column in relation.columns() {
+            if !type_binding_is_resolvable_with_type_kinds_and_arrays(
+                column.type_binding(),
+                relations,
+                domains,
+                enums,
+                array_types,
                 type_kinds,
             ) {
                 return Err(ObservationError::UnknownTypeBinding {
