@@ -156,7 +156,9 @@ fn temporal_key_requires_observed_conexclop_operator_vector() {
 fn temporal_key_requires_one_exclusion_operator_per_key_column() {
     let error = base_snapshot()
         .with_observed_constraint_periods(vec![period_with_operators(vec![exclusion_operator(
-            1, "=", "int8",
+            1,
+            "&&",
+            "tstzrange",
         )])])
         .expect_err("conexclop arity must match the temporal key column arity");
 
