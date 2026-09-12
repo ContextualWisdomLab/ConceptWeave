@@ -4,8 +4,8 @@ use conceptweave_observation::{
     ForeignKeyDeferrability, ForeignKeyMatchType, ForeignKeyObservation,
     ForeignKeyReferenceBehavior, IndexAttributeKind, IndexAttributeObservation, IndexCatalogFlags,
     IndexKeySemantics, IndexObservation, ObservationError, PostgresSchemaSnapshotV3,
-    PostgresTypeKind, PrimaryKeyObservation, QualifiedOperatorClassName, QualifiedTypeName,
-    RelationKind, RelationObservation, TableConstraintObservation, TypeKindObservation,
+    PrimaryKeyObservation, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
+    RelationObservation, TableConstraintObservation, TypeKindObservation,
     UniqueConstraintObservation,
 };
 
