@@ -152,6 +152,31 @@ impl ConstraintPeriodObservation {
         Ok(self)
     }
 
+    /// Records resolved operator signatures without exposing source catalog OIDs as governed input.
+    ///
+    /// Each tuple is `(position, operator_schema, operator_name, left_type, right_type)`. Exact
+    /// qualified operand types disambiguate overloaded PostgreSQL operator names.
+    pub fn with_exclusion_operator_signatures(
+        self,
+        signatures: Vec<(u32, String, String, QualifiedTypeName, QualifiedTypeName)>,
+    ) -> Result<Self, ObservationError> {
+        let operators = signatures
+            .into_iter()
+            .map(
+                |(position, operator_schema, operator_name, left_type, right_type)| {
+                    ConstraintExclusionOperatorObservation::new(
+                        position,
+                        operator_schema,
+                        operator_name,
+                        left_type,
+                        right_type,
+                    )
+                },
+            )
+            .collect::<Result<Vec<_>, _>>()?;
+        self.with_exclusion_operators(operators)
+    }
+
     /// Returns the exact owning schema identifier.
     #[must_use]
     pub fn schema_name(&self) -> &str {
@@ -186,5 +211,25 @@ impl ConstraintPeriodObservation {
     #[must_use]
     pub fn exclusion_operators(&self) -> Option<&[ConstraintExclusionOperatorObservation]> {
         self.exclusion_operators.as_deref()
+    }
+
+    /// Returns one resolved operator signature at its exact one-based position.
+    #[must_use]
+    pub fn exclusion_operator_signature(
+        &self,
+        position: u32,
+    ) -> Option<(&str, &str, &QualifiedTypeName, &QualifiedTypeName)> {
+        self.exclusion_operators
+            .as_ref()?
+            .iter()
+            .find(|operator| operator.position() == position)
+            .map(|operator| {
+                (
+                    operator.operator_schema_name(),
+                    operator.operator_name(),
+                    operator.left_type(),
+                    operator.right_type(),
+                )
+            })
     }
 }
