@@ -1,8 +1,9 @@
 use conceptweave_observation::{
     ColumnObservationV3, ConstraintPeriodObservation, DomainObservation, IndexAttributeKind,
-    IndexAttributeObservation, IndexCatalogFlags, IndexObservation, ObservationError,
-    PostgresSchemaSnapshotV3, PostgresTypeKind, PrimaryKeyObservation, QualifiedTypeName,
-    RelationKind, RelationObservation, TableConstraintObservation, TypeKindObservation,
+    IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics, IndexObservation,
+    ObservationError, PostgresSchemaSnapshotV3, PostgresTypeKind, PrimaryKeyObservation,
+    QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
+    TableConstraintObservation, TypeKindObservation,
 };
 
 mod support;
@@ -13,6 +14,20 @@ fn catalog_type(type_name: &str) -> QualifiedTypeName {
 
 fn user_type(schema_name: &str, type_name: &str) -> QualifiedTypeName {
     QualifiedTypeName::new(schema_name, type_name).expect("user type coordinate is valid")
+}
+
+fn operator_class(schema_name: &str, operator_class_name: &str) -> QualifiedOperatorClassName {
+    QualifiedOperatorClassName::new(schema_name, operator_class_name)
+        .expect("operator-class coordinate is valid")
+}
+
+fn temporal_key_semantics() -> Vec<IndexKeySemantics> {
+    vec![
+        IndexKeySemantics::new(1, None, operator_class("public", "gist_int8_ops"), 0)
+            .expect("integer GiST key semantics are valid"),
+        IndexKeySemantics::new(2, None, operator_class("pg_catalog", "range_ops"), 0)
+            .expect("range GiST key semantics are valid"),
+    ]
 }
 
 fn column_with_binding(
@@ -56,10 +71,15 @@ fn temporal_backing_index() -> IndexObservation {
     )
     .expect("backing index fixture is structurally valid")
     .with_access_method("gist")
+    .with_key_semantics(temporal_key_semantics())
+    .expect("one semantic record matches each temporal key position")
     .with_catalog_flags(IndexCatalogFlags::new(
         true, true, true, false, false, false,
     ))
     .expect("catalog flags fixture is coherent")
+    .with_ready(true)
+    .with_valid(true)
+    .with_live(true)
 }
 
 fn temporal_primary_key_with_binding(
@@ -105,6 +125,23 @@ fn temporal_period() -> ConstraintPeriodObservation {
         true,
     )
     .expect("explicit conperiod fixture is structurally valid")
+    .with_exclusion_operator_signatures(vec![
+        (
+            1,
+            "pg_catalog".to_owned(),
+            "=".to_owned(),
+            catalog_type("int8"),
+            catalog_type("int8"),
+        ),
+        (
+            2,
+            "pg_catalog".to_owned(),
+            "&&".to_owned(),
+            catalog_type("tstzrange"),
+            catalog_type("tstzrange"),
+        ),
+    ])
+    .expect("temporal exclusion operator fixture is valid")
 }
 
 fn catalog_range_family(range_name: &str, multirange_name: &str) -> Vec<TypeKindObservation> {
