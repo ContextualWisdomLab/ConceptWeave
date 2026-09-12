@@ -186,8 +186,13 @@ impl PostgresSchemaSnapshotV3 {
         type_kinds: Vec<TypeKindObservation>,
     ) -> Result<Self, ObservationError> {
         validate_schema_relation_invariants(&relations)?;
-        let type_kinds =
-            canonicalize_type_kind_observations(&relations, &domains, &enums, type_kinds)?;
+        let type_kinds = canonicalize_type_kind_observations(
+            Some(authorized_request.request().allowed_schema_names()),
+            &relations,
+            &domains,
+            &enums,
+            type_kinds,
+        )?;
         validate_type_bindings_with_type_kinds(&relations, &domains, &enums, &type_kinds)?;
 
         let projected_relations = relations
@@ -424,6 +429,7 @@ impl PostgresSchemaSnapshotV3 {
             });
         }
         let type_kinds = canonicalize_type_kind_observations(
+            None,
             &self.relations,
             &self.domains,
             &self.enums,
@@ -717,6 +723,7 @@ fn validate_schema_relation_invariants(
 }
 
 fn canonicalize_type_kind_observations(
+    allowed_schema_names: Option<&[String]>,
     relations: &[RelationObservation],
     domains: &[DomainObservation],
     enums: &[EnumObservation],
@@ -749,7 +756,13 @@ fn canonicalize_type_kind_observations(
 
     for type_kind in &type_kinds {
         let coordinate = type_kind.type_name();
+        let explicitly_authorized = allowed_schema_names.is_some_and(|schema_names| {
+            schema_names
+                .iter()
+                .any(|schema_name| schema_name == coordinate.schema_name())
+        });
         if coordinate.schema_name() != POSTGRES_CATALOG_SCHEMA_NAME
+            && !explicitly_authorized
             && !observed_schemas.contains(coordinate.schema_name())
         {
             return Err(ObservationError::InvalidObservationField {
