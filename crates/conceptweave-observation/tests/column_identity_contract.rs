@@ -27,6 +27,24 @@ fn one_column_relation() -> RelationObservation {
     .expect("account relation fixture is valid")
 }
 
+fn nullable_one_column_relation() -> RelationObservation {
+    RelationObservation::new(
+        "public",
+        "account",
+        RelationKind::Table,
+        vec![ColumnObservationV3::new(
+            "account_id",
+            1,
+            "int8",
+            catalog_type("int8"),
+            true,
+            None,
+        )
+        .expect("nullable identity contradiction fixture is structurally valid")],
+    )
+    .expect("account relation fixture is valid")
+}
+
 fn two_column_relation() -> RelationObservation {
     RelationObservation::new(
         "public",
@@ -116,6 +134,27 @@ fn identity_generation_mode_changes_governed_identity() {
         generated_by_default.snapshot_digest(),
         "pg_attribute.attidentity='a' and 'd' have different write semantics and must not collapse"
     );
+}
+
+#[test]
+fn identity_column_must_not_conflict_with_nullable_column_evidence() {
+    for identity in [always("account_id"), by_default("account_id")] {
+        let error = snapshot(vec![nullable_one_column_relation()], vec![identity])
+            .expect_err("PostgreSQL identity columns are implicitly NOT NULL");
+
+        assert_eq!(
+            error,
+            ObservationError::InvalidObservationField {
+                field: "column_identity_nullability",
+            }
+        );
+    }
+
+    snapshot(
+        vec![nullable_one_column_relation()],
+        vec![not_identity("account_id")],
+    )
+    .expect("nullable ordinary columns remain valid when attidentity is explicitly empty");
 }
 
 #[test]
