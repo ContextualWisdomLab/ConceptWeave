@@ -18,7 +18,7 @@ Protected/default ConceptWeave `main` remains `f4f440dd58c77d7cd90dff8a1eb2eeb9a
 
 #46 stays Draft until one unchanged exact head has repository-pinned Rust 1.98 plus applicable Product/security/dependency/review terminal evidence. #45/#6 ordinary/non-force adopt the complete verified child only after #46 exact-head GREEN; partial cherry-picks and duplicate fixes are invalid succession.
 
-Product bootstrap #35 remains `9bb82f041483cb4e0cf1aa1f5450b413309f9a05`, OPEN/non-Draft/mergeable. Central workflow settlement remains owned outside ConceptWeave. The current protected-handler bootstrap is `.github#2106@24bb6591ab7df23558cb793b4af60c567ff9da97` on protected `.github/main@fb17ef556f94f673234aa557254ae52779e9a7b0`; SAST Semgrep, Python Security, Security Scan, and Runtime Quality have current-head success, while CodeQL PR remains queued. #2106 must reach exact-head terminal acceptance and land normally before #2040 can reconcile/switch protocol; unchanged #35 then needs fresh Product acceptance. ConceptWeave must not copy, weaken, synthetically satisfy, or manually retrigger that owner gate.
+Product bootstrap #35 remains `9bb82f041483cb4e0cf1aa1f5450b413309f9a05`, OPEN/non-Draft/mergeable. Central workflow settlement remains owned outside ConceptWeave. The current protected-handler bootstrap is `.github#2106@24bb6591ab7df23558cb793b4af60c567ff9da97` on protected `.github/main@fb17ef556f94f673234aa557254ae52779e9a7b0`. Runtime Quality, SAST, Python Security, and Security are terminal GREEN; CodeQL PR is terminal failure at compatibility enforcement with successful dispatch and `VERDICT_STATE=pending`. #2106 remains Draft/Proposed without independent approval. ConceptWeave must not copy, weaken, synthetically satisfy, or manually retrigger that owner gate.
 
 ## Source Observation boundary
 
@@ -28,40 +28,39 @@ Source Observation owns bounded request admission, exact source/schema/resource 
 
 The active successor keeps exact relation/type/index/constraint coordinates, true-array identity, direct type-kind/domain-base/range evidence, request-authorized cross-schema types, relation-scoped index semantics, PK/UNIQUE timing, and explicit temporal constraint evidence. `pg_constraint.conperiod` remains the declaration authority for `WITHOUT OVERLAPS` PK/UNIQUE and PERIOD FK; index or operator shape never invents it. Temporal final columns resolve to range/multirange through observed type/domain evidence, including domains over range/multirange. PostgreSQL 18 `MATCH PARTIAL` remains fail-closed while SIMPLE/FULL are preserved. PERIOD FKs retain exact action, reference, and referenced-key timing requirements.
 
-## Current temporal exclusion-operator correction
+## Retained temporal exclusion-operator correction
 
-Concurrent ordinary-forward work added resolved `pg_constraint.conexclop` signatures to `ConstraintPeriodObservation`, including position, operator namespace/name, and qualified operand types. It was adopted, not rewritten. The initial repair then over-constrained those signatures by requiring literal `=` for every prefix key and literal `&&` for the final temporal key.
+Review `5186175514`, RED `a9065d460af4c00d84c2453b744796effd4d0485`, production repair `e286c3524f036138546d91cb0d53631e8c8e41bf`, and doctoring `eef825ec486089ce1579305e05d3a309c8cae508` corrected the earlier literal-operator-name inference. Exact operator namespace/name and qualified operand types remain provenance and digest material; equality/overlap authority must later be verified by the PostgreSQL adapter through the exact backing-index operator class/operator family and PostgreSQL `COMPARE_EQ`/`COMPARE_OVERLAP` translation. The same-name GiST/exclusion backing-index, temporal type, action, match, and timing invariants remain in force.
 
-Corrective review `5186175514` verified against PostgreSQL 18 implementation that this spelling rule is not source-authoritative. `ComputeIndexAttrs()` requests `COMPARE_EQ` for non-final `WITHOUT OVERLAPS` keys and `COMPARE_OVERLAP` for the final key, then asks the resolved GiST operator class for the matching operator through `GetOperatorFromCompareType()`. Extensible operator classes can therefore select valid operators with different catalog names. Literal spelling can reject valid PostgreSQL catalogs and still does not prove operator-family membership.
+## Active P1 — outbound PERIOD reference evidence
 
-Corrective lineage:
+Fresh review found a fail-open branch in `canonicalize_constraint_periods()`. For `conperiod=true` foreign keys, the representation verifies that the referenced columns resolve to a positive `WITHOUT OVERLAPS` PK/UNIQUE and that the referenced key is `NOT DEFERRABLE` only when the referenced relation is present in the bounded `relations` inventory. If the referenced relation is absent, the predecessor silently skips the referenced-key authority check and admits the local PERIOD FK.
 
-- source finding `5186175514` on predecessor `55d53adfa13297ff9eaa19555b6c2c2eb5890a3f`;
-- behavioral RED `a9065d460af4c00d84c2453b744796effd4d0485`, preserving custom-named opclass-selected temporal operators;
-- production repair `e286c3524f036138546d91cb0d53631e8c8e41bf`, removing operator-name inference while retaining non-empty contiguous signatures and aggregate arity enforcement;
-- primary-source doctoring `eef825ec486089ce1579305e05d3a309c8cae508`.
+PostgreSQL 18 requires a PERIOD foreign key to reference a PRIMARY KEY or UNIQUE constraint declared `WITHOUT OVERLAPS`; the local FK's `conperiod=true` value cannot independently prove the immutable referenced-key identity or timing. A governed positive temporal relationship therefore must not use absence of captured reference evidence as success.
 
-Exact operator namespace/name and qualified operand types remain retained/digested provenance. Equality/overlap semantic verification belongs to the PostgreSQL adapter ACL where catalog OIDs, each backing-index key's exact operator class/operator family, and compare-type translation can be resolved inside one bounded snapshot. The adapter must verify that `COMPARE_EQ`/`COMPARE_OVERLAP` translation returns the same operator represented by `conexclop`; neither operator spelling nor catalog OID alone becomes governed identity.
+Current lineage:
 
-The preceding backing-index invariant remains in force: `conperiod=true` PK/UNIQUE requires the exact same-name index, material catalog flags, `indisexclusion=true`, and exact observed `gist`; ordinary `conperiod=false` keys do not acquire mandatory index-family observation.
+- P1 finding review `5186323924` on exact predecessor `cd758faa7a9798fe0cf04ead6f0c1fb50f926106`;
+- behavioral RED `d692773a5050b6d5486c40a97d5d8589601fe995`, `constraint_period_external_reference_contract.rs`, requiring missing referenced temporal-key evidence to fail with `constraint_period_reference`;
+- primary-source doctoring `6ae821dfa5925a16eb690933bdf29ea96cb87c4d`, `source-observation-period-external-reference-evidence.md`.
 
-This lane is **source-repaired / exact-head native-and-Product-acceptance-pending**. It is not Ready, merged, adopted by #45/#6, transported to PostgreSQL, published, or released.
+This P1 is **behavioral RED active**. The minimal causal production repair is to fail closed when a positive PERIOD FK's exact referenced relation is absent from the current bounded representation, while preserving the already-supported fully observed referenced `WITHOUT OVERLAPS` + `NOT DEFERRABLE` path and leaving ordinary non-PERIOD outbound foreign keys unchanged. A future external referenced-key evidence family may relax this only if it is explicit, immutable, domain-separated, digest-material, provenance-bearing, and authorization-bounded.
 
 ## Acceptance still required
 
-Before Ready/adoption/merge, one unchanged exact #46 successor must produce repository-pinned Rust 1.98 `cargo fmt --all --check`, strict workspace/all-target Clippy with warnings denied, workspace/doc tests including temporal operator/backing-index witnesses and retained v2/v3 contracts, release build, owned production docstring/test/edge-case coverage, and applicable Product/security/dependency/review workflows terminal on the same head. Draft state, bot-only status, mechanical mergeability, predecessor GREEN, manual/no-op reruns, and synthetic statuses are not evidence.
+After the active RED is repaired, one unchanged exact #46 successor must produce repository-pinned Rust 1.98 `cargo fmt --all --check`, strict workspace/all-target Clippy with warnings denied, workspace/doc tests including the outbound PERIOD reference witness and retained temporal/type/index contracts, release build, owned production docstring/test/edge-case coverage, and applicable Product/security/dependency/review workflows terminal on the same head. Draft state, bot-only status, mechanical mergeability, predecessor GREEN, manual/no-op reruns, and synthetic statuses are not evidence.
 
 ## PostgreSQL adapter boundary
 
 Transport remains blocked until representation exact-head GREEN and ordinary/non-force adoption through #45/#6. The later adapter must use a maintained patched Rust PostgreSQL driver pinned by immutable lock coordinate; resolve least-privilege credentials only through the authorized source/policy binding; use bounded `REPEATABLE READ READ ONLY` catalog capture; and never keep an explicit database transaction/lock open while waiting on LLM or long external computation.
 
-Catalog OIDs may only join the captured snapshot. The ACL must cross with exact qualified names and complete evidence from `pg_type`, `pg_range`, `pg_class`, `pg_index`, `pg_constraint`, `pg_opclass`/operator-family catalogs, and `pg_operator`. A represented temporal key must preserve the complete per-column `conexclop` vector and durable namespace/name/type signatures, verify the appropriate `COMPARE_EQ` or `COMPARE_OVERLAP` mapping through each resolved backing-index operator class, retain same-name GiST/exclusion index evidence, temporal type/domain chain, exact timing/action/match facts, and policy-admitted row/byte/concurrency ceilings. Reconstructed DDL is provenance text, never the sole semantic carrier.
+Catalog OIDs may only join the captured snapshot. The ACL must cross with exact qualified names and complete evidence from `pg_type`, `pg_range`, `pg_class`, `pg_index`, `pg_constraint`, `pg_opclass`/operator-family catalogs, and `pg_operator`. A represented temporal key must preserve the complete per-column `conexclop` vector and durable namespace/name/type signatures, verify the appropriate `COMPARE_EQ` or `COMPARE_OVERLAP` mapping through each resolved backing-index operator class, retain same-name GiST/exclusion index evidence, temporal type/domain chain, exact timing/action/match facts, and policy-admitted row/byte/concurrency ceilings. Referenced temporal keys outside the initially bounded relation set must trigger an explicitly authorized evidence-expansion flow or remain fail-closed; the adapter must never silently widen schema authorization. Reconstructed DDL is provenance text, never the sole semantic carrier.
 
 ## Primary authority
 
-- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE TABLE* — `WITHOUT OVERLAPS` exclusion semantics, supporting index, PERIOD FK behavior.
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE TABLE* — `WITHOUT OVERLAPS` and PERIOD FK requirements, referenced-key eligibility, supporting index semantics.
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_constraint* — `conperiod`, `conkey`, and `confkey` catalog facts.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: GiST indexes* — operator-class extensibility and compare-type translation for temporal constraints.
-- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_constraint / pg_index / pg_type / pg_range / pg_class*.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL source: `ComputeIndexAttrs()`* — `COMPARE_EQ`/`COMPARE_OVERLAP` operator lookup for `WITHOUT OVERLAPS`.
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18.4 release notes* — domains over range/multirange for `WITHOUT OVERLAPS`.
 
@@ -69,17 +68,17 @@ Catalog OIDs may only join the captured snapshot. The ACL must cross with exact 
 
 | Area | Status | Evidence / next verification |
 | --- | --- | --- |
-| Source Observation | TEMPORAL_OPERATOR_SOURCE_REPAIRED | `5186175514 -> a9065d4... -> e286c35... -> eef825e...`; exact-head native/Product acceptance required. |
-| Product CI | BLOCKED_OWNER_ACCEPTANCE | #35 unchanged; central #2106 exact `24bb659...` has SAST/Python Security/Security Scan/Runtime Quality success and CodeQL PR queued. |
-| Quality gate | NATIVE_ACCEPTANCE_REQUIRED | No Ready/adoption/merge before one unchanged head passes Rust 1.98 and hosted gates. |
-| PostgreSQL adapter | BLOCKED_ON_REPRESENTATION_ACCEPTANCE | No transport before representation GREEN and parent adoption; compare-type/opclass verification is an explicit ACL requirement. |
+| Source Observation | PERIOD_EXTERNAL_REFERENCE_RED | `5186323924 -> d692773... -> 6ae821d...`; production fail-closed repair required. |
+| Product CI | BLOCKED_OWNER_ACCEPTANCE | #35 unchanged; central #2106 exact `24bb659...` has four terminal GREEN lanes but CodeQL compatibility enforcement is terminal failure/pending settlement and independent approval is absent. |
+| Quality gate | RED_REPAIR_THEN_NATIVE_ACCEPTANCE | No Ready/adoption/merge before causal repair and one unchanged head passes Rust 1.98 plus hosted gates. |
+| PostgreSQL adapter | BLOCKED_ON_REPRESENTATION_ACCEPTANCE | No transport before representation GREEN and parent adoption; explicit referenced-key completeness is now an ACL requirement. |
 | Publication | NO_PUBLICATION | No protected immutable semantic release exists. |
 | Release | NOT_STARTED | Version/CHANGELOG/tag/package/semantic release/SBOM/provenance/reproducibility/rollback remain mandatory. |
 
 ## Current causal sequence
 
-1. Keep #46 Draft and obtain one unchanged exact-head Rust 1.98/Product/security/dependency/review acceptance.
-2. Repair only real failures ordinary-forward and restart exact-head acceptance whenever the head moves.
+1. Repair the active outbound PERIOD reference RED in #46 without widening ordinary foreign-key scope or source authorization.
+2. Keep #46 Draft and obtain one unchanged exact-head Rust 1.98/Product/security/dependency/review acceptance; repair only real failures ordinary-forward and restart exact-head acceptance whenever the head moves.
 3. Adopt the complete verified #46 delta ordinary/non-force into #45, obtain fresh parent acceptance, then adopt #45 into #6.
-4. Independently, central `.github#2106@24bb659...` must reach terminal checks and land normally; #2040 then reconciles/switches protocol and lands before unchanged #35 can obtain Product acceptance.
-5. Only after representation/Product prerequisites are GREEN may the bounded PostgreSQL adapter proceed, including exact operator-class compare-type verification, followed by deterministic validation, independent evaluation, steward review, and immutable publication under canonical owner boundaries.
+4. Independently, central `.github#2106@24bb659...` must reach terminal checks and independent acceptance, land normally, and unblock the documented #2040/#35 sequence.
+5. Only after representation/Product prerequisites are GREEN may the bounded PostgreSQL adapter proceed, followed by deterministic validation, independent evaluation, steward review, and immutable publication under canonical owner boundaries.
