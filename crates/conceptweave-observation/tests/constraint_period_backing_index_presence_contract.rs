@@ -109,6 +109,23 @@ fn temporal_period() -> ConstraintPeriodObservation {
         true,
     )
     .expect("constraint-period fixture is valid")
+    .with_exclusion_operator_signatures(vec![
+        (
+            1,
+            "pg_catalog".to_owned(),
+            "=".to_owned(),
+            catalog_type("int8"),
+            catalog_type("int8"),
+        ),
+        (
+            2,
+            "pg_catalog".to_owned(),
+            "&&".to_owned(),
+            catalog_type("tstzrange"),
+            catalog_type("tstzrange"),
+        ),
+    ])
+    .expect("temporal exclusion operator fixture is valid")
 }
 
 fn snapshot(relation: RelationObservation) -> PostgresSchemaSnapshotV3 {
