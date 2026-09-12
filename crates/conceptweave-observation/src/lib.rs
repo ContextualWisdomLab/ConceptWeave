@@ -43,8 +43,8 @@ const SNAPSHOT_DIGEST_DOMAIN_V3_TYPE_KINDS_V1: &[u8] =
     b"conceptweave.postgres_schema_snapshot.v3.type_kinds.v1";
 const SNAPSHOT_DIGEST_DOMAIN_V3_CONSTRAINT_TIMINGS_V1: &[u8] =
     b"conceptweave.postgres_schema_snapshot.v3.constraint_timings.v1";
-const SNAPSHOT_DIGEST_DOMAIN_V3_CONSTRAINT_PERIODS_V1: &[u8] =
-    b"conceptweave.postgres_schema_snapshot.v3.constraint_periods.v1";
+const SNAPSHOT_DIGEST_DOMAIN_V3_CONSTRAINT_PERIODS_V2: &[u8] =
+    b"conceptweave.postgres_schema_snapshot.v3.constraint_periods.v2";
 const POSTGRES_CATALOG_SCHEMA_NAME: &str = "pg_catalog";
 
 /// Immutable receipt binding one exact successor source coordinate to snapshot provenance.
@@ -472,11 +472,12 @@ impl PostgresSchemaSnapshotV3 {
     /// UNIQUE, and FOREIGN KEY constraint in the bounded snapshot. Explicit `false` therefore remains
     /// distinct from an unobserved family. Every `conperiod=true` local final column must resolve,
     /// through source-authoritative observed type-kind/domain-base evidence, to a range or multirange.
-    /// PRIMARY KEY/UNIQUE values are cross-checked against any already-observed same-name backing-
-    /// index exclusion flags, while those index facts are never used to invent `conperiod`. A PERIOD
-    /// foreign key targeting a relation inside the same bounded snapshot must resolve to an explicitly
-    /// observed `WITHOUT OVERLAPS`, `NOT DEFERRABLE` key on the referenced columns; referenced-key
-    /// timing is never inferred from index shape. This consuming method may be applied only once.
+    /// `WITHOUT OVERLAPS` PRIMARY KEY/UNIQUE observations also require the exact resolved ordered
+    /// `pg_constraint.conexclop` operator signatures and coherent same-name GiST/exclusion backing
+    /// evidence; those facts never invent `conperiod`. A PERIOD foreign key targeting a relation
+    /// inside the same bounded snapshot must resolve to an explicitly observed `WITHOUT OVERLAPS`,
+    /// `NOT DEFERRABLE` key on the referenced columns; referenced-key timing is never inferred from
+    /// index shape. This consuming method may be applied only once.
     pub fn with_observed_constraint_periods(
         mut self,
         constraint_periods: Vec<ConstraintPeriodObservation>,
@@ -1395,6 +1396,16 @@ fn canonicalize_constraint_periods(
                     .find(|index| index.index_name() == period.constraint_name());
                 if period.has_period_semantics() {
                     validate_constraint_period_column_type(relation, constraint, type_kinds)?;
+                    let Some(exclusion_operators) = period.exclusion_operators() else {
+                        return Err(ObservationError::InvalidObservationField {
+                            field: "constraint_period_exclusion_operators",
+                        });
+                    };
+                    if exclusion_operators.len() != constraint.column_names().len() {
+                        return Err(ObservationError::InvalidObservationField {
+                            field: "constraint_period_exclusion_operators",
+                        });
+                    }
                     let Some(backing_index) = backing_index else {
                         return Err(ObservationError::InvalidObservationField {
                             field: "constraint_period_backing_index",
@@ -1410,16 +1421,28 @@ fn canonicalize_constraint_periods(
                             field: "constraint_period_backing_index",
                         });
                     }
-                } else if let Some(backing_index) = backing_index
-                    && let Some(catalog_flags) = backing_index.catalog_flags()
-                    && catalog_flags.exclusion()
-                {
-                    return Err(ObservationError::InvalidObservationField {
-                        field: "constraint_period_backing_index",
-                    });
+                } else {
+                    if period.exclusion_operators().is_some() {
+                        return Err(ObservationError::InvalidObservationField {
+                            field: "constraint_period_exclusion_operators",
+                        });
+                    }
+                    if let Some(backing_index) = backing_index
+                        && let Some(catalog_flags) = backing_index.catalog_flags()
+                        && catalog_flags.exclusion()
+                    {
+                        return Err(ObservationError::InvalidObservationField {
+                            field: "constraint_period_backing_index",
+                        });
+                    }
                 }
             }
             TableConstraintObservation::ForeignKey(foreign_key) => {
+                if period.exclusion_operators().is_some() {
+                    return Err(ObservationError::InvalidObservationField {
+                        field: "constraint_period_exclusion_operators",
+                    });
+                }
                 if period.has_period_semantics() {
                     if foreign_key.column_names().len() < 2 {
                         return Err(ObservationError::InvalidObservationField {
@@ -1907,7 +1930,7 @@ fn compute_constraint_period_digest(
     let mut hasher = Sha256::new();
     encode_bytes(
         &mut hasher,
-        SNAPSHOT_DIGEST_DOMAIN_V3_CONSTRAINT_PERIODS_V1,
+        SNAPSHOT_DIGEST_DOMAIN_V3_CONSTRAINT_PERIODS_V2,
     );
     encode_str(&mut hasher, base_snapshot_digest);
     encode_len(&mut hasher, constraint_periods.len());
@@ -1917,6 +1940,22 @@ fn compute_constraint_period_digest(
         encode_str(&mut hasher, period.relation_kind().token());
         encode_str(&mut hasher, period.constraint_name());
         encode_bool(&mut hasher, period.has_period_semantics());
+        match period.exclusion_operators() {
+            None => hasher.update([0]),
+            Some(operators) => {
+                hasher.update([1]);
+                encode_len(&mut hasher, operators.len());
+                for operator in operators {
+                    hasher.update(operator.position().to_be_bytes());
+                    encode_str(&mut hasher, operator.operator_schema_name());
+                    encode_str(&mut hasher, operator.operator_name());
+                    encode_str(&mut hasher, operator.left_type().schema_name());
+                    encode_str(&mut hasher, operator.left_type().type_name());
+                    encode_str(&mut hasher, operator.right_type().schema_name());
+                    encode_str(&mut hasher, operator.right_type().type_name());
+                }
+            }
+        }
     }
     encode_sha256(hasher)
 }
