@@ -1,5 +1,5 @@
 use conceptweave_observation::{
-    ColumnObservationV3, ConstraintPeriodObservation, IndexAttributeKind,
+    ColumnObservationV3, ConstraintPeriodObservation, DomainObservation, IndexAttributeKind,
     IndexAttributeObservation, IndexCatalogFlags, IndexObservation, ObservationError,
     PostgresSchemaSnapshotV3, PrimaryKeyObservation, QualifiedTypeName, RelationKind,
     RelationObservation, TableConstraintObservation,
@@ -9,6 +9,10 @@ mod support;
 
 fn catalog_type(type_name: &str) -> QualifiedTypeName {
     QualifiedTypeName::new("pg_catalog", type_name).expect("catalog type coordinate is valid")
+}
+
+fn user_type(schema_name: &str, type_name: &str) -> QualifiedTypeName {
+    QualifiedTypeName::new(schema_name, type_name).expect("user type coordinate is valid")
 }
 
 fn column(
@@ -28,7 +32,7 @@ fn column(
     .expect("column fixture is valid")
 }
 
-fn temporal_primary_key_with_scalar_period() -> RelationObservation {
+fn temporal_backing_index() -> IndexObservation {
     let attributes = ["document_id", "valid_during"]
         .iter()
         .enumerate()
@@ -41,7 +45,7 @@ fn temporal_primary_key_with_scalar_period() -> RelationObservation {
             .expect("index attribute fixture is valid")
         })
         .collect();
-    let backing_index = IndexObservation::new(
+    IndexObservation::new(
         "document_temporal_key",
         true,
         Some(false),
@@ -53,8 +57,10 @@ fn temporal_primary_key_with_scalar_period() -> RelationObservation {
     .with_catalog_flags(IndexCatalogFlags::new(
         true, true, true, false, false, false,
     ))
-    .expect("catalog flags fixture is coherent");
+    .expect("catalog flags fixture is coherent")
+}
 
+fn temporal_primary_key_with_scalar_period() -> RelationObservation {
     RelationObservation::new(
         "public",
         "document",
@@ -73,8 +79,50 @@ fn temporal_primary_key_with_scalar_period() -> RelationObservation {
         .expect("primary-key fixture is valid"),
     )])
     .expect("constraint fixture is valid")
-    .with_indexes(vec![backing_index])
+    .with_indexes(vec![temporal_backing_index()])
     .expect("index fixture is valid")
+}
+
+fn temporal_primary_key_with_domain_period() -> RelationObservation {
+    RelationObservation::new(
+        "public",
+        "document",
+        RelationKind::Table,
+        vec![
+            column("document_id", 1, "bigint", "int8"),
+            ColumnObservationV3::new(
+                "valid_during",
+                2,
+                "active_period",
+                user_type("public", "active_period"),
+                false,
+                None,
+            )
+            .expect("domain-backed period column fixture is valid"),
+        ],
+    )
+    .expect("relation fixture is valid")
+    .with_constraints(vec![TableConstraintObservation::PrimaryKey(
+        PrimaryKeyObservation::new(
+            "document_temporal_key",
+            vec!["document_id".to_owned(), "valid_during".to_owned()],
+        )
+        .expect("primary-key fixture is valid"),
+    )])
+    .expect("constraint fixture is valid")
+    .with_indexes(vec![temporal_backing_index()])
+    .expect("index fixture is valid")
+}
+
+fn temporal_period() -> ConstraintPeriodObservation {
+    ConstraintPeriodObservation::new(
+        "public",
+        "document",
+        RelationKind::Table,
+        "document_temporal_key",
+        true,
+    )
+    .expect("explicit conperiod fixture is structurally valid")
 }
 
 #[test]
@@ -89,17 +137,8 @@ fn without_overlaps_rejects_scalar_final_key_column() {
     )
     .expect("base snapshot can preserve non-temporal scalar schema evidence");
 
-    let period = ConstraintPeriodObservation::new(
-        "public",
-        "document",
-        RelationKind::Table,
-        "document_temporal_key",
-        true,
-    )
-    .expect("explicit conperiod fixture is structurally valid");
-
     let error = snapshot
-        .with_observed_constraint_periods(vec![period])
+        .with_observed_constraint_periods(vec![temporal_period()])
         .expect_err(
             "PostgreSQL 18 WITHOUT OVERLAPS requires its final column to be range or multirange",
         );
@@ -108,5 +147,34 @@ fn without_overlaps_rejects_scalar_final_key_column() {
         ObservationError::InvalidObservationField {
             field: "constraint_period_column_type",
         }
+    );
+}
+
+#[test]
+fn without_overlaps_preserves_domain_over_range_positive_control() {
+    let period_domain = DomainObservation::new(
+        "public",
+        "active_period",
+        catalog_type("tstzrange"),
+    )
+    .expect("domain-over-range fixture is valid");
+    let snapshot = PostgresSchemaSnapshotV3::new(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-12T03:25:00Z",
+        vec![temporal_primary_key_with_domain_period()],
+        vec![period_domain],
+        Vec::new(),
+    )
+    .expect("domain-over-range schema evidence is representable");
+
+    let accepted = snapshot
+        .with_observed_constraint_periods(vec![temporal_period()])
+        .expect("PostgreSQL 18.4+ permits WITHOUT OVERLAPS on a domain over a range type");
+    assert!(
+        accepted
+            .constraint_periods()
+            .expect("period family was observed")[0]
+            .has_period_semantics()
     );
 }
