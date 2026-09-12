@@ -4,13 +4,23 @@ use conceptweave_observation::{
     ForeignKeyObservation, ForeignKeyReferenceBehavior, IndexAttributeKind,
     IndexAttributeObservation, IndexCatalogFlags, IndexObservation, ObservationError,
     PostgresSchemaSnapshotV3, PrimaryKeyObservation, QualifiedTypeName, RelationKind,
-    RelationObservation, TableConstraintObservation,
+    RelationObservation, TableConstraintObservation, TypeKindObservation,
 };
 
 mod support;
 
 fn catalog_type(type_name: &str) -> QualifiedTypeName {
     QualifiedTypeName::new("pg_catalog", type_name).expect("catalog type coordinate is valid")
+}
+
+fn temporal_type_kinds() -> Vec<TypeKindObservation> {
+    vec![
+        TypeKindObservation::range(catalog_type("tstzrange"), catalog_type("tstzmultirange")),
+        TypeKindObservation::multirange(
+            catalog_type("tstzmultirange"),
+            catalog_type("tstzrange"),
+        ),
+    ]
 }
 
 fn column(name: &str, position: u32, type_name: &str) -> ColumnObservationV3 {
@@ -147,19 +157,22 @@ fn base_snapshot(immediate: bool) -> PostgresSchemaSnapshotV3 {
         Vec::new(),
     )
     .expect("base snapshot fixture is valid")
+    .with_observed_type_kinds(temporal_type_kinds())
+    .expect("temporal type-kind evidence fixture is coherent")
 }
 
 fn timed_snapshot(
     immediate: bool,
     deferrability: ConstraintDeferrability,
 ) -> PostgresSchemaSnapshotV3 {
-    PostgresSchemaSnapshotV3::new_with_constraint_timings(
+    PostgresSchemaSnapshotV3::new_with_type_kinds_and_constraint_timings(
         &support::authorized_source("warehouse_primary", &["public"]),
         "postgres_introspector_v3",
         "2026-09-12T00:00:00Z",
         vec![temporal_parent_relation(immediate), period_child_relation()],
         Vec::new(),
         Vec::new(),
+        temporal_type_kinds(),
         vec![timing(deferrability)],
     )
     .expect("timed snapshot fixture is internally coherent")
