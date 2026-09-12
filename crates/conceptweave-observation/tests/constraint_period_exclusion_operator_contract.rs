@@ -1,9 +1,9 @@
 use conceptweave_observation::{
     ColumnObservationV3, ConstraintDeferrability, ConstraintPeriodObservation,
     ConstraintTimingObservation, IndexAttributeKind, IndexAttributeObservation, IndexCatalogFlags,
-    IndexObservation, ObservationError, PostgresSchemaSnapshotV3, PrimaryKeyObservation,
-    QualifiedTypeName, RelationKind, RelationObservation, TableConstraintObservation,
-    TypeKindObservation,
+    IndexKeySemantics, IndexObservation, ObservationError, PostgresSchemaSnapshotV3,
+    PrimaryKeyObservation, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
+    RelationObservation, TableConstraintObservation, TypeKindObservation,
 };
 
 mod support;
@@ -12,6 +12,20 @@ type OperatorSignature = (u32, String, String, QualifiedTypeName, QualifiedTypeN
 
 fn catalog_type(type_name: &str) -> QualifiedTypeName {
     QualifiedTypeName::new("pg_catalog", type_name).expect("catalog type coordinate is valid")
+}
+
+fn operator_class(schema_name: &str, operator_class_name: &str) -> QualifiedOperatorClassName {
+    QualifiedOperatorClassName::new(schema_name, operator_class_name)
+        .expect("operator-class coordinate is valid")
+}
+
+fn temporal_key_semantics() -> Vec<IndexKeySemantics> {
+    vec![
+        IndexKeySemantics::new(1, None, operator_class("public", "gist_int8_ops"), 0)
+            .expect("integer GiST key semantics are valid"),
+        IndexKeySemantics::new(2, None, operator_class("pg_catalog", "range_ops"), 0)
+            .expect("range GiST key semantics are valid"),
+    ]
 }
 
 fn temporal_type_kinds() -> Vec<TypeKindObservation> {
@@ -66,10 +80,15 @@ fn temporal_relation() -> RelationObservation {
     )
     .expect("backing index fixture is valid")
     .with_access_method("gist")
+    .with_key_semantics(temporal_key_semantics())
+    .expect("one semantic record matches each temporal key position")
     .with_catalog_flags(IndexCatalogFlags::new(
         true, true, true, false, false, false,
     ))
-    .expect("backing index catalog flags are valid");
+    .expect("backing index catalog flags are valid")
+    .with_ready(true)
+    .with_valid(true)
+    .with_live(true);
 
     RelationObservation::new("public", "document", RelationKind::Table, columns)
         .expect("relation fixture is valid")
