@@ -126,6 +126,14 @@ impl NotNullConstraintObservation {
                 field: "not_null_constraint_inheritance_ancestor_count",
             });
         }
+        // PostgreSQL 18 requires NOT NULL constraints declared on a partitioned table to be
+        // inherited by every partition. A partitioned-table `NO INHERIT` row is therefore not
+        // source-representable evidence and must not acquire a governed semantic identity.
+        if relation_kind == RelationKind::PartitionedTable && no_inherit {
+            return Err(ObservationError::InvalidObservationField {
+                field: "not_null_constraint_no_inherit",
+            });
+        }
         Ok(Self {
             schema_name,
             relation_name,
