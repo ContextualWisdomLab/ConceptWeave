@@ -269,25 +269,6 @@ pub(crate) fn canonicalize_not_null_constraints(
         }
     }
 
-    let expected_columns = relations
-        .iter()
-        .flat_map(|relation| {
-            relation
-                .columns()
-                .iter()
-                .filter(|column| !column.nullable())
-                .map(move |column| {
-                    (
-                        relation.schema_name().to_owned(),
-                        relation.relation_name().to_owned(),
-                        relation.kind().token().to_owned(),
-                        column.column_name().to_owned(),
-                    )
-                })
-        })
-        .collect::<BTreeSet<_>>();
-    let mut observed_columns = BTreeSet::new();
-
     for observation in &constraints {
         let relation = relations.iter().find(|relation| {
             relation.schema_name() == observation.schema_name()
@@ -313,19 +294,6 @@ pub(crate) fn canonicalize_not_null_constraints(
                 field: "not_null_constraint_nullability",
             });
         }
-
-        observed_columns.insert((
-            observation.schema_name().to_owned(),
-            observation.relation_name().to_owned(),
-            observation.relation_kind().token().to_owned(),
-            observation.column_name().to_owned(),
-        ));
-    }
-
-    if observed_columns != expected_columns {
-        return Err(ObservationError::InvalidObservationField {
-            field: "not_null_constraint_completeness",
-        });
     }
 
     Ok(constraints)
