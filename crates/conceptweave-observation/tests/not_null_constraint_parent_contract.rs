@@ -1,6 +1,7 @@
 use conceptweave_observation::{
-    ColumnObservationV3, NotNullConstraintObservation, ParentNotNullConstraintCoordinate,
-    PostgresSchemaSnapshotV3, QualifiedTypeName, RelationKind, RelationObservation,
+    ColumnObservationV3, NotNullConstraintObservation, ObservationError,
+    ParentNotNullConstraintCoordinate, PostgresSchemaSnapshotV3, QualifiedTypeName, RelationKind,
+    RelationObservation,
 };
 
 mod support;
@@ -27,9 +28,7 @@ fn child_relation() -> RelationObservation {
     .expect("child relation fixture is valid")
 }
 
-fn child_constraint(
-    parent_relation_name: &str,
-) -> NotNullConstraintObservation {
+fn child_constraint(parent_relation_name: &str) -> NotNullConstraintObservation {
     NotNullConstraintObservation::new(
         "public",
         "metric_2026",
@@ -55,9 +54,7 @@ fn child_constraint(
     .expect("parent linkage is valid")
 }
 
-fn snapshot(
-    constraint: NotNullConstraintObservation,
-) -> PostgresSchemaSnapshotV3 {
+fn snapshot(constraint: NotNullConstraintObservation) -> PostgresSchemaSnapshotV3 {
     PostgresSchemaSnapshotV3::new_with_not_null_constraints(
         &support::authorized_source("warehouse_primary", &["public"]),
         "postgres_introspector_v3",
@@ -96,4 +93,22 @@ fn catalog_oid_is_not_part_of_public_parent_constraint_contract() {
     assert_eq!(parent.relation_name(), "metric");
     assert_eq!(parent.relation_kind(), RelationKind::PartitionedTable);
     assert_eq!(parent.constraint_name(), "metric_raw_value_not_null");
+}
+
+#[test]
+fn parent_constraint_coordinate_requires_partitioned_table_relation_kind() {
+    let error = ParentNotNullConstraintCoordinate::new(
+        "public",
+        "metric",
+        RelationKind::Table,
+        "metric_raw_value_not_null",
+    )
+    .expect_err("conparentid cannot resolve to a non-partitioned parent relation");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "not_null_parent_relation_kind",
+        }
+    );
 }
