@@ -47,7 +47,7 @@ fn two_column_relation() -> RelationObservation {
                 2,
                 "numeric",
                 catalog_type("numeric"),
-                true,
+                false,
                 None,
             )
             .expect("generated-column candidate fixture is valid"),
