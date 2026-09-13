@@ -14,8 +14,8 @@ Protected/default ConceptWeave `main` remains `f4f440dd58c77d7cd90dff8a1eb2eeb9a
 
 - #6 `287165d399c5f54d6c4b4aa3c15497b47de8244b`, OPEN Draft.
 - #45 `6b2a8f555725dc79f60432afbc492d6005290a4a`, OPEN Draft on #6.
-- #46 `codex/pr6-v3-index-evidence`, OPEN Draft/mergeable, is the active Source Observation writer. Its ordinary-forward lineage retains the repaired column-collation and column-identity families and now includes the identity/nullability consistency repair through `00b166bfb47473b567bef3c5ab2f800327afda34` plus doctoring `0bba879daec988b15cff63918224d70ff71c7cf6`; native/Product acceptance remains pending.
-- Product bootstrap #35 remains `9bb82f041483cb4e0cf1aa1f5450b413309f9a05`, OPEN/non-Draft/mergeable.
+- #46 `codex/pr6-v3-index-evidence`, OPEN Draft/mergeable, is the active Source Observation writer. Its ordinary-forward lineage retains the repaired index/lifecycle/temporal, column-collation, column-identity, and identity/nullability contracts. Review `5188836578` and RED `be3adfd0fa49fe3e27d9794c3773993a48235289` now add an active PostgreSQL 18 column-generation declaration gap; doctoring is `docs/research/postgresql-18-column-generation-evidence.md` from `4708708c3b9e33a3ec6ef5b49defadfbd5339300`.
+- Product bootstrap #35 remains a separate Product acceptance lane; central workflow evidence never transfers to #46.
 
 #45 and #6 must not duplicate or partially cherry-pick the Source Observation slice. They adopt the complete verified child ordinary/non-force only after one unchanged exact #46 head is GREEN.
 
@@ -23,101 +23,94 @@ Protected/default ConceptWeave `main` remains `f4f440dd58c77d7cd90dff8a1eb2eeb9a
 
 The active successor preserves exact relation/type/index/constraint coordinates, true-array identity, type-kind/domain-base/range evidence, request-authorized cross-schema types, relation-scoped index semantics, PK/UNIQUE timing, explicit temporal constraint evidence, optional source-authoritative column-collation evidence, and optional source-authoritative column-identity declaration mode. `pg_constraint.conperiod` remains declaration authority for `WITHOUT OVERLAPS` PK/UNIQUE and PERIOD FK; index/lifecycle/operator shape never invents temporal truth. Temporal final columns resolve to range or multirange through observed type/domain evidence. PERIOD FKs retain exact action, referenced-key, timing, and bounded-reference requirements.
 
-Retained production repairs include literal exclusion-operator inference removal (`5186175514 -> a9065d46... -> e286c352...`), PERIOD referenced-key completeness (`5186323924 -> d692773a... -> 1462105f...`), temporal backing-index ordered-key/static-shape coherence (`5186585545 -> ffe75edd... -> e258b394...`), explicit unusable lifecycle rejection (`5186802339 -> 681e280f... / ed4882e... -> ff842b35...`), and lifecycle completeness (`5187402940 -> 9d9e8d9e... -> 77b12263... -> 384d1305...`). The shared `key_constraint_backing_index_static_shape_matches()` predicate requires `ready() == Some(true)`, `valid() == Some(true)`, and `live() == Some(true)` when an index is promoted as authoritative support for observed PK/UNIQUE timing or positive `conperiod`. Generic standalone index lifecycle remains optional.
+Retained production repairs include literal exclusion-operator inference removal (`5186175514 -> a9065d46... -> e286c352...`), PERIOD referenced-key completeness (`5186323924 -> d692773a... -> 1462105f...`), temporal backing-index ordered-key/static-shape coherence (`5186585545 -> ffe75edd... -> e258b394...`), explicit unusable lifecycle rejection (`5186802339 -> 681e280f... / ed4882e... -> ff842b35...`), and lifecycle completeness (`5187402940 -> 9d9e8d9e... -> 77b12263... -> 384d1305...`). The shared key-constraint backing-index predicate requires `ready() == Some(true)`, `valid() == Some(true)`, and `live() == Some(true)` when an index is promoted as authoritative support for observed PK/UNIQUE timing or positive `conperiod`. Generic standalone index lifecycle remains optional.
 
-## Retained-test fixture integrity — repaired, execution pending
-
-Review `5187787381` identified a separate P1 on exact predecessor `cdb50a49d6abb3101abb9498a88adf7fe0d890e0`: several retained temporal/index tests constructed supporting indexes using older fixture assumptions. `RelationObservation::with_indexes()` now requires a nonblank access method and exactly one `IndexKeySemantics` record per structural key; constraint-support admission additionally requires explicit ready/valid/live evidence. Stale fixtures therefore failed during setup instead of reaching the temporal/type/index assertion they claimed to test.
-
-The ordinary-forward fixture repair series is test-only from `cdb50a49...` through `d704bf9254d0f4c98401052ee275f0984039d62a`. A direct compare is 10 commits ahead / 0 behind and changes only nine contract-test files; no production source or semantic rule changed. The repaired tests add exact per-key opclass/indoption evidence and explicit lifecycle=true to coherent supporting-index controls while preserving deliberately missing/false lifecycle, missing catalog flags, wrong key order, action/timing/type/operator negative cases. `constraint_period_type_contract.rs` also restores complete `conexclop` fixture evidence so its tests reach the intended type-kind assertions. `constraint_period_contract.rs` drops a stale unused import after the restack.
-
-Repair coordinates:
-
-- `aeed9149e0613f11cd206f1273ac8bf8da33c826` — exclusion-operator fixtures;
-- `c9bc77b522cc13b508acebea6f38c8bc0ba1b1e5` and `d704bf9254d0f4c98401052ee275f0984039d62a` — period fixtures plus stale-import cleanup;
-- `148f68044cbaab30c6827f709dd48b50493b120c` — temporal-index controls;
-- `0a8799bd3935d673715cb6a41fea4810678840c6` — timing controls;
-- `cd650963a68f97edc9c3d67c628fc6e69dd90f0f` — backing-index presence/lifecycle controls;
-- `2d6ab7a21f5d9bf5dfef018a3ed1a9e424327cf1` — temporal FK action controls;
-- `b692bc22bfbf2391a1e21bc83c3b4819c4c3c693` — referenced-key timing controls;
-- `546d5efda56e151bb316b741e416d9d595c9c78a` — temporal period-type controls;
-- `7f8416dfee4fca20db9a027b4aadf60f26260061` — key backing-index shape controls.
+The retained test-fixture repair series through `d704bf9254d0f4c98401052ee275f0984039d62a` preserves the intended temporal/index negative cases while supplying the now-required access method, per-key semantics, catalog flags, lifecycle evidence, and `conexclop` controls. Those are test repairs, not new production semantics.
 
 ## Column collation identity / FK consistency — source repaired, acceptance pending
 
-Review `5187855669` verified the column-collation Source Observation gap on predecessor exact `fcb75659c4c7ffc046c4c7187789ef3b5d53715d`. `ColumnObservationV3` preserved exact qualified type identity but not `pg_attribute.attcollation`; PostgreSQL 18 also requires every collatable referencing/referenced FK pair to have collations that are either both deterministic or exactly the same. The representation therefore needed an explicit source-authoritative column-collation family rather than inference from type/domain/index state.
+Review `5187855669` identified that `ColumnObservationV3` did not preserve `pg_attribute.attcollation`, while PostgreSQL requires collatable FK column pairs to use either two deterministic collations or the exact same collation. RED `8006b24fd4409bc092d80640084a64892190ea4a` established collation materiality, observed `attcollation=0` versus unobserved distinction, nondeterministic FK rejection, and valid controls.
 
-Source-level RED `8006b24fd4409bc092d80640084a64892190ea4a` established exact collation materiality, observed `attcollation=0` versus family-unobserved distinction, nondeterministic FK rejection, and both-deterministic / exact-same nondeterministic controls. Doctoring `313f27c35be2b1bf834ad98c43e162ae874c9107` fixed the source boundary and rejected inference paths.
+Production lineage `3e495eac... -> 66489478... -> 3d8a7fb7... -> 8a4b7a1b... -> 6fb0c2b6...` implements a complete bounded `ColumnCollationObservation` family with exact qualified `pg_collation` identity, `collisdeterministic`, duplicate/determinism consistency checks, canonical ordering, domain-separated digesting, and bounded FK validation. Index collation, type/domain defaults, locale text, `search_path`, rendered DDL, and OIDs do not substitute for column-collation evidence.
 
-Production repair is present. `3e495eac9e345db40e3009fe7579e6422a46447a` introduced the isolated family; `664894780f2643c00b86165b0b75757ee1d607db` corrected borrowed determinism access before integration; `3d8a7fb7c8f00ebbc7f6994f2b83274a6f3d3bc0` integrates `ColumnCollationObservation` and the public aggregate boundary. The original v3 constructor still leaves the family unobserved and retains its prior digest. The observed family is complete for every bounded relation column, distinguishes explicit uncollatable state, stores exact qualified `pg_collation` plus `collisdeterministic`, rejects duplicate column coordinates and conflicting determinism for one collation coordinate, canonicalizes input order, and extends identity under `conceptweave.postgres_schema_snapshot.v3.column_collations.v1`.
+## Column identity declaration mode — source repaired, acceptance pending
 
-For an FK whose local and referenced relations are both in the bounded inventory, the family compares the exact paired column evidence directly. A collatable pair is valid when both collations are deterministic or the exact qualified coordinates are equal; a different pair with either side nondeterministic fails closed as `foreign_key_collation`. Index `indcollation`, type/domain defaults, locale text, `search_path`, rendered DDL, and OIDs are not substitutes. An FK that references a relation outside the bounded inventory does not receive invented remote collation truth; a later immutable referenced-column evidence seam is required before claiming cross-boundary collation adjudication.
+Review `5188215648` identified that the successor did not preserve `pg_attribute.attidentity`. RED `85f2eb0cdd80b6de6983895f598efe5e463da887` requires GENERATED ALWAYS/BY DEFAULT digest distinction, explicit not-identity versus family-unobserved distinction, complete bounded coverage, duplicate rejection, and permutation invariance. Production commits `69a86d2a52fc0f75360f6a48a4549154511fa92b` and `95f7f81f9bed07ebd17c8a9d3d27187b0c94fa48` add and integrate the isolated `ColumnIdentityObservation` family without changing legacy-unobserved digest semantics.
 
-Edge-contract successor `8a4b7a1b59353289d3cc33f80d852db9116f7096` adds completeness, duplicate-coordinate, conflicting-determinism, permutation-invariance, retained-evidence, and one-sided-nondeterministic FK cases. Doctoring successor `6fb0c2b673bec4784751cf2e2e90da55fc47458c` aligns the decision record with the implemented boundary.
+Follow-up review `5188419794`, RED `bd6da911262a70a0a6d27ba439848831062813fb`, repair `00b166bfb47473b567bef3c5ab2f800327afda34`, and doctoring `0bba879daec988b15cff63918224d70ff71c7cf6` close the identity/nullability consistency hole: an observed identity mode paired with the same bounded column reporting nullable source evidence fails closed as `column_identity_nullability`. Nullability never invents identity. Identity-sequence options and ownership remain a separate future evidence family.
 
-## Column identity generation mode — source repaired, acceptance pending
+## Column generation declaration mode — behavioral RED active
 
-Review `5188215648` identified a separate material Source Observation gap on exact predecessor `122dfa983ef1c2a9a1f6a68882eb12461243155d`. PostgreSQL 18 exposes identity declaration mode directly in `pg_attribute.attidentity`: empty means not an identity column, `a` means `GENERATED ALWAYS`, and `d` means `GENERATED BY DEFAULT`. The predecessor v3 column contract/public aggregate did not preserve that family, so two otherwise-identical schemas could collapse even though their admissible write behavior differs.
+Review `5188836578` on exact predecessor `7386ffb46ac72fb5257ac2ffd50ef8baab672f5e` found a separate material Source Observation gap: no owned evidence preserves PostgreSQL 18 `pg_attribute.attgenerated`. PostgreSQL exposes empty/not-generated, `s`/stored, and `v`/virtual states. `atthasdef` cannot substitute because it covers both defaults and generation expressions and the catalog explicitly directs consumers to `attgenerated` to distinguish them. Stored and virtual generated columns differ in when the value is computed and whether normal storage is occupied; PostgreSQL 18 also makes virtual the default generated-column kind.
 
-Behavioral/source RED `85f2eb0cdd80b6de6983895f598efe5e463da887` added `column_identity_contract.rs`. It requires GENERATED ALWAYS and GENERATED BY DEFAULT to produce different governed identities, explicitly observed not-identity to remain distinct from family-unobserved evidence, a claimed family to cover every bounded relation column, duplicate exact column coordinates to fail closed, and input order to remain identity-neutral.
+Behavioral/source RED `be3adfd0fa49fe3e27d9794c3773993a48235289` adds `crates/conceptweave-observation/tests/column_generation_contract.rs`. It intentionally does not compile against current production because `ColumnGenerationObservation`, `new_with_column_generations`, and `column_generations()` do not yet exist. Acceptance is explicit:
 
-Doctoring `9bcc5e66c0eb6e0234ebcdb82ea8d5b5896b7138` recorded the direct catalog authority, compatibility boundary, rejected inference paths, inheritance/partition caveat, and the separate future responsibility for attached identity-sequence options. Identity must not be inferred from integer type, `NOT NULL`, PK/UNIQUE/index shape, rendered default text, `nextval(...)`, sequence naming, or OIDs.
+- stored and virtual generation modes must produce different governed source identities;
+- explicitly observed `attgenerated=''` must remain distinct from a family the adapter did not observe;
+- a claimed family must cover every bounded relation column;
+- duplicate exact column coordinates fail closed;
+- input ordering is identity-neutral;
+- a generated column and an observed identity declaration on the same bounded column are contradictory and fail closed.
 
-Production repair is present. `69a86d2a52fc0f75360f6a48a4549154511fa92b` adds the isolated `ColumnIdentityObservation` family with explicit not-identity/generated-always/generated-by-default states, exact bounded coordinates, duplicate/completeness validation, canonical input ordering, public rustdoc, and `conceptweave.postgres_schema_snapshot.v3.column_identity.v1` digest framing. `95f7f81f9bed07ebd17c8a9d3d27187b0c94fa48` integrates the family into `PostgresSchemaSnapshotV3` with explicit constructor, consuming method, accessor, and unobserved initialization on every legacy-compatible constructor path. Canonical optional-family order is type/array -> column collation -> column identity -> constraint timing/period. Identity-sequence options remain outside the family.
+Doctoring `4708708c3b9e33a3ec6ef5b49defadfbd5339300` records the direct PostgreSQL 18 catalog authority, alternatives, selected optional-family design, cross-family invariant, adapter obligation, and follow-on expression boundary in `docs/research/postgresql-18-column-generation-evidence.md`.
 
-Follow-up review `5188419794` on exact `da9e20ace19426a3a43d7f9400e034d1361204f7` found a same-snapshot consistency hole: identity observations were coordinate-validated but were not checked against the same bounded column's nullability. PostgreSQL identity columns are implicitly `NOT NULL`, so `GENERATED ALWAYS` or `GENERATED BY DEFAULT` paired with `ColumnObservationV3::nullable() == true` is contradictory source evidence and must not become governed immutable identity.
+The minimum production repair is a separate, complete, domain-separated optional generation family. Do not modify frozen `ColumnObservationV3`, infer generation mode from `atthasdef`, `pg_attrdef`, rendered DDL, defaults, types, or OIDs, or collapse generation-expression evidence into this mode-only family. Generation expression identity/dependencies require a later explicit immutable `pg_attrdef` evidence contract.
 
-Behavioral regression `bd6da911262a70a0a6d27ba439848831062813fb` covers both identity modes against a nullable column and preserves explicit not-identity on the same nullable column as a positive control. Production repair `00b166bfb47473b567bef3c5ab2f800327afda34` changes only the shared identity canonicalization seam: it resolves the exact bounded column and fails closed as `column_identity_nullability` when an identity mode conflicts with nullable evidence. It does not infer identity from nullability, alter the digest framing, or change public constructors. Doctoring `0bba879daec988b15cff63918224d70ff71c7cf6` records the decision and adapter obligation.
-
-Current Source Observation state is **COLUMN_IDENTITY_SOURCE_REPAIRED / ACCEPTANCE_PENDING**. It is not native/Product GREEN, Ready, merge-authorized, published, or released.
+Current Source Observation state is **COLUMN_GENERATION_RED_ACTIVE**. It is not source repaired, native/Product GREEN, Ready, merge-authorized, published, or released.
 
 ## Exact-head acceptance
 
-One unchanged exact #46 successor containing the column-identity and identity/nullability consistency repairs must pass repository-pinned Rust 1.98 `cargo fmt --all --check`, strict workspace/all-target Clippy with warnings denied, `column_identity_contract`, the repaired `column_collation_contract`, lifecycle-completeness and all retained temporal/type/index contracts, workspace/doc tests, release build, owned production docstring/test/edge-case coverage, and applicable Product/security/dependency/review terminal evidence. Any head movement restarts exact-head acceptance.
+Production repair comes before acceptance. The repair must preserve the existing families and establish one canonical optional-family order so attaching source-authoritative column facts cannot create different digests for the same complete evidence set. The generated/identity contradiction must be checked whenever both families are observed; order must not become an escape hatch.
 
-The available execution host does not provide `cargo`/`rustc`; therefore repository-pinned Rust execution cannot be substituted locally. Current #46 pushes have not produced pull-request-triggered workflow runs. This is not a reason to toggle Draft/Ready, synthesize status, copy central workflows, manually/no-op retrigger, transfer predecessor evidence, or weaken a gate.
+After the repair, one unchanged exact #46 head must pass repository-pinned Rust 1.98 `cargo fmt --all --check`, strict workspace/all-target Clippy with warnings denied, `column_generation_contract`, `column_identity_contract`, `column_collation_contract`, lifecycle-completeness and retained temporal/type/index contracts, workspace/doc tests, release build, owned production docstring/test/edge-case coverage, and applicable Product/security/dependency/review terminal evidence. Any head movement restarts exact-head acceptance.
+
+The current execution host has not supplied repository-pinned Rust execution evidence and #46 has not obtained a qualifying exact-head hosted acceptance set. This is not a reason to toggle Draft/Ready, synthesize status, copy central workflows, manually/no-op retrigger, transfer predecessor evidence, or weaken a gate.
 
 ## Central Product-CI owner
 
-Central workflow ownership remains outside ConceptWeave. Fresh owner state is `ContextualWisdomLab/.github#2114` exact `e7c58c04ed7e59c23cbe4a5f38d4c522ae712712`, OPEN/non-Draft/mergeable, based on protected `.github/main@fb17ef556f94f673234aa557254ae52779e9a7b0`. On that exact head SAST Semgrep `34716210489`, Python Security `34716210535`, Security Scan `34716210462`, Runtime Quality `34716210506`, and CodeQL PR `34716210555` are terminal GREEN.
+Central workflow ownership remains outside ConceptWeave. Fresh PR metadata confirms `ContextualWisdomLab/.github#2114` is OPEN/non-Draft/mergeable at exact `e7c58c04ed7e59c23cbe4a5f38d4c522ae712712`, based on protected `.github/main@fb17ef556f94f673234aa557254ae52779e9a7b0`. Its body contains historical/source snapshots that do not override the actual PR head.
 
-That does not complete the central review gate. Current-head OpenCode review is `CHANGES_REQUESTED` because Required Noema Review failed and the Strix review run was cancelled on the same head; no qualifying independent approval exists. The `.github` review/settlement lane remains central-owner work. ConceptWeave must not copy the workflow, bypass providers, synthesize settlement, or treat central evidence as leaf evidence.
+The central review path remains unresolved independently of this new Source Observation RED. A live Required Noema Review on #2114 previously reached `contextual-orchestrator/orchestrator/free` and then failed local validation because the published JSON Schema represents `findings[]` and adversarial `probes[]` independently while the deterministic validator requires a confirmed probe anchored to a published finding. Owner review `5188653693` is on `.github#2079`; no leaf retry/provider fallback/validator weakening is accepted. Strix also retains the separate terminal-sub-agent negative-control obligation. None of this evidence transfers to ConceptWeave acceptance.
 
 ## PostgreSQL adapter boundary
 
 Transport remains blocked until representation exact-head GREEN and ordinary/non-force adoption through #45/#6. The later adapter must use a maintained patched Rust PostgreSQL driver pinned by immutable lock coordinate, resolve least-privilege credentials only through the authorized source/policy binding, use bounded `REPEATABLE READ READ ONLY` catalog capture, and never keep an explicit database transaction/lock open while waiting on an LLM or long external computation.
 
-Catalog OIDs may only join the captured snapshot. When the adapter claims an index supports PK/UNIQUE timing or a temporal key, it must bind `pg_constraint.conindid` to the exact `pg_index` row inside the same authorized snapshot and explicitly capture `indisready=true`, `indisvalid=true`, and `indislive=true`. It must retain exact key layout/static flags, `conexclop`, operator-class/operator-family compare-type evidence, temporal type/domain chain, timing/action/match facts, and policy-admitted row/byte/concurrency ceilings. Referenced temporal keys outside the bounded relation set require explicitly authorized evidence expansion or remain fail-closed.
+Catalog OIDs are capture-time joins only. Constraint support must bind `pg_constraint.conindid` to the exact same-snapshot `pg_index` row and explicitly capture usable lifecycle, key/static flags, `conexclop`, operator-class/operator-family evidence, timing/action/match state, and temporal type/domain chains. Referenced temporal keys outside the bounded relation set require explicitly authorized evidence expansion or remain fail closed.
 
-For column collation, the adapter must capture `pg_attribute.attcollation` for every bounded column when claiming that family. Zero is explicit uncollatable evidence; nonzero OIDs must be resolved within the same bounded catalog snapshot to exact `pg_collation` namespace/name plus `collisdeterministic`. OIDs stay adapter-local. Column collation must not be reconstructed from the type, domain, index, rendered DDL, locale text, or `search_path`. Cross-boundary referenced-column collation, when required, needs explicit immutable/versioned evidence rather than hidden schema widening.
+For column collation, the adapter captures `attcollation` for every bounded column when claiming that family; zero is explicit uncollatable evidence and nonzero OIDs resolve inside the same catalog snapshot to exact `pg_collation` namespace/name plus `collisdeterministic`.
 
-For column identity, the adapter must capture `pg_attribute.attidentity` and `attnotnull` for every bounded column when claiming that family and map only PostgreSQL's documented empty/`a`/`d` identity states. Unexpected values fail closed. An identity mode observed with nullable column evidence is rejected rather than normalized or repaired heuristically. The attached sequence's options and ownership are not inferred from this flag; they require a separately versioned immutable evidence family.
+For column identity, the adapter captures `attidentity` and `attnotnull` for every bounded column when claiming that family and maps only the documented empty/`a`/`d` states. Unexpected values fail closed; sequence options/ownership are separate evidence.
+
+For column generation, the adapter must capture `attgenerated` for every bounded column when claiming the family and map only the documented empty/`s`/`v` states. Unexpected values fail closed. `atthasdef` merely establishes that a `pg_attrdef` row exists and does not establish whether it is a default or generation expression. Generation mode must not be reconstructed from default text, `pg_attrdef`, rendered DDL, type, naming, or OID. A later expression contract must bind generation expressions explicitly and account for inheritance/partition rules where generation kind must agree while expressions can differ.
 
 ## Primary authority
 
-- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_index*.
-- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_constraint*.
-- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_attribute*.
-- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_collation*.
-- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: Identity columns*.
-- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE TABLE*.
-- PostgreSQL Global Development Group. (2026). *PostgreSQL source: ComputeIndexAttrs()*.
+- PostgreSQL Global Development Group. (n.d.). *PostgreSQL 18 documentation: pg_index*. https://www.postgresql.org/docs/18/catalog-pg-index.html
+- PostgreSQL Global Development Group. (n.d.). *PostgreSQL 18 documentation: pg_constraint*. https://www.postgresql.org/docs/18/catalog-pg-constraint.html
+- PostgreSQL Global Development Group. (n.d.). *PostgreSQL 18 documentation: pg_attribute*. https://www.postgresql.org/docs/18/catalog-pg-attribute.html
+- PostgreSQL Global Development Group. (n.d.). *PostgreSQL 18 documentation: pg_collation*. https://www.postgresql.org/docs/18/catalog-pg-collation.html
+- PostgreSQL Global Development Group. (n.d.). *PostgreSQL 18 documentation: Identity columns*. https://www.postgresql.org/docs/18/ddl-identity-columns.html
+- PostgreSQL Global Development Group. (n.d.). *PostgreSQL 18 documentation: Generated columns*. https://www.postgresql.org/docs/18/ddl-generated-columns.html
+- PostgreSQL Global Development Group. (n.d.). *PostgreSQL 18 documentation: CREATE TABLE*. https://www.postgresql.org/docs/18/sql-createtable.html
+- PostgreSQL Global Development Group. (n.d.). *PostgreSQL 18 release notes*. https://www.postgresql.org/docs/18/release-18.html
 
 ## Capability status
 
 | Area | Status | Evidence / next verification |
 | --- | --- | --- |
-| Source Observation | COLUMN_IDENTITY_SOURCE_REPAIRED | `5188215648 -> 85f2eb0c... -> 69a86d2a... -> 95f7f81f... -> 5188419794 -> bd6da911... -> 00b166bf... -> 0bba879d...`; native and hosted acceptance remain pending. |
-| Product CI | CENTRAL_OWNER_REVIEW_BLOCKED | `.github#2114@e7c58c04...`: five core hosted workflows GREEN; Noema/Strix review settlement and independent approval remain unresolved. |
-| Quality gate | BLOCKED_ON_EXACT_HEAD_EXECUTION | Generate Rust 1.98/native and hosted acceptance on one unchanged source-repaired head. |
+| Source Observation | COLUMN_GENERATION_RED_ACTIVE | `5188836578 -> be3adfd0... -> 4708708c...`; production family and GREEN are pending. |
+| Retained column semantics | SOURCE_REPAIRED / EXECUTION_PENDING | Collation, identity, identity/nullability contracts remain retained and must stay GREEN after generation repair. |
+| Product CI | CENTRAL_OWNER_REVIEW_BLOCKED | `.github#2114@e7c58c04...`; Noema/Strix review settlement and independent approval are separate central-owner work. |
+| Quality gate | BLOCKED_ON_PRODUCTION_REPAIR_THEN_EXACT_HEAD_EXECUTION | Implement the generation family, then obtain Rust 1.98/native and hosted acceptance on one unchanged head. |
 | PostgreSQL adapter | BLOCKED_ON_REPRESENTATION_ACCEPTANCE | No transport before #46 GREEN and parent adoption. |
 | Publication | NO_PUBLICATION | No protected immutable semantic release exists. |
 | Release | NOT_STARTED | Version/CHANGELOG/tag/package/semantic release/SBOM/provenance/reproducibility/rollback remain mandatory. |
 
 ## Current causal sequence
 
-1. Keep the source-repaired identity/collation families, the identity/nullability consistency invariant, and all retained index/lifecycle/temporal invariants unchanged while obtaining one exact-head Rust 1.98 and hosted Product/security/dependency/review acceptance set. Head movement restarts the set.
-2. If execution exposes a real failure, repair only that causal defect ordinary-forward and restart exact-head acceptance. Do not weaken or bypass the gate.
+1. Implement the minimum source-authoritative `attgenerated` family ordinary-forward against #46, preserving frozen v3 compatibility, complete bounded coverage, a domain-separated digest, canonical family order, and generated/identity contradiction rejection.
+2. Run the new RED plus all retained column/index/temporal contracts under repository-pinned Rust 1.98 and obtain hosted Product/security/dependency/review acceptance on one unchanged exact head. Any real failure receives only its causal repair; head movement restarts acceptance.
 3. Adopt the complete verified #46 delta ordinary/non-force into #45, obtain fresh parent acceptance, then adopt #45 into #6.
-4. Independently, `ContextualWisdomLab/.github#2114` must resolve Noema/Strix review settlement and obtain qualifying independent approval. No central evidence transfers to ConceptWeave.
-5. Only after representation/Product prerequisites are GREEN may the bounded PostgreSQL adapter proceed, followed by deterministic validation, independent evaluation, steward review, immutable publication, and release evidence.
+4. Independently repair the central Noema/Strix review-owner contracts and obtain qualifying independent approval; central evidence never transfers to ConceptWeave.
+5. Only after representation/Product prerequisites are GREEN may bounded PostgreSQL transport proceed, followed by deterministic validation, independent evaluation, steward review, immutable publication, and release evidence.
