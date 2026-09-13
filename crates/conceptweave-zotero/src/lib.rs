@@ -9,6 +9,9 @@ use std::fmt;
 use std::io::Read;
 use std::time::{Duration, Instant};
 
+mod golden_set;
+pub use golden_set::*;
+
 /// Classification rule revision recorded in every report.
 pub const RULE_REVISION: &str = "ontology-research-v2";
 
