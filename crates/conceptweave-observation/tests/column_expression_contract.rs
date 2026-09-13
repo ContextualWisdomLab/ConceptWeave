@@ -1,6 +1,7 @@
 use conceptweave_observation::{
-    ColumnExpressionObservation, ColumnGenerationObservation, ColumnObservationV3, ObservationError,
-    PostgresSchemaSnapshotV3, QualifiedTypeName, RelationKind, RelationObservation,
+    ColumnExpressionObservation, ColumnGenerationObservation, ColumnIdentityObservation,
+    ColumnObservationV3, ObservationError, PostgresSchemaSnapshotV3, QualifiedTypeName, RelationKind,
+    RelationObservation,
 };
 
 mod support;
@@ -56,6 +57,16 @@ fn stored(column_name: &str) -> ColumnGenerationObservation {
         column_name,
     )
     .expect("stored generation evidence is valid")
+}
+
+fn not_identity(column_name: &str) -> ColumnIdentityObservation {
+    ColumnIdentityObservation::not_identity(
+        "public",
+        "metric",
+        RelationKind::Table,
+        column_name,
+    )
+    .expect("non-identity evidence is valid")
 }
 
 fn no_expression(column_name: &str) -> ColumnExpressionObservation {
@@ -165,6 +176,57 @@ fn observed_no_expression_is_distinct_from_unobserved_expression_family() {
             .expect("observed expression family remains queryable")
             .len(),
         2
+    );
+}
+
+#[test]
+fn expression_family_requires_source_authoritative_generation_evidence() {
+    let snapshot = PostgresSchemaSnapshotV3::new(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-13T03:20:00Z",
+        vec![two_column_relation()],
+        Vec::new(),
+        Vec::new(),
+    )
+    .expect("base snapshot is valid");
+
+    let error = snapshot
+        .with_observed_column_expressions(vec![
+            no_expression("raw_value"),
+            generation_expression("value_normalized", "(raw_value / 100::numeric)"),
+        ])
+        .expect_err("expression evidence cannot infer attgenerated state");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "column_expression_generation_required",
+        }
+    );
+}
+
+#[test]
+fn expression_family_cannot_be_attached_after_identity_evidence() {
+    let snapshot = generation_snapshot()
+        .with_observed_column_identities(vec![
+            not_identity("raw_value"),
+            not_identity("value_normalized"),
+        ])
+        .expect("non-identity family is valid after generation evidence");
+
+    let error = snapshot
+        .with_observed_column_expressions(vec![
+            no_expression("raw_value"),
+            generation_expression("value_normalized", "(raw_value / 100::numeric)"),
+        ])
+        .expect_err("late expression attachment must not create a second optional-family identity");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "column_expression_observation_order",
+        }
     );
 }
 
