@@ -52,6 +52,8 @@ Evaluation must separate extraction recall, semantic correctness, structural cor
 
 `ClassificationReport` remains the Research Intake trusted aggregate. Its provenance, inventory and proposal state are private and constructor-bound; consumers use read-only accessors. Golden-set evaluation must not reopen those fields or deserialize caller-authored JSON into a trusted report merely to create corruption tests.
 
+The `conceptweave-zotero` package keeps `src/lib.rs` as its canonical crate root. Golden-set evaluation is attached there as a sibling module and re-exported from that root; a second wrapper crate root is not an acceptable reconciliation seam because crate-level safety, lint and conditional nightly-coverage attributes belong to the Research Intake root that owns them.
+
 `ClassificationReport.unclassified_items()` retains every input record excluded from bibliographic classification. Bibliographic proposals and this inventory are disjoint and together account for the observed record count. Unresolved ancestry remains visible through `pending_source_item_keys()`, including standalone sources, orphan trees and cycles. Empty pending ancestry is accounting evidence only, never semantic approval.
 
 The Local API reader remains bounded to loopback, API v3, 100 records per page, 8 MiB per page, 50,000 items, 256 MiB cumulative response bodies, finite request timeouts, redirect denial, and a monotonic five-minute admission/completion budget. Total count, library version, Zotero version, schema revision and server identity must remain stable across pages. Record revision must not exceed the page library revision. Inconsistent, oversized, malformed, duplicate-key or late observations fail closed; no smaller successful denominator is returned.
