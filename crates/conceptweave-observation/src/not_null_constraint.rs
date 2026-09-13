@@ -119,6 +119,13 @@ impl NotNullConstraintObservation {
         crate::model::validate_nonblank(&relation_name, "relation_name")?;
         crate::model::validate_nonblank(&constraint_name, "not_null_constraint_name")?;
         crate::model::validate_nonblank(&column_name, "not_null_constraint_column_name")?;
+        // PostgreSQL 18 stores pg_constraint.coninhcount as signed int2. Preserve the nonnegative
+        // count in the public model, but reject values the source catalog cannot represent.
+        if inheritance_ancestor_count > 32_767 {
+            return Err(ObservationError::InvalidObservationField {
+                field: "not_null_constraint_inheritance_ancestor_count",
+            });
+        }
         Ok(Self {
             schema_name,
             relation_name,
