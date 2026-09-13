@@ -14,14 +14,14 @@ Protected/default ConceptWeave `main` remains `f4f440dd58c77d7cd90dff8a1eb2eeb9a
 
 - #6 `287165d399c5f54d6c4b4aa3c15497b47de8244b`, OPEN Draft.
 - #45 `6b2a8f555725dc79f60432afbc492d6005290a4a`, OPEN Draft on #6.
-- #46 `codex/pr6-v3-index-evidence`, OPEN Draft, is the active Source Observation writer. Its current source lineage is `ac590894bfd93297aed1b83859d4745bb5235d40 -> bd63564fd721072269a50bf5c8dbecc09a30807f`.
+- #46 `codex/pr6-v3-index-evidence`, OPEN Draft, is the active Source Observation writer. Column-expression aggregate integration landed at `8da6fa3193f9d2191a260372559078bb31f3118a`; ordering/generation-precondition edge coverage landed at `3b2b6fda8ccab43ce57488ad5fbb76458502af95` before this baseline update.
 - Product bootstrap #35 remains a separate Product acceptance lane. Central workflow evidence never transfers to #46.
 
 #45 and #6 must not duplicate or partially cherry-pick the Source Observation slice. They adopt the complete verified child ordinary/non-force only after one unchanged exact #46 head is terminal GREEN.
 
 ## PostgreSQL 18 representation-v3 state
 
-The active successor preserves exact relation/type/index/constraint coordinates, true-array identity, type-kind/domain-base/range evidence, request-authorized cross-schema types, relation-scoped index semantics, PK/UNIQUE timing, explicit temporal-constraint evidence, source-authoritative column-collation evidence, source-authoritative column-generation declaration mode, and source-authoritative column-identity declaration mode. `pg_constraint.conperiod` remains declaration authority for `WITHOUT OVERLAPS` PK/UNIQUE and PERIOD FK; index/lifecycle/operator shape never invents temporal truth. Temporal final columns resolve to range or multirange through observed type/domain evidence. PERIOD FKs retain exact action, referenced-key, timing, and bounded-reference requirements.
+The active successor preserves exact relation/type/index/constraint coordinates, true-array identity, type-kind/domain-base/range evidence, request-authorized cross-schema types, relation-scoped index semantics, PK/UNIQUE timing, explicit temporal-constraint evidence, source-authoritative column-collation evidence, source-authoritative column-generation declaration mode, source-authoritative column default/generated-expression evidence, and source-authoritative column-identity declaration mode. `pg_constraint.conperiod` remains declaration authority for `WITHOUT OVERLAPS` PK/UNIQUE and PERIOD FK; index/lifecycle/operator shape never invents temporal truth. Temporal final columns resolve to range or multirange through observed type/domain evidence. PERIOD FKs retain exact action, referenced-key, timing, and bounded-reference requirements.
 
 Retained production repairs include:
 
@@ -33,15 +33,16 @@ Retained production repairs include:
 - column-collation source evidence and FK consistency: `5187855669 -> 8006b24f... -> 3e495eac... -> 66489478... -> 3d8a7fb7... -> 8a4b7a1b... -> 6fb0c2b6...`;
 - column-identity declaration mode: `5188215648 -> 85f2eb0c... -> 69a86d2a... -> 95f7f81f...`;
 - identity/nullability consistency: `5188419794 -> bd6da911... -> 00b166bf... -> 0bba879d...`;
-- column-generation declaration mode: `5188836578 -> be3adfd0... -> 493e56bc... -> 32555632... -> f4e8295b... -> 8b0c6447... -> d67433cc...`.
+- column-generation declaration mode: `5188836578 -> be3adfd0... -> 493e56bc... -> 32555632... -> f4e8295b... -> 8b0c6447... -> d67433cc...`;
+- column default/generated-expression identity: `5189444945 -> afc9509f... -> 3a76c46b... -> bd63564f... -> 8da6fa31... -> 3b2b6fda...`.
 
 The shared key-constraint backing-index predicate requires `ready() == Some(true)`, `valid() == Some(true)`, and `live() == Some(true)` when an index is promoted as authoritative support for observed PK/UNIQUE timing or positive `conperiod`. Generic standalone index lifecycle remains optional. Frozen `ColumnObservationV3` remains unchanged.
 
-## Column default / generation expression identity — module staged, aggregate RED active
+## Column default / generation expression identity — source repaired, acceptance pending
 
 Review `5189444945` on predecessor `fb6b0226fb6c4364f9e241bf01b684e110433386` identified that PostgreSQL 18 column default and generated expressions held by `pg_attrdef` were absent from governed Source Observation identity. `pg_attribute.atthasdef` establishes only that an expression exists; `attgenerated` distinguishes ordinary versus generated declaration mode but does not preserve the expression itself. `ALTER TABLE ... SET DEFAULT` and generated-column expression changes can therefore alter source behavior while all previously modeled column facts remain equal.
 
-Compile/source RED `afc9509f021681e6f6a2d0e6d0c386cce46fad12` adds `crates/conceptweave-observation/tests/column_expression_contract.rs`. The contract requires:
+Compile/source RED `afc9509f021681e6f6a2d0e6d0c386cce46fad12` added `crates/conceptweave-observation/tests/column_expression_contract.rs`. The contract requires:
 
 - materially different ordinary defaults to produce different governed digests;
 - materially different generation expressions to produce different governed digests;
@@ -53,27 +54,27 @@ Compile/source RED `afc9509f021681e6f6a2d0e6d0c386cce46fad12` adds `crates/conce
 
 Doctoring `3a76c46bc4d12fac2b8c3407a1d6a09005ddd7ea` selects exact schema/relation/kind/column coordinates plus explicit no/default/generation expression state and exact server-rendered `pg_get_expr(adbin, adrelid)` text as governed evidence. `pg_attrdef` OIDs and `adbin`'s internal `pg_node_tree` serialization remain capture-time/internal details rather than consumer identity. Dependency extraction, function volatility/leakproof/security, semantic equivalence, and application-domain meaning remain separate later contracts.
 
-Production commit `bd63564fd721072269a50bf5c8dbecc09a30807f` now stages `crates/conceptweave-observation/src/column_expression.rs`. It implements `ColumnExpressionObservation` with exact bounded coordinates, explicit no/default/generation states, nonblank exact expression preservation, complete coverage, duplicate rejection, deterministic ordering, generation-mode consistency, and domain-separated framing under `conceptweave.postgres_schema_snapshot.v3.column_expression.v1`.
+Production module commit `bd63564fd721072269a50bf5c8dbecc09a30807f` implements `ColumnExpressionObservation` with exact bounded coordinates, explicit no/default/generation states, nonblank exact expression preservation, complete coverage, duplicate rejection, deterministic ordering, generation-mode consistency, and domain-separated framing under `conceptweave.postgres_schema_snapshot.v3.column_expression.v1`.
 
-This is deliberately not a source-repaired claim. `PostgresSchemaSnapshotV3` still lacks root integration: `mod column_expression`, public re-export, stored expression-family state/observed flag, `new_with_column_expressions`, `with_observed_column_expressions`, `column_expressions`, digest attachment, and canonical optional-family ordering. Until those are integrated, `column_expression_contract.rs` remains expected compile/source RED.
+Aggregate commit `8da6fa3193f9d2191a260372559078bb31f3118a` integrates that family into `PostgresSchemaSnapshotV3`: root module/re-export, retained state and observed flag, `new_with_column_expressions`, `with_observed_column_expressions`, query accessor, canonicalization against the already-observed generation family, and one domain-separated digest extension. The canonical optional-family order is type/array -> column collation -> column generation -> column expression -> column identity -> constraint timing -> PERIOD. Expression attachment requires an already-observed generation family and fails closed if attempted after identity/timing/PERIOD evidence.
 
-The canonical optional-family order is type/array -> column collation -> column generation -> column expression -> column identity -> constraint timing -> PERIOD. Expression attachment must require an already-observed generation family; reverse-order attachment after identity/timing/PERIOD must fail closed rather than create a second identity for the same source facts.
+Edge-contract commit `3b2b6fda8ccab43ce57488ad5fbb76458502af95` adds explicit regressions for both ordering boundaries: expression evidence cannot infer missing `attgenerated`, and expression evidence cannot be attached after identity evidence to create a second optional-family identity.
 
-Current Source Observation state is **COLUMN_EXPRESSION_MODULE_STAGED / AGGREGATE_RED_ACTIVE**. Native/Product GREEN, source-repaired status, Ready, merge authorization, publication, and release are not claimed.
+Current Source Observation state is **COLUMN_EXPRESSION_SOURCE_REPAIRED / ACCEPTANCE_PENDING**. Native/Product GREEN, Ready, merge authorization, publication, and release are not claimed.
 
 ## Exact-head acceptance
 
-After aggregate repair, one unchanged exact #46 head must pass repository-pinned Rust 1.98 `cargo fmt --all --check`, strict workspace/all-target Clippy with warnings denied, `column_expression_contract`, generation/identity/collation contracts, retained lifecycle/temporal/type/index contracts, workspace/doc tests, release build, owned production docstring/test/edge-case coverage, and applicable hosted Product/security/dependency/review terminal evidence. Any head movement restarts exact-head acceptance.
+One unchanged exact #46 head must now pass repository-pinned Rust 1.98 `cargo fmt --all --check`, strict workspace/all-target Clippy with warnings denied, `column_expression_contract`, generation/identity/collation contracts, retained lifecycle/temporal/type/index contracts, workspace/doc tests, release build, owned production docstring/test/edge-case coverage, and applicable hosted Product/security/dependency/review terminal evidence. Any head movement restarts exact-head acceptance.
 
-The current execution host has not established repository-pinned Rust 1.98 native execution for this head. #46 also has no pull-request-triggered workflow run at the pre-module `ac590894...` checkpoint; no predecessor evidence is transferred to the staged module successor. This is not a reason to toggle Draft/Ready, synthesize status, copy central workflows, manually/no-op retrigger, self-approve, dismiss review, force-push, destructively rebase, or weaken a gate.
+The current execution host has not established repository-pinned Rust 1.98 native execution for this head. Hosted checks must be evaluated only against the final unchanged exact #46 head; predecessor evidence is not transferred. This is not a reason to toggle Draft/Ready, synthesize status, copy central workflows, manually/no-op retrigger, self-approve, dismiss review, force-push, destructively rebase, or weaken a gate.
 
 ## Central Product-CI owner
 
 Central workflow ownership remains outside ConceptWeave. Product bootstrap/review integration evidence never transfers to #46.
 
-The Required Noema Review finding/probe relation failure remains an executable owner RED in `.github#2079@6ca329896a846110ade7182ed6fa0fa7b0fbba7d`. Fresh metadata reports OPEN / Draft with mechanical mergeability currently false. The advertised structured-output schema still represents `findings[]` and `adversarial_validation.probes[]` independently while the deterministic validator requires a confirmed probe anchored to a published finding location. Owner review `5188653693`, RED `6ca329896a846110ade7182ed6fa0fa7b0fbba7d`, and review `5188972300` define the owner-local repair: a schema-representable finding/probe binding, prompt population rules, and deterministic validation of a valid referenced finding plus the same changed-side location. Provider/model fallback and validator weakening are invalid repairs.
+The Required Noema Review finding/probe relation failure remains an executable owner RED in `.github#2079@35d1b39ad268e5cf7157716296c926df2bded3e6`, OPEN / Draft / mechanically mergeable. This exact head is an ordinary non-force merge-forward of intentional RED `6ca329896a846110ade7182ed6fa0fa7b0fbba7d` and protected `.github/main@64f483db9d052322c65bcdf1675d66138156f306`; it does not implement the production repair. The advertised structured-output schema still represents `findings[]` and `adversarial_validation.probes[]` independently while the deterministic validator requires a confirmed probe anchored to a published finding location. Owner review `5188653693`, RED `6ca329896a846110ade7182ed6fa0fa7b0fbba7d`, and review `5188972300` define the owner-local repair: a schema-representable finding/probe binding, prompt population rules, and deterministic validation of a valid referenced finding plus the same changed-side location. Provider/model fallback and validator weakening are invalid repairs.
 
-On exact `.github#2079@6ca329...`, Security Scan run `34731494426`, SAST Semgrep `34731494413`, Python Security `34731494455`, and CodeQL PR `34731494433` are terminal success. Those security checks do not satisfy the intentional Noema RED and are not ConceptWeave acceptance evidence.
+Central hosted security checks never substitute for that intentional Noema contract RED and are not ConceptWeave acceptance evidence.
 
 ## PostgreSQL adapter boundary
 
