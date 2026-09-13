@@ -370,3 +370,33 @@ fn not_null_constraint_input_order_does_not_change_identity() {
 
     assert_eq!(first.snapshot_digest(), second.snapshot_digest());
 }
+
+#[test]
+fn not_null_family_can_only_be_attached_once() {
+    let observed = snapshot(&[], Vec::new()).expect("observed-empty NOT NULL family is valid");
+    let error = observed
+        .with_observed_not_null_constraints(Vec::new())
+        .expect_err("the same first-class NOT NULL family cannot extend identity twice");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "not_null_constraint_already_observed",
+        }
+    );
+}
+
+#[test]
+fn earlier_optional_family_cannot_be_attached_after_not_null_evidence() {
+    let observed = snapshot(&[], Vec::new()).expect("observed-empty NOT NULL family is valid");
+    let error = observed
+        .with_observed_type_kinds(Vec::new())
+        .expect_err("late type-kind attachment cannot create a second digest ordering");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "type_kind_observation_order",
+        }
+    );
+}
