@@ -28,7 +28,11 @@ fn child_relation() -> RelationObservation {
     .expect("child relation fixture is valid")
 }
 
-fn child_constraint(parent_relation_name: &str) -> NotNullConstraintObservation {
+fn child_constraint_with_state(
+    parent_relation_name: &str,
+    is_local: bool,
+    inheritance_ancestor_count: u16,
+) -> Result<NotNullConstraintObservation, ObservationError> {
     NotNullConstraintObservation::new(
         "public",
         "metric_2026",
@@ -37,21 +41,21 @@ fn child_constraint(parent_relation_name: &str) -> NotNullConstraintObservation 
         "raw_value",
         true,
         true,
+        is_local,
+        inheritance_ancestor_count,
         false,
-        1,
-        false,
-    )
-    .expect("child NOT NULL constraint is valid")
-    .with_parent_constraint(
-        ParentNotNullConstraintCoordinate::new(
-            "public",
-            parent_relation_name,
-            RelationKind::PartitionedTable,
-            "metric_raw_value_not_null",
-        )
-        .expect("parent constraint coordinate is valid"),
-    )
-    .expect("parent linkage is valid")
+    )?
+    .with_parent_constraint(ParentNotNullConstraintCoordinate::new(
+        "public",
+        parent_relation_name,
+        RelationKind::PartitionedTable,
+        "metric_raw_value_not_null",
+    )?)
+}
+
+fn child_constraint(parent_relation_name: &str) -> NotNullConstraintObservation {
+    child_constraint_with_state(parent_relation_name, false, 1)
+        .expect("partition-child NOT NULL constraint is valid")
 }
 
 fn snapshot(constraint: NotNullConstraintObservation) -> PostgresSchemaSnapshotV3 {
@@ -111,4 +115,32 @@ fn parent_constraint_coordinate_requires_partitioned_table_relation_kind() {
             field: "not_null_parent_relation_kind",
         }
     );
+}
+
+#[test]
+fn partition_parent_link_rejects_locally_defined_child_constraint() {
+    let error = child_constraint_with_state("metric", true, 1)
+        .expect_err("partition-child conparentid rows cannot remain locally defined");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "not_null_constraint_parent_locality",
+        }
+    );
+}
+
+#[test]
+fn partition_parent_link_requires_exactly_one_inheritance_ancestor() {
+    for inheritance_ancestor_count in [0, 2] {
+        let error = child_constraint_with_state("metric", false, inheritance_ancestor_count)
+            .expect_err("partition-child conparentid rows must have exactly one direct ancestor");
+
+        assert_eq!(
+            error,
+            ObservationError::InvalidObservationField {
+                field: "not_null_constraint_parent_inheritance_ancestor_count",
+            }
+        );
+    }
 }
