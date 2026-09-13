@@ -2,7 +2,7 @@
 
 Status: source repaired / exact-head acceptance pending  
 Owner: ConceptWeave / Source Observation  
-Decision date: 2026-09-13
+Decision date: 2026-09-14
 
 ## Problem
 
@@ -29,7 +29,9 @@ PRIMARY KEY handling is material to completeness. An April 2024 development disc
 
 `conparentid` has a narrower meaning than generic inheritance: PostgreSQL defines it as the corresponding constraint of the **parent partitioned table** when the row is a constraint on a partition. The resolved parent relation therefore has `pg_class.relkind = 'p'` (`PartitionedTable`). A stable parent coordinate carrying any other relation kind is impossible source evidence and must fail closed before governed hashing.
 
-`ALTER TABLE` permits not-null constraints to be added `NOT VALID`, later validated, and marked `INHERIT`/`NO INHERIT`. PostgreSQL also permits `NOT ENFORCED` constraint state. The data-definition documentation allows explicit names and states that a column can have at most one explicit not-null constraint.
+PostgreSQL 18 table-partitioning documentation further narrows `connoinherit`: CHECK and NOT NULL constraints of a partitioned table are always inherited by all partitions, and PostgreSQL does not allow `NO INHERIT` constraints of those types on a partitioned table. `NOT NULL ... NO INHERIT` remains meaningful for non-partitioned inheritance hierarchies, but `relation_kind = PartitionedTable` together with `connoinherit = true` is impossible PostgreSQL 18 source evidence and must be rejected before governed hashing.
+
+`ALTER TABLE` permits not-null constraints to be added `NOT VALID`, later validated, and marked `INHERIT`/`NO INHERIT` where the relation kind permits that state. PostgreSQL also permits `NOT ENFORCED` constraint state. The data-definition documentation allows explicit names and states that a column can have at most one explicit not-null constraint.
 
 ## Selected representation boundary
 
@@ -46,6 +48,8 @@ Use a domain-separated optional NOT NULL constraint family whose observations re
 Catalog OIDs are join coordinates inside one captured catalog transaction and are not governed identity. A nonzero `conparentid` is resolved to an exact parent schema/relation/constraint coordinate only after verifying that the parent relation kind is `PartitionedTable`; a non-partitioned parent coordinate is rejected as contradictory catalog evidence.
 
 The public model keeps `coninhcount` as a nonnegative count but validates it against the source catalog domain. Values above 32767 are rejected with `not_null_constraint_inheritance_ancestor_count` rather than hashed as if PostgreSQL could have emitted them.
+
+The model also validates relation-kind-specific inheritance state. `RelationKind::PartitionedTable` plus `no_inherit = true` is rejected with `not_null_constraint_no_inherit`; the state cannot be produced by PostgreSQL 18 and therefore cannot receive a governed semantic identity. Ordinary-table inheritance remains capable of representing `NO INHERIT`.
 
 When the family is declared observed for bounded user relations, its resolved column set must equal the bounded columns whose source `attnotnull` summary is true. PostgreSQL 18 creates/queues first-class NOT NULL constraints for PRIMARY KEY columns, so a PRIMARY KEY does not justify omitting those rows from the captured NOT NULL inventory. An observed empty set is distinct from an unobserved family. Unknown columns, duplicate not-null constraints for one column, multi-column `conkey`, and contradictions between the constraint family and column nullability fail closed.
 
@@ -73,6 +77,10 @@ Rejected because OIDs are database-local join coordinates, not stable semantic i
 
 Rejected because `conparentid` is specifically the corresponding constraint of a parent partitioned table. Preserving an arbitrary relation kind would make impossible catalog state look authoritative.
 
+### Permit `NO INHERIT` NOT NULL evidence on a partitioned table
+
+Rejected because PostgreSQL 18 requires partitioned-table NOT NULL constraints to be inherited by every partition and forbids `NO INHERIT` for that case. Hashing the combination would manufacture an authoritative identity for source state PostgreSQL cannot emit.
+
 ### Permit the full `u16` range for `coninhcount`
 
 Rejected because PostgreSQL 18 stores `coninhcount` as signed `int2`. Accepting 32768 through 65535 would admit source states the catalog cannot represent.
@@ -87,6 +95,8 @@ Rejected because PostgreSQL 18 represents explicit not-null constraints as `cont
 
 `crates/conceptweave-observation/tests/not_null_constraint_parent_contract.rs` additionally pins stable parent-coordinate identity and rejects any resolved `conparentid` coordinate whose parent relation kind is not `PartitionedTable`.
 
+`crates/conceptweave-observation/tests/not_null_partition_inheritance_contract.rs` is the PostgreSQL 18 partition-specific RED. Commit `8ef85d714329d4d26b4fa2a1db5a4f9e84b66220` requires `PartitionedTable + NO INHERIT` to fail with `not_null_constraint_no_inherit`. Production repair `7331fe067f1b9876f8dc7d79bb9d182c01e46e52` adds the minimum constructor guard while preserving valid ordinary-table `NO INHERIT` evidence.
+
 Review `5190456512` and commits `4236309b...`, `5a29f0aa...`, and `ca8d8e5a...` temporarily removed the reverse completeness rule based on the superseded April 2024 development model. Fresh source review `5190470810` identified the chronology error. Corrected RED `d4df54d9...` requires a PRIMARY-KEY-backed non-nullable column with an observed-empty NOT NULL inventory to fail `not_null_constraint_completeness`; production repair `0cdd4fd3...` restores complete PostgreSQL 18 NOT NULL-row coverage ordinary-forward without rewriting history.
 
 The aggregate family is source-repaired. Exact-head repository-pinned Rust and hosted acceptance remain separate gates; documentation never upgrades source repair into execution acceptance.
@@ -95,13 +105,15 @@ The aggregate family is source-repaired. Exact-head repository-pinned Rust and h
 
 A future PostgreSQL transport must collect `pg_attribute`, all bounded `pg_constraint.contype = 'n'` rows, and joined parent `pg_class` metadata from the same bounded `REPEATABLE READ READ ONLY` catalog snapshot. It must resolve each `conkey` to exactly one bounded column, retain exact `conname`, `convalidated`, `conenforced`, `conislocal`, `coninhcount`, and `connoinherit`, and resolve nonzero `conparentid` to a stable parent coordinate whose relation kind is `PartitionedTable`.
 
-For bounded user relations, the resolved `contype='n'` column set must equal the captured `attnotnull=true` column set. PRIMARY KEY columns are not an exception in PostgreSQL 18 because PRIMARY KEY creation queues first-class NOT NULL constraints. `coninhcount` must be parsed as signed `int2`, rejected if negative, and converted to the nonnegative representation only after source-domain validation. Missing, duplicate, contradictory, out-of-domain, or partially resolved rows fail the complete-or-fail capture.
+For bounded user relations, the resolved `contype='n'` column set must equal the captured `attnotnull=true` column set. PRIMARY KEY columns are not an exception in PostgreSQL 18 because PRIMARY KEY creation queues first-class NOT NULL constraints. `coninhcount` must be parsed as signed `int2`, rejected if negative, and converted to the nonnegative representation only after source-domain validation. For partitioned-table rows, `connoinherit=true` is contradictory source state and must fail capture before immutable snapshot construction. Missing, duplicate, contradictory, out-of-domain, or partially resolved rows fail the complete-or-fail capture.
 
 ## References
 
 PostgreSQL Global Development Group. (2025). *PostgreSQL 18.0 release notes*. https://www.postgresql.org/docs/18/release-18.html
 
 PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: 5.5 Constraints*. https://www.postgresql.org/docs/18/ddl-constraints.html
+
+PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: 5.12 Table Partitioning*. https://www.postgresql.org/docs/18/ddl-partitioning.html
 
 PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: 52.7 pg_attribute*. https://www.postgresql.org/docs/18/catalog-pg-attribute.html
 
