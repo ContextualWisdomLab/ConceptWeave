@@ -234,3 +234,40 @@ fn generated_column_and_identity_evidence_are_mutually_exclusive() {
         }
     );
 }
+
+#[test]
+fn identity_first_cannot_bypass_generation_identity_validation() {
+    let identity_first = PostgresSchemaSnapshotV3::new_with_column_identities(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-13T00:47:00Z",
+        vec![two_column_relation()],
+        Vec::new(),
+        Vec::new(),
+        vec![
+            always_identity("metric_id"),
+            ColumnIdentityObservation::not_identity(
+                "public",
+                "metric",
+                RelationKind::Table,
+                "value_normalized",
+            )
+            .expect("ordinary identity evidence is valid"),
+        ],
+    )
+    .expect("identity family is internally valid");
+
+    let error = identity_first
+        .with_observed_column_generations(vec![
+            not_generated("metric_id"),
+            stored("value_normalized"),
+        ])
+        .expect_err("generation evidence cannot be attached after identity evidence");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "column_generation_observation_order",
+        }
+    );
+}
