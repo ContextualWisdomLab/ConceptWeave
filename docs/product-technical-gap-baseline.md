@@ -1,6 +1,6 @@
 # Product / Technical Gap Baseline
 
-**Snapshot:** 2026-09-13
+**Snapshot:** 2026-09-14
 
 This document is the code-current authority for the active ConceptWeave Source Observation lane. Exact SHAs, review IDs, runs, and statuses are evidence coordinates only. Execution and review evidence from an earlier head never transfers after head movement.
 
@@ -14,7 +14,7 @@ Protected/default ConceptWeave `main` remains `f4f440dd58c77d7cd90dff8a1eb2eeb9a
 
 - #6 `287165d399c5f54d6c4b4aa3c15497b47de8244b`, OPEN Draft.
 - #45 `6b2a8f555725dc79f60432afbc492d6005290a4a`, OPEN Draft on #6.
-- #46 `codex/pr6-v3-index-evidence`, OPEN Draft, is the active Source Observation writer. The PostgreSQL 18 first-class NOT NULL lineage includes aggregate admission, partition-parent validation, the `coninhcount` source-domain bound, and the corrected PRIMARY KEY completeness chronology described below. Exact-head native and hosted acceptance remain pending.
+- #46 `codex/pr6-v3-index-evidence`, OPEN Draft, is the active Source Observation writer. The PostgreSQL 18 first-class NOT NULL lineage now includes aggregate admission, partition-parent validation, the `coninhcount` source-domain bound, corrected PRIMARY KEY completeness, and fail-closed rejection of partitioned-table `NO INHERIT` NOT NULL state. Exact-head native and hosted acceptance remain pending.
 - Product bootstrap #35 remains a separate Product acceptance lane. Central workflow evidence never transfers to #46.
 
 #45 and #6 must not duplicate or partially cherry-pick the Source Observation slice. They adopt the complete verified child ordinary/non-force only after one unchanged exact #46 head is terminal GREEN.
@@ -35,7 +35,7 @@ Retained production repairs include:
 - identity/nullability consistency: `5188419794 -> bd6da911... -> 00b166bf... -> 0bba879d...`;
 - column-generation declaration mode: `5188836578 -> be3adfd0... -> 493e56bc... -> 32555632... -> f4e8295b... -> 8b0c6447... -> d67433cc...`;
 - column default/generated-expression identity: `5189444945 -> afc9509f... -> 3a76c46b... -> bd63564f... -> 8da6fa31... -> 3b2b6fda...`;
-- PostgreSQL 18 first-class NOT NULL identity: `5189886354 -> 8ce7fd7c... -> 5c0706da... -> 8912039b... -> e58dd0c5... -> 5ac4cf33... -> 91086655... -> 5190108906 -> 4c1c0640... -> 2f8a4f97... -> e1c62c07... -> c5ac66ff... -> e60cfec3... -> 5190362750 -> 28916758... -> 385bf437... -> 1b16ce65... -> 5190456512 -> 4236309b... -> 5a29f0aa... -> ca8d8e5a... -> 5190470810 -> d4df54d9... -> 0cdd4fd3... -> 6c37275c...`.
+- PostgreSQL 18 first-class NOT NULL identity: `5189886354 -> 8ce7fd7c... -> 5c0706da... -> 8912039b... -> e58dd0c5... -> 5ac4cf33... -> 91086655... -> 5190108906 -> 4c1c0640... -> 2f8a4f97... -> e1c62c07... -> c5ac66ff... -> e60cfec3... -> 5190362750 -> 28916758... -> 385bf437... -> 1b16ce65... -> 5190456512 -> 4236309b... -> 5a29f0aa... -> ca8d8e5a... -> 5190470810 -> d4df54d9... -> 0cdd4fd3... -> 6c37275c... -> 8ef85d71... -> 7331fe06... -> e311a497...`.
 
 The shared key-constraint backing-index predicate requires `ready() == Some(true)`, `valid() == Some(true)`, and `live() == Some(true)` when an index is promoted as authoritative support for observed PK/UNIQUE timing or positive `conperiod`. Generic standalone index lifecycle remains optional. Frozen `ColumnObservationV3` remains unchanged.
 
@@ -57,6 +57,8 @@ Aggregate repair `c5ac66ffa623f6b99ba0c08f73eea4e22f06937b` declares and re-expo
 
 Review `5190362750` found that the public source model accepted the full `u16` range for `pg_constraint.coninhcount`, whose PostgreSQL source type is signed `int2`. RED `2891675822b13282ab57d968cda985d0628920ac`, repair `385bf43794849836ef6871c2abad64c124ddd723`, and doctoring `1b16ce65d674836e88073ba2ea857aa27fb1b2a5` now reject values above 32767 before governed hashing. Negative source values must be rejected by the future adapter before conversion to the public nonnegative count.
 
+Fresh PostgreSQL 18 partitioning review found another source-domain invariant: CHECK and NOT NULL constraints declared on a partitioned table are always inherited by every partition, and PostgreSQL forbids `NO INHERIT` for those constraint types on a partitioned table. RED `8ef85d714329d4d26b4fa2a1db5a4f9e84b66220` pins the impossible `RelationKind::PartitionedTable + no_inherit=true` case. Production repair `7331fe067f1b9876f8dc7d79bb9d182c01e46e52` rejects it as `not_null_constraint_no_inherit` before governed hashing while preserving ordinary-table `NO INHERIT` evidence. Primary-source doctoring `e311a497846be40d39565adf7725bba915c604ff` records the relation-kind-specific rule and transport obligation.
+
 ### Corrected PRIMARY KEY chronology
 
 Review `5190456512` used an April 2024 development-state discussion to conclude that `attnotnull=true` could be backed directly by a PRIMARY KEY without a separate `contype='n'` row. RED `4236309b5317f54a38d39996affd5b7a950b9f06`, repair `5a29f0aa2d0a07ef1ef3182326efb4e70ecfe5a2`, and doctoring `ca8d8e5a7ddf7971a18cea1e5714a523d94d444e` temporarily removed reverse completeness.
@@ -75,9 +77,11 @@ The current execution host has not established repository-pinned Rust 1.98 nativ
 
 Central workflow ownership remains outside ConceptWeave. Product bootstrap/review integration evidence never transfers to #46.
 
-Fresh `.github#2079` authority remains a separate OPEN/Draft owner lane whose finding/probe relation failure is an executable RED. Current owner tests require confirmed probes to carry a valid finding binding at the same changed-side location and falsified probes to carry explicit null; production schema/prompt/validator repair is not claimed GREEN. Provider/model fallback and validator weakening remain invalid repairs.
+`.github#2079@9dccfaa0776950498e557390a2fa8d6c34e0baf4` is OPEN/Draft/mergeable at `FINDING_PROBE_BINDING_SOURCE_REPAIRED / COVERAGE_RED`. The finding↔confirmed-probe schema/prompt/validator repair is present. Current CodeQL, Security, Semgrep and Python Security are terminal GREEN, but Required OpenCode `coverage-evidence` remains RED at 13/17 touched callables (76.47%): `Response.__enter__`, `Response.__exit__`, `Response.read`, and `Opener.open` in `tests/test_noema_review_gate.py` lack meaningful docstrings. The causal repair is those four behavior-neutral docstrings, not threshold weakening or a synthetic rerun.
 
-Central hosted security checks never substitute for that intentional Noema contract RED and are not ConceptWeave acceptance evidence.
+`.github#2170@d3f1d0264912e74b897fdf2a0a6085100de4e40a` is OPEN/Ready/mergeable and source-repaired for that pre-review coverage-RCA deadlock. Its exact Semgrep, Python Security, Security Scan, and Runtime Quality lanes are terminal GREEN. Exact CodeQL PR `34764257373` is terminal FAILURE because compatibility consumers enforced absence before the dispatch producer later ran; this is the separate CodeQL control-plane ordering defect, not a scheduler-source or SARIF finding. #2170 is therefore still `SOURCE_REPAIRED / ACCEPTANCE_PENDING` and must not be manually/no-op retriggered.
+
+The protected-handler prerequisite `.github#2106@db34e6b9d739c5ef228bacdc2efaa5f3a9238356` remains OPEN/Ready/mergeable. Runtime Quality, Python Security, Security Scan and Semgrep are GREEN. CodeQL PR `34761450697` remains terminal FAILURE on attempt 2: Python compatibility succeeded, Actions compatibility failed before a settled verdict, and `Dispatch current-head CodeQL scan` succeeded only afterward. This is executable producer-after-terminal-consumer evidence owned by the central CodeQL control plane. No handler, scheduler, provider fallback, or review logic is copied into ConceptWeave.
 
 ## PostgreSQL adapter boundary
 
@@ -85,7 +89,7 @@ Transport remains blocked until representation exact-head GREEN and ordinary/non
 
 Catalog OIDs are capture-time joins only. Constraint support must bind `pg_constraint.conindid` to the exact same-snapshot `pg_index` row and explicitly capture usable lifecycle, key/static flags, `conexclop`, operator-class/operator-family evidence, timing/action/match state, and temporal type/domain chains. Referenced temporal keys outside the bounded relation set require explicitly authorized evidence expansion or remain fail closed.
 
-For PostgreSQL 18 NOT NULL constraints, the adapter captures `pg_attribute.attnotnull` and all matching bounded-relation `pg_constraint` rows with `contype = 'n'` in the same catalog snapshot. `conkey` must resolve to exactly one bounded column. It retains exact `conname`, `convalidated`, `conenforced`, `conislocal`, `coninhcount`, and `connoinherit`, and resolves nonzero `conparentid` to an exact parent schema/relation/kind/constraint coordinate only after verifying `pg_class.relkind = 'p'` / `PartitionedTable`. `coninhcount` is read as signed `int2`; negative or out-of-domain values fail closed before conversion. For bounded user relations, the resolved `contype='n'` column set must equal the captured `attnotnull=true` column set. PRIMARY KEY columns are not an exception in PostgreSQL 18 because PRIMARY KEY creation queues first-class NOT NULL constraints. Duplicate names within one relation, duplicate-column, multi-column, unknown, non-partitioned-parent, out-of-domain, missing, or contradictory rows fail closed.
+For PostgreSQL 18 NOT NULL constraints, the adapter captures `pg_attribute.attnotnull` and all matching bounded-relation `pg_constraint` rows with `contype = 'n'` in the same catalog snapshot. `conkey` must resolve to exactly one bounded column. It retains exact `conname`, `convalidated`, `conenforced`, `conislocal`, `coninhcount`, and `connoinherit`, and resolves nonzero `conparentid` to an exact parent schema/relation/kind/constraint coordinate only after verifying `pg_class.relkind = 'p'` / `PartitionedTable`. `coninhcount` is read as signed `int2`; negative or out-of-domain values fail closed before conversion. A partitioned-table NOT NULL row with `connoinherit=true` is contradictory PostgreSQL 18 state and must fail before immutable snapshot construction. For bounded user relations, the resolved `contype='n'` column set must equal the captured `attnotnull=true` column set. PRIMARY KEY columns are not an exception in PostgreSQL 18 because PRIMARY KEY creation queues first-class NOT NULL constraints. Duplicate names within one relation, duplicate-column, multi-column, unknown, non-partitioned-parent, out-of-domain, missing, or contradictory rows fail closed.
 
 For column collation, generation, identity, and expressions, the existing source-authoritative families and exact optional-family ordering remain unchanged. Expression evidence preserves exact server-rendered `pg_get_expr(adbin, adrelid)` while catalog OIDs/internal node serialization remain capture-time details only.
 
@@ -93,6 +97,7 @@ For column collation, generation, identity, and expressions, the existing source
 
 - PostgreSQL Global Development Group. (2025). *PostgreSQL 18.0 release notes*. https://www.postgresql.org/docs/18/release-18.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: Constraints*. https://www.postgresql.org/docs/18/ddl-constraints.html
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: Table Partitioning*. https://www.postgresql.org/docs/18/ddl-partitioning.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_attribute*. https://www.postgresql.org/docs/18/catalog-pg-attribute.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_constraint*. https://www.postgresql.org/docs/18/catalog-pg-constraint.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_class*. https://www.postgresql.org/docs/18/catalog-pg-class.html
