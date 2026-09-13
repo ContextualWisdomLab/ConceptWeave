@@ -70,9 +70,9 @@ The current execution host has no `cargo`, `rustc`, or `rustfmt`; repository-pin
 
 ## Central Product-CI owner
 
-Central workflow ownership remains outside ConceptWeave. Fresh PR metadata confirms `ContextualWisdomLab/.github#2114` is OPEN/non-Draft/mergeable at exact `e7c58c04ed7e59c23cbe4a5f38d4c522ae712712`, based on protected `.github/main@fb17ef556f94f673234aa557254ae52779e9a7b0`. Its body contains historical/source snapshots that do not override the actual PR head.
+Central workflow ownership remains outside ConceptWeave. Fresh PR metadata confirms `ContextualWisdomLab/.github#2114` remains the Product bootstrap/review integration lane; its execution evidence never transfers to #46.
 
-The central review path remains unresolved independently of this Source Observation RED. A live Required Noema Review on #2114 previously reached `contextual-orchestrator/orchestrator/free` and then failed local validation because the published JSON Schema represents `findings[]` and adversarial `probes[]` independently while the deterministic validator requires a confirmed probe anchored to a published finding. Owner review `5188653693` is on `.github#2079`; no leaf retry/provider fallback/validator weakening is accepted. Strix also retains the separate terminal-sub-agent negative-control obligation. None of this evidence transfers to ConceptWeave acceptance.
+The Required Noema Review failure is now an executable owner RED rather than a comment-only finding. Actual model transport through `contextual-orchestrator/orchestrator/free` succeeded, but the advertised structured-output schema represents `findings[]` and `adversarial_validation.probes[]` as independent arrays while the deterministic validator requires a confirmed probe anchored to a published finding location. Owner review `5188653693` identified the relation mismatch on `.github#2079`. Exact owner head `6ca329896a846110ade7182ed6fa0fa7b0fbba7d` adds `tests/test_noema_review_finding_probe_binding_contract.py`; review `5188972300` fixes the causal boundary: the schema must carry an explicit finding/probe relation coordinate (the RED uses required nullable `finding_index`), the prompt must explain confirmed versus falsified population, and the validator must check a valid referenced finding plus same changed-side location. Provider/model fallback and validator weakening remain invalid repairs. This owner head is RED until production schema/prompt/validator are repaired and fresh exact-head checks complete. Strix retains its separate terminal-sub-agent negative-control obligation. None of this evidence transfers to ConceptWeave acceptance.
 
 ## PostgreSQL adapter boundary
 
@@ -103,7 +103,7 @@ For column generation, the adapter must capture `attgenerated` for every bounded
 | --- | --- | --- |
 | Source Observation | COLUMN_GENERATION_RED_ACTIVE | `5188836578 -> be3adfd0... -> 493e56bc... -> 4708708c...`; production family and GREEN are pending. |
 | Retained column semantics | SOURCE_REPAIRED / EXECUTION_PENDING | Collation, identity, identity/nullability contracts remain retained and must stay GREEN after generation repair. |
-| Product CI | CENTRAL_OWNER_REVIEW_BLOCKED | `.github#2114@e7c58c04...`; Noema/Strix review settlement and independent approval are separate central-owner work. |
+| Product CI | CENTRAL_OWNER_RED_ACTIVE | `.github#2079@6ca32989...`, owner review `5188972300`; schema/prompt/validator relation repair and fresh exact-head checks are pending. |
 | Quality gate | BLOCKED_ON_PRODUCTION_REPAIR_THEN_EXACT_HEAD_EXECUTION | Implement the generation family, then obtain Rust 1.98/native and hosted acceptance on one unchanged head. |
 | PostgreSQL adapter | BLOCKED_ON_REPRESENTATION_ACCEPTANCE | No transport before #46 GREEN and parent adoption. |
 | Publication | NO_PUBLICATION | No protected immutable semantic release exists. |
@@ -114,5 +114,5 @@ For column generation, the adapter must capture `attgenerated` for every bounded
 1. Implement the minimum source-authoritative `attgenerated` family ordinary-forward against #46, preserving frozen v3 compatibility, complete bounded coverage, a domain-separated digest, canonical family order, and generated/identity contradiction rejection.
 2. Run the refined RED plus all retained column/index/temporal contracts under repository-pinned Rust 1.98 and obtain hosted Product/security/dependency/review acceptance on one unchanged exact head. Any real failure receives only its causal repair; head movement restarts acceptance.
 3. Adopt the complete verified #46 delta ordinary/non-force into #45, obtain fresh parent acceptance, then adopt #45 into #6.
-4. Independently repair the central Noema/Strix review-owner contracts and obtain qualifying independent approval; central evidence never transfers to ConceptWeave.
+4. Repair `.github#2079` from the executable finding/probe-binding RED through owner GREEN, then complete the independent Noema/Strix review-owner settlement; central evidence never transfers to ConceptWeave.
 5. Only after representation/Product prerequisites are GREEN may bounded PostgreSQL transport proceed, followed by deterministic validation, independent evaluation, steward review, immutable publication, and release evidence.
