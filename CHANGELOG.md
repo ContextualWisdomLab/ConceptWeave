@@ -6,6 +6,8 @@ All notable changes to ConceptWeave are documented here.
 
 ### Fixed
 
+- Golden-set evaluation now ordinary/non-force adopts the current Research Intake parent without reopening its private constructor-bound `ClassificationReport` aggregate.
+- Raw-provider snapshot binding uses an explicit `CapturedZoteroItem` wire boundary instead of adding a mandatory caller-owned `source_record` field to the stable public `ZoteroItem` shape.
 - Research evaluation rejects incomplete source inventories and invalidates prior approvals when retained source metadata changes.
 - Research reports retain standalone files and notes that previously disappeared from the classification view, and flag sources whose parent relationships remain unresolved.
 - Zotero research intake rejects a read whose records claim revisions newer than the library being observed, without dropping papers or changing their recorded revisions.
@@ -13,6 +15,7 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
+- Golden-set source/proposal receipts use versioned SHA-256 domains and aggregate-only evaluation evidence; provider-captured and typed-fixture snapshot receipts are deliberately distinct.
 - Initial ConceptWeave product, DDD, security, test, and operability baselines.
 - Rust 1.98.0 `conceptweave-domain` foundation with evidence-bound semantic candidate contracts.
 - Fail-closed Draft -> Proposed -> Validated -> Reviewed -> Published lifecycle with explicit rejection and supersession.
@@ -21,7 +24,7 @@ All notable changes to ConceptWeave are documented here.
 
 ### Security
 
-- Source receipts bind complete captured metadata and actual classifier inputs; earlier report and review artifacts require regeneration under the versioned digest representation.
+- Provider-captured source receipts bind complete captured metadata and actual classifier inputs through a private capture object; typed offline fixtures use a separate domain and do not claim provider authenticity.
 - Golden-set evaluation rejects changed predictions or evidence under an earlier approval. Proposal-bound approvals must be reissued; aggregate receipts identify the actual evaluated proposal run.
 - Model-generated semantics remain non-authoritative until deterministic validation and authorized review.
 - Unsafe Rust is forbidden in the core domain crate.
