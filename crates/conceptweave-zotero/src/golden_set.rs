@@ -6,7 +6,8 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-const PROVIDER_SNAPSHOT_DIGEST_DOMAIN: &str = "conceptweave-zotero-provider-snapshot-v3";
+const CAPTURED_JSON_SNAPSHOT_DIGEST_DOMAIN: &str =
+    "conceptweave-zotero-captured-json-snapshot-v3";
 const TYPED_SNAPSHOT_DIGEST_DOMAIN: &str = "conceptweave-zotero-typed-snapshot-v3";
 const PROPOSAL_DIGEST_DOMAIN: &str = "conceptweave-classification-proposals-v3";
 
@@ -64,10 +65,11 @@ impl<'de> Deserialize<'de> for Disposition {
     }
 }
 
-/// A provider record captured before projection into the stable public `ZoteroItem` shape.
+/// A raw JSON record captured before projection into the stable public `ZoteroItem` shape.
 ///
-/// The raw JSON stays private so callers cannot mutate it independently of the typed
-/// classifier input. Construct this boundary from provider JSON with `TryFrom<Value>`.
+/// The raw JSON stays private so callers cannot mutate it independently of the typed classifier
+/// input. `TryFrom<Value>` binds the supplied bytes and decoded item but does not authenticate
+/// that the value originated from Zotero or any other provider.
 #[derive(Debug, Clone)]
 pub struct CapturedZoteroItem {
     item: ZoteroItem,
@@ -75,7 +77,7 @@ pub struct CapturedZoteroItem {
 }
 
 impl CapturedZoteroItem {
-    /// Returns the immutable typed classifier input decoded from the captured provider record.
+    /// Returns the immutable typed classifier input decoded from the captured raw record.
     pub fn item(&self) -> &ZoteroItem {
         &self.item
     }
@@ -132,8 +134,8 @@ impl GoldenSnapshot {
 
 /// Classifies an explicitly typed offline fixture and binds exactly those typed inputs.
 ///
-/// This path is for deterministic fixtures or already-controlled typed evidence. It is not a
-/// substitute for provider authenticity because unknown/omitted provider JSON is unavailable.
+/// This path is for deterministic fixtures or already-controlled typed evidence. It does not
+/// prove source provenance because unknown or omitted raw JSON is unavailable.
 pub fn classify_typed_golden_snapshot(
     zotero_version: String,
     server_id: Option<String>,
@@ -155,10 +157,11 @@ pub fn classify_typed_golden_snapshot(
     }
 }
 
-/// Classifies provider-captured records while binding the complete raw JSON and typed inputs.
+/// Classifies caller-captured raw JSON while binding the complete JSON and typed inputs.
 ///
-/// Provider objects are sorted by stable key/revision. JSON object key order is canonicalized,
-/// while array order and omitted-versus-present fields remain meaningful evidence.
+/// Captured objects are sorted by stable key/revision. JSON object key order is canonicalized,
+/// while array order and omitted-versus-present fields remain meaningful evidence. This receipt
+/// proves content binding only; provider origin requires a separate transport-owned attestation.
 pub fn classify_captured_golden_snapshot(
     zotero_version: String,
     server_id: Option<String>,
@@ -179,8 +182,9 @@ pub fn classify_captured_golden_snapshot(
         .iter()
         .map(|captured| (canonical_json(&captured.source_record), &captured.item))
         .collect::<Vec<_>>();
-    let snapshot_bytes = serde_json::to_vec(&(PROVIDER_SNAPSHOT_DIGEST_DOMAIN, bound_records))
-        .expect("captured Zotero inputs are JSON-serializable");
+    let snapshot_bytes =
+        serde_json::to_vec(&(CAPTURED_JSON_SNAPSHOT_DIGEST_DOMAIN, bound_records))
+            .expect("captured Zotero inputs are JSON-serializable");
     let snapshot_digest = sha256(snapshot_bytes);
     let typed_items = items.into_iter().map(|captured| captured.item).collect();
     let report = classify_snapshot(zotero_version, server_id, library_version, typed_items);
