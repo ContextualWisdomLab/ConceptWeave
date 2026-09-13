@@ -22,7 +22,7 @@ Domain code must not import web frameworks, databases, provider SDKs, LLM SDKs, 
 
 ## 4. Source observation contract
 
-Every observed source will eventually carry at least a source snapshot identifier, source kind, immutable content digest, source authority, observed/recorded time, parser/extractor version, tenant/workspace scope when tenancy exists, and bounded source locations for extracted evidence.
+Every observed source will eventually carry at least a source snapshot identifier, source kind, immutable content digest, source authority, observed/recorded time, parser/extractor version, tenant/workspace scope when tenancy exists, and bounded source locations for extracted evidence. A digest proves content identity only; source authority requires evidence from the canonical adapter that actually observed the source.
 
 ## 5. Candidate contract
 
@@ -58,14 +58,16 @@ The Local API reader remains bounded to loopback, API v3, 100 records per page, 
 
 Golden evaluation is layered beside, not inside, the trusted report aggregate. `GoldenSnapshot` pairs one constructor-produced `ClassificationReport` with an immutable item key/revision inventory and a versioned snapshot digest. It exposes the report and evidence through read-only accessors only.
 
-Two source-capture modes are deliberately distinct:
+Two caller-visible content-binding modes are deliberately distinct:
 
-- `CapturedZoteroItem` is the provider/wire boundary. It decodes a complete provider JSON object into the stable public `ZoteroItem { key, version, data }` projection while retaining the raw JSON privately. `classify_captured_golden_snapshot` hashes canonicalized complete provider JSON together with the exact immutable typed classifier input under `conceptweave-zotero-provider-snapshot-v3`. Unknown nested fields, field presence and array order remain bound. JSON object key order does not change identity.
-- `classify_typed_golden_snapshot` is for deterministic offline fixtures or already-controlled typed evidence. It binds the public typed projection under the separate `conceptweave-zotero-typed-snapshot-v3` domain. It does not claim provider authenticity and cannot be substituted for the provider-capture path.
+- `CapturedZoteroItem::try_from(Value)` decodes complete caller-supplied raw JSON into the stable public `ZoteroItem { key, version, data }` projection while retaining the raw JSON privately. `classify_captured_golden_snapshot` hashes canonicalized complete raw JSON together with the exact immutable typed classifier input under `conceptweave-zotero-captured-json-snapshot-v3`. Unknown nested fields, field presence and array order remain bound; JSON object key order does not change identity. Because the constructor is public and caller-supplied, this receipt does **not** authenticate that the bytes came from Zotero.
+- `classify_typed_golden_snapshot` is for deterministic offline fixtures or already-controlled typed evidence. It binds the public typed projection under the separate `conceptweave-zotero-typed-snapshot-v3` domain. It likewise makes no provider-origin claim.
 
-This separation preserves the existing `ZoteroItem` construction contract and prevents unrelated callers from fabricating `source_record=None` as an authenticity signal. Captured raw JSON has no mutable public accessor, so the raw representation and typed classifier input cannot drift independently after capture.
+The raw-capture path preserves the existing `ZoteroItem` construction contract and prevents unrelated callers from fabricating `source_record=None` as an authenticity signal. Captured raw JSON has no mutable public accessor, so the raw representation and typed classifier input cannot drift independently after capture. That integrity property is not source authentication.
 
-`classification_proposal_digest` uses `conceptweave-classification-proposals-v3` and binds the current Research Intake report through read-only accessors: Zotero/API/schema/server/library/rule metadata, observed count, all proposals including truth/publication state and supporting evidence, all retained nonbibliographic records, pending-source coordinates and duplicate-candidate provenance. Canonical ordering makes record-order permutations stable. v1/v2 proposal receipts and the earlier v2 snapshot representation are historical evidence only and require independent reapproval; they are not migrated by local digest recomputation.
+If authenticated Zotero-origin evidence becomes required, a canonical transport adapter that actually observes the Local API response must mint a separate attestation bound to the relevant provider/library/version/server/transport evidence. It may reuse canonical raw-content binding, but a public `Value` constructor or caller-selected digest domain cannot grant source authority. The adapter must reuse Research Intake pagination/budget logic rather than duplicating it.
+
+`classification_proposal_digest` uses `conceptweave-classification-proposals-v3` and binds the current Research Intake report through read-only accessors: Zotero/API/schema/server/library/rule metadata, observed count, all proposals including truth/publication state and supporting evidence, all retained nonbibliographic records, pending-source coordinates and duplicate-candidate provenance. Canonical ordering makes record-order permutations stable. v1/v2 proposal receipts, the earlier v2 snapshot representation, and the superseded Draft `conceptweave-zotero-provider-snapshot-v3` label are historical evidence only and require independent reapproval; they are not migrated by local digest recomputation.
 
 Before governance verification, `validate_classification_report` checks complete unique key/revision inventory, library-version bounds, bibliographic/nonbibliographic partitioning, direct-child coordinates, proposed lifecycle state and recomputed pending ancestry. `evaluate_reviewed_golden_set` then verifies library/rule/snapshot/proposal bindings and rejects blank, duplicate, unknown, stale, abstention-as-truth or otherwise invalid labels. Only after those checks may the caller-owned governance verifier authenticate the complete `ReviewedGoldenSet`.
 
