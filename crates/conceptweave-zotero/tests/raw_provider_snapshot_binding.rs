@@ -3,11 +3,32 @@ use conceptweave_zotero::{
     classify_typed_golden_snapshot, classification_snapshot_digest,
 };
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 
 fn provider_snapshot_digest(raw_item: Value) -> String {
     let item = CapturedZoteroItem::try_from(raw_item).unwrap();
     let snapshot = classify_captured_golden_snapshot("9.0.6".into(), None, 42, vec![item]);
     classification_snapshot_digest(&snapshot)
+}
+
+fn expected_caller_captured_digest(raw_item: Value) -> String {
+    let typed: ZoteroItem = serde_json::from_value(raw_item.clone()).unwrap();
+    let bytes = serde_json::to_vec(&(
+        "conceptweave-zotero-captured-json-snapshot-v3",
+        vec![(raw_item, typed)],
+    ))
+    .unwrap();
+    format!("sha256:{:x}", Sha256::digest(bytes))
+}
+
+#[test]
+fn caller_constructed_capture_uses_non_authenticating_receipt_domain() {
+    let raw = json!({
+        "key": "SYNTH001",
+        "version": 7,
+        "data": {"itemType": "book", "title": "Ontology learning"}
+    });
+    assert_eq!(provider_snapshot_digest(raw.clone()), expected_caller_captured_digest(raw));
 }
 
 #[test]
