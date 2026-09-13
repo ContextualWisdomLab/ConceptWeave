@@ -14,7 +14,7 @@ sha2 = "0.10"
 ureq = { version = "3", default-features = false }
 
 [lib]
-path = "src/lib.rs"
+path = "src/merged_lib.rs"
 
 [[bin]]
 name = "conceptweave-zotero"

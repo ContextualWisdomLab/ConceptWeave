@@ -4,7 +4,6 @@
 //! Deterministic, read-only classification of a Zotero library snapshot.
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::io::Read;
@@ -13,8 +12,9 @@ use std::time::{Duration, Instant};
 /// Classification rule revision recorded in every report.
 pub const RULE_REVISION: &str = "ontology-research-v2";
 
+const PROPOSAL_TRUTH_STATUS: &str = "proposed";
+const PROPOSAL_PUBLICATION_STATE: &str = "proposed";
 const SUPPORTED_API_VERSION: u64 = 3;
-const SNAPSHOT_DIGEST_DOMAIN: &str = "conceptweave-zotero-snapshot-v2";
 const SUPPORTED_API_VERSION_HEADER: &str = "3";
 const PAGE_LIMIT: usize = 100;
 const MAX_PAGE_BYTES: u64 = 8 * 1024 * 1024;
@@ -27,7 +27,7 @@ const LOCAL_API: &str = "http://127.0.0.1:23119/api/users/0/items";
 static TEST_LOCAL_API: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 
 /// A Zotero item returned by the Local API.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ZoteroItem {
     /// Stable item key.
     pub key: String,
@@ -35,38 +35,6 @@ pub struct ZoteroItem {
     pub version: u64,
     /// Item metadata.
     pub data: ItemData,
-    /// Complete original JSON object, captured automatically during deserialization.
-    ///
-    /// Offline callers constructing synthetic typed items use `None`. The digest
-    /// binds this source value together with the actual typed classifier input,
-    /// so later projection changes also invalidate the receipt. It retains omitted fields,
-    /// unknown metadata, nested objects, and array order exactly as observed.
-    #[serde(skip)]
-    pub source_record: Option<serde_json::Value>,
-}
-
-impl<'de> Deserialize<'de> for ZoteroItem {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        struct ItemProjection {
-            key: String,
-            version: u64,
-            data: ItemData,
-        }
-
-        let source_record = serde_json::Value::deserialize(deserializer)?;
-        let projection =
-            ItemProjection::deserialize(&source_record).map_err(serde::de::Error::custom)?;
-        Ok(Self {
-            key: projection.key,
-            version: projection.version,
-            data: projection.data,
-            source_record: Some(source_record),
-        })
-    }
 }
 
 /// Metadata used by the classifier.
@@ -103,7 +71,7 @@ pub struct ItemTag {
 }
 
 /// One mutually exclusive proposed disposition.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Disposition {
     /// Evidence about ontology or taxonomy generation.
@@ -143,6 +111,8 @@ pub struct ClassificationEvidence {
     pub fields: Vec<&'static str>,
     /// Exact snapshot values for matched fields, retained only in the local report.
     pub field_values: BTreeMap<&'static str, String>,
+    /// Exact matching source tag values in source order, deduplicated by value.
+    pub matched_tag_values: Vec<String>,
     /// Rule phrases found in those fields.
     pub matched_phrases: Vec<&'static str>,
 }
@@ -162,10 +132,17 @@ pub struct ClassifiedItem {
     pub collection_keys: Vec<String>,
     /// Tag text observed with the item.
     pub tags: Vec<String>,
+    /// Epistemic status projected from ConceptWeave's canonical lifecycle.
+    pub truth_status: &'static str,
+    /// Governance publication state projected from ConceptWeave's canonical lifecycle.
+    pub publication_state: &'static str,
     /// Proposed disposition; never an authoritative governance decision.
     pub proposed_disposition: Disposition,
     /// Deterministic reason for abstention, absent when a rule proposes a disposition.
     pub abstention_reason: Option<AbstentionReason>,
+    /// Original nonblank abstract retained only when a steward must replay an abstention.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_abstract_note: Option<String>,
     /// Deterministic supporting evidence.
     pub evidence: ClassificationEvidence,
     /// Child note and attachment keys linked to the top-level item.
@@ -183,372 +160,254 @@ pub struct DuplicateCandidate {
     pub normalized_identity: String,
     /// Zotero item keys sharing the identity.
     pub item_keys: Vec<String>,
+    /// Exact source identity value observed for each item in the immutable snapshot.
+    pub source_identity_values: BTreeMap<String, String>,
 }
 
 /// Complete local classification report for one immutable library version.
+///
+/// Its snapshot identity and inventory are constructor-bound. Callers can read
+/// them through accessors but cannot construct or mutate a trusted report.
+///
+/// ```compile_fail
+/// # use conceptweave_zotero::{ClassificationReport, classify_snapshot};
+/// let mut report = classify_snapshot("10.0.1".into(), None, 1, Vec::new());
+/// report.library_version = 2;
+/// ```
 #[derive(Debug, Serialize)]
 pub struct ClassificationReport {
     /// Zotero desktop version that served the snapshot.
-    pub zotero_version: String,
+    zotero_version: String,
     /// Requested and observed Local API version for a live read.
-    pub api_version: Option<u64>,
+    api_version: Option<u64>,
     /// Zotero schema revision observed consistently across a live read.
-    pub schema_version: Option<u64>,
+    schema_version: Option<u64>,
     /// Local API server identifier observed on every page when supplied.
-    pub server_id: Option<String>,
+    server_id: Option<String>,
     /// Library version shared by every fetched page.
-    pub library_version: u64,
+    library_version: u64,
     /// Rule revision used for all proposals.
-    pub rule_revision: &'static str,
+    rule_revision: &'static str,
     /// Number of items read, including child notes and attachments.
-    pub observed_item_count: usize,
-    /// Complete item-revision identity of every observed record.
-    pub snapshot_items: Vec<SnapshotItemRevision>,
-    /// Canonical SHA-256 digest of every observed raw Zotero item.
-    pub snapshot_digest: String,
+    observed_item_count: usize,
     /// One proposal for every top-level bibliographic item.
-    pub classified_items: Vec<ClassifiedItem>,
+    classified_items: Vec<ClassifiedItem>,
     /// Metadata for every remaining record, sorted by its original key.
     ///
     /// Together with `classified_items`, this accounts for all observed items.
     /// Notes, attachments and annotations remain evidence, not paper proposals.
     /// Only the fields represented by `ItemData` are retained; this is not a
     /// full-text capture or a lossless copy of the provider's original JSON.
-    pub unclassified_items: Vec<ZoteroItem>,
+    unclassified_items: Vec<ZoteroItem>,
     /// Sorted keys whose parent chain does not reach a bibliographic proposal.
     ///
     /// Standalone sources, their descendants, orphan trees and cycles remain
     /// pending. An empty list proves only parent-link accounting for this input,
     /// never research completion, semantic approval or permission to write.
-    pub pending_source_item_keys: Vec<String>,
+    pending_source_item_keys: Vec<String>,
     /// Reversible DOI/title duplicate candidates.
-    pub duplicate_candidates: Vec<DuplicateCandidate>,
+    duplicate_candidates: Vec<DuplicateCandidate>,
 }
 
-/// One steward-reviewed expected disposition in a local golden set.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct GoldenLabel {
-    /// Zotero item key used only to join the local report and local review set.
-    pub item_key: String,
-    /// Steward-approved disposition used as evaluation truth.
-    pub expected_disposition: Disposition,
-}
+impl ClassificationReport {
+    /// Returns the Zotero desktop version that served this snapshot.
+    pub fn zotero_version(&self) -> &str {
+        &self.zotero_version
+    }
 
-impl GoldenLabel {
-    /// Creates a local golden label.
-    pub fn new(item_key: impl Into<String>, expected_disposition: Disposition) -> Self {
-        Self {
-            item_key: item_key.into(),
-            expected_disposition,
-        }
+    /// Returns the Local API version observed for a live read.
+    pub fn api_version(&self) -> Option<u64> {
+        self.api_version
+    }
+
+    /// Returns the Zotero schema revision observed for a live read.
+    pub fn schema_version(&self) -> Option<u64> {
+        self.schema_version
+    }
+
+    /// Returns the Local API server identity when the provider supplied one.
+    pub fn server_id(&self) -> Option<&str> {
+        self.server_id.as_deref()
+    }
+
+    /// Returns the library revision shared by the complete snapshot.
+    pub fn library_version(&self) -> u64 {
+        self.library_version
+    }
+
+    /// Returns the classifier rule revision used for every proposal.
+    pub fn rule_revision(&self) -> &str {
+        self.rule_revision
+    }
+
+    /// Returns the number of records observed in the snapshot.
+    pub fn observed_item_count(&self) -> usize {
+        self.observed_item_count
+    }
+
+    /// Returns the bibliographic classification proposals in canonical order.
+    pub fn classified_items(&self) -> &[ClassifiedItem] {
+        &self.classified_items
+    }
+
+    /// Returns the retained nonbibliographic source inventory.
+    pub fn unclassified_items(&self) -> &[ZoteroItem] {
+        &self.unclassified_items
+    }
+
+    /// Returns the canonical pending-source key sequence.
+    pub fn pending_source_item_keys(&self) -> &[String] {
+        &self.pending_source_item_keys
+    }
+
+    /// Returns the reversible duplicate candidates detected in this snapshot.
+    pub fn duplicate_candidates(&self) -> &[DuplicateCandidate] {
+        &self.duplicate_candidates
     }
 }
 
-/// Version-bound steward labels that remain outside the repository.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct ReviewedGoldenSet {
-    /// Approval receipt verified by the caller's governance boundary.
-    pub approval: GoldenSetApproval,
-    /// Item-level expected dispositions.
-    pub labels: Vec<GoldenLabel>,
+/// An explicit, non-authoritative outcome for one pending source record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceResolutionDisposition {
+    /// Keep the source as independent evidence without changing Zotero.
+    RetainStandaloneEvidence,
+    /// Record that a separately authorized rebind is required.
+    RebindRequiresSeparateAuthorization,
+    /// Exclude the source from the research scope with the recorded reason.
+    ExcludeFromResearchScope,
 }
 
-/// One item revision in the exact reviewed classification snapshot.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
-pub struct SnapshotItemRevision {
+/// One exact-snapshot decision for a record in `pending_source_item_keys`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct PendingSourceResolution {
     /// Stable Zotero item key.
     pub item_key: String,
-    /// Item revision observed during review.
+    /// Item revision observed in the report.
     pub item_version: u64,
+    /// Library revision that contained this item.
+    pub library_version: u64,
+    /// Item type observed in the report.
+    pub item_type: String,
+    /// Parent key observed in the report, if any.
+    pub parent_item_key: String,
+    /// Explicit steward disposition; it never writes or rebinds a source.
+    pub disposition: SourceResolutionDisposition,
+    /// Human-readable reason required for every disposition.
+    pub reason: String,
 }
 
-/// Governance receipt binding a steward approval to exact input and proposals.
+/// Complete source-resolution aggregate bound to one classification snapshot.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct GoldenSetApproval {
-    /// Opaque receipt identifier.
-    pub receipt_id: String,
-    /// Stable reviewer subject understood by the governance verifier.
-    pub reviewer_subject: String,
-    /// Zotero library version reviewed by the steward.
+pub struct SourceResolutionReview {
+    /// Zotero desktop version that served the snapshot.
+    pub zotero_version: String,
+    /// Local API server identity, when supplied by the snapshot.
+    pub server_id: Option<String>,
+    /// Library version shared by the snapshot.
     pub library_version: u64,
-    /// Classifier rule revision whose proposals were reviewed.
+    /// Rule revision used for the associated classification report.
     pub rule_revision: String,
-    /// Immutable digest over the approved snapshot, verified by the caller.
-    pub snapshot_digest: String,
-    /// Digest of the actual proposal records reviewed and verified by the caller.
-    pub proposal_digest: String,
-    /// Complete sorted item-revision identity of the reviewed report.
-    pub snapshot_items: Vec<SnapshotItemRevision>,
+    /// One resolution for every pending source, sorted by item key.
+    pub resolved_sources: Vec<PendingSourceResolution>,
 }
 
-/// Computes the canonical content identity verified by a golden-set approval.
-pub fn classification_snapshot_digest(report: &ClassificationReport) -> String {
-    report.snapshot_digest.clone()
+/// Failure raised when source resolutions do not exactly match a report.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SourceResolutionError {
+    /// A pending source has no decision.
+    Missing(String),
+    /// A decision refers to a record outside the pending set.
+    Unknown(String),
+    /// More than one decision was supplied for one source key.
+    Duplicate(String),
+    /// A decision's source identity differs from the immutable report.
+    Stale(String),
+    /// A decision has no explanatory reason.
+    BlankReason(String),
+    /// The report's pending key is absent from its retained inventory.
+    MissingInventory(String),
 }
 
-/// Computes the versioned SHA-256 identity of the report's current proposals.
-///
-/// Every proposal field is covered, including its prediction, evidence, and item
-/// revision, plus unclassified metadata and pending source identities. This is
-/// not a full-text backup. Records are sorted by item key and revision so ordering does
-/// not change their identity. No second source snapshot is stored. Governance
-/// must bind this value when issuing an approval; recomputing it alone grants no
-/// authority. Evaluation recomputes it rather than trusting report metadata.
-pub fn classification_proposal_digest(report: &ClassificationReport) -> String {
-    let mut proposals = report.classified_items.iter().collect::<Vec<_>>();
-    proposals.sort_by_key(|item| (&item.item_key, item.item_version));
-    let mut source_items = report.unclassified_items.iter().collect::<Vec<_>>();
-    source_items.sort_by_key(|item| (&item.key, item.version));
-    let mut pending_keys = report.pending_source_item_keys.iter().collect::<Vec<_>>();
-    pending_keys.sort();
-    let proposal_bytes = serde_json::to_vec(&(
-        "conceptweave-classification-proposals-v2",
-        proposals,
-        source_items,
-        pending_keys,
-    ))
-    .expect("classification proposal records contain only JSON-serializable values");
-    format!("sha256:{:x}", Sha256::digest(proposal_bytes))
-}
-
-/// Integer evidence from which precision and recall can be calculated exactly.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
-pub struct DispositionEvaluation {
-    /// Correct predictions for this disposition.
-    pub true_positive: usize,
-    /// All classifier predictions for reviewed items in this disposition.
-    pub predicted: usize,
-    /// All steward labels expecting this disposition.
-    pub expected: usize,
-}
-
-/// Aggregate-only evaluation result; item keys and bibliographic text are omitted.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct GoldenSetEvaluation {
-    /// Opaque review receipt identifier.
-    pub review_id: String,
-    /// Zotero library revision bound to the verified receipt.
-    pub library_version: u64,
-    /// Classifier revision bound to the verified receipt.
-    pub rule_revision: String,
-    /// Opaque immutable snapshot digest from the verified receipt.
-    pub snapshot_digest: String,
-    /// Opaque digest binding the exact proposal records used for these counts.
-    pub proposal_digest: String,
-    /// Number of steward-reviewed items.
-    pub reviewed_count: usize,
-    /// Number of exact disposition matches.
-    pub correct_count: usize,
-    /// Number of reviewed items on which the classifier abstained.
-    pub abstention_count: usize,
-    /// Precision/recall numerators and denominators per observed disposition.
-    pub by_disposition: BTreeMap<Disposition, DispositionEvaluation>,
-}
-
-/// A fail-closed golden-set contract violation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EvaluationError {
-    /// Review receipt, labels, or revisions are missing or incompatible.
-    InvalidReview,
-    /// The golden set was reviewed against another library or rule revision.
-    SnapshotMismatch,
-    /// The caller's governance boundary did not verify the approval receipt.
-    UnverifiedApproval,
-    /// Abstention cannot be used as steward-approved semantic truth.
-    InvalidExpectedDisposition,
-    /// A reviewed key is absent from the classification report.
-    UnknownItem,
-    /// A reviewed key occurs more than once.
-    DuplicateItem,
-}
-
-impl fmt::Display for EvaluationError {
+impl fmt::Display for SourceResolutionError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Self::InvalidReview => "golden-set review metadata or labels are invalid",
-            Self::SnapshotMismatch => "golden set does not match the report snapshot",
-            Self::UnverifiedApproval => "golden-set approval receipt is unverified",
-            Self::InvalidExpectedDisposition => {
-                "steward truth cannot use the classifier abstention disposition"
+        match self {
+            Self::Missing(key) => write!(formatter, "pending source lacks resolution: {key}"),
+            Self::Unknown(key) => {
+                write!(formatter, "resolution is not pending in the report: {key}")
             }
-            Self::UnknownItem => "golden set contains an item absent from the report",
-            Self::DuplicateItem => "golden set contains a duplicate item",
+            Self::Duplicate(key) => {
+                write!(formatter, "pending source has duplicate resolutions: {key}")
+            }
+            Self::Stale(key) => write!(
+                formatter,
+                "resolution does not match report source identity: {key}"
+            ),
+            Self::BlankReason(key) => write!(formatter, "source resolution reason is blank: {key}"),
+            Self::MissingInventory(key) => write!(
+                formatter,
+                "pending source is absent from report inventory: {key}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for SourceResolutionError {}
+
+/// Builds a complete source-resolution aggregate without mutating Zotero.
+pub fn prepare_source_resolution_review(
+    report: &ClassificationReport,
+    mut resolutions: Vec<PendingSourceResolution>,
+) -> Result<SourceResolutionReview, SourceResolutionError> {
+    let pending: BTreeMap<_, _> = report
+        .pending_source_item_keys
+        .iter()
+        .map(|key| {
+            Ok((
+                key,
+                report
+                    .unclassified_items
+                    .iter()
+                    .find(|item| &item.key == key)
+                    .ok_or_else(|| SourceResolutionError::MissingInventory(key.clone()))?,
+            ))
         })
-    }
-}
-
-impl std::error::Error for EvaluationError {}
-
-/// Checks that every observed item belongs to exactly one report partition.
-///
-/// Child links and unresolved source keys are recomputed from preserved metadata.
-/// Orphans and disconnected cycles remain valid pending evidence. This checks
-/// internal consistency, not source authenticity or independent approval.
-pub fn validate_classification_report(
-    report: &ClassificationReport,
-) -> Result<(), EvaluationError> {
-    let invalid = EvaluationError::InvalidReview;
-    if report.observed_item_count != report.snapshot_items.len()
-        || report
-            .classified_items
-            .len()
-            .checked_add(report.unclassified_items.len())
-            != Some(report.observed_item_count)
-    {
-        return Err(invalid);
-    }
-    let mut remaining_items = BTreeMap::new();
-    for item in &report.snapshot_items {
-        if item.item_key.trim().is_empty()
-            || item.item_version > report.library_version
-            || remaining_items
-                .insert(item.item_key.as_str(), item.item_version)
-                .is_some()
-        {
-            return Err(invalid);
-        }
-    }
-    let children = child_index(&report.unclassified_items);
-    for item in &report.classified_items {
-        let mut reported_children = item.child_item_keys.clone();
-        reported_children.sort();
-        let mut actual_children = children.get(&item.item_key).cloned().unwrap_or_default();
-        actual_children.sort();
-        if item.item_type.trim().is_empty()
-            || matches!(
-                item.item_type.as_str(),
-                "attachment" | "note" | "annotation"
-            )
-            || remaining_items.remove(item.item_key.as_str()) != Some(item.item_version)
-            || reported_children != actual_children
-        {
-            return Err(invalid);
-        }
-    }
-    for item in &report.unclassified_items {
-        if item.data.item_type.trim().is_empty()
-            || is_bibliographic(item)
-            || remaining_items.remove(item.key.as_str()) != Some(item.version)
-        {
-            return Err(invalid);
-        }
-    }
-    let mut reported_pending = report.pending_source_item_keys.clone();
-    reported_pending.sort();
-    // Equal partition size and one successful removal per record prove completeness.
-    if reported_pending
-        != pending_source_keys(
-            &report.classified_items,
-            &report.unclassified_items,
-            children,
-        )
-    {
-        return Err(invalid);
-    }
-    Ok(())
-}
-
-/// Evaluates reviewed labels without copying item identities into the result.
-///
-/// Structural, source, proposal, and label validation run before governance is
-/// contacted. The verifier must authenticate the complete reviewed set against
-/// an independently issued receipt, including both digests and every label;
-/// accepting a self-declared receipt identifier or digest is not verification.
-pub fn evaluate_reviewed_golden_set<F>(
-    report: &ClassificationReport,
-    golden: &ReviewedGoldenSet,
-    verify_approval: F,
-) -> Result<GoldenSetEvaluation, EvaluationError>
-where
-    F: FnOnce(&ReviewedGoldenSet) -> bool,
-{
-    validate_classification_report(report)?;
-    if golden.approval.receipt_id.trim().is_empty()
-        || golden.approval.reviewer_subject.trim().is_empty()
-        || golden.labels.is_empty()
-        || golden.approval.rule_revision.trim().is_empty()
-        || golden.approval.snapshot_digest.trim().is_empty()
-        || golden.approval.proposal_digest.trim().is_empty()
-    {
-        return Err(EvaluationError::InvalidReview);
-    }
-    let report_snapshot = report
-        .snapshot_items
-        .iter()
-        .cloned()
-        .collect::<BTreeSet<_>>();
-    let approved_snapshot = golden
-        .approval
-        .snapshot_items
-        .iter()
-        .cloned()
-        .collect::<BTreeSet<_>>();
-    if approved_snapshot.len() != golden.approval.snapshot_items.len() {
-        return Err(EvaluationError::InvalidReview);
-    }
-    if golden.approval.library_version != report.library_version
-        || golden.approval.rule_revision != report.rule_revision
-        || golden.approval.snapshot_digest != classification_snapshot_digest(report)
-        || approved_snapshot != report_snapshot
-    {
-        return Err(EvaluationError::SnapshotMismatch);
-    }
-
-    let classified = report
-        .classified_items
-        .iter()
-        .map(|item| (item.item_key.as_str(), item.proposed_disposition))
-        .collect::<BTreeMap<_, _>>();
-    if golden.approval.proposal_digest != classification_proposal_digest(report) {
-        return Err(EvaluationError::SnapshotMismatch);
-    }
+        .collect::<Result<BTreeMap<_, _>, SourceResolutionError>>()?;
     let mut seen = BTreeSet::new();
-    let mut correct_count = 0;
-    let mut abstention_count = 0;
-    let mut by_disposition = BTreeMap::<Disposition, DispositionEvaluation>::new();
-
-    for label in &golden.labels {
-        if label.item_key.trim().is_empty() {
-            return Err(EvaluationError::InvalidReview);
+    for resolution in &resolutions {
+        if !seen.insert(resolution.item_key.as_str()) {
+            return Err(SourceResolutionError::Duplicate(
+                resolution.item_key.clone(),
+            ));
         }
-        if label.expected_disposition == Disposition::NeedsStewardReview {
-            return Err(EvaluationError::InvalidExpectedDisposition);
+        let Some(source) = pending.get(&resolution.item_key) else {
+            return Err(SourceResolutionError::Unknown(resolution.item_key.clone()));
+        };
+        if resolution.reason.trim().is_empty() {
+            return Err(SourceResolutionError::BlankReason(
+                resolution.item_key.clone(),
+            ));
         }
-        if !seen.insert(label.item_key.as_str()) {
-            return Err(EvaluationError::DuplicateItem);
-        }
-        let predicted = classified
-            .get(label.item_key.as_str())
-            .copied()
-            .ok_or(EvaluationError::UnknownItem)?;
-        by_disposition.entry(predicted).or_default().predicted += 1;
-        by_disposition
-            .entry(label.expected_disposition)
-            .or_default()
-            .expected += 1;
-        if predicted == label.expected_disposition {
-            correct_count += 1;
-            by_disposition.entry(predicted).or_default().true_positive += 1;
-        }
-        if predicted == Disposition::NeedsStewardReview {
-            abstention_count += 1;
+        if resolution.library_version != report.library_version
+            || resolution.item_version != source.version
+            || resolution.item_type != source.data.item_type
+            || resolution.parent_item_key != source.data.parent_item
+        {
+            return Err(SourceResolutionError::Stale(resolution.item_key.clone()));
         }
     }
-
-    if !verify_approval(golden) {
-        return Err(EvaluationError::UnverifiedApproval);
+    for key in pending.keys() {
+        if !seen.contains(key.as_str()) {
+            return Err(SourceResolutionError::Missing((*key).clone()));
+        }
     }
-
-    Ok(GoldenSetEvaluation {
-        review_id: golden.approval.receipt_id.clone(),
-        library_version: golden.approval.library_version,
-        rule_revision: golden.approval.rule_revision.clone(),
-        snapshot_digest: golden.approval.snapshot_digest.clone(),
-        proposal_digest: golden.approval.proposal_digest.clone(),
-        reviewed_count: golden.labels.len(),
-        correct_count,
-        abstention_count,
-        by_disposition,
+    resolutions.sort_by(|left, right| left.item_key.cmp(&right.item_key));
+    Ok(SourceResolutionReview {
+        zotero_version: report.zotero_version.clone(),
+        server_id: report.server_id.clone(),
+        library_version: report.library_version,
+        rule_revision: report.rule_revision.to_owned(),
+        resolved_sources: resolutions,
     })
 }
 
@@ -603,7 +462,8 @@ struct FetchedPage {
 ///
 /// Snapshot consistency, resource budgets, API-version validation, pagination,
 /// and duplicate-key checks live in an injectable reader core. Only the narrow
-/// ureq transport shim is excluded from deterministic coverage.
+/// Local API request/header/body path are exercised through the deterministic
+/// loopback transport regressions.
 /// No page starts or completed report is accepted at or beyond five minutes.
 /// An in-flight request may finish later under its existing per-request limits;
 /// its late result is rejected, not returned as a partial snapshot.
@@ -620,25 +480,35 @@ pub fn read_local_snapshot() -> Result<ClassificationReport, ReadError> {
     read_snapshot_with(&mut |start| fetch_local_page(&agent, start))
 }
 
-fn local_api_base() -> String {
-    #[cfg(test)]
-    {
-        if let Some(value) = TEST_LOCAL_API
-            .lock()
-            .expect("test Local API lock must not be poisoned")
-            .clone()
-        {
-            return value;
-        }
-    }
-    LOCAL_API.to_owned()
+fn is_valid_zotero_object_key(value: &str) -> bool {
+    value.len() == 8
+        && value
+            .bytes()
+            .all(|byte| matches!(byte, b'2'..=b'9' | b'A'..=b'N' | b'P'..=b'Z'))
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
+fn validate_source_item_keys(items: &[ZoteroItem]) -> Result<(), ReadError> {
+    if items
+        .iter()
+        .all(|item| is_valid_zotero_object_key(&item.key))
+    {
+        Ok(())
+    } else {
+        Err(ReadError::SnapshotChanged)
+    }
+}
+
 fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, ReadError> {
+    let local_api = LOCAL_API.to_owned();
+    #[cfg(test)]
+    let local_api = TEST_LOCAL_API
+        .lock()
+        .expect("test Local API lock must not be poisoned")
+        .clone()
+        .unwrap_or(local_api);
     let url = format!(
         "{}?format=json&include=data&limit={PAGE_LIMIT}&start={start}",
-        local_api_base()
+        local_api
     );
     let mut response = agent
         .get(&url)
@@ -647,6 +517,9 @@ fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, Re
         .map_err(|error| ReadError::Http(error.to_string()))?;
     let headers = response.headers();
     let total = header_u64(headers, "Total-Results")?;
+    #[cfg(target_pointer_width = "64")]
+    let total = total as usize;
+    #[cfg(not(target_pointer_width = "64"))]
     let total = usize::try_from(total).map_err(|_| ReadError::Budget("item-count"))?;
     let library_version = header_u64(headers, "Last-Modified-Version")?;
     let zotero_version = header_string(headers, "X-Zotero-Version")?;
@@ -656,8 +529,9 @@ fn fetch_local_page(agent: &ureq::Agent, start: usize) -> Result<FetchedPage, Re
 
     let body = read_bounded_response_text(&mut response, MAX_PAGE_BYTES)
         .map_err(|error| ReadError::Body(error.to_string()))?;
-    let body_bytes = u64::try_from(body.len()).map_err(|_| ReadError::Budget("byte-count"))?;
-    let items = serde_json::from_str(&body).map_err(ReadError::Json)?;
+    let body_bytes = body.len() as u64;
+    let items: Vec<ZoteroItem> = serde_json::from_str(&body).map_err(ReadError::Json)?;
+    validate_source_item_keys(&items)?;
 
     Ok(FetchedPage {
         total,
@@ -691,19 +565,16 @@ fn read_bounded_response_text(
     Ok(body)
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
 fn header_u64(headers: &ureq::http::HeaderMap, name: &'static str) -> Result<u64, ReadError> {
     header_string(headers, name)?
         .parse()
         .map_err(|_| ReadError::Header(name))
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
 fn header_string(headers: &ureq::http::HeaderMap, name: &'static str) -> Result<String, ReadError> {
     optional_header(headers, name).ok_or(ReadError::Header(name))
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
 fn optional_header(headers: &ureq::http::HeaderMap, name: &'static str) -> Option<String> {
     headers.get(name)?.to_str().ok().map(str::to_owned)
 }
@@ -847,21 +718,7 @@ pub fn classify_snapshot(
     mut items: Vec<ZoteroItem>,
 ) -> ClassificationReport {
     items.sort_by(|left, right| left.key.cmp(&right.key));
-    let snapshot_items = items
-        .iter()
-        .map(|item| SnapshotItemRevision {
-            item_key: item.key.clone(),
-            item_version: item.version,
-        })
-        .collect();
-    let snapshot_records: Vec<_> = items
-        .iter()
-        .map(|item| (&item.source_record, item))
-        .collect();
-    let snapshot_bytes = serde_json::to_vec(&(SNAPSHOT_DIGEST_DOMAIN, snapshot_records))
-        .expect("Zotero snapshot items contain only JSON-compatible values");
-    let snapshot_digest = format!("sha256:{:x}", Sha256::digest(snapshot_bytes));
-    let children = child_index(&items);
+    let mut children = child_index(&items);
     let bibliographic: Vec<&ZoteroItem> =
         items.iter().filter(|item| is_bibliographic(item)).collect();
     let duplicate_candidates = duplicate_candidates(&bibliographic);
@@ -874,31 +731,6 @@ pub fn classify_snapshot(
         .into_iter()
         .filter(|item| !is_bibliographic(item))
         .collect();
-    let pending_source_item_keys =
-        pending_source_keys(&classified_items, &unclassified_items, children);
-
-    ClassificationReport {
-        zotero_version,
-        api_version: None,
-        schema_version: None,
-        server_id,
-        library_version,
-        rule_revision: RULE_REVISION,
-        observed_item_count,
-        snapshot_items,
-        snapshot_digest,
-        classified_items,
-        unclassified_items,
-        pending_source_item_keys,
-        duplicate_candidates,
-    }
-}
-
-fn pending_source_keys(
-    classified_items: &[ClassifiedItem],
-    unclassified_items: &[ZoteroItem],
-    mut children: BTreeMap<String, Vec<String>>,
-) -> Vec<String> {
     let mut pending_source_item_keys: BTreeSet<_> = unclassified_items
         .iter()
         .map(|item| item.key.clone())
@@ -914,7 +746,19 @@ fn pending_source_keys(
         }
     }
 
-    pending_source_item_keys.into_iter().collect()
+    ClassificationReport {
+        zotero_version,
+        api_version: None,
+        schema_version: None,
+        server_id,
+        library_version,
+        rule_revision: RULE_REVISION,
+        observed_item_count,
+        classified_items,
+        unclassified_items,
+        pending_source_item_keys: pending_source_item_keys.into_iter().collect(),
+        duplicate_candidates,
+    }
 }
 
 fn is_bibliographic(item: &ZoteroItem) -> bool {
@@ -942,23 +786,27 @@ fn child_index(items: &[ZoteroItem]) -> BTreeMap<String, Vec<String>> {
 fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedItem {
     let title_normalized = item.data.title.to_lowercase();
     let abstract_normalized = item.data.abstract_note.to_lowercase();
-    let tags_original = item
+    let tags_normalized = item
         .data
         .tags
         .iter()
-        .map(|tag| tag.tag.as_str())
-        .collect::<Vec<_>>()
-        .join(" ");
-    let tags_normalized = tags_original.to_lowercase();
-    let fields = [
+        .map(|tag| tag.tag.to_lowercase())
+        .collect::<Vec<_>>();
+    let mut fields = vec![
         ("title", title_normalized.as_str(), item.data.title.as_str()),
         (
             "abstract_note",
             abstract_normalized.as_str(),
             item.data.abstract_note.as_str(),
         ),
-        ("tags", tags_normalized.as_str(), tags_original.as_str()),
     ];
+    fields.extend(
+        item.data
+            .tags
+            .iter()
+            .zip(tags_normalized.iter())
+            .map(|(tag, normalized)| ("tags", normalized.as_str(), tag.tag.as_str())),
+    );
 
     let specific_rules = [
         (
@@ -1015,11 +863,12 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
     let mut matched_dispositions = Vec::new();
     let mut matched_fields = BTreeSet::new();
     let mut field_values = BTreeMap::new();
+    let mut matched_tag_value_set = BTreeSet::new();
     let mut matched_phrases = BTreeSet::new();
 
     for (candidate, phrases) in specific_rules {
         let mut family_matched = false;
-        for (field, normalized, original) in fields {
+        for &(field, normalized, original) in &fields {
             for phrase in phrases {
                 if contains_phrase(normalized, phrase) {
                     family_matched = true;
@@ -1027,6 +876,9 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
                     field_values
                         .entry(field)
                         .or_insert_with(|| original.to_owned());
+                    if field == "tags" {
+                        matched_tag_value_set.insert(original.to_owned());
+                    }
                     matched_phrases.insert(*phrase);
                 }
             }
@@ -1038,13 +890,16 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
 
     let (proposed_disposition, abstention_reason) = match matched_dispositions.as_slice() {
         [] => {
-            for (field, normalized, original) in fields {
+            for &(field, normalized, original) in &fields {
                 for phrase in adjacent_phrases {
                     if contains_phrase(normalized, phrase) {
                         matched_fields.insert(field);
                         field_values
                             .entry(field)
                             .or_insert_with(|| original.to_owned());
+                        if field == "tags" {
+                            matched_tag_value_set.insert(original.to_owned());
+                        }
                         matched_phrases.insert(phrase);
                     }
                 }
@@ -1064,6 +919,21 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
             Some(AbstentionReason::ConflictingDispositionEvidence),
         ),
     };
+    let review_abstract_note = (proposed_disposition == Disposition::NeedsStewardReview
+        && !item.data.abstract_note.trim().is_empty()
+        && !field_values.contains_key("abstract_note"))
+    .then(|| item.data.abstract_note.clone());
+    let mut seen_matched_tag_values = BTreeSet::new();
+    let matched_tag_values = item
+        .data
+        .tags
+        .iter()
+        .filter(|tag| {
+            matched_tag_value_set.contains(&tag.tag)
+                && seen_matched_tag_values.insert(tag.tag.clone())
+        })
+        .map(|tag| tag.tag.clone())
+        .collect();
 
     ClassifiedItem {
         item_key: item.key.clone(),
@@ -1072,11 +942,15 @@ fn classify_item(item: &ZoteroItem, child_item_keys: Vec<String>) -> ClassifiedI
         title: item.data.title.clone(),
         collection_keys: item.data.collections.clone(),
         tags: item.data.tags.iter().map(|tag| tag.tag.clone()).collect(),
+        truth_status: PROPOSAL_TRUTH_STATUS,
+        publication_state: PROPOSAL_PUBLICATION_STATE,
         proposed_disposition,
         abstention_reason,
+        review_abstract_note,
         evidence: ClassificationEvidence {
             fields: matched_fields.into_iter().collect(),
             field_values,
+            matched_tag_values,
             matched_phrases: matched_phrases.into_iter().collect(),
         },
         child_item_keys,
@@ -1091,11 +965,15 @@ fn classify_abstention_reason(fields: &[(&'static str, &str, &str)]) -> Abstenti
     {
         return AbstentionReason::MissingClassificationMetadata;
     }
-    if fields.iter().any(|(_, _, original)| {
+    let has_alphabetic = fields
+        .iter()
+        .any(|(_, _, original)| original.chars().any(|character| character.is_alphabetic()));
+    let has_ascii_alphabetic = fields.iter().any(|(_, _, original)| {
         original
             .chars()
-            .any(|character| character.is_alphabetic() && !character.is_ascii())
-    }) {
+            .any(|character| character.is_ascii_alphabetic())
+    });
+    if has_alphabetic && !has_ascii_alphabetic {
         return AbstentionReason::UnsupportedRuleVocabulary;
     }
     AbstentionReason::NoDeterministicRuleMatch
@@ -1111,44 +989,48 @@ fn contains_phrase(value: &str, phrase: &str) -> bool {
 }
 
 fn duplicate_candidates(items: &[&ZoteroItem]) -> Vec<DuplicateCandidate> {
-    let mut identities: BTreeMap<(&'static str, String), Vec<String>> = BTreeMap::new();
+    type DuplicateGroup = (Vec<String>, BTreeMap<String, String>);
+    let mut identities: BTreeMap<(&'static str, String), DuplicateGroup> = BTreeMap::new();
     for item in items {
         if let Some(doi) = normalize_doi(&item.data.doi) {
-            identities
-                .entry(("doi", doi))
-                .or_default()
-                .push(item.key.clone());
+            let (item_keys, source_identity_values) = identities.entry(("doi", doi)).or_default();
+            item_keys.push(item.key.clone());
+            source_identity_values.insert(item.key.clone(), item.data.doi.clone());
         }
         if let Some(title) = normalize_title(&item.data.title) {
-            identities
-                .entry(("title", title))
-                .or_default()
-                .push(item.key.clone());
+            let (item_keys, source_identity_values) =
+                identities.entry(("title", title)).or_default();
+            item_keys.push(item.key.clone());
+            source_identity_values.insert(item.key.clone(), item.data.title.clone());
         }
     }
     identities
         .into_iter()
-        .filter_map(|((identity_kind, normalized_identity), item_keys)| {
-            (item_keys.len() > 1).then_some(DuplicateCandidate {
-                identity_kind,
-                normalized_identity,
-                item_keys,
-            })
-        })
+        .filter_map(
+            |((identity_kind, normalized_identity), (item_keys, source_identity_values))| {
+                (item_keys.len() > 1).then_some(DuplicateCandidate {
+                    identity_kind,
+                    normalized_identity,
+                    item_keys,
+                    source_identity_values,
+                })
+            },
+        )
         .collect()
 }
 
 fn normalize_doi(value: &str) -> Option<String> {
-    let normalized = value.trim().to_lowercase();
-    let normalized = normalized
+    let mut normalized = value.trim().to_lowercase();
+    while let Some(stripped) = normalized
         .strip_prefix("https://doi.org/")
         .or_else(|| normalized.strip_prefix("http://doi.org/"))
         .or_else(|| normalized.strip_prefix("https://dx.doi.org/"))
         .or_else(|| normalized.strip_prefix("http://dx.doi.org/"))
         .or_else(|| normalized.strip_prefix("doi:"))
-        .unwrap_or(&normalized)
-        .trim();
-    (!normalized.is_empty()).then(|| normalized.to_owned())
+    {
+        normalized = stripped.trim().to_owned();
+    }
+    (!normalized.is_empty()).then_some(normalized)
 }
 
 fn normalize_title(value: &str) -> Option<String> {
@@ -1193,8 +1075,34 @@ mod tests {
                 collections: vec![],
                 tags: vec![],
             },
-            source_record: None,
         }
+    }
+
+    #[test]
+    fn source_resolution_rejects_owner_internal_inventory_drift() {
+        let mut report = classify_snapshot(
+            "10.0.1".into(),
+            Some("local-server".into()),
+            7,
+            vec![item("SOURCE", "attachment", "", "", "")],
+        );
+        report.unclassified_items.clear();
+
+        assert!(matches!(
+            prepare_source_resolution_review(
+                &report,
+                vec![PendingSourceResolution {
+                    item_key: "SOURCE".into(),
+                    item_version: 7,
+                    library_version: 7,
+                    item_type: "attachment".into(),
+                    parent_item_key: String::new(),
+                    disposition: SourceResolutionDisposition::RetainStandaloneEvidence,
+                    reason: "keep".into(),
+                }]
+            ),
+            Err(SourceResolutionError::MissingInventory(key)) if key == "SOURCE"
+        ));
     }
 
     fn fetched_page(total: usize, items: Vec<ZoteroItem>) -> FetchedPage {
@@ -1220,11 +1128,20 @@ mod tests {
 
         let server = thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
-            let mut request = vec![0_u8; 4096];
-            let read = stream.read(&mut request).unwrap();
-            let request = String::from_utf8_lossy(&request[..read]).to_lowercase();
+            let mut request = Vec::new();
+            let mut chunk = [0_u8; 1];
+            while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+                let read = stream.read(&mut chunk).unwrap();
+                assert!(read > 0, "client closed before complete HTTP headers");
+                request.extend_from_slice(&chunk[..read]);
+                assert!(
+                    request.len() <= 16 * 1024,
+                    "HTTP request headers exceeded test bound"
+                );
+            }
+            let request = String::from_utf8_lossy(&request).to_lowercase();
             assert!(request.contains("zotero-api-version: 3"));
-            let body = r#"[{"key":"A","version":1,"data":{"itemType":"book","title":"ontology evaluation"}}]"#;
+            let body = r#"[{"key":"2A3B4C5D","version":1,"data":{"itemType":"book","title":"ontology evaluation"}}]"#;
             write!(
                 stream,
                 "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nTotal-Results: 1\r\nLast-Modified-Version: 42\r\nX-Zotero-Version: 9.0.6\r\nZotero-API-Version: 3\r\nZotero-Schema-Version: 42\r\nZotero-Server-ID: server\r\nConnection: close\r\n\r\n{}",
@@ -1243,7 +1160,6 @@ mod tests {
         assert_eq!(report.schema_version, Some(42));
         assert_eq!(report.library_version, 42);
         assert_eq!(report.classified_items.len(), 1);
-        assert_eq!(local_api_base(), LOCAL_API);
     }
 
     #[test]
@@ -1267,8 +1183,6 @@ mod tests {
 
     #[test]
     fn reader_deadline_rejects_expired_admission_page_and_report() {
-        // Expired before first I/O, after a page, before next I/O, and after
-        // classifying the final page; no partial or late report may escape.
         for (ticks, total, expected_calls) in [
             (vec![300], 1, 0),
             (vec![0, 301], 1, 1),
