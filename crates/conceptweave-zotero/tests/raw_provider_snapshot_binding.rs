@@ -5,7 +5,7 @@ use conceptweave_zotero::{
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
-fn provider_snapshot_digest(raw_item: Value) -> String {
+fn captured_json_snapshot_digest(raw_item: Value) -> String {
     let item = CapturedZoteroItem::try_from(raw_item).unwrap();
     let snapshot = classify_captured_golden_snapshot("9.0.6".into(), None, 42, vec![item]);
     classification_snapshot_digest(&snapshot)
@@ -28,11 +28,14 @@ fn caller_constructed_capture_uses_non_authenticating_receipt_domain() {
         "version": 7,
         "data": {"itemType": "book", "title": "Ontology learning"}
     });
-    assert_eq!(provider_snapshot_digest(raw.clone()), expected_caller_captured_digest(raw));
+    assert_eq!(
+        captured_json_snapshot_digest(raw.clone()),
+        expected_caller_captured_digest(raw)
+    );
 }
 
 #[test]
-fn snapshot_digest_binds_unmodeled_provider_metadata_at_every_item_level() {
+fn snapshot_digest_binds_unmodeled_raw_metadata_at_every_item_level() {
     let original = json!({
         "key": "SYNTH001",
         "version": 7,
@@ -45,7 +48,7 @@ fn snapshot_digest_binds_unmodeled_provider_metadata_at_every_item_level() {
             "tags": [{"tag": "ontology", "type": 0}]
         }
     });
-    let original_digest = provider_snapshot_digest(original.clone());
+    let original_digest = captured_json_snapshot_digest(original.clone());
     for (pointer, replacement) in [
         ("/meta/parsedDate", json!("2026-01-01")),
         ("/data/date", json!("2026-01-01")),
@@ -54,12 +57,16 @@ fn snapshot_digest_binds_unmodeled_provider_metadata_at_every_item_level() {
     ] {
         let mut changed = original.clone();
         *changed.pointer_mut(pointer).unwrap() = replacement;
-        assert_ne!(provider_snapshot_digest(changed), original_digest, "{pointer}");
+        assert_ne!(
+            captured_json_snapshot_digest(changed),
+            original_digest,
+            "{pointer}"
+        );
     }
 }
 
 #[test]
-fn provider_object_order_is_canonical_but_field_presence_and_array_order_are_evidence() {
+fn captured_object_order_is_canonical_but_field_presence_and_array_order_are_evidence() {
     let ordered: Value = serde_json::from_str(
         r#"{"key":"SYNTH001","version":7,"meta":{"a":1,"b":{"c":2,"d":3}},"data":{"itemType":"book","date":"2025","creators":[{"name":"Synthetic Author","creatorType":"author"}]}}"#,
     )
@@ -68,17 +75,20 @@ fn provider_object_order_is_canonical_but_field_presence_and_array_order_are_evi
         r#"{"data":{"creators":[{"creatorType":"author","name":"Synthetic Author"}],"date":"2025","itemType":"book"},"meta":{"b":{"d":3,"c":2},"a":1},"version":7,"key":"SYNTH001"}"#,
     )
     .unwrap();
-    assert_eq!(provider_snapshot_digest(ordered), provider_snapshot_digest(reordered));
+    assert_eq!(
+        captured_json_snapshot_digest(ordered),
+        captured_json_snapshot_digest(reordered)
+    );
 
     let omitted = json!({"key": "SYNTH001", "version": 7, "data": {"itemType": "book"}});
-    let omitted_digest = provider_snapshot_digest(omitted.clone());
+    let omitted_digest = captured_json_snapshot_digest(omitted.clone());
     let mut explicit = omitted;
     explicit["data"]["title"] = json!("");
-    assert_ne!(provider_snapshot_digest(explicit), omitted_digest);
+    assert_ne!(captured_json_snapshot_digest(explicit), omitted_digest);
 }
 
 #[test]
-fn typed_fixture_digest_binds_actual_classifier_inputs_without_claiming_provider_authenticity() {
+fn typed_and_raw_capture_domains_are_distinct_without_claiming_provider_authenticity() {
     fn item(title: &str) -> ZoteroItem {
         ZoteroItem {
             key: "SYNTH001".into(),
@@ -94,24 +104,38 @@ fn typed_fixture_digest_binds_actual_classifier_inputs_without_claiming_provider
             },
         }
     }
-    let original = classify_typed_golden_snapshot("9.0.6".into(), None, 42, vec![item("Ontology learning")]);
-    let changed = classify_typed_golden_snapshot("9.0.6".into(), None, 42, vec![item("Ontology alignment")]);
-    assert_ne!(classification_snapshot_digest(&original), classification_snapshot_digest(&changed));
+    let original = classify_typed_golden_snapshot(
+        "9.0.6".into(),
+        None,
+        42,
+        vec![item("Ontology learning")],
+    );
+    let changed = classify_typed_golden_snapshot(
+        "9.0.6".into(),
+        None,
+        42,
+        vec![item("Ontology alignment")],
+    );
+    assert_ne!(
+        classification_snapshot_digest(&original),
+        classification_snapshot_digest(&changed)
+    );
 
     let captured = CapturedZoteroItem::try_from(json!({
         "key": "SYNTH001", "version": 7, "data": {"itemType": "book", "title": "Ontology learning"}
     }))
     .unwrap();
-    let provider = classify_captured_golden_snapshot("9.0.6".into(), None, 42, vec![captured]);
+    let raw_capture =
+        classify_captured_golden_snapshot("9.0.6".into(), None, 42, vec![captured]);
     assert_ne!(
         classification_snapshot_digest(&original),
-        classification_snapshot_digest(&provider),
-        "typed fixtures and provider-captured receipts use distinct domains"
+        classification_snapshot_digest(&raw_capture),
+        "typed fixtures and caller-captured raw JSON use distinct non-authenticating domains"
     );
 }
 
 #[test]
-fn captured_boundary_preserves_provider_shape_validation() {
+fn captured_boundary_preserves_raw_shape_validation() {
     assert!(CapturedZoteroItem::try_from(json!(null)).is_err());
     for invalid in [
         json!({"key": 7, "version": 7, "data": {"itemType": "book"}}),
