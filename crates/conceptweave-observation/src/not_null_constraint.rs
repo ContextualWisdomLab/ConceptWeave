@@ -154,6 +154,20 @@ impl NotNullConstraintObservation {
         mut self,
         parent_constraint: ParentNotNullConstraintCoordinate,
     ) -> Result<Self, ObservationError> {
+        // REL_18_STABLE ConstraintSetParentConstraint() turns the partition-child row into inherited
+        // state before storing conparentid: conislocal is false and coninhcount advances from 0 to 1.
+        // Regular table inheritance can legitimately have conparentid=0 with other coninhcount values,
+        // so these invariants belong specifically at the partition-parent linkage boundary.
+        if self.is_local {
+            return Err(ObservationError::InvalidObservationField {
+                field: "not_null_constraint_parent_locality",
+            });
+        }
+        if self.inheritance_ancestor_count != 1 {
+            return Err(ObservationError::InvalidObservationField {
+                field: "not_null_constraint_parent_inheritance_ancestor_count",
+            });
+        }
         if self.schema_name == parent_constraint.schema_name
             && self.relation_name == parent_constraint.relation_name
             && self.relation_kind == parent_constraint.relation_kind
