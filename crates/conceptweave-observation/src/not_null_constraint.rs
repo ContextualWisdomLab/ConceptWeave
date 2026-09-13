@@ -42,6 +42,11 @@ impl ParentNotNullConstraintCoordinate {
         crate::model::validate_nonblank(&schema_name, "not_null_parent_schema_name")?;
         crate::model::validate_nonblank(&relation_name, "not_null_parent_relation_name")?;
         crate::model::validate_nonblank(&constraint_name, "not_null_parent_constraint_name")?;
+        if relation_kind != RelationKind::PartitionedTable {
+            return Err(ObservationError::InvalidObservationField {
+                field: "not_null_parent_relation_kind",
+            });
+        }
         Ok(Self {
             schema_name,
             relation_name,
