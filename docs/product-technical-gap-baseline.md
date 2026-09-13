@@ -14,7 +14,7 @@ Protected/default ConceptWeave `main` remains `f4f440dd58c77d7cd90dff8a1eb2eeb9a
 
 - #6 `287165d399c5f54d6c4b4aa3c15497b47de8244b`, OPEN Draft.
 - #45 `6b2a8f555725dc79f60432afbc492d6005290a4a`, OPEN Draft on #6.
-- #46 `codex/pr6-v3-index-evidence`, OPEN Draft/mergeable, is the active Source Observation writer. Its ordinary-forward lineage retains the repaired index/lifecycle/temporal, column-collation, column-identity, and identity/nullability contracts. Review `5188836578` and RED `be3adfd0fa49fe3e27d9794c3773993a48235289` now add an active PostgreSQL 18 column-generation declaration gap; doctoring is `docs/research/postgresql-18-column-generation-evidence.md` from `4708708c3b9e33a3ec6ef5b49defadfbd5339300`.
+- #46 `codex/pr6-v3-index-evidence`, OPEN Draft/mergeable, is the active Source Observation writer. Its ordinary-forward lineage retains the repaired index/lifecycle/temporal, column-collation, column-identity, and identity/nullability contracts. Review `5188836578`, original RED `be3adfd0fa49fe3e27d9794c3773993a48235289`, and fixture-isolation correction `493e56bc6e985495511ef981e2d765c7d0583b51` now carry an active PostgreSQL 18 column-generation declaration gap; doctoring is `docs/research/postgresql-18-column-generation-evidence.md` from `4708708c3b9e33a3ec6ef5b49defadfbd5339300`.
 - Product bootstrap #35 remains a separate Product acceptance lane; central workflow evidence never transfers to #46.
 
 #45 and #6 must not duplicate or partially cherry-pick the Source Observation slice. They adopt the complete verified child ordinary/non-force only after one unchanged exact #46 head is GREEN.
@@ -43,14 +43,16 @@ Follow-up review `5188419794`, RED `bd6da911262a70a0a6d27ba439848831062813fb`, r
 
 Review `5188836578` on exact predecessor `7386ffb46ac72fb5257ac2ffd50ef8baab672f5e` found a separate material Source Observation gap: no owned evidence preserves PostgreSQL 18 `pg_attribute.attgenerated`. PostgreSQL exposes empty/not-generated, `s`/stored, and `v`/virtual states. `atthasdef` cannot substitute because it covers both defaults and generation expressions and the catalog explicitly directs consumers to `attgenerated` to distinguish them. Stored and virtual generated columns differ in when the value is computed and whether normal storage is occupied; PostgreSQL 18 also makes virtual the default generated-column kind.
 
-Behavioral/source RED `be3adfd0fa49fe3e27d9794c3773993a48235289` adds `crates/conceptweave-observation/tests/column_generation_contract.rs`. It intentionally does not compile against current production because `ColumnGenerationObservation`, `new_with_column_generations`, and `column_generations()` do not yet exist. Acceptance is explicit:
+Behavioral/source RED `be3adfd0fa49fe3e27d9794c3773993a48235289` adds `crates/conceptweave-observation/tests/column_generation_contract.rs`. Follow-up `493e56bc6e985495511ef981e2d765c7d0583b51` makes the generated/identity contradiction fixture non-null so the existing identity/nullability invariant cannot satisfy that test first; the RED now isolates the intended new cross-family failure. Production still does not define `ColumnGenerationObservation`, `new_with_column_generations`, or `column_generations()`, so the contract remains intentionally compile-level RED.
+
+Acceptance is explicit:
 
 - stored and virtual generation modes must produce different governed source identities;
 - explicitly observed `attgenerated=''` must remain distinct from a family the adapter did not observe;
 - a claimed family must cover every bounded relation column;
 - duplicate exact column coordinates fail closed;
 - input ordering is identity-neutral;
-- a generated column and an observed identity declaration on the same bounded column are contradictory and fail closed.
+- a generated column and an observed identity declaration on the same bounded non-null column are contradictory and fail closed as generation/identity inconsistency rather than through an unrelated invariant.
 
 Doctoring `4708708c3b9e33a3ec6ef5b49defadfbd5339300` records the direct PostgreSQL 18 catalog authority, alternatives, selected optional-family design, cross-family invariant, adapter obligation, and follow-on expression boundary in `docs/research/postgresql-18-column-generation-evidence.md`.
 
@@ -64,13 +66,13 @@ Production repair comes before acceptance. The repair must preserve the existing
 
 After the repair, one unchanged exact #46 head must pass repository-pinned Rust 1.98 `cargo fmt --all --check`, strict workspace/all-target Clippy with warnings denied, `column_generation_contract`, `column_identity_contract`, `column_collation_contract`, lifecycle-completeness and retained temporal/type/index contracts, workspace/doc tests, release build, owned production docstring/test/edge-case coverage, and applicable Product/security/dependency/review terminal evidence. Any head movement restarts exact-head acceptance.
 
-The current execution host has not supplied repository-pinned Rust execution evidence and #46 has not obtained a qualifying exact-head hosted acceptance set. This is not a reason to toggle Draft/Ready, synthesize status, copy central workflows, manually/no-op retrigger, transfer predecessor evidence, or weaken a gate.
+The current execution host has no `cargo`, `rustc`, or `rustfmt`; repository-pinned native execution cannot be substituted locally. #46 has not obtained a qualifying exact-head hosted acceptance set. This is not a reason to toggle Draft/Ready, synthesize status, copy central workflows, manually/no-op retrigger, transfer predecessor evidence, or weaken a gate.
 
 ## Central Product-CI owner
 
 Central workflow ownership remains outside ConceptWeave. Fresh PR metadata confirms `ContextualWisdomLab/.github#2114` is OPEN/non-Draft/mergeable at exact `e7c58c04ed7e59c23cbe4a5f38d4c522ae712712`, based on protected `.github/main@fb17ef556f94f673234aa557254ae52779e9a7b0`. Its body contains historical/source snapshots that do not override the actual PR head.
 
-The central review path remains unresolved independently of this new Source Observation RED. A live Required Noema Review on #2114 previously reached `contextual-orchestrator/orchestrator/free` and then failed local validation because the published JSON Schema represents `findings[]` and adversarial `probes[]` independently while the deterministic validator requires a confirmed probe anchored to a published finding. Owner review `5188653693` is on `.github#2079`; no leaf retry/provider fallback/validator weakening is accepted. Strix also retains the separate terminal-sub-agent negative-control obligation. None of this evidence transfers to ConceptWeave acceptance.
+The central review path remains unresolved independently of this Source Observation RED. A live Required Noema Review on #2114 previously reached `contextual-orchestrator/orchestrator/free` and then failed local validation because the published JSON Schema represents `findings[]` and adversarial `probes[]` independently while the deterministic validator requires a confirmed probe anchored to a published finding. Owner review `5188653693` is on `.github#2079`; no leaf retry/provider fallback/validator weakening is accepted. Strix also retains the separate terminal-sub-agent negative-control obligation. None of this evidence transfers to ConceptWeave acceptance.
 
 ## PostgreSQL adapter boundary
 
@@ -99,7 +101,7 @@ For column generation, the adapter must capture `attgenerated` for every bounded
 
 | Area | Status | Evidence / next verification |
 | --- | --- | --- |
-| Source Observation | COLUMN_GENERATION_RED_ACTIVE | `5188836578 -> be3adfd0... -> 4708708c...`; production family and GREEN are pending. |
+| Source Observation | COLUMN_GENERATION_RED_ACTIVE | `5188836578 -> be3adfd0... -> 493e56bc... -> 4708708c...`; production family and GREEN are pending. |
 | Retained column semantics | SOURCE_REPAIRED / EXECUTION_PENDING | Collation, identity, identity/nullability contracts remain retained and must stay GREEN after generation repair. |
 | Product CI | CENTRAL_OWNER_REVIEW_BLOCKED | `.github#2114@e7c58c04...`; Noema/Strix review settlement and independent approval are separate central-owner work. |
 | Quality gate | BLOCKED_ON_PRODUCTION_REPAIR_THEN_EXACT_HEAD_EXECUTION | Implement the generation family, then obtain Rust 1.98/native and hosted acceptance on one unchanged head. |
@@ -110,7 +112,7 @@ For column generation, the adapter must capture `attgenerated` for every bounded
 ## Current causal sequence
 
 1. Implement the minimum source-authoritative `attgenerated` family ordinary-forward against #46, preserving frozen v3 compatibility, complete bounded coverage, a domain-separated digest, canonical family order, and generated/identity contradiction rejection.
-2. Run the new RED plus all retained column/index/temporal contracts under repository-pinned Rust 1.98 and obtain hosted Product/security/dependency/review acceptance on one unchanged exact head. Any real failure receives only its causal repair; head movement restarts acceptance.
+2. Run the refined RED plus all retained column/index/temporal contracts under repository-pinned Rust 1.98 and obtain hosted Product/security/dependency/review acceptance on one unchanged exact head. Any real failure receives only its causal repair; head movement restarts acceptance.
 3. Adopt the complete verified #46 delta ordinary/non-force into #45, obtain fresh parent acceptance, then adopt #45 into #6.
 4. Independently repair the central Noema/Strix review-owner contracts and obtain qualifying independent approval; central evidence never transfers to ConceptWeave.
 5. Only after representation/Product prerequisites are GREEN may bounded PostgreSQL transport proceed, followed by deterministic validation, independent evaluation, steward review, immutable publication, and release evidence.
