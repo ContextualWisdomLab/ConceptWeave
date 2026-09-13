@@ -1,6 +1,7 @@
 use conceptweave_observation::{
     ColumnObservationV3, NotNullConstraintObservation, ObservationError, PostgresSchemaSnapshotV3,
-    QualifiedTypeName, RelationKind, RelationObservation,
+    PrimaryKeyObservation, QualifiedTypeName, RelationKind, RelationObservation,
+    TableConstraintObservation,
 };
 
 mod support;
@@ -36,6 +37,21 @@ fn relation(required_columns: &[&str]) -> RelationObservation {
         ],
     )
     .expect("metric relation fixture is valid")
+}
+
+fn relation_with_primary_key(required_columns: &[&str], primary_key_columns: &[&str]) -> RelationObservation {
+    relation(required_columns)
+        .with_constraints(vec![TableConstraintObservation::PrimaryKey(
+            PrimaryKeyObservation::new(
+                "metric_pkey",
+                primary_key_columns
+                    .iter()
+                    .map(|column_name| (*column_name).to_owned())
+                    .collect(),
+            )
+            .expect("primary-key fixture is valid"),
+        )])
+        .expect("relation with primary-key fixture is valid")
 }
 
 fn not_null(
@@ -248,26 +264,23 @@ fn observed_empty_not_null_family_is_distinct_from_unobserved() {
 }
 
 #[test]
-fn observed_not_null_family_must_cover_every_non_nullable_column() {
-    let error = snapshot(
-        &["raw_value", "note"],
-        vec![not_null(
-            "metric_raw_value_not_null",
-            "raw_value",
-            true,
-            true,
-            true,
-            0,
-            false,
-        )],
+fn primary_key_can_back_non_nullable_column_without_explicit_not_null_row() {
+    let observed = PostgresSchemaSnapshotV3::new_with_not_null_constraints(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-13T06:55:00Z",
+        vec![relation_with_primary_key(&["raw_value"], &["raw_value"])],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
     )
-    .expect_err("one non-null column is missing its PostgreSQL 18 constraint row");
+    .expect("PRIMARY KEY can be the backing constraint for attnotnull without a contype='n' row");
 
-    assert_eq!(
-        error,
-        ObservationError::InvalidObservationField {
-            field: "not_null_constraint_completeness",
-        }
+    assert!(
+        observed
+            .not_null_constraints()
+            .expect("observed NOT NULL inventory remains queryable")
+            .is_empty()
     );
 }
 
