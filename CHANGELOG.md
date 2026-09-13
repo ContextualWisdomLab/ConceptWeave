@@ -7,6 +7,7 @@ All notable changes to ConceptWeave are documented here.
 ### Fixed
 
 - Golden-set evaluation now ordinary/non-force adopts the current Research Intake parent without reopening its private constructor-bound `ClassificationReport` aggregate.
+- Golden-set integration now extends the canonical `conceptweave-zotero/src/lib.rs` crate root directly; the temporary `merged_lib.rs` wrapper is removed so crate-level safety, lint, and nightly-coverage attributes remain on the crate root that owns them.
 - Raw JSON snapshot binding uses an explicit `CapturedZoteroItem` boundary instead of adding a mandatory caller-owned `source_record` field to the stable public `ZoteroItem` shape.
 - Caller-constructible raw JSON receipts no longer use a provider-authentication label; `conceptweave-zotero-captured-json-snapshot-v3` binds complete raw content plus typed classifier input while reserving source authentication for a transport-owned attestation boundary.
 - Research evaluation rejects incomplete source inventories and invalidates prior approvals when retained source metadata changes.
