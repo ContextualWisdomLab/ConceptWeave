@@ -243,6 +243,20 @@ pub(crate) fn canonicalize_not_null_constraints(
         }
     }
 
+    let mut relation_constraint_names = BTreeSet::new();
+    for observation in &constraints {
+        if !relation_constraint_names.insert((
+            observation.schema_name().to_owned(),
+            observation.relation_name().to_owned(),
+            observation.relation_kind().token().to_owned(),
+            observation.constraint_name().to_owned(),
+        )) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "not_null_constraint_name",
+            });
+        }
+    }
+
     let expected_columns = relations
         .iter()
         .flat_map(|relation| {
