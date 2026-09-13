@@ -39,7 +39,10 @@ fn relation(required_columns: &[&str]) -> RelationObservation {
     .expect("metric relation fixture is valid")
 }
 
-fn relation_with_primary_key(required_columns: &[&str], primary_key_columns: &[&str]) -> RelationObservation {
+fn relation_with_primary_key(
+    required_columns: &[&str],
+    primary_key_columns: &[&str],
+) -> RelationObservation {
     relation(required_columns)
         .with_constraints(vec![TableConstraintObservation::PrimaryKey(
             PrimaryKeyObservation::new(
@@ -264,8 +267,8 @@ fn observed_empty_not_null_family_is_distinct_from_unobserved() {
 }
 
 #[test]
-fn primary_key_can_back_non_nullable_column_without_explicit_not_null_row() {
-    let observed = PostgresSchemaSnapshotV3::new_with_not_null_constraints(
+fn primary_key_non_nullable_column_requires_captured_not_null_row() {
+    let error = PostgresSchemaSnapshotV3::new_with_not_null_constraints(
         &support::authorized_source("warehouse_primary", &["public"]),
         "postgres_introspector_v3",
         "2026-09-13T06:55:00Z",
@@ -274,13 +277,13 @@ fn primary_key_can_back_non_nullable_column_without_explicit_not_null_row() {
         Vec::new(),
         Vec::new(),
     )
-    .expect("PRIMARY KEY can be the backing constraint for attnotnull without a contype='n' row");
+    .expect_err("PostgreSQL 18 queues a first-class NOT NULL constraint for PRIMARY KEY columns");
 
-    assert!(
-        observed
-            .not_null_constraints()
-            .expect("observed NOT NULL inventory remains queryable")
-            .is_empty()
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "not_null_constraint_completeness",
+        }
     );
 }
 
