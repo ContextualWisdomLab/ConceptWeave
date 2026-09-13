@@ -202,6 +202,30 @@ fn not_null_inheritance_state_is_governed_identity() {
 }
 
 #[test]
+fn not_null_inheritance_ancestor_count_must_fit_postgresql_int2() {
+    let error = NotNullConstraintObservation::new(
+        "public",
+        "metric",
+        RelationKind::Table,
+        "metric_raw_value_not_null",
+        "raw_value",
+        true,
+        true,
+        false,
+        32_768,
+        false,
+    )
+    .expect_err("pg_constraint.coninhcount is PostgreSQL int2 and cannot represent 32768");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "not_null_constraint_inheritance_ancestor_count",
+        }
+    );
+}
+
+#[test]
 fn observed_empty_not_null_family_is_distinct_from_unobserved() {
     let unobserved = PostgresSchemaSnapshotV3::new(
         &support::authorized_source("warehouse_primary", &["public"]),
