@@ -8,6 +8,7 @@
 
 mod array_type;
 mod column_collation;
+mod column_generation;
 mod column_identity;
 mod constraint_period;
 mod constraint_timing;
@@ -17,6 +18,7 @@ mod type_kind;
 
 pub use array_type::{ArrayTypeLocation, ArrayTypeObservation, ArrayTypeSourceReceipt};
 pub use column_collation::ColumnCollationObservation;
+pub use column_generation::ColumnGenerationObservation;
 pub use column_identity::ColumnIdentityObservation;
 pub use constraint_period::ConstraintPeriodObservation;
 pub use constraint_timing::{ConstraintDeferrability, ConstraintTimingObservation};
@@ -109,8 +111,8 @@ impl SuccessorSourceReceipt {
 /// The representation module remains an implementation detail. This owner-level aggregate validates
 /// PostgreSQL's unique `(relname, relnamespace)` catalog namespace, relation-kind ownership rules,
 /// exact schema-local `pg_type` identity, optional observed true-array and type-kind relationships,
-/// optional column-collation and column-identity state, PRIMARY KEY/UNIQUE timing, and explicit
-/// temporal-constraint evidence before exposing immutable governed evidence.
+/// optional column-collation, column-generation, and column-identity state, PRIMARY KEY/UNIQUE
+/// timing, and explicit temporal-constraint evidence before exposing immutable governed evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PostgresSchemaSnapshotV3 {
     inner: representation_v3::PostgresSchemaSnapshotV3,
@@ -124,6 +126,8 @@ pub struct PostgresSchemaSnapshotV3 {
     type_kinds_observed: bool,
     column_collations: Vec<ColumnCollationObservation>,
     column_collations_observed: bool,
+    column_generations: Vec<ColumnGenerationObservation>,
+    column_generations_observed: bool,
     column_identities: Vec<ColumnIdentityObservation>,
     column_identities_observed: bool,
     constraint_timings: Vec<ConstraintTimingObservation>,
@@ -134,7 +138,8 @@ pub struct PostgresSchemaSnapshotV3 {
 
 impl PostgresSchemaSnapshotV3 {
     /// Creates the original deterministic v3 snapshot without claiming true-array, type-kind,
-    /// column-collation, column-identity, key-constraint timing, or temporal-constraint inventory.
+    /// column-collation, column-generation, column-identity, key-constraint timing, or temporal
+    /// constraint inventory.
     ///
     /// This constructor deliberately preserves its existing digest contract. Use the explicit
     /// observed-family constructors or consuming family methods only when the adapter captured those
@@ -172,6 +177,8 @@ impl PostgresSchemaSnapshotV3 {
             type_kinds_observed: false,
             column_collations: Vec::new(),
             column_collations_observed: false,
+            column_generations: Vec::new(),
+            column_generations_observed: false,
             column_identities: Vec::new(),
             column_identities_observed: false,
             constraint_timings: Vec::new(),
@@ -256,6 +263,8 @@ impl PostgresSchemaSnapshotV3 {
             type_kinds_observed: true,
             column_collations: Vec::new(),
             column_collations_observed: false,
+            column_generations: Vec::new(),
+            column_generations_observed: false,
             column_identities: Vec::new(),
             column_identities_observed: false,
             constraint_timings: Vec::new(),
@@ -337,6 +346,31 @@ impl PostgresSchemaSnapshotV3 {
             enums,
         )?
         .with_observed_column_collations(column_collations)
+    }
+
+    /// Creates a deterministic v3 snapshot with explicitly observed PostgreSQL generated-column mode.
+    ///
+    /// The family is complete for the bounded relation-column inventory and distinguishes explicit
+    /// ordinary columns from a generation family that the adapter did not observe at all. Generation
+    /// expressions and dependencies remain separate evidence and are never inferred from defaults.
+    pub fn new_with_column_generations(
+        authorized_request: &AuthorizedObservationRequest,
+        extractor_revision: impl Into<String>,
+        observed_at_utc: impl Into<String>,
+        relations: Vec<RelationObservation>,
+        domains: Vec<DomainObservation>,
+        enums: Vec<EnumObservation>,
+        column_generations: Vec<ColumnGenerationObservation>,
+    ) -> Result<Self, ObservationError> {
+        Self::new(
+            authorized_request,
+            extractor_revision,
+            observed_at_utc,
+            relations,
+            domains,
+            enums,
+        )?
+        .with_observed_column_generations(column_generations)
     }
 
     /// Creates a deterministic v3 snapshot with explicitly observed PostgreSQL column identity mode.
@@ -442,6 +476,8 @@ impl PostgresSchemaSnapshotV3 {
             type_kinds_observed: false,
             column_collations: Vec::new(),
             column_collations_observed: false,
+            column_generations: Vec::new(),
+            column_generations_observed: false,
             column_identities: Vec::new(),
             column_identities_observed: false,
             constraint_timings: Vec::new(),
@@ -480,10 +516,11 @@ impl PostgresSchemaSnapshotV3 {
 
     /// Adds source-authoritative PostgreSQL type-kind/domain-base/range-pair evidence.
     ///
-    /// The family must be attached before column-collation, column-identity, constraint timing, or
-    /// period evidence so optional family order cannot create a second identity for the same source
-    /// facts. Direct user-defined base, range, or multirange column bindings that the private
-    /// compatibility validator cannot represent must use [`Self::new_with_type_kinds`] instead.
+    /// The family must be attached before column-collation, column-generation, column-identity,
+    /// constraint timing, or period evidence so optional family order cannot create a second identity
+    /// for the same source facts. Direct user-defined base, range, or multirange column bindings that
+    /// the private compatibility validator cannot represent must use [`Self::new_with_type_kinds`]
+    /// instead.
     pub fn with_observed_type_kinds(
         mut self,
         type_kinds: Vec<TypeKindObservation>,
@@ -494,6 +531,7 @@ impl PostgresSchemaSnapshotV3 {
             });
         }
         if self.column_collations_observed
+            || self.column_generations_observed
             || self.column_identities_observed
             || self.constraint_timings_observed
             || self.constraint_periods_observed
@@ -529,10 +567,10 @@ impl PostgresSchemaSnapshotV3 {
 
     /// Adds one complete explicitly observed `pg_attribute.attcollation` family to this snapshot.
     ///
-    /// The family is attached after any type-kind/array identity layer and before column-identity,
-    /// constraint timing, or PERIOD evidence, preserving one canonical optional-family order. It
-    /// validates exact bounded column coordinates, completeness, repeated-collation determinism, and
-    /// PostgreSQL's FK collation consistency rule before extending the source digest in its own domain.
+    /// The family is attached after any type-kind/array identity layer and before column-generation,
+    /// column-identity, constraint timing, or PERIOD evidence, preserving one canonical optional-family
+    /// order. It validates exact bounded column coordinates, completeness, repeated-collation
+    /// determinism, and PostgreSQL's FK collation consistency rule before extending the source digest.
     pub fn with_observed_column_collations(
         mut self,
         column_collations: Vec<ColumnCollationObservation>,
@@ -542,7 +580,8 @@ impl PostgresSchemaSnapshotV3 {
                 field: "column_collation_already_observed",
             });
         }
-        if self.column_identities_observed
+        if self.column_generations_observed
+            || self.column_identities_observed
             || self.constraint_timings_observed
             || self.constraint_periods_observed
         {
@@ -563,12 +602,49 @@ impl PostgresSchemaSnapshotV3 {
         Ok(self)
     }
 
+    /// Adds one complete explicitly observed `pg_attribute.attgenerated` family to this snapshot.
+    ///
+    /// The family is attached after type/array and column-collation evidence and before column-identity,
+    /// constraint timing, or PERIOD evidence. It validates exact bounded column coordinates,
+    /// completeness, explicit not-generated state, canonical input order, and extends source identity
+    /// in a dedicated digest domain.
+    pub fn with_observed_column_generations(
+        mut self,
+        column_generations: Vec<ColumnGenerationObservation>,
+    ) -> Result<Self, ObservationError> {
+        if self.column_generations_observed {
+            return Err(ObservationError::InvalidObservationField {
+                field: "column_generation_already_observed",
+            });
+        }
+        if self.column_identities_observed
+            || self.constraint_timings_observed
+            || self.constraint_periods_observed
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "column_generation_observation_order",
+            });
+        }
+        let column_generations = column_generation::canonicalize_column_generations(
+            &self.relations,
+            column_generations,
+        )?;
+        self.snapshot_digest = column_generation::compute_column_generation_digest(
+            &self.snapshot_digest,
+            &column_generations,
+        );
+        self.column_generations = column_generations;
+        self.column_generations_observed = true;
+        Ok(self)
+    }
+
     /// Adds one complete explicitly observed `pg_attribute.attidentity` family to this snapshot.
     ///
-    /// The family is attached after any type-kind/array and column-collation evidence and before
-    /// constraint timing or PERIOD evidence. It validates exact bounded column coordinates and
-    /// completeness, keeps explicit not-identity distinct from unobserved evidence, canonicalizes
-    /// input order, and extends source identity in its own digest domain.
+    /// The family is attached after any type/array, column-collation, and column-generation evidence
+    /// and before constraint timing or PERIOD evidence. It validates exact bounded column coordinates
+    /// and completeness, keeps explicit not-identity distinct from unobserved evidence, rejects a
+    /// generated-column/identity contradiction, canonicalizes input order, and extends source identity
+    /// in its own digest domain.
     pub fn with_observed_column_identities(
         mut self,
         column_identities: Vec<ColumnIdentityObservation>,
@@ -587,6 +663,16 @@ impl PostgresSchemaSnapshotV3 {
             &self.relations,
             column_identities,
         )?;
+        if self.column_generations_observed
+            && column_generation::generated_identity_conflicts(
+                &self.column_generations,
+                &column_identities,
+            )
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "column_generation_identity",
+            });
+        }
         self.snapshot_digest = column_identity::compute_column_identity_digest(
             &self.snapshot_digest,
             &column_identities,
@@ -719,6 +805,14 @@ impl PostgresSchemaSnapshotV3 {
     pub fn column_collations(&self) -> Option<&[ColumnCollationObservation]> {
         self.column_collations_observed
             .then_some(self.column_collations.as_slice())
+    }
+
+    /// Returns explicitly observed PostgreSQL generated-column evidence, or `None` when that catalog
+    /// family was not observed.
+    #[must_use]
+    pub fn column_generations(&self) -> Option<&[ColumnGenerationObservation]> {
+        self.column_generations_observed
+            .then_some(self.column_generations.as_slice())
     }
 
     /// Returns explicitly observed PostgreSQL column-identity evidence, or `None` when that catalog
