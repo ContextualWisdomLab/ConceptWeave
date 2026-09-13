@@ -60,7 +60,8 @@ sequenceDiagram
     Report->>Steward: review dispositions and merge candidates
     Steward->>Intake: reviewed labels and independently issued receipt
     Intake->>Intake: validate complete partitions and recompute pending ancestry
-    Intake->>Intake: verify v2 proposal and retained-source binding
+    Intake->>Intake: verify v3 proposal and captured/typed snapshot binding
+    Note over Intake,Steward: Raw capture binds supplied content but does not authenticate provider origin
     Note over Intake,Steward: Only locally valid reports reach independent governance verification
     Intake-->>Zotero: no mutation
 ```
