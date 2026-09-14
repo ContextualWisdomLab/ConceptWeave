@@ -424,6 +424,14 @@ pub(crate) fn canonicalize_not_null_constraints(
                     field: "not_null_constraint_parent_column",
                 });
             }
+            // PostgreSQL 18 AdjustNotNullInheritance() refuses to attach a valid inherited parent
+            // to an existing NOT VALID child constraint. The inverse is allowed: a child that is
+            // already valid may satisfy an inherited parent that remains NOT VALID.
+            if parent_observation.validated() && !observation.validated() {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "not_null_constraint_parent_validation",
+                });
+            }
         } else if observation.partition_parent_relation().is_some() {
             return Err(ObservationError::InvalidObservationField {
                 field: "not_null_constraint_partition_parent_relation",
