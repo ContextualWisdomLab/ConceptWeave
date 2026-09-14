@@ -482,6 +482,12 @@ fn canonicalize_index_partitions(
             if child_definition.is_unique() != parent_definition.is_unique() {
                 return Err(invalid("index_partition_definition_uniqueness"));
             }
+            if child_definition.nulls_not_distinct() != parent_definition.nulls_not_distinct() {
+                return Err(invalid("index_partition_definition_nulls_not_distinct"));
+            }
+            if child_definition.access_method() != parent_definition.access_method() {
+                return Err(invalid("index_partition_definition_access_method"));
+            }
         }
     }
 
