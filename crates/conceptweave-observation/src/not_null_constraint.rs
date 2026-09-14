@@ -6,7 +6,7 @@
 //! representation. Catalog OIDs remain capture-time join coordinates and never enter governed
 //! identity.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use sha2::{Digest, Sha256};
 
@@ -379,6 +379,8 @@ pub(crate) fn canonicalize_not_null_constraints(
         ));
     }
 
+    validate_parent_constraint_acyclicity(&constraints)?;
+
     if observed_columns != expected_columns {
         return Err(ObservationError::InvalidObservationField {
             field: "not_null_constraint_completeness",
@@ -396,6 +398,57 @@ fn same_column_coordinate(
         && left.relation_name() == right.relation_name()
         && left.relation_kind() == right.relation_kind()
         && left.column_name() == right.column_name()
+}
+
+fn validate_parent_constraint_acyclicity(
+    constraints: &[NotNullConstraintObservation],
+) -> Result<(), ObservationError> {
+    let constraint_index = constraints
+        .iter()
+        .enumerate()
+        .map(|(index, constraint)| {
+            (
+                (
+                    constraint.schema_name(),
+                    constraint.relation_name(),
+                    constraint.relation_kind().token(),
+                    constraint.constraint_name(),
+                ),
+                index,
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    for start_index in 0..constraints.len() {
+        let mut visited = BTreeSet::new();
+        let mut current_index = start_index;
+        loop {
+            if !visited.insert(current_index) {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "not_null_constraint_parent_cycle",
+                });
+            }
+
+            let current = &constraints[current_index];
+            let Some(parent) = current.parent_constraint() else {
+                break;
+            };
+            let parent_key = (
+                parent.schema_name(),
+                parent.relation_name(),
+                parent.relation_kind().token(),
+                parent.constraint_name(),
+            );
+            let Some(parent_index) = constraint_index.get(&parent_key) else {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "not_null_constraint_parent_coordinate",
+                });
+            };
+            current_index = *parent_index;
+        }
+    }
+
+    Ok(())
 }
 
 pub(crate) fn compute_not_null_constraint_digest(
