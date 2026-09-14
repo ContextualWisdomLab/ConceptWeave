@@ -23,6 +23,17 @@ The frozen v3 snapshot still owns relation/type/index/constraint coordinates and
 
 Retained source-repaired index-partition checks include uniqueness, `NULLS NOT DISTINCT`, access method, key/`INCLUDE` cardinality and role boundary, simple-column versus expression slot shape, mapped simple-column identity, corresponding key collation, resolved operator-family identity, and exclusion operator/procedure/strategy semantics. Earlier detailed chronology and NOT NULL repair lineage remain in the archived baseline referenced above.
 
+### Relation-partition rowtype mapping — source repaired, acceptance pending
+
+PostgreSQL declarative partitions must expose the same user-column set as their partitioned parent. `ALTER TABLE ... ATTACH PARTITION` requires matching column types, while PostgreSQL's `build_attrmap_by_name()` intentionally allows physically different attribute order by matching names and then rejecting type/type-modifier mismatch.
+
+- Review `5201119054` on exact `28236f1f68ab86a621047de5cb547b8db7597514` identified that `RelationPartitionSnapshot` previously validated parent kind/topology/NOT NULL coherence but not the parent/child rowtype.
+- Source RED `37062c4b49229ba8f7aae56b7c4ac607f59e0398` covers missing and extra child columns, different qualified type identity, different type-modifier rendering, and a positive control whose physical ordinals differ.
+- Production `ad371e2feddb74c7457e1f28f4fb9992f758ea6b` validates exact name sets before digest, compares frozen-v3 qualified type bindings, and—because frozen v3 does not structurally expose `pg_attribute.atttypmod`—uses the exact adapter-rendered `data_type` witness as a temporary fail-closed modifier check. It deliberately does not compare `ordinal_position`.
+- Primary-source decision record: `docs/doctoring/postgresql-relation-partition-rowtype-integrity.md`.
+
+The rendered type witness is a bounded compatibility bridge, not a new claim that display text is preferred semantic identity. A future domain-separated structured `atttypmod` successor may replace this check without rewriting frozen v3 or current predecessor receipts.
+
 ### Operator-family successor — source repaired, acceptance pending
 
 PostgreSQL 18 `CompareIndexInfo()` compares operator-family identity for every key after mapped attributes and collation. v3 retained `pg_opclass` but not `pg_opfamily`, so review `5200439852` on exact `7c65090c2a90ba11dff575fde15fde37838795f6` identified a P1 representation gap.
@@ -54,20 +65,21 @@ PostgreSQL 18 `CompareIndexInfo()` does not compare rendered expression text. It
 
 This closes the in-memory representation/comparison gap but not the live PostgreSQL extraction proof. The concrete PostgreSQL adapter must still derive the canonical tree from the PostgreSQL 18 node/catalog structure, resolve every OID-bearing `equal()` field to stable coordinates, fail closed for unsupported node kinds, and pass a differential oracle against real PostgreSQL attachment behavior. Raw `pg_get_expr`, raw `pg_node_tree`/`nodeToString`, or reconstructed `pg_get_indexdef`/DDL is not an acceptable fallback.
 
-State: **NOT_NULL_CONSTRAINT_SOURCE_REPAIRED / RELATION_PARTITION_SOURCE_REPAIRED / RELATION_PARTITION_NOT_NULL_INHERITANCE_SOURCE_REPAIRED / INDEX_PARTITION_TOPOLOGY_SOURCE_REPAIRED / INDEX_PARTITION_VALIDITY_SOURCE_REPAIRED / INDEX_PARTITION_UNIQUENESS_SOURCE_REPAIRED / INDEX_PARTITION_NULLS_NOT_DISTINCT_SOURCE_REPAIRED / INDEX_PARTITION_ACCESS_METHOD_SOURCE_REPAIRED / INDEX_PARTITION_ATTRIBUTE_MAPPING_SOURCE_REPAIRED / INDEX_PARTITION_COLLATION_SOURCE_REPAIRED / INDEX_PARTITION_OPERATOR_FAMILY_SOURCE_REPAIRED / INDEX_PARTITION_EXCLUSION_SOURCE_REPAIRED / INDEX_PARTITION_EXPRESSION_PREDICATE_REPRESENTATION_REPAIRED / POSTGRESQL_EXPRESSION_EXTRACTOR_DIFFERENTIAL_OPEN / ACCEPTANCE_PENDING**.
+State: **NOT_NULL_CONSTRAINT_SOURCE_REPAIRED / RELATION_PARTITION_SOURCE_REPAIRED / RELATION_PARTITION_ROWTYPE_MAPPING_SOURCE_REPAIRED / RELATION_PARTITION_NOT_NULL_INHERITANCE_SOURCE_REPAIRED / INDEX_PARTITION_TOPOLOGY_SOURCE_REPAIRED / INDEX_PARTITION_VALIDITY_SOURCE_REPAIRED / INDEX_PARTITION_UNIQUENESS_SOURCE_REPAIRED / INDEX_PARTITION_NULLS_NOT_DISTINCT_SOURCE_REPAIRED / INDEX_PARTITION_ACCESS_METHOD_SOURCE_REPAIRED / INDEX_PARTITION_ATTRIBUTE_MAPPING_SOURCE_REPAIRED / INDEX_PARTITION_COLLATION_SOURCE_REPAIRED / INDEX_PARTITION_OPERATOR_FAMILY_SOURCE_REPAIRED / INDEX_PARTITION_EXCLUSION_SOURCE_REPAIRED / INDEX_PARTITION_EXPRESSION_PREDICATE_REPRESENTATION_REPAIRED / POSTGRESQL_EXPRESSION_EXTRACTOR_DIFFERENTIAL_OPEN / ACCEPTANCE_PENDING**.
 
 ## Acceptance boundary
 
-No executed Rust RED/GREEN or hosted Product acceptance is claimed for the current moved head. The available execution host does not provide the repository-pinned Rust 1.98 toolchain, and protected ConceptWeave `main` still lacks the Product PR workflow at this checkpoint. The committed contract and causal source changes are source evidence only.
+No executed Rust RED/GREEN or hosted Product acceptance is claimed for the current moved head. The available execution host does not provide the repository-pinned Rust 1.98 toolchain, and protected ConceptWeave `main` still lacks the Product PR workflow at this checkpoint. The committed contracts and causal source changes are source evidence only.
 
-One unchanged #46 exact head must pass repository-pinned Rust 1.98 `fmt`, strict workspace/all-target Clippy, focused relation-partition/index-partition/NOT NULL/operator-family/exclusion/expression-predicate contracts plus retained expression/generation/identity/collation/temporal/type/index contracts, workspace/doc tests, release build, owned production rustdoc/test/edge-case coverage, and applicable hosted Product/security/dependency/review evidence. Any head movement restarts exact-head acceptance.
+One unchanged #46 exact head must pass repository-pinned Rust 1.98 `fmt`, strict workspace/all-target Clippy, focused relation-partition rowtype/index-partition/NOT NULL/operator-family/exclusion/expression-predicate contracts plus retained expression/generation/identity/collation/temporal/type/index contracts, workspace/doc tests, release build, owned production rustdoc/test/edge-case coverage, and applicable hosted Product/security/dependency/review evidence. Any head movement restarts exact-head acceptance.
 
 ## Next causal work
 
 1. Implement the concrete PostgreSQL 18 semantic-expression extractor at the Source Observation adapter boundary. It must cover every admitted `equal()`-participating semantic field, resolve OIDs to stable coordinates, and reject unsupported nodes rather than degrade to text.
 2. Add a real PostgreSQL differential oracle: generate admissible expression/partial-index parent/child cases, compare ConceptWeave admission with PostgreSQL's actual partition-index attachment result, and retain mismatch fixtures as regressions.
-3. Converge central workflow ownership; obtain compatible fresh unchanged-head acceptance for #35 and land it normally; then obtain one unchanged #46 native+hosted GREEN.
-4. Only after terminal #46 exact-head GREEN may the complete child flow ordinary/non-force into #45, followed by fresh #45 acceptance and #6 propagation.
-5. PostgreSQL transport completion, semantic publication, version/tag/package/SBOM/provenance/reproducibility/rollback, and immutable release remain later gates.
+3. Replace the temporary frozen-v3 rendered type-modifier witness with a domain-separated structured modifier observation before claiming complete PostgreSQL rowtype semantic parity; do not rewrite current predecessor identity to do so.
+4. Converge central workflow ownership; obtain compatible fresh unchanged-head acceptance for #35 and land it normally; then obtain one unchanged #46 native+hosted GREEN.
+5. Only after terminal #46 exact-head GREEN may the complete child flow ordinary/non-force into #45, followed by fresh #45 acceptance and #6 propagation.
+6. PostgreSQL transport completion, semantic publication, version/tag/package/SBOM/provenance/reproducibility/rollback, and immutable release remain later gates.
 
 No force-push, destructive rebase, self-approval, review dismissal, administrator bypass, synthetic status, copied central workflow, manual/no-op rerun, gate weakening, partial parent adoption, predecessor-evidence transfer, or premature publication/release is authorized.
