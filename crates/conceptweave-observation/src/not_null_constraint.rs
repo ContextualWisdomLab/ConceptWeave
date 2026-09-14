@@ -201,14 +201,16 @@ impl NotNullConstraintObservation {
 
     /// Attaches the direct declarative-partition parent resolved from `pg_inherits`.
     ///
-    /// This is validation evidence for the relation edge behind `conparentid`. The same parent
-    /// relation coordinate is already carried by the parent-constraint coordinate and therefore is
-    /// not hashed twice. The canonicalizer requires exact agreement between both independent catalog
-    /// joins before the constraint family can acquire governed identity.
+    /// This is validation evidence for the relation edge behind `conparentid`. The adapter must pass
+    /// the observed `inhdetachpending` bit rather than defaulting it. A detach-pending edge is a
+    /// transitional catalog state and fails closed instead of collapsing into a stable partition
+    /// membership assertion. The accepted parent coordinate is already carried by the parent-
+    /// constraint coordinate and therefore is not hashed twice.
     pub fn with_partition_parent_relation(
         mut self,
         schema_name: impl Into<String>,
         relation_name: impl Into<String>,
+        detach_pending: bool,
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let relation_name = relation_name.into();
@@ -220,6 +222,11 @@ impl NotNullConstraintObservation {
             &relation_name,
             "not_null_constraint_partition_parent_relation_name",
         )?;
+        if detach_pending {
+            return Err(ObservationError::InvalidObservationField {
+                field: "not_null_constraint_partition_parent_detach_pending",
+            });
+        }
         self.partition_parent_relation = Some((schema_name, relation_name));
         Ok(self)
     }
