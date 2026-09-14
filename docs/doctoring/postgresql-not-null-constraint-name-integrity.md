@@ -35,6 +35,7 @@ The repair intentionally does not require schema-wide uniqueness. PostgreSQL all
   - same-relation CHECK/NOT NULL name collision must fail with `DuplicateConstraintName`;
   - the same constraint name on different relations remains valid.
 - Production repair: `crates/conceptweave-observation/src/not_null_constraint.rs`, commit `aaf4b3144452a67d938fd12a78b4e6fee6c44b6b`.
+- Fixture isolation: commit `0cff8f0a23fc65a66ee5ce9499ea99d9bb101bce` makes the different-relation preservation case keep its CHECK-only relation nullable, so NOT NULL completeness tests only the intended non-null relation instead of introducing an unrelated missing-row failure.
 - Integration boundary: `PostgresSchemaSnapshotV3::with_observed_not_null_constraints` → `canonicalize_not_null_constraints`.
 
 ## Adapter obligation
