@@ -13,6 +13,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use conceptweave_observation::{ObservationError, PostgresSchemaSnapshotV3, RelationKind};
 use sha2::{Digest, Sha256};
 
+mod index_partition;
+pub use index_partition::*;
+
 const RELATION_PARTITION_DIGEST_DOMAIN_V1: &[u8] =
     b"conceptweave.postgres_schema_snapshot.v3.relation_partition.v1";
 const SHA256_DIGEST_PREFIX: &str = "sha256:";
