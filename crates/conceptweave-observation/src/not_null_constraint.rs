@@ -336,6 +336,20 @@ pub(crate) fn canonicalize_not_null_constraints(
             });
         }
 
+        if let Some(parent) = observation.parent_constraint() {
+            let parent_exists = constraints.iter().any(|candidate| {
+                candidate.schema_name() == parent.schema_name()
+                    && candidate.relation_name() == parent.relation_name()
+                    && candidate.relation_kind() == parent.relation_kind()
+                    && candidate.constraint_name() == parent.constraint_name()
+            });
+            if !parent_exists {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "not_null_constraint_parent_coordinate",
+                });
+            }
+        }
+
         observed_columns.insert((
             observation.schema_name().to_owned(),
             observation.relation_name().to_owned(),
