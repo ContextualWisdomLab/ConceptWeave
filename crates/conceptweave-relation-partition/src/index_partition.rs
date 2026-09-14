@@ -8,7 +8,9 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
-use conceptweave_observation::{ObservationError, PostgresSchemaSnapshotV3, RelationKind};
+use conceptweave_observation::{
+    IndexObservation, ObservationError, PostgresSchemaSnapshotV3, RelationKind,
+};
 use sha2::{Digest, Sha256};
 
 use crate::{RelationPartitionObservation, RelationPartitionSnapshot};
@@ -274,8 +276,9 @@ impl IndexPartitionSourceReceipt {
 /// The family is complete over every index in the bounded v3 snapshot. It preserves index versus
 /// partitioned-index `relkind`, index `relispartition`, exact direct index parent, and detach state.
 /// Every attached index must belong to an attached relation and its parent index must be owned by the
-/// same direct parent relation. This keeps table and index inheritance graphs coherent without
-/// changing the frozen v3 or relation-partition predecessor identities.
+/// same direct parent relation. A partitioned index observed as valid must already have one attached
+/// child index for every direct table partition. This keeps table and index inheritance graphs
+/// coherent without changing the frozen v3 or relation-partition predecessor identities.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexPartitionSnapshot {
     source_connection_key: String,
@@ -474,8 +477,67 @@ fn canonicalize_index_partitions(
         }
     }
 
+    validate_valid_partitioned_index_children(base_snapshot, relation_partitions, &by_coordinate)?;
     validate_index_parent_graph(&by_coordinate)?;
     Ok(observations)
+}
+
+fn validate_valid_partitioned_index_children(
+    base_snapshot: &PostgresSchemaSnapshotV3,
+    relation_partitions: &[RelationPartitionObservation],
+    by_coordinate: &BTreeMap<IndexPartitionCoordinate, &IndexPartitionObservation>,
+) -> Result<(), ObservationError> {
+    for (parent_coordinate, parent_observation) in by_coordinate {
+        if parent_observation.index_relation_kind() != IndexRelationKind::PartitionedIndex {
+            continue;
+        }
+        let parent_index = find_base_index(base_snapshot, parent_coordinate)
+            .ok_or_else(|| invalid("index_partition_owner_coordinate"))?;
+        if parent_index.valid() != Some(true) {
+            continue;
+        }
+
+        for child_relation in relation_partitions.iter().filter(|membership| {
+            membership.is_partition()
+                && membership.parent_relation().is_some_and(|parent_relation| {
+                    parent_relation.schema_name() == parent_coordinate.schema_name()
+                        && parent_relation.relation_name() == parent_coordinate.relation_name()
+                })
+        }) {
+            let attached = by_coordinate.values().any(|child_index| {
+                child_index.coordinate().schema_name() == child_relation.schema_name()
+                    && child_index.coordinate().relation_name() == child_relation.relation_name()
+                    && child_index.coordinate().relation_kind() == child_relation.relation_kind()
+                    && child_index
+                        .parent_index()
+                        .is_some_and(|parent| parent == parent_coordinate)
+            });
+            if !attached {
+                return Err(invalid("index_partition_parent_validity"));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn find_base_index<'a>(
+    base_snapshot: &'a PostgresSchemaSnapshotV3,
+    coordinate: &IndexPartitionCoordinate,
+) -> Option<&'a IndexObservation> {
+    base_snapshot
+        .relations()
+        .iter()
+        .find(|relation| {
+            relation.schema_name() == coordinate.schema_name()
+                && relation.relation_name() == coordinate.relation_name()
+                && relation.kind() == coordinate.relation_kind()
+        })
+        .and_then(|relation| {
+            relation
+                .indexes()
+                .iter()
+                .find(|index| index.index_name() == coordinate.index_name())
+        })
 }
 
 fn validate_index_parent_graph(
