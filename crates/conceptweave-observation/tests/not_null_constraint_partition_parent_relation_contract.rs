@@ -58,7 +58,7 @@ fn direct_partition_parent_witness_requires_nonblank_coordinates() {
         ),
     ] {
         let error = local_child_constraint()
-            .with_partition_parent_relation(schema_name, relation_name)
+            .with_partition_parent_relation(schema_name, relation_name, false)
             .expect_err("blank pg_inherits relation coordinates must fail closed");
 
         assert_eq!(error, ObservationError::InvalidObservationField { field });
@@ -66,9 +66,23 @@ fn direct_partition_parent_witness_requires_nonblank_coordinates() {
 }
 
 #[test]
+fn detach_pending_partition_parent_witness_is_rejected() {
+    let error = local_child_constraint()
+        .with_partition_parent_relation("public", "metric", true)
+        .expect_err("an inhdetachpending edge must not collapse into stable partition membership");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "not_null_constraint_partition_parent_detach_pending",
+        }
+    );
+}
+
+#[test]
 fn direct_partition_parent_witness_without_conparentid_is_rejected() {
     let child = local_child_constraint()
-        .with_partition_parent_relation("public", "metric")
+        .with_partition_parent_relation("public", "metric", false)
         .expect("direct parent coordinate is syntactically valid before family validation");
 
     let error = PostgresSchemaSnapshotV3::new_with_not_null_constraints(
