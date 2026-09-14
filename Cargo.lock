@@ -38,6 +38,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "conceptweave-relation-partition"
+version = "0.1.0"
+dependencies = [
+ "conceptweave-observation",
+ "conceptweave-source-port",
+ "sha2",
+]
+
+[[package]]
 name = "conceptweave-source-port"
 version = "0.1.0"
 
@@ -56,8 +65,8 @@ version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a"
 dependencies = [
- "generic-array",
- "typenum",
+ "block-buffer",
+ "crypto-common",
 ]
 
 [[package]]
@@ -101,7 +110,7 @@ dependencies = [
 name = "typenum"
 version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
+checksum = "b6f5e870be6b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 
 [[package]]
 name = "version_check"
