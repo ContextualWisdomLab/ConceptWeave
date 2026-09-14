@@ -66,13 +66,15 @@ This is source repair, not PostgreSQL adapter completion. The concrete semantic-
 
 No executed Rust RED/GREEN or hosted Product acceptance is claimed for the moved #46 head. One unchanged exact head must pass repository-pinned Rust 1.98 `fmt`, strict workspace/all-target Clippy, focused relation/index-partition/type-modifier/expression-schema/relation-Var/composed-proof contracts plus retained Source Observation contracts, workspace/doc tests, release build, owned production rustdoc/test/edge-case coverage, and applicable hosted Product/security/dependency/review evidence. Any head movement resets exact-head acceptance.
 
+The current #46 slice is still representation/source-contract work. Concrete database I/O, live PostgreSQL attachment attempts, and adapter extraction remain transport work and must not be pulled ahead of terminal exact-head acceptance of this representation slice.
+
 ## Next causal work
 
-1. Implement the concrete PostgreSQL 18 semantic-expression extractor, including exact relation-`Var` capture into the composed successor. It must emit only supported complete node/leaf schemas, resolve OIDs to stable coordinates, and reject unsupported nodes rather than degrade to text.
-2. Add a live PostgreSQL differential oracle comparing ConceptWeave admission with PostgreSQL's actual index-partition attachment outcome, including attribute-order mapping and Var type/typmod/collation mismatch cases.
-3. Add typed constant/Datum semantics and additional node schemas only when PostgreSQL 18 equality can be represented completely; do not broaden generic node acceptance first.
-4. Wire the concrete PostgreSQL adapter to emit exact `pg_attribute.atttypmod` for every bounded column and add a live rowtype differential oracle.
-5. Converge central workflow ownership; obtain compatible fresh unchanged-head acceptance for #35 and land it normally; then obtain one unchanged #46 native+hosted GREEN.
-6. Only after terminal #46 exact-head GREEN may the complete child flow ordinary/non-force into #45, followed by fresh #45 acceptance and #6 propagation. PostgreSQL transport completion, semantic publication, version/tag/package/SBOM/provenance/reproducibility/rollback, and immutable release remain later gates.
+1. Converge the canonical central workflow owner; repair and accept its current exact head without ConceptWeave-side source duplication or wake commits.
+2. Obtain compatible fresh unchanged-head acceptance for Product bootstrap #35 and land it normally on protected/default ConceptWeave `main`.
+3. Obtain one unchanged #46 representation head with repository-pinned Rust 1.98 native GREEN plus applicable hosted Product/security/dependency/review terminal GREEN.
+4. Only after that representation gate, extend #46 ordinary-forward with the concrete PostgreSQL 18 semantic-expression extractor and live attached-index differential oracle. The extractor must emit only supported complete node/leaf schemas, resolve OIDs to stable coordinates, and reject unsupported nodes rather than degrade to text; that transport descendant must reacquire its own exact-head acceptance.
+5. Add typed constant/Datum semantics and additional node schemas only when PostgreSQL 18 equality can be represented completely; do not broaden generic node acceptance first. Wire the concrete PostgreSQL adapter to emit exact `pg_attribute.atttypmod` for every bounded column and add a live rowtype differential oracle, again with fresh exact-head acceptance.
+6. Only after the complete #46 child — including required transport evidence — is terminal GREEN may its full delta flow ordinary/non-force into #45, followed by fresh #45 acceptance and #6 propagation. Semantic publication, version/tag/package/SBOM/provenance/reproducibility/rollback, and immutable release remain later gates.
 
 No force-push, destructive rebase, self-approval, review dismissal, administrator bypass, synthetic status, copied central workflow, manual/no-op rerun, gate weakening, partial parent adoption, predecessor-evidence transfer, or premature publication/release is authorized.
