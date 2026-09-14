@@ -9,54 +9,59 @@ use super::{
 };
 
 const EXPRESSION_NODE_SCHEMA_DIGEST_DOMAIN_V1: &[u8] = b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.operator_family.exclusion.expression_semantics.node_schema.v1";
-const EXPRESSION_NODE_SCHEMA_REVISION: &str = "postgresql-18-equal-supported-v1";
+const EXPRESSION_NODE_SCHEMA_REVISION_V1: &str = "postgresql-18-equal-supported-v1";
+const EXPRESSION_NODE_SCHEMA_DIGEST_DOMAIN_V2: &[u8] = b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.operator_family.exclusion.expression_semantics.node_schema.v2";
+const EXPRESSION_NODE_SCHEMA_REVISION_V2: &str =
+    "postgresql-18-equal-supported-v2-var-safe";
 const SHA256_DIGEST_PREFIX: &str = "sha256:";
 
-/// Validates that a canonical expression contains the complete PostgreSQL 18 `equal()` schema for
-/// every node kind currently admitted by ConceptWeave.
+/// Validates the historical PostgreSQL 18 equality-schema v1 contract.
 ///
-/// The current supported set is intentionally narrow: `FuncExpr` and `OpExpr` whose complete leaf
-/// semantics are themselves supported. Relation-local `Var` leaves are not yet admissible here:
-/// [`CanonicalExpression::Column`] preserves only the attribute-map-normalized column name, while
-/// PostgreSQL `equal()` also observes material `Var` state such as type, type modifier, collation,
-/// nulling relations, nesting level, and RETURNING behavior. [`CanonicalExpression::WholeRow`] is
-/// likewise not a complete `Var` representation. Both therefore fail closed until a later
-/// domain-separated Var-semantics successor binds every equality-participating field or proves the
-/// corresponding PostgreSQL index-expression invariant.
+/// This function deliberately preserves the issued v1 admission semantics. The v1 family validates
+/// the complete modeled field sets for `FuncExpr` and `OpExpr`, rejects `Const` and unknown node
+/// kinds, but historically admits relation-local [`CanonicalExpression::Column`] and
+/// [`CanonicalExpression::WholeRow`] leaves without carrying the complete PostgreSQL `Var` equality
+/// state. That limitation is retained here only so an existing v1 digest can still be rebound under
+/// exactly the contract that produced it.
 ///
-/// `Const` remains unsupported because PostgreSQL `_equalConst` compares the exact Datum using type
-/// length/by-value semantics; rendered SQL or type output is not an equivalent immutable
-/// representation. Unknown node kinds fail closed until their full equality schema and stable OID
-/// resolution are modeled.
-///
-/// `CoercionForm` and parse locations are deliberately absent because PostgreSQL 18 `equal()`
-/// explicitly ignores them. `FuncExpr` function identity includes the resolved result type in
-/// [`super::QualifiedFunctionSignature`]. `OpExpr` operator identity is resolved by its stable
-/// signature while the result type remains an explicit equality field.
+/// New authoritative equality claims must use [`validate_postgres18_equal_schema_v2`] and
+/// [`IndexExpressionNodeSchemaSnapshotV2`].
 pub fn validate_postgres18_equal_schema(
     expression: &CanonicalExpression,
 ) -> Result<(), ObservationError> {
     match expression {
-        CanonicalExpression::Column(_) | CanonicalExpression::WholeRow => Err(invalid()),
+        CanonicalExpression::Column(_) | CanonicalExpression::WholeRow => Ok(()),
         CanonicalExpression::Node { node_kind, fields } => {
             match node_kind.as_str() {
                 "FuncExpr" => validate_func_expr(fields)?,
                 "OpExpr" => validate_op_expr(fields)?,
-                _ => return Err(invalid()),
+                _ => return Err(invalid_v1()),
             }
-            validate_nested_fields(fields)
+            validate_nested_fields_v1(fields)
         }
     }
 }
 
-/// Immutable validation successor proving that one expression-semantics predecessor contains only
-/// supported, complete PostgreSQL 18 equality schemas.
+/// Validates the PostgreSQL 18 equality-schema v2 contract.
 ///
-/// This successor adds no source fact and does not rewrite its predecessor. Its digest frames the
-/// exact expression-semantics digest under a new domain only after every expression and predicate
-/// passes [`validate_postgres18_equal_schema`]. A concrete PostgreSQL adapter still has to extract
-/// the equality-participating fields from server node/catalog structures and pass differential
-/// attachment tests before production semantic parity can be claimed.
+/// V2 first requires the complete historical v1 node-field schema and then fails closed on the v1
+/// relation-`Var` leaves. PostgreSQL `CompareIndexInfo()` maps child `varattno` values and compares
+/// the resulting complete node tree with `equal()`. A column name alone therefore cannot prove the
+/// equality state of `vartype`, `vartypmod`, `varcollid`, `varnullingrels`, `varlevelsup`, or
+/// `varreturningtype`; a whole-row marker is likewise incomplete. Those leaves remain inadmissible
+/// until a later domain-separated Var-semantics successor represents or proves every material field.
+pub fn validate_postgres18_equal_schema_v2(
+    expression: &CanonicalExpression,
+) -> Result<(), ObservationError> {
+    validate_postgres18_equal_schema(expression)?;
+    reject_incomplete_var_leaves(expression)
+}
+
+/// Historical v1 validation successor for one exact expression-semantics predecessor.
+///
+/// This type is retained for digest-family stability. It is not sufficient for new authoritative
+/// PostgreSQL expression-equality claims when its predecessor contains relation `Var` leaves; use
+/// [`IndexExpressionNodeSchemaSnapshotV2`] for the current fail-closed contract.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexExpressionNodeSchemaSnapshot {
     source_connection_key: String,
@@ -68,7 +73,7 @@ pub struct IndexExpressionNodeSchemaSnapshot {
 }
 
 impl IndexExpressionNodeSchemaSnapshot {
-    /// Validates and frames one exact expression-semantics predecessor.
+    /// Validates and frames one exact expression-semantics predecessor under historical v1 rules.
     pub fn new(predecessor: &IndexExpressionSemanticsSnapshot) -> Result<Self, ObservationError> {
         for observation in predecessor.expression_observations() {
             validate_postgres18_equal_schema(observation.expression())?;
@@ -78,7 +83,7 @@ impl IndexExpressionNodeSchemaSnapshot {
         }
 
         let predecessor_digest = predecessor.snapshot_digest().to_owned();
-        let snapshot_digest = compute_digest(&predecessor_digest);
+        let snapshot_digest = compute_digest_v1(&predecessor_digest);
         Ok(Self {
             source_connection_key: predecessor.source_connection_key().to_owned(),
             connection_policy_binding: predecessor.connection_policy_binding().to_owned(),
@@ -101,13 +106,13 @@ impl IndexExpressionNodeSchemaSnapshot {
         &self.connection_policy_binding
     }
 
-    /// Returns the exact expression-semantics predecessor digest that was validated.
+    /// Returns the exact expression-semantics predecessor digest that v1 validated.
     #[must_use]
     pub fn predecessor_digest(&self) -> &str {
         &self.predecessor_digest
     }
 
-    /// Returns the domain-separated node-schema validation digest.
+    /// Returns the domain-separated historical v1 node-schema digest.
     #[must_use]
     pub fn snapshot_digest(&self) -> &str {
         &self.snapshot_digest
@@ -124,6 +129,107 @@ impl IndexExpressionNodeSchemaSnapshot {
     pub fn observed_at_utc(&self) -> &str {
         &self.observed_at_utc
     }
+}
+
+/// Domain-separated v2 successor proving that an exact v1 node-schema predecessor contains no
+/// incompletely represented relation `Var` leaves.
+///
+/// The constructor rebound-validates the supplied v1 snapshot from the exact expression-semantics
+/// predecessor before applying v2 validation. Its digest is derived from the exact v1 digest under
+/// a new domain and revision, so tightening the `Var` boundary does not redefine issued v1 identity.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IndexExpressionNodeSchemaSnapshotV2 {
+    source_connection_key: String,
+    connection_policy_binding: String,
+    predecessor_digest: String,
+    snapshot_digest: String,
+    extractor_revision: String,
+    observed_at_utc: String,
+}
+
+impl IndexExpressionNodeSchemaSnapshotV2 {
+    /// Rebound-validates v1 and frames the exact predecessor under the v2 fail-closed `Var` rule.
+    pub fn new(
+        expression_predecessor: &IndexExpressionSemanticsSnapshot,
+        v1_predecessor: &IndexExpressionNodeSchemaSnapshot,
+    ) -> Result<Self, ObservationError> {
+        validate_v1_predecessor(expression_predecessor, v1_predecessor)?;
+
+        for observation in expression_predecessor.expression_observations() {
+            validate_postgres18_equal_schema_v2(observation.expression())?;
+        }
+        for observation in expression_predecessor.predicate_observations() {
+            validate_postgres18_equal_schema_v2(observation.predicate())?;
+        }
+
+        let predecessor_digest = v1_predecessor.snapshot_digest().to_owned();
+        let snapshot_digest = compute_digest_v2(&predecessor_digest);
+        Ok(Self {
+            source_connection_key: v1_predecessor.source_connection_key().to_owned(),
+            connection_policy_binding: v1_predecessor.connection_policy_binding().to_owned(),
+            predecessor_digest,
+            snapshot_digest,
+            extractor_revision: v1_predecessor.extractor_revision().to_owned(),
+            observed_at_utc: v1_predecessor.observed_at_utc().to_owned(),
+        })
+    }
+
+    /// Returns the stable source registry key inherited from the exact v1 predecessor.
+    #[must_use]
+    pub fn source_connection_key(&self) -> &str {
+        &self.source_connection_key
+    }
+
+    /// Returns the immutable connection-policy binding inherited from the exact v1 predecessor.
+    #[must_use]
+    pub fn connection_policy_binding(&self) -> &str {
+        &self.connection_policy_binding
+    }
+
+    /// Returns the exact v1 node-schema digest rebound-validated by this successor.
+    #[must_use]
+    pub fn predecessor_digest(&self) -> &str {
+        &self.predecessor_digest
+    }
+
+    /// Returns the domain-separated v2 node-schema digest.
+    #[must_use]
+    pub fn snapshot_digest(&self) -> &str {
+        &self.snapshot_digest
+    }
+
+    /// Returns the exact extractor revision inherited from the bounded predecessor stack.
+    #[must_use]
+    pub fn extractor_revision(&self) -> &str {
+        &self.extractor_revision
+    }
+
+    /// Returns the exact canonical observation time inherited from the bounded predecessor stack.
+    #[must_use]
+    pub fn observed_at_utc(&self) -> &str {
+        &self.observed_at_utc
+    }
+}
+
+fn validate_v1_predecessor(
+    expression_predecessor: &IndexExpressionSemanticsSnapshot,
+    v1_predecessor: &IndexExpressionNodeSchemaSnapshot,
+) -> Result<(), ObservationError> {
+    if expression_predecessor.source_connection_key() != v1_predecessor.source_connection_key()
+        || expression_predecessor.connection_policy_binding()
+            != v1_predecessor.connection_policy_binding()
+        || expression_predecessor.extractor_revision() != v1_predecessor.extractor_revision()
+        || expression_predecessor.observed_at_utc() != v1_predecessor.observed_at_utc()
+        || expression_predecessor.snapshot_digest() != v1_predecessor.predecessor_digest()
+    {
+        return Err(invalid_v2());
+    }
+
+    let rebound = IndexExpressionNodeSchemaSnapshot::new(expression_predecessor)?;
+    if rebound.snapshot_digest() != v1_predecessor.snapshot_digest() {
+        return Err(invalid_v2());
+    }
+    Ok(())
 }
 
 fn validate_func_expr(fields: &[CanonicalExpressionField]) -> Result<(), ObservationError> {
@@ -192,7 +298,7 @@ fn require_exact_fields(
         .collect::<BTreeSet<_>>();
     let expected = expected.iter().copied().collect::<BTreeSet<_>>();
     if actual != expected || actual.len() != fields.len() {
-        return Err(invalid());
+        return Err(invalid_v1());
     }
     Ok(())
 }
@@ -207,10 +313,10 @@ fn require_value(
         .find(|field| field.name() == name)
         .map(CanonicalExpressionField::value)
     else {
-        return Err(invalid());
+        return Err(invalid_v1());
     };
     if !predicate(value) {
-        return Err(invalid());
+        return Err(invalid_v1());
     }
     Ok(())
 }
@@ -227,14 +333,14 @@ fn require_optional_collation(
     })
 }
 
-fn validate_nested_fields(fields: &[CanonicalExpressionField]) -> Result<(), ObservationError> {
+fn validate_nested_fields_v1(fields: &[CanonicalExpressionField]) -> Result<(), ObservationError> {
     for field in fields {
-        validate_nested_value(field.value())?;
+        validate_nested_value_v1(field.value())?;
     }
     Ok(())
 }
 
-fn validate_nested_value(value: &CanonicalExpressionValue) -> Result<(), ObservationError> {
+fn validate_nested_value_v1(value: &CanonicalExpressionValue) -> Result<(), ObservationError> {
     match value {
         CanonicalExpressionValue::Expression(expression) => {
             validate_postgres18_equal_schema(expression)
@@ -247,7 +353,7 @@ fn validate_nested_value(value: &CanonicalExpressionValue) -> Result<(), Observa
         }
         CanonicalExpressionValue::ValueList(values) => {
             for value in values {
-                validate_nested_value(value)?;
+                validate_nested_value_v1(value)?;
             }
             Ok(())
         }
@@ -263,10 +369,57 @@ fn validate_nested_value(value: &CanonicalExpressionValue) -> Result<(), Observa
     }
 }
 
-fn compute_digest(predecessor_digest: &str) -> String {
+fn reject_incomplete_var_leaves(expression: &CanonicalExpression) -> Result<(), ObservationError> {
+    match expression {
+        CanonicalExpression::Column(_) | CanonicalExpression::WholeRow => Err(invalid_v2()),
+        CanonicalExpression::Node { fields, .. } => {
+            for field in fields {
+                reject_incomplete_var_value(field.value())?;
+            }
+            Ok(())
+        }
+    }
+}
+
+fn reject_incomplete_var_value(value: &CanonicalExpressionValue) -> Result<(), ObservationError> {
+    match value {
+        CanonicalExpressionValue::Expression(expression) => reject_incomplete_var_leaves(expression),
+        CanonicalExpressionValue::ExpressionList(expressions) => {
+            for expression in expressions {
+                reject_incomplete_var_leaves(expression)?;
+            }
+            Ok(())
+        }
+        CanonicalExpressionValue::ValueList(values) => {
+            for value in values {
+                reject_incomplete_var_value(value)?;
+            }
+            Ok(())
+        }
+        CanonicalExpressionValue::Null
+        | CanonicalExpressionValue::Boolean(_)
+        | CanonicalExpressionValue::Integer(_)
+        | CanonicalExpressionValue::Text(_)
+        | CanonicalExpressionValue::Type(_)
+        | CanonicalExpressionValue::Collation(_)
+        | CanonicalExpressionValue::Operator(_)
+        | CanonicalExpressionValue::UnaryOperator(_)
+        | CanonicalExpressionValue::Function(_) => Ok(()),
+    }
+}
+
+fn compute_digest_v1(predecessor_digest: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(EXPRESSION_NODE_SCHEMA_DIGEST_DOMAIN_V1);
-    encode_str(&mut hasher, EXPRESSION_NODE_SCHEMA_REVISION);
+    encode_str(&mut hasher, EXPRESSION_NODE_SCHEMA_REVISION_V1);
+    encode_str(&mut hasher, predecessor_digest);
+    format!("{SHA256_DIGEST_PREFIX}{:x}", hasher.finalize())
+}
+
+fn compute_digest_v2(predecessor_digest: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(EXPRESSION_NODE_SCHEMA_DIGEST_DOMAIN_V2);
+    encode_str(&mut hasher, EXPRESSION_NODE_SCHEMA_REVISION_V2);
     encode_str(&mut hasher, predecessor_digest);
     format!("{SHA256_DIGEST_PREFIX}{:x}", hasher.finalize())
 }
@@ -277,8 +430,14 @@ fn encode_str(hasher: &mut Sha256, value: &str) {
     hasher.update(value.as_bytes());
 }
 
-fn invalid() -> ObservationError {
+fn invalid_v1() -> ObservationError {
     ObservationError::InvalidObservationField {
         field: "canonical_expression_node_schema",
+    }
+}
+
+fn invalid_v2() -> ObservationError {
+    ObservationError::InvalidObservationField {
+        field: "canonical_expression_node_schema_v2",
     }
 }
