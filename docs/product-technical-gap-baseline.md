@@ -40,23 +40,30 @@ Decision records include `docs/doctoring/postgresql-index-partition-operator-fam
 
 PostgreSQL 18 `CompareIndexInfo()` maps child `ii_Expressions` and `ii_Predicate` through the partition attribute map, rejects an unpreservable child whole-row reference, and then applies internal `equal()` rather than rendered-text equality. Production `697597edb4f40e1dffedd7fcfd2f54cfaea91c87`, exported by `09028cc1945e078aee0f661b15bb01a11ec80365`, introduced `IndexExpressionSemanticsSnapshot`. Raw `pg_get_expr`, `pg_node_tree`/`nodeToString`, and reconstructed DDL remain invalid semantic substitutes.
 
-Review `5201557492`, RED `cbf819f55b1ef54360c1ae47b2a23317d4a2dd23`, contract correction `fdc78e63fed2e933cd25ae8105541f7deadcecf3`, production `0c7e12d05c0da2bf279cc94a13a180043ae6dbd5`, and export `d7767cf93cc02cea684c039ba3c1385ab9143999` added the versioned PostgreSQL-18 equality-schema gate. `FuncExpr` and `OpExpr` require their complete modeled equality field sets; `Const` and unknown node kinds remain fail closed.
+Review `5201557492`, RED `cbf819f55b1ef54360c1ae47b2a23317d4a2dd23`, contract correction `fdc78e63fed2e933cd25ae8105541f7deadcecf3`, production `0c7e12d05c0da2bf279cc94a13a180043ae6dbd5`, and export `d7767cf93cc02cea684c039ba3c1385ab9143999` introduced the historical `node_schema.v1` gate. V1 models complete field sets for supported `FuncExpr`/`OpExpr` nodes and rejects `Const`/unknown nodes, but historically admits relation-local `Column`/`WholeRow` leaves without complete PostgreSQL `Var` equality state.
 
-### Relation `Var` equality — unsafe completeness removed, full successor still open
+### Relation `Var` equality — v1 preserved, v2 fail-closed successor source repaired
 
-Review `5202734131` found that `validate_postgres18_equal_schema()` still accepted `CanonicalExpression::Column(String)` as a complete PostgreSQL `Var` leaf. That representation preserves attribute-map-normalized column identity but not every field PostgreSQL 18 `equal()` still compares after `map_variable_attnos()` copies the complete child `Var` and changes only the mapped attribute number.
+Review `5202734131` found that a column-name-only `CanonicalExpression::Column` could be certified by v1 even though PostgreSQL 18 `CompareIndexInfo()` calls `map_variable_attnos()` and then `equal()` on the complete mapped tree. `map_variable_attnos_mutator()` copies the complete child `Var` and changes only the mapped attribute number (plus the equality-ignored syntactic attribute when applicable), so material `Var` fields remain part of PostgreSQL equality.
 
-- Behavioral source RED `60fe5da642bf32db0d6487a9c9a1f998dcfd39fe` requires `Column` and `WholeRow` leaves to fail closed at the complete equality-schema gate.
-- Test-contract isolation `3eac59e2d8d50fe1d154b9d5cedd01f341ce5edd` keeps positive `FuncExpr`/`OpExpr` schema tests independent by using a complete zero-argument function leaf rather than an incomplete relation `Var`.
-- Minimal production repair `afbecf97fb126bfb59edb95911d7214d375849c9` rejects current `Column`/`WholeRow` leaves in `validate_postgres18_equal_schema()`, including nested occurrences. The expression-semantics predecessor remains unchanged and its digest family is not rewritten.
+Behavioral source RED `60fe5da642bf32db0d6487a9c9a1f998dcfd39fe` demonstrated the unsafe completeness claim. Test-contract isolation `3eac59e2d8d50fe1d154b9d5cedd01f341ce5edd` separated positive `FuncExpr`/`OpExpr` schema controls from incomplete relation Vars.
 
-A later domain-separated relation-`Var` successor must preserve or prove the PostgreSQL equality state for target-relation role, attribute-map-normalized column identity, stable qualified value type, exact raw type modifier, stable qualified collation, nulling relations, `varlevelsup`, and `varreturningtype`. PostgreSQL-equality-ignored `varnosyn`, `varattnosyn`, and parse location must stay out of governed identity. Decision record: `docs/doctoring/postgresql-expression-var-equality-integrity.md`.
+The first production attempt `afbecf97fb126bfb59edb95911d7214d375849c9` hardened v1 in place. Review `5202777524` correctly rejected that approach: changing the validator while retaining the same `node_schema.v1` digest domain/revision would redefine what an existing immutable v1 digest proves.
 
-This repair intentionally narrows admissible complete schemas. It does not claim the concrete PostgreSQL semantic-expression extractor or attachment differential oracle is finished.
+The repair is now versioned:
+
+- preservation RED `af93518aa6d4467abe680a4fee225278aad41780` requires v1 to keep its original `Column`/`WholeRow` admission behavior;
+- production `969b193f14d37af80d5f9522ab289792e2a2b2f3` restores v1 semantics and adds `validate_postgres18_equal_schema_v2()` plus `IndexExpressionNodeSchemaSnapshotV2` under `node_schema.v2` / revision `postgresql-18-equal-supported-v2-var-safe`;
+- v2 rebound-validates the exact expression-semantics predecessor and exact v1 digest before applying the stricter leaf rule, then hashes the v1 digest under the new domain;
+- regression `bdaa26c9f20627a1275a9163e8aae98ea37fd614` locks both contracts: v1 remains historically reproducible; v2 rejects current `Column`/`WholeRow` leaves and accepts modeled no-Var `FuncExpr`/`OpExpr` trees.
+
+A later domain-separated relation-`Var` semantic successor must preserve or prove target-relation role, attribute-map-normalized column identity, stable qualified value type, exact raw type modifier, stable qualified collation, nulling relations, `varlevelsup`, and `varreturningtype`. PostgreSQL-equality-ignored `varnosyn`, `varattnosyn`, and parse location must stay out of governed identity. Decision record: `docs/doctoring/postgresql-expression-var-equality-integrity.md`.
+
+This repair removes the unsafe authoritative path without rewriting v1. It does not claim the concrete PostgreSQL semantic-expression extractor or attachment differential oracle is finished.
 
 ## Current state
 
-**NOT_NULL_CONSTRAINT_SOURCE_REPAIRED / RELATION_PARTITION_SOURCE_REPAIRED / RELATION_PARTITION_ROWTYPE_MAPPING_SOURCE_REPAIRED / RELATION_PARTITION_NOT_NULL_INHERITANCE_SOURCE_REPAIRED / RELATION_PARTITION_STRUCTURED_ATTTYPMOD_SOURCE_REPAIRED / INDEX_PARTITION_TOPOLOGY_SOURCE_REPAIRED / INDEX_PARTITION_VALIDITY_SOURCE_REPAIRED / INDEX_PARTITION_UNIQUENESS_SOURCE_REPAIRED / INDEX_PARTITION_NULLS_NOT_DISTINCT_SOURCE_REPAIRED / INDEX_PARTITION_ACCESS_METHOD_SOURCE_REPAIRED / INDEX_PARTITION_ATTRIBUTE_MAPPING_SOURCE_REPAIRED / INDEX_PARTITION_COLLATION_SOURCE_REPAIRED / INDEX_PARTITION_OPERATOR_FAMILY_SOURCE_REPAIRED / INDEX_PARTITION_EXCLUSION_SOURCE_REPAIRED / INDEX_PARTITION_EXPRESSION_PREDICATE_REPRESENTATION_REPAIRED / INDEX_EXPRESSION_NODE_SCHEMA_SOURCE_REPAIRED / INDEX_EXPRESSION_VAR_INCOMPLETE_FAIL_CLOSED / POSTGRESQL_EXPRESSION_VAR_SUCCESSOR_OPEN / POSTGRESQL_EXPRESSION_EXTRACTOR_DIFFERENTIAL_OPEN / POSTGRESQL_ATTTYPMOD_ADAPTER_DIFFERENTIAL_OPEN / ACCEPTANCE_PENDING**.
+**NOT_NULL_CONSTRAINT_SOURCE_REPAIRED / RELATION_PARTITION_SOURCE_REPAIRED / RELATION_PARTITION_ROWTYPE_MAPPING_SOURCE_REPAIRED / RELATION_PARTITION_NOT_NULL_INHERITANCE_SOURCE_REPAIRED / RELATION_PARTITION_STRUCTURED_ATTTYPMOD_SOURCE_REPAIRED / INDEX_PARTITION_TOPOLOGY_SOURCE_REPAIRED / INDEX_PARTITION_VALIDITY_SOURCE_REPAIRED / INDEX_PARTITION_UNIQUENESS_SOURCE_REPAIRED / INDEX_PARTITION_NULLS_NOT_DISTINCT_SOURCE_REPAIRED / INDEX_PARTITION_ACCESS_METHOD_SOURCE_REPAIRED / INDEX_PARTITION_ATTRIBUTE_MAPPING_SOURCE_REPAIRED / INDEX_PARTITION_COLLATION_SOURCE_REPAIRED / INDEX_PARTITION_OPERATOR_FAMILY_SOURCE_REPAIRED / INDEX_PARTITION_EXCLUSION_SOURCE_REPAIRED / INDEX_PARTITION_EXPRESSION_PREDICATE_REPRESENTATION_REPAIRED / INDEX_EXPRESSION_NODE_SCHEMA_V1_PRESERVED / INDEX_EXPRESSION_NODE_SCHEMA_V2_VAR_SAFE_SOURCE_REPAIRED / POSTGRESQL_EXPRESSION_VAR_SUCCESSOR_OPEN / POSTGRESQL_EXPRESSION_EXTRACTOR_DIFFERENTIAL_OPEN / POSTGRESQL_ATTTYPMOD_ADAPTER_DIFFERENTIAL_OPEN / ACCEPTANCE_PENDING**.
 
 ## Acceptance boundary
 
@@ -64,7 +71,7 @@ No executed Rust RED/GREEN or hosted Product acceptance is claimed for the moved
 
 ## Next causal work
 
-1. Add the domain-separated PostgreSQL 18 relation-`Var` semantic successor. Re-admit a relation variable only after every `equal()`-participating field is represented with stable identity or proven fixed at the stored-index boundary.
+1. Add the domain-separated PostgreSQL 18 relation-`Var` semantic successor on top of `IndexExpressionNodeSchemaSnapshotV2`. Re-admit a relation variable only after every `equal()`-participating field is represented with stable identity or proven fixed at the stored-index boundary.
 2. Implement the concrete PostgreSQL 18 semantic-expression extractor. It must emit only supported complete node/leaf schemas, resolve OIDs to stable coordinates, and reject unsupported nodes rather than degrade to text.
 3. Add a live PostgreSQL differential oracle comparing ConceptWeave admission with PostgreSQL's actual index-partition attachment outcome, including attribute-order mapping and Var type/typmod/collation mismatch cases.
 4. Add typed constant/Datum semantics and additional node schemas only when PostgreSQL 18 equality can be represented completely; do not broaden generic node acceptance first.
