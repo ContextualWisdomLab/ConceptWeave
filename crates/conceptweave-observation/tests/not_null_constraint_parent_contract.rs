@@ -74,7 +74,8 @@ fn child_constraint_with_state(
         parent_relation_name,
         RelationKind::PartitionedTable,
         "metric_raw_value_not_null",
-    )?)
+    )?)?
+    .with_partition_parent_relation("public", parent_relation_name)
 }
 
 fn child_constraint(parent_relation_name: &str) -> NotNullConstraintObservation {
@@ -109,6 +110,8 @@ fn partitioned_constraint_with_parent(
         .expect("partition parent coordinate is valid"),
     )
     .expect("non-self parent coordinate can be attached before family validation")
+    .with_partition_parent_relation("public", parent_relation_name)
+    .expect("direct partition-parent witness is valid")
 }
 
 fn snapshot(
@@ -193,11 +196,68 @@ fn partition_parent_constraint_requires_direct_relation_witness() {
         vec![parent_relation("metric"), child_relation()],
         Vec::new(),
         Vec::new(),
-        vec![parent_constraint("metric"), child_constraint("metric")],
+        vec![
+            parent_constraint("metric"),
+            NotNullConstraintObservation::new(
+                "public",
+                "metric_2026",
+                RelationKind::Table,
+                "metric_raw_value_not_null",
+                "raw_value",
+                true,
+                true,
+                false,
+                1,
+                false,
+            )
+            .expect("partition-child NOT NULL constraint is valid before parent attachment")
+            .with_parent_constraint(
+                ParentNotNullConstraintCoordinate::new(
+                    "public",
+                    "metric",
+                    RelationKind::PartitionedTable,
+                    "metric_raw_value_not_null",
+                )
+                .expect("partition parent coordinate is valid"),
+            )
+            .expect("conparentid attachment remains structurally valid before family validation"),
+        ],
     )
     .expect_err(
         "conparentid cannot establish that the referenced partitioned table is the child's direct pg_inherits parent",
     );
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "not_null_constraint_partition_parent_relation",
+        }
+    );
+}
+
+#[test]
+fn mismatched_partition_parent_relation_witness_is_rejected() {
+    let child = child_constraint("metric")
+        .with_partition_parent_relation("public", "metric_archive")
+        .expect("the raw pg_inherits coordinate is syntactically valid before family validation");
+    let error = PostgresSchemaSnapshotV3::new_with_not_null_constraints(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-14T05:42:00Z",
+        vec![
+            parent_relation("metric"),
+            parent_relation("metric_archive"),
+            child_relation(),
+        ],
+        Vec::new(),
+        Vec::new(),
+        vec![
+            parent_constraint("metric"),
+            parent_constraint("metric_archive"),
+            child,
+        ],
+    )
+    .expect_err("the pg_inherits direct parent must match the relation owning conparentid");
 
     assert_eq!(
         error,
