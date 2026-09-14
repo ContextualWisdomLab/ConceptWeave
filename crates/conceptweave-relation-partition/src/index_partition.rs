@@ -11,3 +11,7 @@ pub use operator_family::*;
 #[path = "exclusion.rs"]
 mod exclusion;
 pub use exclusion::*;
+
+#[path = "expression_semantics.rs"]
+mod expression_semantics;
+pub use expression_semantics::*;
