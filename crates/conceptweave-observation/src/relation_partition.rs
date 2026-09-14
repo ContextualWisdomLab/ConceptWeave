@@ -9,9 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use sha2::{Digest, Sha256};
 
-use crate::{
-    NotNullConstraintObservation, ObservationError, PostgresSchemaSnapshotV3, RelationKind,
-};
+use crate::{ObservationError, PostgresSchemaSnapshotV3, RelationKind};
 
 const RELATION_PARTITION_DIGEST_DOMAIN_V1: &[u8] =
     b"conceptweave.postgres_schema_snapshot.v3.relation_partition.v1";
@@ -539,9 +537,7 @@ fn validate_not_null_partition_witnesses(
     };
 
     for not_null in not_null_constraints {
-        let Some((parent_schema_name, parent_relation_name)) =
-            not_null.partition_parent_relation()
-        else {
+        let Some(parent_constraint) = not_null.parent_constraint() else {
             continue;
         };
         let membership = observations.iter().find(|observation| {
@@ -553,8 +549,8 @@ fn validate_not_null_partition_witnesses(
             .filter(|observation| observation.is_partition())
             .and_then(RelationPartitionObservation::parent_relation)
             .is_some_and(|parent| {
-                parent.schema_name() == parent_schema_name
-                    && parent.relation_name() == parent_relation_name
+                parent.schema_name() == parent_constraint.schema_name()
+                    && parent.relation_name() == parent_constraint.relation_name()
             });
         if !agrees {
             return Err(ObservationError::InvalidObservationField {
@@ -603,6 +599,3 @@ fn encode_str(hasher: &mut Sha256, value: &str) {
 fn encode_bool(hasher: &mut Sha256, value: bool) {
     hasher.update([u8::from(value)]);
 }
-
-#[allow(dead_code)]
-fn _not_null_type_anchor(_: &NotNullConstraintObservation) {}
