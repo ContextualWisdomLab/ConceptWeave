@@ -85,6 +85,8 @@ fn partition_child_constraint(
         .expect("parent constraint coordinate is valid"),
     )
     .expect("partition-child parent linkage state is valid")
+    .with_partition_parent_relation("public", "metric")
+    .expect("direct partition-parent witness is valid")
 }
 
 #[test]
