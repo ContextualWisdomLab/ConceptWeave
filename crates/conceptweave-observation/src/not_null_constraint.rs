@@ -168,6 +168,14 @@ impl NotNullConstraintObservation {
                 field: "not_null_constraint_parent_inheritance_ancestor_count",
             });
         }
+        // A nonzero conparentid represents the inherited copy of a partitioned-table constraint.
+        // PostgreSQL requires parent NOT NULL constraints to remain inheritable across partitions;
+        // accepting NO INHERIT here would turn an impossible partition tuple into governed identity.
+        if self.no_inherit {
+            return Err(ObservationError::InvalidObservationField {
+                field: "not_null_constraint_parent_no_inherit",
+            });
+        }
         if self.schema_name == parent_constraint.schema_name
             && self.relation_name == parent_constraint.relation_name
             && self.relation_kind == parent_constraint.relation_kind
