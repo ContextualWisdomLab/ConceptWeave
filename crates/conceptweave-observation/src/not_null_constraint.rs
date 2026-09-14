@@ -135,6 +135,14 @@ impl NotNullConstraintObservation {
                 field: "not_null_constraint_inheritance_ancestor_count",
             });
         }
+        // PostgreSQL creates an inherited-only NOT NULL with at least one inheritance ancestor.
+        // `conislocal=false` with `coninhcount=0` has neither a local origin nor an inherited one,
+        // so accepting it would grant governed identity to caller-fabricated catalog evidence.
+        if !is_local && inheritance_ancestor_count == 0 {
+            return Err(ObservationError::InvalidObservationField {
+                field: "not_null_constraint_inheritance_origin",
+            });
+        }
         // PostgreSQL 18 requires NOT NULL constraints declared on a partitioned table to be
         // inherited by every partition. A partitioned-table `NO INHERIT` row is therefore not
         // source-representable evidence and must not acquire a governed semantic identity.
