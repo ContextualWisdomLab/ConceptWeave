@@ -69,7 +69,7 @@ fn index(name: &str, collation_name: &str) -> IndexObservation {
         name,
         false,
         Some(false),
-        vec![IndexAttributeObservation::new(1, IndexAttributeKind::Key, "id").unwrap()],
+        vec![IndexAttributeObservation::new(1, IndexAttributeKind::Key, "label").unwrap()],
         vec![],
     )
     .unwrap()
@@ -78,7 +78,7 @@ fn index(name: &str, collation_name: &str) -> IndexObservation {
         IndexKeySemantics::new(
             1,
             Some(QualifiedCollationName::new("pg_catalog", collation_name).unwrap()),
-            QualifiedOperatorClassName::new("pg_catalog", "int8_ops").unwrap(),
+            QualifiedOperatorClassName::new("pg_catalog", "text_ops").unwrap(),
             0,
         )
         .unwrap(),
@@ -98,10 +98,10 @@ fn relation(
         name,
         kind,
         vec![ColumnObservationV3::new(
-            "id",
+            "label",
             1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+            "text",
+            QualifiedTypeName::new("pg_catalog", "text").unwrap(),
             true,
             None,
         )
@@ -117,7 +117,7 @@ fn parent_index() -> IndexPartitionCoordinate {
         "public",
         "events",
         RelationKind::PartitionedTable,
-        "events_id_idx",
+        "events_label_idx",
     )
     .unwrap()
 }
@@ -127,7 +127,7 @@ fn child_index() -> IndexPartitionCoordinate {
         "public",
         "events_2026",
         RelationKind::Table,
-        "events_2026_id_idx",
+        "events_2026_label_idx",
     )
     .unwrap()
 }
@@ -144,13 +144,13 @@ fn snapshots(
             relation(
                 "events",
                 RelationKind::PartitionedTable,
-                "events_id_idx",
+                "events_label_idx",
                 parent_collation,
             ),
             relation(
                 "events_2026",
                 RelationKind::Table,
-                "events_2026_id_idx",
+                "events_2026_label_idx",
                 child_collation,
             ),
         ],
