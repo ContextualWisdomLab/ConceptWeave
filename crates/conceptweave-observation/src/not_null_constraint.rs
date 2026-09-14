@@ -119,6 +119,14 @@ impl NotNullConstraintObservation {
         crate::model::validate_nonblank(&relation_name, "relation_name")?;
         crate::model::validate_nonblank(&constraint_name, "not_null_constraint_name")?;
         crate::model::validate_nonblank(&column_name, "not_null_constraint_column_name")?;
+        // PostgreSQL 18 supports NOT ENFORCED only for CHECK and foreign-key constraints.
+        // A first-class NOT NULL row with conenforced=false is therefore not source-representable
+        // evidence and must fail closed before it can acquire governed identity.
+        if !enforced {
+            return Err(ObservationError::InvalidObservationField {
+                field: "not_null_constraint_enforcement",
+            });
+        }
         // PostgreSQL 18 stores pg_constraint.coninhcount as signed int2. Preserve the nonnegative
         // count in the public model, but reject values the source catalog cannot represent.
         if inheritance_ancestor_count > 32_767 {
