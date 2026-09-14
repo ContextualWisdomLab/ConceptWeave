@@ -1,6 +1,4 @@
-use conceptweave_observation::{
-    ObservationError, QualifiedCollationName, QualifiedTypeName,
-};
+use conceptweave_observation::{ObservationError, QualifiedTypeName};
 use conceptweave_relation_partition::{
     validate_postgres18_equal_schema, CanonicalExpression, CanonicalExpressionField,
     CanonicalExpressionValue, QualifiedFunctionSignature, QualifiedOperatorSignature,
@@ -61,6 +59,36 @@ fn incomplete_op_expr() -> CanonicalExpression {
                     CanonicalExpression::column("account_id").unwrap(),
                     CanonicalExpression::column("account_id").unwrap(),
                 ]),
+            ),
+        ],
+    )
+    .unwrap()
+}
+
+fn complete_zero_arg_func_expr() -> CanonicalExpression {
+    let float8 = QualifiedTypeName::new("pg_catalog", "float8").unwrap();
+    CanonicalExpression::node(
+        "FuncExpr",
+        vec![
+            field(
+                "function",
+                CanonicalExpressionValue::Function(
+                    QualifiedFunctionSignature::new(
+                        "pg_catalog",
+                        "pi",
+                        vec![],
+                        float8,
+                    )
+                    .unwrap(),
+                ),
+            ),
+            field("returns_set", CanonicalExpressionValue::Boolean(false)),
+            field("variadic", CanonicalExpressionValue::Boolean(false)),
+            field("result_collation", CanonicalExpressionValue::Null),
+            field("input_collation", CanonicalExpressionValue::Null),
+            field(
+                "arguments",
+                CanonicalExpressionValue::ExpressionList(vec![]),
             ),
         ],
     )
@@ -147,48 +175,12 @@ fn relation_var_leaves_fail_closed_until_their_full_equal_schema_is_modeled() {
 }
 
 #[test]
-fn supported_func_and_op_nodes_accept_complete_equal_schemas() {
-    let text = QualifiedTypeName::new("pg_catalog", "text").unwrap();
-    let default_collation =
-        QualifiedCollationName::new("pg_catalog", "default").unwrap();
-    let func = CanonicalExpression::node(
-        "FuncExpr",
-        vec![
-            field(
-                "function",
-                CanonicalExpressionValue::Function(
-                    QualifiedFunctionSignature::new(
-                        "pg_catalog",
-                        "lower",
-                        vec![text.clone()],
-                        text,
-                    )
-                    .unwrap(),
-                ),
-            ),
-            field("returns_set", CanonicalExpressionValue::Boolean(false)),
-            field("variadic", CanonicalExpressionValue::Boolean(false)),
-            field(
-                "result_collation",
-                CanonicalExpressionValue::Collation(default_collation.clone()),
-            ),
-            field(
-                "input_collation",
-                CanonicalExpressionValue::Collation(default_collation),
-            ),
-            field(
-                "arguments",
-                CanonicalExpressionValue::ExpressionList(vec![
-                    CanonicalExpression::column("account_email").unwrap(),
-                ]),
-            ),
-        ],
-    )
-    .unwrap();
+fn supported_func_and_op_nodes_accept_complete_equal_schemas_without_incomplete_var_leaves() {
+    let func = complete_zero_arg_func_expr();
     validate_postgres18_equal_schema(&func)
         .expect("all PostgreSQL 18 FuncExpr equality fields are represented");
 
-    let int4 = QualifiedTypeName::new("pg_catalog", "int4").unwrap();
+    let float8 = QualifiedTypeName::new("pg_catalog", "float8").unwrap();
     let bool_type = QualifiedTypeName::new("pg_catalog", "bool").unwrap();
     let op = CanonicalExpression::node(
         "OpExpr",
@@ -199,8 +191,8 @@ fn supported_func_and_op_nodes_accept_complete_equal_schemas() {
                     QualifiedOperatorSignature::new(
                         "pg_catalog",
                         ">",
-                        int4.clone(),
-                        int4,
+                        float8.clone(),
+                        float8,
                     )
                     .unwrap(),
                 ),
@@ -212,8 +204,8 @@ fn supported_func_and_op_nodes_accept_complete_equal_schemas() {
             field(
                 "arguments",
                 CanonicalExpressionValue::ExpressionList(vec![
-                    CanonicalExpression::column("account_id").unwrap(),
-                    CanonicalExpression::column("account_id").unwrap(),
+                    complete_zero_arg_func_expr(),
+                    complete_zero_arg_func_expr(),
                 ]),
             ),
         ],
