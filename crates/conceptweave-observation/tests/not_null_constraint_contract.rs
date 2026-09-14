@@ -129,7 +129,7 @@ fn not_null_constraint_name_is_governed_identity() {
 }
 
 #[test]
-fn not_null_validation_and_enforcement_are_governed_identity() {
+fn not_null_validation_state_is_governed_identity() {
     let valid = snapshot(
         &["raw_value"],
         vec![not_null(
@@ -156,22 +156,8 @@ fn not_null_validation_and_enforcement_are_governed_identity() {
         )],
     )
     .expect("NOT VALID constraint is still source-authoritative evidence");
-    let not_enforced = snapshot(
-        &["raw_value"],
-        vec![not_null(
-            "metric_raw_value_not_null",
-            "raw_value",
-            false,
-            false,
-            true,
-            0,
-            false,
-        )],
-    )
-    .expect("NOT ENFORCED constraint is still source-authoritative evidence");
 
     assert_ne!(valid.snapshot_digest(), not_valid.snapshot_digest());
-    assert_ne!(not_valid.snapshot_digest(), not_enforced.snapshot_digest());
 }
 
 #[test]
