@@ -5,6 +5,7 @@
 //! tables. Direct index-parent relationships and detach state are recorded in `pg_inherits`. This
 //! module preserves those facts without changing the predecessor relation-partition digest.
 
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
 use conceptweave_observation::{ObservationError, PostgresSchemaSnapshotV3, RelationKind};
@@ -35,12 +36,35 @@ impl IndexRelationKind {
 }
 
 /// Exact source coordinate of one index nested under its owning relation.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexPartitionCoordinate {
     schema_name: String,
     relation_name: String,
     relation_kind: RelationKind,
     index_name: String,
+}
+
+impl Ord for IndexPartitionCoordinate {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (
+            self.schema_name.as_str(),
+            self.relation_name.as_str(),
+            self.relation_kind.token(),
+            self.index_name.as_str(),
+        )
+            .cmp(&(
+                other.schema_name.as_str(),
+                other.relation_name.as_str(),
+                other.relation_kind.token(),
+                other.index_name.as_str(),
+            ))
+    }
+}
+
+impl PartialOrd for IndexPartitionCoordinate {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl IndexPartitionCoordinate {
