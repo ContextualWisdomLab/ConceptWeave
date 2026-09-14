@@ -396,6 +396,17 @@ pub(crate) fn canonicalize_not_null_constraints(
                 field: "not_null_constraint_coordinate",
             });
         };
+        if relation
+            .constraints()
+            .iter()
+            .any(|constraint| constraint.constraint_name() == observation.constraint_name())
+        {
+            return Err(ObservationError::DuplicateConstraintName {
+                schema_name: observation.schema_name().to_owned(),
+                table_name: observation.relation_name().to_owned(),
+                constraint_name: observation.constraint_name().to_owned(),
+            });
+        }
         let column = relation
             .columns()
             .iter()
