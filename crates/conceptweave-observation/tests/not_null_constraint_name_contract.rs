@@ -37,6 +37,7 @@ fn constraint(column_name: &str) -> NotNullConstraintObservation {
 fn relation(
     relation_name: &str,
     column_name: &str,
+    nullable: bool,
     standard_constraint_name: Option<&str>,
 ) -> RelationObservation {
     let relation = RelationObservation::new(
@@ -49,7 +50,7 @@ fn relation(
                 1,
                 "numeric",
                 catalog_type("numeric"),
-                false,
+                nullable,
                 None,
             )
             .expect("column fixture is valid"),
@@ -124,7 +125,7 @@ fn duplicate_not_null_constraint_name_on_one_relation_fails_closed() {
 
 #[test]
 fn not_null_name_colliding_with_other_constraint_kind_on_same_relation_fails_closed() {
-    let relation = relation("metric", "raw_value", Some("metric_required"));
+    let relation = relation("metric", "raw_value", false, Some("metric_required"));
 
     let error = PostgresSchemaSnapshotV3::new_with_not_null_constraints(
         &support::authorized_source("warehouse_primary", &["public"]),
@@ -149,8 +150,10 @@ fn not_null_name_colliding_with_other_constraint_kind_on_same_relation_fails_clo
 
 #[test]
 fn same_constraint_name_on_different_relations_remains_valid() {
-    let metric = relation("metric", "raw_value", Some("shared_constraint_name"));
-    let sample = relation("sample", "sample_value", None);
+    // Keep the CHECK-only relation nullable so NOT NULL-family completeness does not require an
+    // unrelated NOT NULL row there; the sample relation is the sole non-null column in this fixture.
+    let metric = relation("metric", "raw_value", true, Some("shared_constraint_name"));
+    let sample = relation("sample", "sample_value", false, None);
 
     PostgresSchemaSnapshotV3::new_with_not_null_constraints(
         &support::authorized_source("warehouse_primary", &["public"]),
