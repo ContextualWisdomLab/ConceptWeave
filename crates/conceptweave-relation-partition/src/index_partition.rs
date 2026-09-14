@@ -474,6 +474,14 @@ fn canonicalize_index_partitions(
             if parent_observation.index_relation_kind() != IndexRelationKind::PartitionedIndex {
                 return Err(invalid("index_partition_parent_kind"));
             }
+
+            let child_definition = find_base_index(base_snapshot, coordinate)
+                .ok_or_else(|| invalid("index_partition_owner_coordinate"))?;
+            let parent_definition = find_base_index(base_snapshot, parent_index)
+                .ok_or_else(|| invalid("index_partition_parent_coordinate"))?;
+            if child_definition.is_unique() != parent_definition.is_unique() {
+                return Err(invalid("index_partition_definition_uniqueness"));
+            }
         }
     }
 
