@@ -139,6 +139,14 @@ impl NotNullConstraintObservation {
                 field: "not_null_constraint_enforcement",
             });
         }
+        // PostgreSQL 18 ALTER FOREIGN TABLE supports NOT VALID only for CHECK. Foreign-table
+        // NOT NULL constraints may vary in enforcement state but cannot be source-created as
+        // NOT VALID, so reject that impossible catalog tuple before it receives governed identity.
+        if relation_kind == RelationKind::ForeignTable && !validated {
+            return Err(ObservationError::InvalidObservationField {
+                field: "not_null_constraint_foreign_validation",
+            });
+        }
         // PostgreSQL 18 stores pg_constraint.coninhcount as signed int2. Preserve the nonnegative
         // count in the public model, but reject values the source catalog cannot represent.
         if inheritance_ancestor_count > 32_767 {
