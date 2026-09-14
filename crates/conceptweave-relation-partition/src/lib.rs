@@ -311,10 +311,10 @@ impl RelationPartitionSourceReceipt {
 ///
 /// Every bounded relation must receive one explicit `relispartition` observation, making observed
 /// false distinct from unobserved family absence. Positive membership resolves to an observed
-/// partitioned-table parent, detach-pending topology fails closed, the parent graph must be acyclic,
-/// and PostgreSQL 18 NOT NULL evidence must agree bidirectionally with the same direct relation edge.
-/// The successor digest frames the predecessor digest in a new domain, preserving the frozen v3
-/// identity contract.
+/// partitioned-table parent, requires a valid PostgreSQL name/type rowtype map, detach-pending
+/// topology fails closed, the parent graph must be acyclic, and PostgreSQL 18 NOT NULL evidence must
+/// agree bidirectionally with the same direct relation edge. The successor digest frames the
+/// predecessor digest in a new domain, preserving the frozen v3 identity contract.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RelationPartitionSnapshot {
     source_connection_key: String,
@@ -466,9 +466,72 @@ fn canonicalize_relation_partitions(
         }
     }
 
+    validate_partition_rowtypes(base_snapshot, &observations)?;
     validate_parent_graph(&observations)?;
     validate_not_null_partition_witnesses(base_snapshot, &observations)?;
     Ok(observations)
+}
+
+fn validate_partition_rowtypes(
+    base_snapshot: &PostgresSchemaSnapshotV3,
+    observations: &[RelationPartitionObservation],
+) -> Result<(), ObservationError> {
+    for membership in observations.iter().filter(|observation| observation.is_partition()) {
+        let Some(parent_coordinate) = membership.parent_relation() else {
+            continue;
+        };
+        let child_relation = base_snapshot
+            .relations()
+            .iter()
+            .find(|relation| {
+                relation.schema_name() == membership.schema_name()
+                    && relation.relation_name() == membership.relation_name()
+                    && relation.kind() == membership.relation_kind()
+            })
+            .ok_or_else(|| invalid("relation_partition_child_coordinate"))?;
+        let parent_relation = base_snapshot
+            .relations()
+            .iter()
+            .find(|relation| {
+                relation.schema_name() == parent_coordinate.schema_name()
+                    && relation.relation_name() == parent_coordinate.relation_name()
+                    && relation.kind() == RelationKind::PartitionedTable
+            })
+            .ok_or_else(|| invalid("relation_partition_parent_coordinate"))?;
+
+        let parent_columns = parent_relation
+            .columns()
+            .iter()
+            .map(|column| (column.column_name(), column))
+            .collect::<BTreeMap<_, _>>();
+        let child_columns = child_relation
+            .columns()
+            .iter()
+            .map(|column| (column.column_name(), column))
+            .collect::<BTreeMap<_, _>>();
+
+        if parent_columns.keys().copied().collect::<BTreeSet<_>>()
+            != child_columns.keys().copied().collect::<BTreeSet<_>>()
+        {
+            return Err(invalid("relation_partition_column_mapping"));
+        }
+
+        for (column_name, parent_column) in parent_columns {
+            let child_column = child_columns
+                .get(column_name)
+                .expect("column-name sets were verified equal");
+            if parent_column.type_binding() != child_column.type_binding() {
+                return Err(invalid("relation_partition_column_type"));
+            }
+            if parent_column.data_type() != child_column.data_type() {
+                // Frozen v3 does not yet expose pg_attribute.atttypmod structurally. Its exact
+                // adapter-rendered data-type text is therefore the retained typmod witness until a
+                // future successor can carry a typed modifier without rewriting v3 identity.
+                return Err(invalid("relation_partition_column_type_modifier"));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn validate_parent_graph(
