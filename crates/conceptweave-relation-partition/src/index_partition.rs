@@ -4,6 +4,10 @@
 mod base;
 pub use base::*;
 
+#[path = "collation_identity.rs"]
+mod collation_identity;
+pub use collation_identity::*;
+
 #[path = "operator_family.rs"]
 mod operator_family;
 pub use operator_family::*;
