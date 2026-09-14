@@ -10,6 +10,8 @@ Without a successor evidence family, those two source states collapse to the sam
 
 A second source-integrity boundary appears once topology is represented. PostgreSQL 18 permits `CREATE INDEX ON ONLY` a partitioned table as a staged operation: the partitioned index is initially invalid, child indexes can be created independently and attached one partition at a time, and the parent becomes valid automatically only after every table partition has a matching attached child index. A governed state with an explicitly valid partitioned index but a direct table partition lacking any child-index attachment is therefore source-impossible.
 
+A third boundary is definition compatibility. PostgreSQL 18 `ALTER INDEX ... ATTACH PARTITION` requires the child index to have an equivalent definition. Core `CompareIndexInfo()` rejects candidate pairs immediately when `ii_Unique` differs, before access method, attribute mapping, expressions, predicate, and exclusion properties are considered. Therefore an observed direct index-parent edge between a unique partitioned parent and a non-unique child is source-impossible even when the table/index topology itself resolves.
+
 ## Constraint and rejected alternatives
 
 The frozen v3 digest and the existing relation-partition digest are historical contracts. Adding index `relkind`, `relispartition`, or `pg_inherits` fields directly to either predecessor would silently change existing digest meaning and receipt semantics. Treating table partition membership as proof of index attachment is also invalid: PostgreSQL permits indexes to be created independently on partitions and attached later with `ALTER INDEX ... ATTACH PARTITION`.
@@ -18,9 +20,11 @@ The repair therefore uses another domain-separated immutable successor rather th
 
 The validity rule also does **not** infer attachment from index-name or definition similarity. It uses the already explicit direct index-parent evidence owned by this successor. When parent validity is false or unobserved, a local child index remains representable because it can be part of a legitimate staged attachment workflow.
 
+Likewise, definition integrity must not be implemented by comparing raw `pg_get_indexdef` text, index names, comments, tablespaces, or lifecycle flags. Those fields can differ without disproving the server attachment relation. The focused repair checks the mandatory uniqueness property that PostgreSQL core itself compares as part of attachment equivalence. Broader modeled equivalence remains a separate contract because PostgreSQL compares access method, attribute mapping, collation/opfamily, expressions, predicates, and exclusion properties with semantics that cannot safely be approximated by raw string equality.
+
 ## Decision
 
-`conceptweave-relation-partition` now exposes an index-partition evidence family layered over one exact `PostgresSchemaSnapshotV3` and one exact `RelationPartitionSnapshot`.
+`conceptweave-relation-partition` exposes an index-partition evidence family layered over one exact `PostgresSchemaSnapshotV3` and one exact `RelationPartitionSnapshot`.
 
 The family is complete over every nested observed index and preserves:
 
@@ -32,7 +36,8 @@ The family is complete over every nested observed index and preserves:
 - deterministic domain-separated digest and exact source receipts;
 - parent-index resolution to an observed partitioned index;
 - consistency between the index parent owner and the independently observed direct table-partition parent;
-- the PostgreSQL validity lifecycle: an explicitly valid partitioned index must have an attached child index on every observed direct table partition.
+- the PostgreSQL validity lifecycle: an explicitly valid partitioned index must have an attached child index on every observed direct table partition;
+- attached parent/child uniqueness compatibility, rejecting a direct edge when `indisunique` differs.
 
 A local/unattached child index remains legal when its owning table is a partition and the parent partitioned index is invalid or its validity was not observed. Attachment is asserted only when the index evidence itself carries the exact direct parent.
 
@@ -52,7 +57,13 @@ Partitioned-index validity repair:
 - Behavioral RED source: `d819639b3f8973b2d3bca166c9a091b6868b92e1` requires `valid parent + local/unattached direct child` to fail while preserving the legitimate `invalid parent + staged local child` state.
 - Minimal production repair: `664afcc1684ead7569d9d6dd070afca4ef847ceb` resolves the exact predecessor `IndexObservation.valid()` state and, only for `Some(true)`, requires an explicit child-index parent edge for every direct table partition before hashing.
 
-The initial chronology is intentional evidence: the implementation text existed before the first RED commit, but it was not reachable through the production crate API. The executable external contract preceded the commit that made the production path active. The validity repair follows the ordinary review → behavioral RED source → minimal causal production change sequence. No claim is made that Rust RED or GREEN was executed on this host.
+Attached-index uniqueness repair:
+
+- Finding review: PR #46 review `5199509892` on exact predecessor `9fd9bb20740d57def0019b3ddbebb9e8126cc096`.
+- Behavioral RED source: `6161a9955cb03284e189a367bfcfc017af610222` adds an external contract in which a unique partitioned parent has an explicitly attached non-unique child. The topology and parent-validity requirements otherwise resolve, isolating the definition mismatch.
+- Minimal production repair: `71bd71af598cd9a9979bd235c167b558ab938804` resolves the exact child and parent `IndexObservation` records for every admitted direct index-parent edge and fails closed with `index_partition_definition_uniqueness` when `is_unique()` differs, before digesting.
+
+The initial topology chronology is intentional evidence: the implementation text existed before the first RED commit, but it was not reachable through the production crate API. The executable external contract preceded the commit that made the production path active. The later validity and uniqueness repairs follow review → behavioral RED source → minimal causal production change. No claim is made that Rust RED or GREEN was executed on this host.
 
 ## Invariants
 
@@ -64,17 +75,18 @@ An admitted `IndexPartitionSnapshot` must satisfy all of the following:
 4. `relispartition=true` has exactly one direct parent index and detach-pending state is rejected;
 5. an attached child index is owned by a table partition and its parent index is owned by that table's exact direct partition parent;
 6. the parent index is observed and is a partitioned index;
-7. an explicitly valid partitioned index has at least one explicitly attached child index for every direct table partition; an invalid or unobserved-validity parent may retain unattached local child indexes during staged construction;
-8. the parent graph is acyclic before digesting;
-9. input order does not affect canonical identity; topology does.
+7. every admitted direct index-parent edge preserves the mandatory parent/child uniqueness property;
+8. an explicitly valid partitioned index has at least one explicitly attached child index for every direct table partition; an invalid or unobserved-validity parent may retain unattached local child indexes during staged construction;
+9. the parent graph is acyclic before digesting;
+10. input order does not affect canonical identity; topology does.
 
 ## Risk and follow-up
 
 The current branch still lacks exact-head native execution because the available execution host has no repository-pinned Rust toolchain, and protected ConceptWeave `main` still lacks the repository-owned Product pull-request workflow. These commits are source repair, not acceptance evidence.
 
-The PostgreSQL adapter must eventually capture index `pg_class.relkind`, index `relispartition`, `pg_index.indisvalid`, and direct index `pg_inherits` rows in the same bounded catalog snapshot used for relation and index evidence. Catalog OIDs may be used only for capture-time joins; governed identity uses resolved coordinates. Publication remains blocked until one unchanged exact head has native Rust and applicable hosted acceptance.
+The PostgreSQL adapter must eventually capture index `pg_class.relkind`, index `relispartition`, `pg_index.indisvalid`, `pg_index.indisunique`, and direct index `pg_inherits` rows in the same bounded catalog snapshot used for relation and index evidence. Catalog OIDs may be used only for capture-time joins; governed identity uses resolved coordinates. Publication remains blocked until one unchanged exact head has native Rust and applicable hosted acceptance.
 
-PostgreSQL also requires `ALTER INDEX ... ATTACH PARTITION` targets to have an equivalent definition. The direct `pg_inherits` edge remains the authoritative evidence that PostgreSQL accepted the attachment; this successor does not reconstruct server attachment eligibility from names or partial client-side heuristics. The adapter must resolve that exact edge, not synthesize it from similar index definitions.
+PostgreSQL requires `ALTER INDEX ... ATTACH PARTITION` targets to have an equivalent definition. The direct `pg_inherits` edge is authoritative evidence that the server recorded attachment, but ConceptWeave still must reject contradictions in material definition facts it already owns. Uniqueness is now checked. Full `CompareIndexInfo()` parity is **not** claimed: access method, mapped key/include attributes, `NULLS NOT DISTINCT`, collation/opfamily, expressions, predicates, and exclusion semantics require a separate representation-aware contract rather than index-name or rendered-DDL heuristics. Until that contract exists, the adapter must preserve the server-recorded edge and must never synthesize one from apparent definition similarity.
 
 ## Primary references
 
@@ -85,3 +97,5 @@ PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: 52.27
 PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: 5.12. Table partitioning*. https://www.postgresql.org/docs/18/ddl-partitioning.html
 
 PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: ALTER INDEX*. https://www.postgresql.org/docs/18/sql-alterindex.html
+
+PostgreSQL Global Development Group. (2026). *PostgreSQL source: `src/backend/catalog/index.c`, `CompareIndexInfo()`*. https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/catalog/index.c
