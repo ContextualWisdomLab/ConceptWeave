@@ -36,6 +36,10 @@ pub use expression_relation_var_schema::*;
 mod expression_collation_identity;
 pub use expression_collation_identity::*;
 
+#[path = "collation_database_encoding.rs"]
+mod collation_database_encoding;
+pub use collation_database_encoding::*;
+
 #[path = "type_modifier.rs"]
 mod type_modifier;
 pub use type_modifier::*;
