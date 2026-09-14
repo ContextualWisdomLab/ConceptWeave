@@ -363,3 +363,79 @@ fn partition_parent_link_rejects_no_inherit_child_constraint() {
         }
     );
 }
+
+#[test]
+fn valid_partition_parent_rejects_not_valid_child_constraint() {
+    let child = NotNullConstraintObservation::new(
+        "public",
+        "metric_2026",
+        RelationKind::Table,
+        "metric_raw_value_not_null",
+        "raw_value",
+        false,
+        true,
+        false,
+        1,
+        false,
+    )
+    .expect("NOT VALID remains representable before partition-parent compatibility is checked")
+    .with_parent_constraint(
+        ParentNotNullConstraintCoordinate::new(
+            "public",
+            "metric",
+            RelationKind::PartitionedTable,
+            "metric_raw_value_not_null",
+        )
+        .expect("partition parent coordinate is valid"),
+    )
+    .expect("partition-parent structural state is valid")
+    .with_partition_parent_relation("public", "metric", false)
+    .expect("stable direct partition-parent witness is valid");
+
+    let error = PostgresSchemaSnapshotV3::new_with_not_null_constraints(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-14T06:32:00Z",
+        vec![parent_relation("metric"), child_relation()],
+        Vec::new(),
+        Vec::new(),
+        vec![parent_constraint("metric"), child],
+    )
+    .expect_err("a valid inherited parent cannot resolve to an existing NOT VALID child");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "not_null_constraint_parent_validation",
+        }
+    );
+}
+
+#[test]
+fn not_valid_partition_parent_allows_already_valid_child_constraint() {
+    let parent = NotNullConstraintObservation::new(
+        "public",
+        "metric",
+        RelationKind::PartitionedTable,
+        "metric_raw_value_not_null",
+        "raw_value",
+        false,
+        true,
+        true,
+        0,
+        false,
+    )
+    .expect("a NOT VALID parent NOT NULL constraint is source-representable");
+    let child = child_constraint("metric");
+
+    PostgresSchemaSnapshotV3::new_with_not_null_constraints(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-14T06:32:00Z",
+        vec![parent_relation("metric"), child_relation()],
+        Vec::new(),
+        Vec::new(),
+        vec![parent, child],
+    )
+    .expect("an already-valid child may satisfy an inherited NOT VALID parent constraint");
+}
