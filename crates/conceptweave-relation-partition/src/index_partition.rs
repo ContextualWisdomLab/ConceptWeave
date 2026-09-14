@@ -488,12 +488,50 @@ fn canonicalize_index_partitions(
             if child_definition.access_method() != parent_definition.access_method() {
                 return Err(invalid("index_partition_definition_access_method"));
             }
+            validate_modeled_index_attribute_mapping(child_definition, parent_definition)?;
         }
     }
 
     validate_valid_partitioned_index_children(base_snapshot, relation_partitions, &by_coordinate)?;
     validate_index_parent_graph(&by_coordinate)?;
     Ok(observations)
+}
+
+fn validate_modeled_index_attribute_mapping(
+    child_definition: &IndexObservation,
+    parent_definition: &IndexObservation,
+) -> Result<(), ObservationError> {
+    if child_definition.key_attributes().len() != parent_definition.key_attributes().len()
+        || child_definition.include_attributes().len()
+            != parent_definition.include_attributes().len()
+    {
+        return Err(invalid("index_partition_definition_attribute_mapping"));
+    }
+
+    for (child_attribute, parent_attribute) in child_definition
+        .key_attributes()
+        .iter()
+        .chain(child_definition.include_attributes())
+        .zip(
+            parent_definition
+                .key_attributes()
+                .iter()
+                .chain(parent_definition.include_attributes()),
+        )
+    {
+        match (
+            child_attribute.attribute_name(),
+            parent_attribute.attribute_name(),
+        ) {
+            (Some(child_name), Some(parent_name)) if child_name == parent_name => {}
+            (None, None) => {
+                // Expression-tree equality requires canonical expression evidence beyond this repair.
+            }
+            _ => return Err(invalid("index_partition_definition_attribute_mapping")),
+        }
+    }
+
+    Ok(())
 }
 
 fn validate_valid_partitioned_index_children(
