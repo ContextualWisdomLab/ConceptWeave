@@ -309,9 +309,9 @@ impl RelationPartitionSourceReceipt {
 /// Every bounded relation must receive one explicit `relispartition` observation, making observed
 /// false distinct from unobserved family absence. Positive membership resolves to an observed
 /// partitioned-table parent, detach-pending topology fails closed, the parent graph must be acyclic,
-/// and any already-observed PostgreSQL 18 NOT NULL partition parent must agree with the same direct
-/// relation edge. The successor digest frames the predecessor digest in a new domain, preserving the
-/// frozen v3 identity contract.
+/// and PostgreSQL 18 NOT NULL evidence must agree bidirectionally with the same direct relation edge.
+/// The successor digest frames the predecessor digest in a new domain, preserving the frozen v3
+/// identity contract.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RelationPartitionSnapshot {
     source_connection_key: String,
@@ -516,6 +516,8 @@ fn validate_not_null_partition_witnesses(
         return Ok(());
     };
 
+    // First preserve the existing direction: every explicit conparentid witness must agree with the
+    // independently observed direct declarative-partition relation edge.
     for not_null in not_null_constraints {
         let Some(parent_constraint) = not_null.parent_constraint() else {
             continue;
@@ -536,6 +538,40 @@ fn validate_not_null_partition_witnesses(
             return Err(invalid("relation_partition_not_null_parent"));
         }
     }
+
+    // PostgreSQL declarative partitions inherit every NOT NULL constraint from their direct
+    // partitioned-table parent. Relation membership therefore also constrains the NOT NULL family:
+    // each observed parent row must have the corresponding child row linked back to that exact
+    // parent constraint. Child-local constraints that do not correspond to a parent row remain legal.
+    for membership in observations.iter().filter(|observation| observation.is_partition()) {
+        let Some(parent_relation) = membership.parent_relation() else {
+            continue;
+        };
+
+        for parent_not_null in not_null_constraints.iter().filter(|constraint| {
+            constraint.schema_name() == parent_relation.schema_name()
+                && constraint.relation_name() == parent_relation.relation_name()
+                && constraint.relation_kind() == RelationKind::PartitionedTable
+        }) {
+            let inherited = not_null_constraints.iter().any(|child_not_null| {
+                child_not_null.schema_name() == membership.schema_name()
+                    && child_not_null.relation_name() == membership.relation_name()
+                    && child_not_null.relation_kind() == membership.relation_kind()
+                    && child_not_null.column_name() == parent_not_null.column_name()
+                    && child_not_null.parent_constraint().is_some_and(|parent_constraint| {
+                        parent_constraint.schema_name() == parent_not_null.schema_name()
+                            && parent_constraint.relation_name() == parent_not_null.relation_name()
+                            && parent_constraint.relation_kind() == parent_not_null.relation_kind()
+                            && parent_constraint.constraint_name()
+                                == parent_not_null.constraint_name()
+                    })
+            });
+            if !inherited {
+                return Err(invalid("relation_partition_not_null_inheritance"));
+            }
+        }
+    }
+
     Ok(())
 }
 
