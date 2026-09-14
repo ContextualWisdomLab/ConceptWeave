@@ -120,6 +120,17 @@ impl NotNullConstraintObservation {
         crate::model::validate_nonblank(&relation_name, "relation_name")?;
         crate::model::validate_nonblank(&constraint_name, "not_null_constraint_name")?;
         crate::model::validate_nonblank(&column_name, "not_null_constraint_column_name")?;
+        // PostgreSQL 18 stores NOT NULL rows as table constraints. Regular, partitioned, and
+        // foreign tables can own them; views, materialized views, sequences, and standalone
+        // composite types cannot. Reject impossible relkind/constraint pairs before governance.
+        if !matches!(
+            relation_kind,
+            RelationKind::Table | RelationKind::PartitionedTable | RelationKind::ForeignTable
+        ) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "not_null_constraint_relation_kind",
+            });
+        }
         // PostgreSQL 18 supports NOT ENFORCED only for CHECK and foreign-key constraints.
         // A first-class NOT NULL row with conenforced=false is therefore not source-representable
         // evidence and must fail closed before it can acquire governed identity.
