@@ -21,13 +21,20 @@ ConceptWeave owns `observe -> discover -> propose -> align -> validate -> review
 
 The frozen v3 snapshot still owns relation/type/index/constraint coordinates and raw relation-scoped index evidence. Domain-separated successors preserve declarative relation partitioning, index-partition topology, NOT NULL inheritance coherence, and PostgreSQL 18 attachment-definition evidence without changing frozen predecessor digest meaning.
 
-Retained source-repaired attachment checks include uniqueness, `NULLS NOT DISTINCT`, access method, key/`INCLUDE` structure, mapped simple-column identity, corresponding key collation, resolved operator-family identity, exclusion operator/procedure/strategy semantics, relation-partition rowtype mapping, and canonical expression/partial-predicate semantics. Detailed rationale remains in `docs/doctoring/`.
+Retained source-repaired attachment checks include uniqueness, `NULLS NOT DISTINCT`, access method, key/`INCLUDE` structure, mapped simple-column identity, corresponding key collation, resolved operator-family identity, exclusion operator/procedure/strategy semantics, relation-partition rowtype mapping, structured column type modifiers, and canonical expression/partial-predicate semantics. Detailed rationale remains in `docs/doctoring/`.
 
-### Relation-partition rowtype mapping — source repaired, structured modifier successor open
+### Relation-partition rowtype mapping and structured type modifiers — source repaired, adapter acceptance open
 
-PostgreSQL `build_attrmap_by_name()` maps partition columns by name, permits different physical attribute order, and rejects mismatched `atttypid` or `atttypmod`. Production `ad371e2feddb74c7457e1f28f4fb9992f758ea6b` therefore rejects missing/extra child columns and mismatched qualified type identity without comparing `ordinal_position`.
+PostgreSQL `build_attrmap_by_name()` maps partition columns by name, permits different physical attribute order, and rejects mismatched `atttypid` or `atttypmod`. Production `ad371e2feddb74c7457e1f28f4fb9992f758ea6b` rejects missing/extra child columns and mismatched qualified type identity without comparing `ordinal_position`.
 
-Frozen v3 does not structurally expose `pg_attribute.atttypmod`. The current relation-partition predecessor uses exact adapter-rendered `data_type` only as a temporary fail-closed modifier witness. That bridge is not preferred semantic identity and must be replaced by a domain-separated structured `atttypmod` observation before complete rowtype parity is claimed. Decision record: `docs/doctoring/postgresql-relation-partition-rowtype-integrity.md`.
+Frozen v3 does not structurally expose `pg_attribute.atttypmod`, so the relation-partition predecessor retained adapter-rendered `data_type` only as a temporary fail-closed witness. Review `5202118195` on exact `738f668e61a7f0a3bc4e459a3d5416e19bf868c6` identified that rendered text cannot prove the raw catalog equality PostgreSQL actually checks.
+
+- Source RED `2523a121214bd03b3e90bd3e45a391f7615f69c5` requires same rendered type text with raw parent/child modifiers 36 versus 68 to fail, while preserving valid name mapping across different physical ordinals and exact `-1` catalog evidence.
+- Production `ccbea8dc919a13184488002b1b6f274802d93834` adds `RelationPartitionTypeModifierSnapshot` plus exact observation/location/receipt contracts. It requires complete one-per-column evidence, rebound-validates the exact predecessor stack, compares direct parent/child modifiers by stable column name, and frames raw signed `i32` evidence under a new digest domain.
+- No type-specific pseudo-decoding is introduced; the exact raw `atttypmod` remains bound to the predecessor's qualified type identity.
+- The predecessor's rendered-text bridge remains historical fail-closed behavior until an explicit version transition; the new structured successor does not mutate issued v3 or relation-partition identity.
+
+Decision records: `docs/doctoring/postgresql-relation-partition-rowtype-integrity.md` and `docs/doctoring/postgresql-relation-partition-type-modifier-integrity.md`.
 
 ### Index definition successors — source repaired, acceptance pending
 
@@ -58,18 +65,18 @@ Review `5201557492` on exact `64e4ef2e77d3b56d68573e2cd5aa19fa8fc6338a` found a 
 
 The successor frames the exact predecessor digest only after all expression/predicate trees satisfy the supported node schemas. This closes arbitrary field-subset admission for the modeled nodes; it does not implement the concrete PostgreSQL extractor. Decision record: `docs/doctoring/postgresql-expression-node-equality-schema-integrity.md`.
 
-State: **NOT_NULL_CONSTRAINT_SOURCE_REPAIRED / RELATION_PARTITION_SOURCE_REPAIRED / RELATION_PARTITION_ROWTYPE_MAPPING_SOURCE_REPAIRED / RELATION_PARTITION_NOT_NULL_INHERITANCE_SOURCE_REPAIRED / INDEX_PARTITION_TOPOLOGY_SOURCE_REPAIRED / INDEX_PARTITION_VALIDITY_SOURCE_REPAIRED / INDEX_PARTITION_UNIQUENESS_SOURCE_REPAIRED / INDEX_PARTITION_NULLS_NOT_DISTINCT_SOURCE_REPAIRED / INDEX_PARTITION_ACCESS_METHOD_SOURCE_REPAIRED / INDEX_PARTITION_ATTRIBUTE_MAPPING_SOURCE_REPAIRED / INDEX_PARTITION_COLLATION_SOURCE_REPAIRED / INDEX_PARTITION_OPERATOR_FAMILY_SOURCE_REPAIRED / INDEX_PARTITION_EXCLUSION_SOURCE_REPAIRED / INDEX_PARTITION_EXPRESSION_PREDICATE_REPRESENTATION_REPAIRED / INDEX_EXPRESSION_NODE_SCHEMA_SOURCE_REPAIRED / POSTGRESQL_EXPRESSION_EXTRACTOR_DIFFERENTIAL_OPEN / RELATION_PARTITION_STRUCTURED_ATTTYPMOD_OPEN / ACCEPTANCE_PENDING**.
+State: **NOT_NULL_CONSTRAINT_SOURCE_REPAIRED / RELATION_PARTITION_SOURCE_REPAIRED / RELATION_PARTITION_ROWTYPE_MAPPING_SOURCE_REPAIRED / RELATION_PARTITION_NOT_NULL_INHERITANCE_SOURCE_REPAIRED / RELATION_PARTITION_STRUCTURED_ATTTYPMOD_SOURCE_REPAIRED / INDEX_PARTITION_TOPOLOGY_SOURCE_REPAIRED / INDEX_PARTITION_VALIDITY_SOURCE_REPAIRED / INDEX_PARTITION_UNIQUENESS_SOURCE_REPAIRED / INDEX_PARTITION_NULLS_NOT_DISTINCT_SOURCE_REPAIRED / INDEX_PARTITION_ACCESS_METHOD_SOURCE_REPAIRED / INDEX_PARTITION_ATTRIBUTE_MAPPING_SOURCE_REPAIRED / INDEX_PARTITION_COLLATION_SOURCE_REPAIRED / INDEX_PARTITION_OPERATOR_FAMILY_SOURCE_REPAIRED / INDEX_PARTITION_EXCLUSION_SOURCE_REPAIRED / INDEX_PARTITION_EXPRESSION_PREDICATE_REPRESENTATION_REPAIRED / INDEX_EXPRESSION_NODE_SCHEMA_SOURCE_REPAIRED / POSTGRESQL_EXPRESSION_EXTRACTOR_DIFFERENTIAL_OPEN / POSTGRESQL_ATTTYPMOD_ADAPTER_DIFFERENTIAL_OPEN / ACCEPTANCE_PENDING**.
 
 ## Acceptance boundary
 
-No executed Rust RED/GREEN or hosted Product acceptance is claimed for the current moved head. One unchanged #46 exact head must pass repository-pinned Rust 1.98 `fmt`, strict workspace/all-target Clippy, focused relation/index-partition and expression-node-schema contracts plus retained Source Observation contracts, workspace/doc tests, release build, owned production rustdoc/test/edge-case coverage, and applicable hosted Product/security/dependency/review evidence. Any head movement restarts exact-head acceptance.
+No executed Rust RED/GREEN or hosted Product acceptance is claimed for the current moved head. One unchanged #46 exact head must pass repository-pinned Rust 1.98 `fmt`, strict workspace/all-target Clippy, focused relation/index-partition, structured type-modifier, and expression-node-schema contracts plus retained Source Observation contracts, workspace/doc tests, release build, owned production rustdoc/test/edge-case coverage, and applicable hosted Product/security/dependency/review evidence. Any head movement restarts exact-head acceptance.
 
 ## Next causal work
 
 1. Implement the concrete PostgreSQL 18 semantic-expression extractor at the Source Observation adapter boundary. It must emit only supported complete node schemas, resolve OIDs to stable coordinates, and reject unsupported nodes rather than degrade to text.
 2. Add a real PostgreSQL differential oracle: compare ConceptWeave admission with PostgreSQL's actual index-partition attachment outcome and retain mismatches as regression fixtures.
-3. Add typed constant/DATUM semantics and further node schemas only when PostgreSQL 18 equality can be represented completely; do not broaden generic node acceptance first.
-4. Replace the temporary frozen-v3 rendered type-modifier witness with a domain-separated structured `pg_attribute.atttypmod` successor.
+3. Add typed constant/Datum semantics and further node schemas only when PostgreSQL 18 equality can be represented completely; do not broaden generic node acceptance first.
+4. Wire the concrete PostgreSQL adapter to emit exact `pg_attribute.atttypmod` for every bounded column and add a real rowtype/attachment differential oracle. The structured contract exists; live extraction proof does not.
 5. Converge central workflow ownership; obtain compatible fresh unchanged-head acceptance for #35 and land it normally; then obtain one unchanged #46 native+hosted GREEN.
 6. Only after terminal #46 exact-head GREEN may the complete child flow ordinary/non-force into #45, followed by fresh #45 acceptance and #6 propagation. PostgreSQL transport completion, semantic publication, version/tag/package/SBOM/provenance/reproducibility/rollback, and immutable release remain later gates.
 
