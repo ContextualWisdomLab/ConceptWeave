@@ -6,7 +6,7 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
-- PostgreSQL relation/index-partition evidence now uses domain-separated immutable successors for direct partition topology and attachment-definition semantics. Mapped key/`INCLUDE` structure, collations, resolved operator families, and exclusion operator/procedure/strategy tuples are validated against the exact predecessor stack without rewriting frozen v3 identity; expression-tree and partial-predicate equivalence remain explicitly open until stable semantic evidence replaces raw rendered text.
+- PostgreSQL relation/index-partition evidence now uses domain-separated immutable successors for direct partition topology and attachment-definition semantics. Mapped key/`INCLUDE` structure, collations, resolved operator families, exclusion operator/procedure/strategy tuples, and canonical expression/partial-predicate semantic trees are validated against the exact predecessor stack without rewriting frozen v3 identity. Relation-local expression Vars use stable column identity instead of physical attribute numbers, OID-backed semantic identities resolve to qualified signatures, and direct-child whole-row references fail closed. The live PostgreSQL semantic-tree extractor and differential oracle remain open before end-to-end source acceptance; raw `pg_get_expr`, `pg_node_tree`/`nodeToString`, or reconstructed DDL are not semantic substitutes.
 
 - Relational evidence now distinguishes unique constraints that treat missing values as distinct from those that treat them as equal, while retaining unknown behavior when it was not observed. Evidence identity changes with that behavior; earlier evidence is not rewritten.
 
