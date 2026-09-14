@@ -20,6 +20,10 @@ pub use expression_semantics::*;
 mod expression_schema;
 pub use expression_schema::*;
 
+#[path = "expression_var.rs"]
+mod expression_var;
+pub use expression_var::*;
+
 #[path = "type_modifier.rs"]
 mod type_modifier;
 pub use type_modifier::*;
