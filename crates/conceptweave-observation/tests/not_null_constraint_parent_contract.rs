@@ -10,11 +10,11 @@ fn catalog_type(type_name: &str) -> QualifiedTypeName {
     QualifiedTypeName::new("pg_catalog", type_name).expect("catalog type coordinate is valid")
 }
 
-fn child_relation() -> RelationObservation {
+fn relation(relation_name: &str, relation_kind: RelationKind) -> RelationObservation {
     RelationObservation::new(
         "public",
-        "metric_2026",
-        RelationKind::Table,
+        relation_name,
+        relation_kind,
         vec![ColumnObservationV3::new(
             "raw_value",
             1,
@@ -23,9 +23,33 @@ fn child_relation() -> RelationObservation {
             false,
             None,
         )
-        .expect("child column fixture is valid")],
+        .expect("column fixture is valid")],
     )
-    .expect("child relation fixture is valid")
+    .expect("relation fixture is valid")
+}
+
+fn child_relation() -> RelationObservation {
+    relation("metric_2026", RelationKind::Table)
+}
+
+fn parent_relation(parent_relation_name: &str) -> RelationObservation {
+    relation(parent_relation_name, RelationKind::PartitionedTable)
+}
+
+fn parent_constraint(parent_relation_name: &str) -> NotNullConstraintObservation {
+    NotNullConstraintObservation::new(
+        "public",
+        parent_relation_name,
+        RelationKind::PartitionedTable,
+        "metric_raw_value_not_null",
+        "raw_value",
+        true,
+        true,
+        true,
+        0,
+        false,
+    )
+    .expect("partition-parent NOT NULL constraint is valid")
 }
 
 fn child_constraint_with_state(
@@ -58,28 +82,52 @@ fn child_constraint(parent_relation_name: &str) -> NotNullConstraintObservation 
         .expect("partition-child NOT NULL constraint is valid")
 }
 
-fn snapshot(constraint: NotNullConstraintObservation) -> PostgresSchemaSnapshotV3 {
+fn snapshot(
+    parent_relation_name: &str,
+    constraint: NotNullConstraintObservation,
+) -> PostgresSchemaSnapshotV3 {
     PostgresSchemaSnapshotV3::new_with_not_null_constraints(
         &support::authorized_source("warehouse_primary", &["public"]),
         "postgres_introspector_v3",
         "2026-09-13T07:02:00Z",
-        vec![child_relation()],
+        vec![parent_relation(parent_relation_name), child_relation()],
         Vec::new(),
         Vec::new(),
-        vec![constraint],
+        vec![parent_constraint(parent_relation_name), constraint],
     )
     .expect("partition-child NOT NULL family is valid")
 }
 
 #[test]
 fn resolved_partition_parent_constraint_is_governed_identity() {
-    let first = snapshot(child_constraint("metric"));
-    let second = snapshot(child_constraint("metric_archive"));
+    let first = snapshot("metric", child_constraint("metric"));
+    let second = snapshot("metric_archive", child_constraint("metric_archive"));
 
     assert_ne!(
         first.snapshot_digest(),
         second.snapshot_digest(),
         "conparentid must be resolved to a stable source coordinate before governed hashing"
+    );
+}
+
+#[test]
+fn unresolved_partition_parent_constraint_is_rejected() {
+    let error = PostgresSchemaSnapshotV3::new_with_not_null_constraints(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-13T07:02:00Z",
+        vec![child_relation()],
+        Vec::new(),
+        Vec::new(),
+        vec![child_constraint("metric")],
+    )
+    .expect_err("conparentid must resolve to an observed parent NOT NULL constraint row");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "not_null_constraint_parent_coordinate",
+        }
     );
 }
 
