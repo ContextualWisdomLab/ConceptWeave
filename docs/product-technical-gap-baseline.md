@@ -84,14 +84,14 @@ The current execution host does not provide a usable repository Rust toolchain, 
 
 ## Central Product-CI and review owners
 
-Central workflow ownership remains outside ConceptWeave; central evidence never transfers to a ConceptWeave leaf head. Protected `.github/main` is `7f07029381a9ca770d0a68b7f3938dd652799d4d` at this snapshot.
+Central workflow ownership remains outside ConceptWeave; central evidence never transfers to a ConceptWeave leaf head. Protected `.github/main` advanced by ordinary protected merge #2194 from `7f07029381a9ca770d0a68b7f3938dd652799d4d` to `91be6442906c7b6b4f600272c953699708394327` on 2026-09-14. The advance changes OpenCode/Pingora policy paths and does not overlap the effective source paths of the three central prerequisite PRs below, but their branches are now one protected commit behind and require ordinary/non-force restack before fresh acceptance can authorize landing.
 
-- `.github#2106@44901e45636e655cf84cc609e5fe62789216cde9` is OPEN Draft / mergeable. Runtime Quality `34794865763`, Semgrep `34794865812`, Python Security `34794865728`, and Security Scan `34794865771` are terminal success; CodeQL `34794865762` remains queued.
-- `.github#2170@d493cc4c53d0b77d67ef4af13005dcda8fb33c7f` is OPEN Ready / mergeable. Runtime Quality `34794949744`, Semgrep `34794949745`, Python Security `34794949775`, and Security `34794949825` are terminal success; CodeQL `34794949758` remains queued.
-- `.github#2079@2d27e0c13f9b118ca844f5299b0fcdde420fa66b` is OPEN Ready / mergeable. Semgrep `34794916614`, Python Security `34794916564`, and Security `34794916586` are terminal success; CodeQL `34794916559` remains queued.
+- `.github#2106@44901e45636e655cf84cc609e5fe62789216cde9` is OPEN Draft and currently reports `mergeable=false` against the advanced protected base. Its four security/runtime lanes had reached success and CodeQL `34794865762` was still queued before the protected advance. Review `5195806540` records the path-disjoint restack prerequisite; no predecessor evidence transfers after movement.
+- `.github#2170@d493cc4c53d0b77d67ef4af13005dcda8fb33c7f` is OPEN Ready and currently reports `mergeable=false`. Its four non-CodeQL lanes had reached success and CodeQL `34794949758` was still queued before the protected advance. Review `5195808542` records the path-disjoint ordinary-restack prerequisite.
+- `.github#2079@2d27e0c13f9b118ca844f5299b0fcdde420fa66b` is OPEN Ready and currently reports `mergeable=false`. Its three security lanes had reached success and CodeQL `34794916559` was still queued before the protected advance. Review `5195811048` records the path-disjoint ordinary-restack prerequisite.
 - ConceptWeave #35 exact `9bb82f041483cb4e0cf1aa1f5450b413309f9a05` remains the Product-workflow bootstrap. Its historical CodeQL PR run is terminal failure; Semgrep and Security succeeded. Fresh compatible unchanged-head acceptance remains required before normal landing.
 
-Only after central owners settle and #35 lands normally can one unchanged #46 head obtain meaningful hosted Product acceptance. The complete #46 delta then flows ordinary/non-force into #45, followed by fresh #45 acceptance and #6 propagation.
+No ConceptWeave leaf copies or edits these central owner sources. The central owner branches must preserve the new protected `91be6442...` delta by ordinary/non-force integration, then obtain fresh exact-head terminal acceptance. Only after those owners settle and #35 lands normally can one unchanged #46 head obtain meaningful hosted Product acceptance. The complete #46 delta then flows ordinary/non-force into #45, followed by fresh #45 acceptance and #6 propagation.
 
 ## PostgreSQL adapter boundary
 
