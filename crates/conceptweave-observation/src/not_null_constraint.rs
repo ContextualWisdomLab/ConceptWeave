@@ -131,17 +131,18 @@ impl NotNullConstraintObservation {
                 field: "not_null_constraint_relation_kind",
             });
         }
-        // Ordinary PostgreSQL 18 tables do not support NOT ENFORCED for NOT NULL constraints.
-        // CREATE FOREIGN TABLE has a separate grammar and explicitly allows ENFORCED/NOT ENFORCED
-        // on NOT NULL, so preserve that source state for foreign tables instead of rejecting it.
-        if relation_kind != RelationKind::ForeignTable && !enforced {
+        // REL_18_STABLE stores every NOT NULL constraint as enforced. StoreRelNotNull() hard-codes
+        // the cooked NOT NULL state to enforced and CreateConstraintEntry() permits non-enforcement
+        // only for CHECK and FOREIGN KEY constraints. The generic foreign-table grammar does not
+        // expand the representable pg_constraint state for contype='n'.
+        if !enforced {
             return Err(ObservationError::InvalidObservationField {
                 field: "not_null_constraint_enforcement",
             });
         }
         // PostgreSQL 18 ALTER FOREIGN TABLE supports NOT VALID only for CHECK. Foreign-table
-        // NOT NULL constraints may vary in enforcement state but cannot be source-created as
-        // NOT VALID, so reject that impossible catalog tuple before it receives governed identity.
+        // NOT NULL constraints cannot be source-created as NOT VALID, so reject that impossible
+        // catalog tuple before it receives governed identity.
         if relation_kind == RelationKind::ForeignTable && !validated {
             return Err(ObservationError::InvalidObservationField {
                 field: "not_null_constraint_foreign_validation",
