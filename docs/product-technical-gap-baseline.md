@@ -14,7 +14,7 @@ Protected/default ConceptWeave `main` remains `f4f440dd58c77d7cd90dff8a1eb2eeb9a
 
 - #6 `287165d399c5f54d6c4b4aa3c15497b47de8244b`, OPEN Draft.
 - #45 `6b2a8f555725dc79f60432afbc492d6005290a4a`, OPEN Draft on #6.
-- #46 `codex/pr6-v3-index-evidence`, OPEN Draft, is the active Source Observation writer. The ordinary-forward relation-partition successor preserves complete table-level `pg_class.relispartition`, direct declarative `pg_inherits` parentage, detach-state fail-closed handling, acyclic parent topology, exact receipts, and bidirectional coherence with the PostgreSQL 18 NOT NULL family. The branch now also carries a domain-separated index-partition successor preserving index/partitioned-index `relkind`, index `relispartition`, exact direct index parentage, detach state, receipts, and table/index parent coherence. Exact-head native and hosted acceptance remain pending.
+- #46 `codex/pr6-v3-index-evidence`, OPEN Draft, is the active Source Observation writer. The ordinary-forward relation-partition successor preserves complete table-level `pg_class.relispartition`, direct declarative `pg_inherits` parentage, detach-state fail-closed handling, acyclic parent topology, exact receipts, and bidirectional coherence with the PostgreSQL 18 NOT NULL family. Its domain-separated index-partition successor preserves index/partitioned-index `relkind`, index `relispartition`, exact direct index parentage, detach state, receipts, table/index parent coherence, and the partitioned-index validity lifecycle: an explicitly valid partitioned index must have an attached child index for every direct table partition. Exact-head native and hosted acceptance remain pending.
 - Product bootstrap #35 remains exact `9bb82f041483cb4e0cf1aa1f5450b413309f9a05`, OPEN Ready and mechanically mergeable. It remains the prerequisite for repository-owned Product `pull_request` evidence because the workflow is absent from protected ConceptWeave `main`.
 
 #45 and #6 must not duplicate or partially cherry-pick the Source Observation slice. They adopt the complete verified child ordinary/non-force only after one unchanged exact #46 head is terminal GREEN.
@@ -25,23 +25,29 @@ The active successor preserves exact relation/type/index/constraint coordinates,
 
 The relation-partition P1 recorded in review `5197218821` is source-repaired ordinary-forward rather than by mutating frozen v3 identity. The `conceptweave-relation-partition` crate layers complete per-relation `pg_class.relispartition` observations over an exact predecessor digest, resolves every positive direct parent to an observed `PartitionedTable`, rejects detach-pending state and cycles, and issues exact relation-partition receipts. Generic inheritance remains outside this family.
 
-A follow-up review on exact `551862ff8647a673bcab5a96404a02eb39a28465`, `5198504917`, found that the initial NOT NULL cross-family validation was only one-way: existing `conparentid` had to agree with relation membership, but positive relation membership did not require inherited parent NOT NULL linkage. Behavioral RED `7b00339e699ea83c77ed9ac45057d51d73fa83e4` and production repair `c708d45429f9b942d8b5ee7628f6876595a2a856` make that relationship bidirectional without invalidating extra child-local NOT NULL constraints. Primary-source doctoring is `docs/doctoring/postgresql-relation-partition-not-null-inheritance-integrity.md`.
+Review `5198504917` on exact `551862ff8647a673bcab5a96404a02eb39a28465` found that initial NOT NULL cross-family validation was one-way. Behavioral RED `7b00339e699ea83c77ed9ac45057d51d73fa83e4` and production repair `c708d45429f9b942d8b5ee7628f6876595a2a856` make relation membership and inherited parent NOT NULL linkage bidirectionally coherent without invalidating extra child-local NOT NULL constraints. Primary-source doctoring is `docs/doctoring/postgresql-relation-partition-not-null-inheritance-integrity.md`.
 
 ### Index-partition topology
 
-Review `5199149942` on exact predecessor `18c19281260f98d450b399a12c469fe86d9acbb5` identified a second partition-topology gap. PostgreSQL 18 represents ordinary indexes as `pg_class.relkind='i'`, partitioned indexes as `relkind='I'`, defines `relispartition` for tables **and indexes**, and stores direct index parent-child edges in `pg_inherits`. Because v3 nested indexes carried none of those index-relation facts, an attached child index and an otherwise-identical local/unattached index could collapse to the same relation-partition identity.
+Review `5199149942` on exact predecessor `18c19281260f98d450b399a12c469fe86d9acbb5` identified that relation-level partition evidence omitted PostgreSQL index partition topology. PostgreSQL 18 represents ordinary indexes as `pg_class.relkind='i'`, partitioned indexes as `relkind='I'`, defines `relispartition` for tables **and indexes**, and stores direct index parent-child edges in `pg_inherits`. Because v3 nested indexes carried none of those index-relation facts, an attached child index and an otherwise-identical local/unattached index could collapse to the same relation-partition identity.
 
-The repair does not mutate the frozen v3 or relation-partition digest. `index_partition.rs` introduces another domain-separated successor that is complete over every nested observed index. It retains index versus partitioned-index kind, `relispartition`, exact direct parent index coordinate, `inhdetachpending` fail-closed behavior, deterministic digesting, exact receipts, parent-index resolution, and consistency between the index parent owner and the independently observed direct table-partition parent.
+The repair does not mutate the frozen v3 or relation-partition digest. `index_partition.rs` adds a domain-separated successor complete over every nested observed index. It retains index versus partitioned-index kind, `relispartition`, exact direct parent index coordinate, `inhdetachpending` fail-closed behavior, deterministic digesting, exact receipts, parent-index resolution, and consistency between the index parent owner and the independently observed direct table-partition parent.
 
-Repair chronology is explicit rather than rewritten after the fact:
+Initial topology chronology is explicit:
 
 - `209f2a5832396bba420ede11a52d54406340e3eb` staged the implementation file while it was unreachable from the crate root and therefore did not change reachable production behavior;
 - `1dd392936aed8103c4ebb6879f923343ab733818` added the external behavioral contract while the module was still unreachable, requiring attached versus local/unattached topology to change identity and covering wrong table parent, completeness, detach-pending, and receipt boundaries;
 - `7865809a5dc090679a1b34d3c8074193c652f395` wired the successor into the production crate API;
 - `2dc8c91535acc99550e0760166451bf31631880f` corrected canonical coordinate ordering after static review found that `RelationKind` deliberately does not derive `Ord`;
-- `docs/doctoring/postgresql-index-partition-topology-integrity.md` binds the source repair to PostgreSQL 18 primary documentation and the exact review/commit lineage.
+- `docs/doctoring/postgresql-index-partition-topology-integrity.md` binds the repair to PostgreSQL 18 primary documentation and exact review/commit lineage.
 
-This is source repair, not executed Rust GREEN. The active host still does not provide `cargo`, `rustc`, or `rustup`, and protected ConceptWeave `main` still lacks the Product PR workflow.
+A second review, `5199344556` on exact `d156ad01cd6bc7b964952076a1bab71af5c4d416`, found a lifecycle contradiction. The successor allowed `parent partitioned index indisvalid=true` while a direct table partition carried only a local/unattached child index. PostgreSQL 18 permits staged local child indexes only while a `CREATE INDEX ON ONLY` parent remains invalid; the parent is marked valid automatically after every partition index has been attached.
+
+- behavioral RED `d819639b3f8973b2d3bca166c9a091b6868b92e1` requires the valid-parent/local-child state to fail and preserves invalid-parent/local-child staging;
+- minimal production repair `664afcc1684ead7569d9d6dd070afca4ef847ceb` resolves the exact parent `IndexObservation.valid()` state and requires an explicit child `pg_inherits` edge for each direct table partition only when the parent is `Some(true)`;
+- doctoring `695230758302ade2405be9c1249db76e5e90142f` updates the PostgreSQL 18 lifecycle rationale without inventing attachment from name or definition similarity.
+
+This remains source repair, not executed Rust GREEN. The active host does not provide `cargo`, `rustc`, or `rustup`, and protected ConceptWeave `main` still lacks the Product PR workflow.
 
 ## PostgreSQL 18 NOT NULL constraint identity
 
@@ -72,35 +78,25 @@ Retained repair lineage:
 - `NO INHERIT` origin coherence: `5197273298 -> dc6fc29b... -> 9d20fc05... -> af22bf6e...`;
 - relation-partition / NOT NULL bidirectional inheritance coherence: `5198504917 -> 7b00339e... -> c708d454... -> postgresql-relation-partition-not-null-inheritance-integrity.md`.
 
-### Direct parent relation and detach-state integrity
+### Direct parent relation, validation, and origin integrity
 
-`pg_constraint.conparentid` identifies the corresponding constraint on the parent partitioned table, while `pg_inherits` separately records every direct parent-child relation with `inhrelid`, `inhparent`, and `inhdetachpending`. For every nonzero parent constraint, NOT NULL canonicalization requires an independently captured direct relation witness and exact agreement with the relation owning the resolved parent constraint. A witness without a parent constraint, a missing witness, a mismatched witness, or `inhdetachpending=true` fails before governed hashing.
+`pg_constraint.conparentid` identifies the corresponding constraint on the parent partitioned table, while `pg_inherits` separately records every direct parent-child relation with `inhrelid`, `inhparent`, and `inhdetachpending`. Every nonzero parent constraint requires an independently captured direct relation witness and exact agreement with the relation owning the resolved parent constraint. A witness without a parent constraint, a missing or mismatched witness, or `inhdetachpending=true` fails before governed hashing.
 
-The relation-partition successor validates the inverse relationship too. Once `relispartition=true` and the direct partition parent are independently observed, every observed inheritable parent NOT NULL row must resolve to the corresponding inherited child row with the exact parent constraint coordinate. A child-local NOT NULL that has no parent counterpart remains legal; relation membership never invents new constraint rows.
+The inverse is also validated. Once `relispartition=true` and the direct partition parent are observed, every observed inheritable parent NOT NULL row must resolve to the corresponding inherited child row with the exact parent constraint coordinate. A child-local NOT NULL with no parent counterpart remains legal; relation membership never invents constraint rows.
 
-### Parent validation asymmetry
+`REL_18_STABLE` `AdjustNotNullInheritance()` refuses attaching a valid inherited parent to an existing NOT VALID child, while the inverse is allowed. Canonicalization therefore rejects only `parent.validated() && !child.validated()` after exact parent-row and corresponding-column resolution.
 
-`convalidated=false` remains a legitimate PostgreSQL 18 NOT NULL state on supported ordinary-table paths. The parent-edge rule is narrower: `REL_18_STABLE` `AdjustNotNullInheritance()` refuses attaching a valid inherited parent to an existing NOT VALID child, while the inverse is allowed. Canonicalization therefore rejects only `parent.validated() && !child.validated()` after exact parent-row and corresponding-column resolution.
-
-### Inheritance-origin coherence
-
-PostgreSQL creates an inherited NOT NULL with a positive direct-ancestor count. `conislocal=false / coninhcount=0` has neither a local origin nor an inheritance ancestor and is not source-representable. `NotNullConstraintObservation::new()` rejects that combination while preserving local-only `(true,0)`, inherited-only `(false,>=1)`, and local-plus-inherited `(true,>=1)` states.
-
-### `NO INHERIT` origin coherence
-
-`pg_constraint.connoinherit` means the constraint is locally defined and non-inheritable. PostgreSQL 18 refuses changing an inherited constraint to `NO INHERIT` while `coninhcount>0`. The governed tuple must therefore satisfy `connoinherit=true => conislocal=true && coninhcount==0`.
-
-The rule is intentionally one-way. Local inheritable constraints and local-plus-inherited constraints remain valid when `connoinherit=false`. Purely local ordinary-table and foreign-table `NOT NULL ... NO INHERIT` remain representable. Partitioned-table NOT NULL `NO INHERIT` remains invalid under its stricter existing rule. The adapter captures all three fields from one bounded source snapshot and never derives one from another.
+`conislocal=false / coninhcount=0` has neither a local origin nor an inheritance ancestor and fails closed. `connoinherit=true` requires `conislocal=true && coninhcount==0`; purely local ordinary/foreign-table NO INHERIT remains valid, while partitioned-table NO INHERIT is rejected.
 
 ### Owning relation-kind, enforcement, validation, and naming integrity
 
 `NotNullConstraintObservation::new()` admits only ordinary tables, partitioned tables, and foreign tables. Views, materialized views, sequences, and standalone composite types fail before governed identity.
 
-Every PostgreSQL 18 relation NOT NULL row must have `conenforced=true`; the prior foreign-table exemption was superseded by `REL_18_STABLE` implementation evidence. Foreign-table NOT NULL additionally requires `convalidated=true`; ordinary-table NOT VALID semantics remain independently represented where PostgreSQL supports them.
+Every PostgreSQL 18 relation NOT NULL row requires `conenforced=true`; the prior foreign-table exemption was superseded by `REL_18_STABLE` implementation evidence. Foreign-table NOT NULL additionally requires `convalidated=true`; ordinary-table NOT VALID semantics remain represented where PostgreSQL supports them.
 
 Constraint names share the owning relation's `pg_constraint` namespace. The separate NOT NULL optional family is not a second naming namespace. A NOT NULL name colliding with CHECK/PK/UNIQUE/FK evidence on the same relation fails with `DuplicateConstraintName`; the same name on another relation remains valid.
 
-Current Source Observation state is **NOT_NULL_CONSTRAINT_SOURCE_REPAIRED / RELATION_PARTITION_SOURCE_REPAIRED / RELATION_PARTITION_NOT_NULL_INHERITANCE_SOURCE_REPAIRED / INDEX_PARTITION_TOPOLOGY_SOURCE_REPAIRED / RELATION_KIND_SOURCE_REPAIRED / CONSTRAINT_NAME_SOURCE_REPAIRED / ENFORCEMENT_SOURCE_REPAIRED / FOREIGN_TABLE_VALIDATION_SOURCE_REPAIRED / INHERITANCE_ORIGIN_SOURCE_REPAIRED / NO_INHERIT_ORIGIN_SOURCE_REPAIRED / PARENT_RESOLUTION_SOURCE_REPAIRED / PARENT_COLUMN_SOURCE_REPAIRED / PARENT_NO_INHERIT_SOURCE_REPAIRED / PARENT_GRAPH_SOURCE_REPAIRED / PARTITION_PARENT_RELATION_SOURCE_REPAIRED / PARTITION_PARENT_DETACH_STATE_SOURCE_REPAIRED / PARENT_VALIDATION_SOURCE_REPAIRED / ACCEPTANCE_PENDING**. Ready, merge authorization, publication, and release are not claimed.
+Current Source Observation state is **NOT_NULL_CONSTRAINT_SOURCE_REPAIRED / RELATION_PARTITION_SOURCE_REPAIRED / RELATION_PARTITION_NOT_NULL_INHERITANCE_SOURCE_REPAIRED / INDEX_PARTITION_TOPOLOGY_SOURCE_REPAIRED / INDEX_PARTITION_VALIDITY_SOURCE_REPAIRED / RELATION_KIND_SOURCE_REPAIRED / CONSTRAINT_NAME_SOURCE_REPAIRED / ENFORCEMENT_SOURCE_REPAIRED / FOREIGN_TABLE_VALIDATION_SOURCE_REPAIRED / INHERITANCE_ORIGIN_SOURCE_REPAIRED / NO_INHERIT_ORIGIN_SOURCE_REPAIRED / PARENT_RESOLUTION_SOURCE_REPAIRED / PARENT_COLUMN_SOURCE_REPAIRED / PARENT_NO_INHERIT_SOURCE_REPAIRED / PARENT_GRAPH_SOURCE_REPAIRED / PARTITION_PARENT_RELATION_SOURCE_REPAIRED / PARTITION_PARENT_DETACH_STATE_SOURCE_REPAIRED / PARENT_VALIDATION_SOURCE_REPAIRED / ACCEPTANCE_PENDING**. Ready, merge authorization, publication, and release are not claimed.
 
 ## Exact-head acceptance
 
@@ -123,17 +119,19 @@ No ConceptWeave leaf copies or edits central owner sources. #2106 proceeds throu
 
 Transport remains blocked until representation exact-head GREEN and ordinary/non-force adoption through #45/#6. The later adapter uses a maintained patched Rust PostgreSQL driver pinned by immutable lock coordinate, resolves least-privilege credentials only through the authorized source/policy binding, and uses bounded `REPEATABLE READ READ ONLY` catalog capture. It never keeps an explicit database transaction or lock open while waiting on an LLM or long external computation.
 
-For every bounded relation, the adapter captures `pg_class.relispartition`. Positive table membership additionally resolves the direct `pg_inherits.inhparent` relation and `inhdetachpending`; the parent must be an observed partitioned table, detach-pending state fails closed, and the direct relation graph must be acyclic. Generic table inheritance remains a separate source concept.
+For every bounded relation, the adapter captures `pg_class.relispartition`. Positive table membership resolves direct `pg_inherits.inhparent` and `inhdetachpending`; the parent must be an observed partitioned table, detach-pending state fails closed, and the direct relation graph must be acyclic. Generic table inheritance remains separate.
 
-For every observed nested index, the adapter also captures its `pg_class.relkind` (`i` ordinary index or `I` partitioned index), index `relispartition`, and any direct index `pg_inherits` row in the same bounded catalog snapshot. A positive index partition resolves the exact parent index coordinate, requires `inhdetachpending=false`, and must agree with the independently observed direct parent of its owning table partition. Catalog OIDs are capture-time joins only; semantic identity uses resolved schema/relation-kind/relation/index coordinates. The adapter must not infer index attachment merely because the owning table is a partition: independently created local indexes are legal until explicitly attached.
+For every observed nested index, the adapter captures `pg_class.relkind` (`i` ordinary index or `I` partitioned index), index `relispartition`, `pg_index.indisvalid`, and any direct index `pg_inherits` row in the same bounded catalog snapshot. A positive index partition resolves the exact parent index coordinate, requires `inhdetachpending=false`, and must agree with the independently observed direct parent of its owning table partition. Catalog OIDs are capture-time joins only; semantic identity uses resolved schema/relation-kind/relation/index coordinates. The adapter must not infer attachment merely because the owning table is a partition or because definitions look similar. An explicitly valid parent partitioned index requires a real attached child-index edge on every direct table partition; invalid or unobserved-validity parents may retain staged local indexes.
+
+PostgreSQL requires an `ALTER INDEX ... ATTACH PARTITION` target to have an equivalent definition. The authoritative governed attachment evidence is the exact index `pg_inherits` edge created by PostgreSQL after that check. ConceptWeave does not reconstruct attachment authority from names or incomplete client-side equivalence heuristics.
 
 For PostgreSQL 18 NOT NULL constraints, the adapter captures `pg_attribute.attnotnull`, bounded `pg_constraint.contype='n'` rows including exact `convalidated`, `conenforced`, `conislocal`, signed `coninhcount`, and `connoinherit`, parent constraints, owning `pg_class` rows, the complete standard relation constraint-name inventory, and required direct `pg_inherits` witnesses inside the same catalog snapshot. `conkey` resolves to exactly one bounded column. The owning `pg_class.relkind` must resolve without coercion to ordinary table (`r`), partitioned table (`p`), or foreign table (`f`).
 
 Every NOT NULL row requires `conenforced=true`; foreign-table NOT NULL additionally requires `convalidated=true`. `conislocal=false / coninhcount=0` fails closed. `connoinherit=true` requires `conislocal=true / coninhcount=0`; purely local ordinary/foreign-table NO INHERIT remains valid, while partitioned-table NO INHERIT is rejected. A nonzero `conparentid` requires a real parent-constraint join, parent `relkind='p'`, `conislocal=false`, `coninhcount=1`, `connoinherit=false`, corresponding constrained columns, compatible parent/child validation state, an acyclic parent graph, and an independent stable direct `pg_inherits` witness with `inhdetachpending=false`.
 
-When relation-partition evidence is observed together with the complete NOT NULL family, validation is bidirectional: existing child `conparentid` must agree with the relation-level direct parent, and every inheritable NOT NULL row on that direct partitioned-table parent must have the corresponding inherited child row/link. The adapter must never synthesize the missing side from the other family.
+When relation-partition evidence is observed with the complete NOT NULL family, validation is bidirectional: existing child `conparentid` must agree with the relation-level direct parent, and every inheritable NOT NULL row on that direct partitioned-table parent must have the corresponding inherited child row/link. The adapter never synthesizes the missing side from the other family.
 
-The adapter must not manufacture parent witnesses from names or column shape, default missing detach/enforcement/validation values, rename constraints, normalize impossible inheritance tuples, or repair contradictory catalog data before domain validation. Missing, unauthorized, contradictory, origin-less, unsupported-relation-kind, duplicate, cross-family-name-colliding, cross-column, cyclic, invalid parent/child validation, NOT ENFORCED NOT NULL, foreign-table NOT VALID NOT NULL, inherited-ancestry NO INHERIT, partitioned-table NO INHERIT, detach-pending, missing inherited partition linkage, incomplete index topology, wrong index parent, or partially resolved evidence fails closed before immutable snapshot construction.
+Missing, unauthorized, contradictory, origin-less, unsupported-relation-kind, duplicate, cross-family-name-colliding, cross-column, cyclic, invalid parent/child validation, NOT ENFORCED NOT NULL, foreign-table NOT VALID NOT NULL, inherited-ancestry NO INHERIT, partitioned-table NO INHERIT, detach-pending, missing inherited partition linkage, incomplete index topology, wrong index parent, explicitly valid partitioned-index topology with a missing attached direct child, or partially resolved evidence fails closed before immutable snapshot construction.
 
 ## Primary authority
 
@@ -141,10 +139,11 @@ The adapter must not manufacture parent witnesses from names or column shape, de
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_inherits*. https://www.postgresql.org/docs/18/catalog-pg-inherits.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_class*. https://www.postgresql.org/docs/18/catalog-pg-class.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: Table Partitioning*. https://www.postgresql.org/docs/18/ddl-partitioning.html
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: ALTER INDEX*. https://www.postgresql.org/docs/18/sql-alterindex.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE TABLE*. https://www.postgresql.org/docs/18/sql-createtable.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE FOREIGN TABLE*. https://www.postgresql.org/docs/18/sql-createforeigntable.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: ALTER TABLE*. https://www.postgresql.org/docs/18/sql-altertable.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 release notes*. https://www.postgresql.org/docs/18/release-18.html
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 source: tablecmds.c (REL_18_STABLE)*. https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/commands/tablecmds.c
-- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 source: heap.c (REL_18_STABLE)*. https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/catalog/heap.c
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 source: index.c (REL_18_STABLE)*. https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/catalog/index.c
 - PostgreSQL Global Development Group. (2026). *PostgreSQL 18 source: pg_constraint.c (REL_18_STABLE)*. https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/catalog/pg_constraint.c
