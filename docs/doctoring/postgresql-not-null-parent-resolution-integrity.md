@@ -10,13 +10,15 @@ Decision date: 2026-09-14
 
 That row-existence repair was necessary but not sufficient. The lookup matched only parent schema, relation kind, relation name, and constraint name. In a parent with more than one NOT NULL column, a child `raw_value` constraint could therefore claim the observed parent `quality_flag` constraint as its `conparentid`. Both rows existed, relation/column completeness still held, and the contradictory edge could enter governed identity.
 
-This is a source-integrity defect rather than a naming preference. PostgreSQL does not use `conparentid` as an arbitrary constraint-to-constraint association; the child row represents the inherited corresponding constraint for the partition column.
+The partition-parent attachment boundary also remained able to combine a nonzero parent coordinate with `connoinherit=true` on a regular-table partition child. The constructor correctly rejected `NO INHERIT` on `RelationKind::PartitionedTable`, but ordinary `RelationKind::Table` constraints may legitimately use `NO INHERIT` for classic inheritance. Once such a row is attached to a partitioned-table parent through `conparentid`, however, it represents the inherited partition copy, and PostgreSQL's declarative partitioning rules require the parent's NOT NULL constraint to remain inherited by the partition. That tuple is therefore not source-representable partition evidence.
+
+These are source-integrity defects rather than naming preferences. PostgreSQL does not use `conparentid` as an arbitrary constraint-to-constraint association, and a partition-child copy cannot simultaneously claim the partition parent edge while declaring that the constraint does not inherit.
 
 ## Primary-source basis
 
-PostgreSQL 18 documents `pg_constraint.conparentid` as referencing `pg_constraint.oid` and identifying the corresponding constraint of the parent partitioned table when the row belongs to a partition. The same catalog exposes `conkey` as the constrained relation-column numbers. PostgreSQL 18 `CREATE TABLE` states that a partition has the same column names and types as its parent and that parent constraints are cloned on the partition. The partitioning rules require the parent NOT NULL constraints to be inherited by all partitions.
+PostgreSQL 18 documents `pg_constraint.conparentid` as referencing `pg_constraint.oid` and identifying the corresponding constraint of the parent partitioned table when the row belongs to a partition. The same catalog exposes `conkey` as the constrained relation-column numbers and `connoinherit` as the non-inheritable flag. PostgreSQL 18 partitioning rules state that CHECK and NOT NULL constraints of a partitioned table are always inherited by all its partitions and that NO INHERIT constraints of those types are not allowed on the partitioned parent. `ALTER TABLE ... ATTACH PARTITION` likewise requires the attached table to carry all parent NOT NULL and CHECK constraints without `NO INHERIT`.
 
-`REL_18_STABLE` makes the column identity explicit in the catalog implementation. `findNotNullConstraintAttnum(relid, attnum)` scans `pg_constraint`, retains only `CONSTRAINT_NOTNULL`, extracts the sole NOT NULL `conkey`, and returns a row only when that key equals the requested attribute number. `ConstraintSetParentConstraint()` then records the partition dependency on the exact `parentConstrId`. Taken together, a governed parent edge must resolve both the parent row identity and the corresponding constrained column.
+`REL_18_STABLE` makes the column identity explicit in the catalog implementation. `findNotNullConstraintAttnum(relid, attnum)` scans `pg_constraint`, retains only `CONSTRAINT_NOTNULL`, extracts the sole NOT NULL `conkey`, and returns a row only when that key equals the requested attribute number. `ConstraintSetParentConstraint()` then records the partition dependency on the exact `parentConstrId`. Taken together, a governed parent edge must resolve both the parent row identity and the corresponding constrained column, and its child-side inheritance flags must remain compatible with an inherited partition copy.
 
 ## Decision
 
@@ -24,11 +26,12 @@ A nonzero source `conparentid` may enter governed identity only after all of the
 
 - the parent coordinate names a `RelationKind::PartitionedTable`;
 - the child row has `conislocal=false` and `coninhcount=1`;
+- the child row has `connoinherit=false`;
 - a NOT NULL observation with the exact parent schema, relation kind, relation name, and constraint name exists in the same canonicalized family;
 - the resolved parent observation constrains the same source column name as the partition-child observation;
 - normal relation/column completeness validation independently proves that both constraints belong to observed relation columns.
 
-The same-column rule is partition-specific. It does not reinterpret generic inheritance rows with `conparentid=0`, and it does not require child and parent constraint names to be equal. The model continues to exclude raw OIDs from governed identity.
+The same-column and no-inherit rules are partition-parent specific. They do not reinterpret classic inheritance rows with `conparentid=0`; ordinary local table inheritance may still carry `NO INHERIT` where PostgreSQL permits it. The model continues to exclude raw OIDs from governed identity.
 
 ## Repair lineage
 
@@ -38,19 +41,23 @@ RED `b20a54c3da3d2890b7e786fce7535fdd13bf6615` changed `not_null_constraint_pare
 
 Fresh review `5193201137` then identified the remaining cross-column edge on exact `15a1729949eda1ace3b668768a75b9c7c4c11f02`. RED `212d17e96963cf584576056a3907e8a55adef2f2` adds a two-column partition family in `not_null_constraint_parent_column_contract.rs`: the child `raw_value` row deliberately references the parent's `quality_flag` NOT NULL row while every relation and NOT NULL row is otherwise complete. That predecessor accepts the impossible edge, so the contract expects `not_null_constraint_parent_column`.
 
-Production repair `cfe1851f0807c1d53c2a51c58c913509a40cfd36` resolves the parent row once by its stable coordinate and then requires `parent_observation.column_name() == observation.column_name()`. Missing parents continue to use `not_null_constraint_parent_coordinate`; cross-column parents use the distinct `not_null_constraint_parent_column` failure. Existing partition-kind, locality/count, signed-`int2`, `NO INHERIT`, nullability, duplicate-column, completeness, naming, and digest-domain behavior remains unchanged.
+Production repair `cfe1851f0807c1d53c2a51c58c913509a40cfd36` resolves the parent row once by its stable coordinate and then requires `parent_observation.column_name() == observation.column_name()`. Missing parents continue to use `not_null_constraint_parent_coordinate`; cross-column parents use the distinct `not_null_constraint_parent_column` failure.
 
-The repair is source-complete but not execution acceptance. Rust 1.98 fmt, strict Clippy, contract/workspace/doc tests, release build, owned coverage, hosted security/Product/review evidence, and the unchanged-head requirement remain separate gates.
+Review `5193490988` found the remaining inheritance-flag contradiction on exact `862d966b5ec8f24908f546d9d413d6c535b497a0`. RED `1bd8e20e9a13574a2c0d4f700d93bd54923451f9` adds `partition_parent_link_rejects_no_inherit_child_constraint`: an ordinary table constraint is first constructed with `NO INHERIT`, which remains valid before any partition-parent edge is attached, then the test requires parent attachment to fail as `not_null_constraint_parent_no_inherit`. Minimal production repair `e1618a20db333cae4facdf1bf80c209785b6b782` places that fail-closed check only in `with_parent_constraint()`. Generic inheritance with `conparentid=0` is therefore unchanged.
+
+Existing partition-kind, locality/count, signed-`int2`, parent-coordinate, same-column, nullability, duplicate-column, completeness, naming, and digest-domain behavior remains unchanged. The repair is source-complete but not execution acceptance. Rust 1.98 fmt, strict Clippy, contract/workspace/doc tests, release build, owned coverage, hosted security/Product/review evidence, and the unchanged-head requirement remain separate gates.
 
 ## Adapter obligation
 
-The future PostgreSQL transport must resolve `conparentid` while holding the same bounded read-only catalog snapshot used for `pg_constraint`/`pg_attribute` capture. It must join the referenced parent `pg_constraint` row, extract its NOT NULL `conkey`, resolve that attribute against the parent relation, and prove that it is the corresponding partition column before emitting the stable coordinate. A missing, out-of-scope without authorized expansion, contradictory, cross-column, or partially resolved parent row fails closed before immutable snapshot construction.
+The future PostgreSQL transport must resolve `conparentid` while holding the same bounded read-only catalog snapshot used for `pg_constraint`/`pg_attribute` capture. It must join the referenced parent `pg_constraint` row, extract its NOT NULL `conkey`, resolve that attribute against the parent relation, prove that it is the corresponding partition column, and reject a partition-parent-linked child row whose inheritance flags contradict the inherited partition semantics before emitting the stable coordinate. A missing, out-of-scope without authorized expansion, contradictory, cross-column, `NO INHERIT`, or partially resolved parent row fails closed before immutable snapshot construction.
 
 ## References
 
 PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_constraint*. https://www.postgresql.org/docs/18/catalog-pg-constraint.html
 
 PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE TABLE*. https://www.postgresql.org/docs/18/sql-createtable.html
+
+PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: ALTER TABLE*. https://www.postgresql.org/docs/18/sql-altertable.html
 
 PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: Table partitioning*. https://www.postgresql.org/docs/18/ddl-partitioning.html
 
