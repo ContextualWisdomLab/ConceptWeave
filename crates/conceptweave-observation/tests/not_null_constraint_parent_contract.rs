@@ -82,6 +82,35 @@ fn child_constraint(parent_relation_name: &str) -> NotNullConstraintObservation 
         .expect("partition-child NOT NULL constraint is valid")
 }
 
+fn partitioned_constraint_with_parent(
+    relation_name: &str,
+    parent_relation_name: &str,
+) -> NotNullConstraintObservation {
+    NotNullConstraintObservation::new(
+        "public",
+        relation_name,
+        RelationKind::PartitionedTable,
+        "metric_raw_value_not_null",
+        "raw_value",
+        true,
+        true,
+        false,
+        1,
+        false,
+    )
+    .expect("partitioned child NOT NULL constraint is valid before parent attachment")
+    .with_parent_constraint(
+        ParentNotNullConstraintCoordinate::new(
+            "public",
+            parent_relation_name,
+            RelationKind::PartitionedTable,
+            "metric_raw_value_not_null",
+        )
+        .expect("partition parent coordinate is valid"),
+    )
+    .expect("non-self parent coordinate can be attached before family validation")
+}
+
 fn snapshot(
     parent_relation_name: &str,
     constraint: NotNullConstraintObservation,
@@ -127,6 +156,30 @@ fn unresolved_partition_parent_constraint_is_rejected() {
         error,
         ObservationError::InvalidObservationField {
             field: "not_null_constraint_parent_coordinate",
+        }
+    );
+}
+
+#[test]
+fn cyclic_partition_parent_constraints_are_rejected() {
+    let error = PostgresSchemaSnapshotV3::new_with_not_null_constraints(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-14T04:42:00Z",
+        vec![parent_relation("metric_a"), parent_relation("metric_b")],
+        Vec::new(),
+        Vec::new(),
+        vec![
+            partitioned_constraint_with_parent("metric_a", "metric_b"),
+            partitioned_constraint_with_parent("metric_b", "metric_a"),
+        ],
+    )
+    .expect_err("a declarative partition parent-constraint graph cannot contain a cycle");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "not_null_constraint_parent_cycle",
         }
     );
 }
