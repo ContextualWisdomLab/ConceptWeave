@@ -94,6 +94,7 @@ pub struct NotNullConstraintObservation {
     inheritance_ancestor_count: u16,
     no_inherit: bool,
     parent_constraint: Option<ParentNotNullConstraintCoordinate>,
+    partition_parent_relation: Option<(String, String)>,
 }
 
 impl NotNullConstraintObservation {
@@ -154,6 +155,7 @@ impl NotNullConstraintObservation {
             inheritance_ancestor_count,
             no_inherit,
             parent_constraint: None,
+            partition_parent_relation: None,
         })
     }
 
@@ -194,6 +196,31 @@ impl NotNullConstraintObservation {
             });
         }
         self.parent_constraint = Some(parent_constraint);
+        Ok(self)
+    }
+
+    /// Attaches the direct declarative-partition parent resolved from `pg_inherits`.
+    ///
+    /// This is validation evidence for the relation edge behind `conparentid`. The same parent
+    /// relation coordinate is already carried by the parent-constraint coordinate and therefore is
+    /// not hashed twice. The canonicalizer requires exact agreement between both independent catalog
+    /// joins before the constraint family can acquire governed identity.
+    pub fn with_partition_parent_relation(
+        mut self,
+        schema_name: impl Into<String>,
+        relation_name: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        let schema_name = schema_name.into();
+        let relation_name = relation_name.into();
+        crate::model::validate_nonblank(
+            &schema_name,
+            "not_null_constraint_partition_parent_schema_name",
+        )?;
+        crate::model::validate_nonblank(
+            &relation_name,
+            "not_null_constraint_partition_parent_relation_name",
+        )?;
+        self.partition_parent_relation = Some((schema_name, relation_name));
         Ok(self)
     }
 
@@ -261,6 +288,12 @@ impl NotNullConstraintObservation {
     #[must_use]
     pub const fn parent_constraint(&self) -> Option<&ParentNotNullConstraintCoordinate> {
         self.parent_constraint.as_ref()
+    }
+
+    fn partition_parent_relation(&self) -> Option<(&str, &str)> {
+        self.partition_parent_relation
+            .as_ref()
+            .map(|(schema_name, relation_name)| (schema_name.as_str(), relation_name.as_str()))
     }
 }
 
@@ -353,6 +386,21 @@ pub(crate) fn canonicalize_not_null_constraints(
         }
 
         if let Some(parent) = observation.parent_constraint() {
+            let Some((partition_parent_schema_name, partition_parent_relation_name)) =
+                observation.partition_parent_relation()
+            else {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "not_null_constraint_partition_parent_relation",
+                });
+            };
+            if partition_parent_schema_name != parent.schema_name()
+                || partition_parent_relation_name != parent.relation_name()
+            {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "not_null_constraint_partition_parent_relation",
+                });
+            }
+
             let parent_observation = constraints.iter().find(|candidate| {
                 candidate.schema_name() == parent.schema_name()
                     && candidate.relation_name() == parent.relation_name()
@@ -369,6 +417,10 @@ pub(crate) fn canonicalize_not_null_constraints(
                     field: "not_null_constraint_parent_column",
                 });
             }
+        } else if observation.partition_parent_relation().is_some() {
+            return Err(ObservationError::InvalidObservationField {
+                field: "not_null_constraint_partition_parent_relation",
+            });
         }
 
         observed_columns.insert((
