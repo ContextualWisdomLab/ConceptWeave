@@ -131,10 +131,10 @@ impl NotNullConstraintObservation {
                 field: "not_null_constraint_relation_kind",
             });
         }
-        // PostgreSQL 18 supports NOT ENFORCED only for CHECK and foreign-key constraints.
-        // A first-class NOT NULL row with conenforced=false is therefore not source-representable
-        // evidence and must fail closed before it can acquire governed identity.
-        if !enforced {
+        // Ordinary PostgreSQL 18 tables do not support NOT ENFORCED for NOT NULL constraints.
+        // CREATE FOREIGN TABLE has a separate grammar and explicitly allows ENFORCED/NOT ENFORCED
+        // on NOT NULL, so preserve that source state for foreign tables instead of rejecting it.
+        if relation_kind != RelationKind::ForeignTable && !enforced {
             return Err(ObservationError::InvalidObservationField {
                 field: "not_null_constraint_enforcement",
             });
