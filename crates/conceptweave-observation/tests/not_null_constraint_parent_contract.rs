@@ -185,6 +185,29 @@ fn cyclic_partition_parent_constraints_are_rejected() {
 }
 
 #[test]
+fn partition_parent_constraint_requires_direct_relation_witness() {
+    let error = PostgresSchemaSnapshotV3::new_with_not_null_constraints(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-14T05:42:00Z",
+        vec![parent_relation("metric"), child_relation()],
+        Vec::new(),
+        Vec::new(),
+        vec![parent_constraint("metric"), child_constraint("metric")],
+    )
+    .expect_err(
+        "conparentid cannot establish that the referenced partitioned table is the child's direct pg_inherits parent",
+    );
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "not_null_constraint_partition_parent_relation",
+        }
+    );
+}
+
+#[test]
 fn catalog_oid_is_not_part_of_public_parent_constraint_contract() {
     let parent = ParentNotNullConstraintCoordinate::new(
         "public",
