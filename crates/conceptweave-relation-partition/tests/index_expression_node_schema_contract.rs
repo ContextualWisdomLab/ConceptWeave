@@ -125,6 +125,28 @@ fn const_and_unknown_nodes_fail_closed_until_their_full_equal_schema_is_modeled(
 }
 
 #[test]
+fn relation_var_leaves_fail_closed_until_their_full_equal_schema_is_modeled() {
+    let column = CanonicalExpression::column("account_email").unwrap();
+    let column_error = validate_postgres18_equal_schema(&column)
+        .expect_err("column name alone cannot prove PostgreSQL Var equal() semantics");
+    assert_eq!(
+        column_error,
+        ObservationError::InvalidObservationField {
+            field: "canonical_expression_node_schema",
+        }
+    );
+
+    let whole_row_error = validate_postgres18_equal_schema(&CanonicalExpression::whole_row())
+        .expect_err("whole-row Var evidence must also retain complete PostgreSQL equality state");
+    assert_eq!(
+        whole_row_error,
+        ObservationError::InvalidObservationField {
+            field: "canonical_expression_node_schema",
+        }
+    );
+}
+
+#[test]
 fn supported_func_and_op_nodes_accept_complete_equal_schemas() {
     let text = QualifiedTypeName::new("pg_catalog", "text").unwrap();
     let default_collation =
