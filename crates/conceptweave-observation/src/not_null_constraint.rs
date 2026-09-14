@@ -163,6 +163,14 @@ impl NotNullConstraintObservation {
                 field: "not_null_constraint_inheritance_origin",
             });
         }
+        // `connoinherit` marks a locally defined constraint that cannot propagate to children.
+        // PostgreSQL refuses ALTER ... NO INHERIT for a constraint with inherited ancestry, so a
+        // NO INHERIT NOT NULL row must be purely local: conislocal=true and coninhcount=0.
+        if no_inherit && (!is_local || inheritance_ancestor_count != 0) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "not_null_constraint_no_inherit_origin",
+            });
+        }
         // PostgreSQL 18 requires NOT NULL constraints declared on a partitioned table to be
         // inherited by every partition. A partitioned-table `NO INHERIT` row is therefore not
         // source-representable evidence and must not acquire a governed semantic identity.
