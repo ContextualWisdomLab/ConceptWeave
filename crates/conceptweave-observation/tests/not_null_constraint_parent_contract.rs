@@ -192,3 +192,38 @@ fn partition_parent_link_requires_exactly_one_inheritance_ancestor() {
         );
     }
 }
+
+#[test]
+fn partition_parent_link_rejects_no_inherit_child_constraint() {
+    let child = NotNullConstraintObservation::new(
+        "public",
+        "metric_2026",
+        RelationKind::Table,
+        "metric_raw_value_not_null",
+        "raw_value",
+        true,
+        true,
+        false,
+        1,
+        true,
+    )
+    .expect("ordinary-table NO INHERIT is valid before partition-parent linkage is attached");
+    let parent = ParentNotNullConstraintCoordinate::new(
+        "public",
+        "metric",
+        RelationKind::PartitionedTable,
+        "metric_raw_value_not_null",
+    )
+    .expect("partition parent coordinate is valid");
+
+    let error = child
+        .with_parent_constraint(parent)
+        .expect_err("a partition-inherited NOT NULL constraint cannot be NO INHERIT");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "not_null_constraint_parent_no_inherit",
+        }
+    );
+}
