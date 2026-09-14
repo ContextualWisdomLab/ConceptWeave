@@ -15,3 +15,7 @@ pub use exclusion::*;
 #[path = "expression_semantics.rs"]
 mod expression_semantics;
 pub use expression_semantics::*;
+
+#[path = "expression_schema.rs"]
+mod expression_schema;
+pub use expression_schema::*;
