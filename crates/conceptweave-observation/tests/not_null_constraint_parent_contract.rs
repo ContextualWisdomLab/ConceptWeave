@@ -75,7 +75,7 @@ fn child_constraint_with_state(
         RelationKind::PartitionedTable,
         "metric_raw_value_not_null",
     )?)?
-    .with_partition_parent_relation("public", parent_relation_name)
+    .with_partition_parent_relation("public", parent_relation_name, false)
 }
 
 fn child_constraint(parent_relation_name: &str) -> NotNullConstraintObservation {
@@ -110,8 +110,8 @@ fn partitioned_constraint_with_parent(
         .expect("partition parent coordinate is valid"),
     )
     .expect("non-self parent coordinate can be attached before family validation")
-    .with_partition_parent_relation("public", parent_relation_name)
-    .expect("direct partition-parent witness is valid")
+    .with_partition_parent_relation("public", parent_relation_name, false)
+    .expect("direct partition-parent witness is valid and not detach-pending")
 }
 
 fn snapshot(
@@ -238,7 +238,7 @@ fn partition_parent_constraint_requires_direct_relation_witness() {
 #[test]
 fn mismatched_partition_parent_relation_witness_is_rejected() {
     let child = child_constraint("metric")
-        .with_partition_parent_relation("public", "metric_archive")
+        .with_partition_parent_relation("public", "metric_archive", false)
         .expect("the raw pg_inherits coordinate is syntactically valid before family validation");
     let error = PostgresSchemaSnapshotV3::new_with_not_null_constraints(
         &support::authorized_source("warehouse_primary", &["public"]),
