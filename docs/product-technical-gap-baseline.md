@@ -67,9 +67,10 @@ A fifth review, `5199853671` on exact `10b3dbb8ed58ecea065fbe5fab8bb1aa1039f2bf`
 
 A sixth review, `5199923125` on exact `d41f30312120555bf466ed8980cf23793faf83b2`, found that already-modeled per-key collation could still contradict the direct edge. PostgreSQL `CompareIndexInfo()` compares corresponding key collations after mapped-attribute validation.
 
-- behavioral source RED `7380cbc663e5f643fa5409f5d49eb314113c2531` isolates a parent/child key-collation mismatch while preserving a matching positive control;
+- initial behavioral source RED `7380cbc663e5f643fa5409f5d49eb314113c2531` targeted a parent/child key-collation mismatch, but static fixture review found it used a non-collatable `bigint/int8_ops` key with a collation;
+- fixture-reality correction `4ab3657e28cb312a6812b6142a783f1849868045` switches the contract to collatable `text/text_ops`, so `C` versus `POSIX` isolates the intended mismatch while preserving a matching positive control;
 - minimal production repair `af2e6ad76d08e069127236e47b342f480275539a` compares every corresponding `IndexKeySemantics::collation()` coordinate and fails closed before hashing;
-- `docs/doctoring/postgresql-index-partition-collation-integrity.md` records the source contract and keeps operator-family semantics separate from the modeled operator-class coordinate.
+- doctoring correction `9757a7d18379556fa3de117b3182cdc0205454ee` records the fixture correction and keeps operator-family semantics separate from the modeled operator-class coordinate.
 
 Full PostgreSQL `CompareIndexInfo()` parity is still not claimed. Operator-family identity, expression-tree equality, predicates, and exclusion semantics remain the next representation-aware definition-equivalence gap. Current evidence stores operator class, not operator family, so operator-class equality must not be substituted for the PostgreSQL check; raw rendered DDL is not an acceptable semantic shortcut.
 
