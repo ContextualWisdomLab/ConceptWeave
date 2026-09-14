@@ -15,11 +15,19 @@ const SHA256_DIGEST_PREFIX: &str = "sha256:";
 /// Validates that a canonical expression contains the complete PostgreSQL 18 `equal()` schema for
 /// every node kind currently admitted by ConceptWeave.
 ///
-/// The current supported set is intentionally narrow: relation-local column/whole-row references,
-/// `FuncExpr`, and `OpExpr`. `Const` remains unsupported because PostgreSQL `_equalConst` compares
-/// the exact Datum using type length/by-value semantics; rendered SQL or type output is not an
-/// equivalent immutable representation. Unknown node kinds fail closed until their full equality
-/// schema and stable OID resolution are modeled.
+/// The current supported set is intentionally narrow: `FuncExpr` and `OpExpr` whose complete leaf
+/// semantics are themselves supported. Relation-local `Var` leaves are not yet admissible here:
+/// [`CanonicalExpression::Column`] preserves only the attribute-map-normalized column name, while
+/// PostgreSQL `equal()` also observes material `Var` state such as type, type modifier, collation,
+/// nulling relations, nesting level, and RETURNING behavior. [`CanonicalExpression::WholeRow`] is
+/// likewise not a complete `Var` representation. Both therefore fail closed until a later
+/// domain-separated Var-semantics successor binds every equality-participating field or proves the
+/// corresponding PostgreSQL index-expression invariant.
+///
+/// `Const` remains unsupported because PostgreSQL `_equalConst` compares the exact Datum using type
+/// length/by-value semantics; rendered SQL or type output is not an equivalent immutable
+/// representation. Unknown node kinds fail closed until their full equality schema and stable OID
+/// resolution are modeled.
 ///
 /// `CoercionForm` and parse locations are deliberately absent because PostgreSQL 18 `equal()`
 /// explicitly ignores them. `FuncExpr` function identity includes the resolved result type in
@@ -29,7 +37,7 @@ pub fn validate_postgres18_equal_schema(
     expression: &CanonicalExpression,
 ) -> Result<(), ObservationError> {
     match expression {
-        CanonicalExpression::Column(_) | CanonicalExpression::WholeRow => Ok(()),
+        CanonicalExpression::Column(_) | CanonicalExpression::WholeRow => Err(invalid()),
         CanonicalExpression::Node { node_kind, fields } => {
             match node_kind.as_str() {
                 "FuncExpr" => validate_func_expr(fields)?,
