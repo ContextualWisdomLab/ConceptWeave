@@ -200,8 +200,43 @@ fn identity(encoding: i32) -> CollationCatalogIdentity {
     CollationCatalogIdentity::new("pg_catalog", "C", encoding).unwrap()
 }
 
-fn observation(index: IndexPartitionCoordinate, encoding: i32) -> IndexKeyCollationIdentityObservation {
+fn observation(
+    index: IndexPartitionCoordinate,
+    encoding: i32,
+) -> IndexKeyCollationIdentityObservation {
     IndexKeyCollationIdentityObservation::new(index, 1, Some(identity(encoding))).unwrap()
+}
+
+#[test]
+fn catalog_identity_preserves_the_unique_pg_collation_coordinate() {
+    let identity = identity(6);
+    assert_eq!(identity.schema_name(), "pg_catalog");
+    assert_eq!(identity.collation_name(), "C");
+    assert_eq!(identity.encoding(), 6);
+
+    let blank_schema = CollationCatalogIdentity::new(" ", "C", 6)
+        .expect_err("collation namespace must be a real catalog coordinate");
+    assert_eq!(
+        blank_schema,
+        ObservationError::InvalidObservationField {
+            field: "index_collation_catalog_schema_name",
+        }
+    );
+    let blank_name = CollationCatalogIdentity::new("pg_catalog", "", 6)
+        .expect_err("collation name must be a real catalog coordinate");
+    assert_eq!(
+        blank_name,
+        ObservationError::InvalidObservationField {
+            field: "index_collation_catalog_name",
+        }
+    );
+}
+
+#[test]
+fn key_identity_location_requires_a_real_key_position() {
+    let error = IndexKeyCollationIdentityObservation::new(parent_index(), 0, Some(identity(6)))
+        .expect_err("index key positions are one-based");
+    assert_eq!(error, ObservationError::InvalidOrdinalPosition);
 }
 
 #[test]
@@ -227,7 +262,53 @@ fn same_qualified_name_with_different_catalog_encoding_is_not_the_same_collation
 }
 
 #[test]
-fn matching_catalog_row_identity_remains_admissible() {
+fn catalog_identity_must_bind_to_the_issued_key_collation_name() {
+    let (base, relations, indexes) = snapshots();
+    let wrong = IndexKeyCollationIdentityObservation::new(
+        parent_index(),
+        1,
+        Some(CollationCatalogIdentity::new("pg_catalog", "POSIX", 6).unwrap()),
+    )
+    .unwrap();
+
+    let error = IndexPartitionCollationIdentitySnapshot::new(
+        &base,
+        &relations,
+        &indexes,
+        vec![wrong, observation(child_index(), 6)],
+    )
+    .expect_err("catalog identity must prove the exact qualified collation already issued in v3");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "index_partition_collation_catalog_binding",
+        }
+    );
+}
+
+#[test]
+fn catalog_identity_family_is_complete_over_bounded_key_semantics() {
+    let (base, relations, indexes) = snapshots();
+
+    let error = IndexPartitionCollationIdentitySnapshot::new(
+        &base,
+        &relations,
+        &indexes,
+        vec![observation(parent_index(), 6)],
+    )
+    .expect_err("every bounded key-semantic position needs explicit catalog identity evidence");
+
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "index_partition_collation_catalog_completeness",
+        }
+    );
+}
+
+#[test]
+fn matching_catalog_row_identity_remains_admissible_and_receiptable() {
     let (base, relations, indexes) = snapshots();
 
     let snapshot = IndexPartitionCollationIdentitySnapshot::new(
@@ -238,6 +319,39 @@ fn matching_catalog_row_identity_remains_admissible() {
     )
     .expect("the same resolved pg_collation row must remain admissible");
 
+    assert_eq!(snapshot.source_connection_key(), "warehouse");
+    assert_eq!(snapshot.connection_policy_binding(), POLICY_BINDING);
+    assert_eq!(snapshot.predecessor_digest(), indexes.snapshot_digest());
     assert!(snapshot.snapshot_digest().starts_with("sha256:"));
+    assert_eq!(snapshot.extractor_revision(), indexes.extractor_revision());
+    assert_eq!(snapshot.observed_at_utc(), indexes.observed_at_utc());
     assert_eq!(snapshot.observations().len(), 2);
+
+    let receipt = snapshot
+        .source_receipt(&child_index(), 1)
+        .expect("an observed key must issue exact provenance");
+    assert_eq!(receipt.source_id(), "warehouse");
+    assert_eq!(receipt.connection_policy_binding(), POLICY_BINDING);
+    assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
+    assert_eq!(receipt.index(), &child_index());
+    assert_eq!(receipt.key_position(), 1);
+
+    let zero = snapshot
+        .source_receipt(&child_index(), 0)
+        .expect_err("receipt key positions are one-based");
+    assert_eq!(zero, ObservationError::InvalidOrdinalPosition);
+
+    let unknown_index = IndexPartitionCoordinate::new(
+        "public",
+        "events_2026",
+        RelationKind::Table,
+        "not_observed_idx",
+    )
+    .unwrap();
+    assert!(matches!(
+        snapshot.source_receipt(&unknown_index, 1),
+        Err(ObservationError::UnknownObservationLocation { .. })
+    ));
 }
