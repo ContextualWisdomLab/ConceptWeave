@@ -1,7 +1,7 @@
 use conceptweave_observation::{NotNullConstraintObservation, ObservationError, RelationKind};
 
 #[test]
-fn not_null_constraint_rejects_not_enforced_source_state() {
+fn ordinary_table_rejects_not_enforced_not_null() {
     let error = NotNullConstraintObservation::new(
         "public",
         "metric",
@@ -14,7 +14,7 @@ fn not_null_constraint_rejects_not_enforced_source_state() {
         0,
         false,
     )
-    .expect_err("PostgreSQL 18 supports NOT ENFORCED only for CHECK and foreign-key constraints");
+    .expect_err("ordinary PostgreSQL 18 tables do not support NOT ENFORCED NOT NULL constraints");
 
     assert_eq!(
         error,
@@ -22,4 +22,24 @@ fn not_null_constraint_rejects_not_enforced_source_state() {
             field: "not_null_constraint_enforcement",
         }
     );
+}
+
+#[test]
+fn foreign_table_preserves_not_enforced_not_null() {
+    let observation = NotNullConstraintObservation::new(
+        "remote",
+        "metric",
+        RelationKind::ForeignTable,
+        "metric_raw_value_not_null",
+        "raw_value",
+        true,
+        false,
+        true,
+        0,
+        false,
+    )
+    .expect("PostgreSQL 18 CREATE FOREIGN TABLE permits NOT NULL NOT ENFORCED");
+
+    assert_eq!(observation.relation_kind(), RelationKind::ForeignTable);
+    assert!(!observation.enforced());
 }
