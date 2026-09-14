@@ -24,6 +24,10 @@ pub use expression_schema::*;
 mod expression_var;
 pub use expression_var::*;
 
+#[path = "expression_relation_var_schema.rs"]
+mod expression_relation_var_schema;
+pub use expression_relation_var_schema::*;
+
 #[path = "type_modifier.rs"]
 mod type_modifier;
 pub use type_modifier::*;
