@@ -489,6 +489,7 @@ fn canonicalize_index_partitions(
                 return Err(invalid("index_partition_definition_access_method"));
             }
             validate_modeled_index_attribute_mapping(child_definition, parent_definition)?;
+            validate_modeled_index_key_collations(child_definition, parent_definition)?;
         }
     }
 
@@ -531,6 +532,28 @@ fn validate_modeled_index_attribute_mapping(
         }
     }
 
+    Ok(())
+}
+
+fn validate_modeled_index_key_collations(
+    child_definition: &IndexObservation,
+    parent_definition: &IndexObservation,
+) -> Result<(), ObservationError> {
+    let child_semantics = child_definition
+        .key_semantics()
+        .ok_or_else(|| invalid("index_partition_definition_collation"))?;
+    let parent_semantics = parent_definition
+        .key_semantics()
+        .ok_or_else(|| invalid("index_partition_definition_collation"))?;
+
+    if child_semantics.len() != parent_semantics.len() {
+        return Err(invalid("index_partition_definition_collation"));
+    }
+    for (child_key, parent_key) in child_semantics.iter().zip(parent_semantics) {
+        if child_key.collation() != parent_key.collation() {
+            return Err(invalid("index_partition_definition_collation"));
+        }
+    }
     Ok(())
 }
 
