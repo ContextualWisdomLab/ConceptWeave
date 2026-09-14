@@ -29,9 +29,10 @@ Applying the `CREATE TABLE` restriction to every table-like `relkind` was reject
   - ordinary-table `NOT NULL NOT ENFORCED` remains rejected;
   - foreign-table `NOT NULL NOT ENFORCED` must be constructible and preserve `enforced = false`.
 - Minimal production repair: `crates/conceptweave-observation/src/not_null_constraint.rs`, commit `41de3e390905299c3b77e7ba9dbd950c2fa90d46`.
-- The production delta is one file, four additions and four deletions relative to the RED head; parent topology, completeness, validation asymmetry, constraint-name integrity, and digest framing are unchanged.
+- Governed-identity regression: `crates/conceptweave-observation/tests/not_null_constraint_enforcement_contract.rs`, commit `5f786846a03974dbe8a6eb085fb9e151d20202d2`, proves foreign-table enforced and not-enforced observations produce distinct snapshot digests.
+- The production delta itself remains one file, four additions and four deletions relative to the RED head; parent topology, completeness, validation asymmetry, constraint-name integrity, and digest framing are unchanged.
 
-The executable RED is source-level evidence only until one unchanged exact head runs the repository-pinned Rust 1.98 and hosted acceptance gates.
+The executable contracts are source-level evidence only until one unchanged exact head runs the repository-pinned Rust 1.98 and hosted acceptance gates.
 
 ## Adapter obligation
 
