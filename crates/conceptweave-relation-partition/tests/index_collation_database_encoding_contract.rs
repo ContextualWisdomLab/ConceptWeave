@@ -45,6 +45,15 @@ fn postgres18_database_encoding_is_bounded_to_backend_encoding_ids() {
         }
     );
 
+    let unused = PostgresDatabaseEncodingObservation::new(7)
+        .expect_err("PG_UNUSED_1 is inside the enum range but is not a valid backend encoding");
+    assert_eq!(
+        unused,
+        ObservationError::InvalidObservationField {
+            field: "postgres_database_encoding",
+        }
+    );
+
     let sentinel = PostgresDatabaseEncodingObservation::new(-1)
         .expect_err("-1 is a collation sentinel, not a database encoding");
     assert_eq!(
@@ -53,4 +62,9 @@ fn postgres18_database_encoding_is_bounded_to_backend_encoding_ids() {
             field: "postgres_database_encoding",
         }
     );
+
+    PostgresDatabaseEncodingObservation::new(0)
+        .expect("SQL_ASCII remains a valid PostgreSQL backend encoding ID");
+    PostgresDatabaseEncodingObservation::new(34)
+        .expect("KOI8U is the final valid PostgreSQL 18 backend encoding ID");
 }
