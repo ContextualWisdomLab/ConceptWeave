@@ -32,6 +32,10 @@ pub use expression_var::*;
 mod expression_relation_var_schema;
 pub use expression_relation_var_schema::*;
 
+#[path = "expression_collation_identity.rs"]
+mod expression_collation_identity;
+pub use expression_collation_identity::*;
+
 #[path = "type_modifier.rs"]
 mod type_modifier;
 pub use type_modifier::*;
