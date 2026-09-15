@@ -134,6 +134,14 @@ impl CollationDefinitionObservation {
             lc_collate.as_deref(),
             actual_version.as_deref(),
         )?;
+        if provider == PostgresCollationProvider::Libc
+            && identity.encoding() == -1
+            && version.is_some()
+        {
+            return Err(invalid(
+                "index_collation_definition_libc_encoding_independent_stored_version",
+            ));
+        }
         if matches!(
             provider,
             PostgresCollationProvider::Builtin | PostgresCollationProvider::Icu
