@@ -134,7 +134,7 @@ fn foreign_relation(name: &str) -> RelationObservation {
     .unwrap()
 }
 
-fn base_snapshot(parent_valid: bool) -> PostgresSchemaSnapshotV3 {
+fn base_snapshot(parent_valid: bool, child_valid: bool) -> PostgresSchemaSnapshotV3 {
     PostgresSchemaSnapshotV3::new(
         &authorized_source(),
         "extractor-index-parent-validity-v1",
@@ -150,7 +150,7 @@ fn base_snapshot(parent_valid: bool) -> PostgresSchemaSnapshotV3 {
                 "events_2026",
                 RelationKind::Table,
                 "events_2026_id_idx",
-                true,
+                child_valid,
             ),
         ],
         vec![],
@@ -278,6 +278,30 @@ fn local_index_topology(
     )
 }
 
+fn attached_local_index_topology(
+    base: &PostgresSchemaSnapshotV3,
+    relations: &RelationPartitionSnapshot,
+) -> Result<IndexPartitionSnapshot, ObservationError> {
+    IndexPartitionSnapshot::new(
+        base,
+        relations,
+        vec![
+            IndexPartitionObservation::non_partition(
+                parent_index(),
+                IndexRelationKind::PartitionedIndex,
+            )
+            .unwrap(),
+            IndexPartitionObservation::partition(
+                child_index(),
+                IndexRelationKind::Index,
+                parent_index(),
+                false,
+            )
+            .unwrap(),
+        ],
+    )
+}
+
 fn foreign_partition_index_topology(
     base: &PostgresSchemaSnapshotV3,
     relations: &RelationPartitionSnapshot,
@@ -295,7 +319,7 @@ fn foreign_partition_index_topology(
 
 #[test]
 fn valid_partitioned_index_requires_attached_child_for_each_direct_partition() {
-    let base = base_snapshot(true);
+    let base = base_snapshot(true, true);
     let relations = relation_partitions(&base);
 
     let error = local_index_topology(&base, &relations)
@@ -309,8 +333,33 @@ fn valid_partitioned_index_requires_attached_child_for_each_direct_partition() {
 }
 
 #[test]
+fn valid_partitioned_index_requires_attached_child_to_be_valid() {
+    let base = base_snapshot(true, false);
+    let relations = relation_partitions(&base);
+
+    let error = attached_local_index_topology(&base, &relations)
+        .expect_err("a valid partitioned index cannot have an attached invalid child index");
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "index_partition_child_validity",
+        }
+    );
+}
+
+#[test]
+fn valid_partitioned_index_accepts_attached_valid_child() {
+    let base = base_snapshot(true, true);
+    let relations = relation_partitions(&base);
+
+    let topology = attached_local_index_topology(&base, &relations)
+        .expect("a valid partitioned index may attach a valid child index");
+    assert_eq!(topology.observations().len(), 2);
+}
+
+#[test]
 fn invalid_partitioned_index_can_stage_local_child_before_attachment() {
-    let base = base_snapshot(false);
+    let base = base_snapshot(false, true);
     let relations = relation_partitions(&base);
 
     let staged = local_index_topology(&base, &relations)
