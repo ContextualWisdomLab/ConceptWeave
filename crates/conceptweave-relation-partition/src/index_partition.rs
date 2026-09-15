@@ -44,6 +44,10 @@ pub use collation_database_encoding::*;
 mod collation_definition;
 pub use collation_definition::*;
 
+#[path = "database_default_collation.rs"]
+mod database_default_collation;
+pub use database_default_collation::*;
+
 #[path = "type_modifier.rs"]
 mod type_modifier;
 pub use type_modifier::*;
