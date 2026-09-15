@@ -37,6 +37,7 @@ Rejected alternatives:
   - the same encoding-independent rows with fabricated stored versions fail closed with `index_collation_definition_libc_encoding_independent_stored_version`;
   - database-encoding libc `C` with an explicit stored `VERSION` remains a positive control.
 - Minimal production repair: `7434f719b68fa2308437f2c10632959d62364290`, `crates/conceptweave-relation-partition/src/collation_definition.rs`.
+- Retained-contract correction: `bf62a577eb0da8910b05d82f37c606835521346e`, `crates/conceptweave-relation-partition/tests/index_collation_definition_contract.rs`. The earlier libc actual-version fixture had used one `collencoding=-1` identity while asserting an explicit stored version for `C`, `C.*`, and `POSIX`. That was source-invalid after this invariant and already source-invalid for `C.*` under the preceding provider-encoding rule. The fixture now uses concrete UTF8 encoding ID `6` for the direct libc creation path, preserving its actual-version-NULL purpose and explicit-version positive control without weakening the new encoding-independent invariant.
 
 No executed Rust GREEN is asserted. The available execution host has no `cargo`, `rustc`, or `rustup`; exact-head repository-pinned Rust 1.98 and hosted Product/security acceptance remain required.
 
@@ -47,7 +48,7 @@ The PostgreSQL transport descendant must validate this invariant against a real 
 1. Confirm bootstrap `pg_catalog.C` and `pg_catalog.POSIX` have raw `collencoding = -1` and `collversion IS NULL`.
 2. Execute arbitrary-name `CREATE COLLATION ... FROM pg_catalog.C` and `... FROM pg_catalog.POSIX`; confirm target rows preserve `-1`, the exact locale pair, and `collversion IS NULL`.
 3. Execute `ALTER COLLATION ... REFRESH VERSION` on the copied rows and confirm it cannot create a non-NULL stored version.
-4. In a database with a concrete backend encoding, create libc `C` with an explicit `VERSION` and confirm the concrete-encoding row remains representable separately.
+4. In a UTF8 database, directly create libc `C`/`C.*`/`POSIX` collations with an explicit `VERSION`; confirm their concrete `collencoding = 6`, stored version is preserved, and actual provider version remains NULL where PostgreSQL reports no provider version.
 
 ## References
 
