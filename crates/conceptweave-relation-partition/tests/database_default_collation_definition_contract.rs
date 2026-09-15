@@ -1,6 +1,7 @@
 use conceptweave_observation::ObservationError;
 use conceptweave_relation_partition::{
-    DatabaseDefaultCollationDefinitionObservation, PostgresDatabaseLocaleProvider,
+    DatabaseDefaultCollationDefinitionObservation, PostgresDatabaseEncodingObservation,
+    PostgresDatabaseLocaleProvider,
 };
 
 fn database_default(
@@ -16,6 +17,19 @@ fn database_default(
         Some("&V << w <<< W".to_owned()),
         Some(recorded_version.to_owned()),
         Some(actual_version.to_owned()),
+    )
+    .unwrap()
+}
+
+fn builtin_database_default(locale: &str) -> DatabaseDefaultCollationDefinitionObservation {
+    DatabaseDefaultCollationDefinitionObservation::new(
+        PostgresDatabaseLocaleProvider::Builtin,
+        Some(locale.to_owned()),
+        Some(locale.to_owned()),
+        Some(locale.to_owned()),
+        None,
+        Some("18".to_owned()),
+        Some("18".to_owned()),
     )
     .unwrap()
 }
@@ -187,16 +201,7 @@ fn non_libc_requires_datlocale_and_icu_rules_are_icu_only() {
 #[test]
 fn builtin_database_default_accepts_only_postgresql18_builtin_locales() {
     for locale in ["C", "C.UTF-8", "PG_UNICODE_FAST"] {
-        DatabaseDefaultCollationDefinitionObservation::new(
-            PostgresDatabaseLocaleProvider::Builtin,
-            Some(locale.to_owned()),
-            Some(locale.to_owned()),
-            Some(locale.to_owned()),
-            None,
-            Some("18".to_owned()),
-            Some("18".to_owned()),
-        )
-        .expect("PostgreSQL 18 builtin database locale must be accepted");
+        builtin_database_default(locale);
     }
 
     for locale in ["und", "en-US", "ko-KR"] {
@@ -209,5 +214,38 @@ fn builtin_database_default_accepts_only_postgresql18_builtin_locales() {
             Some("18".to_owned()),
             Some("18".to_owned()),
         ));
+    }
+}
+
+#[test]
+fn builtin_utf8_only_database_locales_reject_non_utf8_database_encoding() {
+    let latin1 = PostgresDatabaseEncodingObservation::new(8)
+        .expect("LATIN1 remains a valid PostgreSQL 18 backend/database encoding");
+
+    for locale in ["C.UTF-8", "PG_UNICODE_FAST"] {
+        let error = builtin_database_default(locale)
+            .validate_database_encoding(latin1)
+            .expect_err("PostgreSQL 18 UTF8-only built-in database locales must fail on LATIN1");
+        assert_eq!(
+            error,
+            ObservationError::InvalidObservationField {
+                field: "database_default_collation_database_encoding",
+            }
+        );
+    }
+}
+
+#[test]
+fn builtin_database_locale_encoding_positive_controls_remain_valid() {
+    let latin1 = PostgresDatabaseEncodingObservation::new(8).unwrap();
+    builtin_database_default("C")
+        .validate_database_encoding(latin1)
+        .expect("the built-in C locale remains valid across PostgreSQL backend encodings");
+
+    let utf8 = PostgresDatabaseEncodingObservation::new(6).unwrap();
+    for locale in ["C.UTF-8", "PG_UNICODE_FAST"] {
+        builtin_database_default(locale)
+            .validate_database_encoding(utf8)
+            .expect("PostgreSQL 18 UTF8-only built-in locale must remain valid on UTF8");
     }
 }
