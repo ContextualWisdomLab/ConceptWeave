@@ -62,12 +62,14 @@ impl TryFrom<char> for PostgresDatabaseLocaleProvider {
 /// Exact PostgreSQL 18 database-default collation definition for one bounded source observation.
 ///
 /// PostgreSQL 18 requires `datcollate` and `datctype` to be non-NULL for every database. `datlocale`
-/// is NULL for libc and present for built-in/ICU; `daticurules` is ICU-only. The option-bearing
-/// fields retain the raw catalog representation at the API boundary, but the constructor rejects
-/// combinations that cannot represent a valid PostgreSQL 18 database locale definition.
-/// `recorded_version` comes from `pg_database.datcollversion`; `actual_version` comes from
-/// `pg_database_collation_actual_version(database_oid)` in the same bounded capture. Keeping both
-/// values makes a provider upgrade visible before `ALTER DATABASE ... REFRESH COLLATION VERSION`.
+/// is NULL for libc and present for built-in/ICU; built-in databases use only PostgreSQL 18's
+/// `C`, `C.UTF-8`, or `PG_UNICODE_FAST` locale identifiers; `daticurules` is ICU-only. The
+/// option-bearing fields retain the raw catalog representation at the API boundary, but the
+/// constructor rejects combinations that cannot represent a valid PostgreSQL 18 database locale
+/// definition. `recorded_version` comes from `pg_database.datcollversion`; `actual_version` comes
+/// from `pg_database_collation_actual_version(database_oid)` in the same bounded capture. Keeping
+/// both values makes a provider upgrade visible before `ALTER DATABASE ... REFRESH COLLATION
+/// VERSION`.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct DatabaseDefaultCollationDefinitionObservation {
     provider: PostgresDatabaseLocaleProvider,
@@ -384,7 +386,10 @@ fn validate_database_provider_shape(
     let common_fields_present = lc_collate.is_some() && lc_ctype.is_some();
     let provider_fields_valid = match provider {
         PostgresDatabaseLocaleProvider::Libc => locale.is_none() && icu_rules.is_none(),
-        PostgresDatabaseLocaleProvider::Builtin => locale.is_some() && icu_rules.is_none(),
+        PostgresDatabaseLocaleProvider::Builtin => {
+            icu_rules.is_none()
+                && matches!(locale, Some("C" | "C.UTF-8" | "PG_UNICODE_FAST"))
+        }
         PostgresDatabaseLocaleProvider::Icu => locale.is_some(),
     };
 
