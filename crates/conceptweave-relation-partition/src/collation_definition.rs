@@ -123,6 +123,7 @@ impl CollationDefinitionObservation {
             icu_rules.as_deref(),
         )?;
         validate_provider_encoding(&identity, provider, locale.as_deref())?;
+        validate_provider_actual_version(provider, actual_version.as_deref())?;
         if provider == PostgresCollationProvider::DatabaseDefault && version.is_some() {
             return Err(invalid("index_collation_definition_default_stored_version"));
         }
@@ -474,6 +475,18 @@ fn validate_provider_encoding(
         Ok(())
     } else {
         Err(invalid("index_collation_definition_provider_encoding"))
+    }
+}
+
+fn validate_provider_actual_version(
+    provider: PostgresCollationProvider,
+    actual_version: Option<&str>,
+) -> Result<(), ObservationError> {
+    let valid = provider != PostgresCollationProvider::Builtin || actual_version == Some("1");
+    if valid {
+        Ok(())
+    } else {
+        Err(invalid("index_collation_definition_actual_version"))
     }
 }
 
