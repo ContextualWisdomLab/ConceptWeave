@@ -61,7 +61,10 @@ impl TryFrom<char> for PostgresDatabaseLocaleProvider {
 
 /// Exact PostgreSQL 18 database-default collation definition for one bounded source observation.
 ///
-/// The optional strings preserve SQL `NULL` versus present text without inventing provider defaults.
+/// PostgreSQL 18 requires `datcollate` and `datctype` to be non-NULL for every database. `datlocale`
+/// is NULL for libc and present for built-in/ICU; `daticurules` is ICU-only. The option-bearing
+/// fields retain the raw catalog representation at the API boundary, but the constructor rejects
+/// combinations that cannot represent a valid PostgreSQL 18 database locale definition.
 /// `recorded_version` comes from `pg_database.datcollversion`; `actual_version` comes from
 /// `pg_database_collation_actual_version(database_oid)` in the same bounded capture. Keeping both
 /// values makes a provider upgrade visible before `ALTER DATABASE ... REFRESH COLLATION VERSION`.
@@ -103,6 +106,13 @@ impl DatabaseDefaultCollationDefinitionObservation {
                 return Err(invalid("database_default_collation_text"));
             }
         }
+        validate_database_provider_shape(
+            provider,
+            lc_collate.as_deref(),
+            lc_ctype.as_deref(),
+            locale.as_deref(),
+            icu_rules.as_deref(),
+        )?;
         Ok(Self {
             provider,
             lc_collate,
@@ -361,6 +371,27 @@ impl IndexEffectiveCollationDefinitionSnapshot {
             extractor_revision: self.extractor_revision.clone(),
             observed_at_utc: self.observed_at_utc.clone(),
         })
+    }
+}
+
+fn validate_database_provider_shape(
+    provider: PostgresDatabaseLocaleProvider,
+    lc_collate: Option<&str>,
+    lc_ctype: Option<&str>,
+    locale: Option<&str>,
+    icu_rules: Option<&str>,
+) -> Result<(), ObservationError> {
+    let common_fields_present = lc_collate.is_some() && lc_ctype.is_some();
+    let provider_fields_valid = match provider {
+        PostgresDatabaseLocaleProvider::Libc => locale.is_none() && icu_rules.is_none(),
+        PostgresDatabaseLocaleProvider::Builtin => locale.is_some() && icu_rules.is_none(),
+        PostgresDatabaseLocaleProvider::Icu => locale.is_some(),
+    };
+
+    if common_fields_present && provider_fields_valid {
+        Ok(())
+    } else {
+        Err(invalid("database_default_collation_provider_shape"))
     }
 }
 
