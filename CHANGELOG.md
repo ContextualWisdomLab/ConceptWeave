@@ -6,6 +6,8 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
+- PostgreSQL database-default libc C-UTF8 evidence now rejects source-unreachable database-encoding combinations before effective collation identity is admitted. `DatabaseDefaultCollationDefinitionObservation::validate_database_encoding` treats case-insensitive `C.UTF-8`/`C.utf8` in either `datcollate` or `datctype` as compatible with UTF8 and PostgreSQL's explicit superuser SQL_ASCII path, rejects LATIN1, and retains `C`/`POSIX` as encoding-independent controls. Arbitrary platform locale names are not inferred from spelling; no issued digest domain changes.
+
 - PostgreSQL encoding-independent libc material-collation evidence now requires stored `pg_collation.collversion` to remain SQL `NULL` for raw `C/C/-1` and `POSIX/POSIX/-1` rows, including arbitrary-name `CREATE COLLATION ... FROM` copies. PostgreSQL 18 bootstrap rows have no stored version, the copy path cannot combine `FROM` with `VERSION` and recomputes a NULL actual version for C/POSIX, and `ALTER COLLATION ... REFRESH VERSION` cannot introduce a NULL↔non-NULL transition. Direct database-encoding libc C/POSIX collations with explicit `VERSION` remain representable; no digest domain is changed.
 
 - PostgreSQL libc material-collation evidence now restricts encoding-independent `pg_collation.collencoding = -1` rows to the source-reachable raw locale pairs `C/C` and `POSIX/POSIX`. Arbitrary target identities created with `CREATE COLLATION ... FROM pg_catalog.C` or `... FROM pg_catalog.POSIX` remain valid because PostgreSQL copies provider/encoding/locale fields, while fabricated non-C/POSIX or mixed locale pairs fail closed. Concrete-encoding libc rows, catalog identity, and existing digest domains are unchanged.
