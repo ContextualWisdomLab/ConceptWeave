@@ -122,7 +122,13 @@ impl CollationDefinitionObservation {
             locale.as_deref(),
             icu_rules.as_deref(),
         )?;
-        validate_provider_encoding(&identity, provider, locale.as_deref())?;
+        validate_provider_encoding(
+            &identity,
+            provider,
+            lc_collate.as_deref(),
+            lc_ctype.as_deref(),
+            locale.as_deref(),
+        )?;
         validate_provider_actual_version(
             provider,
             lc_collate.as_deref(),
@@ -474,10 +480,17 @@ fn validate_provider_shape(
 fn validate_provider_encoding(
     identity: &CollationCatalogIdentity,
     provider: PostgresCollationProvider,
+    lc_collate: Option<&str>,
+    lc_ctype: Option<&str>,
     locale: Option<&str>,
 ) -> Result<(), ObservationError> {
     let valid = match provider {
-        PostgresCollationProvider::DatabaseDefault | PostgresCollationProvider::Libc => true,
+        PostgresCollationProvider::DatabaseDefault => true,
+        PostgresCollationProvider::Libc if identity.encoding() == -1 => matches!(
+            (lc_collate, lc_ctype),
+            (Some("C"), Some("C")) | (Some("POSIX"), Some("POSIX"))
+        ),
+        PostgresCollationProvider::Libc => true,
         PostgresCollationProvider::Builtin => match locale {
             // Direct built-in C uses -1. CREATE COLLATION ... FROM pg_catalog.ucs_basic
             // preserves the bootstrap row's UTF8 encoding on every valid copy.
