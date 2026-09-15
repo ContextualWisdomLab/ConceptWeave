@@ -193,10 +193,14 @@ impl CollationDefinitionObservation {
         self.actual_version.as_deref()
     }
 
-    /// Reports stored-versus-actual provider-version drift, including availability changes.
+    /// Reports stored-versus-actual provider-version drift for material collations.
+    ///
+    /// The PostgreSQL 18 bootstrap provider-`d` row has no stored `pg_collation.collversion`; its
+    /// recorded-versus-actual drift belongs to the effective `pg_database` default definition.
     #[must_use]
     pub fn has_version_mismatch(&self) -> bool {
-        self.version() != self.actual_version()
+        self.provider != PostgresCollationProvider::DatabaseDefault
+            && self.version() != self.actual_version()
     }
 
     /// Returns a domain-separated digest of this exact material definition.
