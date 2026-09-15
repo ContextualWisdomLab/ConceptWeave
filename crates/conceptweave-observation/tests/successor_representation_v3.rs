@@ -1,7 +1,10 @@
 use conceptweave_observation::{
     CheckConstraintObservation, ColumnObservationV3, DomainCheckConstraintObservation,
-    DomainObservation, EnumObservation, ObservationError, PostgresSchemaSnapshot,
-    PostgresSchemaSnapshotV3, QualifiedCollationName, QualifiedTypeName, RelationKind,
+    DomainObservation, EnumObservation, ForeignKeyAction, ForeignKeyDeferrability,
+    ForeignKeyMatchType, ForeignKeyObservation, ForeignKeyReferenceBehavior, IndexAttributeKind,
+    IndexAttributeObservation, IndexKeySemantics, IndexObservation, ObservationError,
+    PostgresSchemaSnapshot, PostgresSchemaSnapshotV3, PrimaryKeyObservation,
+    QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
     RelationObservation, SchemaObjectLocation, SchemaObjectLocationKind,
     TableConstraintObservation, UniqueConstraintObservation,
 };
@@ -28,6 +31,93 @@ fn bound_column(
         None,
     )
     .expect("bound column fixture is valid")
+}
+
+fn event_index() -> IndexObservation {
+    IndexObservation::new(
+        "event_parent_ix",
+        true,
+        None,
+        vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
+        vec![index_attribute(2, IndexAttributeKind::Include, "event_key")],
+    )
+    .expect("index fixture is valid")
+    .with_access_method("btree")
+    .with_key_semantics(vec![key_semantics(1)])
+    .expect("one semantic record matches the single key position")
+    .with_predicate("(parent_key IS NOT NULL)")
+    .with_source_comment("observed index comment")
+}
+
+fn index_attribute(
+    position: u32,
+    kind: IndexAttributeKind,
+    attribute_name: &str,
+) -> IndexAttributeObservation {
+    IndexAttributeObservation::new(position, kind, attribute_name)
+        .expect("index attribute fixture is valid")
+}
+
+fn key_operator_class(name: &str) -> QualifiedOperatorClassName {
+    QualifiedOperatorClassName::new("pg_catalog", name)
+        .expect("operator-class coordinate fixture is valid")
+}
+
+fn key_semantics(position: u32) -> IndexKeySemantics {
+    IndexKeySemantics::new(position, None, key_operator_class("uuid_ops"), 0)
+        .expect("key-semantics fixture is valid")
+}
+
+fn observed(index: IndexObservation) -> IndexObservation {
+    let semantics = (1..=index.key_attributes().len() as u32)
+        .map(key_semantics)
+        .collect();
+    index
+        .with_access_method("btree")
+        .with_key_semantics(semantics)
+        .expect("one semantic record per key position")
+}
+
+fn indexed_relation() -> RelationObservation {
+    event_relation(RelationKind::Table)
+        .with_indexes(vec![event_index()])
+        .expect("index fixture references observed columns")
+}
+
+fn foreign_key_behavior(
+    update_action: ForeignKeyAction,
+    delete_action: ForeignKeyAction,
+    match_type: ForeignKeyMatchType,
+    deferrability: ForeignKeyDeferrability,
+) -> ForeignKeyReferenceBehavior {
+    ForeignKeyReferenceBehavior::new(update_action, delete_action, match_type, deferrability)
+}
+
+fn expression_index() -> IndexObservation {
+    IndexObservation::new(
+        "event_lower_email_ix",
+        true,
+        Some(false),
+        vec![IndexAttributeObservation::expression(
+            1,
+            IndexAttributeKind::Key,
+            "lower(parent_key)",
+        )
+        .expect("expression attribute fixture is valid")],
+        Vec::new(),
+    )
+    .expect("expression index fixture is valid")
+    .with_access_method("btree")
+    .with_key_semantics(vec![key_semantics(1)])
+    .expect("one semantic record matches the single key position")
+    .with_predicate("(parent_key IS NOT NULL)")
+    .with_ready(true)
+    .with_valid(true)
+    .with_live(false)
+    .with_index_definition(
+        "CREATE UNIQUE INDEX event_lower_email_ix ON public.event_record USING btree (lower(parent_key)) WHERE (parent_key IS NOT NULL)",
+    )
+    .with_source_comment("observed expression index comment")
 }
 
 fn event_constraints(reversed: bool) -> Vec<TableConstraintObservation> {
@@ -509,21 +599,32 @@ fn every_v3_evidence_kind_has_a_verified_receipt_coordinate() {
     let snapshot = complete_snapshot();
     let cases = [
         (
-            SchemaObjectLocation::table("public", "event_record").expect("table location"),
-            SchemaObjectLocationKind::Table,
-            "/schemas/public/tables/event_record",
+            SchemaObjectLocation::relation("public", "event_record", RelationKind::Table)
+                .expect("relation location"),
+            SchemaObjectLocationKind::Relation,
+            "/schemas/public/relations/table/event_record",
         ),
         (
-            SchemaObjectLocation::column("public", "event_record", "parent_key")
-                .expect("column location"),
+            SchemaObjectLocation::column(
+                "public",
+                "event_record",
+                RelationKind::Table,
+                "parent_key",
+            )
+            .expect("column location"),
             SchemaObjectLocationKind::Column,
-            "/schemas/public/tables/event_record/columns/parent_key",
+            "/schemas/public/relations/table/event_record/columns/parent_key",
         ),
         (
-            SchemaObjectLocation::constraint("public", "event_record", "event_parent_uq")
-                .expect("constraint location"),
+            SchemaObjectLocation::constraint(
+                "public",
+                "event_record",
+                RelationKind::Table,
+                "event_parent_uq",
+            )
+            .expect("constraint location"),
             SchemaObjectLocationKind::Constraint,
-            "/schemas/public/tables/event_record/constraints/event_parent_uq",
+            "/schemas/public/relations/table/event_record/constraints/event_parent_uq",
         ),
         (
             SchemaObjectLocation::domain("public", "event_status_kind").expect("domain location"),
@@ -573,24 +674,46 @@ fn v3_schema_scoped_canonical_locations_are_collision_safe() {
 #[test]
 fn v3_location_accessors_expose_only_the_declared_coordinate() {
     let locations = [
-        SchemaObjectLocation::table("public", "event_record").expect("table"),
-        SchemaObjectLocation::column("public", "event_record", "event_key").expect("column"),
-        SchemaObjectLocation::constraint("public", "event_record", "event_parent_uq")
-            .expect("constraint"),
+        SchemaObjectLocation::relation("public", "event_record", RelationKind::Table)
+            .expect("relation"),
+        SchemaObjectLocation::column("public", "event_record", RelationKind::Table, "event_key")
+            .expect("column"),
+        SchemaObjectLocation::constraint(
+            "public",
+            "event_record",
+            RelationKind::Table,
+            "event_parent_uq",
+        )
+        .expect("constraint"),
         SchemaObjectLocation::domain("public", "event_status_kind").expect("domain"),
         SchemaObjectLocation::enum_("public", "event_status").expect("enum"),
     ];
 
-    let tables: Vec<Option<&str>> = locations
+    let relations: Vec<Option<&str>> = locations
         .iter()
-        .map(SchemaObjectLocation::table_name)
+        .map(SchemaObjectLocation::relation_name)
         .collect();
     assert_eq!(
-        tables,
+        relations,
         vec![
             Some("event_record"),
             Some("event_record"),
             Some("event_record"),
+            None,
+            None
+        ]
+    );
+
+    let kinds: Vec<Option<RelationKind>> = locations
+        .iter()
+        .map(SchemaObjectLocation::relation_kind)
+        .collect();
+    assert_eq!(
+        kinds,
+        vec![
+            Some(RelationKind::Table),
+            Some(RelationKind::Table),
+            Some(RelationKind::Table),
             None,
             None
         ]
@@ -635,12 +758,19 @@ fn v3_location_accessors_expose_only_the_declared_coordinate() {
 fn schema_scoped_receipts_cannot_be_satisfied_by_a_different_kind() {
     let snapshot = complete_snapshot();
     let unobserved = [
-        SchemaObjectLocation::table("public", "event_status").expect("table shape"),
-        SchemaObjectLocation::table("public", "missing_relation").expect("table shape"),
-        SchemaObjectLocation::column("public", "event_record", "missing_key")
+        SchemaObjectLocation::relation("public", "event_status", RelationKind::Table)
+            .expect("relation shape"),
+        SchemaObjectLocation::relation("public", "missing_relation", RelationKind::Table)
+            .expect("relation shape"),
+        SchemaObjectLocation::column("public", "event_record", RelationKind::Table, "missing_key")
             .expect("column shape"),
-        SchemaObjectLocation::constraint("public", "event_record", "missing_constraint")
-            .expect("constraint shape"),
+        SchemaObjectLocation::constraint(
+            "public",
+            "event_record",
+            RelationKind::Table,
+            "missing_constraint",
+        )
+        .expect("constraint shape"),
         SchemaObjectLocation::domain("public", "event_status").expect("domain shape"),
         SchemaObjectLocation::domain("public", "missing_domain").expect("domain shape"),
         SchemaObjectLocation::enum_("public", "event_record").expect("enum shape"),
@@ -657,6 +787,93 @@ fn schema_scoped_receipts_cannot_be_satisfied_by_a_different_kind() {
             ObservationError::UnknownObservationLocation { location: expected }
         );
     }
+}
+
+#[test]
+fn relation_coordinates_carry_kind_and_reject_a_mislabelled_table_receipt() {
+    let snapshot = complete_snapshot();
+
+    let mislabelled = SchemaObjectLocation::relation("audit", "event_record", RelationKind::Table)
+        .expect("relation shape");
+    let expected = mislabelled.canonical_location();
+    assert_eq!(expected, "/schemas/audit/relations/table/event_record");
+    let error = snapshot
+        .source_receipt(mislabelled)
+        .expect_err("a view must not be receipted with table vocabulary");
+    assert_eq!(
+        error,
+        ObservationError::UnknownObservationLocation { location: expected }
+    );
+
+    let view = SchemaObjectLocation::relation("audit", "event_record", RelationKind::View)
+        .expect("view coordinate");
+    assert_eq!(view.relation_kind(), Some(RelationKind::View));
+    assert_eq!(
+        view.canonical_location(),
+        "/schemas/audit/relations/view/event_record"
+    );
+    let receipt = snapshot
+        .source_receipt(view)
+        .expect("the observed view coordinate is receipted with its exact kind");
+
+    assert_ne!(
+        receipt.location().canonical_location(),
+        SchemaObjectLocation::relation("audit", "event_record", RelationKind::Table)
+            .expect("relation shape")
+            .canonical_location(),
+        "the kind segment must distinguish a view from a table at the same name"
+    );
+}
+
+#[test]
+fn every_relation_kind_has_a_distinct_lossless_coordinate() {
+    let kinds = [
+        RelationKind::Table,
+        RelationKind::PartitionedTable,
+        RelationKind::View,
+        RelationKind::MaterializedView,
+        RelationKind::ForeignTable,
+        RelationKind::Sequence,
+        RelationKind::CompositeType,
+    ];
+    let mut seen = std::collections::BTreeSet::new();
+    for kind in kinds {
+        let location = SchemaObjectLocation::relation("public", "event_record", kind)
+            .expect("relation coordinate");
+        assert_eq!(location.relation_kind(), Some(kind));
+        let canonical = location.canonical_location();
+        assert!(
+            seen.insert(canonical.clone()),
+            "each relation kind must map to a distinct coordinate, repeated: {canonical}"
+        );
+    }
+    assert_eq!(seen.len(), kinds.len());
+}
+
+#[test]
+fn non_table_relation_children_keep_the_relation_kind_in_their_coordinates() {
+    let location =
+        SchemaObjectLocation::column("audit", "event_record", RelationKind::View, "parent_key")
+            .expect("view column coordinate");
+    assert_eq!(
+        location.canonical_location(),
+        "/schemas/audit/relations/view/event_record/columns/parent_key"
+    );
+    assert_eq!(location.relation_kind(), Some(RelationKind::View));
+
+    let snapshot = snapshot_v3(vec![audit_view()], Vec::new(), Vec::new())
+        .expect("view-only fixture is valid");
+    let table_child =
+        SchemaObjectLocation::column("audit", "event_record", RelationKind::Table, "parent_key")
+            .expect("column shape");
+    let expected = table_child.canonical_location();
+    let error = snapshot
+        .source_receipt(table_child)
+        .expect_err("a view child must not be receipted with table vocabulary");
+    assert_eq!(
+        error,
+        ObservationError::UnknownObservationLocation { location: expected }
+    );
 }
 
 #[test]
@@ -810,6 +1027,70 @@ fn fake_type_coordinates_fail_closed() {
             type_name: "event_record".to_owned(),
         }
     );
+}
+
+#[test]
+fn domain_base_type_must_resolve_without_search_path() {
+    let missing_base = DomainObservation::new(
+        "public",
+        "money_kind",
+        QualifiedTypeName::new("public", "missing_base").expect("type"),
+    )
+    .expect("domain fixture");
+    let error = snapshot_v3(Vec::new(), vec![missing_base], Vec::new())
+        .expect_err("an unresolvable domain base type must fail closed");
+    assert_eq!(
+        error,
+        ObservationError::UnknownTypeBinding {
+            schema_name: "public".to_owned(),
+            type_name: "missing_base".to_owned(),
+        }
+    );
+
+    let relation_base = DomainObservation::new(
+        "public",
+        "money_kind",
+        QualifiedTypeName::new("public", "event_record").expect("type"),
+    )
+    .expect("domain fixture");
+    let error = snapshot_v3(
+        vec![event_relation(RelationKind::Table)],
+        vec![relation_base],
+        Vec::new(),
+    )
+    .expect_err("a relation coordinate must not satisfy a domain base type");
+    assert_eq!(
+        error,
+        ObservationError::UnknownTypeBinding {
+            schema_name: "public".to_owned(),
+            type_name: "event_record".to_owned(),
+        }
+    );
+}
+
+#[test]
+fn domain_may_build_on_an_observed_domain_or_enum() {
+    let base_domain = DomainObservation::new("public", "base_kind", catalog_type("text"))
+        .expect("base domain fixture");
+    let derived_domain = DomainObservation::new(
+        "public",
+        "derived_kind",
+        QualifiedTypeName::new("public", "base_kind").expect("type"),
+    )
+    .expect("derived domain fixture");
+    let enum_base = DomainObservation::new(
+        "public",
+        "on_enum_kind",
+        QualifiedTypeName::new("public", "event_status").expect("type"),
+    )
+    .expect("enum-backed domain fixture");
+    let snapshot = snapshot_v3(
+        Vec::new(),
+        vec![base_domain, derived_domain, enum_base],
+        vec![status_enum()],
+    )
+    .expect("observed schema-scoped base types must resolve");
+    assert_eq!(snapshot.domains().len(), 3);
 }
 
 #[test]
@@ -1035,25 +1316,25 @@ fn v3_value_objects_reject_ambiguous_or_blank_evidence() {
     );
 
     assert_eq!(
-        SchemaObjectLocation::table(" ", "event_record"),
+        SchemaObjectLocation::relation(" ", "event_record", RelationKind::Table),
         Err(ObservationError::InvalidObservationField {
             field: "schema_name"
         })
     );
     assert_eq!(
-        SchemaObjectLocation::table("public", " "),
+        SchemaObjectLocation::relation("public", " ", RelationKind::Table),
         Err(ObservationError::InvalidObservationField {
-            field: "table_name"
+            field: "relation_name"
         })
     );
     assert_eq!(
-        SchemaObjectLocation::column("public", "event_record", " "),
+        SchemaObjectLocation::column("public", "event_record", RelationKind::Table, " "),
         Err(ObservationError::InvalidObservationField {
             field: "column_name"
         })
     );
     assert_eq!(
-        SchemaObjectLocation::constraint("public", "event_record", "\n"),
+        SchemaObjectLocation::constraint("public", "event_record", RelationKind::Table, "\n"),
         Err(ObservationError::InvalidObservationField {
             field: "constraint_name"
         })
@@ -1207,4 +1488,867 @@ fn enum_labels_preserve_exact_source_text_including_empty_labels() {
     )
     .expect("an empty enum label is exact source text, not a missing value");
     assert_eq!(observed_enum.labels(), ["", "pending"]);
+}
+
+#[test]
+fn index_evidence_is_material_successor_identity() {
+    let base = digest_of(vec![indexed_relation()], Vec::new(), Vec::new());
+
+    let no_predicate = IndexObservation::new(
+        "event_parent_ix",
+        true,
+        None,
+        vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
+        vec![index_attribute(2, IndexAttributeKind::Include, "event_key")],
+    )
+    .expect("index fixture")
+    .with_source_comment("observed index comment");
+    let non_unique = IndexObservation::new(
+        "event_parent_ix",
+        false,
+        None,
+        vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
+        vec![index_attribute(2, IndexAttributeKind::Include, "event_key")],
+    )
+    .expect("index fixture")
+    .with_predicate("(parent_key IS NOT NULL)")
+    .with_source_comment("observed index comment");
+    let nulls_not_distinct = IndexObservation::new(
+        "event_parent_ix",
+        true,
+        Some(true),
+        vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
+        vec![index_attribute(2, IndexAttributeKind::Include, "event_key")],
+    )
+    .expect("index fixture")
+    .with_predicate("(parent_key IS NOT NULL)")
+    .with_source_comment("observed index comment");
+    let all_key_attributes = IndexObservation::new(
+        "event_parent_ix",
+        true,
+        None,
+        vec![
+            index_attribute(1, IndexAttributeKind::Key, "parent_key"),
+            index_attribute(2, IndexAttributeKind::Key, "event_key"),
+        ],
+        Vec::new(),
+    )
+    .expect("index fixture")
+    .with_predicate("(parent_key IS NOT NULL)")
+    .with_source_comment("observed index comment");
+    let reordered_attributes = IndexObservation::new(
+        "event_parent_ix",
+        true,
+        None,
+        vec![index_attribute(1, IndexAttributeKind::Key, "event_key")],
+        vec![index_attribute(
+            2,
+            IndexAttributeKind::Include,
+            "parent_key",
+        )],
+    )
+    .expect("index fixture")
+    .with_predicate("(parent_key IS NOT NULL)")
+    .with_source_comment("observed index comment");
+    let renamed = IndexObservation::new(
+        "event_parent_ix_v2",
+        true,
+        None,
+        vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
+        vec![index_attribute(2, IndexAttributeKind::Include, "event_key")],
+    )
+    .expect("index fixture")
+    .with_predicate("(parent_key IS NOT NULL)")
+    .with_source_comment("observed index comment");
+    let comment_only = IndexObservation::new(
+        "event_parent_ix",
+        true,
+        None,
+        vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
+        vec![index_attribute(2, IndexAttributeKind::Include, "event_key")],
+    )
+    .expect("index fixture")
+    .with_predicate("(parent_key IS NOT NULL)")
+    .with_source_comment("changed index comment");
+
+    let variants = [
+        IndexObservation::new(
+            "event_parent_ix",
+            true,
+            None,
+            vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
+            vec![index_attribute(2, IndexAttributeKind::Include, "event_key")],
+        )
+        .expect("index fixture"),
+        no_predicate,
+        non_unique,
+        nulls_not_distinct,
+        all_key_attributes,
+        reordered_attributes,
+        renamed,
+        comment_only,
+    ];
+
+    assert_ne!(
+        digest_of(
+            vec![event_relation(RelationKind::Table)],
+            Vec::new(),
+            Vec::new()
+        ),
+        base,
+        "adding index evidence must change successor identity"
+    );
+    for (index_number, variant) in variants.into_iter().enumerate() {
+        let relation = event_relation(RelationKind::Table)
+            .with_indexes(vec![observed(variant)])
+            .expect("variant index references observed columns");
+        assert_ne!(
+            base,
+            digest_of(vec![relation], Vec::new(), Vec::new()),
+            "material index variant {index_number} must change successor identity"
+        );
+    }
+}
+
+#[test]
+fn index_coordinates_receive_verified_receipts() {
+    let snapshot = snapshot_v3(vec![indexed_relation()], Vec::new(), Vec::new())
+        .expect("indexed fixture snapshot is valid");
+
+    let location = SchemaObjectLocation::index(
+        "public",
+        "event_record",
+        RelationKind::Table,
+        "event_parent_ix",
+    )
+    .expect("index location");
+    assert_eq!(location.kind(), SchemaObjectLocationKind::Index);
+    assert_eq!(
+        location.canonical_location(),
+        "/schemas/public/relations/table/event_record/indexes/event_parent_ix"
+    );
+    assert_eq!(location.relation_name(), Some("event_record"));
+    assert_eq!(location.relation_kind(), Some(RelationKind::Table));
+    assert_eq!(location.index_name(), Some("event_parent_ix"));
+    assert_eq!(location.column_name(), None);
+    assert_eq!(location.constraint_name(), None);
+    assert_eq!(location.domain_name(), None);
+    assert_eq!(location.enum_name(), None);
+
+    let receipt = snapshot
+        .source_receipt(location)
+        .expect("observed index coordinate can be receipted");
+    assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+}
+
+#[test]
+fn index_locational_coordinates_are_collision_safe() {
+    let location = SchemaObjectLocation::index(
+        "Sales/~North",
+        "Event/Record",
+        RelationKind::Table,
+        "Parent/~Ix",
+    )
+    .expect("index location");
+    assert_eq!(
+        location.canonical_location(),
+        "/schemas/Sales~1~0North/relations/table/Event~1Record/indexes/Parent~1~0Ix"
+    );
+}
+
+#[test]
+fn index_attributes_are_canonicalized_in_position_order() {
+    let index = IndexObservation::new(
+        "event_parent_ix",
+        true,
+        None,
+        vec![
+            index_attribute(2, IndexAttributeKind::Key, "event_key"),
+            index_attribute(1, IndexAttributeKind::Key, "parent_key"),
+        ],
+        vec![
+            index_attribute(4, IndexAttributeKind::Include, "event_key"),
+            index_attribute(3, IndexAttributeKind::Include, "parent_key"),
+        ],
+    )
+    .expect("out-of-order attributes are canonicalized, not rejected");
+
+    let key_positions: Vec<u32> = index
+        .key_attributes()
+        .iter()
+        .map(IndexAttributeObservation::position)
+        .collect();
+    let include_positions: Vec<u32> = index
+        .include_attributes()
+        .iter()
+        .map(IndexAttributeObservation::position)
+        .collect();
+    assert_eq!(key_positions, vec![1, 2]);
+    assert_eq!(include_positions, vec![3, 4]);
+    assert_eq!(
+        index.key_attributes()[0].attribute_name(),
+        Some("parent_key")
+    );
+    assert_eq!(index.key_attributes()[0].kind(), IndexAttributeKind::Key);
+}
+
+#[test]
+fn relation_indexes_reject_duplicate_or_unknown_coordinates() {
+    let duplicate_index = event_relation(RelationKind::Table)
+        .with_indexes(vec![event_index(), event_index()])
+        .expect_err("duplicate index names must fail closed");
+    assert_eq!(
+        duplicate_index,
+        ObservationError::DuplicateIndexObservation {
+            schema_name: "public".to_owned(),
+            relation_name: "event_record".to_owned(),
+            index_name: "event_parent_ix".to_owned(),
+        }
+    );
+
+    let duplicate_position = IndexObservation::new(
+        "event_parent_ix",
+        true,
+        None,
+        vec![
+            index_attribute(1, IndexAttributeKind::Key, "parent_key"),
+            index_attribute(1, IndexAttributeKind::Key, "event_key"),
+        ],
+        Vec::new(),
+    )
+    .expect_err("duplicate attribute positions must fail closed");
+    assert_eq!(
+        duplicate_position,
+        ObservationError::InvalidObservationField {
+            field: "index_attribute_layout",
+        }
+    );
+
+    let unknown_attribute = event_relation(RelationKind::Table)
+        .with_indexes(vec![observed(
+            IndexObservation::new(
+                "event_parent_ix",
+                true,
+                None,
+                vec![index_attribute(1, IndexAttributeKind::Key, "missing_key")],
+                Vec::new(),
+            )
+            .expect("index fixture"),
+        )])
+        .expect_err("index attributes must resolve to observed relation columns");
+    assert_eq!(
+        unknown_attribute,
+        ObservationError::UnknownIndexAttribute {
+            schema_name: "public".to_owned(),
+            relation_name: "event_record".to_owned(),
+            index_name: "event_parent_ix".to_owned(),
+            attribute_name: "missing_key".to_owned(),
+        }
+    );
+}
+
+#[test]
+fn index_value_objects_reject_blank_or_zero_evidence() {
+    assert_eq!(
+        IndexObservation::new(" ", true, None, Vec::new(), Vec::new()),
+        Err(ObservationError::InvalidObservationField {
+            field: "index_name"
+        })
+    );
+    assert_eq!(
+        IndexAttributeObservation::new(1, IndexAttributeKind::Key, " "),
+        Err(ObservationError::InvalidObservationField {
+            field: "attribute_name"
+        })
+    );
+    assert_eq!(
+        IndexAttributeObservation::new(0, IndexAttributeKind::Key, "parent_key"),
+        Err(ObservationError::InvalidOrdinalPosition)
+    );
+    assert_eq!(
+        SchemaObjectLocation::index("public", " ", RelationKind::Table, "event_parent_ix"),
+        Err(ObservationError::InvalidObservationField {
+            field: "relation_name"
+        })
+    );
+    assert_eq!(
+        SchemaObjectLocation::index("public", "event_record", RelationKind::Table, " "),
+        Err(ObservationError::InvalidObservationField {
+            field: "index_name"
+        })
+    );
+    assert_eq!(
+        IndexKeySemantics::new(0, None, key_operator_class("uuid_ops"), 0),
+        Err(ObservationError::InvalidOrdinalPosition)
+    );
+}
+
+#[test]
+fn key_semantics_require_one_record_per_key_position() {
+    let two_keys = IndexObservation::new(
+        "event_parent_ix",
+        true,
+        None,
+        vec![
+            index_attribute(1, IndexAttributeKind::Key, "parent_key"),
+            index_attribute(2, IndexAttributeKind::Key, "event_key"),
+        ],
+        Vec::new(),
+    )
+    .expect("index fixture is valid");
+    assert_eq!(
+        two_keys.with_key_semantics(vec![key_semantics(1)]),
+        Err(ObservationError::InvalidObservationField {
+            field: "index_key_semantics"
+        })
+    );
+}
+
+#[test]
+fn index_readiness_validity_liveness_and_definition_are_material() {
+    let base = digest_of(
+        vec![
+            event_relation(RelationKind::Table)
+                .with_indexes(vec![
+                    event_index()
+                        .with_ready(true)
+                        .with_valid(true)
+                        .with_live(true),
+                ])
+                .expect("observed index"),
+        ],
+        Vec::new(),
+        Vec::new(),
+    );
+    let variants = [
+        digest_of(
+            vec![event_relation(RelationKind::Table)
+                .with_indexes(vec![event_index()
+                    .with_ready(false)
+                    .with_valid(true)
+                    .with_live(true)])
+                .expect("observed index")],
+            Vec::new(),
+            Vec::new(),
+        ),
+        digest_of(
+            vec![event_relation(RelationKind::Table)
+                .with_indexes(vec![event_index()
+                    .with_ready(true)
+                    .with_valid(false)
+                    .with_live(true)])
+                .expect("observed index")],
+            Vec::new(),
+            Vec::new(),
+        ),
+        digest_of(
+            vec![event_relation(RelationKind::Table)
+                .with_indexes(vec![event_index()
+                    .with_ready(true)
+                    .with_valid(true)
+                    .with_live(false)])
+                .expect("observed index")],
+            Vec::new(),
+            Vec::new(),
+        ),
+        digest_of(
+            vec![event_relation(RelationKind::Table)
+                .with_indexes(vec![event_index()
+                    .with_ready(true)
+                    .with_valid(true)
+                    .with_live(true)
+                    .with_access_method("hash")])
+                .expect("observed index")],
+            Vec::new(),
+            Vec::new(),
+        ),
+        digest_of(
+            vec![event_relation(RelationKind::Table)
+                .with_indexes(vec![event_index()
+                    .with_ready(true)
+                    .with_valid(true)
+                    .with_live(true)
+                    .with_index_definition(
+                        "CREATE UNIQUE INDEX event_parent_ix ON public.event_record USING btree (parent_key)",
+                    )])
+                .expect("observed index")],
+            Vec::new(),
+            Vec::new(),
+        ),
+    ];
+
+    for (index_number, variant) in variants.into_iter().enumerate() {
+        assert_ne!(
+            base, variant,
+            "index readiness/validity/liveness/definition variant {index_number} must change successor identity"
+        );
+    }
+}
+
+#[test]
+fn expression_indexes_are_structurally_distinct_from_column_indexes() {
+    let expression_snapshot = snapshot_v3(
+        vec![
+            event_relation(RelationKind::Table)
+                .with_indexes(vec![expression_index()])
+                .expect("expression index fixture is valid"),
+        ],
+        Vec::new(),
+        Vec::new(),
+    )
+    .expect("expression index snapshot is valid");
+    let observed = &expression_snapshot.relations()[0].indexes()[0];
+    let attribute = &observed.key_attributes()[0];
+    assert_eq!(attribute.attribute_name(), None);
+    assert_eq!(attribute.expression_text(), Some("lower(parent_key)"));
+    assert_eq!(observed.access_method(), Some("btree"));
+    assert_eq!(observed.ready(), Some(true));
+    assert_eq!(observed.valid(), Some(true));
+    assert_eq!(observed.live(), Some(false));
+    assert!(observed.index_definition().is_some());
+
+    let column_snapshot = snapshot_v3(vec![indexed_relation()], Vec::new(), Vec::new())
+        .expect("column index snapshot is valid");
+    assert_ne!(
+        expression_snapshot.snapshot_digest(),
+        column_snapshot.snapshot_digest(),
+        "the same position as an expression and as a column must not collapse"
+    );
+}
+
+#[test]
+fn index_attribute_rejects_a_blank_expression() {
+    assert_eq!(
+        IndexAttributeObservation::expression(1, IndexAttributeKind::Key, " "),
+        Err(ObservationError::InvalidObservationField {
+            field: "expression"
+        })
+    );
+    assert_eq!(
+        IndexAttributeObservation::expression(0, IndexAttributeKind::Key, "lower(x)"),
+        Err(ObservationError::InvalidOrdinalPosition)
+    );
+}
+
+#[test]
+fn index_receipts_cannot_be_satisfied_by_a_different_kind_or_relation() {
+    let snapshot = snapshot_v3(vec![indexed_relation()], Vec::new(), Vec::new())
+        .expect("indexed fixture snapshot is valid");
+    let unobserved = [
+        SchemaObjectLocation::index("public", "event_record", RelationKind::Table, "missing_ix")
+            .expect("index shape"),
+        SchemaObjectLocation::index(
+            "public",
+            "missing_relation",
+            RelationKind::Table,
+            "event_parent_ix",
+        )
+        .expect("index shape"),
+        SchemaObjectLocation::constraint(
+            "public",
+            "event_record",
+            RelationKind::Table,
+            "event_parent_ix",
+        )
+        .expect("constraint shape"),
+    ];
+
+    for location in unobserved {
+        let expected = location.canonical_location();
+        let error = snapshot
+            .source_receipt(location)
+            .expect_err("an unrelated coordinate must not be receipted as an index");
+        assert_eq!(
+            error,
+            ObservationError::UnknownObservationLocation { location: expected }
+        );
+    }
+}
+
+#[test]
+fn coordinate_constructors_reject_blank_schema_and_relation_names() {
+    assert_eq!(
+        QualifiedCollationName::new(" ", "C"),
+        Err(ObservationError::InvalidObservationField {
+            field: "schema_name"
+        })
+    );
+    assert_eq!(
+        DomainObservation::new(" ", "event_status_kind", catalog_type("text")),
+        Err(ObservationError::InvalidObservationField {
+            field: "schema_name"
+        })
+    );
+    assert_eq!(
+        EnumObservation::new(" ", "event_status", Vec::new()),
+        Err(ObservationError::InvalidObservationField {
+            field: "schema_name"
+        })
+    );
+    assert_eq!(
+        SchemaObjectLocation::column("public", " ", RelationKind::Table, "event_key"),
+        Err(ObservationError::InvalidObservationField {
+            field: "relation_name"
+        })
+    );
+    assert_eq!(
+        SchemaObjectLocation::constraint("public", " ", RelationKind::Table, "event_parent_uq"),
+        Err(ObservationError::InvalidObservationField {
+            field: "relation_name"
+        })
+    );
+}
+
+#[test]
+fn successor_snapshot_rejects_blank_revision_and_malformed_observation_time() {
+    let source = support::authorized_source("warehouse_primary", &["public"]);
+
+    let blank_revision = PostgresSchemaSnapshotV3::new(
+        &source,
+        " ",
+        "2026-09-11T00:00:00Z",
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    )
+    .expect_err("a blank extractor revision must fail closed");
+    assert_eq!(
+        blank_revision,
+        ObservationError::InvalidObservationField {
+            field: "extractor_revision"
+        }
+    );
+
+    let malformed_time = PostgresSchemaSnapshotV3::new(
+        &source,
+        "postgres_introspector_v3",
+        "not-a-timestamp",
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    )
+    .expect_err("a malformed observation time must fail closed");
+    assert_eq!(
+        malformed_time,
+        ObservationError::InvalidObservationField {
+            field: "observed_at_utc"
+        }
+    );
+}
+
+#[test]
+fn successor_snapshot_accessors_expose_only_provenance() {
+    let snapshot = complete_snapshot();
+    assert_eq!(snapshot.source_connection_key(), "warehouse_primary");
+    assert_eq!(
+        snapshot.connection_policy_binding(),
+        "fixture_policy_revision_a"
+    );
+    assert_eq!(snapshot.extractor_revision(), "postgres_introspector_v3");
+    assert_eq!(snapshot.observed_at_utc(), "2026-09-11T00:00:00Z");
+}
+
+#[test]
+fn index_attribute_role_accessors_expose_exactly_one_source() {
+    let column_index = indexed_relation();
+    let column_attribute = &column_index.indexes()[0].key_attributes()[0];
+    assert_eq!(column_attribute.attribute_name(), Some("parent_key"));
+    assert_eq!(column_attribute.expression_text(), None);
+
+    let enum_location =
+        SchemaObjectLocation::enum_("public", "event_status").expect("enum location");
+    assert_eq!(enum_location.index_name(), None);
+    assert_eq!(enum_location.domain_name(), None);
+    assert_eq!(
+        enum_location.canonical_location(),
+        "/schemas/public/enums/event_status"
+    );
+}
+
+#[test]
+fn domain_and_relation_child_sort_comparators_are_exercised() {
+    let domain = DomainObservation::new("public", "event_status_kind", catalog_type("text"))
+        .expect("domain fixture")
+        .with_check_constraints(vec![
+            DomainCheckConstraintObservation::new(
+                "event_status_kind_zeta",
+                "CHECK ((VALUE <> ''::text))",
+                true,
+                true,
+            )
+            .expect("check fixture"),
+            DomainCheckConstraintObservation::new(
+                "event_status_kind_alpha",
+                "CHECK ((VALUE IS NOT NULL))",
+                true,
+                true,
+            )
+            .expect("check fixture"),
+        ])
+        .expect("distinct domain check names are valid");
+    let ordered: Vec<&str> = domain
+        .check_constraints()
+        .iter()
+        .map(DomainCheckConstraintObservation::constraint_name)
+        .collect();
+    assert_eq!(
+        ordered,
+        vec!["event_status_kind_alpha", "event_status_kind_zeta"]
+    );
+
+    let relation = event_relation(RelationKind::Table)
+        .with_indexes(vec![
+            observed(
+                IndexObservation::new(
+                    "zzz_ix",
+                    true,
+                    None,
+                    vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
+                    Vec::new(),
+                )
+                .expect("index fixture"),
+            ),
+            observed(
+                IndexObservation::new(
+                    "aaa_ix",
+                    true,
+                    None,
+                    vec![index_attribute(1, IndexAttributeKind::Key, "event_key")],
+                    Vec::new(),
+                )
+                .expect("index fixture"),
+            ),
+        ])
+        .expect("both indexes reference observed columns");
+    let index_names: Vec<&str> = relation
+        .indexes()
+        .iter()
+        .map(IndexObservation::index_name)
+        .collect();
+    assert_eq!(index_names, vec!["aaa_ix", "zzz_ix"]);
+}
+
+#[test]
+fn index_layout_rejects_individual_key_include_role_and_position_mismatches() {
+    let wrong_include_role = IndexObservation::new(
+        "event_parent_ix",
+        true,
+        None,
+        vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
+        vec![index_attribute(2, IndexAttributeKind::Key, "event_key")],
+    )
+    .expect_err("an INCLUDE collection entry must carry the INCLUDE role");
+    assert_eq!(
+        wrong_include_role,
+        ObservationError::InvalidObservationField {
+            field: "index_attribute_layout"
+        }
+    );
+
+    let wrong_include_position = IndexObservation::new(
+        "event_parent_ix",
+        true,
+        None,
+        vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
+        vec![index_attribute(3, IndexAttributeKind::Include, "event_key")],
+    )
+    .expect_err("INCLUDE positions must continue the key ordinals contiguously");
+    assert_eq!(
+        wrong_include_position,
+        ObservationError::InvalidObservationField {
+            field: "index_attribute_layout"
+        }
+    );
+}
+
+#[test]
+fn canonicalization_comparators_cover_distinct_schemas_and_names() {
+    let mixed_relations = snapshot_v3(
+        vec![
+            event_relation(RelationKind::Table),
+            RelationObservation::new("public", "other_record", RelationKind::Table, Vec::new())
+                .expect("second public relation fixture"),
+            RelationObservation::new("audit", "event_record", RelationKind::Table, Vec::new())
+                .expect("audit relation fixture"),
+        ],
+        Vec::new(),
+        Vec::new(),
+    )
+    .expect("distinct relation coordinates are valid");
+    assert_eq!(mixed_relations.relations().len(), 3);
+
+    let mixed_enums = snapshot_v3(
+        Vec::new(),
+        Vec::new(),
+        vec![
+            status_enum(),
+            EnumObservation::new("public", "mood", vec!["calm".to_owned()])
+                .expect("second public enum fixture"),
+            EnumObservation::new("audit", "event_status", vec!["closed".to_owned()])
+                .expect("audit enum fixture"),
+        ],
+    )
+    .expect("distinct enum coordinates are valid");
+    assert_eq!(mixed_enums.enums().len(), 3);
+}
+
+#[test]
+fn type_resolution_short_circuits_on_a_schema_mismatched_enum_binding() {
+    let relation = RelationObservation::new(
+        "public",
+        "event_record",
+        RelationKind::Table,
+        vec![
+            ColumnObservationV3::new(
+                "event_status",
+                1,
+                "event_status",
+                QualifiedTypeName::new("public", "missing_kind").expect("type"),
+                false,
+                None,
+            )
+            .expect("bound column fixture"),
+        ],
+    )
+    .expect("relation fixture");
+    let error = snapshot_v3(
+        vec![relation],
+        Vec::new(),
+        vec![
+            EnumObservation::new("audit", "event_status", vec!["closed".to_owned()])
+                .expect("audit enum fixture"),
+        ],
+    )
+    .expect_err("a schema-mismatched enum must not satisfy a type binding");
+    assert_eq!(
+        error,
+        ObservationError::UnknownTypeBinding {
+            schema_name: "public".to_owned(),
+            type_name: "missing_kind".to_owned(),
+        }
+    );
+}
+
+fn foreign_key_relation_carrier() -> RelationObservation {
+    let mut constraints = vec![
+        TableConstraintObservation::PrimaryKey(
+            PrimaryKeyObservation::new("event_pk", vec!["event_key".to_owned()])
+                .expect("primary-key fixture"),
+        ),
+        TableConstraintObservation::Unique(
+            UniqueConstraintObservation::new("event_parent_uq", vec!["parent_key".to_owned()])
+                .expect("unique fixture"),
+        ),
+        TableConstraintObservation::Check(
+            CheckConstraintObservation::new(
+                "event_parent_present",
+                "CHECK ((parent_key IS NOT NULL))",
+                true,
+                true,
+                false,
+            )
+            .expect("check fixture"),
+        ),
+        TableConstraintObservation::ForeignKey(
+            ForeignKeyObservation::new(
+                "fk_unknown",
+                vec!["parent_key".to_owned()],
+                "public",
+                "event_record",
+                vec!["event_key".to_owned()],
+            )
+            .expect("unobserved reference behavior is structurally valid"),
+        ),
+    ];
+
+    let behaviors = [
+        (
+            ForeignKeyAction::NoAction,
+            ForeignKeyAction::NoAction,
+            ForeignKeyMatchType::Simple,
+            ForeignKeyDeferrability::NotDeferrable,
+            false,
+        ),
+        (
+            ForeignKeyAction::Restrict,
+            ForeignKeyAction::Restrict,
+            ForeignKeyMatchType::Full,
+            ForeignKeyDeferrability::InitiallyImmediate,
+            false,
+        ),
+        (
+            ForeignKeyAction::Cascade,
+            ForeignKeyAction::Cascade,
+            ForeignKeyMatchType::Partial,
+            ForeignKeyDeferrability::InitiallyDeferred,
+            false,
+        ),
+        (
+            ForeignKeyAction::SetNull,
+            ForeignKeyAction::SetNull,
+            ForeignKeyMatchType::Simple,
+            ForeignKeyDeferrability::InitiallyDeferred,
+            true,
+        ),
+        (
+            ForeignKeyAction::SetDefault,
+            ForeignKeyAction::SetDefault,
+            ForeignKeyMatchType::Full,
+            ForeignKeyDeferrability::NotDeferrable,
+            true,
+        ),
+    ];
+    for (index, (update, delete, match_type, deferrability, targets)) in
+        behaviors.into_iter().enumerate()
+    {
+        let mut behavior = foreign_key_behavior(update, delete, match_type, deferrability);
+        if targets {
+            behavior = behavior
+                .with_delete_target_columns(vec!["parent_key".to_owned()])
+                .expect("SET NULL/SET DEFAULT may target an observed local column");
+        }
+        constraints.push(TableConstraintObservation::ForeignKey(
+            ForeignKeyObservation::with_reference_behavior(
+                format!("fk_variant_{index}"),
+                vec!["parent_key".to_owned()],
+                "public",
+                "event_record",
+                vec!["event_key".to_owned()],
+                behavior,
+            )
+            .expect("reference behavior fixture is valid"),
+        ));
+    }
+
+    RelationObservation::new(
+        "public",
+        "event_record",
+        RelationKind::Table,
+        vec![
+            bound_column("event_key", 1, "uuid", catalog_type("uuid"), false),
+            bound_column("parent_key", 2, "uuid", catalog_type("uuid"), true),
+        ],
+    )
+    .expect("relation fixture is valid")
+    .with_constraints(constraints)
+    .expect("every foreign key references an observed column")
+}
+
+#[test]
+fn digest_encodes_every_constraint_and_reference_behavior_variant() {
+    let base = digest_of(
+        vec![base_relation(RelationKind::Table, false, false)],
+        Vec::new(),
+        Vec::new(),
+    );
+    let with_primary_key_and_foreign_keys =
+        digest_of(vec![foreign_key_relation_carrier()], Vec::new(), Vec::new());
+    assert_ne!(
+        base, with_primary_key_and_foreign_keys,
+        "primary-key and foreign-key evidence must participate in successor identity"
+    );
+    assert!(
+        with_primary_key_and_foreign_keys.starts_with("sha256:"),
+        "digest framing remains canonical"
+    );
 }
