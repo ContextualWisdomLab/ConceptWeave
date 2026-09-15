@@ -112,6 +112,14 @@ impl CollationDefinitionObservation {
                 return Err(invalid("index_collation_definition_text"));
             }
         }
+        validate_provider_shape(
+            provider,
+            deterministic,
+            lc_collate.as_deref(),
+            lc_ctype.as_deref(),
+            locale.as_deref(),
+            icu_rules.as_deref(),
+        )?;
         Ok(Self {
             identity,
             provider,
@@ -384,6 +392,48 @@ impl IndexCollationDefinitionSnapshot {
             observed_at_utc: self.observed_at_utc.clone(),
             identity: identity.clone(),
         })
+    }
+}
+
+fn validate_provider_shape(
+    provider: PostgresCollationProvider,
+    deterministic: bool,
+    lc_collate: Option<&str>,
+    lc_ctype: Option<&str>,
+    locale: Option<&str>,
+    icu_rules: Option<&str>,
+) -> Result<(), ObservationError> {
+    let valid = match provider {
+        PostgresCollationProvider::DatabaseDefault => {
+            deterministic
+                && lc_collate.is_none()
+                && lc_ctype.is_none()
+                && locale.is_none()
+                && icu_rules.is_none()
+        }
+        PostgresCollationProvider::Builtin => {
+            deterministic
+                && lc_collate.is_none()
+                && lc_ctype.is_none()
+                && icu_rules.is_none()
+                && matches!(locale, Some("C" | "C.UTF-8" | "PG_UNICODE_FAST"))
+        }
+        PostgresCollationProvider::Libc => {
+            deterministic
+                && lc_collate.is_some()
+                && lc_ctype.is_some()
+                && locale.is_none()
+                && icu_rules.is_none()
+        }
+        PostgresCollationProvider::Icu => {
+            lc_collate.is_none() && lc_ctype.is_none() && locale.is_some()
+        }
+    };
+
+    if valid {
+        Ok(())
+    } else {
+        Err(invalid("index_collation_definition_provider_shape"))
     }
 }
 
