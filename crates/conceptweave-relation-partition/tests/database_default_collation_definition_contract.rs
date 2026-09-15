@@ -249,3 +249,38 @@ fn builtin_database_locale_encoding_positive_controls_remain_valid() {
             .expect("PostgreSQL 18 UTF8-only built-in locale must remain valid on UTF8");
     }
 }
+
+#[test]
+fn icu_database_default_rejects_postgresql18_icu_unsupported_database_encodings() {
+    let definition = database_default("und", "153.80", "153.80");
+
+    for encoding_id in [0, 5, 7, 17, 21] {
+        let encoding = PostgresDatabaseEncodingObservation::new(encoding_id)
+            .expect("the ICU-negative witnesses are valid PostgreSQL 18 backend encodings");
+        let error = definition
+            .validate_database_encoding(encoding)
+            .expect_err("PostgreSQL 18 must reject database encodings absent from pg_enc2icu_tbl");
+        assert_eq!(
+            error,
+            ObservationError::InvalidObservationField {
+                field: "database_default_collation_database_encoding",
+            }
+        );
+    }
+}
+
+#[test]
+fn icu_database_default_accepts_exact_postgresql18_icu_supported_encoding_set() {
+    let definition = database_default("und", "153.80", "153.80");
+
+    for encoding_id in [
+        1, 2, 3, 4, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 22, 23, 24, 25, 26,
+        27, 28, 29, 30, 31, 32, 33, 34,
+    ] {
+        let encoding = PostgresDatabaseEncodingObservation::new(encoding_id)
+            .expect("the ICU-positive witnesses are valid PostgreSQL 18 backend encodings");
+        definition
+            .validate_database_encoding(encoding)
+            .expect("PostgreSQL 18 pg_enc2icu_tbl marks this backend encoding ICU-capable");
+    }
+}
