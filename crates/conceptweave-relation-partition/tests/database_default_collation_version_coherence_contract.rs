@@ -77,3 +77,18 @@ fn default_collation_actual_version_matches_database_default_actual_version() {
         .validate_material_default_collation(&unavailable_material)
         .expect("matching unavailable actual-version evidence remains coherent");
 }
+
+#[test]
+fn default_material_version_mismatch_delegates_to_database_definition() {
+    let material = material_default(None, Some("153.80")).unwrap();
+    assert!(
+        !material.has_version_mismatch(),
+        "pg_catalog.default has no stored collversion; database-level evidence owns version drift"
+    );
+
+    let database = database_default(Some("154.10"));
+    assert!(
+        database.has_version_mismatch(),
+        "pg_database.datcollversion remains the recorded baseline for the delegated default"
+    );
+}
