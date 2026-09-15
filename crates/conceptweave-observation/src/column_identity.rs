@@ -309,6 +309,6 @@ fn encode_bytes(hasher: &mut Sha256, value: &[u8]) {
 }
 
 fn encode_len(hasher: &mut Sha256, value: usize) {
-    let value = u64::try_from(value.len()).expect("Rust target usize must fit into canonical u64 length");
+    let value = u64::try_from(value).expect("Rust target usize must fit into canonical u64 length");
     hasher.update(value.to_be_bytes());
 }
