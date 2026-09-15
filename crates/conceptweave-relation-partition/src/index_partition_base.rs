@@ -277,9 +277,10 @@ impl IndexPartitionSourceReceipt {
 /// partitioned-index `relkind`, index `relispartition`, exact direct index parent, and detach state.
 /// Every attached index must belong to an attached relation and its parent index must be owned by the
 /// same direct parent relation. A valid partitioned index must cover every direct local table
-/// partition; PostgreSQL skips foreign-table partitions for regular indexes and rejects valid unique
-/// partitioned indexes over such a foreign child. This keeps table and index inheritance graphs
-/// coherent without changing the frozen v3 or relation-partition predecessor identities.
+/// partition with an attached valid child index; PostgreSQL skips foreign-table partitions for
+/// regular indexes and rejects valid unique partitioned indexes over such a foreign child. This
+/// keeps table and index inheritance graphs coherent without changing the frozen v3 or
+/// relation-partition predecessor identities.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexPartitionSnapshot {
     source_connection_key: String,
@@ -587,16 +588,21 @@ fn validate_valid_partitioned_index_children(
                 continue;
             }
 
-            let attached = by_coordinate.values().any(|child_index| {
+            let Some(attached_child) = by_coordinate.values().find(|child_index| {
                 child_index.coordinate().schema_name() == child_relation.schema_name()
                     && child_index.coordinate().relation_name() == child_relation.relation_name()
                     && child_index.coordinate().relation_kind() == child_relation.relation_kind()
                     && child_index
                         .parent_index()
                         .is_some_and(|parent| parent == parent_coordinate)
-            });
-            if !attached {
+            }) else {
                 return Err(invalid("index_partition_parent_validity"));
+            };
+
+            let child_index = find_base_index(base_snapshot, attached_child.coordinate())
+                .ok_or_else(|| invalid("index_partition_owner_coordinate"))?;
+            if child_index.valid() != Some(true) {
+                return Err(invalid("index_partition_child_validity"));
             }
         }
     }
