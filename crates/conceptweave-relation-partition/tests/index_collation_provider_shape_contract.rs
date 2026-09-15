@@ -114,9 +114,13 @@ fn nondeterminism_and_icu_rules_are_icu_only() {
 
 #[test]
 fn builtin_provider_accepts_only_postgresql18_builtin_locales() {
-    for locale in ["C", "C.UTF-8", "PG_UNICODE_FAST"] {
+    for (locale, encoding) in [
+        ("C", -1),
+        ("C.UTF-8", 6),
+        ("PG_UNICODE_FAST", 6),
+    ] {
         CollationDefinitionObservation::new(
-            identity("builtin", 6),
+            identity("builtin", encoding),
             PostgresCollationProvider::Builtin,
             true,
             None,
@@ -126,7 +130,7 @@ fn builtin_provider_accepts_only_postgresql18_builtin_locales() {
             Some("1".to_owned()),
             Some("1".to_owned()),
         )
-        .expect("PostgreSQL 18 built-in locale must be admitted");
+        .expect("PostgreSQL 18 built-in locale with its canonical catalog encoding must be admitted");
     }
 
     assert_provider_shape_error(CollationDefinitionObservation::new(
