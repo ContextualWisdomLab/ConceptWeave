@@ -19,26 +19,24 @@ fn copied_ucs_basic(
     )
 }
 
-fn assert_copied_ucs_basic_version_error(
-    result: Result<CollationDefinitionObservation, ObservationError>,
-) {
-    assert_eq!(
-        result.expect_err(
-            "PostgreSQL 18 UTF8 built-in C rows descend from ucs_basic and store version 1",
-        ),
-        ObservationError::InvalidObservationField {
-            field: "index_collation_definition_copied_ucs_basic_version",
-        }
-    );
-}
-
 #[test]
 fn copied_ucs_basic_requires_the_postgresql18_stored_version() {
     copied_ucs_basic(Some("1"))
         .expect("CREATE COLLATION ... FROM pg_catalog.ucs_basic recomputes stored version 1");
 
-    assert_copied_ucs_basic_version_error(copied_ucs_basic(None));
-    assert_copied_ucs_basic_version_error(copied_ucs_basic(Some("18")));
+    assert_eq!(
+        copied_ucs_basic(None).expect_err("ordinary built-in rows require a stored version"),
+        ObservationError::InvalidObservationField {
+            field: "index_collation_definition_stored_version_presence",
+        }
+    );
+    assert_eq!(
+        copied_ucs_basic(Some("18"))
+            .expect_err("UTF8 built-in C descendants must store PostgreSQL 18 version 1"),
+        ObservationError::InvalidObservationField {
+            field: "index_collation_definition_copied_ucs_basic_version",
+        }
+    );
 }
 
 #[test]
