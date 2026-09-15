@@ -222,6 +222,13 @@ pub(crate) fn canonicalize_column_identities(
                 field: "column_identity_coordinate",
             });
         };
+        if !observation.is_not_identity()
+            && !relation_kind_supports_identity(observation.relation_kind())
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "column_identity_relation_kind",
+            });
+        }
         if !observation.is_not_identity() && column.nullable() {
             return Err(ObservationError::InvalidObservationField {
                 field: "column_identity_nullability",
@@ -243,6 +250,10 @@ pub(crate) fn canonicalize_column_identities(
     }
 
     Ok(column_identities)
+}
+
+const fn relation_kind_supports_identity(kind: RelationKind) -> bool {
+    matches!(kind, RelationKind::Table | RelationKind::PartitionedTable)
 }
 
 fn same_column_coordinate(
@@ -298,6 +309,6 @@ fn encode_bytes(hasher: &mut Sha256, value: &[u8]) {
 }
 
 fn encode_len(hasher: &mut Sha256, value: usize) {
-    let value = u64::try_from(value).expect("Rust target usize must fit into canonical u64 length");
+    let value = u64::try_from(value.len()).expect("Rust target usize must fit into canonical u64 length");
     hasher.update(value.to_be_bytes());
 }
