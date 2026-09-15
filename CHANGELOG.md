@@ -6,6 +6,8 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
+- PostgreSQL encoding-independent libc material-collation evidence now requires stored `pg_collation.collversion` to remain SQL `NULL` for raw `C/C/-1` and `POSIX/POSIX/-1` rows, including arbitrary-name `CREATE COLLATION ... FROM` copies. PostgreSQL 18 bootstrap rows have no stored version, the copy path cannot combine `FROM` with `VERSION` and recomputes a NULL actual version for C/POSIX, and `ALTER COLLATION ... REFRESH VERSION` cannot introduce a NULL↔non-NULL transition. Direct database-encoding libc C/POSIX collations with explicit `VERSION` remain representable; no digest domain is changed.
+
 - PostgreSQL libc material-collation evidence now restricts encoding-independent `pg_collation.collencoding = -1` rows to the source-reachable raw locale pairs `C/C` and `POSIX/POSIX`. Arbitrary target identities created with `CREATE COLLATION ... FROM pg_catalog.C` or `... FROM pg_catalog.POSIX` remain valid because PostgreSQL copies provider/encoding/locale fields, while fabricated non-C/POSIX or mixed locale pairs fail closed. Concrete-encoding libc rows, catalog identity, and existing digest domains are unchanged.
 
 - PostgreSQL ordinary built-in and ICU material-collation evidence now requires stored `pg_collation.collversion` presence. PostgreSQL 18 fills an omitted ordinary collation version from the provider's actual version for both direct creation and `CREATE COLLATION ... FROM`, while explicit `VERSION` remains valid stale/upgrade evidence. Libc/provider-`d` nullable semantics are unchanged, and the rule deliberately does not apply to database-default ICU `pg_database.datcollversion` because `template0` is a source-reachable NULL exception. No digest domain is changed.
