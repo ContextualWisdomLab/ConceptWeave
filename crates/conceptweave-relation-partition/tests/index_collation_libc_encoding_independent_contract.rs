@@ -38,6 +38,19 @@ fn assert_provider_encoding_error(
     );
 }
 
+fn assert_encoding_independent_stored_version_error(
+    result: Result<CollationDefinitionObservation, ObservationError>,
+) {
+    assert_eq!(
+        result.expect_err(
+            "PostgreSQL 18 C/POSIX any-encoding libc rows cannot retain a stored provider version",
+        ),
+        ObservationError::InvalidObservationField {
+            field: "index_collation_definition_libc_encoding_independent_stored_version",
+        }
+    );
+}
+
 #[test]
 fn encoding_independent_libc_rows_preserve_c_or_posix_locale_pairs() {
     libc("public", "copied_c", -1, "C", "C", None, None)
@@ -63,6 +76,39 @@ fn encoding_independent_libc_rows_preserve_c_or_posix_locale_pairs() {
         None,
         None,
     ));
+}
+
+#[test]
+fn encoding_independent_libc_rows_cannot_carry_stored_provider_versions() {
+    assert_encoding_independent_stored_version_error(libc(
+        "public",
+        "copied_c_with_fabricated_version",
+        -1,
+        "C",
+        "C",
+        Some("2.39"),
+        None,
+    ));
+    assert_encoding_independent_stored_version_error(libc(
+        "tenant",
+        "copied_posix_with_fabricated_version",
+        -1,
+        "POSIX",
+        "POSIX",
+        Some("2.39"),
+        None,
+    ));
+
+    libc(
+        "public",
+        "direct_c_with_explicit_version",
+        6,
+        "C",
+        "C",
+        Some("operator-supplied"),
+        None,
+    )
+    .expect("direct database-encoding libc C may preserve an explicit VERSION value");
 }
 
 #[test]
