@@ -26,9 +26,11 @@ Source/compile RED `b9305ce9f91153912dd657b6e9fcb5817d9e67b6` adds a focused con
 
 Production repair `8c6cde815524437d76be8e5549473d7a298afbb9` validates actual-version evidence by provider at construction: built-in requires exactly `Some("1")`, ICU requires presence, and libc remains unconstrained at this layer. Existing fixture repair `8011132558d20bbf89bf88f6436ce5d322cc1204` replaces fabricated built-in version `18` positive controls with PostgreSQL 18's fixed version `1` without weakening provider-shape or encoding tests.
 
+Follow-up review `5209094918` found a second acceptance-fixture defect after the stricter provider rules were composed: `database_default_collation_version_coherence_contract.rs` still used an ICU-only helper to construct `actual_version = None` and expected success. That state is impossible for ICU, although matching NULL actual-version evidence remains valid for providers such as libc `C`. Fixture repair `0fcf97761c5674f8ded811eea489977cb3b5c577` moves the nullable coherence witness to an explicit libc `C` database default rather than weakening ICU validation.
+
 ## Rejected alternatives
 
-Treating built-in `None` as generic version-availability drift was rejected because it admits a source state the PostgreSQL 18 built-in provider does not return. Constraining recorded `datcollversion` to `1` was also rejected because it would erase legitimate stale/missing recorded-version evidence and confuse capture-time provider truth with catalog maintenance state.
+Treating built-in `None` as generic version-availability drift was rejected because it admits a source state the PostgreSQL 18 built-in provider does not return. Constraining recorded `datcollversion` to `1` was also rejected because it would erase legitimate stale/missing recorded-version evidence and confuse capture-time provider truth with catalog maintenance state. Restoring ICU `actual_version = None` merely to keep an old fixture passing was rejected for the same reason; the fixture must model a provider that PostgreSQL 18 can actually report as versionless.
 
 ## Risk and follow-up
 
