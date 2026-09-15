@@ -66,6 +66,48 @@ fn same_catalog_coordinate_with_different_provider_semantics_is_not_the_same_def
 }
 
 #[test]
+fn postgres18_libc_c_family_has_no_capture_time_actual_version() {
+    for locale in ["C", "c", "C.UTF-8", "c.utf8", "POSIX", "posix"] {
+        let error = CollationDefinitionObservation::new(
+            identity(),
+            PostgresCollationProvider::Libc,
+            true,
+            Some(locale.to_owned()),
+            Some(locale.to_owned()),
+            None,
+            None,
+            Some("operator-supplied-recorded-version".to_owned()),
+            Some("fabricated-provider-version".to_owned()),
+        )
+        .expect_err(
+            "PostgreSQL 18 returns NULL actual version for libc C, C.*, and POSIX locales",
+        );
+        assert_eq!(
+            error,
+            ObservationError::InvalidObservationField {
+                field: "index_collation_definition_actual_version",
+            }
+        );
+
+        let observation = CollationDefinitionObservation::new(
+            identity(),
+            PostgresCollationProvider::Libc,
+            true,
+            Some(locale.to_owned()),
+            Some(locale.to_owned()),
+            None,
+            None,
+            Some("operator-supplied-recorded-version".to_owned()),
+            None,
+        )
+        .expect("stored version drift remains representable when actual provider version is NULL");
+        assert_eq!(observation.version(), Some("operator-supplied-recorded-version"));
+        assert_eq!(observation.actual_version(), None);
+        assert!(observation.has_version_mismatch());
+    }
+}
+
+#[test]
 fn postgres18_collation_provider_tokens_fail_closed() {
     assert_eq!(
         PostgresCollationProvider::try_from('d').unwrap(),
