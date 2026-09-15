@@ -28,8 +28,9 @@ fn postgresql18_builtin_database_defaults_require_fixed_actual_version_one() {
     }
 
     for actual_version in [None, Some("18"), Some("2")] {
-        let error = builtin_database_default("C", Some("1"), actual_version)
-            .expect_err("PostgreSQL 18 built-in database actual version cannot be absent or fabricated");
+        let error = builtin_database_default("C", Some("1"), actual_version).expect_err(
+            "PostgreSQL 18 built-in database actual version cannot be absent or fabricated",
+        );
         assert_eq!(
             error,
             ObservationError::InvalidObservationField {
