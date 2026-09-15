@@ -4,11 +4,11 @@
 //! distinguish resolved `pg_collation` rows inside one captured catalog: namespace, name, and raw
 //! `collencoding`. That coordinate is not the complete content of a collation definition. PostgreSQL
 //! 18 also records provider, deterministic comparison mode, provider locale fields, ICU rules, and a
-//! provider-specific version. Those values can change ordering/comparison behavior without changing
-//! the catalog coordinate. This domain-separated successor preserves that material source content
-//! without rewriting any issued coordinate or database-encoding digest.
+//! provider-specific version. The effective provider version can change before the stored catalog
+//! version is refreshed. This domain-separated successor preserves both states without rewriting any
+//! issued coordinate or database-encoding digest.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use conceptweave_observation::ObservationError;
 use sha2::{Digest, Sha256};
@@ -19,7 +19,8 @@ use super::{
 };
 
 const COLLATION_DEFINITION_DIGEST_DOMAIN_V1: &[u8] = b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.expression_collation_catalog_identity.database_encoding.definition.v1";
-const COLLATION_DEFINITION_ITEM_DIGEST_DOMAIN_V1: &[u8] = b"conceptweave.postgres_schema_snapshot.v3.collation_definition.v1";
+const COLLATION_DEFINITION_ITEM_DIGEST_DOMAIN_V1: &[u8] =
+    b"conceptweave.postgres_schema_snapshot.v3.collation_definition.v1";
 const SHA256_DIGEST_PREFIX: &str = "sha256:";
 
 /// PostgreSQL 18 `pg_collation.collprovider` values.
@@ -64,10 +65,11 @@ impl TryFrom<char> for PostgresCollationProvider {
 
 /// Exact material PostgreSQL 18 definition of one resolved collation catalog coordinate.
 ///
-/// The optional strings preserve the catalog distinction between SQL `NULL` and a present string;
-/// this contract does not normalize provider fields or guess provider defaults. `oid` remains a
-/// capture-time join coordinate and `collowner` remains authorization metadata rather than collation
-/// comparison behavior, so neither is part of this immutable semantic-definition successor.
+/// Optional strings preserve the catalog distinction between SQL `NULL` and a present string. The
+/// recorded `collversion` and capture-time `pg_collation_actual_version(oid)` are separate because a
+/// provider upgrade can change effective ordering before the catalog version is refreshed. `oid`
+/// remains a capture-time join coordinate and `collowner` remains authorization metadata rather than
+/// collation comparison behavior, so neither is part of this semantic-definition successor.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct CollationDefinitionObservation {
     identity: CollationCatalogIdentity,
@@ -78,10 +80,11 @@ pub struct CollationDefinitionObservation {
     locale: Option<String>,
     icu_rules: Option<String>,
     version: Option<String>,
+    actual_version: Option<String>,
 }
 
 impl CollationDefinitionObservation {
-    /// Creates one lossless modeled `pg_collation` definition observation.
+    /// Creates one lossless modeled `pg_collation` definition plus actual provider-version evidence.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         identity: CollationCatalogIdentity,
@@ -92,7 +95,23 @@ impl CollationDefinitionObservation {
         locale: Option<String>,
         icu_rules: Option<String>,
         version: Option<String>,
+        actual_version: Option<String>,
     ) -> Result<Self, ObservationError> {
+        for value in [
+            lc_collate.as_deref(),
+            lc_ctype.as_deref(),
+            locale.as_deref(),
+            icu_rules.as_deref(),
+            version.as_deref(),
+            actual_version.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if value.contains('\0') {
+                return Err(invalid("index_collation_definition_text"));
+            }
+        }
         Ok(Self {
             identity,
             provider,
@@ -102,6 +121,7 @@ impl CollationDefinitionObservation {
             locale,
             icu_rules,
             version,
+            actual_version,
         })
     }
 
@@ -147,10 +167,25 @@ impl CollationDefinitionObservation {
         self.icu_rules.as_deref()
     }
 
-    /// Returns raw recorded `pg_collation.collversion`.
+    /// Returns recorded `pg_collation.collversion`.
     #[must_use]
     pub fn version(&self) -> Option<&str> {
         self.version.as_deref()
+    }
+
+    /// Returns capture-time `pg_collation_actual_version(oid)`.
+    #[must_use]
+    pub fn actual_version(&self) -> Option<&str> {
+        self.actual_version.as_deref()
+    }
+
+    /// Reports an explicit stored-versus-actual provider-version mismatch when both are available.
+    #[must_use]
+    pub fn has_version_mismatch(&self) -> bool {
+        matches!(
+            (self.version(), self.actual_version()),
+            (Some(recorded), Some(actual)) if recorded != actual
+        )
     }
 
     /// Returns a domain-separated digest of this exact material definition.
@@ -220,8 +255,9 @@ impl CollationDefinitionSourceReceipt {
 /// The constructor rebinds the database-encoding successor to its exact key and expression
 /// predecessors, derives the distinct non-null catalog identities actually used by those snapshots,
 /// and requires exactly one complete definition observation for every such identity. Missing,
-/// duplicate, or unrelated definitions fail closed. The resulting digest changes when any material
-/// provider definition/version field changes even if the catalog coordinate remains identical.
+/// duplicate, or unrelated definitions fail closed. The resulting digest changes when material
+/// provider definition, stored version, or actual provider version changes while the coordinate does
+/// not. A version mismatch is preserved as evidence rather than normalized away.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexCollationDefinitionSnapshot {
     source_connection_key: String,
@@ -311,6 +347,14 @@ impl IndexCollationDefinitionSnapshot {
     #[must_use]
     pub fn definitions(&self) -> &[CollationDefinitionObservation] {
         &self.definitions
+    }
+
+    /// Reports whether any bounded collation has a recorded-versus-actual provider-version mismatch.
+    #[must_use]
+    pub fn has_version_mismatch(&self) -> bool {
+        self.definitions
+            .iter()
+            .any(CollationDefinitionObservation::has_version_mismatch)
     }
 
     /// Issues provenance for one exact collation definition.
@@ -450,6 +494,7 @@ fn encode_definition(hasher: &mut Sha256, definition: &CollationDefinitionObserv
     encode_optional_str(hasher, definition.locale());
     encode_optional_str(hasher, definition.icu_rules());
     encode_optional_str(hasher, definition.version());
+    encode_optional_str(hasher, definition.actual_version());
 }
 
 fn encode_optional_str(hasher: &mut Sha256, value: Option<&str>) {
