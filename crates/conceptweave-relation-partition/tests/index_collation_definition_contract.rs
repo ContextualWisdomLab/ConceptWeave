@@ -4,7 +4,7 @@ use conceptweave_relation_partition::{
 };
 
 fn identity() -> CollationCatalogIdentity {
-    CollationCatalogIdentity::new("public", "casefolded", 6).unwrap()
+    CollationCatalogIdentity::new("public", "casefolded", -1).unwrap()
 }
 
 fn icu_definition(recorded_version: &str, actual_version: &str) -> CollationDefinitionObservation {
@@ -52,12 +52,12 @@ fn same_catalog_coordinate_with_different_provider_semantics_is_not_the_same_def
         identity(),
         PostgresCollationProvider::Libc,
         true,
-        Some("en_US.UTF-8".to_owned()),
-        Some("en_US.UTF-8".to_owned()),
+        Some("C".to_owned()),
+        Some("C".to_owned()),
         None,
         None,
-        Some("2.39".to_owned()),
-        Some("2.39".to_owned()),
+        None,
+        None,
     )
     .unwrap();
 
