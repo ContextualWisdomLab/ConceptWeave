@@ -31,7 +31,7 @@ pub enum PostgresDatabaseLocaleProvider {
     Builtin,
     /// Operating-system libc locale provider (`c`).
     Libc,
-    /// ICU locale provider (`i`).
+    /// ICU provider (`i`).
     Icu,
 }
 
@@ -169,13 +169,10 @@ impl DatabaseDefaultCollationDefinitionObservation {
         self.actual_version.as_deref()
     }
 
-    /// Reports an explicit recorded-versus-current provider-version mismatch when both exist.
+    /// Reports recorded-versus-actual provider-version drift, including availability changes.
     #[must_use]
     pub fn has_version_mismatch(&self) -> bool {
-        matches!(
-            (self.recorded_version(), self.actual_version()),
-            (Some(recorded), Some(actual)) if recorded != actual
-        )
+        self.recorded_version() != self.actual_version()
     }
 
     /// Validates database-encoding compatibility that cannot be decided from `pg_database` locale
