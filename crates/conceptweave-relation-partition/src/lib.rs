@@ -10,7 +10,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use conceptweave_observation::{ObservationError, PostgresSchemaSnapshotV3, RelationKind};
+use conceptweave_observation::{
+    ColumnGenerationObservation, ColumnIdentityObservation, ObservationError,
+    PostgresSchemaSnapshotV3, RelationKind,
+};
 use sha2::{Digest, Sha256};
 
 mod index_partition;
@@ -311,7 +314,8 @@ impl RelationPartitionSourceReceipt {
 ///
 /// Every bounded relation must receive one explicit `relispartition` observation, making observed
 /// false distinct from unobserved family absence. Positive membership resolves to an observed
-/// partitioned-table parent, requires a valid PostgreSQL name/type rowtype map, detach-pending
+/// partitioned-table parent, requires a valid PostgreSQL name/type rowtype map, preserves observed
+/// identity and generated-column mode coherence across each direct partition edge, detach-pending
 /// topology fails closed, the parent graph must be acyclic, and PostgreSQL 18 NOT NULL evidence must
 /// agree bidirectionally with the same direct relation edge. The successor digest frames the
 /// predecessor digest in a new domain, preserving the frozen v3 identity contract.
@@ -467,6 +471,7 @@ fn canonicalize_relation_partitions(
     }
 
     validate_partition_rowtypes(base_snapshot, &observations)?;
+    validate_partition_column_declarations(base_snapshot, &observations)?;
     validate_parent_graph(&observations)?;
     validate_not_null_partition_witnesses(base_snapshot, &observations)?;
     Ok(observations)
@@ -532,6 +537,83 @@ fn validate_partition_rowtypes(
         }
     }
     Ok(())
+}
+
+fn validate_partition_column_declarations(
+    base_snapshot: &PostgresSchemaSnapshotV3,
+    observations: &[RelationPartitionObservation],
+) -> Result<(), ObservationError> {
+    if let Some(identities) = base_snapshot.column_identities() {
+        for membership in observations.iter().filter(|observation| observation.is_partition()) {
+            let Some(parent) = membership.parent_relation() else {
+                continue;
+            };
+            for parent_identity in identities.iter().filter(|identity| {
+                identity.schema_name() == parent.schema_name()
+                    && identity.relation_name() == parent.relation_name()
+                    && identity.relation_kind() == RelationKind::PartitionedTable
+            }) {
+                let child_identity = identities
+                    .iter()
+                    .find(|identity| {
+                        identity.schema_name() == membership.schema_name()
+                            && identity.relation_name() == membership.relation_name()
+                            && identity.relation_kind() == membership.relation_kind()
+                            && identity.column_name() == parent_identity.column_name()
+                    })
+                    .ok_or_else(|| invalid("relation_partition_column_identity"))?;
+                if !same_identity_mode(parent_identity, child_identity) {
+                    return Err(invalid("relation_partition_column_identity"));
+                }
+            }
+        }
+    }
+
+    if let Some(generations) = base_snapshot.column_generations() {
+        for membership in observations.iter().filter(|observation| observation.is_partition()) {
+            let Some(parent) = membership.parent_relation() else {
+                continue;
+            };
+            for parent_generation in generations.iter().filter(|generation| {
+                generation.schema_name() == parent.schema_name()
+                    && generation.relation_name() == parent.relation_name()
+                    && generation.relation_kind() == RelationKind::PartitionedTable
+            }) {
+                let child_generation = generations
+                    .iter()
+                    .find(|generation| {
+                        generation.schema_name() == membership.schema_name()
+                            && generation.relation_name() == membership.relation_name()
+                            && generation.relation_kind() == membership.relation_kind()
+                            && generation.column_name() == parent_generation.column_name()
+                    })
+                    .ok_or_else(|| invalid("relation_partition_column_generation"))?;
+                if !same_generation_mode(parent_generation, child_generation) {
+                    return Err(invalid("relation_partition_column_generation"));
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+const fn same_identity_mode(
+    left: &ColumnIdentityObservation,
+    right: &ColumnIdentityObservation,
+) -> bool {
+    (left.is_not_identity() && right.is_not_identity())
+        || (left.is_generated_always() && right.is_generated_always())
+        || (left.is_generated_by_default() && right.is_generated_by_default())
+}
+
+const fn same_generation_mode(
+    left: &ColumnGenerationObservation,
+    right: &ColumnGenerationObservation,
+) -> bool {
+    (left.is_not_generated() && right.is_not_generated())
+        || (left.is_stored() && right.is_stored())
+        || (left.is_virtual_generated() && right.is_virtual_generated())
 }
 
 fn validate_parent_graph(
