@@ -19,11 +19,11 @@ use super::{
 const COLLATION_DATABASE_ENCODING_DIGEST_DOMAIN_V1: &[u8] = b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.expression_collation_catalog_identity.database_encoding.v1";
 const SHA256_DIGEST_PREFIX: &str = "sha256:";
 
-// PostgreSQL 18 `PG_ENCODING_BE_LAST == PG_KOI8U == 34`. The enum also retains the historical
-// `PG_UNUSED_1 == 7` hole, which `PG_VALID_BE_ENCODING` explicitly excludes. IDs above 34 are
-// client-only or the enum sentinel and cannot be `pg_database.encoding` values.
+// PostgreSQL 18 `PG_ENCODING_BE_LAST == PG_KOI8U == 34`. In REL_18_STABLE,
+// `PG_VALID_BE_ENCODING` accepts every encoding ID in the inclusive 0..=34 range; ID 7 remains
+// `PG_MULE_INTERNAL`. Later PostgreSQL development lines may retire that slot, but this contract is
+// intentionally version-specific and must not project a future enum hole backward into v18.
 const POSTGRES18_BACKEND_ENCODING_MAX: i32 = 34;
-const POSTGRES18_UNUSED_ENCODING_ID: i32 = 7;
 
 /// Exact PostgreSQL 18 source-database encoding observed from `pg_database.encoding`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -34,9 +34,7 @@ pub struct PostgresDatabaseEncodingObservation {
 impl PostgresDatabaseEncodingObservation {
     /// Creates one PostgreSQL 18 backend/database encoding observation.
     pub fn new(encoding: i32) -> Result<Self, ObservationError> {
-        if !(0..=POSTGRES18_BACKEND_ENCODING_MAX).contains(&encoding)
-            || encoding == POSTGRES18_UNUSED_ENCODING_ID
-        {
+        if !(0..=POSTGRES18_BACKEND_ENCODING_MAX).contains(&encoding) {
             return Err(invalid("postgres_database_encoding"));
         }
         Ok(Self { encoding })
