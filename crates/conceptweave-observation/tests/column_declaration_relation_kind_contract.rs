@@ -68,14 +68,17 @@ fn generated_column(kind: RelationKind) -> ColumnGenerationObservation {
 }
 
 #[test]
-fn identity_modes_are_restricted_to_table_relation_kinds() {
-    for kind in [RelationKind::Table, RelationKind::PartitionedTable] {
+fn identity_modes_are_restricted_to_table_and_foreign_table_relation_kinds() {
+    for kind in [
+        RelationKind::Table,
+        RelationKind::PartitionedTable,
+        RelationKind::ForeignTable,
+    ] {
         identity_snapshot(kind, generated_identity(kind))
-            .expect("tables and partitioned tables can carry identity catalog state");
+            .expect("table and foreign-table DDL can carry identity catalog state");
     }
 
     for kind in [
-        RelationKind::ForeignTable,
         RelationKind::View,
         RelationKind::MaterializedView,
         RelationKind::Sequence,
