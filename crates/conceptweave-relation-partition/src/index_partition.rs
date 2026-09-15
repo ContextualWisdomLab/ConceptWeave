@@ -40,6 +40,10 @@ pub use expression_collation_identity::*;
 mod collation_database_encoding;
 pub use collation_database_encoding::*;
 
+#[path = "collation_definition.rs"]
+mod collation_definition;
+pub use collation_definition::*;
+
 #[path = "type_modifier.rs"]
 mod type_modifier;
 pub use type_modifier::*;
