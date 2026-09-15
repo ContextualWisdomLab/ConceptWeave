@@ -22,6 +22,7 @@ const COLLATION_DEFINITION_DIGEST_DOMAIN_V1: &[u8] = b"conceptweave.postgres_sch
 const COLLATION_DEFINITION_ITEM_DIGEST_DOMAIN_V1: &[u8] =
     b"conceptweave.postgres_schema_snapshot.v3.collation_definition.v1";
 const SHA256_DIGEST_PREFIX: &str = "sha256:";
+const POSTGRES18_UTF8_ENCODING_ID: i32 = 6;
 
 /// PostgreSQL 18 `pg_collation.collprovider` values.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -121,6 +122,7 @@ impl CollationDefinitionObservation {
             locale.as_deref(),
             icu_rules.as_deref(),
         )?;
+        validate_provider_encoding(&identity, provider, locale.as_deref())?;
         Ok(Self {
             identity,
             provider,
@@ -439,6 +441,30 @@ fn validate_provider_shape(
         Ok(())
     } else {
         Err(invalid("index_collation_definition_provider_shape"))
+    }
+}
+
+fn validate_provider_encoding(
+    identity: &CollationCatalogIdentity,
+    provider: PostgresCollationProvider,
+    locale: Option<&str>,
+) -> Result<(), ObservationError> {
+    let valid = match provider {
+        PostgresCollationProvider::DatabaseDefault | PostgresCollationProvider::Libc => true,
+        PostgresCollationProvider::Builtin => match locale {
+            Some("C") => identity.encoding() == -1,
+            Some("C.UTF-8" | "PG_UNICODE_FAST") => {
+                identity.encoding() == POSTGRES18_UTF8_ENCODING_ID
+            }
+            _ => true,
+        },
+        PostgresCollationProvider::Icu => identity.encoding() == -1,
+    };
+
+    if valid {
+        Ok(())
+    } else {
+        Err(invalid("index_collation_definition_provider_encoding"))
     }
 }
 
