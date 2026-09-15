@@ -77,6 +77,41 @@ fn postgresql18_ucs_basic_bootstrap_collation_is_utf8_builtin_c() {
 }
 
 #[test]
+fn builtin_actual_provider_version_is_exactly_postgresql18_version_one() {
+    let error = CollationDefinitionObservation::new(
+        identity("pg_c_utf8", 6),
+        PostgresCollationProvider::Builtin,
+        true,
+        None,
+        None,
+        Some("C.UTF-8".to_owned()),
+        None,
+        Some("stale-recorded-version".to_owned()),
+        Some("18".to_owned()),
+    )
+    .expect_err("PostgreSQL 18 capture-time built-in provider version is always 1");
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "index_collation_definition_actual_version",
+        }
+    );
+
+    CollationDefinitionObservation::new(
+        identity("pg_c_utf8", 6),
+        PostgresCollationProvider::Builtin,
+        true,
+        None,
+        None,
+        Some("C.UTF-8".to_owned()),
+        None,
+        Some("stale-recorded-version".to_owned()),
+        Some("1".to_owned()),
+    )
+    .expect("recorded-version drift remains evidence while actual built-in version stays exact");
+}
+
+#[test]
 fn icu_catalog_encoding_is_always_encoding_independent() {
     icu(-1).expect("PostgreSQL 18 ICU collations use collencoding -1");
     assert_provider_encoding_error(icu(6));
