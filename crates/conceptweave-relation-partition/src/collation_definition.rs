@@ -461,12 +461,9 @@ fn validate_provider_encoding(
     let valid = match provider {
         PostgresCollationProvider::DatabaseDefault | PostgresCollationProvider::Libc => true,
         PostgresCollationProvider::Builtin => match locale {
-            Some("C") => {
-                identity.encoding() == -1
-                    || (identity.schema_name() == "pg_catalog"
-                        && identity.collation_name() == "ucs_basic"
-                        && identity.encoding() == POSTGRES18_UTF8_ENCODING_ID)
-            }
+            // Direct built-in C uses -1. CREATE COLLATION ... FROM pg_catalog.ucs_basic
+            // preserves the bootstrap row's UTF8 encoding on every valid copy.
+            Some("C") => matches!(identity.encoding(), -1 | POSTGRES18_UTF8_ENCODING_ID),
             Some("C.UTF-8" | "PG_UNICODE_FAST") => {
                 identity.encoding() == POSTGRES18_UTF8_ENCODING_ID
             }
