@@ -6,6 +6,8 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
+- PostgreSQL database-default libc collation evidence now rejects fabricated non-NULL `pg_database_collation_actual_version(database_oid)` values for case-insensitive libc `C`, every `C.*` spelling, and `POSIX`, matching PostgreSQL 18 `get_collation_actual_version_libc()`. Those database defaults preserve NULL actual-version evidence; non-C libc locales keep platform-dependent optional version availability, and recorded `pg_database.datcollversion` remains independent. No digest domain is changed.
+
 - PostgreSQL database-default built-in collation evidence now requires capture-time `pg_database_collation_actual_version(database_oid)` to be exactly `"1"` for `C`, `C.UTF-8`, and `PG_UNICODE_FAST`, matching PostgreSQL 18's built-in provider. Missing or fabricated current-version values fail closed while recorded `pg_database.datcollversion` remains independently nullable or stale drift evidence. Existing libc NULL-version and ICU non-NULL-version semantics remain provider-specific; no digest domain is changed.
 
 - PostgreSQL ICU collation version evidence now requires capture-time actual provider versions wherever PostgreSQL 18 can construct valid ICU state. Ordinary ICU `CollationDefinitionObservation` and ICU `DatabaseDefaultCollationDefinitionObservation` reject missing `pg_collation_actual_version(oid)` / `pg_database_collation_actual_version(database_oid)` evidence, while recorded `collversion` / `datcollversion` remain independently nullable or stale so real drift is preserved. Libc `C`/`C.*`/`POSIX` keeps its valid NULL actual-version semantics; no digest domain is changed.
