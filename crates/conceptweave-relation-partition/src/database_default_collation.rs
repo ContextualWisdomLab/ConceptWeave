@@ -12,13 +12,14 @@ use sha2::{Digest, Sha256};
 use super::{
     IndexCollationDatabaseEncodingSnapshot, IndexCollationDefinitionSnapshot,
     IndexExpressionCollationIdentitySnapshot, IndexPartitionCollationIdentitySnapshot,
-    PostgresCollationProvider,
+    PostgresCollationProvider, PostgresDatabaseEncodingObservation,
 };
 
 const DATABASE_DEFAULT_COLLATION_ITEM_DIGEST_DOMAIN_V1: &[u8] =
     b"conceptweave.postgres_schema_snapshot.v3.database_default_collation_definition.v1";
 const EFFECTIVE_COLLATION_DEFINITION_DIGEST_DOMAIN_V1: &[u8] = b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.expression_collation_catalog_identity.database_encoding.definition.effective_database_default.v1";
 const SHA256_DIGEST_PREFIX: &str = "sha256:";
+const POSTGRES18_UTF8_ENCODING_ID: i32 = 6;
 
 /// PostgreSQL 18 `pg_database.datlocprovider` values.
 ///
@@ -177,6 +178,22 @@ impl DatabaseDefaultCollationDefinitionObservation {
         )
     }
 
+    /// Validates database-encoding compatibility that cannot be decided from `pg_database` locale
+    /// fields alone. PostgreSQL 18 restricts built-in `C.UTF-8` and `PG_UNICODE_FAST` to UTF8,
+    /// while the built-in `C` locale remains valid for other backend encodings.
+    pub fn validate_database_encoding(
+        &self,
+        database_encoding: PostgresDatabaseEncodingObservation,
+    ) -> Result<(), ObservationError> {
+        if self.provider == PostgresDatabaseLocaleProvider::Builtin
+            && matches!(self.locale(), Some("C.UTF-8" | "PG_UNICODE_FAST"))
+            && database_encoding.encoding() != POSTGRES18_UTF8_ENCODING_ID
+        {
+            return Err(invalid("database_default_collation_database_encoding"));
+        }
+        Ok(())
+    }
+
     /// Returns a domain-separated digest of this exact database-default definition.
     #[must_use]
     pub fn canonical_digest(&self) -> String {
@@ -283,6 +300,9 @@ impl IndexEffectiveCollationDefinitionSnapshot {
             .any(|definition| definition.provider() == PostgresCollationProvider::DatabaseDefault);
         if requires_database_default != database_default_definition.is_some() {
             return Err(invalid("database_default_collation_definition_presence"));
+        }
+        if let Some(definition) = database_default_definition.as_ref() {
+            definition.validate_database_encoding(database_encoding_predecessor.database_encoding())?;
         }
 
         let predecessor_digest = material_definition_predecessor.snapshot_digest().to_owned();
