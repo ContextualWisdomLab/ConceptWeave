@@ -123,7 +123,11 @@ impl CollationDefinitionObservation {
             icu_rules.as_deref(),
         )?;
         validate_provider_encoding(&identity, provider, locale.as_deref())?;
-        validate_provider_actual_version(provider, actual_version.as_deref())?;
+        validate_provider_actual_version(
+            provider,
+            lc_collate.as_deref(),
+            actual_version.as_deref(),
+        )?;
         if provider == PostgresCollationProvider::DatabaseDefault && version.is_some() {
             return Err(invalid("index_collation_definition_default_stored_version"));
         }
@@ -480,14 +484,30 @@ fn validate_provider_encoding(
 
 fn validate_provider_actual_version(
     provider: PostgresCollationProvider,
+    lc_collate: Option<&str>,
     actual_version: Option<&str>,
 ) -> Result<(), ObservationError> {
-    let valid = provider != PostgresCollationProvider::Builtin || actual_version == Some("1");
+    let valid = match provider {
+        PostgresCollationProvider::Builtin => actual_version == Some("1"),
+        PostgresCollationProvider::Libc => match lc_collate {
+            Some(locale) if is_unversioned_libc_locale(locale) => actual_version.is_none(),
+            _ => true,
+        },
+        PostgresCollationProvider::DatabaseDefault | PostgresCollationProvider::Icu => true,
+    };
     if valid {
         Ok(())
     } else {
         Err(invalid("index_collation_definition_actual_version"))
     }
+}
+
+fn is_unversioned_libc_locale(locale: &str) -> bool {
+    locale.eq_ignore_ascii_case("C")
+        || locale.eq_ignore_ascii_case("POSIX")
+        || locale
+            .get(..2)
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case("C."))
 }
 
 fn validate_predecessors(
