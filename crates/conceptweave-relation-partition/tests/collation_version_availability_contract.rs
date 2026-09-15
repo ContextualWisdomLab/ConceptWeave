@@ -4,10 +4,7 @@ use conceptweave_relation_partition::{
     PostgresDatabaseLocaleProvider,
 };
 
-fn ordinary(
-    recorded_version: Option<&str>,
-    actual_version: &str,
-) -> CollationDefinitionObservation {
+fn ordinary(recorded_version: &str, actual_version: &str) -> CollationDefinitionObservation {
     CollationDefinitionObservation::new(
         CollationCatalogIdentity::new("public", "casefolded", -1).unwrap(),
         PostgresCollationProvider::Icu,
@@ -16,7 +13,7 @@ fn ordinary(
         None,
         Some("und-u-ks-level2".to_owned()),
         None,
-        recorded_version.map(str::to_owned),
+        Some(recorded_version.to_owned()),
         Some(actual_version.to_owned()),
     )
     .unwrap()
@@ -40,9 +37,8 @@ fn database_default(
 
 #[test]
 fn ordinary_icu_collation_recorded_version_drift_remains_observable() {
-    assert!(!ordinary(Some("153.80"), "153.80").has_version_mismatch());
-    assert!(ordinary(None, "153.80").has_version_mismatch());
-    assert!(ordinary(Some("153.80"), "154.10").has_version_mismatch());
+    assert!(!ordinary("153.80", "153.80").has_version_mismatch());
+    assert!(ordinary("153.80", "154.10").has_version_mismatch());
 }
 
 #[test]
