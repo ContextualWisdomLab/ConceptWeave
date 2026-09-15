@@ -128,6 +128,15 @@ impl CollationDefinitionObservation {
             lc_collate.as_deref(),
             actual_version.as_deref(),
         )?;
+        if provider == PostgresCollationProvider::Builtin
+            && locale.as_deref() == Some("C")
+            && identity.encoding() == POSTGRES18_UTF8_ENCODING_ID
+            && version.as_deref() != Some("1")
+        {
+            return Err(invalid(
+                "index_collation_definition_copied_ucs_basic_version",
+            ));
+        }
         if provider == PostgresCollationProvider::DatabaseDefault && version.is_some() {
             return Err(invalid("index_collation_definition_default_stored_version"));
         }
