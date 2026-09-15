@@ -195,19 +195,27 @@ impl DatabaseDefaultCollationDefinitionObservation {
     }
 
     /// Validates database-encoding compatibility that cannot be decided from `pg_database` locale
-    /// fields alone. PostgreSQL 18 restricts built-in `C.UTF-8` and `PG_UNICODE_FAST` to UTF8,
-    /// while the built-in `C` locale remains valid for other backend encodings.
+    /// fields alone. PostgreSQL 18 restricts built-in `C.UTF-8` and `PG_UNICODE_FAST` to UTF8 and
+    /// admits ICU only for backend encodings present in its `pg_enc2icu_tbl`; the built-in `C`
+    /// locale remains valid for other backend encodings.
     pub fn validate_database_encoding(
         &self,
         database_encoding: PostgresDatabaseEncodingObservation,
     ) -> Result<(), ObservationError> {
-        if self.provider == PostgresDatabaseLocaleProvider::Builtin
-            && matches!(self.locale(), Some("C.UTF-8" | "PG_UNICODE_FAST"))
-            && database_encoding.encoding() != POSTGRES18_UTF8_ENCODING_ID
-        {
-            return Err(invalid("database_default_collation_database_encoding"));
+        let encoding = database_encoding.encoding();
+        let valid = match self.provider {
+            PostgresDatabaseLocaleProvider::Builtin => {
+                !matches!(self.locale(), Some("C.UTF-8" | "PG_UNICODE_FAST"))
+                    || encoding == POSTGRES18_UTF8_ENCODING_ID
+            }
+            PostgresDatabaseLocaleProvider::Icu => postgres18_database_encoding_supports_icu(encoding),
+            PostgresDatabaseLocaleProvider::Libc => true,
+        };
+        if valid {
+            Ok(())
+        } else {
+            Err(invalid("database_default_collation_database_encoding"))
         }
-        Ok(())
     }
 
     /// Returns a domain-separated digest of this exact database-default definition.
@@ -439,6 +447,16 @@ fn validate_database_provider_shape(
     } else {
         Err(invalid("database_default_collation_provider_shape"))
     }
+}
+
+/// Mirrors PostgreSQL 18 `is_encoding_supported_by_icu()` / `pg_enc2icu_tbl` for validated backend
+/// encoding IDs. The five omitted backend encodings are SQL_ASCII (0), EUC_JIS_2004 (5),
+/// MULE_INTERNAL (7), LATIN10 (17), and WIN874 (21).
+fn postgres18_database_encoding_supports_icu(encoding: i32) -> bool {
+    matches!(
+        encoding,
+        1..=4 | 6 | 8..=16 | 18..=20 | 22..=34
+    )
 }
 
 fn compute_snapshot_digest(
