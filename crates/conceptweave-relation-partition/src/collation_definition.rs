@@ -128,6 +128,15 @@ impl CollationDefinitionObservation {
             lc_collate.as_deref(),
             actual_version.as_deref(),
         )?;
+        if matches!(
+            provider,
+            PostgresCollationProvider::Builtin | PostgresCollationProvider::Icu
+        ) && version.is_none()
+        {
+            return Err(invalid(
+                "index_collation_definition_stored_version_presence",
+            ));
+        }
         if provider == PostgresCollationProvider::Builtin
             && locale.as_deref() == Some("C")
             && identity.encoding() == POSTGRES18_UTF8_ENCODING_ID
