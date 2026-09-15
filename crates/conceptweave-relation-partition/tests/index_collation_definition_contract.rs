@@ -39,6 +39,8 @@ fn provider_upgrade_before_refresh_changes_governed_definition_identity() {
 
     assert_eq!(before.identity(), provider_upgraded.identity());
     assert_eq!(before.version(), provider_upgraded.version());
+    assert!(!before.has_version_mismatch());
+    assert!(provider_upgraded.has_version_mismatch());
     assert_ne!(before.actual_version(), provider_upgraded.actual_version());
     assert_ne!(before.canonical_digest(), provider_upgraded.canonical_digest());
 }
