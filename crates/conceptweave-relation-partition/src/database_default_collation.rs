@@ -207,10 +207,12 @@ impl DatabaseDefaultCollationDefinitionObservation {
         Ok(())
     }
 
-    /// Validates database-encoding compatibility that cannot be decided from `pg_database` locale
-    /// fields alone. PostgreSQL 18 restricts built-in `C.UTF-8` and `PG_UNICODE_FAST` to UTF8 and
-    /// admits ICU only for backend encodings present in its `pg_enc2icu_tbl`; the built-in `C`
-    /// locale remains valid for other backend encodings.
+    /// Validates database-encoding compatibility that can be decided without platform locale
+    /// inference. PostgreSQL 18 restricts built-in `C.UTF-8` and `PG_UNICODE_FAST` to UTF8, admits
+    /// ICU only for backend encodings present in its `pg_enc2icu_tbl`, and routes libc database
+    /// locales through `check_encoding_locale_matches`. For libc, exact C-UTF8 spellings are
+    /// therefore UTF8-only while `C`/`POSIX` remain encoding-independent; arbitrary platform locale
+    /// names are deliberately not inferred here.
     pub fn validate_database_encoding(
         &self,
         database_encoding: PostgresDatabaseEncodingObservation,
@@ -222,7 +224,13 @@ impl DatabaseDefaultCollationDefinitionObservation {
                     || encoding == POSTGRES18_UTF8_ENCODING_ID
             }
             PostgresDatabaseLocaleProvider::Icu => postgres18_database_encoding_supports_icu(encoding),
-            PostgresDatabaseLocaleProvider::Libc => true,
+            PostgresDatabaseLocaleProvider::Libc => {
+                ![self.lc_collate(), self.lc_ctype()]
+                    .into_iter()
+                    .flatten()
+                    .any(is_c_utf8_libc_locale)
+                    || encoding == POSTGRES18_UTF8_ENCODING_ID
+            }
         };
         if valid {
             Ok(())
@@ -460,6 +468,10 @@ fn validate_database_provider_shape(
     } else {
         Err(invalid("database_default_collation_provider_shape"))
     }
+}
+
+fn is_c_utf8_libc_locale(locale: &str) -> bool {
+    locale.eq_ignore_ascii_case("C.UTF-8") || locale.eq_ignore_ascii_case("C.utf8")
 }
 
 fn is_unversioned_libc_locale(locale: &str) -> bool {
