@@ -315,10 +315,10 @@ impl RelationPartitionSourceReceipt {
 /// Every bounded relation must receive one explicit `relispartition` observation, making observed
 /// false distinct from unobserved family absence. Positive membership resolves to an observed
 /// partitioned-table parent, requires a valid PostgreSQL name/type rowtype map, preserves observed
-/// identity and generated-column mode coherence across each direct partition edge, detach-pending
-/// topology fails closed, the parent graph must be acyclic, and PostgreSQL 18 NOT NULL evidence must
-/// agree bidirectionally with the same direct relation edge. The successor digest frames the
-/// predecessor digest in a new domain, preserving the frozen v3 identity contract.
+/// column collation, identity, and generated-column mode coherence across each direct partition edge,
+/// detach-pending topology fails closed, the parent graph must be acyclic, and PostgreSQL 18 NOT NULL
+/// evidence must agree bidirectionally with the same direct relation edge. The successor digest frames
+/// the predecessor digest in a new domain, preserving the frozen v3 identity contract.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RelationPartitionSnapshot {
     source_connection_key: String,
@@ -471,6 +471,7 @@ fn canonicalize_relation_partitions(
     }
 
     validate_partition_rowtypes(base_snapshot, &observations)?;
+    validate_partition_column_collations(base_snapshot, &observations)?;
     validate_partition_column_declarations(base_snapshot, &observations)?;
     validate_parent_graph(&observations)?;
     validate_not_null_partition_witnesses(base_snapshot, &observations)?;
@@ -536,6 +537,44 @@ fn validate_partition_rowtypes(
             }
         }
     }
+    Ok(())
+}
+
+fn validate_partition_column_collations(
+    base_snapshot: &PostgresSchemaSnapshotV3,
+    observations: &[RelationPartitionObservation],
+) -> Result<(), ObservationError> {
+    let Some(collations) = base_snapshot.column_collations() else {
+        return Ok(());
+    };
+
+    for membership in observations.iter().filter(|observation| observation.is_partition()) {
+        let Some(parent) = membership.parent_relation() else {
+            continue;
+        };
+        for parent_collation in collations.iter().filter(|collation| {
+            collation.schema_name() == parent.schema_name()
+                && collation.relation_name() == parent.relation_name()
+                && collation.relation_kind() == RelationKind::PartitionedTable
+        }) {
+            let child_collation = collations
+                .iter()
+                .find(|collation| {
+                    collation.schema_name() == membership.schema_name()
+                        && collation.relation_name() == membership.relation_name()
+                        && collation.relation_kind() == membership.relation_kind()
+                        && collation.column_name() == parent_collation.column_name()
+                })
+                .ok_or_else(|| invalid("relation_partition_column_collation"))?;
+
+            if parent_collation.collation() != child_collation.collation()
+                || parent_collation.deterministic() != child_collation.deterministic()
+            {
+                return Err(invalid("relation_partition_column_collation"));
+            }
+        }
+    }
+
     Ok(())
 }
 
