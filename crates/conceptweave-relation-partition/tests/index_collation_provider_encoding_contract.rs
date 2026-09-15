@@ -59,6 +59,24 @@ fn builtin_catalog_encoding_is_derived_from_the_builtin_locale() {
 }
 
 #[test]
+fn postgresql18_ucs_basic_bootstrap_collation_is_utf8_builtin_c() {
+    CollationDefinitionObservation::new(
+        identity("ucs_basic", 6),
+        PostgresCollationProvider::Builtin,
+        true,
+        None,
+        None,
+        Some("C".to_owned()),
+        None,
+        Some("1".to_owned()),
+        Some("1".to_owned()),
+    )
+    .expect("PostgreSQL 18 pg_catalog.ucs_basic is the canonical UTF8 built-in C bootstrap row");
+
+    assert_provider_encoding_error(builtin("C", 6));
+}
+
+#[test]
 fn icu_catalog_encoding_is_always_encoding_independent() {
     icu(-1).expect("PostgreSQL 18 ICU collations use collencoding -1");
     assert_provider_encoding_error(icu(6));
