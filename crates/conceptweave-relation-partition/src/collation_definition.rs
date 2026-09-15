@@ -190,13 +190,10 @@ impl CollationDefinitionObservation {
         self.actual_version.as_deref()
     }
 
-    /// Reports an explicit stored-versus-actual provider-version mismatch when both are available.
+    /// Reports stored-versus-actual provider-version drift, including availability changes.
     #[must_use]
     pub fn has_version_mismatch(&self) -> bool {
-        matches!(
-            (self.version(), self.actual_version()),
-            (Some(recorded), Some(actual)) if recorded != actual
-        )
+        self.version() != self.actual_version()
     }
 
     /// Returns a domain-separated digest of this exact material definition.
