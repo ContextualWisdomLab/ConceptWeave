@@ -18,7 +18,7 @@ ConceptWeave owns `observe -> discover -> propose -> align -> validate -> review
 
 ## Current Source Observation authority
 
-All source-repaired relation-partition/index evidence archived through `b1de4de9...` remains retained: rowtype/`atttypmod`, topology/validity/uniqueness/access method, mapped key/`INCLUDE`, operator-family/exclusion semantics, canonical expression/predicate and relation-`Var` equality, exact collation catalog coordinates and database encoding, PostgreSQL-18 provider/field/encoding shape, material/effective database-default definitions, provider-version presence/drift/coherence, copied `ucs_basic`, libc encoding-independent C/POSIX rows, and provider-`d` delegation. No issued digest domain is rewritten by the current repair.
+All source-repaired relation-partition/index evidence archived through `b1de4de9...` remains retained: rowtype/`atttypmod`, topology/validity/uniqueness/access method, mapped key/`INCLUDE`, operator-family/exclusion semantics, canonical expression/predicate and relation-`Var` equality, exact collation catalog coordinates and database encoding, PostgreSQL-18 provider/field/encoding shape, material/effective database-default definitions, provider-version presence/drift/coherence, copied `ucs_basic`, libc encoding-independent C/POSIX rows, and provider-`d` delegation. No issued digest domain is rewritten by the current repairs.
 
 ### Database-default libc C-UTF8 encoding binding
 
@@ -35,15 +35,30 @@ PostgreSQL 18 `CreateDatabase()` executes `check_encoding_locale_matches(encodin
 
 Current invariant: for provider `c`, if either raw `datcollate` or `datctype` is case-insensitive `C.UTF-8`/`C.utf8`, the bounded PostgreSQL database encoding must be UTF8 (`6`) or the explicit source-reachable SQL_ASCII (`0`) path. LATIN1 is rejected. `C` and `POSIX` remain encoding-independent controls. Arbitrary libc locale names are not assigned a codeset by string parsing; PostgreSQL obtains that truth from the runtime/OS, so the remaining general libc compatibility proof belongs to concrete transport/live differential evidence.
 
+### Column declaration relation-kind binding
+
+Review `5214601753` found that the complete `pg_attribute.attidentity` and `attgenerated` families validated coordinates and completeness but did not constrain non-empty declaration modes by the owning `pg_class.relkind`. That admitted source-unreachable governed evidence such as identity state on a view/foreign table or generated-column state on a materialized view.
+
+PostgreSQL 18 `CREATE TABLE` supports identity and generated-column declarations and can create partitioned tables. Leaf partitions inherit the partitioned-table identity state. `CREATE FOREIGN TABLE` supports generated columns but does not support identity declarations. The catalog-empty states remain legitimate observations for relation kinds that cannot own a non-empty declaration.
+
+- Finding review: `5214601753` on predecessor exact `619a43b493ee4e3751eecb43e25e688ae5afda58`.
+- Source RED: `e5a5f10140d8b66299e317612b36a20d28f52ac1`, `column_declaration_relation_kind_contract.rs`.
+- Identity repair converged at `2faafe07c2b53b9538a56d31a6febc5c07eae16e`; an intermediate ordinary-forward full-file replacement introduced an `encode_len` typo and the converged commit restores the original helper without rewriting history.
+- Generation repair: `6f4d8871fc41e0ad283d950a00b80d6d5c8c410d`.
+- Focused doctoring: `03cb2c75a371fe85a5e4d0e1704fdf4c18c9c810`, `docs/doctoring/postgresql-column-declaration-relation-kind-integrity.md`.
+- PostgreSQL authority: `REL_18_STABLE@3d2e8573e9cb91bd2b545184f4f9b326d237bcd1`.
+
+Current invariant: non-empty identity modes are admissible only on table/partitioned-table observations; non-empty generated-column modes are admissible only on table/partitioned-table/foreign-table observations. Explicit `not_identity` and `not_generated` remain valid for every modeled relation kind. Existing digest domains are unchanged.
+
 ## Current state
 
-**INDEX_DATABASE_DEFAULT_LIBC_C_UTF8_ENCODING_BINDING_SOURCE_REPAIRED / POSTGRESQL_DATABASE_DEFAULT_LIBC_GENERAL_ENCODING_DIFFERENTIAL_OPEN / POSTGRESQL_COLLATION_DEFINITION_ADAPTER_DIFFERENTIAL_OPEN / POSTGRESQL_DATABASE_DEFAULT_COLLATION_ADAPTER_DIFFERENTIAL_OPEN / POSTGRESQL_EXPRESSION_EXTRACTOR_DIFFERENTIAL_OPEN / POSTGRESQL_ATTTYPMOD_ADAPTER_DIFFERENTIAL_OPEN / POSTGRESQL_DATABASE_ENCODING_ADAPTER_DIFFERENTIAL_OPEN / ACCEPTANCE_PENDING**.
+**COLUMN_DECLARATION_RELATION_KIND_SOURCE_REPAIRED / INDEX_DATABASE_DEFAULT_LIBC_C_UTF8_ENCODING_BINDING_SOURCE_REPAIRED / POSTGRESQL_COLUMN_DECLARATION_RELATION_KIND_DIFFERENTIAL_OPEN / POSTGRESQL_DATABASE_DEFAULT_LIBC_GENERAL_ENCODING_DIFFERENTIAL_OPEN / POSTGRESQL_COLLATION_DEFINITION_ADAPTER_DIFFERENTIAL_OPEN / POSTGRESQL_DATABASE_DEFAULT_COLLATION_ADAPTER_DIFFERENTIAL_OPEN / POSTGRESQL_EXPRESSION_EXTRACTOR_DIFFERENTIAL_OPEN / POSTGRESQL_ATTTYPMOD_ADAPTER_DIFFERENTIAL_OPEN / POSTGRESQL_DATABASE_ENCODING_ADAPTER_DIFFERENTIAL_OPEN / ACCEPTANCE_PENDING**.
 
 The complete archived Source Observation state through `b1de4de9...` remains authoritative unless explicitly superseded by a focused decision record. This concise baseline is not a deletion of earlier contracts or evidence; the archive is the retained history and this file is the current decision surface.
 
 ## Acceptance boundary
 
-No executed Rust RED/GREEN or hosted Product acceptance is claimed after these ordinary-forward head moves. One unchanged exact #46 representation head must pass repository-pinned Rust 1.98 `fmt`, strict workspace/all-target Clippy, the new libc C-UTF8 database-encoding contract plus every retained Source Observation focused contract, workspace/doc tests, release build, owned production rustdoc/test/edge-case coverage, and applicable hosted Product/security/dependency/review gates. Any head movement resets exact-head acceptance.
+No executed Rust RED/GREEN or hosted Product acceptance is claimed after these ordinary-forward head moves. One unchanged exact #46 representation head must pass repository-pinned Rust 1.98 `fmt`, strict workspace/all-target Clippy, the new declaration relation-kind contract and libc C-UTF8 database-encoding contract plus every retained Source Observation focused contract, workspace/doc tests, release build, owned production rustdoc/test/edge-case coverage, and applicable hosted Product/security/dependency/review gates. Any head movement resets exact-head acceptance.
 
 Protected ConceptWeave `main` still requires repository-owned Product PR workflow convergence through #35. Central workflow-owner work remains in `ContextualWisdomLab/.github`; ConceptWeave must not copy, wake, or locally weaken that owner contract.
 
@@ -51,7 +66,7 @@ Protected ConceptWeave `main` still requires repository-owned Product PR workflo
 
 1. Converge the canonical central workflow owner and obtain compatible fresh unchanged-head acceptance for Product bootstrap #35; land #35 normally on protected/default ConceptWeave `main` only when required gates are terminal GREEN.
 2. Obtain one unchanged #46 representation head with repository-pinned Rust 1.98 native GREEN plus applicable hosted Product/security/dependency/review terminal GREEN.
-3. Only after that representation gate, extend #46 ordinary-forward with the concrete PostgreSQL 18 extractor/live differential. For the new seam, prove UTF8 + libc C-UTF8 acceptance, LATIN1 + libc C-UTF8 rejection/non-creation, the authorized SQL_ASCII + C-UTF8 path, and C/POSIX cross-encoding controls. For arbitrary libc locale names, observe runtime codeset compatibility instead of inferring it from spelling. All retained built-in/ICU/provider-`d`, version, copied-`ucs_basic`, expression, and `atttypmod` differentials remain required.
+3. Only after that representation gate, extend #46 ordinary-forward with the concrete PostgreSQL 18 extractor/live differential. For column declarations, prove table/partitioned-table identity state, inherited leaf-partition identity state, foreign-table generated state, and catalog-empty declaration state on relation kinds that cannot own those declarations. For database-default libc, prove UTF8 + C-UTF8 acceptance, LATIN1 + C-UTF8 rejection/non-creation, the authorized SQL_ASCII + C-UTF8 path, and C/POSIX cross-encoding controls. For arbitrary libc locale names, observe runtime codeset compatibility instead of inferring it from spelling. All retained built-in/ICU/provider-`d`, version, copied-`ucs_basic`, expression, and `atttypmod` differentials remain required.
 4. Only after the complete #46 child is terminal GREEN may its full delta flow ordinary/non-force into #45, followed by fresh #45 acceptance and #6 propagation. Semantic publication, version/tag/package/SBOM/provenance/reproducibility/rollback, and immutable release remain later gates.
 
 No force-push, destructive rebase, self-approval, review dismissal, administrator bypass, synthetic status, copied central workflow, manual/no-op rerun, gate weakening, partial parent adoption, predecessor-evidence transfer, or premature publication/release is authorized.
