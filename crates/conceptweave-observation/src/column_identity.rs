@@ -253,7 +253,10 @@ pub(crate) fn canonicalize_column_identities(
 }
 
 const fn relation_kind_supports_identity(kind: RelationKind) -> bool {
-    matches!(kind, RelationKind::Table | RelationKind::PartitionedTable)
+    matches!(
+        kind,
+        RelationKind::Table | RelationKind::PartitionedTable | RelationKind::ForeignTable
+    )
 }
 
 fn same_column_coordinate(
