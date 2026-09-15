@@ -278,7 +278,9 @@ impl IndexPartitionSourceReceipt {
 /// Every attached index must belong to an attached relation and its parent index must be owned by the
 /// same direct parent relation. A valid partitioned index must cover every direct local table
 /// partition with an attached valid child index; PostgreSQL skips foreign-table partitions for
-/// regular indexes and rejects valid unique partitioned indexes over such a foreign child. This
+/// regular indexes and rejects valid unique partitioned indexes over such a foreign child. Attached
+/// indexes also preserve PostgreSQL's constraint-parent rule: if the parent index backs an observed
+/// key constraint, the child index must back its own observed key constraint before attachment. This
 /// keeps table and index inheritance graphs coherent without changing the frozen v3 or
 /// relation-partition predecessor identities.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -492,6 +494,7 @@ fn canonicalize_index_partitions(
             }
             validate_modeled_index_attribute_mapping(child_definition, parent_definition)?;
             validate_modeled_index_key_collations(child_definition, parent_definition)?;
+            validate_attached_constraint_backing(base_snapshot, coordinate, parent_index)?;
         }
     }
 
@@ -557,6 +560,42 @@ fn validate_modeled_index_key_collations(
         }
     }
     Ok(())
+}
+
+fn validate_attached_constraint_backing(
+    base_snapshot: &PostgresSchemaSnapshotV3,
+    child_coordinate: &IndexPartitionCoordinate,
+    parent_coordinate: &IndexPartitionCoordinate,
+) -> Result<(), ObservationError> {
+    if relation_has_key_constraint_for_index(base_snapshot, parent_coordinate)?
+        && !relation_has_key_constraint_for_index(base_snapshot, child_coordinate)?
+    {
+        return Err(invalid("index_partition_child_constraint"));
+    }
+    Ok(())
+}
+
+fn relation_has_key_constraint_for_index(
+    base_snapshot: &PostgresSchemaSnapshotV3,
+    coordinate: &IndexPartitionCoordinate,
+) -> Result<bool, ObservationError> {
+    let relation = base_snapshot
+        .relations()
+        .iter()
+        .find(|relation| {
+            relation.schema_name() == coordinate.schema_name()
+                && relation.relation_name() == coordinate.relation_name()
+                && relation.kind() == coordinate.relation_kind()
+        })
+        .ok_or_else(|| invalid("index_partition_owner_coordinate"))?;
+
+    Ok(relation.constraints().iter().any(|constraint| {
+        matches!(
+            constraint,
+            conceptweave_observation::TableConstraintObservation::PrimaryKey(_)
+                | conceptweave_observation::TableConstraintObservation::Unique(_)
+        ) && constraint.constraint_name() == coordinate.index_name()
+    }))
 }
 
 fn validate_valid_partitioned_index_children(
