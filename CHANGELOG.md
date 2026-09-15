@@ -6,6 +6,8 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
+- PostgreSQL attached partition-index constraint composition now rejects a structurally compatible child index when its attached parent index backs an observed primary-key or unique constraint but the child index backs no observed key constraint on its own relation. Standalone parent indexes remain standalone and no constraint is inferred from index shape; the repair composes only already-observed relation-local constraint/backing-index evidence and does not change an issued digest domain.
+
 - PostgreSQL partitioned-index validity composition now requires every attached required local child index to report `pg_index.indisvalid = true` whenever its partitioned parent reports valid. Parent-valid/child-invalid governed tuples fail closed with `index_partition_child_validity`; fully attached all-valid hierarchies remain admitted, invalid-parent staging and stale-invalid-parent source states remain observable, the foreign-table exception is unchanged, and no issued digest domain changes.
 
 - PostgreSQL partitioned-index topology now preserves the foreign-table child semantics implemented by PostgreSQL 18. A valid regular/non-unique partitioned index may omit a child index for a direct foreign-table partition because PostgreSQL skips local index creation there, while a valid unique partitioned index over such a foreign child fails closed with `index_partition_foreign_partition_unique`. Valid local table/partitioned-table children still require attached child indexes, invalid `CREATE INDEX ON ONLY` staging remains unchanged, and no issued digest domain changes.
