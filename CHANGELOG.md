@@ -6,6 +6,8 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
+- PostgreSQL copied-`ucs_basic` material-collation evidence now requires source-reachable built-in `C/6` rows to preserve stored `pg_collation.collversion = "1"`. PostgreSQL 18 `CREATE COLLATION ... FROM pg_catalog.ucs_basic` copies provider/encoding/locale but recomputes the omitted stored version from the built-in provider's fixed actual version `1`; missing or fabricated stored versions therefore fail closed. Direct built-in `C/-1` remains a separate creation path and can preserve operator-supplied `VERSION`; no digest domain is changed.
+
 - PostgreSQL attached-index built-in `C` provider/encoding evidence now preserves source-reachable copies of bootstrap `pg_catalog.ucs_basic`. PostgreSQL 18 `CREATE COLLATION ... FROM` copies the source provider, locale fields, and raw `collencoding`, so built-in `C` is valid at `-1` for direct creation or at UTF8 encoding ID `6` for `ucs_basic`-descendant copies under their own catalog identities; unrelated encodings still fail closed. `C.UTF-8`, `PG_UNICODE_FAST`, ICU, and provider-`d` encoding rules remain unchanged, and no digest domain is changed.
 
 - PostgreSQL database-default libc collation evidence now rejects fabricated non-NULL `pg_database_collation_actual_version(database_oid)` values for case-insensitive libc `C`, every `C.*` spelling, and `POSIX`, matching PostgreSQL 18 `get_collation_actual_version_libc()`. Those database defaults preserve NULL actual-version evidence; non-C libc locales keep platform-dependent optional version availability, and recorded `pg_database.datcollversion` remains independent. No digest domain is changed.
