@@ -45,14 +45,8 @@ fn postgres18_database_encoding_is_bounded_to_backend_encoding_ids() {
         }
     );
 
-    let unused = PostgresDatabaseEncodingObservation::new(7)
-        .expect_err("PG_UNUSED_1 is inside the enum range but is not a valid backend encoding");
-    assert_eq!(
-        unused,
-        ObservationError::InvalidObservationField {
-            field: "postgres_database_encoding",
-        }
-    );
+    PostgresDatabaseEncodingObservation::new(7)
+        .expect("PostgreSQL 18 keeps ID 7 as the backend encoding PG_MULE_INTERNAL");
 
     let sentinel = PostgresDatabaseEncodingObservation::new(-1)
         .expect_err("-1 is a collation sentinel, not a database encoding");
