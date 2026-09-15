@@ -3,8 +3,12 @@ use conceptweave_relation_partition::{
     CollationCatalogIdentity, CollationDefinitionObservation, PostgresCollationProvider,
 };
 
+fn identity_with_encoding(encoding: i32) -> CollationCatalogIdentity {
+    CollationCatalogIdentity::new("public", "casefolded", encoding).unwrap()
+}
+
 fn identity() -> CollationCatalogIdentity {
-    CollationCatalogIdentity::new("public", "casefolded", -1).unwrap()
+    identity_with_encoding(-1)
 }
 
 fn icu_definition(recorded_version: &str, actual_version: &str) -> CollationDefinitionObservation {
@@ -69,7 +73,7 @@ fn same_catalog_coordinate_with_different_provider_semantics_is_not_the_same_def
 fn postgres18_libc_c_family_has_no_capture_time_actual_version() {
     for locale in ["C", "c", "C.UTF-8", "c.utf8", "POSIX", "posix"] {
         let error = CollationDefinitionObservation::new(
-            identity(),
+            identity_with_encoding(6),
             PostgresCollationProvider::Libc,
             true,
             Some(locale.to_owned()),
@@ -90,7 +94,7 @@ fn postgres18_libc_c_family_has_no_capture_time_actual_version() {
         );
 
         let observation = CollationDefinitionObservation::new(
-            identity(),
+            identity_with_encoding(6),
             PostgresCollationProvider::Libc,
             true,
             Some(locale.to_owned()),
@@ -100,7 +104,9 @@ fn postgres18_libc_c_family_has_no_capture_time_actual_version() {
             Some("operator-supplied-recorded-version".to_owned()),
             None,
         )
-        .expect("stored version drift remains representable when actual provider version is NULL");
+        .expect(
+            "direct database-encoding libc C-family rows may retain explicit stored versions while actual provider version is NULL",
+        );
         assert_eq!(observation.version(), Some("operator-supplied-recorded-version"));
         assert_eq!(observation.actual_version(), None);
         assert!(observation.has_version_mismatch());
