@@ -113,6 +113,7 @@ impl CollationDefinitionObservation {
             }
         }
         validate_provider_shape(
+            &identity,
             provider,
             deterministic,
             lc_collate.as_deref(),
@@ -396,6 +397,7 @@ impl IndexCollationDefinitionSnapshot {
 }
 
 fn validate_provider_shape(
+    identity: &CollationCatalogIdentity,
     provider: PostgresCollationProvider,
     deterministic: bool,
     lc_collate: Option<&str>,
@@ -405,7 +407,10 @@ fn validate_provider_shape(
 ) -> Result<(), ObservationError> {
     let valid = match provider {
         PostgresCollationProvider::DatabaseDefault => {
-            deterministic
+            identity.schema_name() == "pg_catalog"
+                && identity.collation_name() == "default"
+                && identity.encoding() == -1
+                && deterministic
                 && lc_collate.is_none()
                 && lc_ctype.is_none()
                 && locale.is_none()
