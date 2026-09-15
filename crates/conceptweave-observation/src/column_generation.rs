@@ -216,6 +216,13 @@ pub(crate) fn canonicalize_column_generations(
                 field: "column_generation_coordinate",
             });
         }
+        if !observation.is_not_generated()
+            && !relation_kind_supports_generation(observation.relation_kind())
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "column_generation_relation_kind",
+            });
+        }
 
         observed_coordinates.insert((
             observation.schema_name().to_owned(),
@@ -232,6 +239,13 @@ pub(crate) fn canonicalize_column_generations(
     }
 
     Ok(column_generations)
+}
+
+const fn relation_kind_supports_generation(kind: RelationKind) -> bool {
+    matches!(
+        kind,
+        RelationKind::Table | RelationKind::PartitionedTable | RelationKind::ForeignTable
+    )
 }
 
 pub(crate) fn generated_identity_conflicts(
