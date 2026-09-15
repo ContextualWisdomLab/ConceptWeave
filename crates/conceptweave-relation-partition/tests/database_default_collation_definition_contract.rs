@@ -183,3 +183,31 @@ fn non_libc_requires_datlocale_and_icu_rules_are_icu_only() {
     )
     .expect("ICU database default may carry ICU rules");
 }
+
+#[test]
+fn builtin_database_default_accepts_only_postgresql18_builtin_locales() {
+    for locale in ["C", "C.UTF-8", "PG_UNICODE_FAST"] {
+        DatabaseDefaultCollationDefinitionObservation::new(
+            PostgresDatabaseLocaleProvider::Builtin,
+            Some(locale.to_owned()),
+            Some(locale.to_owned()),
+            Some(locale.to_owned()),
+            None,
+            Some("18".to_owned()),
+            Some("18".to_owned()),
+        )
+        .expect("PostgreSQL 18 builtin database locale must be accepted");
+    }
+
+    for locale in ["und", "en-US", "ko-KR"] {
+        assert_provider_shape_error(DatabaseDefaultCollationDefinitionObservation::new(
+            PostgresDatabaseLocaleProvider::Builtin,
+            Some(locale.to_owned()),
+            Some(locale.to_owned()),
+            Some(locale.to_owned()),
+            None,
+            Some("18".to_owned()),
+            Some("18".to_owned()),
+        ));
+    }
+}
