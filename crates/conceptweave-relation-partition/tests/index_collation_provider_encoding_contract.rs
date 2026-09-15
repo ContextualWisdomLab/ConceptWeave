@@ -3,8 +3,12 @@ use conceptweave_relation_partition::{
     CollationCatalogIdentity, CollationDefinitionObservation, PostgresCollationProvider,
 };
 
+fn identity_in(schema: &str, name: &str, encoding: i32) -> CollationCatalogIdentity {
+    CollationCatalogIdentity::new(schema, name, encoding).unwrap()
+}
+
 fn identity(name: &str, encoding: i32) -> CollationCatalogIdentity {
-    CollationCatalogIdentity::new("pg_catalog", name, encoding).unwrap()
+    identity_in("pg_catalog", name, encoding)
 }
 
 fn builtin(locale: &str, encoding: i32) -> Result<CollationDefinitionObservation, ObservationError> {
@@ -47,19 +51,22 @@ fn assert_provider_encoding_error(
 }
 
 #[test]
-fn builtin_catalog_encoding_is_derived_from_the_builtin_locale() {
-    builtin("C", -1).expect("PostgreSQL 18 built-in C is encoding-independent");
+fn builtin_catalog_encoding_is_derived_from_the_builtin_locale_or_copied_source() {
+    builtin("C", -1).expect("direct PostgreSQL 18 built-in C is encoding-independent");
+    builtin("C", 6).expect(
+        "PostgreSQL 18 CREATE COLLATION FROM pg_catalog.ucs_basic preserves UTF8 built-in C",
+    );
     builtin("C.UTF-8", 6).expect("PostgreSQL 18 built-in C.UTF-8 is UTF8-only");
     builtin("PG_UNICODE_FAST", 6)
         .expect("PostgreSQL 18 built-in PG_UNICODE_FAST is UTF8-only");
 
-    assert_provider_encoding_error(builtin("C", 6));
+    assert_provider_encoding_error(builtin("C", 8));
     assert_provider_encoding_error(builtin("C.UTF-8", -1));
     assert_provider_encoding_error(builtin("PG_UNICODE_FAST", -1));
 }
 
 #[test]
-fn postgresql18_ucs_basic_bootstrap_collation_is_utf8_builtin_c() {
+fn postgresql18_ucs_basic_and_its_copies_are_utf8_builtin_c() {
     CollationDefinitionObservation::new(
         identity("ucs_basic", 6),
         PostgresCollationProvider::Builtin,
@@ -73,7 +80,18 @@ fn postgresql18_ucs_basic_bootstrap_collation_is_utf8_builtin_c() {
     )
     .expect("PostgreSQL 18 pg_catalog.ucs_basic is the canonical UTF8 built-in C bootstrap row");
 
-    assert_provider_encoding_error(builtin("C", 6));
+    CollationDefinitionObservation::new(
+        identity_in("public", "ucs_basic_copy", 6),
+        PostgresCollationProvider::Builtin,
+        true,
+        None,
+        None,
+        Some("C".to_owned()),
+        None,
+        Some("1".to_owned()),
+        Some("1".to_owned()),
+    )
+    .expect("CREATE COLLATION public.ucs_basic_copy FROM pg_catalog.ucs_basic preserves encoding 6");
 }
 
 #[test]
