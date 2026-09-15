@@ -276,8 +276,9 @@ impl IndexPartitionSourceReceipt {
 /// The family is complete over every index in the bounded v3 snapshot. It preserves index versus
 /// partitioned-index `relkind`, index `relispartition`, exact direct index parent, and detach state.
 /// Every attached index must belong to an attached relation and its parent index must be owned by the
-/// same direct parent relation. A partitioned index observed as valid must already have one attached
-/// child index for every direct table partition. This keeps table and index inheritance graphs
+/// same direct parent relation. A valid partitioned index must cover every direct local table
+/// partition; PostgreSQL skips foreign-table partitions for regular indexes and rejects valid unique
+/// partitioned indexes over such a foreign child. This keeps table and index inheritance graphs
 /// coherent without changing the frozen v3 or relation-partition predecessor identities.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexPartitionSnapshot {
@@ -579,6 +580,13 @@ fn validate_valid_partitioned_index_children(
                         && parent_relation.relation_name() == parent_coordinate.relation_name()
                 })
         }) {
+            if child_relation.relation_kind() == RelationKind::ForeignTable {
+                if parent_index.is_unique() {
+                    return Err(invalid("index_partition_foreign_partition_unique"));
+                }
+                continue;
+            }
+
             let attached = by_coordinate.values().any(|child_index| {
                 child_index.coordinate().schema_name() == child_relation.schema_name()
                     && child_index.coordinate().relation_name() == child_relation.relation_name()
