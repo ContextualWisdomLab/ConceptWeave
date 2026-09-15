@@ -28,8 +28,8 @@ fn builtin_database_default(locale: &str) -> DatabaseDefaultCollationDefinitionO
         Some(locale.to_owned()),
         Some(locale.to_owned()),
         None,
-        Some("18".to_owned()),
-        Some("18".to_owned()),
+        Some("1".to_owned()),
+        Some("1".to_owned()),
     )
     .unwrap()
 }
@@ -211,8 +211,8 @@ fn builtin_database_default_accepts_only_postgresql18_builtin_locales() {
             Some(locale.to_owned()),
             Some(locale.to_owned()),
             None,
-            Some("18".to_owned()),
-            Some("18".to_owned()),
+            Some("1".to_owned()),
+            Some("1".to_owned()),
         ));
     }
 }
