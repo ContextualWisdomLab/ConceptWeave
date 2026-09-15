@@ -117,6 +117,9 @@ impl DatabaseDefaultCollationDefinitionObservation {
             locale.as_deref(),
             icu_rules.as_deref(),
         )?;
+        if provider == PostgresDatabaseLocaleProvider::Icu && actual_version.is_none() {
+            return Err(invalid("database_default_collation_actual_version"));
+        }
         Ok(Self {
             provider,
             lc_collate,
