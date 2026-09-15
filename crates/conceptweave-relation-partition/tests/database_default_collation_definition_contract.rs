@@ -10,14 +10,25 @@ fn database_default(
 ) -> DatabaseDefaultCollationDefinitionObservation {
     DatabaseDefaultCollationDefinitionObservation::new(
         PostgresDatabaseLocaleProvider::Icu,
-        None,
-        None,
+        Some("C.UTF-8".to_owned()),
+        Some("C.UTF-8".to_owned()),
         Some(locale.to_owned()),
         Some("&V << w <<< W".to_owned()),
         Some(recorded_version.to_owned()),
         Some(actual_version.to_owned()),
     )
     .unwrap()
+}
+
+fn assert_provider_shape_error(
+    result: Result<DatabaseDefaultCollationDefinitionObservation, ObservationError>,
+) {
+    assert_eq!(
+        result.expect_err("impossible PostgreSQL 18 pg_database locale shapes must fail closed"),
+        ObservationError::InvalidObservationField {
+            field: "database_default_collation_provider_shape",
+        }
+    );
 }
 
 #[test]
@@ -66,4 +77,109 @@ fn database_locale_provider_accepts_only_postgresql18_database_provider_tokens()
             }
         );
     }
+}
+
+#[test]
+fn database_catalog_requires_lc_collate_and_lc_ctype_for_every_provider() {
+    for provider in [
+        PostgresDatabaseLocaleProvider::Builtin,
+        PostgresDatabaseLocaleProvider::Libc,
+        PostgresDatabaseLocaleProvider::Icu,
+    ] {
+        let locale = if provider == PostgresDatabaseLocaleProvider::Libc {
+            None
+        } else {
+            Some("und".to_owned())
+        };
+        assert_provider_shape_error(DatabaseDefaultCollationDefinitionObservation::new(
+            provider,
+            None,
+            Some("C.UTF-8".to_owned()),
+            locale.clone(),
+            None,
+            None,
+            None,
+        ));
+        assert_provider_shape_error(DatabaseDefaultCollationDefinitionObservation::new(
+            provider,
+            Some("C.UTF-8".to_owned()),
+            None,
+            locale,
+            None,
+            None,
+            None,
+        ));
+    }
+}
+
+#[test]
+fn libc_forbids_datlocale_and_icu_rules() {
+    assert_provider_shape_error(DatabaseDefaultCollationDefinitionObservation::new(
+        PostgresDatabaseLocaleProvider::Libc,
+        Some("en_US.UTF-8".to_owned()),
+        Some("en_US.UTF-8".to_owned()),
+        Some("en-US".to_owned()),
+        None,
+        Some("2.39".to_owned()),
+        Some("2.39".to_owned()),
+    ));
+    assert_provider_shape_error(DatabaseDefaultCollationDefinitionObservation::new(
+        PostgresDatabaseLocaleProvider::Libc,
+        Some("en_US.UTF-8".to_owned()),
+        Some("en_US.UTF-8".to_owned()),
+        None,
+        Some("&V << w <<< W".to_owned()),
+        Some("2.39".to_owned()),
+        Some("2.39".to_owned()),
+    ));
+
+    DatabaseDefaultCollationDefinitionObservation::new(
+        PostgresDatabaseLocaleProvider::Libc,
+        Some("en_US.UTF-8".to_owned()),
+        Some("en_US.UTF-8".to_owned()),
+        None,
+        None,
+        Some("2.39".to_owned()),
+        Some("2.39".to_owned()),
+    )
+    .expect("libc database default uses datcollate/datctype and no datlocale");
+}
+
+#[test]
+fn non_libc_requires_datlocale_and_icu_rules_are_icu_only() {
+    for provider in [
+        PostgresDatabaseLocaleProvider::Builtin,
+        PostgresDatabaseLocaleProvider::Icu,
+    ] {
+        assert_provider_shape_error(DatabaseDefaultCollationDefinitionObservation::new(
+            provider,
+            Some("C.UTF-8".to_owned()),
+            Some("C.UTF-8".to_owned()),
+            None,
+            None,
+            None,
+            None,
+        ));
+    }
+
+    assert_provider_shape_error(DatabaseDefaultCollationDefinitionObservation::new(
+        PostgresDatabaseLocaleProvider::Builtin,
+        Some("C.UTF-8".to_owned()),
+        Some("C.UTF-8".to_owned()),
+        Some("C.UTF-8".to_owned()),
+        Some("&V << w <<< W".to_owned()),
+        Some("1".to_owned()),
+        Some("1".to_owned()),
+    ));
+
+    DatabaseDefaultCollationDefinitionObservation::new(
+        PostgresDatabaseLocaleProvider::Icu,
+        Some("C.UTF-8".to_owned()),
+        Some("C.UTF-8".to_owned()),
+        Some("und".to_owned()),
+        Some("&V << w <<< W".to_owned()),
+        Some("153.80".to_owned()),
+        Some("153.80".to_owned()),
+    )
+    .expect("ICU database default may carry ICU rules");
 }
