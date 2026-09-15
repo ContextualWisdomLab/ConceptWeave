@@ -143,7 +143,7 @@ fn builtin_provider_accepts_only_postgresql18_builtin_locales() {
 }
 
 #[test]
-fn database_default_catalog_row_uses_the_bootstrap_shape() {
+fn database_default_catalog_row_uses_the_bootstrap_shape_and_coordinate() {
     CollationDefinitionObservation::new(
         identity("default", -1),
         PostgresCollationProvider::DatabaseDefault,
@@ -156,6 +156,24 @@ fn database_default_catalog_row_uses_the_bootstrap_shape() {
         None,
     )
     .expect("PostgreSQL 18 bootstrap default collation row must remain representable");
+
+    for invalid_identity in [
+        CollationCatalogIdentity::new("public", "default", -1).unwrap(),
+        identity("default", 6),
+        identity("not_default", -1),
+    ] {
+        assert_provider_shape_error(CollationDefinitionObservation::new(
+            invalid_identity,
+            PostgresCollationProvider::DatabaseDefault,
+            true,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ));
+    }
 
     assert_provider_shape_error(CollationDefinitionObservation::new(
         identity("default", -1),
