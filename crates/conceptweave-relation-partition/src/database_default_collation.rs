@@ -211,8 +211,8 @@ impl DatabaseDefaultCollationDefinitionObservation {
     /// inference. PostgreSQL 18 restricts built-in `C.UTF-8` and `PG_UNICODE_FAST` to UTF8, admits
     /// ICU only for backend encodings present in its `pg_enc2icu_tbl`, and routes libc database
     /// locales through `check_encoding_locale_matches`. For libc, exact C-UTF8 spellings are
-    /// therefore UTF8-only while `C`/`POSIX` remain encoding-independent; arbitrary platform locale
-    /// names are deliberately not inferred here.
+    /// compatible with UTF8 and the explicit superuser SQL_ASCII path while `C`/`POSIX` remain
+    /// encoding-independent; arbitrary platform locale names are deliberately not inferred here.
     pub fn validate_database_encoding(
         &self,
         database_encoding: PostgresDatabaseEncodingObservation,
@@ -229,7 +229,7 @@ impl DatabaseDefaultCollationDefinitionObservation {
                     .into_iter()
                     .flatten()
                     .any(is_c_utf8_libc_locale)
-                    || encoding == POSTGRES18_UTF8_ENCODING_ID
+                    || matches!(encoding, 0 | POSTGRES18_UTF8_ENCODING_ID)
             }
         };
         if valid {
