@@ -71,9 +71,9 @@ impl TryFrom<char> for PostgresDatabaseLocaleProvider {
 /// definition. `recorded_version` comes from `pg_database.datcollversion`; `actual_version` comes
 /// from `pg_database_collation_actual_version(database_oid)` in the same bounded capture. Built-in
 /// database locales report the fixed PostgreSQL 18 collation version `1`; ICU reports a concrete
-/// provider version; libc may legitimately have no actual version. Keeping recorded and current
-/// values separate makes provider drift visible before `ALTER DATABASE ... REFRESH COLLATION
-/// VERSION`.
+/// provider version; libc `C`, `C.*`, and `POSIX` report no actual version while other libc locales
+/// may or may not expose version data depending on the platform. Keeping recorded and current values
+/// separate makes provider drift visible before `ALTER DATABASE ... REFRESH COLLATION VERSION`.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct DatabaseDefaultCollationDefinitionObservation {
     provider: PostgresDatabaseLocaleProvider,
@@ -122,7 +122,10 @@ impl DatabaseDefaultCollationDefinitionObservation {
         let actual_version_valid = match provider {
             PostgresDatabaseLocaleProvider::Builtin => actual_version.as_deref() == Some("1"),
             PostgresDatabaseLocaleProvider::Icu => actual_version.is_some(),
-            PostgresDatabaseLocaleProvider::Libc => true,
+            PostgresDatabaseLocaleProvider::Libc => match lc_collate.as_deref() {
+                Some(locale) if is_unversioned_libc_locale(locale) => actual_version.is_none(),
+                _ => true,
+            },
         };
         if !actual_version_valid {
             return Err(invalid("database_default_collation_actual_version"));
@@ -457,6 +460,14 @@ fn validate_database_provider_shape(
     } else {
         Err(invalid("database_default_collation_provider_shape"))
     }
+}
+
+fn is_unversioned_libc_locale(locale: &str) -> bool {
+    locale.eq_ignore_ascii_case("C")
+        || locale.eq_ignore_ascii_case("POSIX")
+        || locale
+            .get(..2)
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case("C."))
 }
 
 /// Mirrors PostgreSQL 18 `is_encoding_supported_by_icu()` / `pg_enc2icu_tbl` for validated backend
