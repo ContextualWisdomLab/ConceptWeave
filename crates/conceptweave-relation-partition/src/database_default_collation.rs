@@ -69,8 +69,10 @@ impl TryFrom<char> for PostgresDatabaseLocaleProvider {
 /// option-bearing fields retain the raw catalog representation at the API boundary, but the
 /// constructor rejects combinations that cannot represent a valid PostgreSQL 18 database locale
 /// definition. `recorded_version` comes from `pg_database.datcollversion`; `actual_version` comes
-/// from `pg_database_collation_actual_version(database_oid)` in the same bounded capture. Keeping
-/// both values makes a provider upgrade visible before `ALTER DATABASE ... REFRESH COLLATION
+/// from `pg_database_collation_actual_version(database_oid)` in the same bounded capture. Built-in
+/// database locales report the fixed PostgreSQL 18 collation version `1`; ICU reports a concrete
+/// provider version; libc may legitimately have no actual version. Keeping recorded and current
+/// values separate makes provider drift visible before `ALTER DATABASE ... REFRESH COLLATION
 /// VERSION`.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct DatabaseDefaultCollationDefinitionObservation {
@@ -117,7 +119,12 @@ impl DatabaseDefaultCollationDefinitionObservation {
             locale.as_deref(),
             icu_rules.as_deref(),
         )?;
-        if provider == PostgresDatabaseLocaleProvider::Icu && actual_version.is_none() {
+        let actual_version_valid = match provider {
+            PostgresDatabaseLocaleProvider::Builtin => actual_version.as_deref() == Some("1"),
+            PostgresDatabaseLocaleProvider::Icu => actual_version.is_some(),
+            PostgresDatabaseLocaleProvider::Libc => true,
+        };
+        if !actual_version_valid {
             return Err(invalid("database_default_collation_actual_version"));
         }
         Ok(Self {
