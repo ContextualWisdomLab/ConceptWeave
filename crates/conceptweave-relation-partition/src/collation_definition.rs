@@ -456,7 +456,12 @@ fn validate_provider_encoding(
     let valid = match provider {
         PostgresCollationProvider::DatabaseDefault | PostgresCollationProvider::Libc => true,
         PostgresCollationProvider::Builtin => match locale {
-            Some("C") => identity.encoding() == -1,
+            Some("C") => {
+                identity.encoding() == -1
+                    || (identity.schema_name() == "pg_catalog"
+                        && identity.collation_name() == "ucs_basic"
+                        && identity.encoding() == POSTGRES18_UTF8_ENCODING_ID)
+            }
             Some("C.UTF-8" | "PG_UNICODE_FAST") => {
                 identity.encoding() == POSTGRES18_UTF8_ENCODING_ID
             }
