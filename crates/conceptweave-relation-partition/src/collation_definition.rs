@@ -123,6 +123,9 @@ impl CollationDefinitionObservation {
             icu_rules.as_deref(),
         )?;
         validate_provider_encoding(&identity, provider, locale.as_deref())?;
+        if provider == PostgresCollationProvider::DatabaseDefault && version.is_some() {
+            return Err(invalid("index_collation_definition_default_stored_version"));
+        }
         Ok(Self {
             identity,
             provider,
