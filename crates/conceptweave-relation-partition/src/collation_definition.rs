@@ -493,7 +493,8 @@ fn validate_provider_actual_version(
             Some(locale) if is_unversioned_libc_locale(locale) => actual_version.is_none(),
             _ => true,
         },
-        PostgresCollationProvider::DatabaseDefault | PostgresCollationProvider::Icu => true,
+        PostgresCollationProvider::DatabaseDefault => true,
+        PostgresCollationProvider::Icu => actual_version.is_some(),
     };
     if valid {
         Ok(())
