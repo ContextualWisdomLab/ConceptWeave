@@ -37,6 +37,19 @@ fn database_default(
     .unwrap()
 }
 
+fn libc_c_database_default() -> DatabaseDefaultCollationDefinitionObservation {
+    DatabaseDefaultCollationDefinitionObservation::new(
+        PostgresDatabaseLocaleProvider::Libc,
+        Some("C".to_owned()),
+        Some("C".to_owned()),
+        None,
+        None,
+        None,
+        None,
+    )
+    .expect("PostgreSQL 18 libc C may have no recorded or actual provider version")
+}
+
 #[test]
 fn postgres18_default_bootstrap_row_rejects_stored_pg_collation_version() {
     let error = material_default(Some("153.80"), Some("153.80"))
@@ -73,9 +86,9 @@ fn default_collation_actual_version_matches_database_default_actual_version() {
     );
 
     let unavailable_material = material_default(None, None).unwrap();
-    database_default(None)
+    libc_c_database_default()
         .validate_material_default_collation(&unavailable_material)
-        .expect("matching unavailable actual-version evidence remains coherent");
+        .expect("libc C preserves matching unavailable actual-version evidence");
 }
 
 #[test]
