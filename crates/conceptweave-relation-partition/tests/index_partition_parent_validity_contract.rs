@@ -64,10 +64,10 @@ fn authorized_source() -> AuthorizedObservationRequest {
     .unwrap()
 }
 
-fn index(name: &str, valid: bool) -> IndexObservation {
+fn index_with_uniqueness(name: &str, valid: bool, unique: bool) -> IndexObservation {
     IndexObservation::new(
         name,
-        false,
+        unique,
         Some(false),
         vec![IndexAttributeObservation::new(1, IndexAttributeKind::Key, "id").unwrap()],
         vec![],
@@ -85,6 +85,10 @@ fn index(name: &str, valid: bool) -> IndexObservation {
     ])
     .unwrap()
     .with_valid(valid)
+}
+
+fn index(name: &str, valid: bool) -> IndexObservation {
+    index_with_uniqueness(name, valid, false)
 }
 
 fn relation(
@@ -109,6 +113,24 @@ fn relation(
     )
     .unwrap()
     .with_indexes(vec![index(index_name, index_valid)])
+    .unwrap()
+}
+
+fn foreign_relation(name: &str) -> RelationObservation {
+    RelationObservation::new(
+        "public",
+        name,
+        RelationKind::ForeignTable,
+        vec![ColumnObservationV3::new(
+            "id",
+            1,
+            "bigint",
+            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+            true,
+            None,
+        )
+        .unwrap()],
+    )
     .unwrap()
 }
 
@@ -137,6 +159,40 @@ fn base_snapshot(parent_valid: bool) -> PostgresSchemaSnapshotV3 {
     .unwrap()
 }
 
+fn foreign_partition_base_snapshot(parent_unique: bool) -> PostgresSchemaSnapshotV3 {
+    let parent = RelationObservation::new(
+        "public",
+        "events",
+        RelationKind::PartitionedTable,
+        vec![ColumnObservationV3::new(
+            "id",
+            1,
+            "bigint",
+            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+            true,
+            None,
+        )
+        .unwrap()],
+    )
+    .unwrap()
+    .with_indexes(vec![index_with_uniqueness(
+        "events_id_idx",
+        true,
+        parent_unique,
+    )])
+    .unwrap();
+
+    PostgresSchemaSnapshotV3::new(
+        &authorized_source(),
+        "extractor-index-parent-validity-foreign-v1",
+        "2026-09-16T00:30:00Z",
+        vec![parent, foreign_relation("events_remote")],
+        vec![],
+        vec![],
+    )
+    .unwrap()
+}
+
 fn relation_partitions(base: &PostgresSchemaSnapshotV3) -> RelationPartitionSnapshot {
     RelationPartitionSnapshot::new(
         base,
@@ -151,6 +207,29 @@ fn relation_partitions(base: &PostgresSchemaSnapshotV3) -> RelationPartitionSnap
                 "public",
                 "events_2026",
                 RelationKind::Table,
+                PartitionParentRelationCoordinate::new("public", "events").unwrap(),
+                false,
+            )
+            .unwrap(),
+        ],
+    )
+    .unwrap()
+}
+
+fn foreign_relation_partitions(base: &PostgresSchemaSnapshotV3) -> RelationPartitionSnapshot {
+    RelationPartitionSnapshot::new(
+        base,
+        vec![
+            RelationPartitionObservation::non_partition(
+                "public",
+                "events",
+                RelationKind::PartitionedTable,
+            )
+            .unwrap(),
+            RelationPartitionObservation::partition(
+                "public",
+                "events_remote",
+                RelationKind::ForeignTable,
                 PartitionParentRelationCoordinate::new("public", "events").unwrap(),
                 false,
             )
@@ -199,6 +278,21 @@ fn local_index_topology(
     )
 }
 
+fn foreign_partition_index_topology(
+    base: &PostgresSchemaSnapshotV3,
+    relations: &RelationPartitionSnapshot,
+) -> Result<IndexPartitionSnapshot, ObservationError> {
+    IndexPartitionSnapshot::new(
+        base,
+        relations,
+        vec![IndexPartitionObservation::non_partition(
+            parent_index(),
+            IndexRelationKind::PartitionedIndex,
+        )
+        .unwrap()],
+    )
+}
+
 #[test]
 fn valid_partitioned_index_requires_attached_child_for_each_direct_partition() {
     let base = base_snapshot(true);
@@ -222,4 +316,30 @@ fn invalid_partitioned_index_can_stage_local_child_before_attachment() {
     let staged = local_index_topology(&base, &relations)
         .expect("CREATE INDEX ON ONLY leaves the parent invalid while child indexes are staged");
     assert_eq!(staged.observations().len(), 2);
+}
+
+#[test]
+fn valid_non_unique_partitioned_index_skips_foreign_partition_child_index() {
+    let base = foreign_partition_base_snapshot(false);
+    let relations = foreign_relation_partitions(&base);
+
+    let topology = foreign_partition_index_topology(&base, &relations).expect(
+        "PostgreSQL skips foreign-table partitions when building a regular partitioned index",
+    );
+    assert_eq!(topology.observations().len(), 1);
+}
+
+#[test]
+fn unique_partitioned_index_rejects_foreign_partition() {
+    let base = foreign_partition_base_snapshot(true);
+    let relations = foreign_relation_partitions(&base);
+
+    let error = foreign_partition_index_topology(&base, &relations)
+        .expect_err("PostgreSQL rejects unique partitioned indexes over foreign-table partitions");
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "index_partition_foreign_partition_unique",
+        }
+    );
 }
