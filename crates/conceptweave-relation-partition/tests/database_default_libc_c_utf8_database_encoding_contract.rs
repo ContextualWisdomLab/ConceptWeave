@@ -20,12 +20,10 @@ fn libc_database_default(
     .expect("C-family libc database defaults are valid representation inputs")
 }
 
-fn assert_database_encoding_error(
-    result: Result<(), ObservationError>,
-) {
+fn assert_database_encoding_error(result: Result<(), ObservationError>) {
     assert_eq!(
         result.expect_err(
-            "PostgreSQL 18 must reject libc C-UTF8 locale evidence on a non-UTF8 database",
+            "PostgreSQL 18 must reject libc C-UTF8 locale evidence on an incompatible database",
         ),
         ObservationError::InvalidObservationField {
             field: "database_default_collation_database_encoding",
@@ -34,7 +32,7 @@ fn assert_database_encoding_error(
 }
 
 #[test]
-fn libc_c_utf8_locale_rejects_non_utf8_database_encoding() {
+fn libc_c_utf8_locale_rejects_incompatible_database_encoding() {
     let latin1 = PostgresDatabaseEncodingObservation::new(8)
         .expect("LATIN1 is a valid PostgreSQL 18 backend/database encoding");
 
@@ -52,14 +50,18 @@ fn libc_c_utf8_locale_rejects_non_utf8_database_encoding() {
 }
 
 #[test]
-fn libc_c_utf8_locale_remains_valid_on_utf8_database_encoding() {
-    let utf8 = PostgresDatabaseEncodingObservation::new(6)
-        .expect("UTF8 is a valid PostgreSQL 18 backend/database encoding");
+fn libc_c_utf8_locale_retains_postgresql_utf8_and_sql_ascii_paths() {
+    for encoding_id in [0, 6] {
+        let encoding = PostgresDatabaseEncodingObservation::new(encoding_id)
+            .expect("SQL_ASCII and UTF8 are valid PostgreSQL 18 backend/database encodings");
 
-    for locale in ["C.UTF-8", "C.utf8"] {
-        libc_database_default(locale, locale)
-            .validate_database_encoding(utf8)
-            .expect("C-UTF8 libc locale evidence is source-compatible with a UTF8 database");
+        for locale in ["C.UTF-8", "C.utf8"] {
+            libc_database_default(locale, locale)
+                .validate_database_encoding(encoding)
+                .expect(
+                    "PostgreSQL accepts C-UTF8 with UTF8 and retains the superuser SQL_ASCII path",
+                );
+        }
     }
 }
 
