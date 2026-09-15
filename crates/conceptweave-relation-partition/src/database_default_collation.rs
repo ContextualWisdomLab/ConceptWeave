@@ -10,9 +10,10 @@ use conceptweave_observation::ObservationError;
 use sha2::{Digest, Sha256};
 
 use super::{
-    IndexCollationDatabaseEncodingSnapshot, IndexCollationDefinitionSnapshot,
-    IndexExpressionCollationIdentitySnapshot, IndexPartitionCollationIdentitySnapshot,
-    PostgresCollationProvider, PostgresDatabaseEncodingObservation,
+    CollationDefinitionObservation, IndexCollationDatabaseEncodingSnapshot,
+    IndexCollationDefinitionSnapshot, IndexExpressionCollationIdentitySnapshot,
+    IndexPartitionCollationIdentitySnapshot, PostgresCollationProvider,
+    PostgresDatabaseEncodingObservation,
 };
 
 const DATABASE_DEFAULT_COLLATION_ITEM_DIGEST_DOMAIN_V1: &[u8] =
@@ -175,6 +176,24 @@ impl DatabaseDefaultCollationDefinitionObservation {
         self.recorded_version() != self.actual_version()
     }
 
+    /// Validates coherence with the exact material `pg_catalog.default` row from the same bounded
+    /// observation. PostgreSQL 18 resolves both actual-version functions through the current
+    /// database provider/locale when the collation OID is the default bootstrap row.
+    pub fn validate_material_default_collation(
+        &self,
+        material_definition: &CollationDefinitionObservation,
+    ) -> Result<(), ObservationError> {
+        if material_definition.provider() != PostgresCollationProvider::DatabaseDefault {
+            return Err(invalid("database_default_collation_material_definition"));
+        }
+        if material_definition.actual_version() != self.actual_version() {
+            return Err(invalid(
+                "database_default_collation_actual_version_coherence",
+            ));
+        }
+        Ok(())
+    }
+
     /// Validates database-encoding compatibility that cannot be decided from `pg_database` locale
     /// fields alone. PostgreSQL 18 restricts built-in `C.UTF-8` and `PG_UNICODE_FAST` to UTF8,
     /// while the built-in `C` locale remains valid for other backend encodings.
@@ -291,15 +310,20 @@ impl IndexEffectiveCollationDefinitionSnapshot {
             return Err(invalid("effective_collation_definition_provenance"));
         }
 
-        let requires_database_default = material_definition_predecessor
+        let material_default_definition = material_definition_predecessor
             .definitions()
             .iter()
-            .any(|definition| definition.provider() == PostgresCollationProvider::DatabaseDefault);
+            .find(|definition| definition.provider() == PostgresCollationProvider::DatabaseDefault);
+        let requires_database_default = material_default_definition.is_some();
         if requires_database_default != database_default_definition.is_some() {
             return Err(invalid("database_default_collation_definition_presence"));
         }
         if let Some(definition) = database_default_definition.as_ref() {
             definition.validate_database_encoding(database_encoding_predecessor.database_encoding())?;
+            let material_default_definition = material_default_definition.ok_or_else(|| {
+                invalid("database_default_collation_material_definition")
+            })?;
+            definition.validate_material_default_collation(material_default_definition)?;
         }
 
         let predecessor_digest = material_definition_predecessor.snapshot_digest().to_owned();
