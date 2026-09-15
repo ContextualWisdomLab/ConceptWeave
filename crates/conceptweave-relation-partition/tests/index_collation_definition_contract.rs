@@ -7,7 +7,7 @@ fn identity() -> CollationCatalogIdentity {
     CollationCatalogIdentity::new("public", "casefolded", 6).unwrap()
 }
 
-fn icu_definition(version: &str) -> CollationDefinitionObservation {
+fn icu_definition(recorded_version: &str, actual_version: &str) -> CollationDefinitionObservation {
     CollationDefinitionObservation::new(
         identity(),
         PostgresCollationProvider::Icu,
@@ -16,15 +16,16 @@ fn icu_definition(version: &str) -> CollationDefinitionObservation {
         None,
         Some("und-u-ks-level2".to_owned()),
         Some("&V << w <<< W".to_owned()),
-        Some(version.to_owned()),
+        Some(recorded_version.to_owned()),
+        Some(actual_version.to_owned()),
     )
     .unwrap()
 }
 
 #[test]
 fn same_catalog_coordinate_with_a_different_recorded_version_is_not_the_same_definition() {
-    let before = icu_definition("153.80");
-    let after = icu_definition("154.10");
+    let before = icu_definition("153.80", "153.80");
+    let after = icu_definition("154.10", "154.10");
 
     assert_eq!(before.identity(), after.identity());
     assert_ne!(before, after);
@@ -32,8 +33,19 @@ fn same_catalog_coordinate_with_a_different_recorded_version_is_not_the_same_def
 }
 
 #[test]
+fn provider_upgrade_before_refresh_changes_governed_definition_identity() {
+    let before = icu_definition("153.80", "153.80");
+    let provider_upgraded = icu_definition("153.80", "154.10");
+
+    assert_eq!(before.identity(), provider_upgraded.identity());
+    assert_eq!(before.version(), provider_upgraded.version());
+    assert_ne!(before.actual_version(), provider_upgraded.actual_version());
+    assert_ne!(before.canonical_digest(), provider_upgraded.canonical_digest());
+}
+
+#[test]
 fn same_catalog_coordinate_with_different_provider_semantics_is_not_the_same_definition() {
-    let icu = icu_definition("153.80");
+    let icu = icu_definition("153.80", "153.80");
     let libc = CollationDefinitionObservation::new(
         identity(),
         PostgresCollationProvider::Libc,
@@ -42,6 +54,7 @@ fn same_catalog_coordinate_with_different_provider_semantics_is_not_the_same_def
         Some("en_US.UTF-8".to_owned()),
         None,
         None,
+        Some("2.39".to_owned()),
         Some("2.39".to_owned()),
     )
     .unwrap();
@@ -52,10 +65,22 @@ fn same_catalog_coordinate_with_different_provider_semantics_is_not_the_same_def
 
 #[test]
 fn postgres18_collation_provider_tokens_fail_closed() {
-    assert_eq!(PostgresCollationProvider::try_from('d').unwrap(), PostgresCollationProvider::DatabaseDefault);
-    assert_eq!(PostgresCollationProvider::try_from('b').unwrap(), PostgresCollationProvider::Builtin);
-    assert_eq!(PostgresCollationProvider::try_from('c').unwrap(), PostgresCollationProvider::Libc);
-    assert_eq!(PostgresCollationProvider::try_from('i').unwrap(), PostgresCollationProvider::Icu);
+    assert_eq!(
+        PostgresCollationProvider::try_from('d').unwrap(),
+        PostgresCollationProvider::DatabaseDefault
+    );
+    assert_eq!(
+        PostgresCollationProvider::try_from('b').unwrap(),
+        PostgresCollationProvider::Builtin
+    );
+    assert_eq!(
+        PostgresCollationProvider::try_from('c').unwrap(),
+        PostgresCollationProvider::Libc
+    );
+    assert_eq!(
+        PostgresCollationProvider::try_from('i').unwrap(),
+        PostgresCollationProvider::Icu
+    );
 
     let error = PostgresCollationProvider::try_from('x')
         .expect_err("unknown pg_collation.collprovider values must not enter governed evidence");
