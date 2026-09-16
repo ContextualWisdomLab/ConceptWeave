@@ -32,6 +32,10 @@ pub use exclusion_constraint_validation::*;
 mod exclusion_constraint_no_inherit;
 pub use exclusion_constraint_no_inherit::*;
 
+#[path = "index_exclusion_constraint_period.rs"]
+mod exclusion_constraint_period;
+pub use exclusion_constraint_period::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
