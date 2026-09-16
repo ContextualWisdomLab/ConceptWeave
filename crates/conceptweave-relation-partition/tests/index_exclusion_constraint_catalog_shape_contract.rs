@@ -237,6 +237,7 @@ fn shape(
     IndexExclusionConstraintCatalogShapeObservation::new(
         coordinate,
         'x',
+        true,
         false,
         empty_actions(),
         empty_foreign_payload(),
@@ -256,6 +257,7 @@ fn exact_exclusion_catalog_family_shape_is_retained() {
 
     let receipt = snapshot.source_receipt(child_constraint()).unwrap();
     assert_eq!(receipt.location().constraint_type_code(), 'x');
+    assert!(receipt.location().relation_owner_present());
     assert!(!receipt.location().domain_owner_present());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
     assert!(receipt.location().canonical_location().ends_with("/catalog-family-shape"));
@@ -266,6 +268,7 @@ fn non_exclusion_constraint_type_fails_closed() {
     let error = IndexExclusionConstraintCatalogShapeObservation::new(
         parent_constraint(),
         'u',
+        true,
         false,
         empty_actions(),
         empty_foreign_payload(),
@@ -281,10 +284,31 @@ fn non_exclusion_constraint_type_fails_closed() {
 }
 
 #[test]
+fn missing_relation_owner_fails_closed() {
+    let error = IndexExclusionConstraintCatalogShapeObservation::new(
+        parent_constraint(),
+        'x',
+        false,
+        false,
+        empty_actions(),
+        empty_foreign_payload(),
+        false,
+    )
+    .expect_err("ordinary EXCLUDE rows must have nonzero conrelid");
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "index_exclusion_constraint_catalog_shape",
+        }
+    );
+}
+
+#[test]
 fn domain_owner_residue_fails_closed() {
     let error = IndexExclusionConstraintCatalogShapeObservation::new(
         parent_constraint(),
         'x',
+        true,
         true,
         empty_actions(),
         empty_foreign_payload(),
@@ -304,6 +328,7 @@ fn foreign_action_residue_fails_closed() {
     let error = IndexExclusionConstraintCatalogShapeObservation::new(
         parent_constraint(),
         'x',
+        true,
         false,
         IndexExclusionConstraintForeignActionCodes::new('a', ' ', ' '),
         empty_foreign_payload(),
@@ -323,6 +348,7 @@ fn foreign_array_residue_fails_closed() {
     let error = IndexExclusionConstraintCatalogShapeObservation::new(
         parent_constraint(),
         'x',
+        true,
         false,
         empty_actions(),
         IndexExclusionConstraintForeignPayloadPresence::new(false, true, [false; 3], false),
@@ -342,6 +368,7 @@ fn check_expression_residue_fails_closed() {
     let error = IndexExclusionConstraintCatalogShapeObservation::new(
         parent_constraint(),
         'x',
+        true,
         false,
         empty_actions(),
         empty_foreign_payload(),
