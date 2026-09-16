@@ -6,6 +6,8 @@ All notable changes to ConceptWeave are documented here.
 
 ### Added
 
+- PostgreSQL key-constraint partition evidence now preserves exact resolved `pg_constraint.conparentid` in a domain-separated `IndexConstraintParentageSnapshot`. When an attached child index and its attached parent index both back observed primary-key or unique constraints, the child constraint must identify that exact parent constraint; a constraint-backed child index attached below a non-constraint parent index remains local with `conparentid = 0`. Frozen v3, relation-partition, and index-partition digest domains are unchanged.
+
 - PostgreSQL attached partition-index constraint composition now rejects a structurally compatible child index when its attached parent index backs an observed primary-key or unique constraint but the child index backs no observed key constraint on its own relation. Standalone parent indexes remain standalone and no constraint is inferred from index shape; the repair composes only already-observed relation-local constraint/backing-index evidence and does not change an issued digest domain.
 
 - PostgreSQL partitioned-index validity composition now requires every attached required local child index to report `pg_index.indisvalid = true` whenever its partitioned parent reports valid. Parent-valid/child-invalid governed tuples fail closed with `index_partition_child_validity`; fully attached all-valid hierarchies remain admitted, invalid-parent staging and stale-invalid-parent source states remain observable, the foreign-table exception is unchanged, and no issued digest domain changes.
