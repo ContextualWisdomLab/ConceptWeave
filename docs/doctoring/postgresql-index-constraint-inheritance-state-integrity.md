@@ -49,6 +49,7 @@ The selected design is `IndexConstraintInheritanceSnapshot`, complete over the e
 - Source/compile RED contract: `9f3125a28d2bd278a10c85a61557e5e00372f403`, `crates/conceptweave-relation-partition/tests/index_constraint_inheritance_state_contract.rs`.
 - Production successor: `023adf1fc665c1aa1ec41e14bb126f510bd28ac4`, `crates/conceptweave-relation-partition/src/index_constraint_inheritance.rs`.
 - Public export: `f3c46120f656afaac2358d5b6b2aea236b3ad5fb`, `crates/conceptweave-relation-partition/src/index_partition.rs`.
+- Receipt-coordinate correction: `dff165bb9bae049e28be6e649e72430e9f13fe14`; inheritance receipts and unknown-location diagnostics now use the distinct `/inheritance-state` evidence path rather than reusing the predecessor `/parentage` path.
 - PostgreSQL authority: `postgres/postgres@3d2e8573e9cb91bd2b545184f4f9b326d237bcd1`, `src/backend/catalog/pg_constraint.c::ConstraintSetParentConstraint()` and `src/backend/commands/tablecmds.c::ATExecAttachPartitionIdx()`.
 
 ## Acceptance and remaining risk
