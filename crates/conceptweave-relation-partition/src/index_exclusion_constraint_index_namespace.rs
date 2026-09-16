@@ -131,6 +131,7 @@ impl IndexExclusionConstraintIndexNamespaceSourceReceipt {
 pub struct IndexExclusionConstraintIndexNamespaceSnapshot {
     source_connection_key: String,
     connection_policy_binding: String,
+    source_snapshot_digest: String,
     snapshot_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
@@ -187,6 +188,7 @@ impl IndexExclusionConstraintIndexNamespaceSnapshot {
         Ok(Self {
             source_connection_key: index_name_snapshot.source_connection_key().to_owned(),
             connection_policy_binding: index_name_snapshot.connection_policy_binding().to_owned(),
+            source_snapshot_digest: index_name_snapshot.source_snapshot_digest().to_owned(),
             snapshot_digest,
             extractor_revision: index_name_snapshot.extractor_revision().to_owned(),
             observed_at_utc: index_name_snapshot.observed_at_utc().to_owned(),
@@ -204,6 +206,12 @@ impl IndexExclusionConstraintIndexNamespaceSnapshot {
     #[must_use]
     pub fn connection_policy_binding(&self) -> &str {
         &self.connection_policy_binding
+    }
+
+    /// Returns the exact v3 source-content digest inherited from the index-name predecessor.
+    #[must_use]
+    pub fn source_snapshot_digest(&self) -> &str {
+        &self.source_snapshot_digest
     }
 
     /// Returns the domain-separated backing-index namespace digest.
