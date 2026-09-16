@@ -106,6 +106,7 @@ impl IndexExclusionConstraintIndexNameSourceReceipt {
 pub struct IndexExclusionConstraintIndexNameSnapshot {
     source_connection_key: String,
     connection_policy_binding: String,
+    source_snapshot_digest: String,
     snapshot_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
@@ -162,6 +163,7 @@ impl IndexExclusionConstraintIndexNameSnapshot {
         Ok(Self {
             source_connection_key: rebound_catalog_shape.source_connection_key().to_owned(),
             connection_policy_binding: rebound_catalog_shape.connection_policy_binding().to_owned(),
+            source_snapshot_digest: base_snapshot.snapshot_digest().to_owned(),
             snapshot_digest,
             extractor_revision: rebound_catalog_shape.extractor_revision().to_owned(),
             observed_at_utc: rebound_catalog_shape.observed_at_utc().to_owned(),
@@ -179,6 +181,12 @@ impl IndexExclusionConstraintIndexNameSnapshot {
     #[must_use]
     pub fn connection_policy_binding(&self) -> &str {
         &self.connection_policy_binding
+    }
+
+    /// Returns the exact v3 source-content digest bound by this predecessor generation.
+    #[must_use]
+    pub fn source_snapshot_digest(&self) -> &str {
+        &self.source_snapshot_digest
     }
 
     /// Returns the domain-separated ordinary EXCLUDE backing-index name-binding digest.
