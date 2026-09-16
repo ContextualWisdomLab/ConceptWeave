@@ -64,6 +64,60 @@ impl IndexExclusionConstraintOperatorObservation {
     }
 }
 
+/// Exact ordinary-EXCLUDE predecessor branch needed to rebind constraint-side operator evidence.
+#[derive(Clone, Copy, Debug)]
+pub struct IndexExclusionConstraintOperatorSourceLineage<'a> {
+    base_snapshot: &'a PostgresSchemaSnapshotV3,
+    relation_partition_snapshot: &'a RelationPartitionSnapshot,
+    index_partition_snapshot: &'a IndexPartitionSnapshot,
+    constraint_snapshot: &'a IndexExclusionConstraintSnapshot,
+    period_snapshot: &'a IndexExclusionConstraintPeriodSnapshot,
+    key_snapshot: &'a IndexExclusionConstraintKeySnapshot,
+}
+
+impl<'a> IndexExclusionConstraintOperatorSourceLineage<'a> {
+    /// Binds the exact v3 through ordinary-EXCLUDE `conkey` predecessor chain for one composition.
+    #[must_use]
+    pub const fn new(
+        base_snapshot: &'a PostgresSchemaSnapshotV3,
+        relation_partition_snapshot: &'a RelationPartitionSnapshot,
+        index_partition_snapshot: &'a IndexPartitionSnapshot,
+        constraint_snapshot: &'a IndexExclusionConstraintSnapshot,
+        period_snapshot: &'a IndexExclusionConstraintPeriodSnapshot,
+        key_snapshot: &'a IndexExclusionConstraintKeySnapshot,
+    ) -> Self {
+        Self {
+            base_snapshot,
+            relation_partition_snapshot,
+            index_partition_snapshot,
+            constraint_snapshot,
+            period_snapshot,
+            key_snapshot,
+        }
+    }
+}
+
+/// Exact backing-index semantic predecessor branch for constraint-side operator comparison.
+#[derive(Clone, Copy, Debug)]
+pub struct IndexExclusionConstraintOperatorSemanticsLineage<'a> {
+    operator_family_snapshot: &'a IndexOperatorFamilySnapshot,
+    exclusion_semantics_snapshot: &'a IndexExclusionSemanticsSnapshot,
+}
+
+impl<'a> IndexExclusionConstraintOperatorSemanticsLineage<'a> {
+    /// Binds the exact operator-family and exclusion-semantics predecessors for one composition.
+    #[must_use]
+    pub const fn new(
+        operator_family_snapshot: &'a IndexOperatorFamilySnapshot,
+        exclusion_semantics_snapshot: &'a IndexExclusionSemanticsSnapshot,
+    ) -> Self {
+        Self {
+            operator_family_snapshot,
+            exclusion_semantics_snapshot,
+        }
+    }
+}
+
 /// Immutable provenance receipt for one exact ordinary EXCLUDE `conexclop` observation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexExclusionConstraintOperatorSourceReceipt {
@@ -133,18 +187,20 @@ pub struct IndexExclusionConstraintOperatorSnapshot {
 
 impl IndexExclusionConstraintOperatorSnapshot {
     /// Creates complete constraint-side exclusion-operator evidence over exact predecessor stacks.
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
-        base_snapshot: &PostgresSchemaSnapshotV3,
-        relation_partition_snapshot: &RelationPartitionSnapshot,
-        index_partition_snapshot: &IndexPartitionSnapshot,
-        constraint_snapshot: &IndexExclusionConstraintSnapshot,
-        period_snapshot: &IndexExclusionConstraintPeriodSnapshot,
-        key_snapshot: &IndexExclusionConstraintKeySnapshot,
-        operator_family_snapshot: &IndexOperatorFamilySnapshot,
-        exclusion_semantics_snapshot: &IndexExclusionSemanticsSnapshot,
+        source_lineage: IndexExclusionConstraintOperatorSourceLineage<'_>,
+        semantics_lineage: IndexExclusionConstraintOperatorSemanticsLineage<'_>,
         mut observations: Vec<IndexExclusionConstraintOperatorObservation>,
     ) -> Result<Self, ObservationError> {
+        let base_snapshot = source_lineage.base_snapshot;
+        let relation_partition_snapshot = source_lineage.relation_partition_snapshot;
+        let index_partition_snapshot = source_lineage.index_partition_snapshot;
+        let constraint_snapshot = source_lineage.constraint_snapshot;
+        let period_snapshot = source_lineage.period_snapshot;
+        let key_snapshot = source_lineage.key_snapshot;
+        let operator_family_snapshot = semantics_lineage.operator_family_snapshot;
+        let exclusion_semantics_snapshot = semantics_lineage.exclusion_semantics_snapshot;
+
         let rebound_constraint = IndexExclusionConstraintSnapshot::new(
             base_snapshot,
             relation_partition_snapshot,
