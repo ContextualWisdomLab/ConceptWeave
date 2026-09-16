@@ -76,16 +76,20 @@ Temporal p/u/f `conperiod` semantics remain owned by `conceptweave-observation::
 
 Review `5219346562` found the next P1 on exact predecessor `658b46604edf597cac700175fc47b91200eaeed4`: the ordinary EXCLUDE successor chain still dropped the independently stored `pg_constraint.conkey` array. PostgreSQL 18 persists the first `ii_NumIndexKeyAttrs` values of `IndexInfo::ii_IndexAttrNumbers` into `conkey`; simple column elements carry exact relation attribute numbers and expression elements carry zero. INCLUDE payload positions are not part of the stored constraint-key array.
 
-- Source/compile RED contract: `edc700bf98bfb3fce9848ab9693624c18c1d97ce`, `crates/conceptweave-relation-partition/tests/index_exclusion_constraint_key_contract.rs`.
-- Production successor: `5a4d55a2e652694f259a50632012c0e3e563f6b7`, `crates/conceptweave-relation-partition/src/index_exclusion_constraint_key.rs`.
-- Public composition: `e856d8f148fb2826503a7928d3fa1da1d38bdea4`, `crates/conceptweave-relation-partition/src/index_partition.rs`.
-- Focused doctoring: `08cac064abdceee49384242fffd6f98396ffa079`, `docs/doctoring/postgresql-index-exclusion-constraint-key-integrity.md`.
+The first source/compile contract `edc700bf98bfb3fce9848ab9693624c18c1d97ce` and first production successor `5a4d55a2e652694f259a50632012c0e3e563f6b7` established raw `conkey` preservation. Exact-head review `5219378111` then found that the first successor accepted a separately supplied v3 base for deriving expected attribute numbers without proving that base was the one transitively bound by the EXCLUDE predecessor.
 
-`IndexExclusionConstraintKeySnapshot` rebound-validates the exact period predecessor, requires one raw ordered `conkey` vector for every ordinary EXCLUDE coordinate, verifies that vector against the exact `conindid` backing index and owning relation (`column -> attnum`, expression -> `0`, INCLUDE omitted), and binds the raw vector into a new domain-separated digest and `/key-attributes` receipt. Issued predecessor digests remain unchanged.
+The corrected ordinary-forward lineage is:
+
+- tightened source/compile contract: `74aa937f91514364327b11a8db12fb44621e9115`, `crates/conceptweave-relation-partition/tests/index_exclusion_constraint_key_contract.rs`;
+- corrected production successor: `08f96237c1301704af2c0be6c8312464a175b987`, `crates/conceptweave-relation-partition/src/index_exclusion_constraint_key.rs`;
+- public composition remains `e856d8f148fb2826503a7928d3fa1da1d38bdea4`, `crates/conceptweave-relation-partition/src/index_partition.rs`;
+- focused doctoring currentized by `001faf8f1bfc13d90bdb7e6c3ceb6b1c3cbe7b4`, `docs/doctoring/postgresql-index-exclusion-constraint-key-integrity.md`.
+
+`IndexExclusionConstraintKeySnapshot` now rebuilds the ordinary EXCLUDE identity from the supplied exact v3 + relation-partition + index-partition predecessors and requires a digest match, then rebound-validates the exact period successor. It requires one raw ordered `conkey` vector for every ordinary EXCLUDE coordinate, verifies that vector against the exact `conindid` backing index and owning relation (`column -> attnum`, expression -> `0`, INCLUDE omitted), and binds the raw vector into a new domain-separated digest and `/key-attributes` receipt. Issued predecessor digests remain unchanged.
 
 ## Current state
 
-**INDEX_EXCLUSION_CONSTRAINT_KEY_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_KEY_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_PERIOD_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_PERIOD_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_NO_INHERIT_RAW_STATE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_NO_INHERIT_LIFECYCLE_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_VALIDATION_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_VALIDATION_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_ENFORCEMENT_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_ENFORCEMENT_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_TIMING_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_PARTITION_SOURCE_REPAIRED / INDEX_CONSTRAINT_INHERITANCE_STATE_SOURCE_REPAIRED / INDEX_CONSTRAINT_PARENTAGE_SOURCE_REPAIRED / SOURCE_OBSERVATION_RETAINED / ACCEPTANCE_PENDING**.
+**INDEX_EXCLUSION_CONSTRAINT_KEY_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_KEY_EXACT_PREDECESSOR_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_KEY_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_PERIOD_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_PERIOD_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_NO_INHERIT_RAW_STATE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_NO_INHERIT_LIFECYCLE_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_VALIDATION_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_VALIDATION_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_ENFORCEMENT_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_ENFORCEMENT_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_TIMING_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_PARTITION_SOURCE_REPAIRED / INDEX_CONSTRAINT_INHERITANCE_STATE_SOURCE_REPAIRED / INDEX_CONSTRAINT_PARENTAGE_SOURCE_REPAIRED / SOURCE_OBSERVATION_RETAINED / ACCEPTANCE_PENDING**.
 
 ## Acceptance boundary
 
