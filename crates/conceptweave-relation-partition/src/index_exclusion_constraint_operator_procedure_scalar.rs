@@ -367,7 +367,6 @@ fn encode_len(hasher: &mut Sha256, value: usize) {
 
 fn encode_str(hasher: &mut Sha256, value: &str) {
     encode_len(hasher, value.len());
-    hasher.update(value.to_be_bytes().len().to_be_bytes());
     hasher.update(value.as_bytes());
 }
 
