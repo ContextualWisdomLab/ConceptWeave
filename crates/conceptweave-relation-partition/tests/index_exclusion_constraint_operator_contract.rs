@@ -6,7 +6,8 @@ use conceptweave_observation::{
 use conceptweave_relation_partition::{
     IndexExclusionConstraintCoordinate, IndexExclusionConstraintKeyObservation,
     IndexExclusionConstraintKeySnapshot, IndexExclusionConstraintObservation,
-    IndexExclusionConstraintOperatorObservation, IndexExclusionConstraintOperatorSnapshot,
+    IndexExclusionConstraintOperatorObservation, IndexExclusionConstraintOperatorSemanticsLineage,
+    IndexExclusionConstraintOperatorSnapshot, IndexExclusionConstraintOperatorSourceLineage,
     IndexExclusionConstraintPeriodObservation, IndexExclusionConstraintPeriodSnapshot,
     IndexExclusionConstraintSnapshot, IndexExclusionSemanticsSnapshot,
     IndexKeyExclusionSemanticsObservation, IndexKeyOperatorFamilyObservation,
@@ -260,19 +261,38 @@ fn predecessor_snapshots() -> (
     )
 }
 
+fn source_lineage<'a>(
+    base: &'a PostgresSchemaSnapshotV3,
+    relations: &'a RelationPartitionSnapshot,
+    indexes: &'a IndexPartitionSnapshot,
+    constraints: &'a IndexExclusionConstraintSnapshot,
+    period: &'a IndexExclusionConstraintPeriodSnapshot,
+    keys: &'a IndexExclusionConstraintKeySnapshot,
+) -> IndexExclusionConstraintOperatorSourceLineage<'a> {
+    IndexExclusionConstraintOperatorSourceLineage::new(
+        base,
+        relations,
+        indexes,
+        constraints,
+        period,
+        keys,
+    )
+}
+
+fn semantics_lineage<'a>(
+    families: &'a IndexOperatorFamilySnapshot,
+    semantics: &'a IndexExclusionSemanticsSnapshot,
+) -> IndexExclusionConstraintOperatorSemanticsLineage<'a> {
+    IndexExclusionConstraintOperatorSemanticsLineage::new(families, semantics)
+}
+
 #[test]
 fn ordinary_exclude_preserves_constraint_side_conexclop() {
     let (base, relations, indexes, constraints, period, keys, families, semantics) =
         predecessor_snapshots();
     let snapshot = IndexExclusionConstraintOperatorSnapshot::new(
-        &base,
-        &relations,
-        &indexes,
-        &constraints,
-        &period,
-        &keys,
-        &families,
-        &semantics,
+        source_lineage(&base, &relations, &indexes, &constraints, &period, &keys),
+        semantics_lineage(&families, &semantics),
         vec![IndexExclusionConstraintOperatorObservation::new(
             constraint_coordinate(),
             vec![qualified_operator("=")],
@@ -296,14 +316,8 @@ fn ordinary_exclude_rejects_constraint_side_operator_drift() {
     let (base, relations, indexes, constraints, period, keys, families, semantics) =
         predecessor_snapshots();
     let error = IndexExclusionConstraintOperatorSnapshot::new(
-        &base,
-        &relations,
-        &indexes,
-        &constraints,
-        &period,
-        &keys,
-        &families,
-        &semantics,
+        source_lineage(&base, &relations, &indexes, &constraints, &period, &keys),
+        semantics_lineage(&families, &semantics),
         vec![IndexExclusionConstraintOperatorObservation::new(
             constraint_coordinate(),
             vec![qualified_operator("<")],
@@ -325,14 +339,8 @@ fn ordinary_exclude_constraint_operator_inventory_is_complete() {
     let (base, relations, indexes, constraints, period, keys, families, semantics) =
         predecessor_snapshots();
     let error = IndexExclusionConstraintOperatorSnapshot::new(
-        &base,
-        &relations,
-        &indexes,
-        &constraints,
-        &period,
-        &keys,
-        &families,
-        &semantics,
+        source_lineage(&base, &relations, &indexes, &constraints, &period, &keys),
+        semantics_lineage(&families, &semantics),
         vec![],
     )
     .expect_err("every ordinary EXCLUDE constraint must retain pg_constraint.conexclop");
@@ -350,14 +358,8 @@ fn exact_conexclop_issues_domain_separated_provenance() {
     let (base, relations, indexes, constraints, period, keys, families, semantics) =
         predecessor_snapshots();
     let snapshot = IndexExclusionConstraintOperatorSnapshot::new(
-        &base,
-        &relations,
-        &indexes,
-        &constraints,
-        &period,
-        &keys,
-        &families,
-        &semantics,
+        source_lineage(&base, &relations, &indexes, &constraints, &period, &keys),
+        semantics_lineage(&families, &semantics),
         vec![IndexExclusionConstraintOperatorObservation::new(
             constraint_coordinate(),
             vec![qualified_operator("=")],
