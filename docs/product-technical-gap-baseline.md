@@ -29,8 +29,10 @@ The ordinary-forward lineage is:
 - source/compile contract `a4f56f9432bb0d8d368d1b36f89d59661623fd2b`, `crates/conceptweave-relation-partition/tests/index_exclusion_constraint_namespace_contract.rs`;
 - production successor `b71fb962177302377a3bd913e185e2ad587025bb`, `crates/conceptweave-relation-partition/src/index_exclusion_constraint_namespace.rs`;
 - public composition `c7dcee510671be162908b75a4c7b4723e914adc0`, `crates/conceptweave-relation-partition/src/index_partition.rs`;
-- focused doctoring `806b372f3514e3cb29918363990f26aba8f5f1ee`, `docs/doctoring/postgresql-index-exclusion-constraint-namespace-integrity.md`;
-- CHANGELOG currentization `2cb49dc3b81ce54d1ec4e04fbe6ab989c9859e2b`.
+- initial focused doctoring `806b372f3514e3cb29918363990f26aba8f5f1ee`;
+- CHANGELOG currentization `2cb49dc3b81ce54d1ec4e04fbe6ab989c9859e2b`;
+- edge-contract currentization `13bf58005f8d6bd90cbc9ee5a3234b391e6906c1`, covering blank namespace, duplicate coordinate, incomplete inventory, mismatch, provenance success, and unknown receipt behavior;
+- focused doctoring currentized to that edge boundary at `4b251612160a3c34ba3fc8c94f4680ca6fddd8a7`.
 
 `IndexExclusionConstraintNamespaceSnapshot` requires exactly one explicit resolved namespace observation for every predecessor ordinary EXCLUDE constraint, keeps the raw resolved schema name in a new domain-separated digest and provenance receipt, and fails closed when it differs from the owning relation schema. It does not derive the namespace from relation metadata, rewrite an issued predecessor digest, or introduce schema-wide constraint-name uniqueness; same-name constraints on different relations remain legal.
 
