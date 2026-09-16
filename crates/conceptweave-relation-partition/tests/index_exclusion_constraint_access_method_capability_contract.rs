@@ -236,6 +236,58 @@ fn ordinary_exclusion_rejects_access_method_binding_drift() {
 }
 
 #[test]
+fn ordinary_exclusion_rejects_backing_index_binding_drift() {
+    let base = base_snapshot("gist");
+    let relations = relation_partitions(&base);
+    let indexes = index_partitions(&base, &relations);
+    let constraints = exclusion_constraints(&base, &relations, &indexes);
+    let wrong_backing = IndexPartitionCoordinate::new(
+        "public",
+        "bookings",
+        RelationKind::Table,
+        "other_index",
+    )
+    .unwrap();
+    let error = IndexExclusionConstraintAccessMethodCapabilitySnapshot::new(
+        &base,
+        &relations,
+        &indexes,
+        &constraints,
+        vec![IndexExclusionConstraintAccessMethodCapabilityObservation::new(
+            constraint_coordinate(),
+            wrong_backing,
+            "gist",
+            true,
+        )
+        .unwrap()],
+    )
+    .expect_err("capability evidence must bind to the exact conindid backing index");
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "index_exclusion_constraint_access_method_capability_binding",
+        }
+    );
+}
+
+#[test]
+fn capability_observation_rejects_blank_access_method_name() {
+    let error = IndexExclusionConstraintAccessMethodCapabilityObservation::new(
+        constraint_coordinate(),
+        backing_index(),
+        "  ",
+        true,
+    )
+    .expect_err("blank access-method identity cannot become governed evidence");
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "index_exclusion_constraint_access_method_name",
+        }
+    );
+}
+
+#[test]
 fn ordinary_exclusion_requires_complete_capability_evidence() {
     let base = base_snapshot("gist");
     let relations = relation_partitions(&base);
@@ -301,4 +353,20 @@ fn extension_access_method_is_admitted_from_observed_capability_not_name_allowli
     assert_eq!(receipt.location().access_method_name(), "acme_exclusion_am");
     assert!(receipt.location().can_exclude());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+}
+
+#[test]
+fn capability_receipt_rejects_unknown_constraint_coordinate() {
+    let snapshot = build_capability("gist", "gist", true).unwrap();
+    let unknown = IndexExclusionConstraintCoordinate::new(
+        "public",
+        "bookings",
+        RelationKind::Table,
+        "unobserved_exclusion",
+    )
+    .unwrap();
+    let error = snapshot
+        .source_receipt(unknown)
+        .expect_err("unobserved constraint capability cannot issue provenance");
+    assert!(matches!(error, ObservationError::UnknownObservationLocation { .. }));
 }
