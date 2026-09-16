@@ -40,6 +40,10 @@ pub use exclusion_constraint_period::*;
 mod exclusion_constraint_key;
 pub use exclusion_constraint_key::*;
 
+#[path = "index_exclusion_constraint_operator.rs"]
+mod exclusion_constraint_operator;
+pub use exclusion_constraint_operator::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
