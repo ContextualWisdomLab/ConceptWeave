@@ -25,8 +25,10 @@ Primary source authority is PostgreSQL `REL_18_STABLE@3d2e8573e9cb91bd2b545184f4
 
 - Finding review: `ContextualWisdomLab/ConceptWeave#46` review `5219874038` on exact predecessor `1051c8cddcd16bdb6d47bc5c2c13a7c736b2b859`.
 - Source/compile regression contract: `1be6077cc9b888c013acfface68afaa739ccc80d`, `crates/conceptweave-relation-partition/tests/index_exclusion_constraint_operator_contract.rs`.
-- Causal successor implementation: `20b9184cb7bef9a4c6baa4379055c34968ca030a`, `crates/conceptweave-relation-partition/src/index_exclusion_constraint_operator.rs`.
+- Initial causal successor: `20b9184cb7bef9a4c6baa4379055c34968ca030a`, `crates/conceptweave-relation-partition/src/index_exclusion_constraint_operator.rs`.
 - Public composition/export: `02805d76f63cc5e3a704b415c0161bf44b6955bd`, `crates/conceptweave-relation-partition/src/index_partition.rs`.
+- API/lint refinement: `81788a5e108bd4198a30faed129861c55cc5bd7a` removes a local `clippy::too_many_arguments` suppression by introducing named source-lineage and semantics-lineage value objects instead of weakening a strict Clippy gate.
+- Contract alignment for the named predecessor lineages: `286bab3dffe8eab2538e65e1843b9aa406c3ea96`.
 
 The regression contract covers an agreeing constraint-side vector, a contradictory operator vector, missing ordinary-EXCLUDE inventory, and domain-separated provenance. The production successor rebounds the exact source -> relation-partition -> index-partition -> ordinary-EXCLUDE -> period -> `conkey` chain and separately rebounds operator-family -> exclusion-semantics before comparing the two independently observed operator vectors.
 
@@ -43,7 +45,7 @@ The regression contract covers an agreeing constraint-side vector, a contradicto
 
 The repair prevents a contradictory `pg_constraint.conexclop` row from being silently normalized to backing-index semantics. It also makes the later PostgreSQL transport responsible for reading and resolving the constraint-side OID vector explicitly.
 
-No exact-head GREEN is claimed by this document. The execution host used for this repair exposes no Rust toolchain, and the ConceptWeave Product pull-request workflow is not yet present on protected `main`. One unchanged successor head still needs repository-pinned Rust 1.98 formatting, strict all-target Clippy, focused/workspace/doc tests, release build, owned rustdoc/test/edge-case coverage, hosted Product/security/dependency checks, and qualifying independent review.
+No exact-head GREEN is claimed by this document. The execution host used for this repair exposes no Rust toolchain, and direct anonymous Git transport is unavailable in that host, so the connector-backed source was not materialized into a runnable workspace. One unchanged successor head still needs repository-pinned Rust 1.98 formatting, strict all-target Clippy, focused/workspace/doc tests, release build, owned rustdoc/test/edge-case coverage, hosted Product/security/dependency checks, and qualifying independent review.
 
 The PostgreSQL 18 live differential must read `contype`, `conindid`, `conparentid`, `conislocal`, `coninhcount`, `connoinherit`, `condeferrable`, `condeferred`, `conenforced`, `convalidated`, `conperiod`, `conkey`, and `conexclop` in one bounded observation, while also reading supporting `pg_index.indkey` and resolved backing-index exclusion semantics. It must retain temporal p/u controls separately so `WITHOUT OVERLAPS` is not reclassified as ordinary EXCLUDE.
 
