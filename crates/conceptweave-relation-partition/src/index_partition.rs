@@ -4,6 +4,10 @@
 mod base;
 pub use base::*;
 
+#[path = "index_constraint_parentage.rs"]
+mod constraint_parentage;
+pub use constraint_parentage::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
