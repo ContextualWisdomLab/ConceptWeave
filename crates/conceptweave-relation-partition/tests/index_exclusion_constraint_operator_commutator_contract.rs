@@ -8,7 +8,9 @@ use conceptweave_relation_partition::{
     IndexExclusionConstraintKeySnapshot, IndexExclusionConstraintObservation,
     IndexExclusionConstraintOperatorCommutatorObservation,
     IndexExclusionConstraintOperatorCommutatorSnapshot,
-    IndexExclusionConstraintOperatorObservation, IndexExclusionConstraintOperatorSemanticsLineage,
+    IndexExclusionConstraintOperatorObservation, IndexExclusionConstraintOperatorProcedureObservation,
+    IndexExclusionConstraintOperatorProcedureSnapshot,
+    IndexExclusionConstraintOperatorSemanticsLineage,
     IndexExclusionConstraintOperatorSnapshot, IndexExclusionConstraintOperatorSourceLineage,
     IndexExclusionConstraintPeriodObservation, IndexExclusionConstraintPeriodSnapshot,
     IndexExclusionConstraintSnapshot, IndexExclusionSemanticsSnapshot,
@@ -73,6 +75,11 @@ fn authorized_source() -> AuthorizedObservationRequest {
 fn operator(name: &str) -> QualifiedOperatorSignature {
     let int4 = QualifiedTypeName::new("pg_catalog", "int4").unwrap();
     QualifiedOperatorSignature::new("pg_catalog", name, int4.clone(), int4).unwrap()
+}
+
+fn procedure(name: &str) -> QualifiedProcedureSignature {
+    let int4 = QualifiedTypeName::new("pg_catalog", "int4").unwrap();
+    QualifiedProcedureSignature::new("pg_catalog", name, vec![int4.clone(), int4]).unwrap()
 }
 
 fn coordinate() -> IndexExclusionConstraintCoordinate {
@@ -364,4 +371,45 @@ fn commutator_receipt_rejects_unknown_key_position() {
         .source_receipt(coordinate(), 2)
         .expect_err("unobserved commutator coordinates cannot issue provenance");
     assert!(matches!(error, ObservationError::UnknownObservationLocation { .. }));
+}
+
+#[test]
+fn ordinary_exclude_requires_independent_operator_procedure_binding() {
+    let operators = operator_snapshot();
+    let snapshot = IndexExclusionConstraintOperatorProcedureSnapshot::new(
+        &operators,
+        vec![IndexExclusionConstraintOperatorProcedureObservation::new(
+            coordinate(),
+            1,
+            operator("="),
+            procedure("int4eq"),
+        )
+        .unwrap()],
+    )
+    .expect("the independently resolved pg_operator.oprcode must match backing exclusion semantics");
+    let receipt = snapshot.source_receipt(coordinate(), 1).unwrap();
+    assert_eq!(receipt.location().procedure(), &procedure("int4eq"));
+    assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+}
+
+#[test]
+fn ordinary_exclude_rejects_same_typed_wrong_operator_procedure() {
+    let operators = operator_snapshot();
+    let error = IndexExclusionConstraintOperatorProcedureSnapshot::new(
+        &operators,
+        vec![IndexExclusionConstraintOperatorProcedureObservation::new(
+            coordinate(),
+            1,
+            operator("="),
+            procedure("int4ne"),
+        )
+        .unwrap()],
+    )
+    .expect_err("matching operand types do not prove that oprcode is the operator implementation");
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "index_exclusion_constraint_operator_procedure_state",
+        }
+    );
 }
