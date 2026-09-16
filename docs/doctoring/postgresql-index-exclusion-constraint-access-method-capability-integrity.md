@@ -54,9 +54,10 @@ Ordinary-forward implementation lineage:
 
 - structural source/compile contract: `507f72fe3727a307c3bb23e3d14c8328a12b8be3`, `crates/conceptweave-relation-partition/tests/index_exclusion_constraint_access_method_capability_contract.rs`;
 - production successor: `a918215bfe29f242ce4684840b03b7de13fe1164`, `crates/conceptweave-relation-partition/src/index_exclusion_constraint_access_method_capability.rs`;
-- public composition: `f4dd77a3abb80180d6e571754b7a627f23854a28`, `crates/conceptweave-relation-partition/src/index_partition.rs`.
+- public composition: `f4dd77a3abb80180d6e571754b7a627f23854a28`, `crates/conceptweave-relation-partition/src/index_partition.rs`;
+- focused contract edge currentization: `90fcd1f79c9e9d608e4aedc1dbb75b36600aec98`, adding exact backing-index drift, blank AM identity, and unknown-receipt rejection without changing the production boundary.
 
-The focused contract covers false capability, access-method binding drift, missing evidence, duplicate evidence, and an extension-AM positive control. The positive control intentionally uses a non-core access-method name and succeeds only because explicit `can_exclude=true` evidence is supplied.
+The focused contract covers false capability, access-method binding drift, exact backing-index drift, blank AM identity, missing evidence, duplicate evidence, unknown provenance coordinates, and an extension-AM positive control. The positive control intentionally uses a non-core access-method name and succeeds only because explicit `can_exclude=true` evidence is supplied.
 
 No executed Rust RED/GREEN is claimed by this document. The structural RED commit references public types that did not yet exist at that commit. Native and hosted acceptance still require one unchanged exact head to pass the repository-pinned Rust 1.98 gates and the applicable central workflow/review/security gates.
 
