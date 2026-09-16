@@ -24,6 +24,10 @@ pub use exclusion_constraint_timing::*;
 mod exclusion_constraint_enforcement;
 pub use exclusion_constraint_enforcement::*;
 
+#[path = "index_exclusion_constraint_validation.rs"]
+mod exclusion_constraint_validation;
+pub use exclusion_constraint_validation::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
