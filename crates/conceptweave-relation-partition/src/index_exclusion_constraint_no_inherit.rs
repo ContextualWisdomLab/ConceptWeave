@@ -1,9 +1,10 @@
 //! PostgreSQL exclusion-constraint `connoinherit` evidence.
 //!
-//! PostgreSQL 18 `index_constraint_create()` records root index constraints with
-//! `connoinherit = true` and partition-child index constraints with `connoinherit = false`.
-//! Existing EXCLUDE identity already retains exact parentage, `conislocal`, and `coninhcount`; this
-//! sibling successor retains the remaining raw inheritance-policy bit without rewriting that digest.
+//! PostgreSQL 18 records `pg_constraint.connoinherit` independently. Creation with an explicit
+//! parent constraint and creation as a standalone constraint initialize the bit differently, while
+//! `ConstraintSetParentConstraint()` later changes parentage/locality without rewriting it. This
+//! successor therefore retains the raw bit as governed evidence rather than deriving it from current
+//! parentage.
 
 use std::collections::BTreeSet;
 
@@ -103,9 +104,11 @@ impl IndexExclusionConstraintNoInheritSourceReceipt {
 
 /// Complete `pg_constraint.connoinherit` evidence over one exact EXCLUDE identity snapshot.
 ///
-/// The pinned PostgreSQL 18 index-constraint creation path sets root constraints to `true` and
-/// partition-child constraints to `false`. This successor requires explicit one-to-one coverage,
-/// validates the raw bit against predecessor parentage, and retains it in a separate digest domain.
+/// Every predecessor EXCLUDE constraint receives exactly one explicit raw observation. PostgreSQL 18
+/// can retain different `connoinherit` values for the same current parentage depending on whether a
+/// child constraint was cloned with its parent or attached later as a preexisting standalone
+/// constraint. The bit is therefore retained in its own digest domain without parentage-derived
+/// normalization.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexExclusionConstraintNoInheritSnapshot {
     source_connection_key: String,
@@ -117,7 +120,7 @@ pub struct IndexExclusionConstraintNoInheritSnapshot {
 }
 
 impl IndexExclusionConstraintNoInheritSnapshot {
-    /// Creates complete no-inherit evidence over one exact EXCLUDE identity predecessor.
+    /// Creates complete raw no-inherit evidence over one exact EXCLUDE identity predecessor.
     pub fn new(
         constraint_snapshot: &IndexExclusionConstraintSnapshot,
         mut observations: Vec<IndexExclusionConstraintNoInheritObservation>,
@@ -141,18 +144,6 @@ impl IndexExclusionConstraintNoInheritSnapshot {
             return Err(invalid(
                 "index_exclusion_constraint_no_inherit_completeness",
             ));
-        }
-
-        for observation in &observations {
-            let predecessor = constraint_snapshot
-                .observations()
-                .iter()
-                .find(|candidate| candidate.coordinate() == observation.coordinate())
-                .ok_or_else(|| invalid("index_exclusion_constraint_no_inherit_coordinate"))?;
-            let expected_no_inherit = predecessor.parent_constraint().is_none();
-            if observation.no_inherit() != expected_no_inherit {
-                return Err(invalid("index_exclusion_constraint_no_inherit_state"));
-            }
         }
 
         let snapshot_digest =
