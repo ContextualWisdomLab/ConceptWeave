@@ -223,6 +223,18 @@ fn mismatched_constraint_namespace_fails_closed() {
 }
 
 #[test]
+fn blank_constraint_namespace_fails_closed() {
+    let error = IndexExclusionConstraintNamespaceObservation::new(parent_constraint(), "   ")
+        .expect_err("resolved constraint namespace must be present");
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "index_exclusion_constraint_namespace_name",
+        }
+    );
+}
+
+#[test]
 fn constraint_namespace_inventory_must_be_complete() {
     let constraints = exclusion_constraint_snapshot();
     let error = IndexExclusionConstraintNamespaceSnapshot::new(
@@ -236,4 +248,42 @@ fn constraint_namespace_inventory_must_be_complete() {
             field: "index_exclusion_constraint_namespace_completeness",
         }
     );
+}
+
+#[test]
+fn duplicate_constraint_namespace_coordinate_fails_closed() {
+    let constraints = exclusion_constraint_snapshot();
+    let parent = IndexExclusionConstraintNamespaceObservation::new(parent_constraint(), "public").unwrap();
+    let error = IndexExclusionConstraintNamespaceSnapshot::new(
+        &constraints,
+        vec![parent.clone(), parent],
+    )
+    .expect_err("one catalog row must not be admitted twice");
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "index_exclusion_constraint_namespace_coordinate",
+        }
+    );
+}
+
+#[test]
+fn unknown_namespace_receipt_fails_closed() {
+    let constraints = exclusion_constraint_snapshot();
+    let snapshot = IndexExclusionConstraintNamespaceSnapshot::new(
+        &constraints,
+        vec![
+            IndexExclusionConstraintNamespaceObservation::new(parent_constraint(), "public").unwrap(),
+            IndexExclusionConstraintNamespaceObservation::new(child_constraint(), "public").unwrap(),
+        ],
+    )
+    .unwrap();
+    let unknown = IndexExclusionConstraintCoordinate::new(
+        "public", "other", RelationKind::Table, "other_no_overlap",
+    )
+    .unwrap();
+    assert!(matches!(
+        snapshot.source_receipt(unknown),
+        Err(ObservationError::UnknownObservationLocation { .. })
+    ));
 }
