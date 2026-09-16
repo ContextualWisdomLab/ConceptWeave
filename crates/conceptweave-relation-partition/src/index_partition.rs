@@ -28,6 +28,10 @@ pub use exclusion_constraint_access_method_capability::*;
 mod exclusion_constraint_index_name;
 pub use exclusion_constraint_index_name::*;
 
+#[path = "index_exclusion_constraint_index_namespace.rs"]
+mod exclusion_constraint_index_namespace;
+pub use exclusion_constraint_index_namespace::*;
+
 #[path = "index_exclusion_constraint_namespace.rs"]
 mod exclusion_constraint_namespace;
 pub use exclusion_constraint_namespace::*;
