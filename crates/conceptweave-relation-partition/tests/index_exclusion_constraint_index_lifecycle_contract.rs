@@ -321,6 +321,32 @@ fn lifecycle_must_bind_the_exact_conindid_backing_index() {
 }
 
 #[test]
+fn lifecycle_rejects_a_different_source_generation() {
+    let stack = stack(Some(true), Some(true), Some(true));
+    let mismatched_base = PostgresSchemaSnapshotV3::new(
+        &authorized_source(),
+        "different-extractor-revision",
+        stack.base.observed_at_utc(),
+        stack.base.relations().to_vec(),
+        vec![],
+        vec![],
+    )
+    .unwrap();
+
+    let error = IndexExclusionConstraintIndexLifecycleSnapshot::new(
+        &mismatched_base,
+        &stack.namespaces,
+    )
+    .expect_err("lifecycle evidence from another source generation must not be rebound silently");
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "index_exclusion_constraint_index_lifecycle_predecessor_binding",
+        }
+    );
+}
+
+#[test]
 fn unknown_backing_index_lifecycle_receipt_fails_closed() {
     let stack = stack(Some(true), Some(true), Some(true));
     let snapshot = IndexExclusionConstraintIndexLifecycleSnapshot::new(
