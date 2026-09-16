@@ -16,6 +16,10 @@ pub use constraint_inheritance::*;
 mod exclusion_constraint;
 pub use exclusion_constraint::*;
 
+#[path = "index_exclusion_constraint_catalog_shape.rs"]
+mod exclusion_constraint_catalog_shape;
+pub use exclusion_constraint_catalog_shape::*;
+
 #[path = "index_exclusion_constraint_namespace.rs"]
 mod exclusion_constraint_namespace;
 pub use exclusion_constraint_namespace::*;
