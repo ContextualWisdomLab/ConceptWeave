@@ -73,8 +73,8 @@ fn base_snapshot() -> PostgresSchemaSnapshotV3 {
     PostgresSchemaSnapshotV3::new(
         &authorized_source(), "extractor-index-exclusion-constraint-v1", "2026-09-16T02:25:00Z",
         vec![
-            relation("bookings", RelationKind::PartitionedTable, "bookings_excl"),
-            relation("bookings_2026", RelationKind::Table, "bookings_2026_excl"),
+            relation("bookings", RelationKind::PartitionedTable, "bookings_excl_idx"),
+            relation("bookings_2026", RelationKind::Table, "bookings_2026_excl_idx"),
         ], vec![], vec![],
     ).unwrap()
 }
@@ -89,10 +89,10 @@ fn relation_partitions(base: &PostgresSchemaSnapshotV3) -> RelationPartitionSnap
     ]).unwrap()
 }
 fn parent_index() -> IndexPartitionCoordinate {
-    IndexPartitionCoordinate::new("public", "bookings", RelationKind::PartitionedTable, "bookings_excl").unwrap()
+    IndexPartitionCoordinate::new("public", "bookings", RelationKind::PartitionedTable, "bookings_excl_idx").unwrap()
 }
 fn child_index() -> IndexPartitionCoordinate {
-    IndexPartitionCoordinate::new("public", "bookings_2026", RelationKind::Table, "bookings_2026_excl").unwrap()
+    IndexPartitionCoordinate::new("public", "bookings_2026", RelationKind::Table, "bookings_2026_excl_idx").unwrap()
 }
 fn index_partitions(base: &PostgresSchemaSnapshotV3, relations: &RelationPartitionSnapshot) -> IndexPartitionSnapshot {
     IndexPartitionSnapshot::new(base, relations, vec![
@@ -101,18 +101,20 @@ fn index_partitions(base: &PostgresSchemaSnapshotV3, relations: &RelationPartiti
     ]).unwrap()
 }
 fn parent_constraint() -> IndexExclusionConstraintCoordinate {
-    IndexExclusionConstraintCoordinate::new("public", "bookings", RelationKind::PartitionedTable, "bookings_excl").unwrap()
+    IndexExclusionConstraintCoordinate::new("public", "bookings", RelationKind::PartitionedTable, "bookings_no_overlap").unwrap()
 }
 fn child_constraint() -> IndexExclusionConstraintCoordinate {
-    IndexExclusionConstraintCoordinate::new("public", "bookings_2026", RelationKind::Table, "bookings_2026_excl").unwrap()
+    IndexExclusionConstraintCoordinate::new("public", "bookings_2026", RelationKind::Table, "bookings_2026_no_overlap").unwrap()
 }
 
 #[test]
 fn attached_exclusion_constraint_rejects_missing_inherited_state() {
     let base = base_snapshot(); let relations = relation_partitions(&base); let indexes = index_partitions(&base, &relations);
     let error = IndexExclusionConstraintSnapshot::new(&base, &relations, &indexes, vec![
-        IndexExclusionConstraintObservation::root(parent_constraint()).unwrap(),
-        IndexExclusionConstraintObservation::partition(child_constraint(), parent_constraint(), true, 0).unwrap(),
+        IndexExclusionConstraintObservation::root(parent_constraint(), parent_index()).unwrap(),
+        IndexExclusionConstraintObservation::partition(
+            child_constraint(), child_index(), parent_constraint(), true, 0,
+        ).unwrap(),
     ]).expect_err("partitioned EXCLUDE constraints must preserve parentage and inherited state");
     assert_eq!(error, ObservationError::InvalidObservationField { field: "index_exclusion_constraint_inheritance_state" });
 }
@@ -121,10 +123,13 @@ fn attached_exclusion_constraint_rejects_missing_inherited_state() {
 fn exact_exclusion_constraint_partition_state_is_admitted_and_receipted() {
     let base = base_snapshot(); let relations = relation_partitions(&base); let indexes = index_partitions(&base, &relations);
     let snapshot = IndexExclusionConstraintSnapshot::new(&base, &relations, &indexes, vec![
-        IndexExclusionConstraintObservation::root(parent_constraint()).unwrap(),
-        IndexExclusionConstraintObservation::partition(child_constraint(), parent_constraint(), false, 1).unwrap(),
+        IndexExclusionConstraintObservation::root(parent_constraint(), parent_index()).unwrap(),
+        IndexExclusionConstraintObservation::partition(
+            child_constraint(), child_index(), parent_constraint(), false, 1,
+        ).unwrap(),
     ]).expect("exact PostgreSQL exclusion-constraint partition state must be admitted");
     let receipt = snapshot.source_receipt(child_constraint()).expect("observed child exclusion constraint must issue provenance");
+    assert_eq!(receipt.location().backing_index(), &child_index());
     assert_eq!(receipt.location().parent_constraint(), Some(&parent_constraint()));
     assert!(!receipt.location().is_local());
     assert_eq!(receipt.location().inheritance_count(), 1);
@@ -136,7 +141,7 @@ fn exclusion_constraint_inventory_is_complete_over_exclusion_indexes() {
     let base = base_snapshot(); let relations = relation_partitions(&base); let indexes = index_partitions(&base, &relations);
     let error = IndexExclusionConstraintSnapshot::new(
         &base, &relations, &indexes,
-        vec![IndexExclusionConstraintObservation::root(parent_constraint()).unwrap()],
-    ).expect_err("every non-key indisexclusion index must retain its pg_constraint row");
+        vec![IndexExclusionConstraintObservation::root(parent_constraint(), parent_index()).unwrap()],
+    ).expect_err("every non-key indisexclusion index must retain its exact conindid-backed constraint row");
     assert_eq!(error, ObservationError::InvalidObservationField { field: "index_exclusion_constraint_completeness" });
 }
