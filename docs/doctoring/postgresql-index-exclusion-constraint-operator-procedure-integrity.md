@@ -35,12 +35,13 @@ A same-typed but different procedure is rejected. Function-name heuristics, oper
 ## Traceability
 
 - Finding review: `5226950243` on exact predecessor `84e287842d094755caa75272fae73111125fd3e7`.
-- Structural source/compile RED: `2f7e37da0362b59d2875e10dc51ed91935d434ed`. The contract referenced the new successor before production composition existed; no executed compiler failure is claimed.
+- Structural source/compile RED: `2f7e37da0362b59d2875e10dc51ed91935d434ed`. The first contract referenced the new successor before production composition existed; no executed compiler failure is claimed.
 - Backing procedure metadata repair: `c05f681081412b12daca0e9b88479c0058878f27` in `index_exclusion_constraint_operator.rs`.
 - Production successor: `9ff1b49b4188ea98f223d0d45075dbdb1490b813` in `index_exclusion_constraint_operator_procedure.rs`.
 - Public composition: `b6776db96a677f39aea5fe8f86d5186fb9ee03a8` in `index_partition.rs`.
-- Initial focused positive/same-typed-negative contract: `2f7e37da0362b59d2875e10dc51ed91935d434ed` in `index_exclusion_constraint_operator_commutator_contract.rs`.
-- Focused edge/provenance currentization: `ae24b046301199fabfb3528300b258d961dc89ba` adds operator-binding drift, missing and duplicate position evidence, zero-position rejection, canonical receipt location, and unknown-receipt coverage.
+- Initial focused positive/same-typed-negative contract: `2f7e37da0362b59d2875e10dc51ed91935d434ed` temporarily proved the source-RED in the neighboring commutator test file.
+- Edge/provenance expansion: `ae24b046301199fabfb3528300b258d961dc89ba` added operator-binding drift, missing and duplicate position evidence, zero-position rejection, canonical receipt location, and unknown-receipt coverage.
+- Test ownership repair: `7d9c9bf2bda0b4db8dc35e2fc111f8e6748b07cb` restores the commutator contract to its original single-purpose scope; `6fb013b53ac95f02a96dacd05661016df0ed03b2` moves the complete operator-procedure contract into `index_exclusion_constraint_operator_procedure_contract.rs` so the new bounded context owns its own tests.
 
 ## Acceptance
 
