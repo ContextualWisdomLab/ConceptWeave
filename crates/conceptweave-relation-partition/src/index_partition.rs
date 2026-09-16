@@ -32,6 +32,10 @@ pub use exclusion_constraint_index_name::*;
 mod exclusion_constraint_index_namespace;
 pub use exclusion_constraint_index_namespace::*;
 
+#[path = "index_exclusion_constraint_index_lifecycle.rs"]
+mod exclusion_constraint_index_lifecycle;
+pub use exclusion_constraint_index_lifecycle::*;
+
 #[path = "index_exclusion_constraint_namespace.rs"]
 mod exclusion_constraint_namespace;
 pub use exclusion_constraint_namespace::*;
