@@ -15,7 +15,7 @@ use super::{
     IndexExclusionConstraintCoordinate, IndexExclusionConstraintKeySnapshot,
     IndexExclusionConstraintPeriodSnapshot, IndexExclusionConstraintSnapshot,
     IndexExclusionSemanticsSnapshot, IndexOperatorFamilySnapshot, IndexPartitionSnapshot,
-    QualifiedOperatorSignature,
+    QualifiedOperatorSignature, QualifiedProcedureSignature,
 };
 use crate::RelationPartitionSnapshot;
 
@@ -183,6 +183,11 @@ pub struct IndexExclusionConstraintOperatorSnapshot {
     extractor_revision: String,
     observed_at_utc: String,
     observations: Vec<IndexExclusionConstraintOperatorObservation>,
+    backing_procedures: Vec<(
+        IndexExclusionConstraintCoordinate,
+        u32,
+        QualifiedProcedureSignature,
+    )>,
 }
 
 impl IndexExclusionConstraintOperatorSnapshot {
@@ -281,6 +286,7 @@ impl IndexExclusionConstraintOperatorSnapshot {
             ));
         }
 
+        let mut backing_procedures = Vec::new();
         for observation in &observations {
             let constraint = rebound_constraint
                 .observations()
@@ -302,6 +308,13 @@ impl IndexExclusionConstraintOperatorSnapshot {
             if expected_operators.is_empty() || observation.operators() != expected_operators {
                 return Err(invalid("index_exclusion_constraint_operator_state"));
             }
+            backing_procedures.extend(backing.into_iter().map(|candidate| {
+                (
+                    observation.coordinate().clone(),
+                    candidate.key_position(),
+                    candidate.procedure().clone(),
+                )
+            }));
         }
 
         let snapshot_digest = compute_operator_digest(
@@ -316,6 +329,7 @@ impl IndexExclusionConstraintOperatorSnapshot {
             extractor_revision: rebound_key.extractor_revision().to_owned(),
             observed_at_utc: rebound_key.observed_at_utc().to_owned(),
             observations,
+            backing_procedures,
         })
     }
 
@@ -353,6 +367,25 @@ impl IndexExclusionConstraintOperatorSnapshot {
     #[must_use]
     pub fn observations(&self) -> &[IndexExclusionConstraintOperatorObservation] {
         &self.observations
+    }
+
+    /// Returns the exact backing exclusion procedure retained for one constraint/key position.
+    ///
+    /// This metadata is inherited from the already-governed backing-index exclusion semantics and
+    /// is intentionally not added to the existing operator digest domain. A later successor compares
+    /// it with an independently resolved `pg_operator.oprcode` observation.
+    #[must_use]
+    pub fn backing_procedure(
+        &self,
+        coordinate: &IndexExclusionConstraintCoordinate,
+        key_position: u32,
+    ) -> Option<&QualifiedProcedureSignature> {
+        self.backing_procedures
+            .iter()
+            .find(|(candidate, position, _)| {
+                candidate == coordinate && *position == key_position
+            })
+            .map(|(_, _, procedure)| procedure)
     }
 
     /// Issues exact provenance for one observed ordinary EXCLUDE `conexclop` coordinate.
