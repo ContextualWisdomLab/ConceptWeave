@@ -66,7 +66,8 @@ The ordinary-forward lineage is:
 - minimal base-family source repair restored at `a6e53cd459e61efaf61ec94e55cd9128aa5ec3fc` after an over-broad formatting-only intermediate delta was repaired forward;
 - expanded NOT NULL behavioral contract, with the temporary duplicate fixture helper removed, at `50b69ea481dd0acdb303c91376976d8f130b942f`;
 - complete bounded source repair `a5c0ce6624eb53d767a881d0fee49ba44841c5ef`;
-- focused doctoring `01b8795b990d7a9d87f693bd718af8c9e1757aab`, `docs/doctoring/postgresql-index-exclusion-constraint-name-integrity.md`.
+- contract-only formatting churn repaired forward at `864cd3bb003c496435110caeacfcf4bf1bb831de` without changing the behavioral boundary;
+- focused doctoring first recorded at `01b8795b990d7a9d87f693bd718af8c9e1757aab` and currentized after the contract cleanup.
 
 The check executes before ordinary EXCLUDE digest or source-receipt issuance. Existing digest algorithms are unchanged.
 
