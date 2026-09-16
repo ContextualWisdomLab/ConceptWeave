@@ -14,8 +14,9 @@ use sha2::{Digest, Sha256};
 
 use super::{
     IndexExclusionConstraintCoordinate, IndexExclusionConstraintPeriodSnapshot,
-    IndexExclusionConstraintSnapshot,
+    IndexExclusionConstraintSnapshot, IndexPartitionSnapshot,
 };
+use crate::RelationPartitionSnapshot;
 
 const INDEX_EXCLUSION_CONSTRAINT_KEY_DIGEST_DOMAIN_V1: &[u8] =
     b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.exclusion_constraint.key.v1";
@@ -117,11 +118,12 @@ impl IndexExclusionConstraintKeySourceReceipt {
 /// Complete `pg_constraint.conkey` evidence over one exact ordinary EXCLUDE period successor.
 ///
 /// Every predecessor ordinary EXCLUDE coordinate receives exactly one raw key vector. The supplied
-/// period successor is rebound against the exact EXCLUDE identity snapshot before use, preventing a
-/// similarly shaped but unrelated predecessor from being substituted. Each raw vector must equal
-/// the backing index's key attributes resolved against the relation: simple columns map to their
-/// exact observed PostgreSQL attribute number and expressions map to zero; INCLUDE payload columns
-/// are intentionally absent because PostgreSQL persists only `ii_NumIndexKeyAttrs` in `conkey`.
+/// relation-, index-, EXCLUDE-identity, and period snapshots are rebound in order against the exact
+/// v3 predecessor before use, preventing a similarly shaped but unrelated base snapshot from being
+/// substituted for attribute-number derivation. Each raw vector must equal the backing index's key
+/// attributes resolved against the relation: simple columns map to their exact observed PostgreSQL
+/// attribute number and expressions map to zero; INCLUDE payload columns are intentionally absent
+/// because PostgreSQL persists only `ii_NumIndexKeyAttrs` in `conkey`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexExclusionConstraintKeySnapshot {
     source_connection_key: String,
@@ -136,12 +138,23 @@ impl IndexExclusionConstraintKeySnapshot {
     /// Creates complete constraint-key evidence over an exact ordinary EXCLUDE predecessor stack.
     pub fn new(
         base_snapshot: &PostgresSchemaSnapshotV3,
+        relation_partition_snapshot: &RelationPartitionSnapshot,
+        index_partition_snapshot: &IndexPartitionSnapshot,
         constraint_snapshot: &IndexExclusionConstraintSnapshot,
         period_snapshot: &IndexExclusionConstraintPeriodSnapshot,
         mut observations: Vec<IndexExclusionConstraintKeyObservation>,
     ) -> Result<Self, ObservationError> {
+        let rebound_constraint = IndexExclusionConstraintSnapshot::new(
+            base_snapshot,
+            relation_partition_snapshot,
+            index_partition_snapshot,
+            constraint_snapshot.observations().to_vec(),
+        )?;
+        if rebound_constraint.snapshot_digest() != constraint_snapshot.snapshot_digest() {
+            return Err(invalid("index_exclusion_constraint_key_predecessor_binding"));
+        }
         let rebound_period = IndexExclusionConstraintPeriodSnapshot::new(
-            constraint_snapshot,
+            &rebound_constraint,
             period_snapshot.observations().to_vec(),
         )?;
         if rebound_period.snapshot_digest() != period_snapshot.snapshot_digest() {
@@ -272,7 +285,7 @@ fn expected_constraint_key(
         .iter()
         .map(|attribute| {
             let Some(attribute_name) = attribute.attribute_name() else {
-                return Ok(0);
+                return Ok(0_i16);
             };
             let column = relation
                 .columns()
