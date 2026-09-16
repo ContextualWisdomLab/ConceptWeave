@@ -80,6 +80,10 @@ pub use exclusion_constraint_operator::*;
 mod exclusion_constraint_operator_commutator;
 pub use exclusion_constraint_operator_commutator::*;
 
+#[path = "index_exclusion_constraint_operator_procedure.rs"]
+mod exclusion_constraint_operator_procedure;
+pub use exclusion_constraint_operator_procedure::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
