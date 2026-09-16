@@ -100,6 +100,10 @@ pub use exclusion_constraint_operator_procedure_scalar::*;
 mod exclusion_constraint_operator_procedure_strictness;
 pub use exclusion_constraint_operator_procedure_strictness::*;
 
+#[path = "index_exclusion_constraint_operator_procedure_volatility.rs"]
+mod exclusion_constraint_operator_procedure_volatility;
+pub use exclusion_constraint_operator_procedure_volatility::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
