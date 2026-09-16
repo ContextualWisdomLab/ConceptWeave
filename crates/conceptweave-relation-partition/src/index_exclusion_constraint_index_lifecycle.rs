@@ -143,6 +143,7 @@ impl IndexExclusionConstraintIndexLifecycleSnapshot {
         if base_snapshot.source_connection_key() != namespace_snapshot.source_connection_key()
             || base_snapshot.connection_policy_binding()
                 != namespace_snapshot.connection_policy_binding()
+            || base_snapshot.snapshot_digest() != namespace_snapshot.source_snapshot_digest()
             || base_snapshot.extractor_revision() != namespace_snapshot.extractor_revision()
             || base_snapshot.observed_at_utc() != namespace_snapshot.observed_at_utc()
         {
