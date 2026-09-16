@@ -28,24 +28,32 @@ Without an explicit `conkey` observation, contradictory catalog evidence can col
 
 ## Repair
 
-The source/compile contract is commit `edc700bf98bfb3fce9848ab9693624c18c1d97ce`, `crates/conceptweave-relation-partition/tests/index_exclusion_constraint_key_contract.rs`.
+The first source/compile contract was `edc700bf98bfb3fce9848ab9693624c18c1d97ce`, and the first production successor was `5a4d55a2e652694f259a50632012c0e3e563f6b7`, exported by `e856d8f148fb2826503a7928d3fa1da1d38bdea4`.
 
-The production successor is commit `5a4d55a2e652694f259a50632012c0e3e563f6b7`, `crates/conceptweave-relation-partition/src/index_exclusion_constraint_key.rs`, exported by `e856d8f148fb2826503a7928d3fa1da1d38bdea4`.
+Exact-head review `5219378111` then found a predecessor-binding defect before acceptance: the first successor rebound-validates period -> ordinary EXCLUDE identity but accepted a separately supplied `PostgresSchemaSnapshotV3` for deriving expected attribute numbers. A similarly shaped but unrelated base snapshot could therefore influence the consistency check without being proven as the base transitively committed by the EXCLUDE identity digest.
 
-`IndexExclusionConstraintKeySnapshot`:
+The repair is ordinary-forward:
 
-- rebound-validates the exact `IndexExclusionConstraintPeriodSnapshot` against the supplied ordinary EXCLUDE identity predecessor;
+- tightened source/compile contract: `74aa937f91514364327b11a8db12fb44621e9115`, `crates/conceptweave-relation-partition/tests/index_exclusion_constraint_key_contract.rs`;
+- corrected production successor: `08f96237c1301704af2c0be6c8312464a175b987`, `crates/conceptweave-relation-partition/src/index_exclusion_constraint_key.rs`;
+- public composition remains the ordinary-forward export introduced by `e856d8f148fb2826503a7928d3fa1da1d38bdea4`.
+
+`IndexExclusionConstraintKeySnapshot` now:
+
+- accepts the exact v3, relation-partition, index-partition, ordinary EXCLUDE identity, and period predecessors;
+- rebuilds `IndexExclusionConstraintSnapshot` from the supplied v3 + relation-partition + index-partition snapshots and the predecessor EXCLUDE observations, then requires an exact digest match;
+- rebound-validates the period successor against that rebuilt EXCLUDE identity and requires an exact digest match;
 - requires exactly one raw `conkey` observation for every ordinary EXCLUDE coordinate;
 - resolves the exact `conindid` backing index already owned by `IndexExclusionConstraintSnapshot`;
 - maps each governed backing-index key element to PostgreSQL constraint-key form: simple relation column -> exact observed attribute number, expression -> `0`;
 - excludes INCLUDE payload positions because PostgreSQL persists only the first `ii_NumIndexKeyAttrs` values into `conkey`;
 - rejects contradictory vectors with `index_exclusion_constraint_key_state`;
-- binds the predecessor digest, exact constraint coordinate, ordered signed `int2` vector, and `/key-attributes` provenance into a new digest domain.
+- binds the period-predecessor digest, exact constraint coordinate, ordered signed `int2` vector, and `/key-attributes` provenance into a new digest domain.
 
-The raw source vector remains the evidence being governed. The derived vector is only a consistency check against already-governed index/relation evidence.
+The raw source vector remains the evidence being governed. The derived vector is only a consistency check against the exact rebound predecessor stack.
 
 ## Validation boundary
 
 No runtime GREEN is inferred from source commits. The execution environment for this lane currently exposes no Rust toolchain, and the Draft PR has no repository-owned exact-head pull-request workflow execution. Before acceptance, one unchanged head must pass repository-pinned Rust 1.98 formatting, strict workspace/all-target Clippy, the new contract and all retained relation-partition contracts, workspace/doc tests, release build, rustdoc/coverage, and applicable hosted Product/security/dependency/review gates.
 
-The concrete PostgreSQL 18 live differential must extract `pg_constraint.conkey` and `pg_index.indkey` in the same bounded read. It must include at least: a simple-column exclusion element, an expression element proving the zero position, an INCLUDE payload proving it is absent from `conkey`, and a partitioned EXCLUDE parent/child pair whose mapped attribute numbers remain correct for each owning relation.
+The concrete PostgreSQL 18 live differential must extract `pg_constraint.conkey` and `pg_index.indkey` in the same bounded read. It must include at least a simple-column exclusion element, an expression element proving the zero position, an INCLUDE payload proving it is absent from `conkey`, and a partitioned EXCLUDE parent/child pair whose mapped attribute numbers remain correct for each owning relation.
