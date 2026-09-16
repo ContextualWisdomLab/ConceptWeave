@@ -96,6 +96,10 @@ pub use exclusion_constraint_operator_kind::*;
 mod exclusion_constraint_operator_procedure_scalar;
 pub use exclusion_constraint_operator_procedure_scalar::*;
 
+#[path = "index_exclusion_constraint_operator_procedure_strictness.rs"]
+mod exclusion_constraint_operator_procedure_strictness;
+pub use exclusion_constraint_operator_procedure_strictness::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
