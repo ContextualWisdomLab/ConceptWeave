@@ -72,7 +72,12 @@ fn base_snapshot() -> PostgresSchemaSnapshotV3 {
             IndexAttributeObservation::column(1, IndexAttributeKind::Key, "resource_id").unwrap(),
             IndexAttributeObservation::expression(2, IndexAttributeKind::Key, "lower(note)").unwrap(),
         ],
-        vec![],
+        vec![IndexAttributeObservation::column(
+            3,
+            IndexAttributeKind::Include,
+            "payload",
+        )
+        .unwrap()],
     )
     .unwrap()
     .with_access_method("btree")
@@ -122,6 +127,15 @@ fn base_snapshot() -> PostgresSchemaSnapshotV3 {
                 None,
             )
             .unwrap(),
+            ColumnObservationV3::new(
+                "payload",
+                3,
+                "text",
+                QualifiedTypeName::new("pg_catalog", "text").unwrap(),
+                true,
+                None,
+            )
+            .unwrap(),
         ],
     )
     .unwrap()
@@ -161,6 +175,8 @@ fn constraint_coordinate() -> IndexExclusionConstraintCoordinate {
 
 fn predecessor_snapshots() -> (
     PostgresSchemaSnapshotV3,
+    RelationPartitionSnapshot,
+    IndexPartitionSnapshot,
     IndexExclusionConstraintSnapshot,
     IndexExclusionConstraintPeriodSnapshot,
 ) {
@@ -205,14 +221,16 @@ fn predecessor_snapshots() -> (
         .unwrap()],
     )
     .unwrap();
-    (base, constraints, period)
+    (base, relations, indexes, constraints, period)
 }
 
 #[test]
-fn ordinary_exclude_preserves_exact_conkey_with_expression_zero() {
-    let (base, constraints, period) = predecessor_snapshots();
+fn ordinary_exclude_preserves_exact_conkey_with_expression_zero_and_omits_include() {
+    let (base, relations, indexes, constraints, period) = predecessor_snapshots();
     let snapshot = IndexExclusionConstraintKeySnapshot::new(
         &base,
+        &relations,
+        &indexes,
         &constraints,
         &period,
         vec![IndexExclusionConstraintKeyObservation::new(
@@ -221,7 +239,7 @@ fn ordinary_exclude_preserves_exact_conkey_with_expression_zero() {
         )
         .unwrap()],
     )
-    .expect("pg_constraint.conkey must preserve simple-column attnum and expression zero");
+    .expect("conkey preserves key attnums/expression zero and excludes INCLUDE payload");
 
     assert_eq!(
         snapshot
@@ -235,9 +253,11 @@ fn ordinary_exclude_preserves_exact_conkey_with_expression_zero() {
 
 #[test]
 fn ordinary_exclude_rejects_conkey_that_disagrees_with_backing_index_key_layout() {
-    let (base, constraints, period) = predecessor_snapshots();
+    let (base, relations, indexes, constraints, period) = predecessor_snapshots();
     let error = IndexExclusionConstraintKeySnapshot::new(
         &base,
+        &relations,
+        &indexes,
         &constraints,
         &period,
         vec![IndexExclusionConstraintKeyObservation::new(
@@ -258,9 +278,16 @@ fn ordinary_exclude_rejects_conkey_that_disagrees_with_backing_index_key_layout(
 
 #[test]
 fn exclusion_constraint_key_inventory_must_be_complete() {
-    let (base, constraints, period) = predecessor_snapshots();
-    let error = IndexExclusionConstraintKeySnapshot::new(&base, &constraints, &period, vec![])
-        .expect_err("every ordinary EXCLUDE constraint must retain pg_constraint.conkey");
+    let (base, relations, indexes, constraints, period) = predecessor_snapshots();
+    let error = IndexExclusionConstraintKeySnapshot::new(
+        &base,
+        &relations,
+        &indexes,
+        &constraints,
+        &period,
+        vec![],
+    )
+    .expect_err("every ordinary EXCLUDE constraint must retain pg_constraint.conkey");
 
     assert_eq!(
         error,
@@ -272,9 +299,11 @@ fn exclusion_constraint_key_inventory_must_be_complete() {
 
 #[test]
 fn exact_conkey_issues_domain_separated_provenance() {
-    let (base, constraints, period) = predecessor_snapshots();
+    let (base, relations, indexes, constraints, period) = predecessor_snapshots();
     let snapshot = IndexExclusionConstraintKeySnapshot::new(
         &base,
+        &relations,
+        &indexes,
         &constraints,
         &period,
         vec![IndexExclusionConstraintKeyObservation::new(
