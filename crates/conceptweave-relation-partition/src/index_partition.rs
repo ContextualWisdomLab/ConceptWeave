@@ -8,6 +8,10 @@ pub use base::*;
 mod constraint_parentage;
 pub use constraint_parentage::*;
 
+#[path = "index_constraint_inheritance.rs"]
+mod constraint_inheritance;
+pub use constraint_inheritance::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
