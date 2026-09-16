@@ -28,11 +28,13 @@ Rejected alternatives:
 
 Finding review: `5222226880` on predecessor `250ed695fc36f83e97a26b004d1d7728712ef2cc`.
 
-Source/compile contract: `a4f56f9432bb0d8d368d1b36f89d59661623fd2b`, `crates/conceptweave-relation-partition/tests/index_exclusion_constraint_namespace_contract.rs`.
+Source/compile contract: `a4f56f9432bb0d8d368d1b36f89d59661623fd2b`, `crates/conceptweave-relation-partition/tests/index_exclusion_constraint_namespace_contract.rs`. At that exact commit the referenced namespace successor did not exist, so this is structural compile-RED evidence rather than an executed compiler failure.
 
 Production successor: `b71fb962177302377a3bd913e185e2ad587025bb`, `crates/conceptweave-relation-partition/src/index_exclusion_constraint_namespace.rs`.
 
 Public composition: `c7dcee510671be162908b75a4c7b4723e914adc0`, `crates/conceptweave-relation-partition/src/index_partition.rs`.
+
+Edge-contract currentization: `13bf58005f8d6bd90cbc9ee5a3234b391e6906c1`, adding explicit blank namespace, duplicate coordinate, incomplete inventory, mismatched namespace, provenance success, and unknown receipt cases around the new production boundary.
 
 No Rust RED/GREEN is claimed for these heads because the current execution host exposes no Rust toolchain. Hosted acceptance must also be reacquired on one unchanged exact head.
 
