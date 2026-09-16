@@ -54,15 +54,33 @@ The ordinary-forward repair is:
 
 `IndexExclusionConstraintIndexRoleSnapshot` rebinds the exact v3 -> relation-partition -> index-partition -> ordinary-EXCLUDE -> timing -> timing/index-immediacy chain, resolves each exact `conindid` backing index, retains raw `indisunique`, `indisprimary`, and `indisexclusion`, and admits only `(false, false, true)`. It never manufactures those catalog bits from the constraint kind.
 
+## Relation-wide EXCLUDE constraint-name integrity
+
+Review `5221675071` on exact predecessor `0de651ee57f823638a416677239a9ef4dbac3c84` found that ordinary EXCLUDE coordinates were unique only within the EXCLUDE successor. PostgreSQL 18 `pg_constraint.h` requires `conname` to be unique among the constraints of one relation/domain and backs the relation case with the unique catalog index over `(conrelid, contypid, conname)`. ConceptWeave could nevertheless combine a relation-owned CHECK/PK/UQ/FK row and an ordinary EXCLUDE row with the same exact relation-local name and issue governed evidence for an impossible catalog state.
+
+Bounded follow-up review `5221753670` extended the same finding to the separately observed PostgreSQL 18 first-class NOT NULL family. The repair checks only evidence actually present in `PostgresSchemaSnapshotV3`: base relation constraints plus explicit NOT NULL observations when that family was captured. It does not infer NOT NULL rows from `attnotnull`, does not normalize names, and preserves the legal case where two different relations use the same textual constraint name.
+
+The ordinary-forward lineage is:
+
+- CHECK↔EXCLUDE behavioral contract `0237a677302ad15121555d575dc09252348cc1c0`;
+- minimal base-family source repair restored at `a6e53cd459e61efaf61ec94e55cd9128aa5ec3fc` after an over-broad formatting-only intermediate delta was repaired forward;
+- expanded NOT NULL behavioral contract, with the temporary duplicate fixture helper removed, at `50b69ea481dd0acdb303c91376976d8f130b942f`;
+- complete bounded source repair `a5c0ce6624eb53d767a881d0fee49ba44841c5ef`;
+- focused doctoring `01b8795b990d7a9d87f693bd718af8c9e1757aab`, `docs/doctoring/postgresql-index-exclusion-constraint-name-integrity.md`.
+
+The check executes before ordinary EXCLUDE digest or source-receipt issuance. Existing digest algorithms are unchanged.
+
 ## Current state
 
-**INDEX_EXCLUSION_CONSTRAINT_INDEX_ROLE_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_INDEX_ROLE_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_IMMEDIACY_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_IMMEDIACY_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_OPERATOR_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_OPERATOR_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_KEY_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_KEY_EXACT_PREDECESSOR_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_KEY_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_PERIOD_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_PERIOD_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_NO_INHERIT_RAW_STATE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_NO_INHERIT_LIFECYCLE_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_VALIDATION_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_VALIDATION_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_ENFORCEMENT_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_ENFORCEMENT_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_TIMING_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_PARTITION_SOURCE_REPAIRED / INDEX_CONSTRAINT_INHERITANCE_STATE_SOURCE_REPAIRED / INDEX_CONSTRAINT_PARENTAGE_SOURCE_REPAIRED / SOURCE_OBSERVATION_RETAINED / ACCEPTANCE_PENDING**.
+**INDEX_EXCLUSION_CONSTRAINT_NAME_INTEGRITY_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_NAME_INTEGRITY_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_INDEX_ROLE_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_INDEX_ROLE_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_IMMEDIACY_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_IMMEDIACY_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_OPERATOR_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_OPERATOR_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_KEY_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_KEY_EXACT_PREDECESSOR_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_KEY_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_PERIOD_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_PERIOD_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_NO_INHERIT_RAW_STATE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_NO_INHERIT_LIFECYCLE_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_VALIDATION_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_VALIDATION_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_ENFORCEMENT_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_ENFORCEMENT_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_TIMING_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_PARTITION_SOURCE_REPAIRED / INDEX_CONSTRAINT_INHERITANCE_STATE_SOURCE_REPAIRED / INDEX_CONSTRAINT_PARENTAGE_SOURCE_REPAIRED / SOURCE_OBSERVATION_RETAINED / ACCEPTANCE_PENDING**.
 
 ## Acceptance boundary
 
-No executed Rust RED/GREEN or hosted Product acceptance is inferred from source commits. One unchanged exact #46 head must pass repository-pinned Rust 1.98 `fmt`, strict workspace/all-target Clippy, the focused EXCLUDE index-role/immediacy/operator/key/period/no-inherit/validation/enforcement/timing contracts, all retained Source Observation/relation-partition contracts, workspace/doc tests, release build, owned rustdoc/test/edge-case coverage, and applicable hosted Product/security/dependency/review gates. Any head movement resets acceptance.
+No executed Rust RED/GREEN or hosted Product acceptance is inferred from source commits. One unchanged exact #46 head must pass repository-pinned Rust 1.98 `fmt`, strict workspace/all-target Clippy, the focused EXCLUDE name-integrity/index-role/immediacy/operator/key/period/no-inherit/validation/enforcement/timing contracts, all retained Source Observation/relation-partition contracts, workspace/doc tests, release build, owned rustdoc/test/edge-case coverage, and applicable hosted Product/security/dependency/review gates. Any head movement resets acceptance.
 
 The concrete PostgreSQL 18 live differential must read ordinary EXCLUDE `contype`, `conindid`, `conparentid`, `conislocal`, `coninhcount`, `connoinherit`, `condeferrable`, `condeferred`, `conenforced`, `convalidated`, `conperiod`, `conkey`, and `conexclop` plus supporting `pg_index.indkey`, `indisunique`, `indisprimary`, `indisexclusion`, `indimmediate`, and resolved backing-index exclusion semantics in the same bounded source observation.
+
+Constraint-name coverage must verify that all captured relation-scoped `pg_constraint` families are unique by exact relation identity and `conname`, including explicitly observed first-class NOT NULL evidence, while the same textual name on different relations remains legal. An unobserved constraint family must not be synthesized merely to satisfy the invariant.
 
 Role coverage must prove an ordinary EXCLUDE backing index is `(indisunique=false, indisprimary=false, indisexclusion=true)` from independently read catalog fields. PRIMARY KEY/UNIQUE `WITHOUT OVERLAPS` must remain a separate temporal-key control rather than being absorbed into the ordinary EXCLUDE family.
 
@@ -74,7 +92,7 @@ Timing/immediacy coverage must create NOT DEFERRABLE, DEFERRABLE INITIALLY IMMED
 
 1. Converge the canonical `.github` workflow owner and obtain fresh compatible acceptance for Product bootstrap #35; merge #35 normally only when required gates are terminal GREEN.
 2. Obtain one unchanged #46 head with repository-pinned Rust 1.98 native GREEN plus hosted Product/security/dependency/review terminal GREEN.
-3. Add the PostgreSQL 18 bounded live differentials for retained ordinary EXCLUDE catalog state, including backing-index role and timing/`indimmediate` invariants, and obtain fresh terminal GREEN on the resulting unchanged head.
+3. Add the PostgreSQL 18 bounded live differentials for retained ordinary EXCLUDE catalog state, including relation-wide constraint-name integrity, backing-index role, and timing/`indimmediate` invariants, and obtain fresh terminal GREEN on the resulting unchanged head.
 4. Continue bounded source-domain review for materially relevant catalog state rather than claiming catalog completeness from field enumeration alone.
 5. Only then adopt the complete #46 child ordinary/non-force into #45, obtain fresh #45 acceptance, and propagate through #6.
 
