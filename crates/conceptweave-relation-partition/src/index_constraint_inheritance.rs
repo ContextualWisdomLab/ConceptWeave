@@ -6,7 +6,6 @@
 //! parent OID. Detach reverses those fields. This successor preserves the two inheritance fields
 //! without changing the already-issued parentage digest domain.
 
-use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
 use conceptweave_observation::ObservationError;
@@ -23,18 +22,6 @@ pub struct IndexConstraintInheritanceObservation {
     coordinate: IndexConstraintParentageCoordinate,
     is_local: bool,
     inheritance_count: i16,
-}
-
-impl Ord for IndexConstraintInheritanceObservation {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.coordinate.cmp(&other.coordinate)
-    }
-}
-
-impl PartialOrd for IndexConstraintInheritanceObservation {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
 }
 
 impl IndexConstraintInheritanceObservation {
@@ -150,7 +137,7 @@ impl IndexConstraintInheritanceSnapshot {
         parentage_snapshot: &IndexConstraintParentageSnapshot,
         mut observations: Vec<IndexConstraintInheritanceObservation>,
     ) -> Result<Self, ObservationError> {
-        observations.sort();
+        observations.sort_by(|left, right| left.coordinate().cmp(right.coordinate()));
 
         let expected = parentage_snapshot
             .observations()
