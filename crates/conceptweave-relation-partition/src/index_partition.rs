@@ -28,6 +28,10 @@ pub use exclusion_constraint_enforcement::*;
 mod exclusion_constraint_validation;
 pub use exclusion_constraint_validation::*;
 
+#[path = "index_exclusion_constraint_no_inherit.rs"]
+mod exclusion_constraint_no_inherit;
+pub use exclusion_constraint_no_inherit::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
