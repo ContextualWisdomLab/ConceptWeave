@@ -294,48 +294,6 @@ fn index_partitions(
     )
     .unwrap()
 }
-fn parent_index() -> IndexPartitionCoordinate {
-    IndexPartitionCoordinate::new(
-        "public",
-        "bookings",
-        RelationKind::PartitionedTable,
-        "bookings_excl_idx",
-    )
-    .unwrap()
-}
-fn child_index() -> IndexPartitionCoordinate {
-    IndexPartitionCoordinate::new(
-        "public",
-        "bookings_2026",
-        RelationKind::Table,
-        "bookings_2026_excl_idx",
-    )
-    .unwrap()
-}
-fn index_partitions(
-    base: &PostgresSchemaSnapshotV3,
-    relations: &RelationPartitionSnapshot,
-) -> IndexPartitionSnapshot {
-    IndexPartitionSnapshot::new(
-        base,
-        relations,
-        vec![
-            IndexPartitionObservation::non_partition(
-                parent_index(),
-                IndexRelationKind::PartitionedIndex,
-            )
-            .unwrap(),
-            IndexPartitionObservation::partition(
-                child_index(),
-                IndexRelationKind::Index,
-                parent_index(),
-                false,
-            )
-            .unwrap(),
-        ],
-    )
-    .unwrap()
-}
 fn parent_constraint() -> IndexExclusionConstraintCoordinate {
     IndexExclusionConstraintCoordinate::new(
         "public",
