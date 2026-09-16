@@ -68,6 +68,10 @@ pub use exclusion_constraint_key::*;
 mod exclusion_constraint_operator;
 pub use exclusion_constraint_operator::*;
 
+#[path = "index_exclusion_constraint_operator_commutator.rs"]
+mod exclusion_constraint_operator_commutator;
+pub use exclusion_constraint_operator_commutator::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
