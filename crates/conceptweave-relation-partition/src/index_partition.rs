@@ -88,6 +88,10 @@ pub use exclusion_constraint_operator_procedure::*;
 mod exclusion_constraint_operator_result;
 pub use exclusion_constraint_operator_result::*;
 
+#[path = "index_exclusion_constraint_operator_kind.rs"]
+mod exclusion_constraint_operator_kind;
+pub use exclusion_constraint_operator_kind::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
