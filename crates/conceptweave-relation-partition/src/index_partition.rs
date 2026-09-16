@@ -20,6 +20,10 @@ pub use exclusion_constraint::*;
 mod exclusion_constraint_catalog_shape;
 pub use exclusion_constraint_catalog_shape::*;
 
+#[path = "index_exclusion_constraint_index_name.rs"]
+mod exclusion_constraint_index_name;
+pub use exclusion_constraint_index_name::*;
+
 #[path = "index_exclusion_constraint_namespace.rs"]
 mod exclusion_constraint_namespace;
 pub use exclusion_constraint_namespace::*;
