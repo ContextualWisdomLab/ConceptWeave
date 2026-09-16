@@ -71,6 +71,12 @@ impl IndexConstraintInheritanceObservation {
     pub const fn inheritance_count(&self) -> i16 {
         self.inheritance_count
     }
+
+    /// Returns a collision-safe evidence location distinct from the predecessor parentage path.
+    #[must_use]
+    pub fn canonical_location(&self) -> String {
+        inheritance_location(&self.coordinate)
+    }
 }
 
 /// Immutable provenance receipt for one exact key-constraint inheritance-state observation.
@@ -239,7 +245,7 @@ impl IndexConstraintInheritanceSnapshot {
             .iter()
             .find(|observation| observation.coordinate() == &coordinate)
             .ok_or_else(|| ObservationError::UnknownObservationLocation {
-                location: coordinate.canonical_location(),
+                location: inheritance_location(&coordinate),
             })?;
         Ok(IndexConstraintInheritanceSourceReceipt {
             source_id: self.source_connection_key.clone(),
@@ -266,6 +272,10 @@ fn compute_inheritance_digest(
         hasher.update(observation.inheritance_count().to_be_bytes());
     }
     format!("{SHA256_DIGEST_PREFIX}{:x}", hasher.finalize())
+}
+
+fn inheritance_location(coordinate: &IndexConstraintParentageCoordinate) -> String {
+    format!("{}/inheritance-state", coordinate.canonical_location())
 }
 
 fn encode_coordinate(hasher: &mut Sha256, coordinate: &IndexConstraintParentageCoordinate) {
