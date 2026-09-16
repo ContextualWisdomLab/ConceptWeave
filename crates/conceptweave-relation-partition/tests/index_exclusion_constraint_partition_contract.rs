@@ -1,8 +1,9 @@
 use conceptweave_observation::{
     CheckConstraintObservation, ColumnObservationV3, IndexAttributeKind,
     IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics, IndexObservation,
-    ObservationError, PostgresSchemaSnapshotV3, QualifiedOperatorClassName, QualifiedTypeName,
-    RelationKind, RelationObservation, TableConstraintObservation,
+    NotNullConstraintObservation, ObservationError, ParentNotNullConstraintCoordinate,
+    PostgresSchemaSnapshotV3, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
+    RelationObservation, TableConstraintObservation,
 };
 use conceptweave_relation_partition::{
     IndexExclusionConstraintCoordinate, IndexExclusionConstraintObservation,
@@ -184,6 +185,51 @@ fn base_snapshot_with_constraint_on(
     .unwrap()
 }
 
+fn base_snapshot_with_not_null_collision() -> PostgresSchemaSnapshotV3 {
+    let parent_constraint = NotNullConstraintObservation::new(
+        "public",
+        "bookings",
+        RelationKind::PartitionedTable,
+        "bookings_no_overlap",
+        "id",
+        true,
+        true,
+        true,
+        0,
+        false,
+    )
+    .unwrap();
+    let child_constraint = NotNullConstraintObservation::new(
+        "public",
+        "bookings_2026",
+        RelationKind::Table,
+        "bookings_no_overlap",
+        "id",
+        true,
+        true,
+        false,
+        1,
+        false,
+    )
+    .unwrap()
+    .with_parent_constraint(
+        ParentNotNullConstraintCoordinate::new(
+            "public",
+            "bookings",
+            RelationKind::PartitionedTable,
+            "bookings_no_overlap",
+        )
+        .unwrap(),
+    )
+    .unwrap()
+    .with_partition_parent_relation("public", "bookings", false)
+    .unwrap();
+
+    base_snapshot()
+        .with_observed_not_null_constraints(vec![parent_constraint, child_constraint])
+        .unwrap()
+}
+
 fn relation_partitions(base: &PostgresSchemaSnapshotV3) -> RelationPartitionSnapshot {
     RelationPartitionSnapshot::new(
         base,
@@ -199,6 +245,48 @@ fn relation_partitions(base: &PostgresSchemaSnapshotV3) -> RelationPartitionSnap
                 "bookings_2026",
                 RelationKind::Table,
                 PartitionParentRelationCoordinate::new("public", "bookings").unwrap(),
+                false,
+            )
+            .unwrap(),
+        ],
+    )
+    .unwrap()
+}
+fn parent_index() -> IndexPartitionCoordinate {
+    IndexPartitionCoordinate::new(
+        "public",
+        "bookings",
+        RelationKind::PartitionedTable,
+        "bookings_excl_idx",
+    )
+    .unwrap()
+}
+fn child_index() -> IndexPartitionCoordinate {
+    IndexPartitionCoordinate::new(
+        "public",
+        "bookings_2026",
+        RelationKind::Table,
+        "bookings_2026_excl_idx",
+    )
+    .unwrap()
+}
+fn index_partitions(
+    base: &PostgresSchemaSnapshotV3,
+    relations: &RelationPartitionSnapshot,
+) -> IndexPartitionSnapshot {
+    IndexPartitionSnapshot::new(
+        base,
+        relations,
+        vec![
+            IndexPartitionObservation::non_partition(
+                parent_index(),
+                IndexRelationKind::PartitionedIndex,
+            )
+            .unwrap(),
+            IndexPartitionObservation::partition(
+                child_index(),
+                IndexRelationKind::Index,
+                parent_index(),
                 false,
             )
             .unwrap(),
@@ -372,6 +460,28 @@ fn exclusion_constraint_rejects_name_collision_with_existing_relation_constraint
         exact_exclusion_observations(),
     )
     .expect_err("one PostgreSQL relation cannot contain two constraints with the same conname");
+    assert_eq!(
+        error,
+        ObservationError::DuplicateConstraintName {
+            schema_name: "public".to_owned(),
+            table_name: "bookings".to_owned(),
+            constraint_name: "bookings_no_overlap".to_owned(),
+        }
+    );
+}
+
+#[test]
+fn exclusion_constraint_rejects_name_collision_with_observed_not_null_constraint() {
+    let base = base_snapshot_with_not_null_collision();
+    let relations = relation_partitions(&base);
+    let indexes = index_partitions(&base, &relations);
+    let error = IndexExclusionConstraintSnapshot::new(
+        &base,
+        &relations,
+        &indexes,
+        exact_exclusion_observations(),
+    )
+    .expect_err("first-class NOT NULL and EXCLUDE rows share relation-wide conname uniqueness");
     assert_eq!(
         error,
         ObservationError::DuplicateConstraintName {
