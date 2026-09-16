@@ -23,9 +23,9 @@ This is not a built-in-method naming problem. PostgreSQL permits extension index
 
 Pinned PostgreSQL authority for this stack is `postgres/postgres@3d2e8573e9cb91bd2b545184f4f9b326d237bcd1` (`REL_18_STABLE`).
 
-`DefineIndex` rejects an exclusion constraint when `amRoutine->amgettuple == NULL`, with the error that the access method does not support exclusion constraints. PostgreSQL exposes the same capability through the stable SQL information function property `can_exclude`; the pinned `amutils.c` implementation returns whether `routine->amgettuple` is present for `AMPROP_CAN_EXCLUDE`.
+`DefineIndex` rejects an exclusion constraint when `amRoutine->amgettuple == NULL`, with the error that the access method does not support exclusion constraints. PostgreSQL exposes the corresponding supported capability query through the SQL information property `can_exclude`. In the pinned `amutils.c`, an access method's `amproperty` callback may answer a property first; when it does not, PostgreSQL's generic `AMPROP_CAN_EXCLUDE` fallback returns whether `routine->amgettuple` is present. The governed observation therefore uses the SQL property result rather than reimplementing handler introspection or a method-name allowlist.
 
-The PostgreSQL 18 `CREATE TABLE` documentation states the same requirement: an `EXCLUDE` index access method must support `amgettuple`, and specifically notes that GIN cannot be used. PostgreSQL 18 system-information documentation defines `pg_indexam_has_property(..., 'can_exclude')` as the AM-level property indicating support for exclusion constraints.
+The PostgreSQL 18 `CREATE TABLE` documentation states the same creation requirement: an `EXCLUDE` index access method must support `amgettuple`, and specifically notes that GIN cannot be used. PostgreSQL 18 system-information documentation defines `pg_indexam_has_property(..., 'can_exclude')` as the AM-level property indicating support for exclusion constraints.
 
 ## Chosen contract
 
@@ -44,7 +44,7 @@ The successor digest includes the predecessor digest plus both coordinates, the 
 
 ## Rejected alternatives
 
-A built-in access-method allowlist was rejected because extension AMs can validly support exclusion constraints. Inferring capability from `pg_index.indisexclusion`, operator-family presence, or exclusion operator/procedure/strategy observations was rejected because those are different source facts and would turn validation into circular reconstruction. Rewriting the existing ordinary EXCLUDE digest was rejected because already-issued predecessor identities must remain immutable.
+A built-in access-method allowlist was rejected because extension AMs can validly support exclusion constraints. Inferring capability from `pg_index.indisexclusion`, operator-family presence, or exclusion operator/procedure/strategy observations was rejected because those are different source facts and would turn validation into circular reconstruction. Reimplementing `amgettuple` capability inference in the adapter was rejected because PostgreSQL already owns the public `can_exclude` property contract and extension AMs may participate in property handling. Rewriting the existing ordinary EXCLUDE digest was rejected because already-issued predecessor identities must remain immutable.
 
 ## Contract evidence
 
@@ -63,7 +63,7 @@ No executed Rust RED/GREEN is claimed by this document. The structural RED commi
 
 ## Live differential requirement
 
-The PostgreSQL 18 live differential must resolve the exact `conindid` backing index, read its `pg_class.relam`, resolve the access-method name independently, and query `pg_indexam_has_property(relam, 'can_exclude')` in the same bounded source-observation operation. The extractor must not map method names to capability locally.
+The PostgreSQL 18 live differential must resolve the exact `conindid` backing index, read its `pg_class.relam`, resolve the access-method name independently, and query `pg_indexam_has_property(relam, 'can_exclude')` in the same bounded source-observation operation. The extractor must not map method names to capability locally and must not bypass PostgreSQL's property API by assuming that all extension access methods follow core generic fallback behavior.
 
 Controls must include at least:
 
