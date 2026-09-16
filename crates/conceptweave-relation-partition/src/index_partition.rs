@@ -16,6 +16,10 @@ pub use constraint_inheritance::*;
 mod exclusion_constraint;
 pub use exclusion_constraint::*;
 
+#[path = "index_exclusion_constraint_timing.rs"]
+mod exclusion_constraint_timing;
+pub use exclusion_constraint_timing::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
