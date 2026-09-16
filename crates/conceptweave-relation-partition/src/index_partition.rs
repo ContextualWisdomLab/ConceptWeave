@@ -12,6 +12,10 @@ pub use constraint_parentage::*;
 mod constraint_inheritance;
 pub use constraint_inheritance::*;
 
+#[path = "index_exclusion_constraint.rs"]
+mod exclusion_constraint;
+pub use exclusion_constraint::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
