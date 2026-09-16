@@ -218,9 +218,9 @@ fn exclusion_constraint_rejects_name_collision_with_observed_not_null_constraint
 }
 
 #[test]
-fn same_constraint_name_on_different_relation_does_not_collide() {
+fn pg_constraint_relation_scope_alone_does_not_invent_cross_relation_collision() {
     let base = base_snapshot_with_constraint_on("bookings_2026", "bookings_no_overlap");
     let relations = relation_partitions(&base); let indexes = index_partitions(&base, &relations);
     IndexExclusionConstraintSnapshot::new(&base, &relations, &indexes, exact_exclusion_observations())
-        .expect("PostgreSQL permits the same constraint name on different relations");
+        .expect("the base pg_constraint layer owns relation-local conname uniqueness; the backing-index-name successor owns the schema-wide pg_class namespace");
 }
