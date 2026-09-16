@@ -35,8 +35,9 @@ PostgreSQL Global Development Group. (2026). *pg_constraint catalog definition* 
 - CHECK↔EXCLUDE behavioral contract `0237a677302ad15121555d575dc09252348cc1c0`;
 - minimal source repair restored ordinary-forward after an overly broad formatting-only intermediate delta at `a6e53cd459e61efaf61ec94e55cd9128aa5ec3fc`;
 - bounded follow-up review `5221753670` identified the separately observed NOT NULL owner family;
-- final expanded behavioral contract after fixture cleanup `50b69ea481dd0acdb303c91376976d8f130b942f`;
-- source repair covering both base relation constraints and explicitly observed first-class NOT NULL constraints `a5c0ce6624eb53d767a881d0fee49ba44841c5ef`.
+- expanded NOT NULL behavioral contract with duplicate fixture helpers removed at `50b69ea481dd0acdb303c91376976d8f130b942f`;
+- source repair covering both base relation constraints and explicitly observed first-class NOT NULL constraints `a5c0ce6624eb53d767a881d0fee49ba44841c5ef`;
+- contract-only formatting churn repaired forward without changing semantics at `864cd3bb003c496435110caeacfcf4bf1bb831de`, leaving the turn-start comparison focused on the new fixtures and assertions rather than a file-wide rewrite.
 
 The production change is intentionally before EXCLUDE digest/receipt issuance. It does not alter predecessor or ordinary-EXCLUDE digest algorithms; it only prevents impossible source combinations from entering that identity domain.
 
