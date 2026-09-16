@@ -24,6 +24,10 @@ pub use exclusion_constraint_timing::*;
 mod exclusion_constraint_immediacy;
 pub use exclusion_constraint_immediacy::*;
 
+#[path = "index_exclusion_constraint_index_role.rs"]
+mod exclusion_constraint_index_role;
+pub use exclusion_constraint_index_role::*;
+
 #[path = "index_exclusion_constraint_enforcement.rs"]
 mod exclusion_constraint_enforcement;
 pub use exclusion_constraint_enforcement::*;
