@@ -235,42 +235,47 @@ fn exclusion_constraint_snapshot() -> IndexExclusionConstraintSnapshot {
 }
 
 #[test]
-fn root_exclusion_constraint_requires_no_inherit_true() {
+fn attached_preexisting_child_can_retain_no_inherit_true() {
     let constraints = exclusion_constraint_snapshot();
-    let error = IndexExclusionConstraintNoInheritSnapshot::new(
-        &constraints,
-        vec![
-            IndexExclusionConstraintNoInheritObservation::new(parent_constraint(), false),
-            IndexExclusionConstraintNoInheritObservation::new(child_constraint(), false),
-        ],
-    )
-    .expect_err("root index-backed constraints are created with connoinherit=true");
-
-    assert_eq!(
-        error,
-        ObservationError::InvalidObservationField {
-            field: "index_exclusion_constraint_no_inherit_state",
-        }
-    );
-}
-
-#[test]
-fn partition_child_exclusion_constraint_requires_no_inherit_false() {
-    let constraints = exclusion_constraint_snapshot();
-    let error = IndexExclusionConstraintNoInheritSnapshot::new(
+    let snapshot = IndexExclusionConstraintNoInheritSnapshot::new(
         &constraints,
         vec![
             IndexExclusionConstraintNoInheritObservation::new(parent_constraint(), true),
             IndexExclusionConstraintNoInheritObservation::new(child_constraint(), true),
         ],
     )
-    .expect_err("partition-child index constraints are created with connoinherit=false");
+    .expect("ConstraintSetParentConstraint does not rewrite connoinherit on attachment");
 
-    assert_eq!(
-        error,
-        ObservationError::InvalidObservationField {
-            field: "index_exclusion_constraint_no_inherit_state",
-        }
+    assert!(snapshot
+        .source_receipt(child_constraint())
+        .unwrap()
+        .location()
+        .no_inherit());
+}
+
+#[test]
+fn no_inherit_raw_bit_changes_governed_digest() {
+    let constraints = exclusion_constraint_snapshot();
+    let cloned_child = IndexExclusionConstraintNoInheritSnapshot::new(
+        &constraints,
+        vec![
+            IndexExclusionConstraintNoInheritObservation::new(parent_constraint(), true),
+            IndexExclusionConstraintNoInheritObservation::new(child_constraint(), false),
+        ],
+    )
+    .expect("a child cloned with parentConstraintId carries connoinherit=false");
+    let attached_existing_child = IndexExclusionConstraintNoInheritSnapshot::new(
+        &constraints,
+        vec![
+            IndexExclusionConstraintNoInheritObservation::new(parent_constraint(), true),
+            IndexExclusionConstraintNoInheritObservation::new(child_constraint(), true),
+        ],
+    )
+    .expect("an attached preexisting child can retain connoinherit=true");
+
+    assert_ne!(
+        cloned_child.snapshot_digest(),
+        attached_existing_child.snapshot_digest()
     );
 }
 
@@ -304,7 +309,7 @@ fn exact_no_inherit_state_issues_provenance() {
             IndexExclusionConstraintNoInheritObservation::new(child_constraint(), false),
         ],
     )
-    .expect("root and partition-child no-inherit state must match PostgreSQL 18");
+    .expect("raw no-inherit state must remain governed evidence");
 
     let receipt = snapshot
         .source_receipt(child_constraint())
