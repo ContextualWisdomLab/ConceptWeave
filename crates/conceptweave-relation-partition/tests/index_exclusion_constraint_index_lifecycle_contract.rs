@@ -347,6 +347,36 @@ fn lifecycle_rejects_a_different_source_generation() {
 }
 
 #[test]
+fn lifecycle_rejects_different_content_with_identical_provenance_coordinates() {
+    let stack = stack(Some(true), Some(true), Some(true));
+    let changed_relation = stack.base.relations()[0]
+        .clone()
+        .with_source_comment("same-provenance-different-content");
+    let mismatched_base = PostgresSchemaSnapshotV3::new(
+        &authorized_source(),
+        stack.base.extractor_revision(),
+        stack.base.observed_at_utc(),
+        vec![changed_relation],
+        vec![],
+        vec![],
+    )
+    .unwrap();
+    assert_ne!(mismatched_base.snapshot_digest(), stack.base.snapshot_digest());
+
+    let error = IndexExclusionConstraintIndexLifecycleSnapshot::new(
+        &mismatched_base,
+        &stack.namespaces,
+    )
+    .expect_err("same provenance coordinates must not permit a different v3 content generation");
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "index_exclusion_constraint_index_lifecycle_predecessor_binding",
+        }
+    );
+}
+
+#[test]
 fn unknown_backing_index_lifecycle_receipt_fails_closed() {
     let stack = stack(Some(true), Some(true), Some(true));
     let snapshot = IndexExclusionConstraintIndexLifecycleSnapshot::new(
