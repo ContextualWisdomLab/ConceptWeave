@@ -279,9 +279,17 @@ fn reject_relation_constraint_name_collisions(
                     && relation.kind() == coordinate.relation_kind()
             })
             .ok_or_else(|| invalid("index_exclusion_constraint_relation"))?;
-        if relation.constraints().iter()
-            .any(|constraint| constraint.constraint_name() == coordinate.constraint_name())
-        {
+        let relation_constraint_collision = relation.constraints().iter()
+            .any(|constraint| constraint.constraint_name() == coordinate.constraint_name());
+        let not_null_constraint_collision = base_snapshot.not_null_constraints().is_some_and(|constraints| {
+            constraints.iter().any(|constraint| {
+                constraint.schema_name() == coordinate.schema_name()
+                    && constraint.relation_name() == coordinate.relation_name()
+                    && constraint.relation_kind() == coordinate.relation_kind()
+                    && constraint.constraint_name() == coordinate.constraint_name()
+            })
+        });
+        if relation_constraint_collision || not_null_constraint_collision {
             return Err(ObservationError::DuplicateConstraintName {
                 schema_name: coordinate.schema_name().to_owned(),
                 table_name: coordinate.relation_name().to_owned(),
