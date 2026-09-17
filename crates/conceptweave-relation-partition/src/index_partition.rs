@@ -140,6 +140,10 @@ pub use exclusion_constraint_operator_procedure_access_control::*;
 mod exclusion_constraint_operator_procedure_planner_support;
 pub use exclusion_constraint_operator_procedure_planner_support::*;
 
+#[path = "index_exclusion_constraint_operator_procedure_cost.rs"]
+mod exclusion_constraint_operator_procedure_cost;
+pub use exclusion_constraint_operator_procedure_cost::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
