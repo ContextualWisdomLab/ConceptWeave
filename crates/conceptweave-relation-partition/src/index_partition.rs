@@ -116,6 +116,10 @@ pub use exclusion_constraint_operator_procedure_kind::*;
 mod exclusion_constraint_operator_procedure_security_definer;
 pub use exclusion_constraint_operator_procedure_security_definer::*;
 
+#[path = "index_exclusion_constraint_operator_procedure_leakproof.rs"]
+mod exclusion_constraint_operator_procedure_leakproof;
+pub use exclusion_constraint_operator_procedure_leakproof::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
