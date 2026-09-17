@@ -128,6 +128,10 @@ pub use exclusion_constraint_operator_procedure_definition::*;
 mod exclusion_constraint_operator_procedure_owner;
 pub use exclusion_constraint_operator_procedure_owner::*;
 
+#[path = "index_exclusion_constraint_operator_procedure_configuration.rs"]
+mod exclusion_constraint_operator_procedure_configuration;
+pub use exclusion_constraint_operator_procedure_configuration::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
