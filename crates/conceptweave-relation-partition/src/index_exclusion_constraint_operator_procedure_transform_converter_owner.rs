@@ -40,6 +40,48 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterDirection {
     }
 }
 
+/// Exact raw and resolved owner identity for one converter `pg_proc` row.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity {
+    owner_oid: u32,
+    owner_role_name: String,
+}
+
+impl IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity {
+    /// Creates owner identity from raw nonzero `proowner` and same-generation role resolution.
+    pub fn new(
+        owner_oid: u32,
+        owner_role_name: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        if owner_oid == 0 {
+            return Err(invalid(
+                "index_exclusion_constraint_operator_procedure_transform_converter_owner_oid",
+            ));
+        }
+        let owner_role_name = owner_role_name.into();
+        validate_nonblank(
+            &owner_role_name,
+            "index_exclusion_constraint_operator_procedure_transform_converter_owner_role_name",
+        )?;
+        Ok(Self {
+            owner_oid,
+            owner_role_name,
+        })
+    }
+
+    /// Returns the exact raw nonzero `pg_proc.proowner` OID.
+    #[must_use]
+    pub const fn owner_oid(&self) -> u32 {
+        self.owner_oid
+    }
+
+    /// Returns the exact same-generation role name resolved for [`Self::owner_oid`].
+    #[must_use]
+    pub fn owner_role_name(&self) -> &str {
+        &self.owner_role_name
+    }
+}
+
 /// Exact `pg_proc.proowner` evidence for one nonzero transform converter function.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexExclusionConstraintOperatorProcedureTransformConverterOwnerObservation {
@@ -49,8 +91,7 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterOwnerObser
     direction: IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
     converter_schema_name: String,
     converter_function_name: String,
-    owner_oid: u32,
-    owner_role_name: String,
+    owner: IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterOwnerObservation {
@@ -62,15 +103,13 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterOwnerObservation
         direction: IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
         converter_schema_name: impl Into<String>,
         converter_function_name: impl Into<String>,
-        owner_oid: u32,
-        owner_role_name: impl Into<String>,
+        owner: IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity,
     ) -> Result<Self, ObservationError> {
         if key_position == 0 {
             return Err(ObservationError::InvalidOrdinalPosition);
         }
         let converter_schema_name = converter_schema_name.into();
         let converter_function_name = converter_function_name.into();
-        let owner_role_name = owner_role_name.into();
         validate_nonblank(
             &converter_schema_name,
             "index_exclusion_constraint_operator_procedure_transform_converter_owner_function_schema",
@@ -79,15 +118,6 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterOwnerObservation
             &converter_function_name,
             "index_exclusion_constraint_operator_procedure_transform_converter_owner_function_name",
         )?;
-        if owner_oid == 0 {
-            return Err(invalid(
-                "index_exclusion_constraint_operator_procedure_transform_converter_owner_oid",
-            ));
-        }
-        validate_nonblank(
-            &owner_role_name,
-            "index_exclusion_constraint_operator_procedure_transform_converter_owner_role_name",
-        )?;
         Ok(Self {
             coordinate,
             key_position,
@@ -95,8 +125,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterOwnerObservation
             direction,
             converter_schema_name,
             converter_function_name,
-            owner_oid,
-            owner_role_name,
+            owner,
         })
     }
 
@@ -138,16 +167,22 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterOwnerObservation
         &self.converter_function_name
     }
 
+    /// Returns the exact raw and resolved owner identity.
+    #[must_use]
+    pub const fn owner(&self) -> &IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity {
+        &self.owner
+    }
+
     /// Returns the exact raw nonzero `pg_proc.proowner` OID.
     #[must_use]
     pub const fn owner_oid(&self) -> u32 {
-        self.owner_oid
+        self.owner.owner_oid()
     }
 
     /// Returns the exact same-generation role name resolved for [`Self::owner_oid`].
     #[must_use]
     pub fn owner_role_name(&self) -> &str {
-        &self.owner_role_name
+        self.owner.owner_role_name()
     }
 
     /// Returns the collision-safe evidence location for this converter-owner fact.
@@ -232,7 +267,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot {
             IndexExclusionConstraintOperatorProcedureTransformConverterOwnerObservation,
         >,
     ) -> Result<Self, ObservationError> {
-        observations.sort_by(|left, right| owner_key(left).cmp(&owner_key(right)));
+        observations.sort_by_key(owner_key);
 
         let expected = converter_snapshot
             .observations()
@@ -261,14 +296,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot {
             .collect::<BTreeSet<_>>();
         let observed = observations
             .iter()
-            .map(|observation| {
-                owner_coordinate_key(
-                    observation.coordinate(),
-                    observation.key_position(),
-                    observation.transform_type(),
-                    observation.direction(),
-                )
-            })
+            .map(owner_key)
             .collect::<BTreeSet<_>>();
         if observed.len() != observations.len() {
             return Err(invalid(
@@ -414,6 +442,18 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot {
     }
 }
 
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct ConverterOwnerCoordinateKey {
+    schema_name: String,
+    relation_name: String,
+    relation_kind: String,
+    constraint_name: String,
+    key_position: u32,
+    transform_type_schema_name: String,
+    transform_type_name: String,
+    direction: IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
+}
+
 fn compute_transform_converter_owner_digest(
     predecessor_digest: &str,
     observations: &[IndexExclusionConstraintOperatorProcedureTransformConverterOwnerObservation],
@@ -439,16 +479,12 @@ fn compute_transform_converter_owner_digest(
 
 fn owner_key(
     observation: &IndexExclusionConstraintOperatorProcedureTransformConverterOwnerObservation,
-) -> (String, String, String, String, u32, String, String, String) {
-    (
-        observation.coordinate().schema_name().to_owned(),
-        observation.coordinate().relation_name().to_owned(),
-        observation.coordinate().relation_kind().token().to_owned(),
-        observation.coordinate().constraint_name().to_owned(),
+) -> ConverterOwnerCoordinateKey {
+    owner_coordinate_key(
+        observation.coordinate(),
         observation.key_position(),
-        observation.transform_type().schema_name().to_owned(),
-        observation.transform_type().type_name().to_owned(),
-        observation.direction().token().to_owned(),
+        observation.transform_type(),
+        observation.direction(),
     )
 }
 
@@ -457,17 +493,17 @@ fn owner_coordinate_key(
     key_position: u32,
     transform_type: &QualifiedTypeName,
     direction: IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
-) -> (String, String, String, String, u32, String, String, String) {
-    (
-        coordinate.schema_name().to_owned(),
-        coordinate.relation_name().to_owned(),
-        coordinate.relation_kind().token().to_owned(),
-        coordinate.constraint_name().to_owned(),
+) -> ConverterOwnerCoordinateKey {
+    ConverterOwnerCoordinateKey {
+        schema_name: coordinate.schema_name().to_owned(),
+        relation_name: coordinate.relation_name().to_owned(),
+        relation_kind: coordinate.relation_kind().token().to_owned(),
+        constraint_name: coordinate.constraint_name().to_owned(),
         key_position,
-        transform_type.schema_name().to_owned(),
-        transform_type.type_name().to_owned(),
-        direction.token().to_owned(),
-    )
+        transform_type_schema_name: transform_type.schema_name().to_owned(),
+        transform_type_name: transform_type.type_name().to_owned(),
+        direction,
+    }
 }
 
 fn procedure_transform_converter_owner_location(
