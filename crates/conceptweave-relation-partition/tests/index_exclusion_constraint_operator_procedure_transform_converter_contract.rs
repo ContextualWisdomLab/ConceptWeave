@@ -3,6 +3,7 @@ include!("index_exclusion_constraint_operator_procedure_transform_types_contract
 use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterBinding,
     IndexExclusionConstraintOperatorProcedureTransformConverterFunction,
+    IndexExclusionConstraintOperatorProcedureTransformConverterFunctionDefinition,
     IndexExclusionConstraintOperatorProcedureTransformConverterObservation,
     IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot,
 };
@@ -42,6 +43,18 @@ fn custom_payload_type() -> QualifiedTypeName {
     QualifiedTypeName::new("public", "custom_payload").unwrap()
 }
 
+fn converter_definition(
+    prosrc: &str,
+) -> IndexExclusionConstraintOperatorProcedureTransformConverterFunctionDefinition {
+    IndexExclusionConstraintOperatorProcedureTransformConverterFunctionDefinition::new(
+        "c",
+        prosrc,
+        Some("$libdir/custom_transform".to_owned()),
+        None,
+    )
+    .unwrap()
+}
+
 fn converter_function(
     function_name: &str,
     return_type: QualifiedTypeName,
@@ -52,10 +65,7 @@ fn converter_function(
         function_name,
         internal_type(),
         return_type,
-        "c",
-        prosrc,
-        Some("$libdir/custom_transform".to_owned()),
-        None,
+        converter_definition(prosrc),
     )
     .unwrap()
 }
@@ -94,7 +104,11 @@ fn ordinary_exclude_operator_procedure_transform_converter_preserves_pg_transfor
     let transform_types = selected_transform_types_predecessor();
     let definition = definition_snapshot();
     let binding = converter_binding(
-        Some(converter_function("payload_from_sql", internal_type(), "payload_from_sql_v1")),
+        Some(converter_function(
+            "payload_from_sql",
+            internal_type(),
+            "payload_from_sql_v1",
+        )),
         Some(converter_function(
             "payload_to_sql",
             custom_payload_type(),
@@ -142,7 +156,11 @@ fn ordinary_exclude_operator_procedure_transform_converter_distinguishes_convert
             procedure("int4eq"),
             "internal",
             vec![converter_binding(
-                Some(converter_function("payload_from_sql", internal_type(), "payload_from_sql_v1")),
+                Some(converter_function(
+                    "payload_from_sql",
+                    internal_type(),
+                    "payload_from_sql_v1",
+                )),
                 None,
             )],
         )],
@@ -156,7 +174,11 @@ fn ordinary_exclude_operator_procedure_transform_converter_distinguishes_convert
             procedure("int4eq"),
             "internal",
             vec![converter_binding(
-                Some(converter_function("payload_from_sql", internal_type(), "payload_from_sql_v2")),
+                Some(converter_function(
+                    "payload_from_sql",
+                    internal_type(),
+                    "payload_from_sql_v2",
+                )),
                 None,
             )],
         )],
@@ -172,7 +194,11 @@ fn ordinary_exclude_operator_procedure_transform_converter_accepts_one_direction
     let definition = definition_snapshot();
     for binding in [
         converter_binding(
-            Some(converter_function("payload_from_sql", internal_type(), "payload_from_sql_v1")),
+            Some(converter_function(
+                "payload_from_sql",
+                internal_type(),
+                "payload_from_sql_v1",
+            )),
             None,
         ),
         converter_binding(
@@ -231,7 +257,11 @@ fn ordinary_exclude_operator_procedure_transform_converter_rejects_row_when_prot
             procedure("int4eq"),
             "internal",
             vec![converter_binding(
-                Some(converter_function("payload_from_sql", internal_type(), "payload_from_sql_v1")),
+                Some(converter_function(
+                    "payload_from_sql",
+                    internal_type(),
+                    "payload_from_sql_v1",
+                )),
                 None,
             )],
         )],
@@ -255,7 +285,11 @@ fn ordinary_exclude_operator_procedure_transform_converter_rejects_target_langua
             procedure("int4eq"),
             "plpython3u",
             vec![converter_binding(
-                Some(converter_function("payload_from_sql", internal_type(), "payload_from_sql_v1")),
+                Some(converter_function(
+                    "payload_from_sql",
+                    internal_type(),
+                    "payload_from_sql_v1",
+                )),
                 None,
             )],
         )],
@@ -324,10 +358,7 @@ fn ordinary_exclude_operator_procedure_transform_converter_rejects_non_internal_
         "payload_from_sql",
         custom_payload_type(),
         internal_type(),
-        "c",
-        "payload_from_sql_v1",
-        Some("$libdir/custom_transform".to_owned()),
-        None,
+        converter_definition("payload_from_sql_v1"),
     )
     .expect_err("PostgreSQL transform converter functions take one internal argument");
     assert_field(
@@ -348,7 +379,11 @@ fn ordinary_exclude_operator_procedure_transform_converter_rejects_binding_drift
             procedure("int4eq"),
             "internal",
             vec![converter_binding(
-                Some(converter_function("payload_from_sql", internal_type(), "payload_from_sql_v1")),
+                Some(converter_function(
+                    "payload_from_sql",
+                    internal_type(),
+                    "payload_from_sql_v1",
+                )),
                 None,
             )],
         )],
@@ -386,7 +421,11 @@ fn ordinary_exclude_operator_procedure_transform_converter_rejects_unknown_recei
             procedure("int4eq"),
             "internal",
             vec![converter_binding(
-                Some(converter_function("payload_from_sql", internal_type(), "payload_from_sql_v1")),
+                Some(converter_function(
+                    "payload_from_sql",
+                    internal_type(),
+                    "payload_from_sql_v1",
+                )),
                 None,
             )],
         )],
