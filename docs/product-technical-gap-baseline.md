@@ -32,11 +32,13 @@ Configuration lineage:
 
 - finding review `5231254550`;
 - structural source/compile RED `f5baf631e9add518322cbab8db471acdf4fe1d4f`; the new public configuration types did not yet exist, so no executed compiler failure is claimed;
-- production successor `4c7117fa7587f6c85e0588f00a76c1a4e1dbb117`;
+- initial production successor `4c7117fa7587f6c85e0588f00a76c1a4e1dbb117`;
 - public composition `0354ecf1c003a021b1401932cbc82f74bd5cbdf4`;
 - PostgreSQL/APA decision record `a7d631a3d9a3c98fb5636ef9211c79801aaa5ce8`, `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-configuration-integrity.md`;
 - pre-configuration CHANGELOG preserved byte-for-byte at `docs/archive/CHANGELOG-through-4ed375df.md` by `2f9bbc4fa1f464c86b54b214a22eeb34dacc4fc3`;
-- pre-configuration product/technical-gap baseline preserved byte-for-byte at `docs/archive/product-technical-gap-baseline-through-4ed375df.md` by `7519d0ba39a39e6ac8f5c681150c59bf48722ff0`.
+- pre-configuration product/technical-gap baseline preserved byte-for-byte at `docs/archive/product-technical-gap-baseline-through-4ed375df.md` by `7519d0ba39a39e6ac8f5c681150c59bf48722ff0`;
+- lint-neutral production refinement `f3995fd2b0484d2c06e2871caab0c930d3109426`;
+- doctoring traceability currentization `1ee99f10024c5bc2f6d0fbc083508b227ae59ee0`.
 
 Configuration invariants are exact coordinate/key completeness, uniqueness, exact operator/function binding to the owner predecessor, one-based key positions, and exact receipt coordinates. `NULL`, empty array, entry-byte changes, and source-order changes remain distinct digest states. This source identity does not parse or normalize GUC assignments and does not itself decide whether a `search_path` is secure; a policy decision must be separately governed with the required security context.
 
@@ -49,9 +51,10 @@ Current configuration traceability:
 - PR: `ContextualWisdomLab/ConceptWeave#46`
 - finding review: `5231254550`
 - structural RED: `f5baf631e9add518322cbab8db471acdf4fe1d4f`
-- production: `4c7117fa7587f6c85e0588f00a76c1a4e1dbb117`
+- initial production: `4c7117fa7587f6c85e0588f00a76c1a4e1dbb117`
 - composition: `0354ecf1c003a021b1401932cbc82f74bd5cbdf4`
-- doctoring: `a7d631a3d9a3c98fb5636ef9211c79801aaa5ce8`
+- production refinement: `f3995fd2b0484d2c06e2871caab0c930d3109426`
+- doctoring currentization: `1ee99f10024c5bc2f6d0fbc083508b227ae59ee0`
 - source: `crates/conceptweave-relation-partition/src/index_exclusion_constraint_operator_procedure_configuration.rs`
 - test: `crates/conceptweave-relation-partition/tests/index_exclusion_constraint_operator_procedure_configuration_contract.rs`
 - predecessor: `IndexExclusionConstraintOperatorProcedureOwnerSnapshot`
