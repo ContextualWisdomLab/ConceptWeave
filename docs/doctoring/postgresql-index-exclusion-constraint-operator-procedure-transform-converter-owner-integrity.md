@@ -48,6 +48,8 @@ Rejected. Issued predecessor digest domains are immutable. The repair is a domai
 
 `IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot` consumes one exact `IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot` and requires exactly one owner observation for every nonzero converter direction.
 
+`IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity` is the owner value object. It holds raw nonzero `proowner` plus the exact same-generation role name and rejects zero OIDs or blank role resolution. Keeping these two fields together makes the public observation constructor semantic rather than parameter-shaped and avoids a lint waiver for an eight-argument boundary.
+
 Each observation binds:
 
 - ordinary-EXCLUDE constraint coordinate;
@@ -55,12 +57,17 @@ Each observation binds:
 - exact selected transform type;
 - converter direction (`from_sql` or `to_sql`);
 - exact converter schema/function coordinate repeated from the predecessor;
-- raw nonzero `pg_proc.proowner` OID;
-- exact same-generation resolved owner role name.
+- one validated converter-owner identity value object.
 
-The snapshot canonicalizes observations by constraint, key, transform type, and direction. Missing or extra converter-owner coordinates, duplicate coordinates, zero positions, blank function/role identifiers, zero owner OID, and converter binding drift fail closed. The digest incorporates the exact predecessor digest and every owner fact under a new domain.
+The snapshot canonicalizes observations with a private typed `ConverterOwnerCoordinateKey`, rather than an anonymous eight-element tuple, by constraint, key, transform type, and direction. Missing or extra converter-owner coordinates, duplicate coordinates, zero positions, blank function/role identifiers, zero owner OID, and converter binding drift fail closed. The digest incorporates the exact predecessor digest and every owner fact under a new domain.
 
 The owner role name is retained together with the OID because an opaque OID alone is not a portable semantic identifier. The raw OID is retained because same-name role recreation is not the same catalog identity within one captured generation.
+
+## Follow-up API-shape repair
+
+Review `5233923341` found that the initial production observation constructor took eight arguments and therefore repeated the strict-Clippy/API-shape problem that the immediately preceding transform-converter successor had already removed. Adding `#[allow(clippy::too_many_arguments)]` was rejected.
+
+Commit `ca66c2bbcb7c5c1c9e689b699362f2e2e3abe3fb` introduced `IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity`, reduced the observation constructor to seven semantic arguments, and replaced the private eight-tuple sort/completeness coordinate with `ConverterOwnerCoordinateKey`. Commit `cebdc1d2b8d0c246fce54f932bb0e50bdbaf314a` adapted the focused contract and added explicit blank-role rejection. No lint suppression was introduced.
 
 ## Privacy and data minimization
 
@@ -74,12 +81,12 @@ The focused contract fixes the following behavior:
 - changing owner OID/role changes the successor digest while the converter predecessor remains unchanged;
 - every nonzero converter direction requires one owner observation;
 - wrong converter-function binding fails closed;
-- zero owner OID fails closed;
+- zero owner OID and blank same-generation role resolution fail closed;
 - duplicate owner coordinates fail closed;
 - unknown receipt coordinates fail closed;
 - the new snapshot is publicly composed through the relation-partition crate.
 
-The first test commit is structural RED only because the new public types did not yet exist and this execution environment does not provide the repository-pinned Rust 1.98 toolchain. No compiler RED or GREEN is claimed.
+The first test commit is structural RED only because the new public types did not yet exist and this execution environment does not provide the repository-pinned Rust 1.98 toolchain. No compiler RED or GREEN is claimed. The later API-shape repair is source-reviewed but likewise not executed in this runtime.
 
 ## TRACEABILITY
 
@@ -92,6 +99,10 @@ The first test commit is structural RED only because the new public types did no
 - canonical receipt-location correction: `fd3ced1bb5325ceabdd0c0c166410eda4a260035`
 - pre-owner gap-baseline archive: `22bc5cf3e0806e07d156f1ad9cabd66c2f8edf64`
 - pre-owner CHANGELOG archive: `20f7eabf5274b9a394332a41260c80fb62cc16e6`
+- doctoring introduction: `8ab5ac9b63333df0e6111440a50371910b59a573`
+- API-shape review: `5233923341`
+- owner-identity VO / typed coordinate repair: `ca66c2bbcb7c5c1c9e689b699362f2e2e3abe3fb`
+- focused contract adaptation: `cebdc1d2b8d0c246fce54f932bb0e50bdbaf314a`
 - source: `crates/conceptweave-relation-partition/src/index_exclusion_constraint_operator_procedure_transform_converter_owner.rs`
 - composition: `crates/conceptweave-relation-partition/src/index_partition.rs`
 - contract: `crates/conceptweave-relation-partition/tests/index_exclusion_constraint_operator_procedure_transform_converter_owner_contract.rs`
