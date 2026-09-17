@@ -22,9 +22,9 @@ Review `5233862979` on exact predecessor `40e137925e46c5f4c758fc671ba699b59c7851
 
 PostgreSQL 18 stores function ownership in the dedicated `pg_proc.proowner` catalog field. `ALTER FUNCTION ... OWNER TO` can change that owner without redefining the converter function's input identity or source body. `CREATE TRANSFORM` separately requires ownership and `EXECUTE` privilege on specified converter functions. Owner, ACL, transform row, function body, and security mode therefore cannot be collapsed into one inferred fact.
 
-The ordinary-forward repair adds `IndexExclusionConstraintOperatorProcedureTransformConverterDirection`, `IndexExclusionConstraintOperatorProcedureTransformConverterOwnerObservation`, `IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSourceReceipt`, and `IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot`.
+The ordinary-forward repair adds `IndexExclusionConstraintOperatorProcedureTransformConverterDirection`, `IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity`, `IndexExclusionConstraintOperatorProcedureTransformConverterOwnerObservation`, `IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSourceReceipt`, and `IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot`.
 
-For every exact `(constraint, key_position, transform_type, direction)` represented by a nonzero predecessor converter, the successor requires exactly one owner observation. It repeats the exact converter schema/function coordinate from the predecessor, retains raw nonzero `proowner`, independently resolves the owner role name in the same source generation, and domain-separates the new digest from the frozen converter predecessor. Missing/extra directions, duplicate coordinates, zero positions, blank converter/role identifiers, zero owner OID, binding drift, and unknown receipt coordinates fail closed.
+`OwnerIdentity` groups raw nonzero `proowner` and the same-generation resolved role name as one semantic value object. For every exact `(constraint, key_position, transform_type, direction)` represented by a nonzero predecessor converter, the successor requires exactly one owner observation. It repeats the exact converter schema/function coordinate from the predecessor, carries the validated owner value object, and domain-separates the new digest from the frozen converter predecessor. Missing/extra directions, duplicate coordinates, zero positions, blank converter/role identifiers, zero owner OID, binding drift, and unknown receipt coordinates fail closed.
 
 The contract remains observational. It does not require a particular owner and does not infer owner from transform creator, schema owner, session principal, ACL, `SECURITY DEFINER`, or any target-function fact.
 
@@ -38,9 +38,13 @@ The contract remains observational. It does not require a particular owner and d
 - canonical receipt-location correction `fd3ced1bb5325ceabdd0c0c166410eda4a260035`;
 - lossless pre-owner gap-baseline archive `22bc5cf3e0806e07d156f1ad9cabd66c2f8edf64`;
 - lossless pre-owner CHANGELOG archive `20f7eabf5274b9a394332a41260c80fb62cc16e6`;
-- PostgreSQL/NIST/APA decision record `8ab5ac9b63333df0e6111440a50371910b59a573`, `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-owner-integrity.md`.
+- PostgreSQL/NIST/APA decision record `8ab5ac9b63333df0e6111440a50371910b59a573`, `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-owner-integrity.md`;
+- API-shape review `5233923341`, rejecting a new eight-argument public constructor and tuple-shaped internal coordinate rather than adding Clippy waivers;
+- owner-identity VO plus typed private coordinate repair `ca66c2bbcb7c5c1c9e689b699362f2e2e3abe3fb`;
+- focused contract adaptation and blank-role edge case `cebdc1d2b8d0c246fce54f932bb0e50bdbaf314a`;
+- code-current doctoring `491b6b80e3f464422161ff3cadcf5bcffc45b836`.
 
-Focused contract coverage includes exact owner provenance, owner-reassignment digest separation, complete nonzero converter coverage, converter-function binding drift, zero owner OID, duplicate owner coordinates, exact receipt lookup, and public composition. Because Rust 1.98 execution is unavailable in this runtime, executed coverage and the 100% owned edge/branch target are not established for the current head.
+Focused contract coverage includes exact owner provenance, owner-reassignment digest separation, complete nonzero converter coverage, converter-function binding drift, zero owner OID, blank resolved role, duplicate owner coordinates, exact receipt lookup, and public composition. Because Rust 1.98 execution is unavailable in this runtime, executed coverage and the 100% owned edge/branch target are not established for the current head.
 
 ## PostgreSQL 18 authority and TRACEABILITY
 
@@ -53,9 +57,13 @@ Current converter-owner traceability:
 - structural RED: `6b8f1daf317ccae54a9d8ebbd7a1144bf9881b5c`
 - production: `11c9cbebab54685b8a06516d640f0b518a698a5b`
 - composition: `0ccc3415f999bce9353330affaff2b71335f4d08`
-- focused correction: `fdc9c792db13148af66dcd4bb0f1fe414fca582a`
+- receipt correction: `fdc9c792db13148af66dcd4bb0f1fe414fca582a`
 - location correction: `fd3ced1bb5325ceabdd0c0c166410eda4a260035`
-- doctoring: `8ab5ac9b63333df0e6111440a50371910b59a573`
+- doctoring introduction: `8ab5ac9b63333df0e6111440a50371910b59a573`
+- API-shape review: `5233923341`
+- semantic owner VO / typed coordinate repair: `ca66c2bbcb7c5c1c9e689b699362f2e2e3abe3fb`
+- contract adaptation: `cebdc1d2b8d0c246fce54f932bb0e50bdbaf314a`
+- code-current doctoring: `491b6b80e3f464422161ff3cadcf5bcffc45b836`
 - source: `crates/conceptweave-relation-partition/src/index_exclusion_constraint_operator_procedure_transform_converter_owner.rs`
 - contract: `crates/conceptweave-relation-partition/tests/index_exclusion_constraint_operator_procedure_transform_converter_owner_contract.rs`
 - direct predecessor: `IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot`
