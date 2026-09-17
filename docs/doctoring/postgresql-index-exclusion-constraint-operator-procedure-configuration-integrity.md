@@ -57,6 +57,7 @@ The focused contract covers provenance, NULL-versus-empty distinction, `search_p
 - Structural source/compile RED: `f5baf631e9add518322cbab8db471acdf4fe1d4f`
 - Production successor: `4c7117fa7587f6c85e0588f00a76c1a4e1dbb117`
 - Public composition: `0354ecf1c003a021b1401932cbc82f74bd5cbdf4`
+- Lint-neutral production refinement: `f3995fd2b0484d2c06e2871caab0c930d3109426`
 - Production: `crates/conceptweave-relation-partition/src/index_exclusion_constraint_operator_procedure_configuration.rs`
 - Contract: `crates/conceptweave-relation-partition/tests/index_exclusion_constraint_operator_procedure_configuration_contract.rs`
 - Predecessor: `IndexExclusionConstraintOperatorProcedureOwnerSnapshot`
