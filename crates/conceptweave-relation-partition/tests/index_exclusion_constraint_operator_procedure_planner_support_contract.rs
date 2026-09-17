@@ -19,6 +19,15 @@ fn access_control_snapshot() -> IndexExclusionConstraintOperatorProcedureAccessC
     .unwrap()
 }
 
+fn planner_support(name: &str) -> QualifiedProcedureSignature {
+    QualifiedProcedureSignature::new(
+        "pg_catalog",
+        name,
+        vec![QualifiedTypeName::new("pg_catalog", "internal").unwrap()],
+    )
+    .unwrap()
+}
+
 fn planner_support_observation(
     observed_operator: QualifiedOperatorSignature,
     observed_procedure: QualifiedProcedureSignature,
@@ -37,7 +46,7 @@ fn planner_support_observation(
 #[test]
 fn ordinary_exclude_operator_procedure_planner_support_preserves_exact_catalog_state() {
     let access_control = access_control_snapshot();
-    let support = procedure("int4eq_support");
+    let support = planner_support("int4eq_support");
     let snapshot = IndexExclusionConstraintOperatorProcedurePlannerSupportSnapshot::new(
         &access_control,
         vec![planner_support_observation(
@@ -77,7 +86,7 @@ fn ordinary_exclude_operator_procedure_planner_support_distinguishes_absence_and
         vec![planner_support_observation(
             operator("="),
             procedure("int4eq"),
-            Some(procedure("int4eq_support")),
+            Some(planner_support("int4eq_support")),
         )],
     )
     .unwrap();
@@ -86,7 +95,7 @@ fn ordinary_exclude_operator_procedure_planner_support_distinguishes_absence_and
         vec![planner_support_observation(
             operator("="),
             procedure("int4eq"),
-            Some(procedure("int4eq_support_v2")),
+            Some(planner_support("int4eq_support_v2")),
         )],
     )
     .unwrap();
@@ -103,7 +112,7 @@ fn ordinary_exclude_operator_procedure_planner_support_rejects_procedure_binding
         vec![planner_support_observation(
             operator("="),
             procedure("int4ne"),
-            Some(procedure("int4eq_support")),
+            Some(planner_support("int4eq_support")),
         )],
     )
     .expect_err("planner support evidence must bind to the exact pg_operator.oprcode function");
@@ -121,7 +130,7 @@ fn ordinary_exclude_operator_procedure_planner_support_rejects_operator_binding_
         vec![planner_support_observation(
             operator("<>"),
             procedure("int4eq"),
-            Some(procedure("int4eq_support")),
+            Some(planner_support("int4eq_support")),
         )],
     )
     .expect_err("planner support evidence must stay on the exact governed conexclop position");
@@ -151,7 +160,7 @@ fn ordinary_exclude_operator_procedure_planner_support_rejects_duplicate_coordin
     let observation = planner_support_observation(
         operator("="),
         procedure("int4eq"),
-        Some(procedure("int4eq_support")),
+        Some(planner_support("int4eq_support")),
     );
     let error = IndexExclusionConstraintOperatorProcedurePlannerSupportSnapshot::new(
         &access_control,
