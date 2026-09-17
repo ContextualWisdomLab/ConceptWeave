@@ -91,6 +91,10 @@ fn ordinary_exclude_transform_converter_owner_preserves_exact_pg_proc_owner() {
     assert_eq!(receipt.location().owner_oid(), 16_384);
     assert_eq!(receipt.location().owner_role_name(), "transform_runtime");
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert!(receipt
+        .location()
+        .canonical_location()
+        .contains("procedure-transform-converters"));
 }
 
 #[test]
@@ -203,15 +207,15 @@ fn ordinary_exclude_transform_converter_owner_rejects_unknown_receipt_coordinate
     let error = snapshot
         .source_receipt(
             coordinate(),
-            1,
+            2,
             custom_payload_type(),
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         )
-        .unwrap();
-    assert!(error
-        .location()
-        .canonical_location()
-        .contains("procedure-transform-converters"));
+        .expect_err("receipt lookup must remain exact-coordinate and exact-position bound");
+    assert!(matches!(
+        error,
+        ObservationError::UnknownObservationLocation { .. }
+    ));
 }
 
 #[test]
