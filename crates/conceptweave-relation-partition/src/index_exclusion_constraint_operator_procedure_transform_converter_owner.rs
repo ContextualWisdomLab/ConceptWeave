@@ -477,7 +477,7 @@ fn procedure_transform_converter_owner_location(
     direction: IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
 ) -> String {
     format!(
-        "{}/exclusion-operators/{key_position}/procedure-transform-converters/{}.{}//{}/owner",
+        "{}/exclusion-operators/{key_position}/procedure-transform-converters/{}.{}/{}/owner",
         coordinate.canonical_location(),
         transform_type.schema_name(),
         transform_type.type_name(),
