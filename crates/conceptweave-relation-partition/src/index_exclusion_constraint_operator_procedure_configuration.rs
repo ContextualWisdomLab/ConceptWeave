@@ -41,7 +41,10 @@ impl IndexExclusionConstraintOperatorProcedureConfigurationMaterial {
     #[must_use]
     pub fn from_proconfig(proconfig: Option<Vec<String>>) -> Self {
         let configured = proconfig.is_some();
-        let entry_count = proconfig.as_ref().map_or(0, Vec::len);
+        let entry_count = match proconfig.as_ref() {
+            Some(entries) => entries.len(),
+            None => 0,
+        };
         let mut hasher = Sha256::new();
         hasher.update(
             INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_CONFIGURATION_MATERIAL_DIGEST_DOMAIN_V1,
