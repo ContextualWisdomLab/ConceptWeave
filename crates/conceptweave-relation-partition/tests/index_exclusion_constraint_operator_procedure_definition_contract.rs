@@ -1,6 +1,7 @@
 include!("index_exclusion_constraint_operator_procedure_leakproof_contract.rs");
 
 use conceptweave_relation_partition::{
+    IndexExclusionConstraintOperatorProcedureDefinitionMaterial,
     IndexExclusionConstraintOperatorProcedureDefinitionObservation,
     IndexExclusionConstraintOperatorProcedureDefinitionSnapshot,
 };
@@ -18,6 +19,21 @@ fn leakproof_snapshot() -> IndexExclusionConstraintOperatorProcedureLeakproofSna
     .unwrap()
 }
 
+fn definition_material(
+    language_name: &str,
+    prosrc: &str,
+    probin: Option<&str>,
+    prosqlbody: Option<&str>,
+) -> IndexExclusionConstraintOperatorProcedureDefinitionMaterial {
+    IndexExclusionConstraintOperatorProcedureDefinitionMaterial::new(
+        language_name,
+        prosrc,
+        probin.map(str::to_owned),
+        prosqlbody.map(str::to_owned),
+    )
+    .unwrap()
+}
+
 fn definition_observation(
     observed_operator: QualifiedOperatorSignature,
     observed_procedure: QualifiedProcedureSignature,
@@ -31,10 +47,7 @@ fn definition_observation(
         1,
         observed_operator,
         observed_procedure,
-        language_name,
-        prosrc,
-        probin.map(str::to_owned),
-        prosqlbody.map(str::to_owned),
+        definition_material(language_name, prosrc, probin, prosqlbody),
     )
     .unwrap()
 }
@@ -205,11 +218,7 @@ fn ordinary_exclude_operator_procedure_definition_distinguishes_language_changes
 
 #[test]
 fn ordinary_exclude_operator_procedure_definition_rejects_blank_language() {
-    let error = IndexExclusionConstraintOperatorProcedureDefinitionObservation::new(
-        coordinate(),
-        1,
-        operator("="),
-        procedure("int4eq"),
+    let error = IndexExclusionConstraintOperatorProcedureDefinitionMaterial::new(
         "   ",
         "int4eq",
         None,
@@ -304,10 +313,7 @@ fn ordinary_exclude_operator_procedure_definition_rejects_zero_position() {
         0,
         operator("="),
         procedure("int4eq"),
-        "internal",
-        "int4eq",
-        None,
-        None,
+        definition_material("internal", "int4eq", None, None),
     )
     .expect_err("operator procedure positions are one-based");
     assert_eq!(error, ObservationError::InvalidOrdinalPosition);
