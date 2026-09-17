@@ -160,6 +160,10 @@ pub use exclusion_constraint_operator_procedure_transform_converter_owner::*;
 mod exclusion_constraint_operator_procedure_transform_converter_access_control;
 pub use exclusion_constraint_operator_procedure_transform_converter_access_control::*;
 
+#[path = "index_exclusion_constraint_operator_procedure_transform_converter_configuration.rs"]
+mod exclusion_constraint_operator_procedure_transform_converter_configuration;
+pub use exclusion_constraint_operator_procedure_transform_converter_configuration::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
