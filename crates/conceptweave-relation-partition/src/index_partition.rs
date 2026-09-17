@@ -168,6 +168,10 @@ pub use exclusion_constraint_operator_procedure_transform_converter_configuratio
 mod exclusion_constraint_operator_procedure_transform_converter_security_definer;
 pub use exclusion_constraint_operator_procedure_transform_converter_security_definer::*;
 
+#[path = "index_exclusion_constraint_operator_procedure_transform_converter_leakproof.rs"]
+mod exclusion_constraint_operator_procedure_transform_converter_leakproof;
+pub use exclusion_constraint_operator_procedure_transform_converter_leakproof::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
