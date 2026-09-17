@@ -2,7 +2,7 @@
 
 **Snapshot:** 2026-09-17
 
-This is the code-current decision surface for the active ConceptWeave Source Observation lane. The immediately preceding active surface through exact `b5904f6ede97bf433665a45e7da910fc7433b7f8` is preserved losslessly at `docs/archive/product-technical-gap-baseline-through-b5904f6e.md`; its matching CHANGELOG is preserved at `docs/archive/CHANGELOG-through-b5904f6e.md`. Earlier surfaces remain under `docs/archive/`, and focused rationale/TRACEABILITY remains under `docs/doctoring/`. Exact-head execution/review evidence never transfers after source movement.
+This is the code-current decision surface for the active ConceptWeave Source Observation lane. The immediately preceding active surface through exact `51820de79986f83e8417efd7196159f59f4be1fb` is preserved losslessly at `docs/archive/product-technical-gap-baseline-through-51820de7.md`; its matching CHANGELOG is preserved at `docs/archive/CHANGELOG-through-51820de7.md`. Earlier surfaces remain under `docs/archive/`, and focused rationale/TRACEABILITY remains under `docs/doctoring/`. Exact-head execution/review evidence never transfers after source movement.
 
 ## Canonical boundary
 
@@ -12,67 +12,64 @@ ConceptWeave owns `observe -> discover -> propose -> align -> validate -> review
 
 ## Retained ordinary-EXCLUDE authority
 
-All valid predecessor repairs remain authoritative; no issued digest domain is rewritten. Ordinary `pg_constraint.contype='x'` evidence retains independent constraint/backing-index identity, ordered `conkey`/`conexclop`, operator kind/commutator/result/procedure binding, target-function scalar/strictness/volatility/parallel/kind/security/leakproof/definition/owner/configuration/ACL/planner-support/cost/transform-type facts, exact selected `pg_transform` rows, nonzero converter definition identity, converter owner identity, converter object-level EXECUTE ACL identity, operator-family/strategy, namespace/name/lifecycle/access-method controls, and exact v3 source-content-generation binding. Temporal `WITHOUT OVERLAPS`/`PERIOD` families remain separate.
+All valid predecessor repairs remain authoritative; no issued digest domain is rewritten. Ordinary `pg_constraint.contype='x'` evidence retains independent constraint/backing-index identity, ordered `conkey`/`conexclop`, operator kind/commutator/result/procedure binding, target-function scalar/strictness/volatility/parallel/kind/security/leakproof/definition/owner/configuration/ACL/planner-support/cost/transform-type facts, exact selected `pg_transform` rows, nonzero converter definition identity, converter owner identity, converter object-level `EXECUTE` ACL identity, converter nullable `proconfig` identity, operator-family/strategy, namespace/name/lifecycle/access-method controls, and exact v3 source-content-generation binding. Temporal `WITHOUT OVERLAPS`/`PERIOD` families remain separate.
 
-## EXCLUDE transform-converter configuration integrity
+## EXCLUDE transform-converter security-context integrity
 
-Review `5235145397` on exact predecessor `b5904f6ede97bf433665a45e7da910fc7433b7f8` found the next material P1: each nonzero transform converter had exact definition, owner, and ACL identity, but nullable `pg_proc.proconfig` remained independently mutable and ungoverned.
+Review `5235250993` on exact predecessor `51820de79986f83e8417efd7196159f59f4be1fb` found the next material P1: every nonzero converter was definition-, owner-, ACL-, and configuration-bound, but raw same-row `pg_proc.prosecdef` remained independently mutable and ungoverned.
 
-PostgreSQL 18 allows function-local configuration through `SET configuration_parameter` and permits `ALTER FUNCTION ... SET`, `SET FROM CURRENT`, `RESET`, and `RESET ALL` without changing the function's input identity. PostgreSQL's own `SECURITY DEFINER` guidance uses a controlled `search_path` because function-local settings can materially change runtime and security semantics. Converter `proconfig` therefore cannot be inferred from converter definition, owner, ACL, current/session GUCs, or reconstructed DDL.
+PostgreSQL 18 permits `ALTER FUNCTION ... SECURITY INVOKER|SECURITY DEFINER` without changing the function signature or the already-governed converter facts. Invoker mode executes with caller privileges; definer mode executes with the function owner's privileges. PostgreSQL's own security guidance treats `SECURITY DEFINER` as a privileged execution boundary and requires careful `search_path` handling. Converter `prosecdef` therefore cannot be inferred from owner, ACL, `proconfig`, language, definition material, or current caller identity.
 
-The ordinary-forward successor adds `IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationMaterial`, `...ConfigurationObservation`, provenance receipt, and `...ConfigurationSnapshot`. `ConfigurationMaterial` preserves raw `proconfig IS NULL` versus explicit array state, exact array length, entry order, and entry bytes in a domain-separated SHA-256 digest while keeping raw GUC values out of receipts. The unkeyed digest is an identity/non-plaintext boundary, not a confidentiality guarantee for low-entropy or guessable settings.
-
-For every exact `(constraint, key_position, transform_type, direction)` in `IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot`, the new snapshot requires exactly one configuration observation with the same converter schema/function binding. Missing/extra directions, duplicate coordinates, zero positions, binding drift, and unknown receipt coordinates fail closed. Effective session configuration and product policy remain outside Source Observation.
+The ordinary-forward successor adds `IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerObservation`, provenance receipt, and `...SecurityDefinerSnapshot`. Both Boolean states are representable; the snapshot is observational rather than a policy rule. It takes `IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationSnapshot` as its immutable direct predecessor and requires exactly one raw Boolean observation for every exact `(constraint, key_position, transform_type, direction)` converter coordinate with the same converter schema/function binding. Missing/extra directions, duplicate coordinates, zero positions, binding drift, and unknown receipt coordinates fail closed.
 
 ### Ordinary-forward lineage
 
-- finding review: `5235145397`;
-- structural source/compile RED: `b99338232954258f93fd43253e61cd58c76e295b`; no executed compiler failure is claimed;
-- production successor: `f863ec28ac0d910befbd3c416e9a0ab4797d300c`;
-- public module composition: `07053742f96f253cf3b76d1563d500a0e17be232`;
-- pre-configuration gap-baseline archive: `fa2770ac67ec527472907febcacdf682b7aabcdc`;
-- pre-configuration CHANGELOG archive: `a81b10183bfbf431588b96f4a92b64e29922a218`;
-- PostgreSQL/NIST/APA decision record: `ffcd5aaab694eae9cac1c39df8ad5ae9c5d75c4b`, `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-configuration-integrity.md`;
-- exact-head self-review `5235192112` narrowed the unkeyed digest claim from privacy to non-plaintext identity and aligned entry-count code with the retained target-function configuration pattern; minimal follow-up `ba7eb24a18e6e15ae8e14c0c152d29e56d38cd9f` changes no digest semantics.
+- finding review: `5235250993`;
+- structural source/compile RED: `96aeb1b07cf32a225db250c570a5a6ff120221be`; no executed compiler failure is claimed;
+- production successor: `6bfa27f7c20e74dfa870515850bcb04424dad4fe`;
+- public module composition: `4652d52ad538bf17ba21bd1d8c8ad3b678a5d0d4`;
+- pre-security-context gap-baseline archive: `41ab49a8a4cffdd75b404eec36bf496c29ec7f25`;
+- pre-security-context CHANGELOG archive: `849fe32b76b670e905a9b53c49aa14f8d29051b3`;
+- PostgreSQL/NIST/APA decision record: `8a9361dddd881bb1be38213a84b1b5b627720aa2`, `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-security-definer-integrity.md`.
 
-Focused contract coverage includes raw configuration provenance, NULL-vs-empty-array separation, setting-value separation, catalog-array order preservation, complete converter-direction coverage, exact converter-function binding, duplicate-coordinate rejection, one-based positions, exact receipt lookup, and public composition. Synthetic GUC values are unit-test distinguishability controls only.
+Focused contract coverage includes raw `prosecdef` provenance, invoker/definer digest separation, complete converter-direction coverage, exact converter-function binding, duplicate-coordinate rejection, one-based positions, exact receipt lookup, and public composition. Synthetic Boolean states are unit-test distinguishability controls only.
 
 ## PostgreSQL 18 and governance authority
 
-Primary authority is PostgreSQL 18 `pg_proc`, `CREATE FUNCTION`, and `ALTER FUNCTION`. Function-local settings are independently mutable, and `RESET` returns execution to the environment-provided value. PostgreSQL specifically documents secure `search_path` handling for `SECURITY DEFINER` functions. NIST SP 800-53 Rev. 5 CM-6 treats configuration settings as security-relevant parameters that require establishment, implementation, documentation, and control; this is governance mapping, not a claim that NIST defines PostgreSQL catalog semantics.
+Primary authority is PostgreSQL 18 `CREATE FUNCTION`, `ALTER FUNCTION`, and function-security guidance. `SECURITY DEFINER` changes the privilege principal under which function code runs, while `SECURITY INVOKER` uses the caller. NIST least-privilege guidance supports governing elevation boundaries as evidence, but it does not define PostgreSQL catalog semantics; PostgreSQL remains the technical authority for `prosecdef`.
 
 Traceability:
 
 - PR: `ContextualWisdomLab/ConceptWeave#46`
-- source: `crates/conceptweave-relation-partition/src/index_exclusion_constraint_operator_procedure_transform_converter_configuration.rs`
-- contract: `crates/conceptweave-relation-partition/tests/index_exclusion_constraint_operator_procedure_transform_converter_configuration_contract.rs`
-- direct predecessor: `IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot`
-- exact catalog fact: each nonzero converter function's nullable same-row `pg_proc.proconfig` array.
+- source: `crates/conceptweave-relation-partition/src/index_exclusion_constraint_operator_procedure_transform_converter_security_definer.rs`
+- contract: `crates/conceptweave-relation-partition/tests/index_exclusion_constraint_operator_procedure_transform_converter_security_definer_contract.rs`
+- direct predecessor: `IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationSnapshot`
+- exact catalog fact: each nonzero converter function's raw same-row `pg_proc.prosecdef`.
 
 ## Acceptance boundary
 
-**Source repaired is not GREEN.** The available execution environment has not established repository-pinned Rust 1.98 execution, so `fmt`, strict workspace/all-target Clippy, focused/retained tests, workspace/doc tests, release build, rustdoc, and owned statement/branch/edge coverage remain unexecuted for the moving head. The RED is structural only. One unchanged exact head must obtain native and hosted terminal acceptance before any differential or publication claim.
+**Source repaired is not GREEN.** Repository-pinned Rust 1.98 is not available in the current execution host (`cargo`, `rustc`, and `rustup` are absent), so `fmt`, strict workspace/all-target Clippy, focused/retained tests, workspace/doc tests, release build, rustdoc, and owned statement/branch/edge coverage remain unexecuted. The RED is structural only. One unchanged exact head must obtain native and hosted terminal acceptance before any differential or publication claim.
 
-The bounded PostgreSQL 18 live differential must retain every predecessor ordinary-EXCLUDE fact, resolve each selected `(trftype, target prolang)` `pg_transform` row, resolve every nonzero converter OID to the exact same-generation converter `pg_proc`, and independently capture converter definition, raw `proowner` plus role resolution, raw `proacl` NULL-state plus canonical object-level `EXECUTE` grants, and now raw nullable `proconfig`. Missing converter/configuration resolution, mixed-generation joins, or substitution with effective/session settings is capture failure rather than an unknown placeholder.
+The bounded PostgreSQL 18 live differential must retain every predecessor ordinary-EXCLUDE fact, resolve each selected `(trftype, target prolang)` `pg_transform` row, resolve every nonzero converter OID to the exact same-generation converter `pg_proc`, and independently capture converter definition, raw `proowner` plus role resolution, raw `proacl` NULL-state plus canonical object-level `EXECUTE` grants, raw nullable `proconfig`, and raw `prosecdef`. Missing converter/security-context resolution, mixed-generation joins, or inferred Boolean state is capture failure rather than an unknown placeholder.
 
 ## Residual material gap
 
-Converter definition, owner, ACL, and local configuration are now independently source-bound, but complete converter runtime/security identity is not yet claimed. `pg_proc.prosecdef` is the next identified independently mutable converter fact because execution privilege context can change without redefining the converter signature/body, owner, ACL, or `proconfig`. `proleakproof`, strictness, volatility, parallel safety, planner support/cost and other auxiliary fields remain later reviewed successors rather than inferred state.
+Converter definition, owner, ACL, local configuration, and execution security context are now independently source-bound, but complete converter runtime/security identity is not yet claimed. `pg_proc.proleakproof` is the next identified independently mutable converter fact because it can affect evaluation ordering around security-barrier views and row-level security without changing the preceding facts. Strictness, volatility, parallel safety, planner support/cost and other auxiliary fields remain later reviewed successors rather than inferred state.
 
 ## Canonical prerequisite state
 
-Fresh canonical `ContextualWisdomLab/.github#2106` has advanced materially from the predecessor authority. It is now exact head `47ccc21c0374e5fdc4deb988fd09b4967adbda23` on protected base `8c77327a52883cbb7a9a698a67c20b3c2bec6700`, OPEN / Draft, with GitHub currently reporting non-mergeable. Its branch already ordinary/non-force reconciled intervening protected-main truth and preserved the owner-qualified evidence repair. Exact-current CodeQL PR `35214196144`, Security Scan `35214196285`, Python Security `35214196142`, SAST Semgrep `35214196258`, and Agent Review Runtime Quality CI `35214196283` are all queued/nonterminal. Formal review history contains no qualifying independent approval for exact `47ccc21c...`. No predecessor checks/reviews transfer.
+Canonical `ContextualWisdomLab/.github#2106` is exact `47ccc21c0374e5fdc4deb988fd09b4967adbda23` on protected base `8c77327a52883cbb7a9a698a67c20b3c2bec6700`, OPEN / Draft and currently non-mergeable. Its branch has ordinary/non-force reconciled intervening protected-main truth. Exact-current CodeQL PR `35214196144`, Security Scan `35214196285`, Python Security `35214196142`, SAST Semgrep `35214196258`, and Agent Review Runtime Quality CI `35214196283` remain queued/nonterminal; formal review history contains no qualifying independent approval for this head. No predecessor checks/reviews transfer.
 
-Product bootstrap #35 remains exact `9bb82f041483cb4e0cf1aa1f5450b413309f9a05`, OPEN / Ready / mergeable. SAST Semgrep `34434790777` and Security Scan `34434790791` are success, while CodeQL PR `34434790860` remains `completed/failure`; normal landing is therefore not authorized before canonical workflow-owner settlement and fresh compatible acceptance.
+Product bootstrap #35 remains exact `9bb82f041483cb4e0cf1aa1f5450b413309f9a05`, OPEN / Ready / mergeable. SAST Semgrep `34434790777` and Security Scan `34434790791` are success while CodeQL PR `34434790860` remains `completed/failure`; normal landing is therefore not authorized before canonical workflow-owner settlement and fresh compatible acceptance.
 
 ## Current state
 
-`INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_CONFIGURATION_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_CONFIGURATION_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_ACCESS_CONTROL_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_OWNER_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_SOURCE_REPAIRED / CANONICAL_WORKFLOW_OWNER_SOURCE_REPAIRED / CANONICAL_WORKFLOW_OWNER_TERMINAL_SETTLEMENT_OPEN / EXACT_HEAD_NATIVE_GREEN_OPEN / EXACT_HEAD_HOSTED_GREEN_OPEN / POSTGRESQL_18_LIVE_DIFFERENTIAL_OPEN`.
+`INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_SECURITY_DEFINER_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_SECURITY_DEFINER_DIFFERENTIAL_OPEN / INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_CONFIGURATION_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_ACCESS_CONTROL_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_OWNER_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_SOURCE_REPAIRED / CANONICAL_WORKFLOW_OWNER_SOURCE_REPAIRED / CANONICAL_WORKFLOW_OWNER_TERMINAL_SETTLEMENT_OPEN / EXACT_HEAD_NATIVE_GREEN_OPEN / EXACT_HEAD_HOSTED_GREEN_OPEN / POSTGRESQL_18_LIVE_DIFFERENTIAL_OPEN`.
 
 No release readiness is asserted. Version/tag/package/immutable semantic release, SBOM/provenance, reproducibility, and rollback evidence follow only after one unchanged protected head reaches terminal acceptance.
 
 ## Required causal order
 
-Canonical `.github#2106` exact-current mergeability/terminal-settlement repair and qualifying independent approval -> fresh compatible #35 acceptance/normal landing -> one unchanged #46 native+hosted terminal GREEN including converter `proconfig` evidence -> bounded PostgreSQL 18 live differential including converter `proconfig` and all retained ordinary-EXCLUDE controls -> fresh terminal GREEN -> review converter `prosecdef` as the next independent auxiliary fact -> complete ordinary/non-force #46 adoption into #45 -> fresh #45 acceptance -> #6 propagation.
+Canonical `.github#2106` exact-current mergeability/terminal-settlement repair and qualifying independent approval -> fresh compatible #35 acceptance/normal landing -> one unchanged #46 native+hosted terminal GREEN including converter `prosecdef` evidence -> bounded PostgreSQL 18 live differential including converter `prosecdef` and all retained ordinary-EXCLUDE controls -> fresh terminal GREEN -> review converter `proleakproof` as the next independent auxiliary fact -> complete ordinary/non-force #46 adoption into #45 -> fresh #45 acceptance -> #6 propagation.
 
 Force-push, destructive rebase, self-approval, review dismissal, administrator bypass, synthetic status, copied central workflows, manual/no-op reruns, gate weakening, partial parent adoption, predecessor-evidence transfer, and premature publication/release remain prohibited.
