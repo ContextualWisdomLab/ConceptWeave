@@ -54,18 +54,22 @@ Converter definition, owner, ACL, local configuration, execution security contex
 
 ## Canonical prerequisite state
 
-Canonical `ContextualWisdomLab/.github#2106` has now ordinary/non-force reconciled onto protected `.github/main@4fda7f504e58f72f0d9120c83b7da2b5cc824f25`. Exact current owner head is `86dd9ed3d20aa45c42f88e47bf0739caf982e851`, 54 ahead / 0 behind protected main, with the effective delta restored to the nine CodeQL/bootstrap-owned paths after correcting two file-mode mismatches. It remains OPEN / Draft. Exact-head CodeQL PR `35225021676`, Security Scan `35225021653`, Python Security `35225021845`, SAST Semgrep `35225021815`, and Agent Review Runtime Quality CI `35225021720` are queued/nonterminal; no qualifying independent current-head approval exists. Predecessor-head check/review evidence does not transfer.
+Review `5237380716` found that canonical `ContextualWisdomLab/.github#2106` predecessor `6be76f6594b784d93d7be33fa1677b2419bf07b2` had retained a stale delta in `tests/test_opencode_agent_contract.py`: the test restored a separate `coverage-source-tree` job even though protected `.github/main@4e56ff0fd10e8d56e9af273881a7eb65d7e4f513` had already folded those reads into `validate-pr-metadata`, and #2106 does not modify the inherited OpenCode dispatch workflow. The reconciled branch therefore tested a job absent from its actual workflow tree.
+
+Ordinary-forward owner repair `0e9412f93bb9d4a08a689f62a563dc666ae91f88` adopts protected main's contract-test blob unchanged. Fresh compare is 57 ahead / 0 behind with the effective #2106 delta reduced from nine paths to eight; GitHub reports the Draft mergeable. This repair changes no CodeQL/bootstrap behavior and does not weaken any gate or permission boundary.
+
+Exact `0e9412f9...` naturally generated CodeQL PR `35236110056`, SAST Semgrep `35236109832`, Security Scan `35236109955`, Python Security `35236109883`, and Agent Review Runtime Quality CI `35236110143`; all are queued/nonterminal at this decision surface. No qualifying independent current-head `APPROVED` exists. Predecessor checks/reviews remain historical only.
 
 Product bootstrap #35 remains exact `9bb82f041483cb4e0cf1aa1f5450b413309f9a05`, OPEN / Ready / mergeable. Existing SAST/Security success does not erase the historical exact-head CodeQL failure; normal landing requires fresh compatible acceptance only after canonical workflow-owner terminal settlement.
 
 ## Current state
 
-`INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_LEAKPROOF_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_LEAKPROOF_LOCATION_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_LEAKPROOF_DIFFERENTIAL_OPEN / CANONICAL_WORKFLOW_OWNER_RESTACK_REPAIRED / CANONICAL_WORKFLOW_OWNER_TERMINAL_SETTLEMENT_OPEN / EXACT_HEAD_NATIVE_GREEN_OPEN / EXACT_HEAD_HOSTED_GREEN_OPEN / POSTGRESQL_18_LIVE_DIFFERENTIAL_OPEN`.
+`INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_LEAKPROOF_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_LEAKPROOF_LOCATION_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_LEAKPROOF_DIFFERENTIAL_OPEN / CANONICAL_WORKFLOW_OWNER_CURRENT_BASE_REPAIRED / CANONICAL_WORKFLOW_OWNER_TERMINAL_SETTLEMENT_OPEN / EXACT_HEAD_NATIVE_GREEN_OPEN / EXACT_HEAD_HOSTED_GREEN_OPEN / POSTGRESQL_18_LIVE_DIFFERENTIAL_OPEN`.
 
 No release readiness is asserted. Version/tag/package/immutable semantic release, SBOM/provenance, reproducibility, and rollback evidence follow only after one unchanged protected head reaches terminal acceptance.
 
 ## Required causal order
 
-Canonical `.github#2106@86dd9ed3...` exact-current terminal settlement plus qualifying independent approval -> fresh compatible #35 acceptance/normal landing -> one unchanged #46 native+hosted terminal GREEN including converter `proleakproof` and quoted-identifier location regression -> bounded PostgreSQL 18 live differential including raw converter `proleakproof` and all retained ordinary-EXCLUDE controls -> fresh terminal GREEN -> review remaining converter auxiliary `pg_proc` surfaces -> complete ordinary/non-force #46 adoption into #45 -> fresh #45 acceptance -> #6 propagation.
+Canonical `.github#2106@0e9412f9...` exact-current terminal settlement plus qualifying independent approval -> fresh compatible #35 acceptance/normal landing -> one unchanged #46 native+hosted terminal GREEN including converter `proleakproof` and quoted-identifier location regression -> bounded PostgreSQL 18 live differential including raw converter `proleakproof` and all retained ordinary-EXCLUDE controls -> fresh terminal GREEN -> review remaining converter auxiliary `pg_proc` surfaces -> complete ordinary/non-force #46 adoption into #45 -> fresh #45 acceptance -> #6 propagation.
 
 Force-push, destructive rebase, self-approval, review dismissal, administrator bypass, synthetic status, copied central workflows, manual/no-op reruns, gate weakening, partial parent adoption, predecessor-evidence transfer, and premature publication/release remain prohibited.
