@@ -2,6 +2,7 @@ include!("index_exclusion_constraint_operator_procedure_transform_converter_cont
 
 use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
+    IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity,
     IndexExclusionConstraintOperatorProcedureTransformConverterOwnerObservation,
     IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot,
 };
@@ -39,6 +40,11 @@ fn converter_owner_observation(
     owner_oid: u32,
     owner_role_name: &str,
 ) -> IndexExclusionConstraintOperatorProcedureTransformConverterOwnerObservation {
+    let owner = IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity::new(
+        owner_oid,
+        owner_role_name,
+    )
+    .unwrap();
     IndexExclusionConstraintOperatorProcedureTransformConverterOwnerObservation::new(
         coordinate(),
         1,
@@ -46,8 +52,7 @@ fn converter_owner_observation(
         direction,
         "public",
         function_name,
-        owner_oid,
-        owner_role_name,
+        owner,
     )
     .unwrap()
 }
@@ -163,13 +168,7 @@ fn ordinary_exclude_transform_converter_owner_rejects_converter_binding_drift() 
 
 #[test]
 fn ordinary_exclude_transform_converter_owner_rejects_zero_owner_oid() {
-    let error = IndexExclusionConstraintOperatorProcedureTransformConverterOwnerObservation::new(
-        coordinate(),
-        1,
-        custom_payload_type(),
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
+    let error = IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity::new(
         0,
         "transform_runtime",
     )
@@ -177,6 +176,19 @@ fn ordinary_exclude_transform_converter_owner_rejects_zero_owner_oid() {
     assert_field(
         error,
         "index_exclusion_constraint_operator_procedure_transform_converter_owner_oid",
+    );
+}
+
+#[test]
+fn ordinary_exclude_transform_converter_owner_rejects_blank_owner_role_name() {
+    let error = IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity::new(
+        16_384,
+        "   ",
+    )
+    .expect_err("owner OID resolution must retain a nonblank same-generation role name");
+    assert_field(
+        error,
+        "index_exclusion_constraint_operator_procedure_transform_converter_owner_role_name",
     );
 }
 
