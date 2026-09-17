@@ -7,7 +7,8 @@ All notable ConceptWeave changes through exact `40e137925e46c5f4c758fc671ba699b5
 ### Added
 
 - PostgreSQL ordinary `EXCLUDE` transform-converter evidence now preserves every nonzero converter function's independently observed `pg_proc.proowner` after exact `pg_transform` converter identity.
-- `IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot` binds each exact `(constraint, key_position, transform_type, direction)` to the predecessor converter coordinate, raw nonzero owner OID, and same-generation resolved role name.
+- `IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity` groups raw nonzero owner OID and same-generation resolved role name as one validated value object.
+- `IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot` binds each exact `(constraint, key_position, transform_type, direction)` to the predecessor converter coordinate and validated owner identity.
 - Converter owner provenance has an exact source receipt and a new domain-separated successor digest; the transform-converter predecessor remains immutable.
 
 ### Correctness
@@ -16,6 +17,7 @@ All notable ConceptWeave changes through exact `40e137925e46c5f4c758fc671ba699b5
 - Missing/extra owner directions, duplicate coordinates, zero owner OIDs, blank role/function identifiers, converter-function binding drift, zero positions, and unknown receipt coordinates fail closed.
 - Owner is not inferred from schema ownership, transform creation, target-function ownership, session identity, ACL, or `SECURITY DEFINER` mode.
 - The receipt location is canonicalized without a duplicate path separator, and the unknown-coordinate fixture now actually exercises a failing receipt lookup.
+- Review `5233923341` rejected the initial eight-argument owner-observation constructor instead of suppressing strict Clippy. The repair uses the owner value object and a private typed coordinate key rather than an eight-element tuple; no lint waiver was added.
 
 ### Retained
 
