@@ -23,11 +23,13 @@ const INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_CONFIGUR
     b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.exclusion_constraint.operator.procedure.transform_converter.configuration.v1";
 const SHA256_DIGEST_PREFIX: &str = "sha256:";
 
-/// Privacy-preserving identity for one exact raw converter `pg_proc.proconfig` catalog value.
+/// Non-plaintext identity for one exact raw converter `pg_proc.proconfig` catalog value.
 ///
 /// PostgreSQL represents no function-local configuration as `NULL`; an explicit empty array is a
 /// distinct catalog state and remains distinct here. Entry order and bytes are preserved exactly in
-/// digest framing rather than normalized or reconstructed from current/session configuration.
+/// digest framing rather than normalized or reconstructed from current/session configuration. The
+/// unkeyed digest prevents plaintext propagation but is not a confidentiality guarantee for
+/// guessable configuration values.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationMaterial {
     configured: bool,
@@ -40,7 +42,10 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationMat
     #[must_use]
     pub fn from_proconfig(proconfig: Option<Vec<String>>) -> Self {
         let configured = proconfig.is_some();
-        let entry_count = proconfig.as_ref().map_or(0, Vec::len);
+        let entry_count = match proconfig.as_ref() {
+            Some(entries) => entries.len(),
+            None => 0,
+        };
         let mut hasher = Sha256::new();
         hasher.update(
             INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_CONFIGURATION_MATERIAL_DIGEST_DOMAIN_V1,
@@ -74,7 +79,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationMat
         self.entry_count
     }
 
-    /// Returns the privacy-preserving digest of the exact raw converter configuration value.
+    /// Returns the domain-separated digest of the exact raw converter configuration value.
     #[must_use]
     pub fn digest(&self) -> &str {
         &self.digest
@@ -166,7 +171,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationObs
         &self.converter_function_name
     }
 
-    /// Returns the privacy-preserving identity of the exact raw converter `proconfig` value.
+    /// Returns the non-plaintext identity of the exact raw converter `proconfig` value.
     #[must_use]
     pub const fn configuration(
         &self,
