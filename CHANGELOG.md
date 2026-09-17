@@ -1,6 +1,6 @@
 # Changelog
 
-All notable ConceptWeave changes through exact `12179434ec7b11e8730a6ff4892a6f3a60973c28` are preserved losslessly at `docs/archive/CHANGELOG-through-12179434.md`; earlier release-era and Source Observation history remains in `docs/archive/`. This active changelog records the current Source Observation delta without deleting archived history.
+All notable ConceptWeave changes through exact `f43ec0d9ae878b0cad292fc9f927c63350f8c2c3` are preserved losslessly at `docs/archive/CHANGELOG-through-f43ec0d9.md`; earlier release-era and Source Observation history remains in `docs/archive/`. This active changelog records the current Source Observation delta without deleting archived history.
 
 ## Unreleased
 
@@ -18,7 +18,7 @@ All notable ConceptWeave changes through exact `12179434ec7b11e8730a6ff4892a6f3a
 
 ### Retained
 
-- All ordinary-EXCLUDE source-integrity repairs archived through `docs/archive/product-technical-gap-baseline-through-12179434.md` remain authoritative, including exact constraint/backing-index identity; namespace/name/role/immediacy; access-method exclusion capability; catalog-family shape; ordered `conkey`/`conexclop`; raw binary `oprkind`; self-commutator; exact `oprcode -> pg_proc` function; independent `oprresult`/`prorettype` with exact `pg_catalog.bool`; scalar `proretset=false`; raw `proisstrict`, `provolatile`, `proparallel`, `prokind='f'`, `prosecdef`, and `proleakproof`; backing-index `pg_class.relnamespace`; ready/valid/live lifecycle; and exact v3 source-content generation binding.
+- All ordinary-EXCLUDE source-integrity repairs archived through `docs/archive/product-technical-gap-baseline-through-f43ec0d9.md` remain authoritative, including exact constraint/backing-index identity; namespace/name/role/immediacy; access-method exclusion capability; catalog-family shape; ordered `conkey`/`conexclop`; raw binary `oprkind`; self-commutator; exact `oprcode -> pg_proc` function; independent `oprresult`/`prorettype` with exact `pg_catalog.bool`; scalar `proretset=false`; raw `proisstrict`, `provolatile`, `proparallel`, `prokind='f'`, `prosecdef`, and `proleakproof`; implementation-definition identity; backing-index `pg_class.relnamespace`; ready/valid/live lifecycle; and exact v3 source-content generation binding.
 
 ### Acceptance
 
