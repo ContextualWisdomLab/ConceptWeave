@@ -32,6 +32,14 @@ PostgreSQL defines `LEAKPROOF` as a trust assertion that a function reveals no i
 
 Synthetic false/true values in the focused contract are distinguishability controls only; they are not empirical claims about a production PostgreSQL instance.
 
+## Provenance-location identity repair
+
+Review `5236499737` on exact head `4256f8dc361ae8ed00980799d524a261b161b1a8` found a separate provenance defect after the leakproof catalog fact itself had been source-bound. `QualifiedTypeName` intentionally preserves exact PostgreSQL identifiers, including characters requiring SQL quoting, but the leakproof `canonical_location()` serialized a selected transform type as raw `schema.type`. PostgreSQL 18 permits quoted identifiers to contain arbitrary characters except the zero byte, so valid coordinates such as schema `payload.domain` with type `json` and schema `payload` with type `domain.json` collapsed to the same path text. The digest remained collision-safe because its type components were length-framed independently, but provenance/error location identity did not.
+
+A realistic regression was committed first at `008c99a2e82105046df0b9ed7061bc6cb931ebb9`: two valid `QualifiedTypeName` values whose raw dotted form is identical must yield different canonical locations. The minimum causal fix at `3ce7e0bcf6d6a3a0935465147e2eaf5fd3a63e81` percent-encodes each transform-type schema/name component independently before inserting the dot separator. ASCII letters, digits, `_`, and `-` remain readable; every other UTF-8 byte, including `.`, `/`, `%`, whitespace, and non-ASCII bytes, is encoded as uppercase `%HH`. Existing ordinary identifiers therefore keep their familiar location shape while quoted/special identifiers cannot cross the component boundary.
+
+This repair deliberately does **not** change the leakproof digest domain or the typed receipt lookup key. It corrects only the string representation used for provenance/error location. Earlier issued predecessor digest semantics remain untouched.
+
 ## PostgreSQL 18 bounded differential
 
 For each selected `(trftype, target prolang)` `pg_transform` row and each nonzero converter OID, one bounded capture must resolve the same exact converter `pg_proc` generation and independently read retained converter definition, `proowner`, `proacl`, `proconfig`, `prosecdef`, and `proleakproof`. A mixed-generation join, unresolved converter row, or inferred leakproof value is capture failure rather than an `unknown` placeholder.
@@ -40,15 +48,18 @@ The differential must retain all earlier ordinary-EXCLUDE operator, target-funct
 
 ## Security and assurance interpretation
 
-PostgreSQL is the technical authority for `proleakproof` semantics. NIST least-privilege and assessment guidance supports preserving independently testable security-relevant configuration evidence, but it does not define PostgreSQL planner semantics and is not used to infer the catalog value. In particular, a leakproof flag is not equivalent to authorization, owner trust, `SECURITY DEFINER`, or an organizational approval.
+PostgreSQL is the technical authority for `proleakproof` semantics and for identifier lexical rules. NIST least-privilege and assessment guidance supports preserving independently testable security-relevant configuration evidence, but it does not define PostgreSQL planner semantics and is not used to infer the catalog value. In particular, a leakproof flag is not equivalent to authorization, owner trust, `SECURITY DEFINER`, or an organizational approval.
 
 ## TRACEABILITY
 
 - owner PR: `ContextualWisdomLab/ConceptWeave#46`
-- finding review: `5235830453`
+- leakproof finding review: `5235830453`
 - structural source/compile RED: `ce86f3c7e84054a0c58e38f81a8b230c3e2653b3`
 - production successor: `14ebe48407ab448586f68dbce8b2cd55b32ea5ba`
 - public module composition: `5a8229d6d04e3d4498cac61b0603eacc2e4398bc`
+- provenance-location finding review: `5236499737`
+- realistic location-collision RED: `008c99a2e82105046df0b9ed7061bc6cb931ebb9`
+- location repair: `3ce7e0bcf6d6a3a0935465147e2eaf5fd3a63e81`
 - predecessor exact head: `1153c0b6f121b5b99c533d73e3dc9e7b4305c276`
 - source: `crates/conceptweave-relation-partition/src/index_exclusion_constraint_operator_procedure_transform_converter_leakproof.rs`
 - focused contract: `crates/conceptweave-relation-partition/tests/index_exclusion_constraint_operator_procedure_transform_converter_leakproof_contract.rs`
@@ -64,6 +75,8 @@ Joint Task Force. (2022). *Assessing security and privacy controls in informatio
 PostgreSQL Global Development Group. (2026). *ALTER FUNCTION*. In *PostgreSQL 18 documentation*. https://www.postgresql.org/docs/18/sql-alterfunction.html
 
 PostgreSQL Global Development Group. (2026). *CREATE FUNCTION*. In *PostgreSQL 18 documentation*. https://www.postgresql.org/docs/18/sql-createfunction.html
+
+PostgreSQL Global Development Group. (2026). *Lexical structure*. In *PostgreSQL 18 documentation*. https://www.postgresql.org/docs/18/sql-syntax-lexical.html
 
 PostgreSQL Global Development Group. (2026). *Planner statistics and security*. In *PostgreSQL 18 documentation*. https://www.postgresql.org/docs/18/planner-stats-security.html
 
