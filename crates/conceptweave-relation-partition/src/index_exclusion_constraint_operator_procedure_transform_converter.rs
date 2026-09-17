@@ -30,6 +30,52 @@ const INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_FUNCTION
     b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.exclusion_constraint.operator.procedure.transform_converter.function.v1";
 const SHA256_DIGEST_PREFIX: &str = "sha256:";
 
+/// Privacy-preserving implementation material for one exact transform converter function.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IndexExclusionConstraintOperatorProcedureTransformConverterFunctionDefinition {
+    implementation_language_name: String,
+    definition_digest: String,
+}
+
+impl IndexExclusionConstraintOperatorProcedureTransformConverterFunctionDefinition {
+    /// Reduces exact converter implementation material to a domain-separated digest.
+    pub fn new(
+        implementation_language_name: impl Into<String>,
+        prosrc: impl Into<String>,
+        probin: Option<String>,
+        prosqlbody: Option<String>,
+    ) -> Result<Self, ObservationError> {
+        let implementation_language_name = implementation_language_name.into();
+        validate_nonblank(
+            &implementation_language_name,
+            "index_exclusion_constraint_operator_procedure_transform_converter_function_language",
+        )?;
+        let prosrc = prosrc.into();
+        let definition_digest = compute_converter_function_definition_digest(
+            &implementation_language_name,
+            &prosrc,
+            probin.as_deref(),
+            prosqlbody.as_deref(),
+        );
+        Ok(Self {
+            implementation_language_name,
+            definition_digest,
+        })
+    }
+
+    /// Returns the independently resolved implementation language of the converter function itself.
+    #[must_use]
+    pub fn implementation_language_name(&self) -> &str {
+        &self.implementation_language_name
+    }
+
+    /// Returns the content digest of exact converter implementation material.
+    #[must_use]
+    pub fn definition_digest(&self) -> &str {
+        &self.definition_digest
+    }
+}
+
 /// Content-bound identity for one nonzero `pg_transform` converter-function OID.
 ///
 /// PostgreSQL requires transform conversion functions to accept exactly one `internal` argument.
@@ -41,25 +87,20 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterFunction {
     function_name: String,
     argument_type: QualifiedTypeName,
     return_type: QualifiedTypeName,
-    implementation_language_name: String,
-    definition_digest: String,
+    definition: IndexExclusionConstraintOperatorProcedureTransformConverterFunctionDefinition,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterFunction {
-    /// Resolves one converter function and immediately reduces its implementation material to a digest.
+    /// Resolves one converter function without retaining plaintext implementation material.
     pub fn new(
         schema_name: impl Into<String>,
         function_name: impl Into<String>,
         argument_type: QualifiedTypeName,
         return_type: QualifiedTypeName,
-        implementation_language_name: impl Into<String>,
-        prosrc: impl Into<String>,
-        probin: Option<String>,
-        prosqlbody: Option<String>,
+        definition: IndexExclusionConstraintOperatorProcedureTransformConverterFunctionDefinition,
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let function_name = function_name.into();
-        let implementation_language_name = implementation_language_name.into();
         validate_nonblank(
             &schema_name,
             "index_exclusion_constraint_operator_procedure_transform_converter_function_schema",
@@ -68,33 +109,17 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterFunction {
             &function_name,
             "index_exclusion_constraint_operator_procedure_transform_converter_function_name",
         )?;
-        validate_nonblank(
-            &implementation_language_name,
-            "index_exclusion_constraint_operator_procedure_transform_converter_function_language",
-        )?;
         if !is_pg_catalog_internal(&argument_type) {
             return Err(invalid(
                 "index_exclusion_constraint_operator_procedure_transform_converter_argument_type",
             ));
         }
-        let prosrc = prosrc.into();
-        let definition_digest = compute_converter_function_definition_digest(
-            &schema_name,
-            &function_name,
-            &argument_type,
-            &return_type,
-            &implementation_language_name,
-            &prosrc,
-            probin.as_deref(),
-            prosqlbody.as_deref(),
-        );
         Ok(Self {
             schema_name,
             function_name,
             argument_type,
             return_type,
-            implementation_language_name,
-            definition_digest,
+            definition,
         })
     }
 
@@ -125,13 +150,13 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterFunction {
     /// Returns the independently resolved implementation language of the converter function itself.
     #[must_use]
     pub fn implementation_language_name(&self) -> &str {
-        &self.implementation_language_name
+        self.definition.implementation_language_name()
     }
 
     /// Returns the content digest of exact converter implementation material.
     #[must_use]
     pub fn definition_digest(&self) -> &str {
-        &self.definition_digest
+        self.definition.definition_digest()
     }
 }
 
@@ -341,7 +366,9 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSourceReceipt {
 
     /// Returns the exact validated transform-converter observation.
     #[must_use]
-    pub const fn location(&self) -> &IndexExclusionConstraintOperatorProcedureTransformConverterObservation {
+    pub const fn location(
+        &self,
+    ) -> &IndexExclusionConstraintOperatorProcedureTransformConverterObservation {
         &self.location
     }
 }
@@ -364,10 +391,12 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot {
         definition_snapshot: &IndexExclusionConstraintOperatorProcedureDefinitionSnapshot,
         mut observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterObservation>,
     ) -> Result<Self, ObservationError> {
-        if transform_types_snapshot.source_connection_key() != definition_snapshot.source_connection_key()
+        if transform_types_snapshot.source_connection_key()
+            != definition_snapshot.source_connection_key()
             || transform_types_snapshot.connection_policy_binding()
                 != definition_snapshot.connection_policy_binding()
-            || transform_types_snapshot.extractor_revision() != definition_snapshot.extractor_revision()
+            || transform_types_snapshot.extractor_revision()
+                != definition_snapshot.extractor_revision()
             || transform_types_snapshot.observed_at_utc() != definition_snapshot.observed_at_utc()
         {
             return Err(invalid(
@@ -478,7 +507,9 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot {
         );
         Ok(Self {
             source_connection_key: transform_types_snapshot.source_connection_key().to_owned(),
-            connection_policy_binding: transform_types_snapshot.connection_policy_binding().to_owned(),
+            connection_policy_binding: transform_types_snapshot
+                .connection_policy_binding()
+                .to_owned(),
             snapshot_digest,
             extractor_revision: transform_types_snapshot.extractor_revision().to_owned(),
             observed_at_utc: transform_types_snapshot.observed_at_utc().to_owned(),
@@ -518,7 +549,9 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot {
 
     /// Returns complete transform-converter observations in deterministic constraint/key order.
     #[must_use]
-    pub fn observations(&self) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterObservation] {
+    pub fn observations(
+        &self,
+    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterObservation] {
         &self.observations
     }
 
@@ -527,7 +560,10 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot {
         &self,
         coordinate: IndexExclusionConstraintCoordinate,
         key_position: u32,
-    ) -> Result<IndexExclusionConstraintOperatorProcedureTransformConverterSourceReceipt, ObservationError> {
+    ) -> Result<
+        IndexExclusionConstraintOperatorProcedureTransformConverterSourceReceipt,
+        ObservationError,
+    > {
         let observation = self
             .observations
             .iter()
@@ -550,21 +586,15 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot {
 }
 
 fn compute_converter_function_definition_digest(
-    schema_name: &str,
-    function_name: &str,
-    argument_type: &QualifiedTypeName,
-    return_type: &QualifiedTypeName,
     implementation_language_name: &str,
     prosrc: &str,
     probin: Option<&str>,
     prosqlbody: Option<&str>,
 ) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_FUNCTION_DIGEST_DOMAIN_V1);
-    encode_str(&mut hasher, schema_name);
-    encode_str(&mut hasher, function_name);
-    encode_type(&mut hasher, argument_type);
-    encode_type(&mut hasher, return_type);
+    hasher.update(
+        INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_FUNCTION_DIGEST_DOMAIN_V1,
+    );
     encode_str(&mut hasher, implementation_language_name);
     encode_str(&mut hasher, prosrc);
     encode_optional_str(&mut hasher, probin);
