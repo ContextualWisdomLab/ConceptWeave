@@ -144,6 +144,10 @@ pub use exclusion_constraint_operator_procedure_planner_support::*;
 mod exclusion_constraint_operator_procedure_cost;
 pub use exclusion_constraint_operator_procedure_cost::*;
 
+#[path = "index_exclusion_constraint_operator_procedure_transform_types.rs"]
+mod exclusion_constraint_operator_procedure_transform_types;
+pub use exclusion_constraint_operator_procedure_transform_types::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
