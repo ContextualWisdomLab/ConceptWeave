@@ -108,6 +108,10 @@ pub use exclusion_constraint_operator_procedure_volatility::*;
 mod exclusion_constraint_operator_procedure_parallel_safety;
 pub use exclusion_constraint_operator_procedure_parallel_safety::*;
 
+#[path = "index_exclusion_constraint_operator_procedure_kind.rs"]
+mod exclusion_constraint_operator_procedure_kind;
+pub use exclusion_constraint_operator_procedure_kind::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
