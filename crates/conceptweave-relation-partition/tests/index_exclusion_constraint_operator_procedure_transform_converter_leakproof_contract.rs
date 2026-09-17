@@ -77,6 +77,38 @@ fn ordinary_exclude_transform_converter_leakproof_preserves_raw_proleakproof() {
 }
 
 #[test]
+fn ordinary_exclude_transform_converter_leakproof_location_is_collision_safe_for_quoted_type_names() {
+    let dotted_schema =
+        conceptweave_observation::QualifiedTypeName::new("payload.domain", "json").unwrap();
+    let dotted_type =
+        conceptweave_observation::QualifiedTypeName::new("payload", "domain.json").unwrap();
+    let schema_location = IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofObservation::new(
+        coordinate(),
+        1,
+        dotted_schema,
+        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+        "public",
+        "payload_from_sql",
+        false,
+    )
+    .unwrap()
+    .canonical_location();
+    let type_location = IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofObservation::new(
+        coordinate(),
+        1,
+        dotted_type,
+        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+        "public",
+        "payload_from_sql",
+        false,
+    )
+    .unwrap()
+    .canonical_location();
+
+    assert_ne!(schema_location, type_location);
+}
+
+#[test]
 fn ordinary_exclude_transform_converter_leakproof_distinguishes_false_from_true() {
     let predecessor = security_definer_snapshot();
     let nonleakproof =
