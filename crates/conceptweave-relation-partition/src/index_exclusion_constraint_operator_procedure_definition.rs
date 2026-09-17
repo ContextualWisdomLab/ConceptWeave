@@ -31,38 +31,25 @@ const INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_DEFINITION_MATERIAL_DIGEST_D
     b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.exclusion_constraint.operator.procedure.definition.material.v1";
 const SHA256_DIGEST_PREFIX: &str = "sha256:";
 
-/// Content-bound implementation-definition evidence for one exact ordinary-EXCLUDE function.
+/// Privacy-preserving content identity derived from one exact `pg_proc` implementation definition.
 ///
-/// The constructor receives the resolved `pg_language.lanname` plus exact `pg_proc.prosrc`, optional
-/// `probin`, and optional `prosqlbody` values from the already-bound `oprcode` row. Plaintext
-/// implementation material is immediately reduced to a domain-separated digest and is not retained
-/// by this value object.
+/// The constructor consumes the resolved `pg_language.lanname` plus exact `prosrc`, optional `probin`,
+/// and optional `prosqlbody`. Plaintext implementation material is reduced immediately to a
+/// domain-separated digest and is not retained by this value object.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IndexExclusionConstraintOperatorProcedureDefinitionObservation {
-    coordinate: IndexExclusionConstraintCoordinate,
-    key_position: u32,
-    operator: QualifiedOperatorSignature,
-    procedure: QualifiedProcedureSignature,
+pub struct IndexExclusionConstraintOperatorProcedureDefinitionMaterial {
     language_name: String,
     definition_digest: String,
 }
 
-impl IndexExclusionConstraintOperatorProcedureDefinitionObservation {
-    /// Records one exact function definition without retaining its plaintext source material.
-    #[allow(clippy::too_many_arguments)]
+impl IndexExclusionConstraintOperatorProcedureDefinitionMaterial {
+    /// Derives implementation identity from one exact `pg_proc` row and its resolved language.
     pub fn new(
-        coordinate: IndexExclusionConstraintCoordinate,
-        key_position: u32,
-        operator: QualifiedOperatorSignature,
-        procedure: QualifiedProcedureSignature,
         language_name: impl Into<String>,
         prosrc: impl Into<String>,
         probin: Option<String>,
         prosqlbody: Option<String>,
     ) -> Result<Self, ObservationError> {
-        if key_position == 0 {
-            return Err(ObservationError::InvalidOrdinalPosition);
-        }
         let language_name = language_name.into();
         if language_name.trim().is_empty() {
             return Err(invalid(
@@ -77,12 +64,52 @@ impl IndexExclusionConstraintOperatorProcedureDefinitionObservation {
             prosqlbody.as_deref(),
         );
         Ok(Self {
+            language_name,
+            definition_digest,
+        })
+    }
+
+    /// Returns the independently resolved implementation language name.
+    #[must_use]
+    pub fn language_name(&self) -> &str {
+        &self.language_name
+    }
+
+    /// Returns the digest of language plus exact `prosrc`/`probin`/`prosqlbody` material.
+    #[must_use]
+    pub fn definition_digest(&self) -> &str {
+        &self.definition_digest
+    }
+}
+
+/// Content-bound implementation-definition evidence for one exact ordinary-EXCLUDE function.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IndexExclusionConstraintOperatorProcedureDefinitionObservation {
+    coordinate: IndexExclusionConstraintCoordinate,
+    key_position: u32,
+    operator: QualifiedOperatorSignature,
+    procedure: QualifiedProcedureSignature,
+    material: IndexExclusionConstraintOperatorProcedureDefinitionMaterial,
+}
+
+impl IndexExclusionConstraintOperatorProcedureDefinitionObservation {
+    /// Records one exact function definition without retaining its plaintext source material.
+    pub fn new(
+        coordinate: IndexExclusionConstraintCoordinate,
+        key_position: u32,
+        operator: QualifiedOperatorSignature,
+        procedure: QualifiedProcedureSignature,
+        material: IndexExclusionConstraintOperatorProcedureDefinitionMaterial,
+    ) -> Result<Self, ObservationError> {
+        if key_position == 0 {
+            return Err(ObservationError::InvalidOrdinalPosition);
+        }
+        Ok(Self {
             coordinate,
             key_position,
             operator,
             procedure,
-            language_name,
-            definition_digest,
+            material,
         })
     }
 
@@ -113,13 +140,13 @@ impl IndexExclusionConstraintOperatorProcedureDefinitionObservation {
     /// Returns the independently resolved implementation language name.
     #[must_use]
     pub fn language_name(&self) -> &str {
-        &self.language_name
+        self.material.language_name()
     }
 
-    /// Returns the domain-separated digest of language plus `prosrc`/`probin`/`prosqlbody` material.
+    /// Returns the domain-separated implementation-definition digest.
     #[must_use]
     pub fn definition_digest(&self) -> &str {
-        &self.definition_digest
+        self.material.definition_digest()
     }
 
     /// Returns the collision-safe evidence location for this implementation definition.
@@ -182,7 +209,7 @@ impl IndexExclusionConstraintOperatorProcedureDefinitionSourceReceipt {
 ///
 /// Every governed ordinary-EXCLUDE operator position must receive exactly one definition observation
 /// bound to the same stable operator and exact `oprcode` function. Plaintext source/link/body values
-/// are not retained after the observation constructor derives its definition digest.
+/// are not retained after definition material derives its digest.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexExclusionConstraintOperatorProcedureDefinitionSnapshot {
     source_connection_key: String,
