@@ -2,7 +2,7 @@
 
 **Snapshot:** 2026-09-17
 
-This is the code-current decision surface for the active ConceptWeave Source Observation lane. The immediately preceding active baseline remains preserved at `docs/archive/product-technical-gap-baseline-through-12179434.md`; earlier detailed decision surfaces remain in `docs/archive/`, and focused authority/TRACEABILITY records remain in `docs/doctoring/`. Exact-head execution evidence never transfers after branch movement.
+This is the code-current decision surface for the active ConceptWeave Source Observation lane. The immediately preceding active baseline is preserved byte-for-byte at `docs/archive/product-technical-gap-baseline-through-f43ec0d9.md`; earlier detailed decision surfaces remain in `docs/archive/`, and focused authority/TRACEABILITY records remain in `docs/doctoring/`. Exact-head execution evidence never transfers after branch movement.
 
 ## Canonical boundary
 
@@ -51,7 +51,9 @@ Owner lineage:
 - production successor `39382ad29a35b428c8b431a46b4071aa202603ec`;
 - public composition `51d8d43af1deb230fa475f211c87ccd890bdbe68`;
 - PostgreSQL/APA decision record `73bd9c86b16c77f2b53c78bf19438d486ee6e8e`, `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-owner-integrity.md`;
-- active CHANGELOG currentization `d470cf19072207c702abfec59de4d6b2be8bc40a`.
+- active CHANGELOG currentization `d470cf19072207c702abfec59de4d6b2be8bc40a`;
+- pre-owner CHANGELOG preserved at `docs/archive/CHANGELOG-through-f43ec0d9.md` by `abb4b15329cd9aa3d6780b7d5e50a9d883b1cb21`;
+- pre-owner product/technical-gap baseline preserved byte-for-byte at `docs/archive/product-technical-gap-baseline-through-f43ec0d9.md` by `75db05c1f4a5ba665f101b9b3ca4b44ff7631107`.
 
 Owner invariants are exact completeness, unique coordinates, exact operator/function predecessor binding, nonzero owner OID, nonblank independently resolved role name, one-based key positions, and exact receipt coordinates. Ownership remains observational for both SECURITY INVOKER and SECURITY DEFINER functions. Role privilege closure, role membership, and role-local configuration are separate concerns and are not inferred by this layer.
 
