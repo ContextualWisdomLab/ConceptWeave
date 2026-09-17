@@ -21,7 +21,7 @@ fn cost_predecessor() -> IndexExclusionConstraintOperatorProcedureCostSnapshot {
 fn transform_types_observation(
     observed_operator: QualifiedOperatorSignature,
     observed_procedure: QualifiedProcedureSignature,
-    transform_types: Vec<QualifiedTypeName>,
+    transform_types: Option<Vec<QualifiedTypeName>>,
 ) -> IndexExclusionConstraintOperatorProcedureTransformTypesObservation {
     IndexExclusionConstraintOperatorProcedureTransformTypesObservation::new(
         coordinate(),
@@ -42,7 +42,7 @@ fn ordinary_exclude_operator_procedure_transform_types_preserve_exact_pg_proc_pr
         vec![transform_types_observation(
             operator("="),
             procedure("int4eq"),
-            vec![transformed.clone()],
+            Some(vec![transformed.clone()]),
         )],
     )
     .unwrap();
@@ -50,7 +50,7 @@ fn ordinary_exclude_operator_procedure_transform_types_preserve_exact_pg_proc_pr
 
     assert_eq!(receipt.location().operator(), &operator("="));
     assert_eq!(receipt.location().procedure(), &procedure("int4eq"));
-    assert_eq!(receipt.location().transform_types(), &[transformed]);
+    assert_eq!(receipt.location().transform_types(), Some(&[transformed][..]));
     assert_eq!(receipt.source_id(), predecessor.source_connection_key());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
     assert!(receipt
@@ -60,14 +60,14 @@ fn ordinary_exclude_operator_procedure_transform_types_preserve_exact_pg_proc_pr
 }
 
 #[test]
-fn ordinary_exclude_operator_procedure_transform_types_distinguish_transform_selection() {
+fn ordinary_exclude_operator_procedure_transform_types_distinguish_null_and_transform_selection() {
     let predecessor = cost_predecessor();
     let none = IndexExclusionConstraintOperatorProcedureTransformTypesSnapshot::new(
         &predecessor,
         vec![transform_types_observation(
             operator("="),
             procedure("int4eq"),
-            vec![],
+            None,
         )],
     )
     .unwrap();
@@ -76,7 +76,7 @@ fn ordinary_exclude_operator_procedure_transform_types_distinguish_transform_sel
         vec![transform_types_observation(
             operator("="),
             procedure("int4eq"),
-            vec![QualifiedTypeName::new("public", "custom_payload").unwrap()],
+            Some(vec![QualifiedTypeName::new("public", "custom_payload").unwrap()]),
         )],
     )
     .unwrap();
@@ -94,7 +94,7 @@ fn ordinary_exclude_operator_procedure_transform_types_are_set_canonical() {
         vec![transform_types_observation(
             operator("="),
             procedure("int4eq"),
-            vec![left.clone(), right.clone()],
+            Some(vec![left.clone(), right.clone()]),
         )],
     )
     .unwrap();
@@ -103,12 +103,28 @@ fn ordinary_exclude_operator_procedure_transform_types_are_set_canonical() {
         vec![transform_types_observation(
             operator("="),
             procedure("int4eq"),
-            vec![right, left],
+            Some(vec![right, left]),
         )],
     )
     .unwrap();
 
     assert_eq!(forward.snapshot_digest(), reverse.snapshot_digest());
+}
+
+#[test]
+fn ordinary_exclude_operator_procedure_transform_types_reject_explicit_empty_array() {
+    let error = IndexExclusionConstraintOperatorProcedureTransformTypesObservation::new(
+        coordinate(),
+        1,
+        operator("="),
+        procedure("int4eq"),
+        Some(vec![]),
+    )
+    .expect_err("PostgreSQL documents NULL rather than an empty protrftypes array when none apply");
+    assert_field(
+        error,
+        "index_exclusion_constraint_operator_procedure_transform_types_empty",
+    );
 }
 
 #[test]
@@ -119,7 +135,7 @@ fn ordinary_exclude_operator_procedure_transform_types_reject_duplicate_type() {
         1,
         operator("="),
         procedure("int4eq"),
-        vec![duplicated.clone(), duplicated],
+        Some(vec![duplicated.clone(), duplicated]),
     )
     .expect_err("duplicate protrftypes entries must not be silently collapsed");
     assert_field(
@@ -136,7 +152,7 @@ fn ordinary_exclude_operator_procedure_transform_types_reject_procedure_binding_
         vec![transform_types_observation(
             operator("="),
             procedure("int4ne"),
-            vec![],
+            None,
         )],
     )
     .expect_err("transform evidence must bind to the exact pg_operator.oprcode function");
@@ -154,7 +170,7 @@ fn ordinary_exclude_operator_procedure_transform_types_reject_operator_binding_d
         vec![transform_types_observation(
             operator("<>"),
             procedure("int4eq"),
-            vec![],
+            None,
         )],
     )
     .expect_err("transform evidence must stay on the exact governed conexclop position");
@@ -181,7 +197,7 @@ fn ordinary_exclude_operator_procedure_transform_types_reject_missing_evidence()
 #[test]
 fn ordinary_exclude_operator_procedure_transform_types_reject_duplicate_coordinate() {
     let predecessor = cost_predecessor();
-    let observation = transform_types_observation(operator("="), procedure("int4eq"), vec![]);
+    let observation = transform_types_observation(operator("="), procedure("int4eq"), None);
     let error = IndexExclusionConstraintOperatorProcedureTransformTypesSnapshot::new(
         &predecessor,
         vec![observation.clone(), observation],
@@ -200,7 +216,7 @@ fn ordinary_exclude_operator_procedure_transform_types_reject_zero_position() {
         0,
         operator("="),
         procedure("int4eq"),
-        vec![],
+        None,
     )
     .expect_err("operator procedure positions are one-based");
     assert_eq!(error, ObservationError::InvalidOrdinalPosition);
@@ -214,7 +230,7 @@ fn ordinary_exclude_operator_procedure_transform_types_reject_unknown_receipt_co
         vec![transform_types_observation(
             operator("="),
             procedure("int4eq"),
-            vec![],
+            None,
         )],
     )
     .unwrap();
