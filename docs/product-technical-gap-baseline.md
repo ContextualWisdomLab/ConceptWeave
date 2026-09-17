@@ -20,7 +20,7 @@ Review `5235145397` on exact predecessor `b5904f6ede97bf433665a45e7da910fc7433b7
 
 PostgreSQL 18 allows function-local configuration through `SET configuration_parameter` and permits `ALTER FUNCTION ... SET`, `SET FROM CURRENT`, `RESET`, and `RESET ALL` without changing the function's input identity. PostgreSQL's own `SECURITY DEFINER` guidance uses a controlled `search_path` because function-local settings can materially change runtime and security semantics. Converter `proconfig` therefore cannot be inferred from converter definition, owner, ACL, current/session GUCs, or reconstructed DDL.
 
-The ordinary-forward successor adds `IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationMaterial`, `...ConfigurationObservation`, provenance receipt, and `...ConfigurationSnapshot`. `ConfigurationMaterial` preserves raw `proconfig IS NULL` versus explicit array state, exact array length, entry order, and entry bytes in a domain-separated SHA-256 digest while keeping raw GUC values out of receipts.
+The ordinary-forward successor adds `IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationMaterial`, `...ConfigurationObservation`, provenance receipt, and `...ConfigurationSnapshot`. `ConfigurationMaterial` preserves raw `proconfig IS NULL` versus explicit array state, exact array length, entry order, and entry bytes in a domain-separated SHA-256 digest while keeping raw GUC values out of receipts. The unkeyed digest is an identity/non-plaintext boundary, not a confidentiality guarantee for low-entropy or guessable settings.
 
 For every exact `(constraint, key_position, transform_type, direction)` in `IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot`, the new snapshot requires exactly one configuration observation with the same converter schema/function binding. Missing/extra directions, duplicate coordinates, zero positions, binding drift, and unknown receipt coordinates fail closed. Effective session configuration and product policy remain outside Source Observation.
 
@@ -32,7 +32,8 @@ For every exact `(constraint, key_position, transform_type, direction)` in `Inde
 - public module composition: `07053742f96f253cf3b76d1563d500a0e17be232`;
 - pre-configuration gap-baseline archive: `fa2770ac67ec527472907febcacdf682b7aabcdc`;
 - pre-configuration CHANGELOG archive: `a81b10183bfbf431588b96f4a92b64e29922a218`;
-- PostgreSQL/NIST/APA decision record: `ffcd5aaab694eae9cac1c39df8ad5ae9c5d75c4b`, `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-configuration-integrity.md`.
+- PostgreSQL/NIST/APA decision record: `ffcd5aaab694eae9cac1c39df8ad5ae9c5d75c4b`, `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-configuration-integrity.md`;
+- exact-head self-review `5235192112` narrowed the unkeyed digest claim from privacy to non-plaintext identity and aligned entry-count code with the retained target-function configuration pattern; minimal follow-up `ba7eb24a18e6e15ae8e14c0c152d29e56d38cd9f` changes no digest semantics.
 
 Focused contract coverage includes raw configuration provenance, NULL-vs-empty-array separation, setting-value separation, catalog-array order preservation, complete converter-direction coverage, exact converter-function binding, duplicate-coordinate rejection, one-based positions, exact receipt lookup, and public composition. Synthetic GUC values are unit-test distinguishability controls only.
 
