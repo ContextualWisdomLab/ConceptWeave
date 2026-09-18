@@ -65,8 +65,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesOb
         }
         if let Some(types) = transform_types.as_mut() {
             types.sort_by(|left, right| {
-                (left.schema_name(), left.type_name())
-                    .cmp(&(right.schema_name(), right.type_name()))
+                (left.schema_name(), left.type_name()).cmp(&(right.schema_name(), right.type_name()))
             });
             if types.windows(2).any(|pair| pair[0] == pair[1]) {
                 return Err(invalid(
@@ -198,6 +197,7 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterTransformT
     source_connection_key: String,
     connection_policy_binding: String,
     snapshot_digest: String,
+    converter_snapshot_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
     observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation>,
@@ -270,6 +270,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSn
             source_connection_key: argument_names_snapshot.source_connection_key().to_owned(),
             connection_policy_binding: argument_names_snapshot.connection_policy_binding().to_owned(),
             snapshot_digest,
+            converter_snapshot_digest: argument_names_snapshot.converter_snapshot_digest().to_owned(),
             extractor_revision: argument_names_snapshot.extractor_revision().to_owned(),
             observed_at_utc: argument_names_snapshot.observed_at_utc().to_owned(),
             observations,
@@ -292,6 +293,12 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSn
     #[must_use]
     pub fn snapshot_digest(&self) -> &str {
         &self.snapshot_digest
+    }
+
+    /// Returns the immutable raw transform-converter root digest.
+    #[must_use]
+    pub fn converter_snapshot_digest(&self) -> &str {
+        &self.converter_snapshot_digest
     }
 
     /// Returns the exact extractor revision inherited from the predecessor chain.
