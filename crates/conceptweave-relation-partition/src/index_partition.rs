@@ -220,6 +220,10 @@ pub use exclusion_constraint_operator_procedure_transform_converter_transform_ty
 mod exclusion_constraint_operator_procedure_transform_converter_extension_membership;
 pub use exclusion_constraint_operator_procedure_transform_converter_extension_membership::*;
 
+#[path = "index_exclusion_constraint_operator_procedure_transform_extension_membership.rs"]
+mod exclusion_constraint_operator_procedure_transform_extension_membership;
+pub use exclusion_constraint_operator_procedure_transform_extension_membership::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
