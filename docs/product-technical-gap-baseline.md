@@ -2,7 +2,7 @@
 
 **Snapshot:** 2026-09-19
 
-This is the code-current decision surface for the active ConceptWeave Source Observation lane. The preceding converter-cost surface through exact head `ef4657347a605a1a5acbfac8500fadf8142ae9b9` is preserved losslessly at `docs/archive/product-technical-gap-baseline-through-ef465734.md`; its matching changelog is preserved at `docs/archive/CHANGELOG-through-ef465734.md`. Earlier surfaces remain under `docs/archive/`, and focused rationale/TRACEABILITY remains under `docs/doctoring/`. Exact-head execution or review evidence never transfers after source movement.
+This is the code-current decision surface for the active ConceptWeave Source Observation lane. The preceding converter-kind surface through exact head `09f4b9c9d1be4da2979c0a01958014a1aa129f42` is preserved losslessly at `docs/archive/product-technical-gap-baseline-through-09f4b9c9.md`; its matching changelog is preserved at `docs/archive/CHANGELOG-through-09f4b9c9.md`. Earlier surfaces remain under `docs/archive/`, and focused rationale/TRACEABILITY remains under `docs/doctoring/`. Exact-head execution or review evidence never transfers after source movement.
 
 ## Canonical boundary
 
@@ -12,28 +12,30 @@ ConceptWeave owns `observe -> discover -> propose -> align -> validate -> review
 
 ## Current Source Observation authority
 
-The current behavior-bearing converter-kind successor is `75028d1c8c18a490f793f8fcde5061ec39c52158`: review `5251421078` identified missing converter `pg_proc.prokind`, RED `f60aa85fbf36ffb8ab6354afc4826d347ba8ea44` first added the missing public contract, production `b75b3f008c0baeeae1b5e5eb3fd421b14e0d1205` added converter-kind behavior, and `75028d1c...` publicly composed it through `index_partition.rs`. Edge-contract successor `98149497113369b1f8a95c7f00bb0800a854a56f` additionally pins successor-domain separation and both blank converter identifier branches.
+The current behavior-bearing structural converter successor is the argument-count public head `c7419477a8538551a573482f78013ad226923899`, built ordinary-forward over converter return-set public head `40fc0e46b8a9e8c1018245540fc788f47a9132c0` and converter-kind authority archived at `09f4b9c9...`.
 
-All valid predecessor ordinary-EXCLUDE facts remain authoritative without rewriting issued digest domains. The active chain binds exact constraint/backing-index identity, ordered keys and exclusion operators, target-procedure scalar/strictness/volatility/parallel/kind/security/leakproof/definition/owner/configuration/ACL/planner-support/cost/transform-type facts, exact selected `pg_transform` rows, converter definition, converter owner, converter object-level `EXECUTE` ACL, converter nullable `proconfig`, converter raw `prosecdef`, converter raw `proleakproof`, converter raw `proisstrict`, converter raw `provolatile`, converter raw `proparallel`, converter `prosupport` absence or exact resolved support-function identity, converter raw `procost` float4 bits, and now converter raw `prokind='f'` evidence.
+Return-set lineage: review `5251492933` -> RED `e92a8657a20878621da883a4326237f1d899bc89` -> production `c6d11432cbac681a937449ea41e2c49e26f24409` -> public composition `40fc0e46b8a9e8c1018245540fc788f47a9132c0`.
 
-Quoted PostgreSQL transform-type identifiers remain collision-safe: schema and type-name components are percent-encoded independently before the canonical `.` separator. Valid pairs such as (`payload.domain`, `json`) and (`payload`, `domain.json`) therefore cannot collapse to one provenance location.
+Argument-count lineage: review `5251508944` -> RED `4f81f92f54edb622ba933617ef6a598d7a4a1d16` -> production `65dabb7df539c2a80455f8b4aec5c024117b8a58` -> final public composition `c7419477a8538551a573482f78013ad226923899`. An intermediate composition `cb43e7fc8ba28516dc96a6e3d61a8df9a71c9a24` contained one duplicate re-export outside the intended stanza and was immediately repaired ordinary-forward. The net `40fc0e46... -> c7419477...` compare is ahead-only and leaves only the new argument-count source, its contract, and four intended `index_partition.rs` additions.
 
-## Transform-converter routine-kind integrity
+All valid predecessor ordinary-EXCLUDE facts remain authoritative without rewriting issued digest domains. The active chain now binds exact selected transform converters plus definition, owner, object-level `EXECUTE` ACL, nullable `proconfig`, raw `prosecdef`, `proleakproof`, `proisstrict`, `provolatile`, `proparallel`, exact `prosupport` absence/identity, exact raw `procost` float4 bits, raw `prokind='f'`, raw `proretset=false`, and raw `pronargs=1`.
 
-PostgreSQL 18 stores routine kind independently in `pg_proc.prokind`: `f` for a normal function, `p` for a procedure, `a` for an aggregate, and `w` for a window function. PostgreSQL's `check_transform_function()` separately requires `prokind == PROKIND_FUNCTION`, rejects set-returning converters, requires exactly one argument, and requires that argument to be `internal`. ConceptWeave's converter base already normalizes the required call boundary, but normalized signature/definition evidence is not a substitute for the raw same-generation routine-kind field.
+Quoted PostgreSQL transform-type identifiers remain collision-safe: schema and type-name components are percent-encoded independently before the canonical `.` separator.
 
-`IndexExclusionConstraintOperatorProcedureTransformConverterKindSnapshot` is a structural observational successor over `IndexExclusionConstraintOperatorProcedureTransformConverterCostSnapshot`. Every exact predecessor `(constraint coordinate, key position, transform type, direction)` must receive one observation with matching converter schema/function identity and raw `prokind='f'`. Missing or extra coordinates, duplicates, binding drift, zero positions, blank converter identifiers, non-function routine kinds, and unknown receipt coordinates fail closed. The successor uses its own digest domain even though all admitted observations carry `f`.
+## Transform-converter structural validity
+
+PostgreSQL 18 `check_transform_function()` performs independent structural checks after resolving the converter function. It requires a normal function (`prokind == PROKIND_FUNCTION`), rejects set-returning functions (`proretset`), requires exactly one argument (`pronargs == 1`), and then requires that argument type to be `INTERNALOID`. ConceptWeave must preserve those source predicates rather than infer them from a normalized function-shaped value object.
+
+`IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapshot` succeeds the converter-kind snapshot and binds raw same-generation `proretset=false` for every exact converter direction. `IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSnapshot` succeeds that snapshot and binds raw same-generation `pronargs=1`. The base converter contract already requires the resolved one argument type to be `pg_catalog.internal`; this remains the source call-boundary contract rather than being duplicated into a new digest domain.
+
+Both new successors require exact predecessor inventory and converter schema/function binding. Missing/extra coordinates, duplicates, binding drift, blank identifiers, zero positions, invalid structural values, and unknown provenance receipts fail closed. Their digests are separately domain-separated, and their canonical locations retain component-wise percent encoding.
 
 Traceability:
 
-- finding review: `5251421078`;
-- RED: `f60aa85fbf36ffb8ab6354afc4826d347ba8ea44`;
-- production implementation: `b75b3f008c0baeeae1b5e5eb3fd421b14e0d1205`;
-- public-composition successor: `75028d1c8c18a490f793f8fcde5061ec39c52158`;
-- edge-contract successor: `98149497113369b1f8a95c7f00bb0800a854a56f`;
-- source: `crates/conceptweave-relation-partition/src/index_exclusion_constraint_operator_procedure_transform_converter_kind.rs`;
-- contract: `crates/conceptweave-relation-partition/tests/index_exclusion_constraint_operator_procedure_transform_converter_kind_contract.rs`;
-- doctoring: `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-kind-integrity.md`.
+- converter kind: review `5251421078`, RED `f60aa85fbf36ffb8ab6354afc4826d347ba8ea44`, production `b75b3f008c0baeeae1b5e5eb3fd421b14e0d1205`, public composition `75028d1c8c18a490f793f8fcde5061ec39c52158`, edge contract `98149497113369b1f8a95c7f00bb0800a854a56f`;
+- converter return-set: review `5251492933`, RED `e92a8657a20878621da883a4326237f1d899bc89`, production `c6d11432cbac681a937449ea41e2c49e26f24409`, public composition `40fc0e46b8a9e8c1018245540fc788f47a9132c0`;
+- converter argument count: review `5251508944`, RED `4f81f92f54edb622ba933617ef6a598d7a4a1d16`, production `65dabb7df539c2a80455f8b4aec5c024117b8a58`, final public composition `c7419477a8538551a573482f78013ad226923899`;
+- doctoring: `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-{kind,return-set,argument-count}-integrity.md`.
 
 Primary authority is PostgreSQL 18 `pg_proc`, `CREATE TRANSFORM`, and `src/backend/commands/functioncmds.c::check_transform_function()`.
 
@@ -41,11 +43,11 @@ Primary authority is PostgreSQL 18 `pg_proc`, `CREATE TRANSFORM`, and `src/backe
 
 **Source repaired is not GREEN.** Repository-pinned Rust 1.98 `fmt`, strict workspace/all-target Clippy, focused and retained tests, workspace/doc tests, release build, rustdoc, and owned production statement/branch/edge coverage must be demonstrated on the final exact head. No predecessor execution result transfers after source movement.
 
-The bounded PostgreSQL 18 live differential must retain all predecessor ordinary-EXCLUDE evidence and resolve every nonzero selected transform converter to the same exact-generation `pg_proc` row, independently capturing definition, owner/ACL, nullable `proconfig`, raw `prosecdef`, raw `proleakproof`, raw `proisstrict`, raw `provolatile`, raw `proparallel`, `prosupport`, raw `procost`, and raw `prokind`. Any converter direction whose resolved row is not `prokind='f'` is capture failure. Missing resolution, mixed-generation joins, inferred routine kind, or signature-only normalization is also capture failure.
+The bounded PostgreSQL 18 live differential must retain all predecessor ordinary-EXCLUDE evidence and resolve every nonzero selected transform converter to the same exact-generation `pg_proc` row. It must independently capture definition/owner/ACL/configuration/security/planner facts plus raw `prokind`, raw `proretset`, raw `pronargs`, and the argument-type vector needed to prove `proargtypes[0] == internal`. Non-`f` kind, `proretset=true`, `pronargs != 1`, a non-`internal` argument, missing resolution, mixed-generation joins, or normalization-derived substitutes are capture failures.
 
 ## Residual material gap
 
-Fresh PostgreSQL source review found the next structural transform-converter fact immediately adjacent to `prokind`: `check_transform_function()` independently rejects `pg_proc.proretset=true`. `proretset=false` is not encoded by the converter-kind successor and must not be inferred from scalar return-type normalization. It remains the next explicit Source Observation review target. The same checker also verifies argument count and the `internal` argument type; the current base converter contract represents one `internal` argument but a fresh review must confirm extractor-level `pronargs` evidence is not being normalized away before declaring that portion complete.
+The explicit structural predicates in PostgreSQL 18 `check_transform_function()` are now represented across the governed chain: `prokind='f'`, `proretset=false`, `pronargs=1`, and the exact `internal` argument-type boundary. This closes the specific checker gap found in this source review; it is not a universal claim that every future PostgreSQL/catalog semantic fact is exhausted. The next Source Observation successor must come from another fresh code/catalog review rather than extending the chain by naming fields speculatively.
 
 Publication and immutable semantic release remain unauthorized until exact-head Rust/coverage acceptance, the bounded PostgreSQL 18 differential, central workflow prerequisites, and downstream stack adoption are complete.
 
@@ -55,10 +57,10 @@ Active central owner remains `.github#2040@12c3fa6f3623aa5f2979d3d5ee4ed987002a6
 
 The next valid central movement is ordinary/non-force path-wise protected-main reconciliation. The resolved scheduler must preserve #2040's v2 CodeQL producer, removal of source-neutral restamps, repository-scoped Actions credential/selected-token proof, stale-run revalidation, rationale/docstrings/tests; adopt compatible protected-main queue/coalescing/capacity behavior; and enforce the stronger repository-identity invariant.
 
-Queue-health #2268 remains source-repaired at `142e5b2617778e79f665693be1e6f8c04d7533aa` and CodeQL scan-dispatch #2271 remains source-repaired at `2b849c874122961e025c29f7fa0bb697863c3d68`. Their hosted evidence remains independent and does not transfer into #2040. Source-fix #2175 remains exact `6e5f75dd40a428d174f691e35e210d08a29eb270`; it intentionally cannot self-modify `.github/` or `scripts/ci/` control-plane paths.
+Queue-health #2268 remains source-repaired at `142e5b2617778e79f665693be1e6f8c04d7533aa` and CodeQL scan-dispatch #2271 remains source-repaired at `2b849c874122961e025c29f7fa0bb697863c3d68`. Their hosted evidence remains independent and does not transfer into #2040.
 
 Product bootstrap #35 remains exact `9bb82f041483cb4e0cf1aa1f5450b413309f9a05`. Its Security Scan and SAST success do not override terminal CodeQL PR failure; no unchanged-head manual rerun or leaf-source workaround is authorized.
 
 ## Required order
 
-`.github#2040` path-wise reconciliation with repository-identity repair -> focused scheduler GREEN -> fresh exact-head central terminal checks plus qualifying non-self approval -> fresh compatible #35 acceptance and normal landing -> exact #46 Rust 1.98 native/hosted GREEN -> bounded PostgreSQL 18 differential including converter `prosupport`, exact `procost`, and raw `prokind='f'` -> converter `proretset=false` review -> fresh next semantic-gap review -> complete ordinary/non-force #46 adoption into #45 -> fresh #45 acceptance -> #6 propagation -> immutable governed release only from an accepted protected head.
+`.github#2040` path-wise reconciliation with repository-identity repair -> focused scheduler GREEN -> fresh exact-head central terminal checks plus qualifying non-self approval -> fresh compatible #35 acceptance and normal landing -> exact #46 Rust 1.98 native/hosted GREEN -> bounded PostgreSQL 18 differential including converter structural facts (`prokind`, `proretset`, `pronargs`, internal argument type) -> fresh semantic-gap review -> complete ordinary/non-force #46 adoption into #45 -> fresh #45 acceptance -> #6 propagation -> immutable governed release only from an accepted protected head.
