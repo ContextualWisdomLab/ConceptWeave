@@ -109,7 +109,7 @@ fn ordinary_exclude_transform_converter_volatility_location_is_collision_safe_fo
 }
 
 #[test]
-fn ordinary_exclude_transform_converter_volatility_distinguishes_catalog_states() {
+fn ordinary_exclude_transform_converter_volatility_distinguishes_immutable_and_stable_states() {
     let predecessor = converter_strictness_snapshot();
     let immutable = IndexExclusionConstraintOperatorProcedureTransformConverterVolatilitySnapshot::new(
         &predecessor,
@@ -120,15 +120,33 @@ fn ordinary_exclude_transform_converter_volatility_distinguishes_catalog_states(
     changed[0] = converter_volatility_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "payload_from_sql",
-        'v',
+        's',
     );
-    let volatile = IndexExclusionConstraintOperatorProcedureTransformConverterVolatilitySnapshot::new(
+    let stable = IndexExclusionConstraintOperatorProcedureTransformConverterVolatilitySnapshot::new(
         &predecessor,
         changed,
     )
     .unwrap();
 
-    assert_ne!(immutable.snapshot_digest(), volatile.snapshot_digest());
+    assert_ne!(immutable.snapshot_digest(), stable.snapshot_digest());
+}
+
+#[test]
+fn ordinary_exclude_transform_converter_volatility_rejects_volatile_transform_function() {
+    let error = IndexExclusionConstraintOperatorProcedureTransformConverterVolatilityObservation::new(
+        coordinate(),
+        1,
+        custom_payload_type(),
+        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+        "public",
+        "payload_from_sql",
+        'v',
+    )
+    .expect_err("PostgreSQL check_transform_function rejects VOLATILE transform converters");
+    assert_field(
+        error,
+        "index_exclusion_constraint_operator_procedure_transform_converter_volatility",
+    );
 }
 
 #[test]
@@ -142,7 +160,7 @@ fn ordinary_exclude_transform_converter_volatility_rejects_unknown_catalog_state
         "payload_from_sql",
         'x',
     )
-    .expect_err("PostgreSQL provolatile must be one of i, s, or v");
+    .expect_err("PostgreSQL provolatile must be i or s for transform converters");
     assert_field(
         error,
         "index_exclusion_constraint_operator_procedure_transform_converter_volatility",
