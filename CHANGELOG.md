@@ -1,6 +1,6 @@
 # Changelog
 
-The preceding active Source Observation surface through converter-kind head `09f4b9c9d1be4da2979c0a01958014a1aa129f42` is preserved losslessly at `docs/archive/CHANGELOG-through-09f4b9c9.md`; its matching product/technical decision surface is preserved at `docs/archive/product-technical-gap-baseline-through-09f4b9c9.md`. Earlier history remains under `docs/archive/`. This active changelog records the remaining explicit structural transform-converter predicates from PostgreSQL 18 `check_transform_function()`.
+The preceding active Source Observation surface through converter-kind head `09f4b9c9d1be4da2979c0a01958014a1aa129f42` is preserved losslessly at `docs/archive/CHANGELOG-through-09f4b9c9.md`; its matching product/technical decision surface is preserved at `docs/archive/product-technical-gap-baseline-through-09f4b9c9.md`. Earlier history remains under `docs/archive/`. This active changelog records the remaining explicit structural transform-converter predicates from PostgreSQL 18 `check_transform_function()` and the corrected observation/validation boundary for its volatility predicate.
 
 ## Unreleased
 
@@ -17,20 +17,22 @@ The preceding active Source Observation surface through converter-kind head `09f
 - A normalized one-`internal`-argument value object no longer substitutes for raw `pronargs`: converter rows fail closed unless the same-generation catalog count is exactly `1`.
 - Both successors exactly cover the predecessor converter-direction inventory and preserve transform type plus converter schema/function binding. Missing or extra coordinates, duplicates, binding drift, blank identifiers, zero positions, invalid structural values, and unknown receipts fail closed.
 - Quoted transform-type provenance remains collision-safe through independent component percent-encoding.
-- The base converter contract continues to require the resolved single argument type to be `pg_catalog.internal`, preserving PostgreSQL's final explicit structural predicate without rewriting predecessor digest domains.
+- The base converter contract continues to require the resolved single argument type to be `pg_catalog.internal`, preserving PostgreSQL's final explicit shape predicate without rewriting predecessor digest domains.
+- Corrected the volatility lifecycle boundary: PostgreSQL 18 `check_transform_function()` rejects `VOLATILE` when a transform is created, but `ALTER FUNCTION` can later change an already referenced converter to `VOLATILE`. Source Observation therefore continues to preserve raw `i|s|v`, including `v` as post-creation drift evidence; fresh-transform admissibility belongs to validation and must not erase the observed catalog state.
 
 ### Test and repair evidence
 
 - Return-set finding review `5251492933` -> RED `e92a8657a20878621da883a4326237f1d899bc89` -> production `c6d11432cbac681a937449ea41e2c49e26f24409` -> public composition `40fc0e46b8a9e8c1018245540fc788f47a9132c0`.
 - Argument-count finding review `5251508944` -> RED `4f81f92f54edb622ba933617ef6a598d7a4a1d16` -> production `65dabb7df539c2a80455f8b4aec5c024117b8a58` -> final public composition `c7419477a8538551a573482f78013ad226923899`.
 - The first argument-count composition attempt `cb43e7fc8ba28516dc96a6e3d61a8df9a71c9a24` accidentally duplicated one public re-export outside the intended stanza. Ordinary-forward `c7419477...` removed it immediately. Net comparison from return-set public head `40fc0e46...` to `c7419477...` is ahead-only and leaves only the new production module, its contract, and four intended `index_partition.rs` lines.
-- Focused contracts cover structural-value rejection, direction completeness, extra/duplicate coordinates, binding drift, blank identifiers, zero positions, exact receipt lookup, successor digest-domain separation, public composition, and quoted-type provenance collision safety.
+- Volatility follow-up review `5251665634` initially interpreted the creation-time non-volatile check as a raw-capture constraint. RED `a4a735d2...` and production `9de4b4ae...` encoded that interpretation. Primary-source follow-up on PostgreSQL 18 `ALTER FUNCTION` invalidated it; correction review `5251695984`, ordinary-forward source repair `b4df9bef...`, and regression `7ebe2a48...` restore raw volatile drift observability without rewriting history.
+- Focused contracts cover structural-value rejection, direction completeness, extra/duplicate coordinates, binding drift, blank identifiers, zero positions, exact receipt lookup, successor digest-domain separation, public composition, quoted-type provenance collision safety, and preservation of post-creation `VOLATILE` drift.
 - No native/hosted GREEN is claimed. Rust 1.98 fmt/Clippy/tests/docs/release/rustdoc/owned coverage and the PostgreSQL 18 bounded live differential remain acceptance gates on the final exact head.
 
 ### Retained
 
 - All valid ordinary-EXCLUDE predecessor authority remains in force, including converter definition, owner, object-level `EXECUTE` ACL, nullable `proconfig`, raw `prosecdef`, raw `proleakproof`, raw `proisstrict`, raw `provolatile`, raw `proparallel`, exact `prosupport` absence/identity, exact raw `procost` float4 bits, raw `prokind='f'`, and collision-safe quoted-identifier provenance.
-- The explicit structural predicates in PostgreSQL 18 `check_transform_function()` are now represented as source facts: `prokind='f'`, `proretset=false`, `pronargs=1`, and the existing exact `internal` argument-type boundary. This is not a universal semantic-completeness claim; any next successor must come from fresh source/catalog review.
+- The immutable/shape predicates in PostgreSQL 18 `check_transform_function()` are represented as source facts: `prokind='f'`, `proretset=false`, `pronargs=1`, and the existing exact `internal` argument-type boundary. Its separate creation-time volatility predicate is represented by raw `provolatile`; observed `v` remains capturable because function volatility is mutable after transform creation. This is not a universal semantic-completeness claim; any next successor must come from fresh source/catalog review.
 - #45 and #6 remain source-stable and must adopt #46 only after complete child acceptance; partial cherry-pick/reimplementation is not an acceptable successor.
 
 ### Canonical-owner coordination
