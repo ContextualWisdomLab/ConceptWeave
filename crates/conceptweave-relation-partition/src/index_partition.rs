@@ -208,6 +208,10 @@ pub use exclusion_constraint_operator_procedure_transform_converter_argument_cou
 mod exclusion_constraint_operator_procedure_transform_converter_argument_modes;
 pub use exclusion_constraint_operator_procedure_transform_converter_argument_modes::*;
 
+#[path = "index_exclusion_constraint_operator_procedure_transform_converter_argument_names.rs"]
+mod exclusion_constraint_operator_procedure_transform_converter_argument_names;
+pub use exclusion_constraint_operator_procedure_transform_converter_argument_names::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
