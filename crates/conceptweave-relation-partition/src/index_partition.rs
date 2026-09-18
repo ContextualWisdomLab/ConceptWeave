@@ -192,6 +192,10 @@ pub use exclusion_constraint_operator_procedure_transform_converter_planner_supp
 mod exclusion_constraint_operator_procedure_transform_converter_cost;
 pub use exclusion_constraint_operator_procedure_transform_converter_cost::*;
 
+#[path = "index_exclusion_constraint_operator_procedure_transform_converter_kind.rs"]
+mod exclusion_constraint_operator_procedure_transform_converter_kind;
+pub use exclusion_constraint_operator_procedure_transform_converter_kind::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
