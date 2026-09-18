@@ -1,0 +1,40 @@
+include!("index_exclusion_constraint_operator_procedure_transform_extension_membership_contract.rs");
+
+#[test]
+fn ordinary_exclude_transform_extension_membership_rejects_same_generation_converter_direction_drift() {
+    let function_membership = converter_function_extension_membership_snapshot();
+    let transform_types = selected_transform_types_predecessor();
+    let definition = definition_snapshot();
+    let from_sql_only = IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot::new(
+        &transform_types,
+        &definition,
+        vec![converter_observation(
+            operator("="),
+            procedure("int4eq"),
+            "internal",
+            vec![converter_binding(
+                Some(converter_function(
+                    "payload_from_sql",
+                    internal_type(),
+                    "payload_from_sql_v1",
+                )),
+                None,
+            )],
+        )],
+    )
+    .unwrap();
+
+    let error = IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapshot::new(
+        &function_membership,
+        &from_sql_only,
+        complete_transform_extension_membership_observations(),
+    )
+    .expect_err(
+        "transform-object extension membership must not combine a converter-membership predecessor with a different same-generation pg_transform direction set",
+    );
+
+    assert_field(
+        error,
+        "index_exclusion_constraint_operator_procedure_transform_extension_membership_binding",
+    );
+}
