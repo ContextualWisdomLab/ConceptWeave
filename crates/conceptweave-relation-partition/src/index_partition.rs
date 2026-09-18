@@ -176,6 +176,10 @@ pub use exclusion_constraint_operator_procedure_transform_converter_leakproof::*
 mod exclusion_constraint_operator_procedure_transform_converter_strictness;
 pub use exclusion_constraint_operator_procedure_transform_converter_strictness::*;
 
+#[path = "index_exclusion_constraint_operator_procedure_transform_converter_volatility.rs"]
+mod exclusion_constraint_operator_procedure_transform_converter_volatility;
+pub use exclusion_constraint_operator_procedure_transform_converter_volatility::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
