@@ -1,35 +1,35 @@
 # Changelog
 
-The Source Observation surface through converter-function transform-selection head `e2e257d1c498a906dc844060d1e3b8cf2303967a` is preserved at `docs/archive/CHANGELOG-through-e2e257d1.md`; its matching product/technical decision surface is preserved at `docs/archive/product-technical-gap-baseline-through-e2e257d1.md`. Earlier history remains under `docs/archive/`; focused rationale and primary-source traceability remain under `docs/doctoring/`.
+The Source Observation surface through converter-function extension-membership head `a2ebefecb185f1c1ba0006fc9f118f5e25c4a9cc` is preserved at `docs/archive/CHANGELOG-through-a2ebefec.md`; its matching product/technical decision surface is preserved at `docs/archive/product-technical-gap-baseline-through-a2ebefec.md`. Earlier history remains under `docs/archive/`; focused rationale and primary-source traceability remain under `docs/doctoring/`.
 
 ## Unreleased
 
 ### Added
 
-- Retained the ordinary-forward raw `pg_proc.proargmodes`, `pg_proc.proargnames`, and converter-function `pg_proc.protrftypes` successors without rewriting their digest domains or source history.
-- Added converter-function extension-membership evidence as `IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipObservation`/receipt/snapshot over the transform-selection predecessor.
-- Added focused extension-membership contract coverage and `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-extension-membership-integrity.md`.
+- Retained the ordinary-forward converter-function successor chain, including raw nullable `pg_proc.proargmodes`, raw nullable `pg_proc.proargnames`, converter-function `pg_proc.protrftypes`, and converter-function extension membership, without rewriting predecessor digest domains or source history.
+- Added transform-object extension-membership evidence as `IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipObservation`/receipt/snapshot.
+- Added focused transform-object extension-membership contract coverage and `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-extension-membership-integrity.md`.
 
 ### Correctness
 
-- A converter function's PostgreSQL extension membership is no longer conflated with function identity, implementation, ACL/config/security/planner state, argument metadata, function transform selection, or the `pg_transform` binding. The successor preserves exact absence or the same-generation `pg_extension.extname` reached through the converter function's `pg_depend.deptype='e'` edge.
-- Extension membership is a governed lifecycle/operability distinction: PostgreSQL permits `ALTER EXTENSION ... ADD/DROP FUNCTION` on an existing function; extension members can only be dropped through their owning extension and are treated as extension-owned objects by `pg_dump`.
-- Every membership observation exactly covers the predecessor `(constraint, key_position, transform_type, direction)` inventory and preserves converter schema/function binding. Missing/extra coordinates, duplicate coordinates, binding drift, blank identifiers, blank extension names, zero positions, unknown receipts and quoted transform-type provenance collisions fail closed.
-- The successor does not copy `pg_extension` version/configuration/control/update-script truth. It records only the exact membership edge. The transform object's own extension-membership edge is independent and remains a separate semantic review rather than being inferred from converter-function membership.
-- The earlier observation/admission boundary remains authoritative: raw catalog/lifecycle drift is observed first; validation or publication policy may reason over it later without rewriting source facts.
+- PostgreSQL transform-object membership is no longer conflated with converter-function membership. PostgreSQL 18 exposes `TRANSFORM FOR type LANGUAGE language` as its own `ALTER EXTENSION ... ADD/DROP` member object, so the `pg_transform` row can be attached to or detached from an extension while its type/language identity and converter functions remain unchanged.
+- The successor records one membership fact per exact same-generation `(constraint, key_position, transform_type, target_language)` transform row, rather than duplicating the fact once per FROM SQL / TO SQL converter direction.
+- Exact standalone state remains distinct from one resolved `pg_extension.extname`. Different extension names produce different successor digests. Missing/extra or duplicate transform coordinates, source-generation mismatch, transform/language drift, blank language or extension identifiers, zero positions, unknown receipts and quoted identifier provenance collisions fail closed.
+- The extractor must resolve membership from the exact `pg_transform` object through its same-generation `pg_depend.deptype='e'` edge to `pg_extension`. Converter-function membership, naming conventions, installed packages and application metadata are not proxies.
+- Extension-owned truth such as `extversion`, extension configuration, control files and update scripts remains with the extension owner and is not copied into ConceptWeave.
 
 ### Test and repair evidence
 
-- Converter-function extension-membership finding review `5252657912` on exact head `e2e257d1c498a906dc844060d1e3b8cf2303967a`.
-- RED contract `ddc04f03c97ae78cccddefe34bd656aec32bd688`.
-- Production observation/snapshot/receipt `30976b643aa96203a203705a75100e6374ff4977`.
-- Public composition `64080cdc8188ca951f73faa95d6f9f656e6860dc`.
-- Focused primary-source traceability `441eadaa35d2fa8606a9c8a1bd9763cd517d2451`.
+- Transform-object extension-membership finding review `5252885919` on exact head `a2ebefecb185f1c1ba0006fc9f118f5e25c4a9cc`.
+- Structural RED contract `708761cc9ef5a14ea1201aa4c5d785463229e40d`.
+- Production observation/snapshot/receipt `c055f0a351e0aec4bec6174327a9cd0cf8a9a4b0`.
+- Public composition `0d543dc5cdc2bfe23a7ee11e961bc7510730c0bd`.
+- Focused primary-source traceability `526bb4cf0ad990ba34996139d5ce08055a400b91`.
 - No native or hosted GREEN is claimed after source movement. Rust 1.98 fmt, strict workspace/all-target Clippy, focused and retained tests, workspace/doc tests, release build, rustdoc, owned production statement/branch/edge coverage, and the PostgreSQL 18 bounded live differential remain acceptance gates on the final exact head.
 
 ### Retained
 
-- All valid ordinary-EXCLUDE predecessor authority remains in force: converter definition, owner, object-level `EXECUTE` ACL, nullable `proconfig`, raw `prosecdef`, `proleakproof`, `proisstrict`, `provolatile`, `proparallel`, exact `prosupport` absence/identity, exact raw `procost` float4 bits, raw `prokind='f'`, raw `proretset=false`, raw `pronargs=1`, exact one-`pg_catalog.internal` input, raw nullable `proargmodes`, raw nullable `proargnames`, raw nullable converter-function `protrftypes`, exact return type, implementation language and implementation-material digest.
+- All valid ordinary-EXCLUDE predecessor authority remains in force: converter definition, owner, object-level `EXECUTE` ACL, nullable `proconfig`, raw `prosecdef`, `proleakproof`, `proisstrict`, `provolatile`, `proparallel`, exact `prosupport` absence/identity, exact raw `procost` float4 bits, raw `prokind='f'`, raw `proretset=false`, raw `pronargs=1`, exact one-`pg_catalog.internal` input, raw nullable `proargmodes`, raw nullable `proargnames`, raw nullable converter-function `protrftypes`, exact return type, implementation language and implementation-material digest, and converter-function extension membership.
 - #45 and #6 remain source-stable and must adopt #46 only after complete child acceptance. Partial cherry-pick or independent reimplementation is not a successor.
 
 ### Canonical-owner coordination
