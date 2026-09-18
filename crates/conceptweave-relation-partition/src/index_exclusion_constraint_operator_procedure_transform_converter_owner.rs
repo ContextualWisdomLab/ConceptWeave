@@ -512,13 +512,31 @@ fn procedure_transform_converter_owner_location(
     transform_type: &QualifiedTypeName,
     direction: IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
 ) -> String {
+    let transform_schema = encode_location_component(transform_type.schema_name());
+    let transform_name = encode_location_component(transform_type.type_name());
     format!(
-        "{}/exclusion-operators/{key_position}/procedure-transform-converters/{}.{}/{}/owner",
+        "{}/exclusion-operators/{key_position}/procedure-transform-converters/{transform_schema}.{transform_name}/{}/owner",
         coordinate.canonical_location(),
-        transform_type.schema_name(),
-        transform_type.type_name(),
         direction.token(),
     )
+}
+
+fn encode_location_component(value: &str) -> String {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    let mut encoded = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'_' | b'-' => {
+                encoded.push(char::from(byte));
+            }
+            _ => {
+                encoded.push('%');
+                encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+                encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+            }
+        }
+    }
+    encoded
 }
 
 fn encode_coordinate(hasher: &mut Sha256, coordinate: &IndexExclusionConstraintCoordinate) {
