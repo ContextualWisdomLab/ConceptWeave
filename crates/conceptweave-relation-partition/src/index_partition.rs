@@ -188,6 +188,10 @@ pub use exclusion_constraint_operator_procedure_transform_converter_parallel_saf
 mod exclusion_constraint_operator_procedure_transform_converter_planner_support;
 pub use exclusion_constraint_operator_procedure_transform_converter_planner_support::*;
 
+#[path = "index_exclusion_constraint_operator_procedure_transform_converter_cost.rs"]
+mod exclusion_constraint_operator_procedure_transform_converter_cost;
+pub use exclusion_constraint_operator_procedure_transform_converter_cost::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
