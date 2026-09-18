@@ -186,6 +186,7 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterKindSnapsh
     source_connection_key: String,
     connection_policy_binding: String,
     snapshot_digest: String,
+    converter_snapshot_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
     observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation>,
@@ -253,6 +254,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterKindSnapshot {
             source_connection_key: cost_snapshot.source_connection_key().to_owned(),
             connection_policy_binding: cost_snapshot.connection_policy_binding().to_owned(),
             snapshot_digest,
+            converter_snapshot_digest: cost_snapshot.converter_snapshot_digest().to_owned(),
             extractor_revision: cost_snapshot.extractor_revision().to_owned(),
             observed_at_utc: cost_snapshot.observed_at_utc().to_owned(),
             observations,
@@ -275,6 +277,12 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterKindSnapshot {
     #[must_use]
     pub fn snapshot_digest(&self) -> &str {
         &self.snapshot_digest
+    }
+
+    /// Returns the immutable raw transform-converter root digest.
+    #[must_use]
+    pub fn converter_snapshot_digest(&self) -> &str {
+        &self.converter_snapshot_digest
     }
 
     /// Returns the exact extractor revision inherited from the predecessor chain.
@@ -353,7 +361,9 @@ fn compute_transform_converter_kind_digest(
     observations: &[IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation],
 ) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_KIND_DIGEST_DOMAIN_V1);
+    hasher.update(
+        INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_KIND_DIGEST_DOMAIN_V1,
+    );
     encode_str(&mut hasher, predecessor_digest);
     encode_len(&mut hasher, observations.len());
     for observation in observations {
@@ -417,7 +427,9 @@ fn encode_location_component(value: &str) -> String {
     let mut encoded = String::with_capacity(value.len());
     for byte in value.bytes() {
         match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'_' | b'-' => encoded.push(char::from(byte)),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'_' | b'-' => {
+                encoded.push(char::from(byte));
+            }
             _ => {
                 encoded.push('%');
                 encoded.push(char::from(HEX[usize::from(byte >> 4)]));
