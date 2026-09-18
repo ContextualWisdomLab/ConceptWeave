@@ -1,35 +1,35 @@
 # Changelog
 
-The preceding active Source Observation surface through converter-volatility head `f7593e834660efa56e3331c99bcf15d908cd46bc` is preserved losslessly at `docs/archive/CHANGELOG-through-f7593e83.md`; its matching product/technical decision surface is preserved at `docs/archive/product-technical-gap-baseline-through-f7593e83.md`. Earlier history remains under `docs/archive/`. This active changelog records the current transform-converter parallel-safety delta.
+The preceding active Source Observation surface through converter-parallel-safety head `1fbbfadec507999710a8ca5c00378685d017326a` is preserved losslessly at `docs/archive/CHANGELOG-through-1fbbfade.md`; its matching product/technical decision surface is preserved at `docs/archive/product-technical-gap-baseline-through-1fbbfade.md`. Earlier history remains under `docs/archive/`. This active changelog records the transform-converter planner-support delta.
 
 ## Unreleased
 
 ### Added
 
-- Added exact PostgreSQL ordinary-`EXCLUDE` transform-converter parallel-safety evidence for raw same-row `pg_proc.proparallel`.
-- Added `IndexExclusionConstraintOperatorProcedureTransformConverterParallelSafetyObservation`, immutable source receipt, and `IndexExclusionConstraintOperatorProcedureTransformConverterParallelSafetySnapshot` as a successor over converter volatility evidence.
-- Added focused doctoring/TRACEABILITY at `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-parallel-safety-integrity.md`, grounded in PostgreSQL 18 `pg_proc`, `CREATE FUNCTION`, parallel-safety, and function-optimization documentation.
+- Added exact PostgreSQL ordinary-`EXCLUDE` transform-converter planner-support evidence for same-row `pg_proc.prosupport` absence or exact resolved support-function identity.
+- Added `IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportObservation`, immutable source receipt, and `IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportSnapshot` as a successor over converter parallel-safety evidence.
+- Added focused doctoring/TRACEABILITY at `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-planner-support-integrity.md`, grounded in PostgreSQL 18 `pg_proc`, `CREATE FUNCTION`, and Function Optimization Information.
 
 ### Correctness
 
-- Converter definition, owner, `EXECUTE` ACL, nullable `proconfig`, security-definer context, leakproof classification, strictness, and volatility no longer imply equal parallel-safety state. Raw `proparallel` changes produce a distinct successor digest.
-- Parallel-safety observations must exactly cover predecessor converter directions and preserve transform type plus converter schema/function binding. Missing or extra coordinates, duplicates, binding drift, zero positions, blank converter identifiers, invalid catalog discriminators, and unknown receipts fail closed.
-- Only PostgreSQL catalog states `s`, `r`, and `u` are accepted. All three remain representable; ConceptWeave does not infer a `PARALLEL SAFE`-only transform policy.
-- Parallel-safety provenance preserves the quoted-qualified-type collision repair by percent-encoding transform schema and type-name components independently before the canonical separator.
+- Converter definition, owner, `EXECUTE` ACL, nullable `proconfig`, security-definer context, leakproof classification, strictness, volatility, and parallel safety no longer imply equal planner-support state. `prosupport = 0` and each exact qualified support-function call signature produce distinct successor digests.
+- Planner-support observations exactly cover the predecessor converter-direction inventory and preserve transform type plus converter schema/function binding. Missing or extra coordinates, duplicates, binding drift, zero positions, blank converter identifiers, and unknown receipts fail closed.
+- Support absence remains valid. ConceptWeave does not invent a policy requiring every converter to have a planner support function.
+- Planner-support provenance preserves the quoted-qualified-type collision repair by percent-encoding transform schema and type-name components independently before the canonical separator.
 
 ### Test and repair evidence
 
-- Review `5250289810` identifies missing raw converter `proparallel` at prior exact head `f7593e834660efa56e3331c99bcf15d908cd46bc`.
-- RED `0fc0f567386d39b848444879a41c4877e9f996b6` adds the executable parallel-safety contract before public parallel-safety types exist.
-- Production `66846c34d668202a6f8fbbdfb3658fba908aec0d` adds raw parallel-safety observation/snapshot/receipt behavior.
-- Public-composition successor `6373c77652f63dae874e2b4bdb881b54f5680bfe` exports the new successor through `index_partition.rs`.
-- The focused contract covers raw-state preservation, `s/r/u` digest separation, exact direction completeness, extra/duplicate coordinates, function-binding drift, invalid states, blank identifiers, zero positions, exact receipt lookup, and quoted-type provenance collision safety.
-- No native/hosted GREEN is claimed. Exact `6373c776...` had no pull-request workflow runs at the first inventory query, so repository-pinned Rust 1.98 fmt/Clippy/tests/docs/release/rustdoc/owned coverage and PostgreSQL 18 bounded live differential remain open.
+- Review `5250887046` identifies missing converter `pg_proc.prosupport` at prior exact head `1fbbfadec507999710a8ca5c00378685d017326a`.
+- RED `f7a92af4d18e964680f514514020b712942ffc49` adds the executable planner-support contract before public planner-support types exist.
+- Production `3b048dae7cefed4c1615d5bfe5659be57d044eb9` adds converter planner-support observation/snapshot/receipt behavior.
+- Public-composition successor `9bbb668767ddaa24f6934568a7340ef1cbc504ad` exports the new successor through `index_partition.rs`.
+- The focused contract covers exact support absence/identity preservation, digest separation, direction completeness, extra/duplicate coordinates, converter-function binding drift, blank identifiers, zero positions, exact receipt lookup, and quoted-type provenance collision safety.
+- No native/hosted GREEN is claimed. Exact `9bbb668...` had no pull-request workflow runs at the first inventory query, so repository-pinned Rust 1.98 fmt/Clippy/tests/docs/release/rustdoc/owned coverage and PostgreSQL 18 bounded live differential remain open.
 
 ### Retained
 
-- All valid ordinary-EXCLUDE predecessor authority remains in force, including converter definition, owner, object-level `EXECUTE` ACL, nullable `proconfig`, raw `prosecdef`, raw `proleakproof`, raw `proisstrict`, raw `provolatile`, and collision-safe quoted-identifier provenance.
-- Converter planner support and cost remain independent review-gated follow-up facts; neither is inferred from parallel safety.
+- All valid ordinary-EXCLUDE predecessor authority remains in force, including converter definition, owner, object-level `EXECUTE` ACL, nullable `proconfig`, raw `prosecdef`, raw `proleakproof`, raw `proisstrict`, raw `provolatile`, raw `proparallel`, and collision-safe quoted-identifier provenance.
+- Converter cost remains the next independent review-gated function fact; it is not inferred from planner support or folded into this digest domain.
 - #45 and #6 remain source-stable and must adopt #46 only after complete child acceptance; partial cherry-pick/reimplementation is not an acceptable successor.
 
 ### Canonical-owner coordination
