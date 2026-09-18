@@ -175,8 +175,9 @@ impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapsh
     ///
     /// `converter_extension_membership_snapshot` is the digest predecessor. The original transform
     /// converter snapshot supplies the transform-row identity `(trftype, trflang)` that is not a
-    /// per-direction converter-function fact. Both inputs must describe the same source generation
-    /// and the exact same converter direction/function set.
+    /// per-direction converter-function fact. Both inputs must describe the same source generation,
+    /// descend from the exact same immutable raw transform-converter root, and retain the same
+    /// converter direction/function set.
     pub fn new(
         converter_extension_membership_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipSnapshot,
         transform_converter_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot,
@@ -196,13 +197,23 @@ impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapsh
             ));
         }
 
+        if converter_extension_membership_snapshot.converter_snapshot_digest()
+            != transform_converter_snapshot.snapshot_digest()
+        {
+            return Err(invalid(
+                "index_exclusion_constraint_operator_procedure_transform_extension_membership_lineage",
+            ));
+        }
+
         let converter_membership_observations =
             converter_extension_membership_snapshot.observations();
         let raw_converter_direction_count = transform_converter_snapshot
             .observations()
             .iter()
             .flat_map(|observation| observation.converters())
-            .map(|binding| usize::from(binding.from_sql().is_some()) + usize::from(binding.to_sql().is_some()))
+            .map(|binding| {
+                usize::from(binding.from_sql().is_some()) + usize::from(binding.to_sql().is_some())
+            })
             .sum::<usize>();
         if raw_converter_direction_count != converter_membership_observations.len() {
             return Err(invalid(
