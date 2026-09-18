@@ -184,6 +184,7 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofS
     source_connection_key: String,
     connection_policy_binding: String,
     snapshot_digest: String,
+    converter_snapshot_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
     observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofObservation>,
@@ -258,6 +259,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofSnapsho
             source_connection_key: security_definer_snapshot.source_connection_key().to_owned(),
             connection_policy_binding: security_definer_snapshot.connection_policy_binding().to_owned(),
             snapshot_digest,
+            converter_snapshot_digest: security_definer_snapshot.converter_snapshot_digest().to_owned(),
             extractor_revision: security_definer_snapshot.extractor_revision().to_owned(),
             observed_at_utc: security_definer_snapshot.observed_at_utc().to_owned(),
             observations,
@@ -280,6 +282,12 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofSnapsho
     #[must_use]
     pub fn snapshot_digest(&self) -> &str {
         &self.snapshot_digest
+    }
+
+    /// Returns the immutable raw transform-converter root digest.
+    #[must_use]
+    pub fn converter_snapshot_digest(&self) -> &str {
+        &self.converter_snapshot_digest
     }
 
     /// Returns the exact extractor revision inherited from the predecessor chain.
