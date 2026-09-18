@@ -12,6 +12,7 @@ use super::{IndexExclusionConstraintCoordinate, QualifiedProcedureSignature, Ind
 const INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_PLANNER_SUPPORT_DIGEST_DOMAIN_V1: &[u8] = b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.exclusion_constraint.operator.procedure.transform_converter.planner_support.v1";
 const SHA256_DIGEST_PREFIX: &str = "sha256:";
 
+/// Exact `pg_proc.prosupport` state for one nonzero transform converter direction.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportObservation {
     coordinate: IndexExclusionConstraintCoordinate,
@@ -23,6 +24,7 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSup
     planner_support: Option<QualifiedProcedureSignature>,
 }
 impl IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportObservation {
+    /// Records support absence or the exact support function resolved from converter `prosupport`.
     pub fn new(coordinate: IndexExclusionConstraintCoordinate, key_position: u32, transform_type: QualifiedTypeName, direction: IndexExclusionConstraintOperatorProcedureTransformConverterDirection, converter_schema_name: impl Into<String>, converter_function_name: impl Into<String>, planner_support: Option<QualifiedProcedureSignature>) -> Result<Self, ObservationError> {
         if key_position == 0 { return Err(ObservationError::InvalidOrdinalPosition); }
         let converter_schema_name = converter_schema_name.into(); let converter_function_name = converter_function_name.into();
@@ -30,29 +32,49 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportOb
         validate_nonblank(&converter_function_name, "index_exclusion_constraint_operator_procedure_transform_converter_planner_support_function_name")?;
         Ok(Self { coordinate, key_position, transform_type, direction, converter_schema_name, converter_function_name, planner_support })
     }
+    /// Returns the exact ordinary exclusion-constraint coordinate.
     #[must_use] pub const fn coordinate(&self)->&IndexExclusionConstraintCoordinate{&self.coordinate}
+    /// Returns the one-based exclusion-key position.
     #[must_use] pub const fn key_position(&self)->u32{self.key_position}
+    /// Returns the selected transform type.
     #[must_use] pub const fn transform_type(&self)->&QualifiedTypeName{&self.transform_type}
+    /// Returns the converter direction.
     #[must_use] pub const fn direction(&self)->IndexExclusionConstraintOperatorProcedureTransformConverterDirection{self.direction}
+    /// Returns the exact converter-function schema.
     #[must_use] pub fn converter_schema_name(&self)->&str{&self.converter_schema_name}
+    /// Returns the exact converter-function name.
     #[must_use] pub fn converter_function_name(&self)->&str{&self.converter_function_name}
+    /// Returns the exact planner support function, or `None` when `prosupport = 0`.
     #[must_use] pub const fn planner_support(&self)->Option<&QualifiedProcedureSignature>{self.planner_support.as_ref()}
+    /// Returns the collision-safe evidence location.
     #[must_use] pub fn canonical_location(&self)->String{procedure_transform_converter_planner_support_location(&self.coordinate,self.key_position,&self.transform_type,self.direction)}
 }
 
+/// Immutable provenance receipt for one exact converter planner-support observation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportSourceReceipt { source_id:String, connection_policy_binding:String, source_digest:String, extractor_revision:String, observed_at_utc:String, location:IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportObservation }
 impl IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportSourceReceipt {
-    #[must_use] pub fn source_id(&self)->&str{&self.source_id} #[must_use] pub fn connection_policy_binding(&self)->&str{&self.connection_policy_binding}
-    #[must_use] pub fn source_digest(&self)->&str{&self.source_digest} #[must_use] pub fn extractor_revision(&self)->&str{&self.extractor_revision}
-    #[must_use] pub fn observed_at_utc(&self)->&str{&self.observed_at_utc} #[must_use] pub const fn location(&self)->&IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportObservation{&self.location}
+    /// Returns the stable source registry key.
+    #[must_use] pub fn source_id(&self)->&str{&self.source_id}
+    /// Returns the immutable source-policy binding.
+    #[must_use] pub fn connection_policy_binding(&self)->&str{&self.connection_policy_binding}
+    /// Returns the owner-computed successor digest.
+    #[must_use] pub fn source_digest(&self)->&str{&self.source_digest}
+    /// Returns the exact extractor revision.
+    #[must_use] pub fn extractor_revision(&self)->&str{&self.extractor_revision}
+    /// Returns the exact canonical UTC observation time.
+    #[must_use] pub fn observed_at_utc(&self)->&str{&self.observed_at_utc}
+    /// Returns the validated planner-support observation.
+    #[must_use] pub const fn location(&self)->&IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportObservation{&self.location}
 }
 
+/// Complete converter `pg_proc.prosupport` evidence over one exact parallel-safety predecessor.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportSnapshot {
     source_connection_key:String, connection_policy_binding:String, snapshot_digest:String, converter_snapshot_digest:String, extractor_revision:String, observed_at_utc:String, observations:Vec<IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportObservation>,
 }
 impl IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportSnapshot {
+    /// Creates complete planner-support evidence for every converter direction in the predecessor.
     pub fn new(parallel_safety_snapshot:&IndexExclusionConstraintOperatorProcedureTransformConverterParallelSafetySnapshot, mut observations:Vec<IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportObservation>)->Result<Self,ObservationError>{
         observations.sort_by_key(planner_support_key);
         let expected=parallel_safety_snapshot.observations().iter().map(|o|planner_support_coordinate_key(o.coordinate(),o.key_position(),o.transform_type(),o.direction())).collect::<BTreeSet<_>>();
@@ -63,10 +85,21 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportSn
         let snapshot_digest=compute_transform_converter_planner_support_digest(parallel_safety_snapshot.snapshot_digest(),&observations);
         Ok(Self{source_connection_key:parallel_safety_snapshot.source_connection_key().to_owned(),connection_policy_binding:parallel_safety_snapshot.connection_policy_binding().to_owned(),snapshot_digest,converter_snapshot_digest:parallel_safety_snapshot.converter_snapshot_digest().to_owned(),extractor_revision:parallel_safety_snapshot.extractor_revision().to_owned(),observed_at_utc:parallel_safety_snapshot.observed_at_utc().to_owned(),observations})
     }
-    #[must_use] pub fn source_connection_key(&self)->&str{&self.source_connection_key} #[must_use] pub fn connection_policy_binding(&self)->&str{&self.connection_policy_binding}
-    #[must_use] pub fn snapshot_digest(&self)->&str{&self.snapshot_digest} #[must_use] pub fn converter_snapshot_digest(&self)->&str{&self.converter_snapshot_digest}
-    #[must_use] pub fn extractor_revision(&self)->&str{&self.extractor_revision} #[must_use] pub fn observed_at_utc(&self)->&str{&self.observed_at_utc}
+    /// Returns the stable source-connection registry key.
+    #[must_use] pub fn source_connection_key(&self)->&str{&self.source_connection_key}
+    /// Returns the immutable source-policy binding.
+    #[must_use] pub fn connection_policy_binding(&self)->&str{&self.connection_policy_binding}
+    /// Returns the domain-separated planner-support successor digest.
+    #[must_use] pub fn snapshot_digest(&self)->&str{&self.snapshot_digest}
+    /// Returns the immutable raw transform-converter root digest.
+    #[must_use] pub fn converter_snapshot_digest(&self)->&str{&self.converter_snapshot_digest}
+    /// Returns the exact extractor revision.
+    #[must_use] pub fn extractor_revision(&self)->&str{&self.extractor_revision}
+    /// Returns the exact canonical UTC observation time.
+    #[must_use] pub fn observed_at_utc(&self)->&str{&self.observed_at_utc}
+    /// Returns complete observations in deterministic converter-direction order.
     #[must_use] pub fn observations(&self)->&[IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportObservation]{&self.observations}
+    /// Issues exact provenance for one observed converter planner-support identity.
     pub fn source_receipt(&self,coordinate:IndexExclusionConstraintCoordinate,key_position:u32,transform_type:QualifiedTypeName,direction:IndexExclusionConstraintOperatorProcedureTransformConverterDirection)->Result<IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportSourceReceipt,ObservationError>{let observation=self.observations.iter().find(|o|o.coordinate()==&coordinate&&o.key_position()==key_position&&o.transform_type()==&transform_type&&o.direction()==direction).ok_or_else(||ObservationError::UnknownObservationLocation{location:procedure_transform_converter_planner_support_location(&coordinate,key_position,&transform_type,direction)})?;Ok(IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportSourceReceipt{source_id:self.source_connection_key.clone(),connection_policy_binding:self.connection_policy_binding.clone(),source_digest:self.snapshot_digest.clone(),extractor_revision:self.extractor_revision.clone(),observed_at_utc:self.observed_at_utc.clone(),location:observation.clone()})}
 }
 
