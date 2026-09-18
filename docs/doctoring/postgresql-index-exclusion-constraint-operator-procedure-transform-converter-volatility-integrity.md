@@ -2,7 +2,7 @@
 
 ## Decision
 
-ConceptWeave records raw `pg_proc.provolatile` as an independent same-row fact for every nonzero `pg_transform` converter direction. The fact is layered after converter strictness evidence rather than folded into transform identity, converter definition, or any earlier auxiliary function property. PostgreSQL's three catalog states — `i` (immutable), `s` (stable), and `v` (volatile) — are all representable and produce distinct domain-separated successor digests.
+ConceptWeave records raw `pg_proc.provolatile` as an independent same-row fact for every nonzero `pg_transform` converter direction. The fact is layered after converter strictness evidence rather than folded into transform identity, converter definition, or any earlier auxiliary function property. PostgreSQL 18's `pg_proc` catalog defines exactly three states for this column: `i` (immutable), `s` (stable), and `v` (volatile). All three are representable and produce distinct domain-separated successor digests.
 
 This is observational rather than normative. PostgreSQL 18 exposes `IMMUTABLE`, `STABLE`, and `VOLATILE` as function attributes that inform planner and MVCC behavior; `VOLATILE` is the default when no category is specified. `CREATE FUNCTION` lists volatility separately from leakproofness, strictness, security context, parallel safety, cost, support, configuration, and transform use. `CREATE OR REPLACE FUNCTION` can replace function properties without changing the function's input identity. The converter coordinate and the already-governed definition/owner/ACL/configuration/security-definer/leakproof/strictness facts therefore cannot stand in for `provolatile`.
 
@@ -29,6 +29,7 @@ No Rust execution result is attached to this lineage yet. This environment has n
 
 | Concern | Owner evidence |
 | --- | --- |
+| PostgreSQL raw catalog discriminator | PostgreSQL 18 `pg_proc.provolatile` (`i`, `s`, `v`) |
 | Raw converter `provolatile` observation, validation and digest | `crates/conceptweave-relation-partition/src/index_exclusion_constraint_operator_procedure_transform_converter_volatility.rs` |
 | Public composition | `crates/conceptweave-relation-partition/src/index_partition.rs` |
 | Completeness, binding drift, invalid state, duplicate, receipt, digest and quoted-identifier contracts | `crates/conceptweave-relation-partition/tests/index_exclusion_constraint_operator_procedure_transform_converter_volatility_contract.rs` |
@@ -36,6 +37,8 @@ No Rust execution result is attached to this lineage yet. This environment has n
 | Deferred independent converter attributes | parallel safety, planner support and cost remain separate review-gated facts |
 
 ## References
+
+PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: pg_proc*. https://www.postgresql.org/docs/18/catalog-pg-proc.html
 
 PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE FUNCTION*. https://www.postgresql.org/docs/18/sql-createfunction.html
 
