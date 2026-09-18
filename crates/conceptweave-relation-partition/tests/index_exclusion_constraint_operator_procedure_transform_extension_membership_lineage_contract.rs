@@ -81,3 +81,46 @@ fn ordinary_exclude_transform_extension_membership_rejects_same_generation_conve
         "index_exclusion_constraint_operator_procedure_transform_extension_membership_binding",
     );
 }
+
+#[test]
+fn ordinary_exclude_transform_extension_membership_rejects_same_name_converter_definition_drift() {
+    let function_membership = converter_function_extension_membership_snapshot();
+    let transform_types = selected_transform_types_predecessor();
+    let definition = definition_snapshot();
+    let drifted_converter = IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot::new(
+        &transform_types,
+        &definition,
+        vec![converter_observation(
+            operator("="),
+            procedure("int4eq"),
+            "internal",
+            vec![converter_binding(
+                Some(converter_function(
+                    "payload_from_sql",
+                    internal_type(),
+                    "payload_from_sql_v2",
+                )),
+                Some(converter_function(
+                    "payload_to_sql",
+                    custom_payload_type(),
+                    "payload_to_sql_v1",
+                )),
+            )],
+        )],
+    )
+    .unwrap();
+
+    let error = IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapshot::new(
+        &function_membership,
+        &drifted_converter,
+        complete_transform_extension_membership_observations(),
+    )
+    .expect_err(
+        "transform-object extension membership must reject a same-name converter snapshot with different immutable function-definition evidence",
+    );
+
+    assert_field(
+        error,
+        "index_exclusion_constraint_operator_procedure_transform_extension_membership_lineage",
+    );
+}
