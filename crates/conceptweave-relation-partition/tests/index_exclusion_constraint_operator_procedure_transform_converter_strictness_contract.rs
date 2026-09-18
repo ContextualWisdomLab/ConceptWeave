@@ -151,6 +151,33 @@ fn ordinary_exclude_transform_converter_strictness_rejects_missing_direction() {
 }
 
 #[test]
+fn ordinary_exclude_transform_converter_strictness_rejects_extra_coordinate() {
+    let predecessor = leakproof_snapshot();
+    let mut observations = complete_converter_strictness_observations();
+    observations.push(
+        IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessObservation::new(
+            coordinate(),
+            2,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            true,
+        )
+        .unwrap(),
+    );
+    let error = IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessSnapshot::new(
+        &predecessor,
+        observations,
+    )
+    .expect_err("strictness evidence cannot introduce a converter coordinate absent from predecessor");
+    assert_field(
+        error,
+        "index_exclusion_constraint_operator_procedure_transform_converter_strictness_completeness",
+    );
+}
+
+#[test]
 fn ordinary_exclude_transform_converter_strictness_rejects_binding_drift() {
     let predecessor = leakproof_snapshot();
     let mut observations = complete_converter_strictness_observations();
@@ -186,6 +213,42 @@ fn ordinary_exclude_transform_converter_strictness_rejects_duplicate_coordinate(
     assert_field(
         error,
         "index_exclusion_constraint_operator_procedure_transform_converter_strictness_coordinate",
+    );
+}
+
+#[test]
+fn ordinary_exclude_transform_converter_strictness_rejects_blank_converter_schema() {
+    let error = IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessObservation::new(
+        coordinate(),
+        1,
+        custom_payload_type(),
+        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+        "  ",
+        "payload_from_sql",
+        true,
+    )
+    .expect_err("converter schema is part of the exact function binding");
+    assert_field(
+        error,
+        "index_exclusion_constraint_operator_procedure_transform_converter_strictness_function_schema",
+    );
+}
+
+#[test]
+fn ordinary_exclude_transform_converter_strictness_rejects_blank_converter_function_name() {
+    let error = IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessObservation::new(
+        coordinate(),
+        1,
+        custom_payload_type(),
+        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+        "public",
+        "\t",
+        true,
+    )
+    .expect_err("converter function name is part of the exact function binding");
+    assert_field(
+        error,
+        "index_exclusion_constraint_operator_procedure_transform_converter_strictness_function_name",
     );
 }
 
