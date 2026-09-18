@@ -15,6 +15,7 @@ use sha2::{Digest, Sha256};
 
 use super::{
     IndexExclusionConstraintCoordinate,
+    IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
     IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipSnapshot,
     IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot,
 };
@@ -174,7 +175,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapsh
     ///
     /// `converter_extension_membership_snapshot` is the digest predecessor. The original transform
     /// converter snapshot supplies the transform-row identity `(trftype, trflang)` that is not a
-    /// per-direction converter-function fact. Both inputs must describe the same source generation.
+    /// per-direction converter-function fact. Both inputs must describe the same source generation
+    /// and the exact same converter direction/function set.
     pub fn new(
         converter_extension_membership_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipSnapshot,
         transform_converter_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot,
@@ -192,6 +194,53 @@ impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapsh
             return Err(invalid(
                 "index_exclusion_constraint_operator_procedure_transform_extension_membership_generation",
             ));
+        }
+
+        let converter_membership_observations =
+            converter_extension_membership_snapshot.observations();
+        let raw_converter_direction_count = transform_converter_snapshot
+            .observations()
+            .iter()
+            .flat_map(|observation| observation.converters())
+            .map(|binding| usize::from(binding.from_sql().is_some()) + usize::from(binding.to_sql().is_some()))
+            .sum::<usize>();
+        if raw_converter_direction_count != converter_membership_observations.len() {
+            return Err(invalid(
+                "index_exclusion_constraint_operator_procedure_transform_extension_membership_binding",
+            ));
+        }
+        for transform_observation in transform_converter_snapshot.observations() {
+            for binding in transform_observation.converters() {
+                for (direction, converter) in [
+                    (
+                        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+                        binding.from_sql(),
+                    ),
+                    (
+                        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::ToSql,
+                        binding.to_sql(),
+                    ),
+                ] {
+                    let Some(converter) = converter else {
+                        continue;
+                    };
+                    let has_exact_converter_membership = converter_membership_observations
+                        .iter()
+                        .any(|candidate| {
+                            candidate.coordinate() == transform_observation.coordinate()
+                                && candidate.key_position() == transform_observation.key_position()
+                                && candidate.transform_type() == binding.transform_type()
+                                && candidate.direction() == direction
+                                && candidate.converter_schema_name() == converter.schema_name()
+                                && candidate.converter_function_name() == converter.function_name()
+                        });
+                    if !has_exact_converter_membership {
+                        return Err(invalid(
+                            "index_exclusion_constraint_operator_procedure_transform_extension_membership_binding",
+                        ));
+                    }
+                }
+            }
         }
 
         observations.sort_by_key(transform_extension_membership_key);
