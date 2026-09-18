@@ -2,7 +2,7 @@
 
 **Snapshot:** 2026-09-19
 
-This is the code-current decision surface for the active ConceptWeave Source Observation lane. The preceding converter-kind surface through exact head `09f4b9c9d1be4da2979c0a01958014a1aa129f42` is preserved losslessly at `docs/archive/product-technical-gap-baseline-through-09f4b9c9.md`; its matching changelog is preserved at `docs/archive/CHANGELOG-through-09f4b9c9.md`. Earlier surfaces remain under `docs/archive/`, and focused rationale/TRACEABILITY remains under `docs/doctoring/`. Exact-head execution or review evidence never transfers after source movement.
+This is the code-current decision surface for the active ConceptWeave Source Observation lane. Earlier surfaces remain under `docs/archive/`; focused rationale and primary-source traceability remain under `docs/doctoring/`. Exact-head execution or review evidence never transfers after source movement.
 
 ## Canonical boundary
 
@@ -12,62 +12,50 @@ ConceptWeave owns `observe -> discover -> propose -> align -> validate -> review
 
 ## Current Source Observation authority
 
-The current behavior-bearing structural converter successor remains argument-count public head `c7419477a8538551a573482f78013ad226923899`, built ordinary-forward over converter return-set public head `40fc0e46b8a9e8c1018245540fc788f47a9132c0` and converter-kind authority archived at `09f4b9c9...`. The later volatility lifecycle correction changes the interpretation of already-observed raw `provolatile`; it does not rewrite the structural successor digest chain.
+Fresh live state showed #46 had advanced ordinary-forward from prior documented head `95e5fb8e19d336b43c6dde3fa7767542b22505c6` to `8132dab8ca9d9f7aca02ac6a84af3c0c1257e312`. That concurrent delta is adopted, not treated as a race: it added raw transform-converter `pg_proc.proargmodes` evidence with RED `6ecc6418fce88b3aaf1519e7c422b2a1583b5407`, production `39602ea78c4bbff856c6274052918c4c0541e9df`, public composition `a3c61e33fbd84c86e9167d17377072df3e0e6ec0`, and doctoring `8132dab8ca9d9f7aca02ac6a84af3c0c1257e312`.
 
-Return-set lineage: review `5251492933` -> RED `e92a8657a20878621da883a4326237f1d899bc89` -> production `c6d11432cbac681a937449ea41e2c49e26f24409` -> public composition `40fc0e46b8a9e8c1018245540fc788f47a9132c0`.
+The next material lossiness found in fresh PostgreSQL 18 catalog review was raw `pg_proc.proargnames`. PostgreSQL defines it independently of `proargtypes`: positions correspond to `proallargtypes`, unnamed positions are empty strings, and the whole field is NULL when none of the arguments are named. `CREATE OR REPLACE FUNCTION` can add a name to an input parameter that previously had none without replacing the function object, so two live converter states can differ only in `proargnames` while retaining the same transform binding and function identity.
 
-Argument-count lineage: review `5251508944` -> RED `4f81f92f54edb622ba933617ef6a598d7a4a1d16` -> production `65dabb7df539c2a80455f8b4aec5c024117b8a58` -> final public composition `c7419477a8538551a573482f78013ad226923899`. An intermediate composition `cb43e7fc8ba28516dc96a6e3d61a8df9a71c9a24` contained one duplicate re-export outside the intended stanza and was immediately repaired ordinary-forward. The net `40fc0e46... -> c7419477...` compare is ahead-only and leaves only the new argument-count source, its contract, and four intended `index_partition.rs` additions.
+Argument-name lineage: finding review `5252092881` on `8132dab8ca9d9f7aca02ac6a84af3c0c1257e312` -> RED `2ccf80dd19f7710d14512f2b184d8551142ad4d5` -> production observation/snapshot/receipt `653aa476578cb3e75bf19103c37ffec4e17e9a5e` -> public composition `bbcf388dfd01323da86b25df300ba112be4dc2cb` -> doctoring `6a4c022c8a8eeb1e9b963ed931bac64fc15aac1d`.
 
-All valid predecessor ordinary-EXCLUDE facts remain authoritative without rewriting issued digest domains. The active chain binds exact selected transform converters plus definition, owner, object-level `EXECUTE` ACL, nullable `proconfig`, raw `prosecdef`, `proleakproof`, `proisstrict`, raw `provolatile`, `proparallel`, exact `prosupport` absence/identity, exact raw `procost` float4 bits, raw `prokind='f'`, raw `proretset=false`, and raw `pronargs=1`.
+`IndexExclusionConstraintOperatorProcedureTransformConverterArgumentNamesSnapshot` is an ordinary-forward successor of the argument-mode snapshot. It preserves NULL separately from a populated name vector, preserves per-position empty-string sentinels, requires exact predecessor coordinate coverage and converter schema/function binding, and domain-separates the successor digest. A populated vector must have the same positional length as the predecessor all-argument shape: one when `proargmodes` is NULL, otherwise the exact mode-vector length. Empty or all-empty populated vectors fail closed because PostgreSQL represents the all-unnamed state as NULL.
 
-Quoted PostgreSQL transform-type identifiers remain collision-safe: schema and type-name components are percent-encoded independently before the canonical `.` separator.
+Quoted transform-type provenance remains collision-safe because schema and type-name components are percent-encoded independently before the canonical separator.
 
-## Transform-converter checker semantics and observation boundary
+All valid predecessor ordinary-EXCLUDE facts remain authoritative without rewriting issued digest domains: converter definition, owner, object-level `EXECUTE` ACL, nullable `proconfig`, raw `prosecdef`, `proleakproof`, `proisstrict`, raw `provolatile`, `proparallel`, exact `prosupport` absence/identity, exact raw `procost` float4 bits, raw `prokind='f'`, raw `proretset=false`, raw `pronargs=1`, the exact one-`pg_catalog.internal` input boundary, raw nullable `proargmodes`, and now raw nullable `proargnames`.
 
-PostgreSQL 18 `check_transform_function()` performs five checks after resolving a converter function: it rejects `PROVOLATILE_VOLATILE`, requires a normal function (`prokind == PROKIND_FUNCTION`), rejects set-returning functions (`proretset`), requires exactly one argument (`pronargs == 1`), and requires that argument type to be `INTERNALOID`. FROM SQL additionally must return `internal`; TO SQL must return the transform data type.
+## Observation versus admission
 
-The four shape predicates are represented by the governed chain: `IndexExclusionConstraintOperatorProcedureTransformConverterKindSnapshot`, `...ReturnSetSnapshot`, `...ArgumentCountSnapshot`, and the base converter's resolved single `pg_catalog.internal` argument boundary. These are exact source facts, not values inferred from a generic function-shaped DTO.
+The raw catalog layer does not normalize away post-creation drift. PostgreSQL 18 `CREATE TRANSFORM` has structural and volatility admission constraints, but function properties can later change without replacing the transform binding. The established volatility correction therefore remains in force: raw `provolatile='v'` is observable drift evidence even though a volatile converter is not admissible for a fresh transform.
 
-Volatility needs a different lifecycle treatment. `check_transform_function()` rejects a volatile converter during `CREATE TRANSFORM`, but PostgreSQL 18 `ALTER FUNCTION` explicitly allows changing an existing function to `IMMUTABLE`, `STABLE`, or `VOLATILE`. The transform checker is not an ALTER-time revalidation hook. Consequently, an already referenced converter can be observed later with raw `provolatile='v'`, even though the same function would fail fresh transform admission.
+Argument names follow the same boundary principle. `CREATE OR REPLACE FUNCTION` may add a name to a previously unnamed input parameter while preserving the function identity. Source Observation records the exact resulting `proargnames`; it does not infer names from signatures and does not classify naming drift as a fresh-transform admission failure.
 
-ConceptWeave therefore preserves `i|s|v` in `IndexExclusionConstraintOperatorProcedureTransformConverterVolatilitySnapshot`. An observed `v` is governance-relevant drift evidence and changes the successor digest; it is not discarded at Source Observation. A later validation rule may mark `v` as non-admissible for a fresh transform or as a drift finding, but validation must consume the raw fact rather than make it unobservable.
+Primary authority:
 
-This boundary was reverified in this run. Review `5251665634` initially interpreted the creation-time volatility check as a raw-capture restriction. RED `a4a735d2bda47b5cbad7cdf6df6405c76f499fc6` and production `9de4b4ae2ddaa1339116a03d15ca13e5f4b19cef` temporarily encoded that interpretation. PostgreSQL 18 `ALTER FUNCTION` primary-source follow-up invalidated it. Correction review `5251695984`, ordinary-forward source correction `b4df9bef3c5eeb892a2ac47e208d06f9bb0f5bb0`, and regression `7ebe2a484330d882a8aa857fdb53333f524e09eb` restore raw volatile-drift observability while retaining the superseded attempt in history.
-
-Both structural successors continue to require exact predecessor inventory and converter schema/function binding. Missing/extra coordinates, duplicates, binding drift, blank identifiers, zero positions, invalid structural values, and unknown provenance receipts fail closed. Their digests are separately domain-separated, and their canonical locations retain component-wise percent encoding.
-
-Traceability:
-
-- converter volatility observation: original review `5249791627`, RED `2bf4001dc1cee62df3d826fe585e246528c450cb`, production `85265a29730698c6847a1089357a0a18e70c77d8`, public composition `d875c26cdd47c008015e8dfd0d769fc16ba8b5d0`; lifecycle correction review `5251695984`, source correction `b4df9bef3c5eeb892a2ac47e208d06f9bb0f5bb0`, drift regression `7ebe2a484330d882a8aa857fdb53333f524e09eb`;
-- converter kind: review `5251421078`, RED `f60aa85fbf36ffb8ab6354afc4826d347ba8ea44`, production `b75b3f008c0baeeae1b5e5eb3fd421b14e0d1205`, public composition `75028d1c8c18a490f793f8fcde5061ec39c52158`, edge contract `98149497113369b1f8a95c7f00bb0800a854a56f`;
-- converter return-set: review `5251492933`, RED `e92a8657a20878621da883a4326237f1d899bc89`, production `c6d11432cbac681a937449ea41e2c49e26f24409`, public composition `40fc0e46b8a9e8c1018245540fc788f47a9132c0`;
-- converter argument count: review `5251508944`, RED `4f81f92f54edb622ba933617ef6a598d7a4a1d16`, production `65dabb7df539c2a80455f8b4aec5c024117b8a58`, final public composition `c7419477a8538551a573482f78013ad226923899`;
-- doctoring: `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-{volatility,kind,return-set,argument-count}-integrity.md`.
-
-Primary authority is PostgreSQL 18 `pg_proc`, `ALTER FUNCTION`, `CREATE TRANSFORM`, and `src/backend/commands/functioncmds.c::check_transform_function()`.
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: 52.39. pg_proc*. https://www.postgresql.org/docs/18/catalog-pg-proc.html
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: CREATE FUNCTION*. https://www.postgresql.org/docs/18/sql-createfunction.html
+- Existing transform-checker/volatility authority remains documented in the prior focused doctoring surfaces.
 
 ## Acceptance boundary
 
-**Source repaired is not GREEN.** Repository-pinned Rust 1.98 `fmt`, strict workspace/all-target Clippy, focused and retained tests, workspace/doc tests, release build, rustdoc, and owned production statement/branch/edge coverage must be demonstrated on the final exact head. No predecessor execution result transfers after source movement.
+**Source repaired is not GREEN.** The final exact head must independently demonstrate repository-pinned Rust 1.98 `fmt`, strict workspace/all-target Clippy, focused and retained tests, workspace/doc tests, release build, rustdoc, and owned production statement/branch/edge coverage. No predecessor execution result transfers after source movement.
 
-The bounded PostgreSQL 18 live differential must retain all predecessor ordinary-EXCLUDE evidence and resolve every nonzero selected transform converter to the same exact-generation `pg_proc` row. It must independently capture definition/owner/ACL/configuration/security/planner facts plus raw `provolatile`, raw `prokind`, raw `proretset`, raw `pronargs`, and the argument-type vector needed to prove `proargtypes[0] == internal`. A raw `v` volatility value is captured as drift evidence, not normalized away. Non-`f` kind, `proretset=true`, `pronargs != 1`, a non-`internal` argument, missing resolution, mixed-generation joins, or normalization-derived substitutes remain capture failures for the structural chain.
+The bounded PostgreSQL 18 live differential must resolve every selected transform converter to the same exact-generation `pg_proc` row and independently capture all predecessor facts plus raw nullable `proargmodes` and raw nullable `proargnames`. It must preserve empty-string unnamed positions and must not reconstruct names from SQL text, signatures, application metadata, or a different catalog generation. Missing resolution, mixed-generation joins, normalization-derived substitutes, coordinate drift, or name/mode positional mismatch remain capture failures.
+
+At the current exact head, no pull-request workflow run has yet established native or hosted GREEN after these source movements. A source-neutral wake commit or unchanged-head manual rerun is not an acceptable substitute for causal execution evidence.
 
 ## Residual material gap
 
-The PostgreSQL 18 transform checker is now represented without collapsing observation into validation: the governed source chain carries raw `provolatile` plus the four shape predicates `prokind='f'`, `proretset=false`, `pronargs=1`, and exact `internal` argument type. Creation-time non-volatility is a validation interpretation over raw volatility, while a live post-creation `v` remains observable. This closes the specific lifecycle mismatch found in this source review; it is not a universal claim that every future PostgreSQL/catalog semantic fact is exhausted.
+The immediate argument-mode/name catalog lossiness is now represented in source. This is not a claim that `pg_proc` or PostgreSQL transform semantics are exhausted. In particular, `proallargtypes`, `pronargdefaults`/`proargdefaults`, return-type and implementation-language/source facts remain candidates only if a fresh catalog/code review proves that their omission creates an independent governed-semantic distinction not already guaranteed by the transform binding and predecessor chain.
 
-The next Source Observation successor must come from another fresh code/catalog review rather than extending the chain by naming fields speculatively. Publication and immutable semantic release remain unauthorized until exact-head Rust/coverage acceptance, the bounded PostgreSQL 18 differential, central workflow prerequisites, and downstream stack adoption are complete.
+The next successor must therefore come from another fresh source/catalog review rather than field enumeration by habit.
 
 ## Canonical prerequisite state
 
-Active central owner remains `.github#2040@12c3fa6f3623aa5f2979d3d5ee4ed987002a6c0d`, OPEN / Draft / non-mergeable, against protected `.github/main@64aa08d7fa487deacd41c761c36277ca68cab6c9` until a fresh sweep proves otherwise. The branches are materially diverged and the shared scheduler changed on both sides. #2040 production remains repository-identity RED; protected main is only partially hardened.
+Central `.github#2040` remains the canonical workflow prerequisite until a fresh sweep proves otherwise. Its next valid movement remains ordinary/non-force path-wise reconciliation of the shared scheduler while preserving its owned v2 producer, no-restamp behavior, repository-scoped credential proof, stale-run revalidation, rationale/tests, compatible current-main queue/coalescing/capacity behavior, and the stronger repository-identity invariant.
 
-The next valid central movement is ordinary/non-force path-wise protected-main reconciliation. The resolved scheduler must preserve #2040's v2 CodeQL producer, removal of source-neutral restamps, repository-scoped Actions credential/selected-token proof, stale-run revalidation, rationale/docstrings/tests; adopt compatible protected-main queue/coalescing/capacity behavior; and enforce the stronger repository-identity invariant.
-
-Queue-health #2268 remains source-repaired at `142e5b2617778e79f665693be1e6f8c04d7533aa` and CodeQL scan-dispatch #2271 remains source-repaired at `2b849c874122961e025c29f7fa0bb697863c3d68`. Their hosted evidence remains independent and does not transfer into #2040.
-
-Product bootstrap #35 remains exact `9bb82f041483cb4e0cf1aa1f5450b413309f9a05`. Its Security Scan and SAST success do not override terminal CodeQL PR failure; no unchanged-head manual rerun or leaf-source workaround is authorized.
+Queue-health and CodeQL scan-dispatch sibling lanes retain independent evidence; their results do not transfer into #2040. Product bootstrap #35 remains a separate prerequisite and its prior successful Security/SAST lanes do not override terminal CodeQL failure evidence.
 
 ## Required order
 
-`.github#2040` path-wise reconciliation with repository-identity repair -> focused scheduler GREEN -> fresh exact-head central terminal checks plus qualifying non-self approval -> fresh compatible #35 acceptance and normal landing -> exact #46 Rust 1.98 native/hosted GREEN -> bounded PostgreSQL 18 differential including raw converter volatility and structural facts (`prokind`, `proretset`, `pronargs`, internal argument type) -> fresh semantic-gap review -> complete ordinary/non-force #46 adoption into #45 -> fresh #45 acceptance -> #6 propagation -> immutable governed release only from an accepted protected head.
+`.github#2040` path-wise reconciliation plus repository-identity repair -> fresh exact-head central GREEN plus qualifying non-self approval -> fresh compatible #35 acceptance/normal landing -> exact #46 Rust 1.98/coverage GREEN -> bounded PostgreSQL 18 differential including raw `proargmodes` and `proargnames` -> fresh semantic-gap review -> complete ordinary/non-force #46 adoption into #45 -> fresh #45 acceptance -> #6 propagation -> immutable governed release only from an accepted protected head.
