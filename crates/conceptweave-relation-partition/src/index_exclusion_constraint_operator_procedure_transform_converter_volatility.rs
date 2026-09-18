@@ -2,9 +2,10 @@
 //!
 //! Converter definition, owner, object-level `EXECUTE` ACL, function-local configuration,
 //! invoker/definer context, leakproof classification, and strictness do not determine
-//! `pg_proc.provolatile`. PostgreSQL exposes `i`, `s`, and `v` as independent function state. This
-//! successor binds that raw same-row discriminator for every exact converter direction without
-//! inventing an immutable-only ordinary-EXCLUDE admission rule.
+//! `pg_proc.provolatile`. PostgreSQL exposes `i`, `s`, and `v` as independent function state, while
+//! `check_transform_function()` admits only immutable (`i`) or stable (`s`) converter functions and
+//! rejects volatile (`v`) functions. This successor binds that raw same-row discriminator for every
+//! exact converter direction and fail-closes the PostgreSQL-invalid volatile state.
 
 use std::collections::BTreeSet;
 
@@ -34,7 +35,7 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterVolatility
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterVolatilityObservation {
-    /// Records raw converter `pg_proc.provolatile` while repeating exact predecessor binding identity.
+    /// Records raw converter `pg_proc.provolatile` while enforcing PostgreSQL transform admission.
     pub fn new(
         coordinate: IndexExclusionConstraintCoordinate,
         key_position: u32,
@@ -57,7 +58,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterVolatilityObserv
             &converter_function_name,
             "index_exclusion_constraint_operator_procedure_transform_converter_volatility_function_name",
         )?;
-        if !matches!(volatility, 'i' | 's' | 'v') {
+        if !matches!(volatility, 'i' | 's') {
             return Err(invalid(
                 "index_exclusion_constraint_operator_procedure_transform_converter_volatility",
             ));
@@ -111,7 +112,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterVolatilityObserv
         &self.converter_function_name
     }
 
-    /// Returns raw `pg_proc.provolatile`: `i` immutable, `s` stable, or `v` volatile.
+    /// Returns raw accepted `pg_proc.provolatile`: `i` immutable or `s` stable.
     #[must_use]
     pub const fn volatility(&self) -> char {
         self.volatility
@@ -180,10 +181,11 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterVolatilitySource
     }
 }
 
-/// Complete raw converter `pg_proc.provolatile` evidence over one exact strictness predecessor.
+/// Complete accepted converter `pg_proc.provolatile` evidence over one exact strictness predecessor.
 ///
-/// This layer is observational. Immutable, stable, and volatile converter states are all
-/// representable, but they produce distinct successor digests and must cover the predecessor
+/// Immutable and stable converter states are representable and produce distinct successor digests.
+/// Volatile converter functions fail closed because PostgreSQL 18 `check_transform_function()`
+/// rejects them before transform admission. The observations must cover the predecessor
 /// converter-direction inventory exactly.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexExclusionConstraintOperatorProcedureTransformConverterVolatilitySnapshot {
