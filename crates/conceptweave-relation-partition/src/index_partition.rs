@@ -234,7 +234,6 @@ pub use expression_relation_var_schema::*;
 
 #[path = "expression_collation_identity.rs"]
 mod expression_collation_identity;
-pub use exclusion_constraint_operator_procedure_transform_converter_argument_count::*;
 pub use expression_collation_identity::*;
 
 #[path = "collation_database_encoding.rs"]
