@@ -200,6 +200,10 @@ pub use exclusion_constraint_operator_procedure_transform_converter_kind::*;
 mod exclusion_constraint_operator_procedure_transform_converter_return_set;
 pub use exclusion_constraint_operator_procedure_transform_converter_return_set::*;
 
+#[path = "index_exclusion_constraint_operator_procedure_transform_converter_argument_count.rs"]
+mod exclusion_constraint_operator_procedure_transform_converter_argument_count;
+pub use exclusion_constraint_operator_procedure_transform_converter_argument_count::*;
+
 #[path = "collation_identity.rs"]
 mod collation_identity;
 pub use collation_identity::*;
@@ -230,6 +234,7 @@ pub use expression_relation_var_schema::*;
 
 #[path = "expression_collation_identity.rs"]
 mod expression_collation_identity;
+pub use exclusion_constraint_operator_procedure_transform_converter_argument_count::*;
 pub use expression_collation_identity::*;
 
 #[path = "collation_database_encoding.rs"]
