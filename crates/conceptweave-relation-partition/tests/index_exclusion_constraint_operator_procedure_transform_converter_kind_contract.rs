@@ -68,6 +68,7 @@ fn ordinary_exclude_transform_converter_kind_preserves_required_normal_function_
     assert_eq!(receipt.location().procedure_kind(), 'f');
     assert_eq!(receipt.source_id(), predecessor.source_connection_key());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_ne!(snapshot.snapshot_digest(), predecessor.snapshot_digest());
     assert_eq!(
         receipt.connection_policy_binding(),
         predecessor.connection_policy_binding()
@@ -219,6 +220,21 @@ fn ordinary_exclude_transform_converter_kind_rejects_blank_identifiers_zero_posi
     assert_field(
         blank_schema,
         "index_exclusion_constraint_operator_procedure_transform_converter_kind_function_schema",
+    );
+
+    let blank_name = IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation::new(
+        coordinate(),
+        1,
+        custom_payload_type(),
+        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+        "public",
+        "\t",
+        'f',
+    )
+    .expect_err("converter function name is part of the exact function binding");
+    assert_field(
+        blank_name,
+        "index_exclusion_constraint_operator_procedure_transform_converter_kind_function_name",
     );
 
     let zero_position = IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation::new(
