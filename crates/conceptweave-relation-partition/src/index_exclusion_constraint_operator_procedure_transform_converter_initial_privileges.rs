@@ -112,7 +112,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
             "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantor_role_oid",
         )?;
         let grantor_role_name = grantor_role_name.into();
-        validate_nonblank(
+        validate_postgresql_identifier(
             &grantor_role_name,
             "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantor_role_name",
         )?;
@@ -161,11 +161,11 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
         )?;
         let grantee_role_name = grantee_role_name.into();
         let grantor_role_name = grantor_role_name.into();
-        validate_nonblank(
+        validate_postgresql_identifier(
             &grantee_role_name,
             "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantee_role_name",
         )?;
-        validate_nonblank(
+        validate_postgresql_identifier(
             &grantor_role_name,
             "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantor_role_name",
         )?;
@@ -194,7 +194,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
             "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantor_role_oid",
         )?;
         let grantee_role_name = grantee_role_name.into();
-        validate_nonblank(
+        validate_postgresql_identifier(
             &grantee_role_name,
             "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantee_role_name",
         )?;
@@ -223,7 +223,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
             "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantor_role_oid",
         )?;
         let grantor_role_name = grantor_role_name.into();
-        validate_nonblank(
+        validate_postgresql_identifier(
             &grantor_role_name,
             "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantor_role_name",
         )?;
@@ -496,11 +496,11 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
         }
         let converter_schema_name = converter_schema_name.into();
         let converter_function_name = converter_function_name.into();
-        validate_nonblank(
+        validate_postgresql_identifier(
             &converter_schema_name,
             "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_function_schema",
         )?;
-        validate_nonblank(
+        validate_postgresql_identifier(
             &converter_function_name,
             "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_function_name",
         )?;
@@ -926,8 +926,8 @@ fn encode_str(hasher: &mut Sha256, value: &str) {
     hasher.update(value.as_bytes());
 }
 
-fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
-    if value.trim().is_empty() {
+fn validate_postgresql_identifier(value: &str, field: &'static str) -> Result<(), ObservationError> {
+    if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }
     Ok(())
