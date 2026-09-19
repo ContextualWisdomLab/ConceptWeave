@@ -1,34 +1,34 @@
 # Changelog
 
-The Source Observation decision surface before dangling-role repair in converter-function initial privileges is preserved at `docs/archive/CHANGELOG-through-5daf2a57.md`; its matching product/technical surface is preserved at `docs/archive/product-technical-gap-baseline-through-5daf2a57.md`. Earlier history remains under `docs/archive/`; focused rationale and primary-source traceability remain under `docs/doctoring/`.
+The Source Observation decision surface before the dangling-role diagnostic-projection repair is preserved at `docs/archive/CHANGELOG-through-8348be96.md`; its matching product/technical surface is preserved at `docs/archive/product-technical-gap-baseline-through-8348be96.md`. The earlier pre-dangling-role surface remains under the `through-5daf2a57` archives. Focused rationale and primary-source traceability remain under `docs/doctoring/`.
 
 ## Unreleased
 
 ### Added
 
 - Retained the converter-function `pg_init_privs` successor: exact row absence/presence, `privtype` (`i`/`e`), complete object-level initial EXECUTE ACL, immutable receipt/snapshot, exact converter binding, and raw converter-root lineage remain authoritative.
-- Added hostile dangling-role coverage for PostgreSQL catalog states where an initial ACL still refers to a role OID after the role no longer exists. The contract covers dangling grantee, dangling grantor, both dangling, PUBLIC with dangling grantor, and rejection of unresolved OID zero.
-- Added `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-initial-privileges-dangling-role-integrity.md` with PostgreSQL 18 BUG #19483/#19513 and pgsql-hackers repair discussion traceability.
+- Retained hostile dangling-role identity coverage for catalog states where an initial ACL still refers to a role OID after the role no longer exists.
+- Added privacy-preserving dangling-role diagnostic projections: `unresolved_grantee_count()` and `unresolved_grantor_count()` expose whether deterministic validation has recovery damage to act on without publishing raw dangling OID values.
+- Updated `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-initial-privileges-dangling-role-integrity.md` with PostgreSQL 18 catalog-source authority, BUG #19483/#19513, and the diagnostic-projection repair trace.
 
 ### Correctness
 
-- `IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant` no longer requires every non-PUBLIC ACL role OID to resolve to a role name before Source Observation can exist. A nonzero dangling grantee or grantor OID is now preserved explicitly as an unresolved raw OID.
-- Resolved role names and unresolved OIDs occupy different identity namespaces. A real role named `"16424"` does not alias raw dangling OID `16424`.
+- `IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant` continues to preserve nonzero dangling grantee/grantor OIDs as raw unresolved identities rather than requiring role lookup or stringifying the OID as a role name.
+- `IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial` now exposes unresolved grantee/grantor counts derived from the canonical initial ACL. Before this repair, the digest committed to dangling OIDs but downstream `validate`/recovery diagnostics could not determine from the immutable observation whether unresolved role references existed.
+- Derived unresolved-reference counts do not enter the digest. Existing resolved and unresolved ACL digest identity remains byte-for-byte stable; raw dangling OIDs remain committed inside the privacy-preserving digest rather than becoming a public diagnostic data surface.
+- Resolved role names and unresolved OIDs remain separate identity namespaces. A real role named `"16424"` does not alias raw dangling OID `16424`.
 - PUBLIC remains a grantee-only identity. OID zero is rejected by unresolved-role constructors and is never treated as a dangling role.
-- Existing resolved-role digest framing remains byte-for-byte stable. Unresolved grantees use a dedicated digest tag; unresolved grantors use a reserved framing sentinel plus the raw OID, avoiding collision with length-framed role names.
-- Source Observation records the damaged external state rather than silently filtering it or failing solely on missing role lookup. Validation/publication may later flag the state as a recovery/security defect.
-- Current `pg_proc.proacl`, converter-function `deptype='e'`, complete `deptype='x'` sets, security labels, exact `pg_init_privs` baseline (including dangling ACL OIDs), immutable raw converter root, and transform-object `deptype='e'` remain separate facts.
+- Current `pg_proc.proacl`, converter-function `deptype='e'`, complete `deptype='x'` sets, security labels, exact `pg_init_privs` baseline, immutable raw converter root, and transform-object `deptype='e'` remain separate facts.
 
 ### Test and repair evidence
 
-- Previous initial-privilege finding/repaired lineage remains archived through exact head `5daf2a5725ed52cd1b8d884200fc7786eaba54de`.
-- Dangling-role finding review: `5254640920`.
-- Structural RED: `94e98da8ebb31f1429b44b20cce7b96ea16e1332`; the contract referenced dangling-role constructors before production exposed them.
-- Production causal repair: `1d6abe4f11cbc9c50b705ec5458a80ba04719c7f`.
-- Pre-repair CHANGELOG archive: `0d91dd7d876e67c8460a9a3ed04d579ab9bf463e`.
-- Pre-repair product/technical baseline archive: `b372444bd178c37100ffda070193cf9ef9bd444d`.
-- Focused primary-source doctoring: `ff8498187781a65273297913ca2a280c7f157c3d`.
-- Source repair itself is not native or hosted GREEN evidence. Exact-head Rust 1.98 fmt, strict workspace/all-target Clippy, focused/retained/workspace/doc tests, release build, rustdoc, owned production statement/branch/edge coverage, and PostgreSQL 18 bounded live differential remain gates.
+- Initial dangling-role representability finding review: `5254640920`; structural RED `94e98da8ebb31f1429b44b20cce7b96ea16e1332`; production causal repair `1d6abe4f11cbc9c50b705ec5458a80ba04719c7f`.
+- Diagnostic-projection finding review: `5254787838` at exact pre-finding head `8348be96316f625525b3d89abb732e952c0240e5`.
+- Diagnostic structural RED: `6d5796fd2e2b1aa6d1df70ee380a76b24731f04a`; the dangling-role contract referenced unresolved-reference count accessors before production exposed them.
+- Diagnostic production causal repair: `fde6d3a8776b75e3dd014713b671734b9226a0fe`.
+- The focused contract requires resolved-only `0/0`, dangling grantee `1/0`, dangling grantor `0/1`, both dangling `1/1`, and PUBLIC with dangling grantor `0/1`.
+- Pre-diagnostic archives were created ordinary-forward as `docs/archive/CHANGELOG-through-8348be96.md` and `docs/archive/product-technical-gap-baseline-through-8348be96.md`.
+- Source/documentation repair itself is not native or hosted GREEN evidence. Exact-head Rust 1.98 fmt, strict workspace/all-target Clippy, focused/retained/workspace/doc tests, release build, rustdoc, owned production statement/branch/edge coverage, and PostgreSQL 18 bounded live differential remain gates.
 
 ### Retained
 
