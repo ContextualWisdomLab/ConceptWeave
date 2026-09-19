@@ -6,8 +6,8 @@
 //! lifecycle can change without changing its `(trftype, trflang)` identity or either converter
 //! function. This successor preserves exact absence or the resolved `pg_extension.extname` for the
 //! transform object itself. Converter-function membership, auto-extension dependencies, security
-//! labels, and extension-owned metadata stay in their existing owners while the latest converter
-//! security-label successor remains the digest predecessor.
+//! labels, initial privileges, and extension-owned metadata stay in their existing owners while the
+//! latest converter initial-privilege successor remains the digest predecessor.
 
 use std::collections::BTreeSet;
 
@@ -17,7 +17,7 @@ use sha2::{Digest, Sha256};
 use super::{
     IndexExclusionConstraintCoordinate,
     IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
-    IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelSnapshot,
+    IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot,
     IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot,
 };
 
@@ -174,23 +174,23 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformExtensionMembership
 impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapshot {
     /// Creates one extension-membership fact for each exact same-generation `pg_transform` row.
     ///
-    /// `converter_security_label_snapshot` is the digest predecessor. The original
+    /// `converter_initial_privilege_snapshot` is the digest predecessor. The original
     /// transform-converter snapshot supplies the transform-row identity `(trftype, trflang)` that is
     /// not a per-direction converter-function fact. Both inputs must describe the same source
     /// generation, descend from the exact same immutable raw transform-converter root, and retain
     /// the same converter direction/function set.
     pub fn new(
-        converter_security_label_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelSnapshot,
+        converter_initial_privilege_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot,
         transform_converter_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot,
         mut observations: Vec<IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipObservation>,
     ) -> Result<Self, ObservationError> {
-        if converter_security_label_snapshot.source_connection_key()
+        if converter_initial_privilege_snapshot.source_connection_key()
             != transform_converter_snapshot.source_connection_key()
-            || converter_security_label_snapshot.connection_policy_binding()
+            || converter_initial_privilege_snapshot.connection_policy_binding()
                 != transform_converter_snapshot.connection_policy_binding()
-            || converter_security_label_snapshot.extractor_revision()
+            || converter_initial_privilege_snapshot.extractor_revision()
                 != transform_converter_snapshot.extractor_revision()
-            || converter_security_label_snapshot.observed_at_utc()
+            || converter_initial_privilege_snapshot.observed_at_utc()
                 != transform_converter_snapshot.observed_at_utc()
         {
             return Err(invalid(
@@ -198,7 +198,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapsh
             ));
         }
 
-        if converter_security_label_snapshot.converter_snapshot_digest()
+        if converter_initial_privilege_snapshot.converter_snapshot_digest()
             != transform_converter_snapshot.snapshot_digest()
         {
             return Err(invalid(
@@ -206,7 +206,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapsh
             ));
         }
 
-        let converter_lifecycle_observations = converter_security_label_snapshot.observations();
+        let converter_lifecycle_observations = converter_initial_privilege_snapshot.observations();
         let raw_converter_direction_count = transform_converter_snapshot
             .observations()
             .iter()
@@ -285,7 +285,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapsh
         }
 
         for observation in &observations {
-            let has_converter_direction = converter_security_label_snapshot
+            let has_converter_direction = converter_initial_privilege_snapshot
                 .observations()
                 .iter()
                 .any(|candidate| {
@@ -301,19 +301,19 @@ impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapsh
         }
 
         let snapshot_digest = compute_transform_extension_membership_digest(
-            converter_security_label_snapshot.snapshot_digest(),
+            converter_initial_privilege_snapshot.snapshot_digest(),
             &observations,
         );
         Ok(Self {
-            source_connection_key: converter_security_label_snapshot
+            source_connection_key: converter_initial_privilege_snapshot
                 .source_connection_key()
                 .to_owned(),
-            connection_policy_binding: converter_security_label_snapshot
+            connection_policy_binding: converter_initial_privilege_snapshot
                 .connection_policy_binding()
                 .to_owned(),
             snapshot_digest,
-            extractor_revision: converter_security_label_snapshot.extractor_revision().to_owned(),
-            observed_at_utc: converter_security_label_snapshot.observed_at_utc().to_owned(),
+            extractor_revision: converter_initial_privilege_snapshot.extractor_revision().to_owned(),
+            observed_at_utc: converter_initial_privilege_snapshot.observed_at_utc().to_owned(),
             observations,
         })
     }
