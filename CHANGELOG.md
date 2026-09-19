@@ -10,6 +10,7 @@ The immediately preceding Source Observation/recovery-validation decision surfac
 - The initial-privilege material retains the complete source-order grant vector after digest construction, including repeated ACL entries when they exist in the source array. `grants()` exposes the observed ACL sequence and multiplicity rather than a normalized set.
 - Resolved ACL role identity now retains the exact same-generation PostgreSQL role OID privately alongside its readable role name. PostgreSQL `AclItem` is OID-based and `pg_authid` stores OID and `rolname` separately, so equal names after role recreation no longer alias the earlier ACLITEM identity.
 - The initial-privilege material digest is versioned to `.material.v2`. Resolved grantee/grantor variants commit both role OID and role name, while PUBLIC and unresolved variants remain explicitly tagged.
+- PostgreSQL identifier content used by resolved ACL roles and converter schema/function names is now preserved exactly. Legal quoted identifiers containing only whitespace are accepted byte-for-byte instead of being rejected by presentation-oriented trimming; zero-length and code-zero identifiers still fail closed.
 - Added log-safe grant semantics accessors for PUBLIC shape, resolved grantee role, unresolved-grantee presence, resolved grantor role, unresolved-grantor presence, and grant option. Numeric resolved OIDs remain private identity material; raw dangling OIDs remain purpose-bound to receipt-backed recovery validation.
 - Retained hostile dangling-role identity coverage for catalog states where an initial ACL still refers to a role OID after the role no longer exists.
 - Retained canonical sorted/deduplicated unresolved grantee/grantor OID sets inside initial-privilege material so recovery evidence preserves the exact missing PostgreSQL role identities rather than only aggregate counts. These remediation sets do not reorder or deduplicate the source ACL itself.
@@ -19,12 +20,13 @@ The immediately preceding Source Observation/recovery-validation decision surfac
 - Retained complete non-secret receipt provenance in every verdict: source registry identity, connection-policy binding, source-content digest, extractor revision, observation timestamp, and canonical converter location. Present rows additionally carry the immutable material digest and exact canonical dangling-role sets.
 - `matches_source_receipt()` compares complete receipt provenance, material absence/presence identity, and exact dangling-role identity sets.
 - Added focused contracts proving equal unresolved counts with different OIDs remain distinguishable and repeated OIDs canonicalize deterministically in remediation sets.
-- Updated initial-privilege traceability with PostgreSQL 18's ACL-array ordering, multiplicity, and OID/name identity boundaries.
+- Updated initial-privilege traceability with PostgreSQL 18's ACL-array ordering, multiplicity, OID/name identity, and quoted-identifier boundaries.
 
 ### Correctness
 
 - `IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant` now requires nonzero exact OIDs for every resolved role identity instead of accepting a resolved role name alone. The OIDs are private and participate in equality/order/digest identity without becoming routine product API.
 - Equal resolved role names with different grantee or grantor OIDs now produce distinct material digests. Drop/recreate role events therefore cannot collapse into a name-only ACL identity.
+- Replaced `str::trim().is_empty()` admission for PostgreSQL role/schema/function identifiers in this initial-privilege boundary. Source Observation now rejects only zero-length or code-zero identifier strings, so legal whitespace remains source truth rather than being treated as blank presentation data.
 - PUBLIC remains a grantee-only identity. OID zero is rejected wherever a resolved or unresolved role identity is required.
 - `IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial` retains the exact source-order grant sequence so `observe -> validate -> review` can inspect PUBLIC/resolved-role/grant-option/unresolved-kind semantics without falsifying PostgreSQL ACL ordering.
 - Removed the material constructor's `grants.sort()` normalization. PostgreSQL 18 treats ACL-array order as significant for client utilities such as `pg_dump`, because grants with grant option may need to precede dependent grants.
@@ -51,7 +53,8 @@ The immediately preceding Source Observation/recovery-validation decision surfac
 - Source-order integrity finding review: `5255912747`; structural RED `13e51561cac125f2a942e7ca0d0dd39433040426`; production causal repair `966e2136c15aa049f72acfebf2c1a478d09c66ef`. The RED is a source-level contract and is not claimed as an executed failing run.
 - ACL-multiplicity finding review: `5256059436`; corrected structural RED `9747763c4b2370185bd18039b00e8ceaa9df206c`; production causal repair `55f828f6f6065fac89ae63f521d72d807f875c5b`. Earlier test-only `3ece5938...` is superseded and is not evidence.
 - Resolved-role OID identity finding review: `5256559272` at exact pre-finding head `a82dced2a154e1ff105864309a74559255898bbc`; structural RED `b1c8fef6a526b22566b65d8f7962c3af0ebd2031`; production causal repair `52e1c12d5e592e624d8d55badbdc24c52b428a00`; retained-contract constructor adoption `2780f5edb6c086a3d13b0dc47d6ca4b22963eec9`; dangling-role adaptation `a7274b7de87f904b8aae7fbdf0208ed8b3066d36`; recovery-fixture adaptation `8ba4e304fa4b24cb4e49ae31474985b400aeddc7`.
-- The OID-identity structural RED is source-level evidence of the missing contract, not an executed failing CI run. Source/documentation repair itself is likewise not native or hosted GREEN evidence.
+- PostgreSQL identifier-fidelity finding review: `5256811598` at exact pre-finding head `69315444d91690886d165a2a9dbde2b193e786ca`; structural RED `650a77aed375798ac2b241bc93ab3dc7cd5e328e`; production causal repair `74aa0c47f8ec30ccc824831383e7c6dcf0b09e99`. The RED requires whitespace-only quoted identifiers to survive exactly while empty and code-zero strings fail closed.
+- Structural RED commits are source-level evidence of missing contracts, not executed failing CI runs. Source/documentation repair itself is likewise not native or hosted GREEN evidence.
 - Exact-head Rust 1.98 fmt, strict workspace/all-target Clippy, focused/retained/workspace/doc tests, release build, rustdoc, owned production statement/branch/edge coverage, and PostgreSQL 18 bounded live differential remain gates.
 
 ### Retained
