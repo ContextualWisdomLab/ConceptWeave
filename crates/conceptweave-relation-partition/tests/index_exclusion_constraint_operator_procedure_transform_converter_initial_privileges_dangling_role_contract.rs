@@ -108,6 +108,56 @@ fn ordinary_exclude_converter_initial_privileges_expose_dangling_role_diagnostic
 }
 
 #[test]
+fn ordinary_exclude_converter_initial_privileges_retain_readable_canonical_acl_semantics() {
+    let material = extension_initial_privileges(vec![
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::unresolved_grantee_oid(
+            16_424,
+            "postgres",
+            true,
+        )
+        .unwrap(),
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::role(
+            "analytics",
+            "postgres",
+            false,
+        )
+        .unwrap(),
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::public(
+            "postgres",
+            false,
+        )
+        .unwrap(),
+    ]);
+
+    let grants = material.grants();
+    assert_eq!(grants.len(), 3);
+
+    assert!(grants[0].is_public_grantee());
+    assert_eq!(grants[0].resolved_grantee_role_name(), None);
+    assert!(!grants[0].has_unresolved_grantee());
+    assert_eq!(grants[0].resolved_grantor_role_name(), Some("postgres"));
+    assert!(!grants[0].has_unresolved_grantor());
+    assert!(!grants[0].grant_option());
+
+    assert!(!grants[1].is_public_grantee());
+    assert_eq!(grants[1].resolved_grantee_role_name(), Some("analytics"));
+    assert!(!grants[1].has_unresolved_grantee());
+    assert_eq!(grants[1].resolved_grantor_role_name(), Some("postgres"));
+    assert!(!grants[1].has_unresolved_grantor());
+    assert!(!grants[1].grant_option());
+
+    assert!(!grants[2].is_public_grantee());
+    assert_eq!(grants[2].resolved_grantee_role_name(), None);
+    assert!(grants[2].has_unresolved_grantee());
+    assert_eq!(grants[2].resolved_grantor_role_name(), Some("postgres"));
+    assert!(!grants[2].has_unresolved_grantor());
+    assert!(grants[2].grant_option());
+
+    let diagnostic = format!("{material:?}");
+    assert!(!diagnostic.contains("16424"));
+}
+
+#[test]
 fn ordinary_exclude_converter_initial_privileges_reject_public_oid_as_unresolved_role() {
     let dangling_grantee =
         IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::unresolved_grantee_oid(
