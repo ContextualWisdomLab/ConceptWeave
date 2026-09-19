@@ -2,7 +2,7 @@ include!("index_exclusion_constraint_operator_procedure_transform_extension_memb
 
 #[test]
 fn ordinary_exclude_transform_extension_membership_rejects_same_generation_converter_direction_drift() {
-    let function_lifecycle = converter_function_auto_extension_dependency_snapshot();
+    let function_lifecycle = converter_function_security_label_snapshot();
     let transform_types = selected_transform_types_predecessor();
     let definition = definition_snapshot();
     let from_sql_only = IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot::new(
@@ -41,7 +41,7 @@ fn ordinary_exclude_transform_extension_membership_rejects_same_generation_conve
 
 #[test]
 fn ordinary_exclude_transform_extension_membership_rejects_same_generation_converter_function_drift() {
-    let function_lifecycle = converter_function_auto_extension_dependency_snapshot();
+    let function_lifecycle = converter_function_security_label_snapshot();
     let transform_types = selected_transform_types_predecessor();
     let definition = definition_snapshot();
     let drifted_converter = IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot::new(
@@ -84,7 +84,7 @@ fn ordinary_exclude_transform_extension_membership_rejects_same_generation_conve
 
 #[test]
 fn ordinary_exclude_transform_extension_membership_rejects_same_name_converter_definition_drift() {
-    let function_lifecycle = converter_function_auto_extension_dependency_snapshot();
+    let function_lifecycle = converter_function_security_label_snapshot();
     let transform_types = selected_transform_types_predecessor();
     let definition = definition_snapshot();
     let drifted_converter = IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot::new(
