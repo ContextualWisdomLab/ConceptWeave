@@ -189,7 +189,7 @@ fn initial_privilege_recovery_validation_binds_absence_to_exact_owner_receipt() 
 }
 
 #[test]
-fn initial_privilege_recovery_validation_blocks_damaged_receipt_without_exposing_raw_oids() {
+fn initial_privilege_recovery_validation_blocks_damaged_receipt_without_logging_raw_oids() {
     let damaged = extension_initial_privileges(vec![
         IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::unresolved_role_oids(
             16_424,
@@ -223,8 +223,70 @@ fn initial_privilege_recovery_validation_blocks_damaged_receipt_without_exposing
     assert_exact_receipt_binding(&validation, &receipt);
     assert_eq!(validation.unresolved_grantee_count(), 1);
     assert_eq!(validation.unresolved_grantor_count(), 1);
+    assert_eq!(validation.unresolved_grantee_oids(), &[16_424]);
+    assert_eq!(validation.unresolved_grantor_oids(), &[16_425]);
 
     let diagnostic = format!("{validation:?}");
     assert!(!diagnostic.contains("16424"));
     assert!(!diagnostic.contains("16425"));
+}
+
+#[test]
+fn initial_privilege_recovery_validation_distinguishes_equal_count_dangling_role_identities() {
+    let snapshot_a = initial_privilege_snapshot_with_materials(
+        Some(extension_initial_privileges(vec![
+            IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::unresolved_role_oids(
+                16_424,
+                16_425,
+                false,
+            )
+            .expect("generation A dangling grant"),
+        ])),
+        None,
+    );
+    let snapshot_b = initial_privilege_snapshot_with_materials(
+        Some(extension_initial_privileges(vec![
+            IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::unresolved_role_oids(
+                26_424,
+                26_425,
+                false,
+            )
+            .expect("generation B dangling grant"),
+        ])),
+        None,
+    );
+    let receipt_a = snapshot_a
+        .source_receipt(
+            coordinate(),
+            1,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+        )
+        .expect("generation A receipt");
+    let receipt_b = snapshot_b
+        .source_receipt(
+            coordinate(),
+            1,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+        )
+        .expect("generation B receipt");
+
+    let validation_a =
+        validate_index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_recovery(
+            &receipt_a,
+        );
+    let validation_b =
+        validate_index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_recovery(
+            &receipt_b,
+        );
+
+    assert_eq!(validation_a.unresolved_grantee_count(), 1);
+    assert_eq!(validation_b.unresolved_grantee_count(), 1);
+    assert_eq!(validation_a.unresolved_grantor_count(), 1);
+    assert_eq!(validation_b.unresolved_grantor_count(), 1);
+    assert_eq!(validation_a.unresolved_grantee_oids(), &[16_424]);
+    assert_eq!(validation_b.unresolved_grantee_oids(), &[26_424]);
+    assert_eq!(validation_a.unresolved_grantor_oids(), &[16_425]);
+    assert_eq!(validation_b.unresolved_grantor_oids(), &[26_425]);
 }
