@@ -1,4 +1,4 @@
-use crate::model::validate_nonblank;
+use crate::column_identity::validate_postgresql_identifier;
 use crate::{ObservationError, QualifiedTypeName, RelationKind};
 
 /// Stable resolved identity for one `pg_constraint.conexclop` entry.
@@ -29,11 +29,14 @@ impl ConstraintExclusionOperatorObservation {
         }
         let operator_schema_name = operator_schema_name.into();
         let operator_name = operator_name.into();
-        validate_nonblank(
+        validate_postgresql_identifier(
             &operator_schema_name,
             "constraint_exclusion_operator_schema_name",
         )?;
-        validate_nonblank(&operator_name, "constraint_exclusion_operator_name")?;
+        validate_postgresql_identifier(
+            &operator_name,
+            "constraint_exclusion_operator_name",
+        )?;
         Ok(Self {
             position,
             operator_schema_name,
@@ -93,9 +96,9 @@ impl ConstraintPeriodObservation {
         let schema_name = schema_name.into();
         let relation_name = relation_name.into();
         let constraint_name = constraint_name.into();
-        validate_nonblank(&schema_name, "constraint_period_schema_name")?;
-        validate_nonblank(&relation_name, "constraint_period_relation_name")?;
-        validate_nonblank(&constraint_name, "constraint_period_constraint_name")?;
+        validate_postgresql_identifier(&schema_name, "constraint_period_schema_name")?;
+        validate_postgresql_identifier(&relation_name, "constraint_period_relation_name")?;
+        validate_postgresql_identifier(&constraint_name, "constraint_period_constraint_name")?;
         if !matches!(
             relation_kind,
             RelationKind::Table | RelationKind::PartitionedTable
