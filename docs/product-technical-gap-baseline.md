@@ -34,7 +34,9 @@ Review `5257069180` on predecessor exact `427587e8be39d38240e57a2ebcc9cdaf291f6e
 
 Systemic structural RED `a1638573b9d99f78c7fcd211fc93559d86d4f93a` requires `QualifiedTypeName`, `QualifiedCollationName`, `QualifiedOperatorClassName`, and `ColumnObservationV3` identifier coordinates to preserve whitespace-only quoted content byte-for-byte and to reject zero-length/code-zero identifiers. Bounded RED `9395d141c70f074a1b60ff1c5d26097973db768a` plus production repair `c2b247b24c45f9e45c90aad7b4fb68e296d0225e` applies the same exact identifier rule only to `ColumnIdentityObservation` schema/relation/column coordinates. This bounded repair is not systemic GREEN.
 
-The remaining production repair must introduce and apply a distinct PostgreSQL-identifier admission rule to identifier-bearing schema/relation/table/column/constraint/reference/type/collation/operator-class/catalog coordinates that still use presentation-oriented nonblank validation. Non-identifier fields such as rendered type text, reconstructed CHECK definitions, extractor revision, and other product metadata keep their existing field-specific nonblank policy; globally weakening `validate_nonblank()` is not an acceptable fix. Exact rationale and lineage are doctored in `docs/doctoring/postgresql-identifier-fidelity-systemic-integrity.md`.
+Current-head review `5257371727` then found a second-order contract gap: the first systemic RED could be made green by repairing only those named core types while separately exported prefixed families continued to call the same trim-based shared validator. Structural RED `3291d594da042d8497b1cc17493fc180f213f397` therefore adds `postgresql_identifier_fidelity_prefixed_contract.rs`. It requires `ColumnCollationObservation` and `ColumnExpressionObservation` schema/relation/column coordinates to preserve quoted whitespace byte-for-byte, reject empty/code-zero identifiers, and simultaneously retain rejection of whitespace-only rendered expression text. The last assertion is a negative control against globally weakening generic nonblank-text validation. This is source-level RED evidence, not an executed failing run.
+
+The remaining production repair must introduce and apply a distinct PostgreSQL-identifier admission rule to identifier-bearing schema/relation/table/column/constraint/reference/type/collation/operator-class/catalog coordinates that still use presentation-oriented nonblank validation. Non-identifier fields such as rendered type text, reconstructed CHECK definitions, rendered expressions, extractor revision, and other product metadata keep their existing field-specific nonblank policy; globally weakening `validate_nonblank()` is not an acceptable fix. Exact rationale and lineage are doctored in `docs/doctoring/postgresql-identifier-fidelity-systemic-integrity.md`.
 
 Primary authority:
 
@@ -63,8 +65,9 @@ The differential must resolve every selected converter and transform from one so
 - PUBLIC, resolved grantee/grantor names and grant-option readback;
 - equal role names with different same-generation OIDs remain different material/source identity for both grantee and grantor;
 - legal quoted identifier content, including whitespace-only schema/relation/table/column/constraint/reference/type/collation/operator-class and converter role/schema/function names, survives observation byte-for-byte rather than being rejected or trimmed;
+- separately exported prefixed identifier-bearing families do not escape that rule merely because their field labels differ;
 - zero-length and code-zero identifiers remain rejected as impossible PostgreSQL identifier states;
-- non-identifier text validation remains unchanged by the identifier repair;
+- non-identifier text validation, including rendered expression text, remains unchanged by the identifier repair;
 - resolved numeric OIDs do not appear in routine grant/material `Debug`;
 - dangling grantee/grantor OIDs remain actionable only through recovery validation;
 - repeated dangling identities canonicalize only in derived remediation sets;
