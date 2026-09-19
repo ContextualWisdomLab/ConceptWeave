@@ -45,20 +45,43 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
     }
 }
 
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Eq, Ord, PartialEq, PartialOrd)]
 enum TransformConverterInitialExecuteGrantee {
     Public,
     Role(String),
     UnresolvedRoleOid(u32),
 }
 
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+impl fmt::Debug for TransformConverterInitialExecuteGrantee {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Public => formatter.write_str("Public"),
+            Self::Role(role_name) => formatter.debug_tuple("Role").field(role_name).finish(),
+            Self::UnresolvedRoleOid(_) => formatter.write_str("UnresolvedRoleOid(<redacted>)"),
+        }
+    }
+}
+
+#[derive(Clone, Eq, Ord, PartialEq, PartialOrd)]
 enum TransformConverterInitialExecuteGrantor {
     Role(String),
     UnresolvedRoleOid(u32),
 }
 
+impl fmt::Debug for TransformConverterInitialExecuteGrantor {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Role(role_name) => formatter.debug_tuple("Role").field(role_name).finish(),
+            Self::UnresolvedRoleOid(_) => formatter.write_str("UnresolvedRoleOid(<redacted>)"),
+        }
+    }
+}
+
 /// One object-level `EXECUTE` ACL entry from converter-function `pg_init_privs.initprivs`.
+///
+/// Routine `Debug` output preserves grant shape and resolved role names but never renders unresolved
+/// raw role OIDs. Exact unresolved identifiers remain available only through the purpose-bound
+/// material and recovery-validation path.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant {
     grantee: TransformConverterInitialExecuteGrantee,
