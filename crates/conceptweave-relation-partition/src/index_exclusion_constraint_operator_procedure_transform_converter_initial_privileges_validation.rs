@@ -3,9 +3,11 @@
 //! Source observation deliberately preserves damaged `pg_init_privs` ACL role references instead of
 //! dropping them or pretending that raw OIDs are role names. Publication and recovery decisions need
 //! a separate fail-closed domain boundary over that immutable evidence. Validation therefore consumes
-//! an owner-issued source receipt rather than detached ACL material and retains the receipt's complete
-//! non-secret provenance binding. Raw dangling role OIDs remain private inside Source Observation
-//! identity.
+//! an owner-issued source receipt, retains the receipt's complete non-secret provenance binding, and
+//! carries exact dangling-role identities for deterministic remediation. Routine `Debug` output
+//! deliberately redacts those raw catalog identifiers.
+
+use std::fmt;
 
 use super::IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSourceReceipt;
 
@@ -15,8 +17,9 @@ use super::IndexExclusionConstraintOperatorProcedureTransformConverterInitialPri
 /// [`validate_index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_recovery`],
 /// which consumes an owner-issued source receipt. Receipt identity is preserved separately from ACL
 /// material identity so equal content observed under a different source/policy/extractor/time epoch
-/// cannot silently reuse validation evidence.
-#[derive(Clone, Debug, Eq, PartialEq)]
+/// cannot silently reuse validation evidence. Exact unresolved role OIDs remain typed evidence for
+/// repair tooling while routine debug formatting exposes only their counts.
+#[derive(Clone, Eq, PartialEq)]
 pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeRecoveryValidation {
     source_id: String,
     connection_policy_binding: String,
@@ -25,15 +28,36 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialPri
     observed_at_utc: String,
     canonical_location: String,
     material_digest: Option<String>,
-    unresolved_grantee_count: usize,
-    unresolved_grantor_count: usize,
+    unresolved_grantee_oids: Vec<u32>,
+    unresolved_grantor_oids: Vec<u32>,
+}
+
+impl fmt::Debug
+    for IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeRecoveryValidation
+{
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct(
+                "IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeRecoveryValidation",
+            )
+            .field("source_id", &self.source_id)
+            .field("connection_policy_binding", &self.connection_policy_binding)
+            .field("source_digest", &self.source_digest)
+            .field("extractor_revision", &self.extractor_revision)
+            .field("observed_at_utc", &self.observed_at_utc)
+            .field("canonical_location", &self.canonical_location)
+            .field("material_digest", &self.material_digest)
+            .field("unresolved_grantee_count", &self.unresolved_grantee_oids.len())
+            .field("unresolved_grantor_count", &self.unresolved_grantor_oids.len())
+            .finish()
+    }
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeRecoveryValidation {
     /// Returns whether this exact observed baseline is safe to advance through the recovery gate.
     #[must_use]
-    pub const fn is_ready(&self) -> bool {
-        self.unresolved_grantee_count == 0 && self.unresolved_grantor_count == 0
+    pub fn is_ready(&self) -> bool {
+        self.unresolved_grantee_oids.is_empty() && self.unresolved_grantor_oids.is_empty()
     }
 
     /// Returns the stable source registry identity copied from the owner-issued receipt.
@@ -80,33 +104,58 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
         self.material_digest.as_deref()
     }
 
-    /// Returns the aggregate unresolved-grantee diagnostic without exposing raw role OIDs.
+    /// Returns how many distinct dangling grantee role identities require remediation.
     #[must_use]
-    pub const fn unresolved_grantee_count(&self) -> usize {
-        self.unresolved_grantee_count
+    pub fn unresolved_grantee_count(&self) -> usize {
+        self.unresolved_grantee_oids.len()
     }
 
-    /// Returns the aggregate unresolved-grantor diagnostic without exposing raw role OIDs.
+    /// Returns how many distinct dangling grantor role identities require remediation.
     #[must_use]
-    pub const fn unresolved_grantor_count(&self) -> usize {
-        self.unresolved_grantor_count
+    pub fn unresolved_grantor_count(&self) -> usize {
+        self.unresolved_grantor_oids.len()
+    }
+
+    /// Returns canonical unresolved grantee role OIDs for exact recovery remediation.
+    ///
+    /// These are PostgreSQL catalog identifiers, not credentials. They are intentionally omitted
+    /// from routine [`Debug`] output but retained here so repair/review does not have to guess from
+    /// aggregate counts or reverse an opaque material digest.
+    #[must_use]
+    pub fn unresolved_grantee_oids(&self) -> &[u32] {
+        &self.unresolved_grantee_oids
+    }
+
+    /// Returns canonical unresolved grantor role OIDs for exact recovery remediation.
+    ///
+    /// These are PostgreSQL catalog identifiers, not credentials. They are intentionally omitted
+    /// from routine [`Debug`] output but retained here so repair/review does not have to guess from
+    /// aggregate counts or reverse an opaque material digest.
+    #[must_use]
+    pub fn unresolved_grantor_oids(&self) -> &[u32] {
+        &self.unresolved_grantor_oids
     }
 
     /// Verifies that this verdict belongs to the exact owner-issued receipt presented by a caller.
     ///
     /// The comparison includes source registry identity, policy binding, source-content digest,
-    /// extractor revision, observation time, canonical converter location, and row absence/presence
-    /// material identity. It deliberately does not expose the raw dangling role OIDs committed inside
-    /// the material digest.
+    /// extractor revision, observation time, canonical converter location, row absence/presence
+    /// material identity, and exact dangling-role identities.
     #[must_use]
     pub fn matches_source_receipt(
         &self,
         receipt: &IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSourceReceipt,
     ) -> bool {
         let observation = receipt.location();
-        let material_digest = observation
-            .initial_privileges()
-            .map(|material| material.digest());
+        let (material_digest, unresolved_grantee_oids, unresolved_grantor_oids) =
+            match observation.initial_privileges() {
+                None => (None, &[][..], &[][..]),
+                Some(material) => (
+                    Some(material.digest()),
+                    material.unresolved_grantee_oids(),
+                    material.unresolved_grantor_oids(),
+                ),
+            };
 
         self.source_id == receipt.source_id()
             && self.connection_policy_binding == receipt.connection_policy_binding()
@@ -115,6 +164,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
             && self.observed_at_utc == receipt.observed_at_utc()
             && self.canonical_location == observation.canonical_location()
             && self.material_digest.as_deref() == material_digest
+            && self.unresolved_grantee_oids.as_slice() == unresolved_grantee_oids
+            && self.unresolved_grantor_oids.as_slice() == unresolved_grantor_oids
     }
 }
 
@@ -122,21 +173,22 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
 ///
 /// PostgreSQL permits no `pg_init_privs` row for an object, so absence is not itself damage. A
 /// present row is blocked whenever the same-generation role lookup left any nonzero ACL grantee or
-/// grantor OID unresolved. The verdict retains the receipt's complete public provenance binding;
-/// present rows additionally carry the exact material digest. This keeps validation evidence
-/// replay-resistant without changing Source Observation identity.
+/// grantor OID unresolved. The verdict retains the receipt's complete public provenance binding,
+/// exact canonical dangling-role identifiers, and (for present rows) the exact material digest. This
+/// keeps validation evidence replay-resistant and remediation-actionable without changing Source
+/// Observation digest identity.
 #[must_use]
 pub fn validate_index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_recovery(
     receipt: &IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSourceReceipt,
 ) -> IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeRecoveryValidation {
     let observation = receipt.location();
-    let (material_digest, unresolved_grantee_count, unresolved_grantor_count) =
+    let (material_digest, unresolved_grantee_oids, unresolved_grantor_oids) =
         match observation.initial_privileges() {
-            None => (None, 0, 0),
+            None => (None, Vec::new(), Vec::new()),
             Some(material) => (
                 Some(material.digest().to_owned()),
-                material.unresolved_grantee_count(),
-                material.unresolved_grantor_count(),
+                material.unresolved_grantee_oids().to_vec(),
+                material.unresolved_grantor_oids().to_vec(),
             ),
         };
 
@@ -148,7 +200,7 @@ pub fn validate_index_exclusion_constraint_operator_procedure_transform_converte
         observed_at_utc: receipt.observed_at_utc().to_owned(),
         canonical_location: observation.canonical_location(),
         material_digest,
-        unresolved_grantee_count,
-        unresolved_grantor_count,
+        unresolved_grantee_oids,
+        unresolved_grantor_oids,
     }
 }
