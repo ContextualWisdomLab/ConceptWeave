@@ -1,0 +1,95 @@
+# Product / Technical Gap Baseline
+
+**Snapshot:** 2026-09-16
+
+This file is the code-current decision surface for the active ConceptWeave Source Observation lane. The complete prior baseline through exact `74ef156e0eefe250ec4d74bcba68ab60e256c90a` is preserved losslessly in `docs/archive/product-technical-gap-baseline-through-74ef156e.md`; focused source decisions remain in `docs/doctoring/`. Exact SHAs, review IDs, workflow IDs, and statuses are evidence coordinates only. Evidence from an earlier head never transfers after head movement.
+
+## Canonical product boundary
+
+ConceptWeave owns `observe -> discover -> propose -> align -> validate -> review -> publish`, ontology/semantic-layer generation and validation, governed immutable semantic releases, and the canonical client release-consumption contract. `semantic-data-portal` owns catalog/governance/consumption, `context-graph-contracts` owns interop contracts, `enterprise-architecture-core` owns EA truth, and `contextual-orchestrator` owns production LLM routing. Product-domain truth and Ubiquitous Language remain with their canonical owners. Consumers use released/versioned `semantic_release`/contract/ACL coordinates only; source copying, cross-service SQL, and mutable sibling-head dependencies are invalid.
+
+## Live stack and single-writer boundary
+
+- Protected/default ConceptWeave `main` remains repository acceptance authority; the active Source Observation branch is not release authority.
+- #46 `codex/pr6-v3-index-evidence` is the active Draft Source Observation writer stacked on #45 exact `6b2a8f555725dc79f60432afbc492d6005290a4a` unless fresh GitHub state says otherwise.
+- #45 and #6 must not duplicate, partially cherry-pick, or independently reimplement this Source Observation slice. They adopt the complete verified child ordinary/non-force only after one unchanged exact #46 head is terminal GREEN.
+- Product bootstrap #35 remains the repository-owned Product `pull_request` prerequisite while protected ConceptWeave `main` lacks that workflow.
+- Canonical reusable workflow ownership remains in `ContextualWisdomLab/.github`; ConceptWeave must not copy, locally mutate, or wake that owner lane.
+
+## Retained Source Observation authority
+
+All valid Source Observation repairs through the prior exact Source Observation lineage remain retained without rewriting issued digest domains. This includes rowtype/`atttypmod`, relation/index partition topology, uniqueness/access method, key/`INCLUDE` mapping, operator-family/exclusion semantics, canonical expression/predicate and relation-`Var` equality, collation catalog/provider/version/database-encoding semantics, copied `ucs_basic`, libc C/POSIX and database-default C-UTF8 rules, column identity/generated-kind relation binding, direct partition declaration/collation coherence, foreign-table partitioned-index behavior, valid-parent/valid-child index composition, constraint-backed child-index presence, exact key-constraint parentage and inheritance state, and exact partitioned exclusion-constraint catalog identity/inheritance state. Detailed rationale and predecessor evidence remain in the archived baseline and focused doctoring records.
+
+## Exact index-constraint parentage
+
+Review `5217351716` found that constraint presence was still weaker than PostgreSQL 18 source truth. `IndexPartitionSnapshot` could prove that an attached child index and parent index each backed an observed `PRIMARY KEY` or `UNIQUE` constraint, but no governed family retained resolved `pg_constraint.conparentid`. The same ConceptWeave evidence could therefore represent both the PostgreSQL state in which the child constraint is parented to the exact parent constraint and an incomplete/fabricated state in which the child constraint is merely local.
+
+PostgreSQL 18 `ATExecAttachPartitionIdx()` resolves constraints by table/index OID and, when the parent index is constraint-backed, requires a child constraint before calling `ConstraintSetParentConstraint(child_constraint_oid, parent_constraint_oid, child_table_oid)`. PostgreSQL also explicitly supports the converse case in which a constraint-backed child index is attached below a non-constraint parent index; that child constraint remains local and must not acquire invented parentage. `pg_constraint.conparentid` is therefore material source identity, not derivable decoration.
+
+The repair is a new domain-separated `IndexConstraintParentageSnapshot` above the exact `IndexPartitionSnapshot`. It is complete over observed primary-key and unique constraints, resolves `conparentid` to exact `(schema, relation, relation_kind, constraint_name)` coordinates, and requires an attached constraint-backed child to identify the exact parent constraint implied by the attached backing-index edge. Child constraints below non-constraint parent indexes remain root/local. Frozen v3, relation-partition, and index-partition digests are unchanged.
+
+- Finding review: `5217351716` on predecessor `8f61b6352f87a18efb113cd6fae1f54fe55adbc9`.
+- Source/compile RED contract: `1534eb3d01872a0f2cdc9c14ab5dff3cc5c86a99`, `crates/conceptweave-relation-partition/tests/index_constraint_parentage_contract.rs`.
+- Production successor: `6b3b4ad06b79e51cee48c261244f1b216f86fa4e`, `crates/conceptweave-relation-partition/src/index_constraint_parentage.rs`.
+- Public export: `5d94610f70a75292aa58c2b086fedfa17bf07122`, `crates/conceptweave-relation-partition/src/index_partition.rs`.
+- Focused doctoring: `81fd26686ecf76c4052c06bdc84ee86067124b25`, `docs/doctoring/postgresql-index-constraint-parentage-integrity.md`.
+- PostgreSQL authority: `REL_18_STABLE@3d2e8573e9cb91bd2b545184f4f9b326d237bcd1`, `src/backend/commands/tablecmds.c::ATExecAttachPartitionIdx()` and PostgreSQL 18 `pg_constraint` catalog documentation.
+
+## Partition key-constraint inheritance state
+
+Review `5217650665` found that exact `conparentid` still did not preserve PostgreSQL's complete partition-constraint state transition. `ConstraintSetParentConstraint()` sets `conislocal=false`, increments `coninhcount` from zero to one, and records the parent OID in the same attach operation; detach decrements the count, restores `conislocal=true`, clears `conparentid`, and asserts the count returns to zero. Parentage-only evidence could therefore admit a source-unreachable child tuple with the correct parent coordinate but `(conislocal=true, coninhcount=0)`.
+
+The repair is a second domain-separated successor, `IndexConstraintInheritanceSnapshot`, layered over the exact `IndexConstraintParentageSnapshot`. It is complete over that bounded PK/UNIQUE family and preserves raw `conislocal` plus signed-int16 `coninhcount`. A constraint with an exact partition parent requires `(false, 1)`; an unparented key constraint requires `(true, 0)`. The valid child-constraint/non-constraint-parent case remains local and is retained as a positive control. No v3, relation-partition, index-partition, or parentage digest domain is rewritten.
+
+- Finding review: `5217650665` on predecessor `ccbe5b8b3c9d2cfa511652e6d74291ffe2fc86f9`.
+- Source/compile RED contract: `9f3125a28d2bd278a10c85a61557e5e00372f403`, `crates/conceptweave-relation-partition/tests/index_constraint_inheritance_state_contract.rs`.
+- Production successor: `023adf1fc665c1aa1ec41e14bb126f510bd28ac4`, `crates/conceptweave-relation-partition/src/index_constraint_inheritance.rs`.
+- Public export: `f3c46120f656afaac2358d5b6b2aea236b3ad5fb`, `crates/conceptweave-relation-partition/src/index_partition.rs`.
+- Source-current corrections: `dff165bb9bae049e28be6e649e72430e9f13fe14` gives inheritance evidence its distinct receipt/diagnostic path; `ca49ab4f74084dfda5f9c2dd34636f26212b6143` removes a coordinate-only `Ord` implementation that would have been inconsistent with full observation equality and canonicalizes explicitly by coordinate instead.
+- Focused doctoring currentization: `a17346272bcd42d1ea0766387a863eb74a8c882f`, `docs/doctoring/postgresql-index-constraint-inheritance-state-integrity.md`.
+- PostgreSQL authority: `REL_18_STABLE@3d2e8573e9cb91bd2b545184f4f9b326d237bcd1`, `src/backend/catalog/pg_constraint.c::ConstraintSetParentConstraint()` and `src/backend/commands/tablecmds.c::ATExecAttachPartitionIdx()`.
+
+## Partitioned exclusion-constraint catalog state
+
+Review `5217805982` found a parallel source gap outside the PK/UNIQUE family. PostgreSQL 18 supports `EXCLUDE` constraints on partitioned tables. Existing ConceptWeave successors preserve `pg_index.indisexclusion` and exact exclusion operator/procedure/strategy evidence, but the independent `pg_constraint.contype='x'` row was absent from governed identity. A hierarchy could therefore retain compatible exclusion indexes while losing exact `conindid`, `conparentid`, `conislocal`, or `coninhcount`.
+
+PostgreSQL 18 uses generic constraint ownership in both creation and attachment. `DefineIndex()` carries `createdConstraintId`/`parentConstraintId` for `EXCLUDE`, and `ATExecAttachPartitionIdx()` resolves the parent and child constraints by backing index before calling `ConstraintSetParentConstraint()`. The new `IndexExclusionConstraintSnapshot` is a domain-separated successor over the exact `IndexPartitionSnapshot`. Every explicit exclusion observation carries an independent constraint coordinate plus its exact resolved backing-index coordinate, so constraint names are not inferred from index names. Completeness is checked against ordinary non-key `indisexclusion` indexes; temporal PRIMARY KEY/UNIQUE `WITHOUT OVERLAPS` remains with the existing key-constraint family and is not double-counted.
+
+- Finding review: `5217805982` on predecessor `63a1feeb238f4bf174fed31f34dbd89add5587c2`.
+- Source/compile RED: `e38db5f009ce154776bb8f3f2aa6b541b37f0ed4`, tightened at `7d2f14d7d5645f244c4b63335bb3638cfee32980` to bind explicit `conindid` independently of constraint name.
+- Production successor: `b87b70130047eb890f375e57012c5be8afd95fdb`, tightened at `c53ef790d4a236cb44d8759621f906078b0fe362` to preserve exact constraint-to-index and constraint-to-parent edges.
+- Public export: `58a9befb66910509861f87275233305975994de0`.
+- Focused doctoring: `caf54b279d1e0b3751003da361a06715c1d59090`, `docs/doctoring/postgresql-index-exclusion-constraint-partition-integrity.md`.
+- PostgreSQL authority: `REL_18_STABLE@3d2e8573e9cb91bd2b545184f4f9b326d237bcd1`, `src/backend/commands/indexcmds.c::DefineIndex()`, `src/backend/commands/tablecmds.c::ATExecAttachPartitionIdx()`, and `src/backend/catalog/pg_constraint.c::ConstraintSetParentConstraint()`.
+
+## Exclusion-constraint deferrability and initial timing
+
+Review `5217974439` found that the new exclusion-constraint catalog successor still omitted `pg_constraint.condeferrable` and `condeferred`. PostgreSQL 18 accepts `NOT DEFERRABLE`, `DEFERRABLE INITIALLY IMMEDIATE`, and `DEFERRABLE INITIALLY DEFERRED` on `EXCLUDE`. The two deferrable forms can have identical backing-index shape and partition parentage while differing in the default transaction check point. Existing PK/UNIQUE-only `ConstraintTimingObservation` does not cover EXCLUDE, and `pg_index.indimmediate` cannot preserve the independent `condeferred` distinction.
+
+The repair is a domain-separated `IndexExclusionConstraintTimingSnapshot` layered over the exact `IndexExclusionConstraintSnapshot`. Every predecessor exclusion constraint must have exactly one explicit timing observation. The successor preserves exact `condeferrable` and `condeferred`, rejects contradictory non-deferrable/deferred state, and frames the predecessor digest plus exact constraint coordinates and timing bits. No issued exclusion-constraint or earlier Source Observation digest is rewritten.
+
+- Finding review: `5217974439` on predecessor `e84eedb0df8a8617ee06f80c8f786f6c9aa18091`.
+- Source/compile RED contract: `c7a1e8f6f0a045493be7bb498cb4033436805d3d`, `crates/conceptweave-relation-partition/tests/index_exclusion_constraint_timing_contract.rs`.
+- Production successor: `34acbf3afd0df90c6fcd0d1e04fb854afbaf14ab`, `crates/conceptweave-relation-partition/src/index_exclusion_constraint_timing.rs`.
+- Public export: `a310d23328f2d0e9d29fff9084d843ba07ddc67e`, `crates/conceptweave-relation-partition/src/index_partition.rs`.
+- Focused doctoring: `97b774349f46b1f8f5856e90faf35dd81ca540a2`, `docs/doctoring/postgresql-index-exclusion-constraint-timing-integrity.md`.
+- PostgreSQL authority: PostgreSQL 18 `CREATE TABLE` and `pg_constraint` documentation; repository source pin remains `REL_18_STABLE@3d2e8573e9cb91bd2b545184f4f9b326d237bcd1`.
+
+## Current state
+
+**INDEX_EXCLUSION_CONSTRAINT_TIMING_SOURCE_REPAIRED / INDEX_EXCLUSION_CONSTRAINT_PARTITION_SOURCE_REPAIRED / INDEX_CONSTRAINT_INHERITANCE_STATE_SOURCE_REPAIRED / INDEX_CONSTRAINT_PARENTAGE_SOURCE_REPAIRED / INDEX_PARTITION_CHILD_CONSTRAINT_SOURCE_REPAIRED / INDEX_PARTITION_CHILD_VALIDITY_SOURCE_REPAIRED / INDEX_PARTITION_FOREIGN_CHILD_SOURCE_REPAIRED / RELATION_PARTITION_COLUMN_COLLATION_SOURCE_REPAIRED / RELATION_PARTITION_COLUMN_DECLARATION_SOURCE_REPAIRED / FOREIGN_TABLE_IDENTITY_SOURCE_REPAIRED / COLUMN_DECLARATION_RELATION_KIND_SOURCE_REPAIRED / INDEX_DATABASE_DEFAULT_LIBC_C_UTF8_ENCODING_BINDING_SOURCE_REPAIRED / POSTGRESQL_INDEX_EXCLUSION_CONSTRAINT_TIMING_DIFFERENTIAL_OPEN / POSTGRESQL_INDEX_EXCLUSION_CONSTRAINT_DIFFERENTIAL_OPEN / POSTGRESQL_INDEX_CONSTRAINT_INHERITANCE_STATE_DIFFERENTIAL_OPEN / POSTGRESQL_INDEX_CONSTRAINT_PARENTAGE_DIFFERENTIAL_OPEN / POSTGRESQL_INDEX_PARTITION_CHILD_CONSTRAINT_DIFFERENTIAL_OPEN / POSTGRESQL_INDEX_PARTITION_CHILD_VALIDITY_DIFFERENTIAL_OPEN / POSTGRESQL_INDEX_PARTITION_FOREIGN_CHILD_DIFFERENTIAL_OPEN / POSTGRESQL_PARTITION_COLUMN_COLLATION_DIFFERENTIAL_OPEN / POSTGRESQL_PARTITION_COLUMN_DECLARATION_DIFFERENTIAL_OPEN / POSTGRESQL_COLUMN_DECLARATION_RELATION_KIND_DIFFERENTIAL_OPEN / POSTGRESQL_DATABASE_DEFAULT_LIBC_GENERAL_ENCODING_DIFFERENTIAL_OPEN / POSTGRESQL_COLLATION_DEFINITION_ADAPTER_DIFFERENTIAL_OPEN / POSTGRESQL_DATABASE_DEFAULT_COLLATION_ADAPTER_DIFFERENTIAL_OPEN / POSTGRESQL_EXPRESSION_EXTRACTOR_DIFFERENTIAL_OPEN / POSTGRESQL_ATTTYPMOD_ADAPTER_DIFFERENTIAL_OPEN / POSTGRESQL_DATABASE_ENCODING_ADAPTER_DIFFERENTIAL_OPEN / ACCEPTANCE_PENDING**.
+
+## Acceptance boundary
+
+No executed Rust RED/GREEN or hosted Product acceptance is claimed after the current ordinary-forward head movement. One unchanged exact #46 representation head must pass repository-pinned Rust 1.98 `fmt`, strict workspace/all-target Clippy, the exclusion-constraint catalog/timing, key-constraint parentage/inheritance, and every retained Source Observation/relation-partition focused contract, workspace/doc tests, release build, owned production rustdoc/test/edge-case coverage, and applicable hosted Product/security/dependency/review gates. Any head movement resets exact-head acceptance.
+
+Protected ConceptWeave `main` still requires repository-owned Product PR workflow convergence through #35. Central workflow-owner work remains in `ContextualWisdomLab/.github`; ConceptWeave must not copy, wake, or locally weaken that owner contract.
+
+## Next causal work
+
+1. Converge the canonical central workflow owner and obtain compatible fresh unchanged-head acceptance for Product bootstrap #35; land #35 normally on protected/default ConceptWeave `main` only when required gates are terminal GREEN.
+2. Obtain one unchanged #46 representation head with repository-pinned Rust 1.98 native GREEN plus applicable hosted Product/security/dependency/review terminal GREEN.
+3. Only after that representation gate, extend #46 ordinary-forward with concrete PostgreSQL 18 extractor/live differentials. The exclusion-constraint differential must create real partitioned `EXCLUDE` constraints in `NOT DEFERRABLE`, `DEFERRABLE INITIALLY IMMEDIATE`, and `DEFERRABLE INITIALLY DEFERRED` forms; resolve `pg_constraint.contype='x'`, `conindid`, `conparentid`, `conislocal`, `coninhcount`, `condeferrable`, and `condeferred` together with the backing-index edge; prove the two deferrable modes remain distinct after extraction; reject missing/wrong identity, parentage, inheritance, or timing evidence; and include a temporal PRIMARY KEY/UNIQUE `WITHOUT OVERLAPS` control proving `indisexclusion=true` is not double-counted as an ordinary exclusion constraint. The retained key-constraint differential must preserve the valid local child-constraint/non-constraint-parent case. All retained child-constraint, child-validity, foreign-table, direct-partition collation/declaration, database-encoding/collation/version, expression, and `atttypmod` differentials remain required.
+4. Only after the complete #46 child is terminal GREEN may its full delta flow ordinary/non-force into #45, followed by fresh #45 acceptance and #6 propagation. Semantic publication, version/tag/package/SBOM/provenance/reproducibility/rollback, and immutable release remain later gates.
+
+No force-push, destructive rebase, self-approval, review dismissal, administrator bypass, synthetic status, copied central workflow, manual/no-op rerun, gate weakening, partial parent adoption, predecessor-evidence transfer, or premature publication/release is authorized.
