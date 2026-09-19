@@ -1,4 +1,4 @@
-use crate::model::validate_nonblank;
+use crate::column_identity::validate_postgresql_identifier;
 use crate::{ObservationError, RelationKind};
 
 /// PostgreSQL deferrability and initial timing for index-backed key constraints.
@@ -51,9 +51,9 @@ impl ConstraintTimingObservation {
         let schema_name = schema_name.into();
         let relation_name = relation_name.into();
         let constraint_name = constraint_name.into();
-        validate_nonblank(&schema_name, "constraint_timing_schema_name")?;
-        validate_nonblank(&relation_name, "constraint_timing_relation_name")?;
-        validate_nonblank(&constraint_name, "constraint_timing_constraint_name")?;
+        validate_postgresql_identifier(&schema_name, "constraint_timing_schema_name")?;
+        validate_postgresql_identifier(&relation_name, "constraint_timing_relation_name")?;
+        validate_postgresql_identifier(&constraint_name, "constraint_timing_constraint_name")?;
         if !matches!(
             relation_kind,
             RelationKind::Table | RelationKind::PartitionedTable
