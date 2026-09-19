@@ -161,7 +161,8 @@ impl ColumnIdentityObservation {
     }
 }
 
-fn validate_postgresql_identifier(
+/// Validates one exact PostgreSQL identifier without presentation normalization.
+pub(crate) fn validate_postgresql_identifier(
     value: &str,
     field: &'static str,
 ) -> Result<(), ObservationError> {
