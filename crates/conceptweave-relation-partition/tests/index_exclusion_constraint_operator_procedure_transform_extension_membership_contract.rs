@@ -1,16 +1,16 @@
-include!("index_exclusion_constraint_operator_procedure_transform_converter_auto_extension_dependency_contract.rs");
+include!("index_exclusion_constraint_operator_procedure_transform_converter_security_label_contract.rs");
 
 use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipObservation,
     IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapshot,
 };
 
-fn converter_function_auto_extension_dependency_snapshot(
-) -> IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencySnapshot {
-    let predecessor = converter_extension_membership_snapshot();
-    IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencySnapshot::new(
+fn converter_function_security_label_snapshot(
+) -> IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelSnapshot {
+    let predecessor = converter_auto_extension_dependency_snapshot();
+    IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelSnapshot::new(
         &predecessor,
-        complete_converter_auto_extension_dependency_observations(),
+        complete_converter_security_label_observations(),
     )
     .unwrap()
 }
@@ -40,41 +40,44 @@ fn complete_transform_extension_membership_observations(
 }
 
 #[test]
-fn ordinary_exclude_transform_extension_membership_descends_from_converter_auto_extension_dependencies() {
+fn ordinary_exclude_transform_extension_membership_descends_from_converter_security_labels() {
     let transforms = converter_snapshot();
-    let without_dependency = converter_function_auto_extension_dependency_snapshot();
+    let unlabeled = converter_function_security_label_snapshot();
     let standalone = IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapshot::new(
-        &without_dependency,
+        &unlabeled,
         &transforms,
         complete_transform_extension_membership_observations(),
     )
     .unwrap();
 
-    let membership = converter_extension_membership_snapshot();
-    let mut dependency_observations = complete_converter_auto_extension_dependency_observations();
-    dependency_observations[0] = converter_auto_extension_dependency_observation(
+    let auto_dependency = converter_auto_extension_dependency_snapshot();
+    let mut label_observations = complete_converter_security_label_observations();
+    label_observations[0] = converter_security_label_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "payload_from_sql",
-        &["payload_runtime"],
+        vec![converter_security_label(
+            "selinux",
+            "system_u:object_r:sepgsql_trusted_proc_exec_t:s0",
+        )],
     );
-    let with_dependency = IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencySnapshot::new(
-        &membership,
-        dependency_observations,
+    let labeled = IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelSnapshot::new(
+        &auto_dependency,
+        label_observations,
     )
     .unwrap();
-    let dependent = IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapshot::new(
-        &with_dependency,
+    let secured = IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapshot::new(
+        &labeled,
         &transforms,
         complete_transform_extension_membership_observations(),
     )
     .unwrap();
 
-    assert_ne!(standalone.snapshot_digest(), dependent.snapshot_digest());
+    assert_ne!(standalone.snapshot_digest(), secured.snapshot_digest());
 }
 
 #[test]
 fn ordinary_exclude_transform_extension_membership_preserves_standalone_and_exact_member_extension() {
-    let function_lifecycle = converter_function_auto_extension_dependency_snapshot();
+    let function_lifecycle = converter_function_security_label_snapshot();
     let transforms = converter_snapshot();
     let standalone = IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapshot::new(
         &function_lifecycle,
@@ -112,7 +115,7 @@ fn ordinary_exclude_transform_extension_membership_preserves_standalone_and_exac
 
 #[test]
 fn ordinary_exclude_transform_extension_membership_is_one_fact_per_transform_row_not_converter_direction() {
-    let function_lifecycle = converter_function_auto_extension_dependency_snapshot();
+    let function_lifecycle = converter_function_security_label_snapshot();
     let transforms = converter_snapshot();
     let snapshot = IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapshot::new(
         &function_lifecycle,
@@ -128,7 +131,7 @@ fn ordinary_exclude_transform_extension_membership_is_one_fact_per_transform_row
 
 #[test]
 fn ordinary_exclude_transform_extension_membership_rejects_completeness_binding_and_duplicates() {
-    let function_lifecycle = converter_function_auto_extension_dependency_snapshot();
+    let function_lifecycle = converter_function_security_label_snapshot();
     let transforms = converter_snapshot();
 
     let missing = IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapshot::new(
@@ -172,15 +175,18 @@ fn ordinary_exclude_transform_extension_membership_rejects_completeness_binding_
     let extra = IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapshot::new(
         &function_lifecycle,
         &transforms,
-        vec![transform_extension_membership_observation(
-            custom_payload_type(),
-            "internal",
-            None,
-        ), transform_extension_membership_observation(
-            QualifiedTypeName::new("public", "other_payload").unwrap(),
-            "internal",
-            None,
-        )],
+        vec![
+            transform_extension_membership_observation(
+                custom_payload_type(),
+                "internal",
+                None,
+            ),
+            transform_extension_membership_observation(
+                QualifiedTypeName::new("public", "other_payload").unwrap(),
+                "internal",
+                None,
+            ),
+        ],
     )
     .expect_err("transform membership cannot introduce an absent pg_transform coordinate");
     assert_field(
@@ -192,8 +198,16 @@ fn ordinary_exclude_transform_extension_membership_rejects_completeness_binding_
 #[test]
 fn ordinary_exclude_transform_extension_membership_rejects_blank_inputs_and_zero_position() {
     for (language, extension, field) in [
-        (" ", None, "index_exclusion_constraint_operator_procedure_transform_extension_membership_language"),
-        ("internal", Some("\t"), "index_exclusion_constraint_operator_procedure_transform_extension_membership_extension_name"),
+        (
+            " ",
+            None,
+            "index_exclusion_constraint_operator_procedure_transform_extension_membership_language",
+        ),
+        (
+            "internal",
+            Some("\t"),
+            "index_exclusion_constraint_operator_procedure_transform_extension_membership_extension_name",
+        ),
     ] {
         let error = IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipObservation::new(
             coordinate(),
@@ -233,7 +247,7 @@ fn ordinary_exclude_transform_extension_membership_preserves_collision_safe_loca
     .canonical_location();
     assert_ne!(left, right);
 
-    let function_lifecycle = converter_function_auto_extension_dependency_snapshot();
+    let function_lifecycle = converter_function_security_label_snapshot();
     let transforms = converter_snapshot();
     let snapshot = IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapshot::new(
         &function_lifecycle,
