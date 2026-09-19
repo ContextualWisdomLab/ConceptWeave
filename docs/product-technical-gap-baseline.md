@@ -69,14 +69,14 @@ No further converter/transform successor is authorized merely because another ca
 
 ## Canonical prerequisite state
 
-The protected reusable-workflow authority remains `ContextualWisdomLab/.github@main` and must be read fresh before any ConceptWeave landing. Product bootstrap #35 remains a separate downstream prerequisite. The live central owner graph is no longer represented completely by `.github#2040` alone:
+The protected reusable-workflow authority remains `ContextualWisdomLab/.github@main` and must be read fresh before any ConceptWeave landing. Product bootstrap #35 remains a separate downstream prerequisite. ConceptWeave records only the stable owner lanes and their contract boundaries here; it does not version mutable foreign PR head SHAs, run IDs, mergeability, or check status as local product truth.
 
-- `.github#2279@25f83aaee9eb97e423f6ef2467e722035bc2e362` owns the shared GitHub API initial-URL and redirect-authority boundary. Its exact-head hosted Python Security, CodeQL, SAST, Security Scan, and agent-review runs exist but are queued; queued evidence is not GREEN.
-- `.github#2271@2b849c874122961e025c29f7fa0bb697863c3d68` owns CodeQL dispatch repository-identity admission and explicitly waits on #2279 before ordinary-forward reconciliation.
-- `.github#2268@142e5b2617778e79f665693be1e6f8c04d7533aa` owns queue-health repository-identity admission.
-- `.github#2040@12c3fa6f3623aa5f2979d3d5ee4ed987002a6c0d` remains the scheduler owner. Its protected-main reconciliation must preserve its own credential/settlement deltas, adopt compatible current-main scheduler behavior, enforce the stronger repository-identity invariant, and must not regress the #2271/#2268 repaired slices if those paths enter the reconciliation.
+- `.github#2279` owns the shared GitHub API initial-URL and redirect-authority boundary.
+- `.github#2271` owns CodeQL dispatch repository-identity admission and remains ordered after the accepted #2279 foundation.
+- `.github#2268` owns queue-health repository-identity admission.
+- `.github#2040` remains the scheduler owner. Its protected-main reconciliation must preserve its credential/settlement deltas, adopt compatible current-main scheduler behavior, enforce the stronger repository-identity invariant, and preserve applicable accepted #2271/#2268 owner slices if those paths enter reconciliation.
 
-These are canonical-owner source authorities, not transferable acceptance evidence. Their exact heads, mergeability, review state, workflow inventory, and relationship to protected `.github/main` must be reread before downstream landing. Sibling or predecessor GREEN never transfers into #2040, #35, or #46.
+These are canonical-owner responsibilities, not transferable acceptance evidence or mutable source dependencies. Immediately before downstream acceptance, reread each owner PR's exact head, review/thread state, workflow inventory, mergeability, and relationship to protected `.github/main`. Record that volatile observation in live PR/review coordination evidence rather than copying it into this versioned baseline. Sibling or predecessor GREEN never transfers into #2040, #35, or #46.
 
 ## Required order
 
