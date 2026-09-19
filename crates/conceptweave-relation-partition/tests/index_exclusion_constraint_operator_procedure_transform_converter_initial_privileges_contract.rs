@@ -209,6 +209,53 @@ fn ordinary_exclude_converter_initial_privileges_preserve_duplicate_acl_entries_
 }
 
 #[test]
+fn ordinary_exclude_converter_initial_privileges_bind_resolved_acl_oid_identity() {
+    let original = extension_initial_privileges(vec![
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::role(
+            16_424,
+            "analytics",
+            10,
+            "postgres",
+            false,
+        )
+        .unwrap(),
+    ]);
+    let recreated_grantee = extension_initial_privileges(vec![
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::role(
+            26_424,
+            "analytics",
+            10,
+            "postgres",
+            false,
+        )
+        .unwrap(),
+    ]);
+    let recreated_grantor = extension_initial_privileges(vec![
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::role(
+            16_424,
+            "analytics",
+            20,
+            "postgres",
+            false,
+        )
+        .unwrap(),
+    ]);
+
+    assert_ne!(original.digest(), recreated_grantee.digest());
+    assert_ne!(original.digest(), recreated_grantor.digest());
+    assert_eq!(
+        original.grants()[0].resolved_grantee_role_name(),
+        Some("analytics")
+    );
+    assert_eq!(
+        original.grants()[0].resolved_grantor_role_name(),
+        Some("postgres")
+    );
+    let diagnostic = format!("{:?}", original.grants()[0]);
+    assert!(!diagnostic.contains("16424"));
+}
+
+#[test]
 fn ordinary_exclude_converter_initial_privileges_reject_completeness_binding_and_duplicate_coordinates() {
     let predecessor = converter_security_label_snapshot();
     let missing = IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot::new(
