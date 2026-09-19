@@ -132,3 +132,20 @@ fn ordinary_exclude_converter_initial_privileges_reject_public_oid_as_unresolved
         "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantor_role_oid",
     );
 }
+
+#[test]
+fn ordinary_exclude_converter_initial_privilege_grant_debug_redacts_dangling_role_oids() {
+    let unresolved =
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::unresolved_role_oids(
+            16_424,
+            16_425,
+            true,
+        )
+        .expect("valid dangling grant");
+    let diagnostic = format!("{unresolved:?}");
+
+    assert!(!diagnostic.contains("16424"));
+    assert!(!diagnostic.contains("16425"));
+    assert!(diagnostic.contains("UnresolvedRoleOid"));
+    assert!(diagnostic.contains("grant_option: true"));
+}
