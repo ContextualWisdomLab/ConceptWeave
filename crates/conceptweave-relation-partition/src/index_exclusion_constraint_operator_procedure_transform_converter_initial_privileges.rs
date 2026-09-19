@@ -6,7 +6,9 @@
 //! emits the GRANT/REVOKE state needed to reconstruct extension objects. This successor therefore
 //! preserves row absence versus presence, exact `privtype`, and the complete object-level EXECUTE
 //! ACL for every exact converter-function direction without inferring the baseline from current ACL,
-//! extension membership, package state, or names.
+//! extension membership, package state, or names. Existing catalog damage can leave ACL grantor or
+//! grantee OIDs dangling after a role disappears, so unresolved raw OIDs remain distinct from
+//! resolved role names instead of making the source observation itself impossible.
 
 use std::collections::BTreeSet;
 
@@ -47,13 +49,20 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
 enum TransformConverterInitialExecuteGrantee {
     Public,
     Role(String),
+    UnresolvedRoleOid(u32),
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+enum TransformConverterInitialExecuteGrantor {
+    Role(String),
+    UnresolvedRoleOid(u32),
 }
 
 /// One object-level `EXECUTE` ACL entry from converter-function `pg_init_privs.initprivs`.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant {
     grantee: TransformConverterInitialExecuteGrantee,
-    grantor_role_name: String,
+    grantor: TransformConverterInitialExecuteGrantor,
     grant_option: bool,
 }
 
@@ -70,7 +79,23 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
         )?;
         Ok(Self {
             grantee: TransformConverterInitialExecuteGrantee::Public,
-            grantor_role_name,
+            grantor: TransformConverterInitialExecuteGrantor::Role(grantor_role_name),
+            grant_option,
+        })
+    }
+
+    /// Records a `PUBLIC` grant whose raw grantor OID no longer resolves to a role.
+    pub fn public_with_unresolved_grantor_oid(
+        grantor_role_oid: u32,
+        grant_option: bool,
+    ) -> Result<Self, ObservationError> {
+        validate_nonzero_role_oid(
+            grantor_role_oid,
+            "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantor_role_oid",
+        )?;
+        Ok(Self {
+            grantee: TransformConverterInitialExecuteGrantee::Public,
+            grantor: TransformConverterInitialExecuteGrantor::UnresolvedRoleOid(grantor_role_oid),
             grant_option,
         })
     }
@@ -93,7 +118,72 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
         )?;
         Ok(Self {
             grantee: TransformConverterInitialExecuteGrantee::Role(grantee_role_name),
-            grantor_role_name,
+            grantor: TransformConverterInitialExecuteGrantor::Role(grantor_role_name),
+            grant_option,
+        })
+    }
+
+    /// Records a resolved grantee whose raw grantor OID no longer resolves to a role.
+    pub fn role_with_unresolved_grantor_oid(
+        grantee_role_name: impl Into<String>,
+        grantor_role_oid: u32,
+        grant_option: bool,
+    ) -> Result<Self, ObservationError> {
+        let grantee_role_name = grantee_role_name.into();
+        validate_nonblank(
+            &grantee_role_name,
+            "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantee_role_name",
+        )?;
+        validate_nonzero_role_oid(
+            grantor_role_oid,
+            "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantor_role_oid",
+        )?;
+        Ok(Self {
+            grantee: TransformConverterInitialExecuteGrantee::Role(grantee_role_name),
+            grantor: TransformConverterInitialExecuteGrantor::UnresolvedRoleOid(grantor_role_oid),
+            grant_option,
+        })
+    }
+
+    /// Records an unresolved raw grantee OID with an exact resolved grantor role.
+    pub fn unresolved_grantee_oid(
+        grantee_role_oid: u32,
+        grantor_role_name: impl Into<String>,
+        grant_option: bool,
+    ) -> Result<Self, ObservationError> {
+        validate_nonzero_role_oid(
+            grantee_role_oid,
+            "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantee_role_oid",
+        )?;
+        let grantor_role_name = grantor_role_name.into();
+        validate_nonblank(
+            &grantor_role_name,
+            "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantor_role_name",
+        )?;
+        Ok(Self {
+            grantee: TransformConverterInitialExecuteGrantee::UnresolvedRoleOid(grantee_role_oid),
+            grantor: TransformConverterInitialExecuteGrantor::Role(grantor_role_name),
+            grant_option,
+        })
+    }
+
+    /// Records unresolved raw grantee and grantor OIDs without converting either OID to a name.
+    pub fn unresolved_role_oids(
+        grantee_role_oid: u32,
+        grantor_role_oid: u32,
+        grant_option: bool,
+    ) -> Result<Self, ObservationError> {
+        validate_nonzero_role_oid(
+            grantee_role_oid,
+            "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantee_role_oid",
+        )?;
+        validate_nonzero_role_oid(
+            grantor_role_oid,
+            "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantor_role_oid",
+        )?;
+        Ok(Self {
+            grantee: TransformConverterInitialExecuteGrantee::UnresolvedRoleOid(grantee_role_oid),
+            grantor: TransformConverterInitialExecuteGrantor::UnresolvedRoleOid(grantor_role_oid),
             grant_option,
         })
     }
@@ -101,8 +191,10 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
 
 /// Privacy-preserving identity for one present converter-function `pg_init_privs` row.
 ///
-/// The adapter must resolve every non-PUBLIC grantor/grantee OID in the same source generation.
-/// Row absence is represented by `None` at the observation boundary, not by an empty material.
+/// The adapter should resolve non-PUBLIC grantor/grantee OIDs against the same source generation.
+/// When a raw ACL OID has no matching role, it must preserve that nonzero OID explicitly instead of
+/// dropping the entry or converting the OID to a role-name string. Row absence is represented by
+/// `None` at the observation boundary, not by an empty material.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial {
     privilege_type: IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeType,
@@ -136,8 +228,23 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
                     hasher.update([1]);
                     encode_str(&mut hasher, role_name);
                 }
+                TransformConverterInitialExecuteGrantee::UnresolvedRoleOid(role_oid) => {
+                    hasher.update([2]);
+                    hasher.update(role_oid.to_be_bytes());
+                }
             }
-            encode_str(&mut hasher, &grant.grantor_role_name);
+            match &grant.grantor {
+                TransformConverterInitialExecuteGrantor::Role(role_name) => {
+                    encode_str(&mut hasher, role_name);
+                }
+                TransformConverterInitialExecuteGrantor::UnresolvedRoleOid(role_oid) => {
+                    // Keep the historical resolved-role framing byte-for-byte stable. `u64::MAX`
+                    // cannot be a realizable Rust string length and therefore safely reserves the
+                    // grantor namespace for an unresolved raw OID without aliasing a role name.
+                    hasher.update(u64::MAX.to_be_bytes());
+                    hasher.update(role_oid.to_be_bytes());
+                }
+            }
             hasher.update([u8::from(grant.grant_option)]);
         }
 
@@ -629,6 +736,13 @@ fn encode_str(hasher: &mut Sha256, value: &str) {
 
 fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
     if value.trim().is_empty() {
+        return Err(invalid(field));
+    }
+    Ok(())
+}
+
+fn validate_nonzero_role_oid(role_oid: u32, field: &'static str) -> Result<(), ObservationError> {
+    if role_oid == 0 {
         return Err(invalid(field));
     }
     Ok(())
