@@ -210,6 +210,55 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
             grant_option,
         })
     }
+
+    /// Returns whether this grant targets PostgreSQL `PUBLIC`.
+    #[must_use]
+    pub fn is_public_grantee(&self) -> bool {
+        matches!(self.grantee, TransformConverterInitialExecuteGrantee::Public)
+    }
+
+    /// Returns the resolved grantee role name, when this is a role grant with a live role lookup.
+    #[must_use]
+    pub fn resolved_grantee_role_name(&self) -> Option<&str> {
+        match &self.grantee {
+            TransformConverterInitialExecuteGrantee::Role(role_name) => Some(role_name),
+            TransformConverterInitialExecuteGrantee::Public
+            | TransformConverterInitialExecuteGrantee::UnresolvedRoleOid(_) => None,
+        }
+    }
+
+    /// Returns whether this grant retains a dangling non-PUBLIC grantee role identity.
+    #[must_use]
+    pub fn has_unresolved_grantee(&self) -> bool {
+        matches!(
+            self.grantee,
+            TransformConverterInitialExecuteGrantee::UnresolvedRoleOid(_)
+        )
+    }
+
+    /// Returns the resolved grantor role name when the same-generation role lookup succeeded.
+    #[must_use]
+    pub fn resolved_grantor_role_name(&self) -> Option<&str> {
+        match &self.grantor {
+            TransformConverterInitialExecuteGrantor::Role(role_name) => Some(role_name),
+            TransformConverterInitialExecuteGrantor::UnresolvedRoleOid(_) => None,
+        }
+    }
+
+    /// Returns whether this grant retains a dangling grantor role identity.
+    #[must_use]
+    pub fn has_unresolved_grantor(&self) -> bool {
+        matches!(
+            self.grantor,
+            TransformConverterInitialExecuteGrantor::UnresolvedRoleOid(_)
+        )
+    }
+
+    /// Returns whether this initial EXECUTE ACL entry carries grant option.
+    #[must_use]
+    pub const fn grant_option(&self) -> bool {
+        self.grant_option
+    }
 }
 
 /// Privacy-conscious identity for one present converter-function `pg_init_privs` row.
@@ -223,6 +272,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
 #[derive(Clone, Eq, PartialEq)]
 pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial {
     privilege_type: IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeType,
+    grants: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant>,
     grant_count: usize,
     unresolved_grantee_oids: Vec<u32>,
     unresolved_grantor_oids: Vec<u32>,
@@ -313,10 +363,12 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
             }
             hasher.update([u8::from(grant.grant_option)]);
         }
+        let grant_count = grants.len();
 
         Ok(Self {
             privilege_type,
-            grant_count: grants.len(),
+            grants,
+            grant_count,
             unresolved_grantee_oids,
             unresolved_grantor_oids,
             digest: format!("{SHA256_DIGEST_PREFIX}{:x}", hasher.finalize()),
@@ -329,6 +381,17 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
         &self,
     ) -> IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeType {
         self.privilege_type
+    }
+
+    /// Returns the complete canonical object-level EXECUTE ACL in deterministic order.
+    ///
+    /// Resolved role names, PUBLIC shape and grant-option state remain directly inspectable. Raw
+    /// dangling OIDs remain private here and are exposed only by receipt-bound recovery validation.
+    #[must_use]
+    pub fn grants(
+        &self,
+    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant] {
+        &self.grants
     }
 
     /// Returns the number of canonical object-level EXECUTE grants consumed into the digest.
