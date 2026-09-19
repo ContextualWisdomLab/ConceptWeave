@@ -3,12 +3,15 @@
 //! Current `pg_proc.proacl` does not preserve the privilege baseline used by PostgreSQL extension
 //! dump/restore. `pg_init_privs` records non-default initial privileges set by `initdb` or an
 //! extension script. PostgreSQL `pg_dump` compares current privileges with that baseline when it
-//! emits the GRANT/REVOKE state needed to reconstruct extension objects. This successor therefore
-//! preserves row absence versus presence, exact `privtype`, and the complete object-level EXECUTE
-//! ACL for every exact converter-function direction without inferring the baseline from current ACL,
-//! extension membership, package state, or names. Existing catalog damage can leave ACL grantor or
-//! grantee OIDs dangling after a role disappears, so unresolved raw OIDs remain distinct from
-//! resolved role names instead of making the source observation itself impossible.
+//! emits the GRANT/REVOKE state needed to reconstruct extension objects. PostgreSQL also treats ACL
+//! array order as recovery-significant because grants with grant option must precede dependent
+//! grants, so this successor preserves the exact source-array order instead of normalizing it.
+//! This successor therefore preserves row absence versus presence, exact `privtype`, and the complete
+//! object-level EXECUTE ACL for every exact converter-function direction without inferring the
+//! baseline from current ACL, extension membership, package state, or names. Existing catalog damage
+//! can leave ACL grantor or grantee OIDs dangling after a role disappears, so unresolved raw OIDs
+//! remain distinct from resolved role names instead of making the source observation itself
+//! impossible.
 
 use std::{collections::BTreeSet, fmt};
 
@@ -266,9 +269,10 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
 /// The adapter should resolve non-PUBLIC grantor/grantee OIDs against the same source generation.
 /// When a raw ACL OID has no matching role, it must preserve that nonzero OID explicitly instead of
 /// dropping the entry or converting the OID to a role-name string. Row absence is represented by
-/// `None` at the observation boundary, not by an empty material. Exact unresolved role identifiers
-/// remain privately retained for the recovery-validation boundary while routine `Debug` output shows
-/// only aggregate counts and the immutable material digest.
+/// `None` at the observation boundary, not by an empty material. PostgreSQL ACL array order is kept
+/// byte-semantically significant because restore tooling can depend on grant ordering. Exact
+/// unresolved role identifiers remain privately retained for the recovery-validation boundary while
+/// routine `Debug` output shows only aggregate counts and the immutable material digest.
 #[derive(Clone, Eq, PartialEq)]
 pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial {
     privilege_type: IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeType,
@@ -295,13 +299,12 @@ impl fmt::Debug for IndexExclusionConstraintOperatorProcedureTransformConverterI
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial {
-    /// Reduces exact `privtype` and canonical object-level EXECUTE grants to a stable digest.
+    /// Reduces exact `privtype` and source-order object-level EXECUTE grants to a stable digest.
     pub fn new(
         privilege_type: IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeType,
-        mut grants: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant>,
+        grants: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant>,
     ) -> Result<Self, ObservationError> {
-        grants.sort();
-        if grants.windows(2).any(|pair| pair[0] == pair[1]) {
+        if grants.iter().collect::<BTreeSet<_>>().len() != grants.len() {
             return Err(invalid(
                 "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grant",
             ));
@@ -383,10 +386,12 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
         self.privilege_type
     }
 
-    /// Returns the complete canonical object-level EXECUTE ACL in deterministic order.
+    /// Returns the complete object-level EXECUTE ACL in exact PostgreSQL source-array order.
     ///
-    /// Resolved role names, PUBLIC shape and grant-option state remain directly inspectable. Raw
-    /// dangling OIDs remain private here and are exposed only by receipt-bound recovery validation.
+    /// Source order is intentionally not canonicalized: PostgreSQL restore clients can rely on
+    /// grant-option providers appearing before dependent grants. Resolved role names, PUBLIC shape
+    /// and grant-option state remain directly inspectable. Raw dangling OIDs remain private here and
+    /// are exposed only by receipt-bound recovery validation.
     #[must_use]
     pub fn grants(
         &self,
@@ -394,7 +399,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
         &self.grants
     }
 
-    /// Returns the number of canonical object-level EXECUTE grants consumed into the digest.
+    /// Returns the number of source-order object-level EXECUTE grants consumed into the digest.
     #[must_use]
     pub const fn grant_count(&self) -> usize {
         self.grant_count
@@ -422,7 +427,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
         &self.unresolved_grantor_oids
     }
 
-    /// Returns the privacy-preserving digest of exact `privtype` plus initial EXECUTE ACL.
+    /// Returns the privacy-preserving digest of exact `privtype` plus source-order initial EXECUTE ACL.
     #[must_use]
     pub fn digest(&self) -> &str {
         &self.digest
