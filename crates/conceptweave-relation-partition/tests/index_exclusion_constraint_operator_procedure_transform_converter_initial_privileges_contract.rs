@@ -170,7 +170,7 @@ fn ordinary_exclude_converter_initial_privileges_preserve_privtype_and_source_ac
 
     let mut initdb_observations = complete_initial_privilege_observations();
     initdb_observations[0] = initial_privilege_observation(
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeDirection::FromSql,
         "payload_from_sql",
         Some(initdb_material),
     );
@@ -183,20 +183,17 @@ fn ordinary_exclude_converter_initial_privileges_preserve_privtype_and_source_ac
 }
 
 #[test]
-fn ordinary_exclude_converter_initial_privileges_reject_duplicate_acl_entries_and_blank_roles() {
-    let duplicate =
-        IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial::new(
-            IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeType::Extension,
-            vec![
-                initial_public_execute("postgres", false),
-                initial_public_execute("postgres", false),
-            ],
-        )
-        .expect_err("duplicate aclitems must not collapse");
-    assert_field(
-        duplicate,
-        "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grant",
-    );
+fn ordinary_exclude_converter_initial_privileges_preserve_duplicate_acl_entries_and_reject_blank_roles() {
+    let single = extension_initial_privileges(vec![initial_public_execute("postgres", false)]);
+    let duplicate = extension_initial_privileges(vec![
+        initial_public_execute("postgres", false),
+        initial_public_execute("postgres", false),
+    ]);
+
+    assert_eq!(duplicate.grant_count(), 2);
+    assert_eq!(duplicate.grants().len(), 2);
+    assert_eq!(duplicate.grants()[0], duplicate.grants()[1]);
+    assert_ne!(single.digest(), duplicate.digest());
 
     let blank =
         IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::role(
