@@ -290,3 +290,46 @@ fn initial_privilege_recovery_validation_distinguishes_equal_count_dangling_role
     assert_eq!(validation_a.unresolved_grantor_oids(), &[16_425]);
     assert_eq!(validation_b.unresolved_grantor_oids(), &[26_425]);
 }
+
+#[test]
+fn initial_privilege_recovery_validation_canonicalizes_repeated_dangling_role_identities() {
+    let damaged = extension_initial_privileges(vec![
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::unresolved_role_oids(
+            16_425,
+            16_430,
+            false,
+        )
+        .expect("first dangling grant"),
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::unresolved_role_oids(
+            16_424,
+            16_430,
+            true,
+        )
+        .expect("second dangling grant"),
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::unresolved_grantee_oid(
+            16_424,
+            "postgres",
+            false,
+        )
+        .expect("repeated dangling grantee"),
+    ]);
+    let snapshot = initial_privilege_snapshot_with_materials(Some(damaged), None);
+    let receipt = snapshot
+        .source_receipt(
+            coordinate(),
+            1,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+        )
+        .expect("damaged receipt");
+    let validation =
+        validate_index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_recovery(
+            &receipt,
+        );
+
+    assert_eq!(validation.unresolved_grantee_oids(), &[16_424, 16_425]);
+    assert_eq!(validation.unresolved_grantor_oids(), &[16_430]);
+    assert_eq!(validation.unresolved_grantee_count(), 2);
+    assert_eq!(validation.unresolved_grantor_count(), 1);
+    assert!(validation.matches_source_receipt(&receipt));
+}
