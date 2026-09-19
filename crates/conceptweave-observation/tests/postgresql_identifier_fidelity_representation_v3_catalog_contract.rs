@@ -1,11 +1,47 @@
 use conceptweave_observation::{
-    DomainCheckConstraintObservation, DomainObservation, EnumObservation, IndexAttributeKind,
-    IndexAttributeObservation, IndexObservation, QualifiedTypeName, RelationKind, RelationObservation,
+    ColumnObservationV3, DomainCheckConstraintObservation, DomainObservation, EnumObservation,
+    IndexAttributeKind, IndexAttributeObservation, IndexKeySemantics, IndexObservation,
+    QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
     SchemaObjectLocation,
 };
 
 fn catalog_text() -> QualifiedTypeName {
     QualifiedTypeName::new("pg_catalog", "text").expect("catalog type coordinate is valid")
+}
+
+fn relation_fixture() -> RelationObservation {
+    RelationObservation::new(
+        "public",
+        "items",
+        RelationKind::Table,
+        vec![ColumnObservationV3::new("id", 1, "text", catalog_text(), false, None)
+            .expect("fixture column is valid")],
+    )
+    .expect("fixture relation is valid")
+}
+
+fn index_with_access_method(access_method: &str) -> IndexObservation {
+    IndexObservation::new(
+        "items_idx",
+        false,
+        None,
+        vec![IndexAttributeObservation::column(1, IndexAttributeKind::Key, "id")
+            .expect("fixture attribute is valid")],
+        vec![],
+    )
+    .expect("fixture index is valid")
+    .with_key_semantics(vec![
+        IndexKeySemantics::new(
+            1,
+            None,
+            QualifiedOperatorClassName::new("pg_catalog", "text_ops")
+                .expect("fixture operator class is valid"),
+            0,
+        )
+        .expect("fixture key semantics are valid"),
+    ])
+    .expect("fixture key semantics match the index")
+    .with_access_method(access_method)
 }
 
 #[test]
@@ -68,6 +104,25 @@ fn representation_v3_catalog_identifiers_reject_empty_and_code_zero() {
         .is_err()
     );
     assert!(SchemaObjectLocation::relation("bad\0schema", "relation", RelationKind::Table).is_err());
+}
+
+#[test]
+fn representation_v3_access_method_preserves_postgresql_identifier_semantics() {
+    let relation = relation_fixture()
+        .with_indexes(vec![index_with_access_method("  ")])
+        .expect("quoted access-method identifiers may contain whitespace");
+    assert_eq!(relation.indexes()[0].access_method(), Some("  "));
+
+    assert!(
+        relation_fixture()
+            .with_indexes(vec![index_with_access_method("")])
+            .is_err()
+    );
+    assert!(
+        relation_fixture()
+            .with_indexes(vec![index_with_access_method("bad\0am")])
+            .is_err()
+    );
 }
 
 #[test]
