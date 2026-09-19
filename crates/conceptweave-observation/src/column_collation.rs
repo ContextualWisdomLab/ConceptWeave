@@ -8,6 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use sha2::{Digest, Sha256};
 
+use crate::column_identity::validate_postgresql_identifier;
 use crate::{
     ObservationError, QualifiedCollationName, RelationKind, RelationObservation,
     TableConstraintObservation,
@@ -88,9 +89,9 @@ impl ColumnCollationObservation {
         let schema_name = schema_name.into();
         let relation_name = relation_name.into();
         let column_name = column_name.into();
-        crate::model::validate_nonblank(&schema_name, "schema_name")?;
-        crate::model::validate_nonblank(&relation_name, "relation_name")?;
-        crate::model::validate_nonblank(&column_name, "column_name")?;
+        validate_postgresql_identifier(&schema_name, "schema_name")?;
+        validate_postgresql_identifier(&relation_name, "relation_name")?;
+        validate_postgresql_identifier(&column_name, "column_name")?;
         Ok(Self {
             schema_name,
             relation_name,
