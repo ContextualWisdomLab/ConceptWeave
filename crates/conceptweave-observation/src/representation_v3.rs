@@ -11,6 +11,7 @@ use std::collections::BTreeSet;
 use conceptweave_source_port::AuthorizedObservationRequest;
 use sha2::{Digest, Sha256};
 
+use crate::column_identity::validate_postgresql_identifier;
 use crate::model::{
     ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType, ForeignKeyReferenceBehavior,
     ObservationError, TableConstraintObservation, escape_json_pointer_token, validate_nonblank,
@@ -42,8 +43,8 @@ impl QualifiedTypeName {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let type_name = type_name.into();
-        validate_nonblank(&schema_name, "schema_name")?;
-        validate_nonblank(&type_name, "type_name")?;
+        validate_postgresql_identifier(&schema_name, "schema_name")?;
+        validate_postgresql_identifier(&type_name, "type_name")?;
         Ok(Self {
             schema_name,
             type_name,
@@ -78,8 +79,8 @@ impl QualifiedCollationName {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let collation_name = collation_name.into();
-        validate_nonblank(&schema_name, "schema_name")?;
-        validate_nonblank(&collation_name, "collation_name")?;
+        validate_postgresql_identifier(&schema_name, "schema_name")?;
+        validate_postgresql_identifier(&collation_name, "collation_name")?;
         Ok(Self {
             schema_name,
             collation_name,
@@ -119,8 +120,8 @@ impl QualifiedOperatorClassName {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let operator_class_name = operator_class_name.into();
-        validate_nonblank(&schema_name, "schema_name")?;
-        validate_nonblank(&operator_class_name, "operator_class_name")?;
+        validate_postgresql_identifier(&schema_name, "schema_name")?;
+        validate_postgresql_identifier(&operator_class_name, "operator_class_name")?;
         Ok(Self {
             schema_name,
             operator_class_name,
@@ -239,7 +240,7 @@ impl IndexTablespace {
 
     fn new(name: impl Into<String>, database_default: bool) -> Result<Self, ObservationError> {
         let name = name.into();
-        validate_nonblank(&name, "index_tablespace_name")?;
+        validate_postgresql_identifier(&name, "index_tablespace_name")?;
         Ok(Self {
             name,
             database_default,
@@ -425,7 +426,7 @@ impl ColumnObservationV3 {
     ) -> Result<Self, ObservationError> {
         let column_name = column_name.into();
         let data_type = data_type.into();
-        validate_nonblank(&column_name, "column_name")?;
+        validate_postgresql_identifier(&column_name, "column_name")?;
         if ordinal_position == 0 {
             return Err(ObservationError::InvalidOrdinalPosition);
         }
@@ -539,7 +540,7 @@ impl IndexAttributeObservation {
         if position == 0 {
             return Err(ObservationError::InvalidOrdinalPosition);
         }
-        validate_nonblank(&attribute_name, "attribute_name")?;
+        validate_postgresql_identifier(&attribute_name, "attribute_name")?;
         Ok(Self {
             position,
             kind,
@@ -716,7 +717,7 @@ impl IndexObservation {
         mut include_attributes: Vec<IndexAttributeObservation>,
     ) -> Result<Self, ObservationError> {
         let index_name = index_name.into();
-        validate_nonblank(&index_name, "index_name")?;
+        validate_postgresql_identifier(&index_name, "index_name")?;
         if !is_unique && nulls_not_distinct == Some(true) {
             return Err(ObservationError::InvalidObservationField {
                 field: "nulls_not_distinct",
@@ -1014,7 +1015,7 @@ impl DomainCheckConstraintObservation {
     ) -> Result<Self, ObservationError> {
         let constraint_name = constraint_name.into();
         let check_definition = check_definition.into();
-        validate_nonblank(&constraint_name, "constraint_name")?;
+        validate_postgresql_identifier(&constraint_name, "constraint_name")?;
         validate_nonblank(&check_definition, "check_definition")?;
         Ok(Self {
             constraint_name,
@@ -1076,8 +1077,8 @@ impl DomainObservation {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let domain_name = domain_name.into();
-        validate_nonblank(&schema_name, "schema_name")?;
-        validate_nonblank(&domain_name, "domain_name")?;
+        validate_postgresql_identifier(&schema_name, "schema_name")?;
+        validate_postgresql_identifier(&domain_name, "domain_name")?;
         Ok(Self {
             schema_name,
             domain_name,
@@ -1186,7 +1187,7 @@ impl DomainObservation {
         self.array_dimensions
     }
 
-    /// Returns the observed qualified collation, or `None` when it was not captured.
+    /// Returns the observed qualified collation, or `None` when unobserved.
     #[must_use]
     pub const fn collation(&self) -> Option<&QualifiedCollationName> {
         self.collation.as_ref()
@@ -1240,8 +1241,8 @@ impl EnumObservation {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let enum_name = enum_name.into();
-        validate_nonblank(&schema_name, "schema_name")?;
-        validate_nonblank(&enum_name, "enum_name")?;
+        validate_postgresql_identifier(&schema_name, "schema_name")?;
+        validate_postgresql_identifier(&enum_name, "enum_name")?;
         let mut seen_labels = BTreeSet::new();
         for label in &labels {
             if !seen_labels.insert(label.as_str()) {
@@ -1321,8 +1322,8 @@ impl RelationObservation {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let relation_name = relation_name.into();
-        validate_nonblank(&schema_name, "schema_name")?;
-        validate_nonblank(&relation_name, "relation_name")?;
+        validate_postgresql_identifier(&schema_name, "schema_name")?;
+        validate_postgresql_identifier(&relation_name, "relation_name")?;
 
         let mut column_names = BTreeSet::new();
         let mut ordinal_positions = BTreeSet::new();
@@ -1574,7 +1575,7 @@ impl SchemaObjectLocation {
         kind: RelationKind,
     ) -> Result<Self, ObservationError> {
         let relation_name = relation_name.into();
-        validate_nonblank(&relation_name, "relation_name")?;
+        validate_postgresql_identifier(&relation_name, "relation_name")?;
         Self::new(
             schema_name,
             SchemaObjectElement::Relation {
@@ -1593,8 +1594,8 @@ impl SchemaObjectLocation {
     ) -> Result<Self, ObservationError> {
         let relation_name = relation_name.into();
         let column_name = column_name.into();
-        validate_nonblank(&relation_name, "relation_name")?;
-        validate_nonblank(&column_name, "column_name")?;
+        validate_postgresql_identifier(&relation_name, "relation_name")?;
+        validate_postgresql_identifier(&column_name, "column_name")?;
         Self::new(
             schema_name,
             SchemaObjectElement::Column {
@@ -1614,8 +1615,8 @@ impl SchemaObjectLocation {
     ) -> Result<Self, ObservationError> {
         let relation_name = relation_name.into();
         let constraint_name = constraint_name.into();
-        validate_nonblank(&relation_name, "relation_name")?;
-        validate_nonblank(&constraint_name, "constraint_name")?;
+        validate_postgresql_identifier(&relation_name, "relation_name")?;
+        validate_postgresql_identifier(&constraint_name, "constraint_name")?;
         Self::new(
             schema_name,
             SchemaObjectElement::Constraint {
@@ -1635,8 +1636,8 @@ impl SchemaObjectLocation {
     ) -> Result<Self, ObservationError> {
         let relation_name = relation_name.into();
         let index_name = index_name.into();
-        validate_nonblank(&relation_name, "relation_name")?;
-        validate_nonblank(&index_name, "index_name")?;
+        validate_postgresql_identifier(&relation_name, "relation_name")?;
+        validate_postgresql_identifier(&index_name, "index_name")?;
         Self::new(
             schema_name,
             SchemaObjectElement::Index {
@@ -1653,7 +1654,7 @@ impl SchemaObjectLocation {
         domain_name: impl Into<String>,
     ) -> Result<Self, ObservationError> {
         let domain_name = domain_name.into();
-        validate_nonblank(&domain_name, "domain_name")?;
+        validate_postgresql_identifier(&domain_name, "domain_name")?;
         Self::new(schema_name, SchemaObjectElement::Domain(domain_name))
     }
 
@@ -1666,7 +1667,7 @@ impl SchemaObjectLocation {
         enum_name: impl Into<String>,
     ) -> Result<Self, ObservationError> {
         let enum_name = enum_name.into();
-        validate_nonblank(&enum_name, "enum_name")?;
+        validate_postgresql_identifier(&enum_name, "enum_name")?;
         Self::new(schema_name, SchemaObjectElement::Enum(enum_name))
     }
 
@@ -1675,7 +1676,7 @@ impl SchemaObjectLocation {
         element: SchemaObjectElement,
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
-        validate_nonblank(&schema_name, "schema_name")?;
+        validate_postgresql_identifier(&schema_name, "schema_name")?;
         Ok(Self {
             schema_name,
             element,
