@@ -119,8 +119,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
     /// Returns canonical unresolved grantee role OIDs for exact recovery remediation.
     ///
     /// These are PostgreSQL catalog identifiers, not credentials. They are intentionally omitted
-    /// from routine [`Debug`] output but retained here so repair/review does not have to guess from
-    /// aggregate counts or reverse an opaque material digest.
+    /// from routine [`fmt::Debug`] output but retained here so repair/review does not have to guess
+    /// from aggregate counts or reverse an opaque material digest.
     #[must_use]
     pub fn unresolved_grantee_oids(&self) -> &[u32] {
         &self.unresolved_grantee_oids
@@ -129,8 +129,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
     /// Returns canonical unresolved grantor role OIDs for exact recovery remediation.
     ///
     /// These are PostgreSQL catalog identifiers, not credentials. They are intentionally omitted
-    /// from routine [`Debug`] output but retained here so repair/review does not have to guess from
-    /// aggregate counts or reverse an opaque material digest.
+    /// from routine [`fmt::Debug`] output but retained here so repair/review does not have to guess
+    /// from aggregate counts or reverse an opaque material digest.
     #[must_use]
     pub fn unresolved_grantor_oids(&self) -> &[u32] {
         &self.unresolved_grantor_oids
