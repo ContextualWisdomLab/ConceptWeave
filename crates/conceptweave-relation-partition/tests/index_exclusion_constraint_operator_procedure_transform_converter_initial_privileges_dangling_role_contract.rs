@@ -51,6 +51,63 @@ fn ordinary_exclude_converter_initial_privileges_preserve_dangling_role_oid_iden
 }
 
 #[test]
+fn ordinary_exclude_converter_initial_privileges_expose_dangling_role_diagnostics() {
+    let resolved = extension_initial_privileges(vec![
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::role(
+            "analytics",
+            "postgres",
+            false,
+        )
+        .unwrap(),
+    ]);
+    assert_eq!(resolved.unresolved_grantee_count(), 0);
+    assert_eq!(resolved.unresolved_grantor_count(), 0);
+
+    let dangling_grantee = extension_initial_privileges(vec![
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::unresolved_grantee_oid(
+            16424,
+            "postgres",
+            false,
+        )
+        .unwrap(),
+    ]);
+    assert_eq!(dangling_grantee.unresolved_grantee_count(), 1);
+    assert_eq!(dangling_grantee.unresolved_grantor_count(), 0);
+
+    let dangling_grantor = extension_initial_privileges(vec![
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::role_with_unresolved_grantor_oid(
+            "analytics",
+            16425,
+            true,
+        )
+        .unwrap(),
+    ]);
+    assert_eq!(dangling_grantor.unresolved_grantee_count(), 0);
+    assert_eq!(dangling_grantor.unresolved_grantor_count(), 1);
+
+    let both_dangling = extension_initial_privileges(vec![
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::unresolved_role_oids(
+            16424,
+            16425,
+            true,
+        )
+        .unwrap(),
+    ]);
+    assert_eq!(both_dangling.unresolved_grantee_count(), 1);
+    assert_eq!(both_dangling.unresolved_grantor_count(), 1);
+
+    let public_with_dangling_grantor = extension_initial_privileges(vec![
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::public_with_unresolved_grantor_oid(
+            16425,
+            false,
+        )
+        .unwrap(),
+    ]);
+    assert_eq!(public_with_dangling_grantor.unresolved_grantee_count(), 0);
+    assert_eq!(public_with_dangling_grantor.unresolved_grantor_count(), 1);
+}
+
+#[test]
 fn ordinary_exclude_converter_initial_privileges_reject_public_oid_as_unresolved_role() {
     let dangling_grantee =
         IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::unresolved_grantee_oid(
