@@ -25,8 +25,8 @@ The snapshot descends from converter-function `deptype='e'` membership, preserve
 For each exact converter function OID selected from the same immutable source generation:
 
 1. preserve any `deptype='e'` membership using the existing membership surface;
-2. independently collect all `pg_depend` rows for that function with `deptype='x'`, `objsubid=0`, and referenced extension objects;
-3. resolve each referenced extension OID to exact `pg_extension.extname` in that same snapshot;
+2. independently collect `pg_depend` rows with dependent `classid = pg_proc`, exact converter `objid`, `objsubid = 0`, referenced `refclassid = pg_extension`, `refobjsubid = 0`, and `deptype='x'`;
+3. resolve every referenced extension OID to exact `pg_extension.extname` in that same snapshot;
 4. provide the complete set to the auto-extension dependency constructor.
 
 Naming conventions, package inventory, `extversion`, control files, update scripts, application configuration, and the transform object's own extension membership are not substitutes. Extension-owned metadata stays outside this Source Observation fact.
@@ -43,6 +43,7 @@ This successor is justified by lifecycle and recovery behavior, not by catalog e
 - Public composition: `55b0baf3bbb34d0ef24534d29c12a3814fa97176`.
 - Transform-object successor contract restack: `458bd76f193906999a81c583da30dff152d0f9f8`.
 - Transform-object production restack: `fcb0e2cdd8700ed56ee4d2a0b96bdf89c5bd4532`.
+- Retained transform direction/function/raw-root lineage contracts restacked on the new converter lifecycle predecessor: `60d90c3ed0b0793378707a39cd27397dba6ed3bb`.
 
 The exact head after documentation movement still requires independent Rust 1.98, coverage, and PostgreSQL 18 same-generation differential evidence before GREEN.
 
