@@ -2,43 +2,32 @@
 
 ## Problem
 
-ConceptWeave promises exact PostgreSQL source identifiers, but parts of `conceptweave-observation` still route identifier-bearing fields through `model::validate_nonblank()`, which rejects `value.trim().is_empty()`. That is presentation-oriented validation, not PostgreSQL identifier validation.
+ConceptWeave preserves exact PostgreSQL catalog identifiers. Generic presentation validation is not sufficient for this boundary because `value.trim().is_empty()` rejects a legal quoted identifier whose exact catalog value consists only of whitespace. PostgreSQL 18 §4.1.1 permits whitespace inside delimited identifiers and forbids the NUL character.
 
-PostgreSQL 18 §4.1.1 defines quoted/delimited identifiers as arbitrary character sequences except code zero and explicitly permits spaces. Source Observation therefore must not collapse or reject legal whitespace-only catalog identifiers merely because their trimmed presentation is empty.
+The invariant is therefore field-specific: identifier values preserve source bytes, reject zero-length/NUL states, and are not trimmed, case-folded, normalized, or reinterpreted. Rendered type text, CHECK definitions, expressions, extractor revisions, and other non-identifier text retain their existing nonblank policy.
 
-The earlier converter initial-privilege repair was intentionally bounded to ACL role and converter schema/function identifiers. It did not repair the shared v2/v3 observation validator.
+## Exact lineage
 
-## Current exact lineage
+- Finding review `5257069180` on predecessor `427587e8be39d38240e57a2ebcc9cdaf291f6ebe` identified the shared legacy/v3 trim-based boundary.
+- Systemic structural RED `a1638573b9d99f78c7fcd211fc93559d86d4f93a` covers qualified type, collation, operator-class, and v3 column identifiers.
+- Bounded column-identity RED `9395d141c70f074a1b60ff1c5d26097973db768a` and repair `c2b247b24c45f9e45c90aad7b4fb68e296d0225e` proved the field-specific rule without globally weakening text validation.
+- Scope review `5257371727` found that separately exported prefixed families were missing from that contract. RED `3291d594da042d8497b1cc17493fc180f213f397` added `ColumnCollationObservation` and `ColumnExpressionObservation`, including the negative control that whitespace-only rendered expression text stays invalid.
+- Fresh exact-head review `5257607599` on `fe70b0c5077fb436c69d75e72502f12e4e209f80` reconfirmed the causal split between identifier coordinates and rendered expression text.
+- Shared identifier admission became crate-reusable at `7de4d9b9072869b562ad34719241a774a170e903` without changing its semantics.
+- `ColumnCollationObservation` coordinates were repaired at `7961c0229938048442c7b1839230f136bb59fd04`.
+- `ColumnExpressionObservation` coordinates were repaired at `a8ad7cf1430a13aaae33bdeff31b29885eaed06f`; its expression payload still uses generic nonblank validation.
+- Generated-column coordinates were repaired at `d295661d0360b88a0da24ec1129b6a9aaf8b72e9`.
+- Constraint-timing coordinates were repaired at `943518644b28d6255453ce574c90ddcef22a21c6`.
+- Temporal-constraint and exclusion-operator identifiers were repaired at `4bbe2ab1438a0949a7e994e3150c0b413737c74d`.
+- Dedicated NOT NULL structural RED `7efd69164df643b2bf325207df70c93ffb6318dc` covers local and parent schema/relation/constraint/column coordinates. Production repair `6b032de91b034f9ab76541eeb1a02150dad1d1d1` applies the same identifier admission to local, parent-constraint, and partition-parent coordinates.
+- Retained catalog-family regression contract `263091310809b223881c2a54e1ee4f5fb761dbe5` covers generated-column, timing, and temporal-constraint coordinates after their repair. It is retained regression evidence, not a claim that an executed pre-fix failure was observed.
 
-- Finding review: `5257069180` on #46 predecessor `427587e8be39d38240e57a2ebcc9cdaf291f6ebe`.
-- Systemic structural RED: `a1638573b9d99f78c7fcd211fc93559d86d4f93a`, adding `postgresql_identifier_fidelity_contract.rs` for qualified type, collation, operator-class and column identifiers. It requires whitespace-only quoted identifiers to round-trip byte-for-byte and empty/code-zero identifiers to fail closed.
-- Bounded column-identity RED: `9395d141c70f074a1b60ff1c5d26097973db768a`.
-- Bounded production repair: `c2b247b24c45f9e45c90aad7b4fb68e296d0225e`, replacing trim-based admission only for `ColumnIdentityObservation` schema/relation/column coordinates with `empty || contains(code-zero)` rejection.
-- Scope-completeness review: `5257371727` on exact predecessor `3b348facbba76f0a228aa677230864140979fe30`. The first systemic RED covered core v3 coordinate types but did not prove separately exported prefixed families that call the same shared validator.
-- Prefixed-family structural RED: `3291d594da042d8497b1cc17493fc180f213f397`, adding `postgresql_identifier_fidelity_prefixed_contract.rs`. It requires `ColumnCollationObservation` and `ColumnExpressionObservation` schema/relation/column coordinates to preserve quoted whitespace and reject empty/code-zero identifiers while retaining whitespace-only rendered-expression rejection as a non-identifier negative control.
+## Current status
 
-The systemic RED remains intentionally unresolved until the shared legacy/v3 identifier-bearing constructors stop using trim-based admission. The bounded column-identity repair and the new prefixed-family RED must not be interpreted as systemic GREEN.
+The repair is materially broader but still not systemic GREEN. `model.rs` and `representation_v3.rs` retain identifier-bearing call sites that use generic trim-based `validate_nonblank()`. The remaining repair must separate those identifier call sites from non-identifier text call sites rather than weakening the generic text validator.
 
-## Invariant
-
-For a field that is an exact PostgreSQL identifier decoded from catalog/source state:
-
-1. preserve the complete string byte-for-byte, including whitespace;
-2. reject zero-length values;
-3. reject code zero;
-4. do not case-fold, trim, Unicode-normalize or reinterpret quoting;
-5. keep non-identifier fields such as rendered data-type/check-definition/expression text and extractor revision on their existing field-specific validation policy.
-
-This separates identifier syntax from generic “nonblank text” policy and avoids widening unrelated product metadata contracts.
-
-## Required acceptance
-
-The shared production repair is complete only when current-head tests prove the exact behavior for schema, relation/table, column, constraint/reference, qualified type, collation, operator-class and other catalog identifier coordinates that currently use the shared trim-based validator. A repair that makes only the original four core-type assertions green is incomplete if separately exported coordinate families still reject legal quoted whitespace. At least one non-identifier negative control must remain in the same contract so a global weakening of `validate_nonblank()` cannot satisfy the suite.
-
-The same exact head must pass Rust 1.98 fmt, strict Clippy, retained/workspace/doc tests, owned statement/branch/edge coverage, and a PostgreSQL 18 live differential with quoted whitespace identifiers and code-zero rejection.
-
-No predecessor execution evidence transfers after source movement. Structural RED commits record executable contracts; they are not claims that a failing CI run was observed.
+The exact accepted head must independently pass repository-pinned Rust 1.98 formatting, strict Clippy, retained/workspace/doc tests, release/rustdoc, owned statement/branch/edge coverage, and a PostgreSQL 18 same-generation differential exercising quoted-whitespace identifiers and NUL rejection. No predecessor execution evidence transfers after source or documentation movement.
 
 ## Primary authority
 
-PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: 4.1.1 Identifiers and key words*. PostgreSQL documents that quoted identifiers can contain any character except the character with code zero and specifically notes identifiers containing spaces.
+PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: 4.1.1 Identifiers and key words*. https://www.postgresql.org/docs/18/sql-syntax-lexical.html
