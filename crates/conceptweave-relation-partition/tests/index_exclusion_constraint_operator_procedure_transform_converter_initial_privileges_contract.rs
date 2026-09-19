@@ -23,6 +23,7 @@ fn initial_public_execute(
     grant_option: bool,
 ) -> IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant {
     IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::public(
+        10,
         grantor,
         grant_option,
     )
@@ -35,7 +36,9 @@ fn initial_role_execute(
     grant_option: bool,
 ) -> IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant {
     IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::role(
+        20,
         grantee,
+        10,
         grantor,
         grant_option,
     )
@@ -197,7 +200,9 @@ fn ordinary_exclude_converter_initial_privileges_preserve_duplicate_acl_entries_
 
     let blank =
         IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::role(
+            20,
             "  ",
+            10,
             "postgres",
             false,
         )
