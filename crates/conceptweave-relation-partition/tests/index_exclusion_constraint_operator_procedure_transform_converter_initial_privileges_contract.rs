@@ -120,7 +120,7 @@ fn ordinary_exclude_converter_initial_privileges_distinguish_absent_and_extensio
 }
 
 #[test]
-fn ordinary_exclude_converter_initial_privileges_preserve_privtype_and_canonical_acl_identity() {
+fn ordinary_exclude_converter_initial_privileges_preserve_privtype_and_source_acl_order_identity() {
     let predecessor = converter_security_label_snapshot();
     let grants_left = vec![
         initial_role_execute("analytics", "postgres", true),
@@ -133,14 +133,24 @@ fn ordinary_exclude_converter_initial_privileges_preserve_privtype_and_canonical
 
     let left_material = extension_initial_privileges(grants_left);
     let right_material = extension_initial_privileges(grants_right);
-    assert_eq!(left_material.digest(), right_material.digest());
+    assert_ne!(left_material.digest(), right_material.digest());
+    assert_eq!(
+        left_material.grants()[0].resolved_grantee_role_name(),
+        Some("analytics")
+    );
+    assert!(!left_material.grants()[0].is_public_grantee());
+    assert!(right_material.grants()[0].is_public_grantee());
+    assert_eq!(
+        right_material.grants()[1].resolved_grantee_role_name(),
+        Some("analytics")
+    );
 
     let initdb_material =
         IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial::new(
             IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeType::Initdb,
             vec![
-                initial_public_execute("postgres", false),
                 initial_role_execute("analytics", "postgres", true),
+                initial_public_execute("postgres", false),
             ],
         )
         .unwrap();
