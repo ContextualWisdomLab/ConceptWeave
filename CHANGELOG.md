@@ -1,45 +1,40 @@
 # Changelog
 
-The Source Observation decision surface before converter-function initial-privilege evidence is preserved at `docs/archive/CHANGELOG-through-71c86b19.md`; its matching product/technical surface is preserved at `docs/archive/product-technical-gap-baseline-through-71c86b19.md`. Earlier history remains under `docs/archive/`; focused rationale and primary-source traceability remain under `docs/doctoring/`.
+The Source Observation decision surface before dangling-role repair in converter-function initial privileges is preserved at `docs/archive/CHANGELOG-through-5daf2a57.md`; its matching product/technical surface is preserved at `docs/archive/product-technical-gap-baseline-through-5daf2a57.md`. Earlier history remains under `docs/archive/`; focused rationale and primary-source traceability remain under `docs/doctoring/`.
 
 ## Unreleased
 
 ### Added
 
-- Added `IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeType`, `IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant`, `IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial`, observation, immutable snapshot, and receipt as a successor to converter-function security-label evidence.
-- The observation preserves exact absence versus presence of the same-generation converter-function `pg_init_privs` row, exact `privtype` (`i`/`e`), and a canonical privacy-preserving identity for the complete object-level initial EXECUTE ACL.
-- Added hostile contracts covering absent versus extension-provided baselines, `initdb` versus extension `privtype`, deterministic ACL ordering, duplicate ACL rejection, blank resolved roles, completeness, duplicate coordinates, exact converter binding, immutable raw converter-root propagation, collision-safe provenance, and exact receipt lookup.
-- Restacked transform-object extension membership on the converter initial-privilege successor so recovery/dump semantics cannot disappear from the final transform-object lifecycle digest.
-- Added `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-initial-privileges-integrity.md` with PostgreSQL 18 `pg_init_privs`, extension packaging, GRANT, and `pg_dump` primary-source traceability.
+- Retained the converter-function `pg_init_privs` successor: exact row absence/presence, `privtype` (`i`/`e`), complete object-level initial EXECUTE ACL, immutable receipt/snapshot, exact converter binding, and raw converter-root lineage remain authoritative.
+- Added hostile dangling-role coverage for PostgreSQL catalog states where an initial ACL still refers to a role OID after the role no longer exists. The contract covers dangling grantee, dangling grantor, both dangling, PUBLIC with dangling grantor, and rejection of unresolved OID zero.
+- Added `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-initial-privileges-dangling-role-integrity.md` with PostgreSQL 18 BUG #19483/#19513 and pgsql-hackers repair discussion traceability.
 
 ### Correctness
 
-- PostgreSQL initial privileges are now represented separately from current `pg_proc.proacl`. Two converter functions may have the same current ACL while carrying different initial privilege baselines, which changes the GRANT/REVOKE reconstruction PostgreSQL emits for extension dump/restore.
-- Row absence remains distinct from a present `pg_init_privs` row. Present rows distinguish `privtype='i'` from `privtype='e'` even when their initial ACLs are otherwise identical.
-- The initial ACL is canonicalized only for deterministic set identity. PUBLIC versus named-role grantee, exact same-generation grantor identity, and grant option remain identity-bearing; duplicate ACL entries fail closed.
-- The successor retains complete converter coordinates, direction, exact converter schema/function binding, same-generation source metadata, and the immutable raw `converter_snapshot_digest`.
-- Transform-object extension membership now uses the initial-privilege snapshot as its digest predecessor while still proving that predecessor's immutable raw converter root equals the separately supplied raw transform-converter snapshot before checking complete direction/function binding.
-- Converter current ACL, `deptype='e'`, complete `deptype='x'` sets, security labels, initial privilege baselines, and transform-object `deptype='e'` remain separate Source Observation facts. Extension package/control/update scripts, role-membership policy, package inventory, and application metadata remain outside ConceptWeave.
+- `IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant` no longer requires every non-PUBLIC ACL role OID to resolve to a role name before Source Observation can exist. A nonzero dangling grantee or grantor OID is now preserved explicitly as an unresolved raw OID.
+- Resolved role names and unresolved OIDs occupy different identity namespaces. A real role named `"16424"` does not alias raw dangling OID `16424`.
+- PUBLIC remains a grantee-only identity. OID zero is rejected by unresolved-role constructors and is never treated as a dangling role.
+- Existing resolved-role digest framing remains byte-for-byte stable. Unresolved grantees use a dedicated digest tag; unresolved grantors use a reserved framing sentinel plus the raw OID, avoiding collision with length-framed role names.
+- Source Observation records the damaged external state rather than silently filtering it or failing solely on missing role lookup. Validation/publication may later flag the state as a recovery/security defect.
+- Current `pg_proc.proacl`, converter-function `deptype='e'`, complete `deptype='x'` sets, security labels, exact `pg_init_privs` baseline (including dangling ACL OIDs), immutable raw converter root, and transform-object `deptype='e'` remain separate facts.
 
 ### Test and repair evidence
 
-- Initial-privilege finding review: `5254405649`.
-- Structural RED: `6a16b6c314e9ba6f9b8a2038055713c62e4cefab`, which referenced the not-yet-existing public initial-privilege contract.
-- Production successor: `c94caa8a1da7088c819b802a87588ba303edcf55`.
-- Public composition: `1ba7f86bb62c399f334b823ed51bad651e398f24`.
-- Transform-object production restack: `50dddc811bacc301fc36f0d7b5bddd3a6a51fd18`.
-- Transform-object contract restack: `34c8611f0c75723bdebc82e0e84fa67a92856604`.
-- Retained direction/function/raw-root hostile lineage restack: `a1c35b715e56f5a62813ba60e65d0ba6a80ba418`.
-- Focused primary-source doctoring: `df88a83cb3606ac89bd0b2ec47fa6d4abae0e123`.
-- The structural RED was real at its commit because the public initial-privilege types did not yet exist. Later source commits satisfy that compile-level contract; source repair itself is not native or hosted GREEN evidence.
-- No native or hosted GREEN is claimed after source or documentation movement. Rust 1.98 fmt, strict workspace/all-target Clippy, focused/retained/workspace/doc tests, release build, rustdoc, owned production statement/branch/edge coverage, and the PostgreSQL 18 bounded live differential remain exact-head gates.
+- Previous initial-privilege finding/repaired lineage remains archived through exact head `5daf2a5725ed52cd1b8d884200fc7786eaba54de`.
+- Dangling-role finding review: `5254640920`.
+- Structural RED: `94e98da8ebb31f1429b44b20cce7b96ea16e1332`; the contract referenced dangling-role constructors before production exposed them.
+- Production causal repair: `1d6abe4f11cbc9c50b705ec5458a80ba04719c7f`.
+- Pre-repair CHANGELOG archive: `0d91dd7d876e67c8460a9a3ed04d579ab9bf463e`.
+- Pre-repair product/technical baseline archive: `b372444bd178c37100ffda070193cf9ef9bd444d`.
+- Focused primary-source doctoring: `ff8498187781a65273297913ca2a280c7f157c3d`.
+- Source repair itself is not native or hosted GREEN evidence. Exact-head Rust 1.98 fmt, strict workspace/all-target Clippy, focused/retained/workspace/doc tests, release build, rustdoc, owned production statement/branch/edge coverage, and PostgreSQL 18 bounded live differential remain gates.
 
 ### Retained
 
-- All previously valid ordinary-EXCLUDE authority remains in force, including exact converter definition/owner/current-ACL/config/security/planner/cost/shape facts, raw nullable `proargmodes`, raw nullable `proargnames`, raw nullable converter-function `protrftypes`, converter-function `deptype='e'` membership, complete converter-function `deptype='x'` dependency sets, security-label maps, immutable raw converter-root lineage, and independent transform-object extension membership.
-- Source Observation stores initial privilege state as exact external recovery truth. Later validation/publication may impose authorization policy, but observation must not reconstruct `pg_init_privs` from current ACL, extension membership, package state, or names.
+- All previously valid ordinary-EXCLUDE authority remains in force, including exact converter definition/owner/current-ACL/config/security/planner/cost/shape facts, raw nullable `proargmodes`, raw nullable `proargnames`, raw nullable converter-function `protrftypes`, converter-function `deptype='e'` membership, complete converter-function `deptype='x'` dependency sets, security-label maps, initial-privilege baselines, immutable raw converter-root lineage, and independent transform-object extension membership.
 - #45 and #6 remain source-stable and may adopt #46 only after complete child acceptance; partial cherry-pick or independent reimplementation is not a successor.
 
 ### Canonical-owner coordination
 
-- Central `.github#2040` and product bootstrap #35 remain separate prerequisites. Their live exact heads, checks, reviews, and protected-main relationships must be read fresh before landing; predecessor or sibling evidence does not transfer into #46.
+- Central `.github#2040` and product bootstrap #35 remain separate prerequisites. Their live exact heads, checks, reviews, workflow inventories, and protected-main relationships must be read fresh before landing; predecessor or sibling evidence does not transfer into #46.
