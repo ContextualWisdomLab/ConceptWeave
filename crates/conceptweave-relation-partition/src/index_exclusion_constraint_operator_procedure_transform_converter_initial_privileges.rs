@@ -10,7 +10,7 @@
 //! grantee OIDs dangling after a role disappears, so unresolved raw OIDs remain distinct from
 //! resolved role names instead of making the source observation itself impossible.
 
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, fmt};
 
 use conceptweave_observation::{ObservationError, QualifiedTypeName};
 use sha2::{Digest, Sha256};
@@ -189,21 +189,36 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
     }
 }
 
-/// Privacy-preserving identity for one present converter-function `pg_init_privs` row.
+/// Privacy-conscious identity for one present converter-function `pg_init_privs` row.
 ///
 /// The adapter should resolve non-PUBLIC grantor/grantee OIDs against the same source generation.
 /// When a raw ACL OID has no matching role, it must preserve that nonzero OID explicitly instead of
 /// dropping the entry or converting the OID to a role-name string. Row absence is represented by
-/// `None` at the observation boundary, not by an empty material. Aggregate unresolved-reference
-/// counts remain visible so later deterministic validation can flag damaged recovery state without
-/// disclosing the raw OID values carried by the digest identity.
-#[derive(Clone, Debug, Eq, PartialEq)]
+/// `None` at the observation boundary, not by an empty material. Exact unresolved role identifiers
+/// remain privately retained for the recovery-validation boundary while routine `Debug` output shows
+/// only aggregate counts and the immutable material digest.
+#[derive(Clone, Eq, PartialEq)]
 pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial {
     privilege_type: IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeType,
     grant_count: usize,
-    unresolved_grantee_count: usize,
-    unresolved_grantor_count: usize,
+    unresolved_grantee_oids: Vec<u32>,
+    unresolved_grantor_oids: Vec<u32>,
     digest: String,
+}
+
+impl fmt::Debug for IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct(
+                "IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial",
+            )
+            .field("privilege_type", &self.privilege_type)
+            .field("grant_count", &self.grant_count)
+            .field("unresolved_grantee_count", &self.unresolved_grantee_oids.len())
+            .field("unresolved_grantor_count", &self.unresolved_grantor_oids.len())
+            .field("digest", &self.digest)
+            .finish()
+    }
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial {
@@ -219,24 +234,29 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
             ));
         }
 
-        let unresolved_grantee_count = grants
+        let unresolved_grantee_oids = grants
             .iter()
-            .filter(|grant| {
-                matches!(
-                    grant.grantee,
-                    TransformConverterInitialExecuteGrantee::UnresolvedRoleOid(_)
-                )
+            .filter_map(|grant| match &grant.grantee {
+                TransformConverterInitialExecuteGrantee::UnresolvedRoleOid(role_oid) => {
+                    Some(*role_oid)
+                }
+                TransformConverterInitialExecuteGrantee::Public
+                | TransformConverterInitialExecuteGrantee::Role(_) => None,
             })
-            .count();
-        let unresolved_grantor_count = grants
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        let unresolved_grantor_oids = grants
             .iter()
-            .filter(|grant| {
-                matches!(
-                    grant.grantor,
-                    TransformConverterInitialExecuteGrantor::UnresolvedRoleOid(_)
-                )
+            .filter_map(|grant| match &grant.grantor {
+                TransformConverterInitialExecuteGrantor::UnresolvedRoleOid(role_oid) => {
+                    Some(*role_oid)
+                }
+                TransformConverterInitialExecuteGrantor::Role(_) => None,
             })
-            .count();
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
 
         let mut hasher = Sha256::new();
         hasher.update(
@@ -274,8 +294,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
         Ok(Self {
             privilege_type,
             grant_count: grants.len(),
-            unresolved_grantee_count,
-            unresolved_grantor_count,
+            unresolved_grantee_oids,
+            unresolved_grantor_oids,
             digest: format!("{SHA256_DIGEST_PREFIX}{:x}", hasher.finalize()),
         })
     }
@@ -294,16 +314,26 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
         self.grant_count
     }
 
-    /// Returns how many initial EXECUTE grants contain an unresolved non-PUBLIC grantee OID.
+    /// Returns how many distinct unresolved non-PUBLIC grantee OIDs were observed.
     #[must_use]
-    pub const fn unresolved_grantee_count(&self) -> usize {
-        self.unresolved_grantee_count
+    pub fn unresolved_grantee_count(&self) -> usize {
+        self.unresolved_grantee_oids.len()
     }
 
-    /// Returns how many initial EXECUTE grants contain an unresolved grantor OID.
+    /// Returns how many distinct unresolved grantor OIDs were observed.
     #[must_use]
-    pub const fn unresolved_grantor_count(&self) -> usize {
-        self.unresolved_grantor_count
+    pub fn unresolved_grantor_count(&self) -> usize {
+        self.unresolved_grantor_oids.len()
+    }
+
+    /// Returns the exact canonical unresolved grantee OIDs for recovery validation.
+    pub(crate) fn unresolved_grantee_oids(&self) -> &[u32] {
+        &self.unresolved_grantee_oids
+    }
+
+    /// Returns the exact canonical unresolved grantor OIDs for recovery validation.
+    pub(crate) fn unresolved_grantor_oids(&self) -> &[u32] {
+        &self.unresolved_grantor_oids
     }
 
     /// Returns the privacy-preserving digest of exact `privtype` plus initial EXECUTE ACL.
