@@ -5,8 +5,8 @@
 //! `ALTER EXTENSION ... ADD|DROP TRANSFORM FOR type LANGUAGE language`, so the transform object's
 //! lifecycle can change without changing its `(trftype, trflang)` identity or either converter
 //! function. This successor preserves exact absence or the resolved `pg_extension.extname` for the
-//! transform object itself. Converter-function membership and extension-owned metadata stay in their
-//! existing owners.
+//! transform object itself. Converter-function membership, auto-extension dependencies, and
+//! extension-owned metadata stay in their existing owners.
 
 use std::collections::BTreeSet;
 
@@ -15,8 +15,8 @@ use sha2::{Digest, Sha256};
 
 use super::{
     IndexExclusionConstraintCoordinate,
+    IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencySnapshot,
     IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
-    IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipSnapshot,
     IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot,
 };
 
@@ -173,23 +173,23 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformExtensionMembership
 impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapshot {
     /// Creates one extension-membership fact for each exact same-generation `pg_transform` row.
     ///
-    /// `converter_extension_membership_snapshot` is the digest predecessor. The original transform
-    /// converter snapshot supplies the transform-row identity `(trftype, trflang)` that is not a
-    /// per-direction converter-function fact. Both inputs must describe the same source generation,
-    /// descend from the exact same immutable raw transform-converter root, and retain the same
-    /// converter direction/function set.
+    /// `converter_auto_extension_dependency_snapshot` is the digest predecessor. The original
+    /// transform-converter snapshot supplies the transform-row identity `(trftype, trflang)` that is
+    /// not a per-direction converter-function fact. Both inputs must describe the same source
+    /// generation, descend from the exact same immutable raw transform-converter root, and retain
+    /// the same converter direction/function set.
     pub fn new(
-        converter_extension_membership_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipSnapshot,
+        converter_auto_extension_dependency_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencySnapshot,
         transform_converter_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot,
         mut observations: Vec<IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipObservation>,
     ) -> Result<Self, ObservationError> {
-        if converter_extension_membership_snapshot.source_connection_key()
+        if converter_auto_extension_dependency_snapshot.source_connection_key()
             != transform_converter_snapshot.source_connection_key()
-            || converter_extension_membership_snapshot.connection_policy_binding()
+            || converter_auto_extension_dependency_snapshot.connection_policy_binding()
                 != transform_converter_snapshot.connection_policy_binding()
-            || converter_extension_membership_snapshot.extractor_revision()
+            || converter_auto_extension_dependency_snapshot.extractor_revision()
                 != transform_converter_snapshot.extractor_revision()
-            || converter_extension_membership_snapshot.observed_at_utc()
+            || converter_auto_extension_dependency_snapshot.observed_at_utc()
                 != transform_converter_snapshot.observed_at_utc()
         {
             return Err(invalid(
@@ -197,7 +197,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapsh
             ));
         }
 
-        if converter_extension_membership_snapshot.converter_snapshot_digest()
+        if converter_auto_extension_dependency_snapshot.converter_snapshot_digest()
             != transform_converter_snapshot.snapshot_digest()
         {
             return Err(invalid(
@@ -205,8 +205,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapsh
             ));
         }
 
-        let converter_membership_observations =
-            converter_extension_membership_snapshot.observations();
+        let converter_lifecycle_observations =
+            converter_auto_extension_dependency_snapshot.observations();
         let raw_converter_direction_count = transform_converter_snapshot
             .observations()
             .iter()
@@ -215,7 +215,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapsh
                 usize::from(binding.from_sql().is_some()) + usize::from(binding.to_sql().is_some())
             })
             .sum::<usize>();
-        if raw_converter_direction_count != converter_membership_observations.len() {
+        if raw_converter_direction_count != converter_lifecycle_observations.len() {
             return Err(invalid(
                 "index_exclusion_constraint_operator_procedure_transform_extension_membership_binding",
             ));
@@ -235,7 +235,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapsh
                     let Some(converter) = converter else {
                         continue;
                     };
-                    let has_exact_converter_membership = converter_membership_observations
+                    let has_exact_converter_lifecycle = converter_lifecycle_observations
                         .iter()
                         .any(|candidate| {
                             candidate.coordinate() == transform_observation.coordinate()
@@ -245,7 +245,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapsh
                                 && candidate.converter_schema_name() == converter.schema_name()
                                 && candidate.converter_function_name() == converter.function_name()
                         });
-                    if !has_exact_converter_membership {
+                    if !has_exact_converter_lifecycle {
                         return Err(invalid(
                             "index_exclusion_constraint_operator_procedure_transform_extension_membership_binding",
                         ));
@@ -285,7 +285,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapsh
         }
 
         for observation in &observations {
-            let has_converter_direction = converter_extension_membership_snapshot
+            let has_converter_direction = converter_auto_extension_dependency_snapshot
                 .observations()
                 .iter()
                 .any(|candidate| {
@@ -301,21 +301,21 @@ impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapsh
         }
 
         let snapshot_digest = compute_transform_extension_membership_digest(
-            converter_extension_membership_snapshot.snapshot_digest(),
+            converter_auto_extension_dependency_snapshot.snapshot_digest(),
             &observations,
         );
         Ok(Self {
-            source_connection_key: converter_extension_membership_snapshot
+            source_connection_key: converter_auto_extension_dependency_snapshot
                 .source_connection_key()
                 .to_owned(),
-            connection_policy_binding: converter_extension_membership_snapshot
+            connection_policy_binding: converter_auto_extension_dependency_snapshot
                 .connection_policy_binding()
                 .to_owned(),
             snapshot_digest,
-            extractor_revision: converter_extension_membership_snapshot
+            extractor_revision: converter_auto_extension_dependency_snapshot
                 .extractor_revision()
                 .to_owned(),
-            observed_at_utc: converter_extension_membership_snapshot
+            observed_at_utc: converter_auto_extension_dependency_snapshot
                 .observed_at_utc()
                 .to_owned(),
             observations,
