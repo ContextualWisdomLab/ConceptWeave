@@ -1,43 +1,43 @@
 # Changelog
 
-The Source Observation decision surface before converter-function security-label evidence is preserved at `docs/archive/CHANGELOG-through-106cfb3f.md`; its matching product/technical surface is preserved at `docs/archive/product-technical-gap-baseline-through-106cfb3f.md`. Earlier history remains under `docs/archive/`; focused rationale and primary-source traceability remain under `docs/doctoring/`.
+The Source Observation decision surface before converter-function initial-privilege evidence is preserved at `docs/archive/CHANGELOG-through-71c86b19.md`; its matching product/technical surface is preserved at `docs/archive/product-technical-gap-baseline-through-71c86b19.md`. Earlier history remains under `docs/archive/`; focused rationale and primary-source traceability remain under `docs/doctoring/`.
 
 ## Unreleased
 
 ### Added
 
-- Added `IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabel`, `IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelObservation`, and immutable snapshot/receipt as a successor to converter-function auto-extension dependency evidence.
-- The observation preserves the complete same-generation PostgreSQL `pg_seclabel` provider/label map for each exact FROM SQL / TO SQL converter function. Empty and populated maps, multiple providers, exact provider identity, and exact provider-owned label text remain distinct.
-- Added focused hostile contracts covering MAC-labeled versus unlabeled functions, deterministic provider ordering, raw empty/whitespace-bearing label text, blank/duplicate provider rejection, completeness, duplicate coordinates, exact converter binding, immutable raw converter-root propagation, collision-safe provenance, and exact receipt lookup.
-- Restacked transform-object extension membership on the converter security-label successor so label-based security state cannot disappear from the final transform-object lifecycle digest.
-- Added `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-security-label-integrity.md` with PostgreSQL 18 `SECURITY LABEL`, `pg_seclabel`, and `sepgsql` primary-source traceability.
+- Added `IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeType`, `IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant`, `IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial`, observation, immutable snapshot, and receipt as a successor to converter-function security-label evidence.
+- The observation preserves exact absence versus presence of the same-generation converter-function `pg_init_privs` row, exact `privtype` (`i`/`e`), and a canonical privacy-preserving identity for the complete object-level initial EXECUTE ACL.
+- Added hostile contracts covering absent versus extension-provided baselines, `initdb` versus extension `privtype`, deterministic ACL ordering, duplicate ACL rejection, blank resolved roles, completeness, duplicate coordinates, exact converter binding, immutable raw converter-root propagation, collision-safe provenance, and exact receipt lookup.
+- Restacked transform-object extension membership on the converter initial-privilege successor so recovery/dump semantics cannot disappear from the final transform-object lifecycle digest.
+- Added `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-initial-privileges-integrity.md` with PostgreSQL 18 `pg_init_privs`, extension packaging, GRANT, and `pg_dump` primary-source traceability.
 
 ### Correctness
 
-- PostgreSQL security labels are now represented separately from owner, EXECUTE ACL, `SECURITY DEFINER`, leakproofness, extension membership, and `DEPENDS ON EXTENSION` edges. Label-based MAC therefore no longer collapses into discretionary privilege state.
-- Provider order is canonicalized only for deterministic set/map identity. Label text is not trimmed, parsed, or interpreted because PostgreSQL delegates validity and meaning to the registered provider. Duplicate provider rows fail closed because PostgreSQL permits at most one label per provider per object.
-- The security-label successor retains complete converter coordinates, direction, exact converter schema/function binding, same-generation source metadata, and the immutable raw `converter_snapshot_digest`.
-- Transform-object extension membership now uses the security-label snapshot as its digest predecessor while still proving that predecessor's immutable raw converter root equals the separately supplied raw transform-converter snapshot before checking complete direction/function binding.
-- Converter-function `deptype='e'`, converter-function `deptype='x'`, converter-function security labels, and transform-object `deptype='e'` remain separate Source Observation facts. Provider policy, SELinux policy, extension-owned metadata, package inventory, and application metadata remain outside ConceptWeave.
+- PostgreSQL initial privileges are now represented separately from current `pg_proc.proacl`. Two converter functions may have the same current ACL while carrying different initial privilege baselines, which changes the GRANT/REVOKE reconstruction PostgreSQL emits for extension dump/restore.
+- Row absence remains distinct from a present `pg_init_privs` row. Present rows distinguish `privtype='i'` from `privtype='e'` even when their initial ACLs are otherwise identical.
+- The initial ACL is canonicalized only for deterministic set identity. PUBLIC versus named-role grantee, exact same-generation grantor identity, and grant option remain identity-bearing; duplicate ACL entries fail closed.
+- The successor retains complete converter coordinates, direction, exact converter schema/function binding, same-generation source metadata, and the immutable raw `converter_snapshot_digest`.
+- Transform-object extension membership now uses the initial-privilege snapshot as its digest predecessor while still proving that predecessor's immutable raw converter root equals the separately supplied raw transform-converter snapshot before checking complete direction/function binding.
+- Converter current ACL, `deptype='e'`, complete `deptype='x'` sets, security labels, initial privilege baselines, and transform-object `deptype='e'` remain separate Source Observation facts. Extension package/control/update scripts, role-membership policy, package inventory, and application metadata remain outside ConceptWeave.
 
 ### Test and repair evidence
 
-- Security-label finding review: `5254227769`.
-- Structural RED: `49059a31e9445f364fca190dba5b049a440e78e1`, which referenced the not-yet-existing public security-label contract.
-- Production successor: `58abc98906919ca803adb4bbe3f197df61ffc37c`.
-- Public composition: `0b1a513c6c4ca50353160b986e70a088381360e6`.
-- Transform-object production restack: `03d434c88e1251d6d28977be4805738c374d183b`.
-- Transform-object contract restack: `e764a73751bb88fd362fbc5af4948691d8dd02aa`.
-- Retained direction/function/raw-root hostile lineage restack: `c52fce2d4ea782e83bae4b31636335ad8c417a06`.
-- Duplicate-provider test correction: `f4c0ce73237062b2a28b2f0ee69731d72ab6853b`.
-- Focused primary-source doctoring: `f93c699a0da1be463593b2aff1bcbf565a1924bc`.
-- The structural RED was real at its commit because the public security-label types did not yet exist. Later source commits satisfy that compile-level contract; source repair itself is not native or hosted GREEN evidence.
+- Initial-privilege finding review: `5254405649`.
+- Structural RED: `6a16b6c314e9ba6f9b8a2038055713c62e4cefab`, which referenced the not-yet-existing public initial-privilege contract.
+- Production successor: `c94caa8a1da7088c819b802a87588ba303edcf55`.
+- Public composition: `1ba7f86bb62c399f334b823ed51bad651e398f24`.
+- Transform-object production restack: `50dddc811bacc301fc36f0d7b5bddd3a6a51fd18`.
+- Transform-object contract restack: `34c8611f0c75723bdebc82e0e84fa67a92856604`.
+- Retained direction/function/raw-root hostile lineage restack: `a1c35b715e56f5a62813ba60e65d0ba6a80ba418`.
+- Focused primary-source doctoring: `df88a83cb3606ac89bd0b2ec47fa6d4abae0e123`.
+- The structural RED was real at its commit because the public initial-privilege types did not yet exist. Later source commits satisfy that compile-level contract; source repair itself is not native or hosted GREEN evidence.
 - No native or hosted GREEN is claimed after source or documentation movement. Rust 1.98 fmt, strict workspace/all-target Clippy, focused/retained/workspace/doc tests, release build, rustdoc, owned production statement/branch/edge coverage, and the PostgreSQL 18 bounded live differential remain exact-head gates.
 
 ### Retained
 
-- All previously valid ordinary-EXCLUDE authority remains in force, including exact converter definition/owner/ACL/config/security/planner/cost/shape facts, raw nullable `proargmodes`, raw nullable `proargnames`, raw nullable converter-function `protrftypes`, converter-function `deptype='e'` membership, complete converter-function `deptype='x'` dependency sets, immutable raw converter-root lineage, and independent transform-object extension membership.
-- Source Observation stores provider/label state as raw external truth. Later validation may reject a label or require a known provider, but observation must not normalize or reinterpret provider-owned label semantics.
+- All previously valid ordinary-EXCLUDE authority remains in force, including exact converter definition/owner/current-ACL/config/security/planner/cost/shape facts, raw nullable `proargmodes`, raw nullable `proargnames`, raw nullable converter-function `protrftypes`, converter-function `deptype='e'` membership, complete converter-function `deptype='x'` dependency sets, security-label maps, immutable raw converter-root lineage, and independent transform-object extension membership.
+- Source Observation stores initial privilege state as exact external recovery truth. Later validation/publication may impose authorization policy, but observation must not reconstruct `pg_init_privs` from current ACL, extension membership, package state, or names.
 - #45 and #6 remain source-stable and may adopt #46 only after complete child acceptance; partial cherry-pick or independent reimplementation is not a successor.
 
 ### Canonical-owner coordination
