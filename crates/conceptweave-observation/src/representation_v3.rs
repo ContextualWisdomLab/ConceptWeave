@@ -11,7 +11,6 @@ use std::collections::BTreeSet;
 use conceptweave_source_port::AuthorizedObservationRequest;
 use sha2::{Digest, Sha256};
 
-use crate::column_identity::validate_postgresql_identifier;
 use crate::model::{
     ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType, ForeignKeyReferenceBehavior,
     ObservationError, TableConstraintObservation, escape_json_pointer_token, validate_nonblank,
@@ -43,8 +42,8 @@ impl QualifiedTypeName {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let type_name = type_name.into();
-        validate_postgresql_identifier(&schema_name, "schema_name")?;
-        validate_postgresql_identifier(&type_name, "type_name")?;
+        validate_nonblank(&schema_name, "schema_name")?;
+        validate_nonblank(&type_name, "type_name")?;
         Ok(Self {
             schema_name,
             type_name,
@@ -79,8 +78,8 @@ impl QualifiedCollationName {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let collation_name = collation_name.into();
-        validate_postgresql_identifier(&schema_name, "schema_name")?;
-        validate_postgresql_identifier(&collation_name, "collation_name")?;
+        validate_nonblank(&schema_name, "schema_name")?;
+        validate_nonblank(&collation_name, "collation_name")?;
         Ok(Self {
             schema_name,
             collation_name,
@@ -120,8 +119,8 @@ impl QualifiedOperatorClassName {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let operator_class_name = operator_class_name.into();
-        validate_postgresql_identifier(&schema_name, "schema_name")?;
-        validate_postgresql_identifier(&operator_class_name, "operator_class_name")?;
+        validate_nonblank(&schema_name, "schema_name")?;
+        validate_nonblank(&operator_class_name, "operator_class_name")?;
         Ok(Self {
             schema_name,
             operator_class_name,
@@ -240,7 +239,7 @@ impl IndexTablespace {
 
     fn new(name: impl Into<String>, database_default: bool) -> Result<Self, ObservationError> {
         let name = name.into();
-        validate_postgresql_identifier(&name, "index_tablespace_name")?;
+        validate_nonblank(&name, "index_tablespace_name")?;
         Ok(Self {
             name,
             database_default,
@@ -426,7 +425,7 @@ impl ColumnObservationV3 {
     ) -> Result<Self, ObservationError> {
         let column_name = column_name.into();
         let data_type = data_type.into();
-        validate_postgresql_identifier(&column_name, "column_name")?;
+        validate_nonblank(&column_name, "column_name")?;
         if ordinal_position == 0 {
             return Err(ObservationError::InvalidOrdinalPosition);
         }
@@ -540,7 +539,7 @@ impl IndexAttributeObservation {
         if position == 0 {
             return Err(ObservationError::InvalidOrdinalPosition);
         }
-        validate_postgresql_identifier(&attribute_name, "attribute_name")?;
+        validate_nonblank(&attribute_name, "attribute_name")?;
         Ok(Self {
             position,
             kind,
@@ -717,7 +716,7 @@ impl IndexObservation {
         mut include_attributes: Vec<IndexAttributeObservation>,
     ) -> Result<Self, ObservationError> {
         let index_name = index_name.into();
-        validate_postgresql_identifier(&index_name, "index_name")?;
+        validate_nonblank(&index_name, "index_name")?;
         if !is_unique && nulls_not_distinct == Some(true) {
             return Err(ObservationError::InvalidObservationField {
                 field: "nulls_not_distinct",
@@ -1015,7 +1014,7 @@ impl DomainCheckConstraintObservation {
     ) -> Result<Self, ObservationError> {
         let constraint_name = constraint_name.into();
         let check_definition = check_definition.into();
-        validate_postgresql_identifier(&constraint_name, "constraint_name")?;
+        validate_nonblank(&constraint_name, "constraint_name")?;
         validate_nonblank(&check_definition, "check_definition")?;
         Ok(Self {
             constraint_name,
@@ -1077,8 +1076,8 @@ impl DomainObservation {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let domain_name = domain_name.into();
-        validate_postgresql_identifier(&schema_name, "schema_name")?;
-        validate_postgresql_identifier(&domain_name, "domain_name")?;
+        validate_nonblank(&schema_name, "schema_name")?;
+        validate_nonblank(&domain_name, "domain_name")?;
         Ok(Self {
             schema_name,
             domain_name,
@@ -1241,8 +1240,8 @@ impl EnumObservation {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let enum_name = enum_name.into();
-        validate_postgresql_identifier(&schema_name, "schema_name")?;
-        validate_postgresql_identifier(&enum_name, "enum_name")?;
+        validate_nonblank(&schema_name, "schema_name")?;
+        validate_nonblank(&enum_name, "enum_name")?;
         let mut seen_labels = BTreeSet::new();
         for label in &labels {
             if !seen_labels.insert(label.as_str()) {
@@ -1322,8 +1321,8 @@ impl RelationObservation {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let relation_name = relation_name.into();
-        validate_postgresql_identifier(&schema_name, "schema_name")?;
-        validate_postgresql_identifier(&relation_name, "relation_name")?;
+        validate_nonblank(&schema_name, "schema_name")?;
+        validate_nonblank(&relation_name, "relation_name")?;
 
         let mut column_names = BTreeSet::new();
         let mut ordinal_positions = BTreeSet::new();
@@ -1575,7 +1574,7 @@ impl SchemaObjectLocation {
         kind: RelationKind,
     ) -> Result<Self, ObservationError> {
         let relation_name = relation_name.into();
-        validate_postgresql_identifier(&relation_name, "relation_name")?;
+        validate_nonblank(&relation_name, "relation_name")?;
         Self::new(
             schema_name,
             SchemaObjectElement::Relation {
@@ -1594,8 +1593,8 @@ impl SchemaObjectLocation {
     ) -> Result<Self, ObservationError> {
         let relation_name = relation_name.into();
         let column_name = column_name.into();
-        validate_postgresql_identifier(&relation_name, "relation_name")?;
-        validate_postgresql_identifier(&column_name, "column_name")?;
+        validate_nonblank(&relation_name, "relation_name")?;
+        validate_nonblank(&column_name, "column_name")?;
         Self::new(
             schema_name,
             SchemaObjectElement::Column {
@@ -1615,8 +1614,8 @@ impl SchemaObjectLocation {
     ) -> Result<Self, ObservationError> {
         let relation_name = relation_name.into();
         let constraint_name = constraint_name.into();
-        validate_postgresql_identifier(&relation_name, "relation_name")?;
-        validate_postgresql_identifier(&constraint_name, "constraint_name")?;
+        validate_nonblank(&relation_name, "relation_name")?;
+        validate_nonblank(&constraint_name, "constraint_name")?;
         Self::new(
             schema_name,
             SchemaObjectElement::Constraint {
@@ -1636,8 +1635,8 @@ impl SchemaObjectLocation {
     ) -> Result<Self, ObservationError> {
         let relation_name = relation_name.into();
         let index_name = index_name.into();
-        validate_postgresql_identifier(&relation_name, "relation_name")?;
-        validate_postgresql_identifier(&index_name, "index_name")?;
+        validate_nonblank(&relation_name, "relation_name")?;
+        validate_nonblank(&index_name, "index_name")?;
         Self::new(
             schema_name,
             SchemaObjectElement::Index {
@@ -1654,7 +1653,7 @@ impl SchemaObjectLocation {
         domain_name: impl Into<String>,
     ) -> Result<Self, ObservationError> {
         let domain_name = domain_name.into();
-        validate_postgresql_identifier(&domain_name, "domain_name")?;
+        validate_nonblank(&domain_name, "domain_name")?;
         Self::new(schema_name, SchemaObjectElement::Domain(domain_name))
     }
 
@@ -1667,7 +1666,7 @@ impl SchemaObjectLocation {
         enum_name: impl Into<String>,
     ) -> Result<Self, ObservationError> {
         let enum_name = enum_name.into();
-        validate_postgresql_identifier(&enum_name, "enum_name")?;
+        validate_nonblank(&enum_name, "enum_name")?;
         Self::new(schema_name, SchemaObjectElement::Enum(enum_name))
     }
 
@@ -1676,7 +1675,7 @@ impl SchemaObjectLocation {
         element: SchemaObjectElement,
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
-        validate_postgresql_identifier(&schema_name, "schema_name")?;
+        validate_nonblank(&schema_name, "schema_name")?;
         Ok(Self {
             schema_name,
             element,
@@ -1709,8 +1708,8 @@ impl SchemaObjectLocation {
     #[must_use]
     pub fn relation_kind(&self) -> Option<RelationKind> {
         match &self.element {
-            SchemaObjectElement::Relation { kind, .. } => Some(*kind),
-            SchemaObjectElement::Column { kind, .. }
+            SchemaObjectElement::Relation { kind, .. }
+            | SchemaObjectElement::Column { kind, .. }
             | SchemaObjectElement::Constraint { kind, .. }
             | SchemaObjectElement::Index { kind, .. } => Some(*kind),
             SchemaObjectElement::Domain(_) | SchemaObjectElement::Enum(_) => None,
@@ -1746,7 +1745,9 @@ impl SchemaObjectLocation {
     #[must_use]
     pub fn constraint_name(&self) -> Option<&str> {
         match &self.element {
-            SchemaObjectElement::Constraint { constraint_name, .. } => Some(constraint_name),
+            SchemaObjectElement::Constraint {
+                constraint_name, ..
+            } => Some(constraint_name),
             SchemaObjectElement::Relation { .. }
             | SchemaObjectElement::Column { .. }
             | SchemaObjectElement::Index { .. }
@@ -1802,27 +1803,42 @@ impl SchemaObjectLocation {
     #[must_use]
     pub fn canonical_location(&self) -> String {
         match &self.element {
-            SchemaObjectElement::Relation { relation_name, kind } => format!(
+            SchemaObjectElement::Relation {
+                relation_name,
+                kind,
+            } => format!(
                 "/schemas/{}/relations/{}/{}",
                 escape_json_pointer_token(&self.schema_name),
                 kind.token(),
                 escape_json_pointer_token(relation_name)
             ),
-            SchemaObjectElement::Column { relation_name, kind, column_name } => format!(
+            SchemaObjectElement::Column {
+                relation_name,
+                kind,
+                column_name,
+            } => format!(
                 "/schemas/{}/relations/{}/{}/columns/{}",
                 escape_json_pointer_token(&self.schema_name),
                 kind.token(),
                 escape_json_pointer_token(relation_name),
                 escape_json_pointer_token(column_name)
             ),
-            SchemaObjectElement::Constraint { relation_name, kind, constraint_name } => format!(
+            SchemaObjectElement::Constraint {
+                relation_name,
+                kind,
+                constraint_name,
+            } => format!(
                 "/schemas/{}/relations/{}/{}/constraints/{}",
                 escape_json_pointer_token(&self.schema_name),
                 kind.token(),
                 escape_json_pointer_token(relation_name),
                 escape_json_pointer_token(constraint_name)
             ),
-            SchemaObjectElement::Index { relation_name, kind, index_name } => format!(
+            SchemaObjectElement::Index {
+                relation_name,
+                kind,
+                index_name,
+            } => format!(
                 "/schemas/{}/relations/{}/{}/indexes/{}",
                 escape_json_pointer_token(&self.schema_name),
                 kind.token(),
@@ -1872,7 +1888,8 @@ fn canonicalize_snapshot_objects(
     mut enums: Vec<EnumObservation>,
 ) -> Result<CanonicalSnapshotObjects, ObservationError> {
     relations.sort_by(|left, right| {
-        (left.schema_name(), left.relation_name()).cmp(&(right.schema_name(), right.relation_name()))
+        (left.schema_name(), left.relation_name())
+            .cmp(&(right.schema_name(), right.relation_name()))
     });
     for pair in relations.windows(2) {
         let (left, right) = (&pair[0], &pair[1]);
@@ -1912,7 +1929,8 @@ fn canonicalize_snapshot_objects(
 
     if let Some(domain) = domains.iter().find(|domain| {
         enums.iter().any(|observed_enum| {
-            observed_enum.schema_name == domain.schema_name && observed_enum.enum_name == domain.domain_name
+            observed_enum.schema_name == domain.schema_name
+                && observed_enum.enum_name == domain.domain_name
         })
     }) {
         return Err(ObservationError::DuplicateSchemaTypeName {
@@ -1924,9 +1942,11 @@ fn canonicalize_snapshot_objects(
     if let Some(relation) = relations.iter().find(|relation| {
         relation_has_row_type(relation.kind)
             && (domains.iter().any(|domain| {
-                domain.schema_name == relation.schema_name && domain.domain_name == relation.relation_name
+                domain.schema_name == relation.schema_name
+                    && domain.domain_name == relation.relation_name
             }) || enums.iter().any(|observed_enum| {
-                observed_enum.schema_name == relation.schema_name && observed_enum.enum_name == relation.relation_name
+                observed_enum.schema_name == relation.schema_name
+                    && observed_enum.enum_name == relation.relation_name
             }))
     }) {
         return Err(ObservationError::DuplicateSchemaTypeName {
@@ -1942,7 +1962,8 @@ fn canonicalize_snapshot_objects(
         domains.iter().any(|domain| {
             domain.schema_name == binding.schema_name && domain.domain_name == binding.type_name
         }) || enums.iter().any(|observed_enum| {
-            observed_enum.schema_name == binding.schema_name && observed_enum.enum_name == binding.type_name
+            observed_enum.schema_name == binding.schema_name
+                && observed_enum.enum_name == binding.type_name
         }) || relations.iter().any(|relation| {
             relation_has_row_type(relation.kind)
                 && relation.schema_name == binding.schema_name
@@ -1972,7 +1993,11 @@ fn canonicalize_snapshot_objects(
         }
     }
 
-    Ok(CanonicalSnapshotObjects { relations, domains, enums })
+    Ok(CanonicalSnapshotObjects {
+        relations,
+        domains,
+        enums,
+    })
 }
 
 /// Immutable receipt binding one exact successor coordinate to snapshot provenance.
@@ -1989,22 +2014,39 @@ pub struct SuccessorSourceReceipt {
 impl SuccessorSourceReceipt {
     /// Returns the stable source reference used by candidate evidence binding.
     #[must_use]
-    pub fn source_id(&self) -> &str { &self.source_id }
+    pub fn source_id(&self) -> &str {
+        &self.source_id
+    }
+
     /// Returns the opaque immutable connection-policy revision used for this observation.
     #[must_use]
-    pub fn connection_policy_binding(&self) -> &str { &self.connection_policy_binding }
+    pub fn connection_policy_binding(&self) -> &str {
+        &self.connection_policy_binding
+    }
+
     /// Returns the immutable canonical successor snapshot digest.
     #[must_use]
-    pub fn source_digest(&self) -> &str { &self.source_digest }
+    pub fn source_digest(&self) -> &str {
+        &self.source_digest
+    }
+
     /// Returns the exact extractor implementation/configuration revision.
     #[must_use]
-    pub fn extractor_revision(&self) -> &str { &self.extractor_revision }
+    pub fn extractor_revision(&self) -> &str {
+        &self.extractor_revision
+    }
+
     /// Returns the exact UTC observation-time evidence supplied by the adapter.
     #[must_use]
-    pub fn observed_at_utc(&self) -> &str { &self.observed_at_utc }
+    pub fn observed_at_utc(&self) -> &str {
+        &self.observed_at_utc
+    }
+
     /// Returns the verified exact successor source coordinate inside the snapshot.
     #[must_use]
-    pub const fn location(&self) -> &SchemaObjectLocation { &self.location }
+    pub const fn location(&self) -> &SchemaObjectLocation {
+        &self.location
+    }
 }
 
 /// Immutable evidence that one bounded PostgreSQL schema snapshot was observed.
@@ -2027,6 +2069,14 @@ pub struct PostgresSchemaSnapshotV3 {
 
 impl PostgresSchemaSnapshotV3 {
     /// Creates a deterministic successor snapshot from already-bounded, authorized source metadata.
+    ///
+    /// Collection order is canonicalized by exact qualified identifier before the digest is
+    /// computed. Exact UTF-8 source text is preserved without Unicode, case, or quoting
+    /// normalization. The complete registry-authorized request is required so every observed local
+    /// schema can be checked against the exact request allowlist before immutable evidence or
+    /// receipts are created, and so the authorized immutable connection-policy binding is retained
+    /// as provenance. The observation time remains explicit provenance and must use the canonical
+    /// UTC form enforced by the underlying observation contract.
     pub fn new(
         authorized_request: &AuthorizedObservationRequest,
         extractor_revision: impl Into<String>,
@@ -2036,32 +2086,52 @@ impl PostgresSchemaSnapshotV3 {
         enums: Vec<EnumObservation>,
     ) -> Result<Self, ObservationError> {
         let allowed_schema_names = authorized_request.request().allowed_schema_names();
-        let is_allowed = |schema_name: &str| allowed_schema_names.iter().any(|allowed| allowed == schema_name);
+        let is_allowed = |schema_name: &str| {
+            allowed_schema_names
+                .iter()
+                .any(|allowed| allowed == schema_name)
+        };
         for relation in &relations {
             if !is_allowed(relation.schema_name()) {
-                return Err(ObservationError::InvalidObservationField { field: "unauthorized_schema_name" });
+                return Err(ObservationError::InvalidObservationField {
+                    field: "unauthorized_schema_name",
+                });
             }
         }
         for domain in &domains {
             if !is_allowed(domain.schema_name()) {
-                return Err(ObservationError::InvalidObservationField { field: "unauthorized_schema_name" });
+                return Err(ObservationError::InvalidObservationField {
+                    field: "unauthorized_schema_name",
+                });
             }
         }
         for observed_enum in &enums {
             if !is_allowed(observed_enum.schema_name()) {
-                return Err(ObservationError::InvalidObservationField { field: "unauthorized_schema_name" });
+                return Err(ObservationError::InvalidObservationField {
+                    field: "unauthorized_schema_name",
+                });
             }
         }
 
-        let CanonicalSnapshotObjects { relations, domains, enums } = canonicalize_snapshot_objects(relations, domains, enums)?;
+        let CanonicalSnapshotObjects {
+            relations,
+            domains,
+            enums,
+        } = canonicalize_snapshot_objects(relations, domains, enums)?;
         let snapshot_digest = compute_snapshot_digest_v3(&relations, &domains, &enums);
         let extractor_revision = extractor_revision.into();
         let observed_at_utc = observed_at_utc.into();
         validate_nonblank(&extractor_revision, "extractor_revision")?;
         validate_observed_at_utc(&observed_at_utc)?;
         Ok(Self {
-            source_connection_key: authorized_request.source_connection().source_connection_key().to_owned(),
-            connection_policy_binding: authorized_request.source_connection().connection_policy_binding().to_owned(),
+            source_connection_key: authorized_request
+                .source_connection()
+                .source_connection_key()
+                .to_owned(),
+            connection_policy_binding: authorized_request
+                .source_connection()
+                .connection_policy_binding()
+                .to_owned(),
             snapshot_digest,
             extractor_revision,
             observed_at_utc,
@@ -2071,26 +2141,63 @@ impl PostgresSchemaSnapshotV3 {
         })
     }
 
+    /// Returns the stable source-connection registry reference, never a credential.
     #[must_use]
-    pub fn source_connection_key(&self) -> &str { &self.source_connection_key }
-    #[must_use]
-    pub fn connection_policy_binding(&self) -> &str { &self.connection_policy_binding }
-    #[must_use]
-    pub fn snapshot_digest(&self) -> &str { &self.snapshot_digest }
-    #[must_use]
-    pub fn extractor_revision(&self) -> &str { &self.extractor_revision }
-    #[must_use]
-    pub fn observed_at_utc(&self) -> &str { &self.observed_at_utc }
-    #[must_use]
-    pub fn relations(&self) -> &[RelationObservation] { &self.relations }
-    #[must_use]
-    pub fn domains(&self) -> &[DomainObservation] { &self.domains }
-    #[must_use]
-    pub fn enums(&self) -> &[EnumObservation] { &self.enums }
+    pub fn source_connection_key(&self) -> &str {
+        &self.source_connection_key
+    }
 
-    pub fn source_receipt(&self, location: SchemaObjectLocation) -> Result<SuccessorSourceReceipt, ObservationError> {
+    /// Returns the opaque immutable connection-policy revision authorized for this snapshot.
+    #[must_use]
+    pub fn connection_policy_binding(&self) -> &str {
+        &self.connection_policy_binding
+    }
+
+    /// Returns the owner-computed canonical SHA-256 successor source-content digest.
+    #[must_use]
+    pub fn snapshot_digest(&self) -> &str {
+        &self.snapshot_digest
+    }
+
+    /// Returns the exact extractor implementation/configuration revision.
+    #[must_use]
+    pub fn extractor_revision(&self) -> &str {
+        &self.extractor_revision
+    }
+
+    /// Returns the exact UTC observation-time evidence supplied by the adapter.
+    #[must_use]
+    pub fn observed_at_utc(&self) -> &str {
+        &self.observed_at_utc
+    }
+
+    /// Returns qualified relations in deterministic exact-identifier order.
+    #[must_use]
+    pub fn relations(&self) -> &[RelationObservation] {
+        &self.relations
+    }
+
+    /// Returns qualified domains in deterministic exact-identifier order.
+    #[must_use]
+    pub fn domains(&self) -> &[DomainObservation] {
+        &self.domains
+    }
+
+    /// Returns qualified enums in deterministic exact-identifier order.
+    #[must_use]
+    pub fn enums(&self) -> &[EnumObservation] {
+        &self.enums
+    }
+
+    /// Issues provenance for an exact successor coordinate only when it exists in this snapshot.
+    pub fn source_receipt(
+        &self,
+        location: SchemaObjectLocation,
+    ) -> Result<SuccessorSourceReceipt, ObservationError> {
         if !self.contains_location(&location) {
-            return Err(ObservationError::UnknownObservationLocation { location: location.canonical_location() });
+            return Err(ObservationError::UnknownObservationLocation {
+                location: location.canonical_location(),
+            });
         }
         Ok(SuccessorSourceReceipt {
             source_id: self.source_connection_key.clone(),
@@ -2103,43 +2210,82 @@ impl PostgresSchemaSnapshotV3 {
     }
 
     fn contains_location(&self, location: &SchemaObjectLocation) -> bool {
-        let relation_matches = |relation_name: &str, kind: RelationKind| self.relations.iter().any(|relation| {
-            relation.schema_name == location.schema_name && relation.relation_name == relation_name && relation.kind == kind
-        });
-        let find_relation = |relation_name: &str, kind: RelationKind| self.relations.iter().find(|relation| {
-            relation.schema_name == location.schema_name && relation.relation_name == relation_name && relation.kind == kind
-        });
+        let relation_matches = |relation_name: &str, kind: RelationKind| {
+            self.relations.iter().any(|relation| {
+                relation.schema_name == location.schema_name
+                    && relation.relation_name == relation_name
+                    && relation.kind == kind
+            })
+        };
+        let find_relation = |relation_name: &str, kind: RelationKind| {
+            self.relations.iter().find(|relation| {
+                relation.schema_name == location.schema_name
+                    && relation.relation_name == relation_name
+                    && relation.kind == kind
+            })
+        };
 
         match &location.element {
-            SchemaObjectElement::Relation { relation_name, kind } => relation_matches(relation_name, *kind),
-            SchemaObjectElement::Column { relation_name, kind, column_name } => find_relation(relation_name, *kind).is_some_and(|relation| {
-                relation.columns.iter().any(|column| column.column_name == *column_name)
+            SchemaObjectElement::Relation {
+                relation_name,
+                kind,
+            } => relation_matches(relation_name, *kind),
+            SchemaObjectElement::Column {
+                relation_name,
+                kind,
+                column_name,
+            } => find_relation(relation_name, *kind).is_some_and(|relation| {
+                relation
+                    .columns
+                    .iter()
+                    .any(|column| column.column_name == *column_name)
             }),
-            SchemaObjectElement::Constraint { relation_name, kind, constraint_name } => find_relation(relation_name, *kind).is_some_and(|relation| {
-                relation.constraints.iter().any(|constraint| constraint.constraint_name() == constraint_name)
+            SchemaObjectElement::Constraint {
+                relation_name,
+                kind,
+                constraint_name,
+            } => find_relation(relation_name, *kind).is_some_and(|relation| {
+                relation
+                    .constraints
+                    .iter()
+                    .any(|constraint| constraint.constraint_name() == constraint_name)
             }),
-            SchemaObjectElement::Index { relation_name, kind, index_name } => find_relation(relation_name, *kind).is_some_and(|relation| {
-                relation.indexes.iter().any(|index| index.index_name() == index_name)
+            SchemaObjectElement::Index {
+                relation_name,
+                kind,
+                index_name,
+            } => find_relation(relation_name, *kind).is_some_and(|relation| {
+                relation
+                    .indexes
+                    .iter()
+                    .any(|index| index.index_name() == index_name)
             }),
             SchemaObjectElement::Domain(domain_name) => self.domains.iter().any(|domain| {
                 domain.schema_name == location.schema_name && domain.domain_name == *domain_name
             }),
             SchemaObjectElement::Enum(enum_name) => self.enums.iter().any(|observed_enum| {
-                observed_enum.schema_name == location.schema_name && observed_enum.enum_name == *enum_name
+                observed_enum.schema_name == location.schema_name
+                    && observed_enum.enum_name == *enum_name
             }),
         }
     }
 }
 
-fn compute_snapshot_digest_v3(relations: &[RelationObservation], domains: &[DomainObservation], enums: &[EnumObservation]) -> String {
+fn compute_snapshot_digest_v3(
+    relations: &[RelationObservation],
+    domains: &[DomainObservation],
+    enums: &[EnumObservation],
+) -> String {
     let mut hasher = Sha256::new();
     encode_bytes(&mut hasher, SNAPSHOT_DIGEST_DOMAIN_V3);
+
     encode_len(&mut hasher, relations.len());
     for relation in relations {
         encode_str(&mut hasher, relation.schema_name());
         encode_str(&mut hasher, relation.relation_name());
         hasher.update([relation.kind().tag()]);
         encode_optional_str(&mut hasher, relation.source_comment());
+
         encode_len(&mut hasher, relation.columns().len());
         for column in relation.columns() {
             encode_str(&mut hasher, column.column_name());
@@ -2150,11 +2296,18 @@ fn compute_snapshot_digest_v3(relations: &[RelationObservation], domains: &[Doma
             encode_bool(&mut hasher, column.nullable());
             encode_optional_str(&mut hasher, column.source_comment());
         }
+
         encode_len(&mut hasher, relation.constraints().len());
-        for constraint in relation.constraints() { encode_constraint(&mut hasher, constraint); }
+        for constraint in relation.constraints() {
+            encode_constraint(&mut hasher, constraint);
+        }
+
         encode_len(&mut hasher, relation.indexes().len());
-        for index in relation.indexes() { encode_index(&mut hasher, index); }
+        for index in relation.indexes() {
+            encode_index(&mut hasher, index);
+        }
     }
+
     encode_len(&mut hasher, domains.len());
     for domain in domains {
         encode_str(&mut hasher, domain.schema_name());
@@ -2163,9 +2316,15 @@ fn compute_snapshot_digest_v3(relations: &[RelationObservation], domains: &[Doma
         encode_str(&mut hasher, domain.base_type().type_name());
         encode_optional_i32(&mut hasher, domain.type_modifier());
         encode_optional_u32(&mut hasher, domain.array_dimensions());
-        encode_optional_qualified_name(&mut hasher, domain.collation().map(|collation| (collation.schema_name(), collation.collation_name())));
+        encode_optional_qualified_name(
+            &mut hasher,
+            domain
+                .collation()
+                .map(|collation| (collation.schema_name(), collation.collation_name())),
+        );
         encode_optional_bool(&mut hasher, domain.not_null());
         encode_optional_str(&mut hasher, domain.default_expression());
+
         encode_len(&mut hasher, domain.check_constraints().len());
         for check_constraint in domain.check_constraints() {
             encode_str(&mut hasher, check_constraint.constraint_name());
@@ -2175,6 +2334,7 @@ fn compute_snapshot_digest_v3(relations: &[RelationObservation], domains: &[Doma
         }
         encode_optional_str(&mut hasher, domain.source_comment());
     }
+
     encode_len(&mut hasher, enums.len());
     for observed_enum in enums {
         encode_str(&mut hasher, observed_enum.schema_name());
@@ -2182,6 +2342,7 @@ fn compute_snapshot_digest_v3(relations: &[RelationObservation], domains: &[Doma
         encode_str_slice(&mut hasher, observed_enum.labels());
         encode_optional_str(&mut hasher, observed_enum.source_comment());
     }
+
     let digest = hasher.finalize();
     let mut encoded = String::with_capacity("sha256:".len() + digest.len() * 2);
     encoded.push_str("sha256:");
@@ -2196,16 +2357,34 @@ fn compute_snapshot_digest_v3(relations: &[RelationObservation], domains: &[Doma
 fn encode_constraint(hasher: &mut Sha256, constraint: &TableConstraintObservation) {
     match constraint {
         TableConstraintObservation::PrimaryKey(observation) => {
-            hasher.update([0]); encode_str(hasher, observation.constraint_name()); encode_str_slice(hasher, observation.column_names());
+            hasher.update([0]);
+            encode_str(hasher, observation.constraint_name());
+            encode_str_slice(hasher, observation.column_names());
         }
         TableConstraintObservation::Unique(observation) => {
-            hasher.update([1]); encode_str(hasher, observation.constraint_name()); encode_str_slice(hasher, observation.column_names()); encode_optional_bool(hasher, observation.nulls_not_distinct());
+            hasher.update([1]);
+            encode_str(hasher, observation.constraint_name());
+            encode_str_slice(hasher, observation.column_names());
+            encode_optional_bool(hasher, observation.nulls_not_distinct());
         }
         TableConstraintObservation::ForeignKey(observation) => {
-            hasher.update([2]); encode_str(hasher, observation.constraint_name()); encode_str_slice(hasher, observation.column_names()); encode_str(hasher, observation.referenced_schema_name()); encode_str(hasher, observation.referenced_table_name()); encode_str_slice(hasher, observation.referenced_column_names()); encode_reference_behavior(hasher, observation.reference_behavior()); encode_optional_bool(hasher, observation.validated()); encode_optional_bool(hasher, observation.enforced());
+            hasher.update([2]);
+            encode_str(hasher, observation.constraint_name());
+            encode_str_slice(hasher, observation.column_names());
+            encode_str(hasher, observation.referenced_schema_name());
+            encode_str(hasher, observation.referenced_table_name());
+            encode_str_slice(hasher, observation.referenced_column_names());
+            encode_reference_behavior(hasher, observation.reference_behavior());
+            encode_optional_bool(hasher, observation.validated());
+            encode_optional_bool(hasher, observation.enforced());
         }
         TableConstraintObservation::Check(observation) => {
-            hasher.update([3]); encode_str(hasher, observation.constraint_name()); encode_str(hasher, observation.definition()); encode_bool(hasher, observation.validated()); encode_bool(hasher, observation.enforced()); encode_bool(hasher, observation.no_inherit());
+            hasher.update([3]);
+            encode_str(hasher, observation.constraint_name());
+            encode_str(hasher, observation.definition());
+            encode_bool(hasher, observation.validated());
+            encode_bool(hasher, observation.enforced());
+            encode_bool(hasher, observation.no_inherit());
         }
     }
 }
@@ -2216,44 +2395,94 @@ fn encode_index(hasher: &mut Sha256, index: &IndexObservation) {
     encode_optional_bool(hasher, index.nulls_not_distinct());
     match index.catalog_flags() {
         None => hasher.update([0]),
-        Some(flags) => { hasher.update([1]); encode_bool(hasher, flags.primary()); encode_bool(hasher, flags.exclusion()); encode_bool(hasher, flags.immediate()); encode_bool(hasher, flags.clustered()); encode_bool(hasher, flags.check_xmin()); encode_bool(hasher, flags.replica_identity()); }
+        Some(flags) => {
+            hasher.update([1]);
+            encode_bool(hasher, flags.primary());
+            encode_bool(hasher, flags.exclusion());
+            encode_bool(hasher, flags.immediate());
+            encode_bool(hasher, flags.clustered());
+            encode_bool(hasher, flags.check_xmin());
+            encode_bool(hasher, flags.replica_identity());
+        }
     }
     match index.storage_options() {
         None => hasher.update([0]),
-        Some(options) => { hasher.update([1]); encode_len(hasher, options.len()); for option in options { encode_str(hasher, option.name()); encode_str(hasher, option.value()); } }
+        Some(options) => {
+            hasher.update([1]);
+            encode_len(hasher, options.len());
+            for option in options {
+                encode_str(hasher, option.name());
+                encode_str(hasher, option.value());
+            }
+        }
     }
     match index.tablespace() {
         None => hasher.update([0]),
-        Some(tablespace) => { hasher.update([1]); encode_bool(hasher, tablespace.is_database_default()); encode_str(hasher, tablespace.name()); }
+        Some(tablespace) => {
+            hasher.update([1]);
+            encode_bool(hasher, tablespace.is_database_default());
+            encode_str(hasher, tablespace.name());
+        }
     }
     encode_optional_str(hasher, index.access_method());
-    encode_len(hasher, index.key_attributes().len()); for attribute in index.key_attributes() { encode_index_attribute(hasher, attribute); }
-    encode_len(hasher, index.include_attributes().len()); for attribute in index.include_attributes() { encode_index_attribute(hasher, attribute); }
+
+    encode_len(hasher, index.key_attributes().len());
+    for attribute in index.key_attributes() {
+        encode_index_attribute(hasher, attribute);
+    }
+
+    encode_len(hasher, index.include_attributes().len());
+    for attribute in index.include_attributes() {
+        encode_index_attribute(hasher, attribute);
+    }
+
     let key_semantics = index.key_semantics().unwrap_or_default();
-    encode_len(hasher, key_semantics.len()); for record in key_semantics { encode_index_key_semantics(hasher, record); }
+    encode_len(hasher, key_semantics.len());
+    for record in key_semantics {
+        encode_index_key_semantics(hasher, record);
+    }
+
     encode_optional_str(hasher, index.predicate());
-    encode_optional_bool(hasher, index.ready()); encode_optional_bool(hasher, index.valid()); encode_optional_bool(hasher, index.live());
-    encode_optional_str(hasher, index.index_definition()); encode_optional_str(hasher, index.source_comment());
+    encode_optional_bool(hasher, index.ready());
+    encode_optional_bool(hasher, index.valid());
+    encode_optional_bool(hasher, index.live());
+    encode_optional_str(hasher, index.index_definition());
+    encode_optional_str(hasher, index.source_comment());
 }
 
 fn encode_index_key_semantics(hasher: &mut Sha256, semantics: &IndexKeySemantics) {
     hasher.update(semantics.position().to_be_bytes());
     match semantics.collation() {
         None => hasher.update([0]),
-        Some(collation) => { hasher.update([1]); encode_str(hasher, collation.schema_name()); encode_str(hasher, collation.collation_name()); }
+        Some(collation) => {
+            hasher.update([1]);
+            encode_str(hasher, collation.schema_name());
+            encode_str(hasher, collation.collation_name());
+        }
     }
     let operator_class = semantics.operator_class();
-    encode_str(hasher, operator_class.schema_name()); encode_str(hasher, operator_class.operator_class_name());
+    encode_str(hasher, operator_class.schema_name());
+    encode_str(hasher, operator_class.operator_class_name());
     hasher.update(semantics.access_method_options().to_be_bytes());
     encode_len(hasher, semantics.operator_class_options().len());
-    for option in semantics.operator_class_options() { encode_str(hasher, option.name()); encode_str(hasher, option.value()); }
+    for option in semantics.operator_class_options() {
+        encode_str(hasher, option.name());
+        encode_str(hasher, option.value());
+    }
 }
 
 fn encode_index_attribute(hasher: &mut Sha256, attribute: &IndexAttributeObservation) {
-    hasher.update(attribute.position().to_be_bytes()); hasher.update([attribute.kind().tag()]);
+    hasher.update(attribute.position().to_be_bytes());
+    hasher.update([attribute.kind().tag()]);
     match &attribute.source {
-        IndexAttributeSource::Column(attribute_name) => { hasher.update([0]); encode_str(hasher, attribute_name); }
-        IndexAttributeSource::Expression(expression) => { hasher.update([1]); encode_str(hasher, expression); }
+        IndexAttributeSource::Column(attribute_name) => {
+            hasher.update([0]);
+            encode_str(hasher, attribute_name);
+        }
+        IndexAttributeSource::Expression(expression) => {
+            hasher.update([1]);
+            encode_str(hasher, expression);
+        }
     }
 }
 
@@ -2264,7 +2493,13 @@ fn encode_reference_behavior(hasher: &mut Sha256, behavior: Option<&ForeignKeyRe
             hasher.update([1]);
             encode_foreign_key_action(hasher, behavior.update_action());
             encode_foreign_key_action(hasher, behavior.delete_action());
-            match behavior.delete_target_columns() { None => hasher.update([0]), Some(columns) => { hasher.update([1]); encode_str_slice(hasher, columns); } }
+            match behavior.delete_target_columns() {
+                None => hasher.update([0]),
+                Some(columns) => {
+                    hasher.update([1]);
+                    encode_str_slice(hasher, columns);
+                }
+            }
             encode_foreign_key_match_type(hasher, behavior.match_type());
             encode_foreign_key_deferrability(hasher, behavior.deferrability());
         }
@@ -2272,24 +2507,106 @@ fn encode_reference_behavior(hasher: &mut Sha256, behavior: Option<&ForeignKeyRe
 }
 
 fn encode_foreign_key_action(hasher: &mut Sha256, action: ForeignKeyAction) {
-    let tag = match action { ForeignKeyAction::NoAction => 0, ForeignKeyAction::Restrict => 1, ForeignKeyAction::Cascade => 2, ForeignKeyAction::SetNull => 3, ForeignKeyAction::SetDefault => 4 };
+    let tag = match action {
+        ForeignKeyAction::NoAction => 0,
+        ForeignKeyAction::Restrict => 1,
+        ForeignKeyAction::Cascade => 2,
+        ForeignKeyAction::SetNull => 3,
+        ForeignKeyAction::SetDefault => 4,
+    };
     hasher.update([tag]);
 }
+
 fn encode_foreign_key_match_type(hasher: &mut Sha256, match_type: ForeignKeyMatchType) {
-    let tag = match match_type { ForeignKeyMatchType::Simple => 0, ForeignKeyMatchType::Full => 1, ForeignKeyMatchType::Partial => 2 };
+    let tag = match match_type {
+        ForeignKeyMatchType::Simple => 0,
+        ForeignKeyMatchType::Full => 1,
+        ForeignKeyMatchType::Partial => 2,
+    };
     hasher.update([tag]);
 }
+
 fn encode_foreign_key_deferrability(hasher: &mut Sha256, deferrability: ForeignKeyDeferrability) {
-    let tag = match deferrability { ForeignKeyDeferrability::NotDeferrable => 0, ForeignKeyDeferrability::InitiallyImmediate => 1, ForeignKeyDeferrability::InitiallyDeferred => 2 };
+    let tag = match deferrability {
+        ForeignKeyDeferrability::NotDeferrable => 0,
+        ForeignKeyDeferrability::InitiallyImmediate => 1,
+        ForeignKeyDeferrability::InitiallyDeferred => 2,
+    };
     hasher.update([tag]);
 }
-fn encode_optional_bool(hasher: &mut Sha256, value: Option<bool>) { match value { None => hasher.update([0]), Some(value) => { hasher.update([1]); encode_bool(hasher, value); } } }
-fn encode_optional_str(hasher: &mut Sha256, value: Option<&str>) { match value { None => hasher.update([0]), Some(value) => { hasher.update([1]); encode_str(hasher, value); } } }
-fn encode_optional_i32(hasher: &mut Sha256, value: Option<i32>) { match value { None => hasher.update([0]), Some(value) => { hasher.update([1]); hasher.update(value.to_be_bytes()); } } }
-fn encode_optional_u32(hasher: &mut Sha256, value: Option<u32>) { match value { None => hasher.update([0]), Some(value) => { hasher.update([1]); hasher.update(value.to_be_bytes()); } } }
-fn encode_optional_qualified_name(hasher: &mut Sha256, value: Option<(&str, &str)>) { match value { None => hasher.update([0]), Some((namespace, name)) => { hasher.update([1]); encode_str(hasher, namespace); encode_str(hasher, name); } } }
-fn encode_str_slice(hasher: &mut Sha256, values: &[String]) { encode_len(hasher, values.len()); for value in values { encode_str(hasher, value); } }
-fn encode_str(hasher: &mut Sha256, value: &str) { encode_bytes(hasher, value.as_bytes()); }
-fn encode_bytes(hasher: &mut Sha256, value: &[u8]) { encode_len(hasher, value.len()); hasher.update(value); }
-fn encode_len(hasher: &mut Sha256, value: usize) { let value = u64::try_from(value).expect("Rust target usize must fit into canonical u64 length"); hasher.update(value.to_be_bytes()); }
-fn encode_bool(hasher: &mut Sha256, value: bool) { hasher.update([u8::from(value)]); }
+
+fn encode_optional_bool(hasher: &mut Sha256, value: Option<bool>) {
+    match value {
+        None => hasher.update([0]),
+        Some(value) => {
+            hasher.update([1]);
+            encode_bool(hasher, value);
+        }
+    }
+}
+
+fn encode_optional_str(hasher: &mut Sha256, value: Option<&str>) {
+    match value {
+        None => hasher.update([0]),
+        Some(value) => {
+            hasher.update([1]);
+            encode_str(hasher, value);
+        }
+    }
+}
+
+fn encode_optional_i32(hasher: &mut Sha256, value: Option<i32>) {
+    match value {
+        None => hasher.update([0]),
+        Some(value) => {
+            hasher.update([1]);
+            hasher.update(value.to_be_bytes());
+        }
+    }
+}
+
+fn encode_optional_u32(hasher: &mut Sha256, value: Option<u32>) {
+    match value {
+        None => hasher.update([0]),
+        Some(value) => {
+            hasher.update([1]);
+            hasher.update(value.to_be_bytes());
+        }
+    }
+}
+
+fn encode_optional_qualified_name(hasher: &mut Sha256, value: Option<(&str, &str)>) {
+    match value {
+        None => hasher.update([0]),
+        Some((namespace, name)) => {
+            hasher.update([1]);
+            encode_str(hasher, namespace);
+            encode_str(hasher, name);
+        }
+    }
+}
+
+fn encode_str_slice(hasher: &mut Sha256, values: &[String]) {
+    encode_len(hasher, values.len());
+    for value in values {
+        encode_str(hasher, value);
+    }
+}
+
+fn encode_str(hasher: &mut Sha256, value: &str) {
+    encode_bytes(hasher, value.as_bytes());
+}
+
+fn encode_bytes(hasher: &mut Sha256, value: &[u8]) {
+    encode_len(hasher, value.len());
+    hasher.update(value);
+}
+
+fn encode_len(hasher: &mut Sha256, value: usize) {
+    let value = u64::try_from(value).expect("Rust target usize must fit into canonical u64 length");
+    hasher.update(value.to_be_bytes());
+}
+
+fn encode_bool(hasher: &mut Sha256, value: bool) {
+    hasher.update([u8::from(value)]);
+}
