@@ -4,7 +4,7 @@
 
 ConceptWeave preserves exact PostgreSQL catalog identifiers. Generic presentation validation is not sufficient for this boundary because `value.trim().is_empty()` rejects a legal quoted identifier whose exact catalog value consists only of whitespace. PostgreSQL 18 §4.1.1 permits whitespace inside delimited identifiers and forbids the NUL character.
 
-The invariant is therefore field-specific: identifier values preserve source bytes, reject zero-length/NUL states, and are not trimmed, case-folded, normalized, or reinterpreted. Rendered type text, CHECK definitions, expressions, extractor revisions, and other non-identifier text retain their existing nonblank policy.
+The invariant is therefore field-specific: identifier values preserve source bytes, reject zero-length/NUL states, and are not trimmed, case-folded, normalized, or reinterpreted. Rendered type text, CHECK definitions, expressions, extractor revisions, option text, and other non-identifier text retain their existing nonblank policy.
 
 ## Exact lineage
 
@@ -21,12 +21,15 @@ The invariant is therefore field-specific: identifier values preserve source byt
 - Temporal-constraint and exclusion-operator identifiers were repaired at `4bbe2ab1438a0949a7e994e3150c0b413737c74d`.
 - Dedicated NOT NULL structural RED `7efd69164df643b2bf325207df70c93ffb6318dc` covers local and parent schema/relation/constraint/column coordinates. Production repair `6b032de91b034f9ab76541eeb1a02150dad1d1d1` applies the same identifier admission to local, parent-constraint, and partition-parent coordinates.
 - Retained catalog-family regression contract `263091310809b223881c2a54e1ee4f5fb761dbe5` covers generated-column, timing, and temporal-constraint coordinates after their repair. It is retained regression evidence, not a claim that an executed pre-fix failure was observed.
+- Legacy-model structural RED `3136e841ed925deffa904f578acc4e46c80bb763` adds coverage for v2-era column/table/constraint/foreign-key/location identifier coordinates while keeping rendered data-type and CHECK text as negative controls.
+- Production repair `b4068f5e78de4f5e76ca1eef70f17cce68b83c1c` routes those `model.rs` identifier-bearing fields through the existing exact PostgreSQL identifier predicate. `validate_nonblank()` itself is unchanged, so non-identifier text keeps the prior trim-based policy.
+- Review `5257904564` records the inspected legacy-model finding and explicitly does not backdate review evidence ahead of the RED/fix commits.
 
 ## Current status
 
-The repair is materially broader but still not systemic GREEN. `model.rs` and `representation_v3.rs` retain identifier-bearing call sites that use generic trim-based `validate_nonblank()`. The remaining repair must separate those identifier call sites from non-identifier text call sites rather than weakening the generic text validator.
+The shared legacy `model.rs` identifier boundary is now causally repaired in source, but this is still **not systemic GREEN**. `representation_v3.rs` retains identifier-bearing call sites on generic trim-based `validate_nonblank()`, including qualified type/collation/operator-class names, v3 column/relation/domain/enum/index/location coordinates, and other catalog identifiers. Those call sites must move to the same PostgreSQL-identifier rule while rendered expressions, reconstructed definitions, extractor revision, option text, and other non-identifier payloads retain their field-specific policy.
 
-The exact accepted head must independently pass repository-pinned Rust 1.98 formatting, strict Clippy, retained/workspace/doc tests, release/rustdoc, owned statement/branch/edge coverage, and a PostgreSQL 18 same-generation differential exercising quoted-whitespace identifiers and NUL rejection. No predecessor execution evidence transfers after source or documentation movement.
+The exact accepted head must independently pass repository-pinned Rust 1.98 formatting, strict Clippy, retained/workspace/doc tests, release/rustdoc, owned statement/branch/edge coverage, and a PostgreSQL 18 same-generation differential exercising quoted-whitespace identifiers and NUL rejection. The current source-level RED/fix lineage is not a claim that a failing or passing workflow was observed, and no predecessor execution evidence transfers after source or documentation movement.
 
 ## Primary authority
 
