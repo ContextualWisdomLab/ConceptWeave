@@ -186,7 +186,7 @@ fn ordinary_exclude_converter_initial_privileges_preserve_privtype_and_source_ac
 }
 
 #[test]
-fn ordinary_exclude_converter_initial_privileges_preserve_duplicate_acl_entries_and_reject_blank_roles() {
+fn ordinary_exclude_converter_initial_privileges_preserve_duplicate_acl_entries_and_postgresql_identifier_content() {
     let single = extension_initial_privileges(vec![initial_public_execute("postgres", false)]);
     let duplicate = extension_initial_privileges(vec![
         initial_public_execute("postgres", false),
@@ -198,18 +198,59 @@ fn ordinary_exclude_converter_initial_privileges_preserve_duplicate_acl_entries_
     assert_eq!(duplicate.grants()[0], duplicate.grants()[1]);
     assert_ne!(single.digest(), duplicate.digest());
 
-    let blank =
+    let quoted_whitespace =
         IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::role(
             20,
             "  ",
             10,
+            "\t",
+            false,
+        )
+        .expect("quoted PostgreSQL role identifiers may consist of whitespace");
+    assert_eq!(
+        quoted_whitespace.resolved_grantee_role_name(),
+        Some("  ")
+    );
+    assert_eq!(quoted_whitespace.resolved_grantor_role_name(), Some("\t"));
+
+    let quoted_converter =
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeObservation::new(
+            coordinate(),
+            1,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "  ",
+            "\t",
+            None,
+        )
+        .expect("quoted PostgreSQL schema and function identifiers may contain whitespace");
+    assert_eq!(quoted_converter.converter_schema_name(), "  ");
+    assert_eq!(quoted_converter.converter_function_name(), "\t");
+
+    let empty =
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::role(
+            20,
+            "",
+            10,
             "postgres",
             false,
         )
-        .expect_err("resolved grantee role must be nonblank");
+        .expect_err("zero-length PostgreSQL role identifiers remain invalid");
     assert_field(
-        blank,
+        empty,
         "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantee_role_name",
+    );
+
+    let nul =
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::public(
+            10,
+            "post\0gres",
+            false,
+        )
+        .expect_err("PostgreSQL identifiers cannot contain code zero");
+    assert_field(
+        nul,
+        "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantor_role_name",
     );
 }
 
