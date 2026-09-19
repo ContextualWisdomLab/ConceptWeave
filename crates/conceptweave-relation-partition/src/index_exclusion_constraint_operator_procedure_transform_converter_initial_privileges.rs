@@ -194,11 +194,15 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
 /// The adapter should resolve non-PUBLIC grantor/grantee OIDs against the same source generation.
 /// When a raw ACL OID has no matching role, it must preserve that nonzero OID explicitly instead of
 /// dropping the entry or converting the OID to a role-name string. Row absence is represented by
-/// `None` at the observation boundary, not by an empty material.
+/// `None` at the observation boundary, not by an empty material. Aggregate unresolved-reference
+/// counts remain visible so later deterministic validation can flag damaged recovery state without
+/// disclosing the raw OID values carried by the digest identity.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial {
     privilege_type: IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeType,
     grant_count: usize,
+    unresolved_grantee_count: usize,
+    unresolved_grantor_count: usize,
     digest: String,
 }
 
@@ -214,6 +218,25 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
                 "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grant",
             ));
         }
+
+        let unresolved_grantee_count = grants
+            .iter()
+            .filter(|grant| {
+                matches!(
+                    grant.grantee,
+                    TransformConverterInitialExecuteGrantee::UnresolvedRoleOid(_)
+                )
+            })
+            .count();
+        let unresolved_grantor_count = grants
+            .iter()
+            .filter(|grant| {
+                matches!(
+                    grant.grantor,
+                    TransformConverterInitialExecuteGrantor::UnresolvedRoleOid(_)
+                )
+            })
+            .count();
 
         let mut hasher = Sha256::new();
         hasher.update(
@@ -251,6 +274,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
         Ok(Self {
             privilege_type,
             grant_count: grants.len(),
+            unresolved_grantee_count,
+            unresolved_grantor_count,
             digest: format!("{SHA256_DIGEST_PREFIX}{:x}", hasher.finalize()),
         })
     }
@@ -267,6 +292,18 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
     #[must_use]
     pub const fn grant_count(&self) -> usize {
         self.grant_count
+    }
+
+    /// Returns how many initial EXECUTE grants contain an unresolved non-PUBLIC grantee OID.
+    #[must_use]
+    pub const fn unresolved_grantee_count(&self) -> usize {
+        self.unresolved_grantee_count
+    }
+
+    /// Returns how many initial EXECUTE grants contain an unresolved grantor OID.
+    #[must_use]
+    pub const fn unresolved_grantor_count(&self) -> usize {
+        self.unresolved_grantor_count
     }
 
     /// Returns the privacy-preserving digest of exact `privtype` plus initial EXECUTE ACL.
