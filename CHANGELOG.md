@@ -9,13 +9,17 @@ The Source Observation decision surface before the dangling-role diagnostic-proj
 - Retained the converter-function `pg_init_privs` successor: exact row absence/presence, `privtype` (`i`/`e`), complete object-level initial EXECUTE ACL, immutable receipt/snapshot, exact converter binding, and raw converter-root lineage remain authoritative.
 - Retained hostile dangling-role identity coverage for catalog states where an initial ACL still refers to a role OID after the role no longer exists.
 - Added privacy-preserving dangling-role diagnostic projections: `unresolved_grantee_count()` and `unresolved_grantor_count()` expose whether deterministic validation has recovery damage to act on without publishing raw dangling OID values.
+- Added `IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeRecoveryValidation` and `validate_index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_recovery()`. Row absence and fully resolved material validate `Ready`; any unresolved grantee or grantor reference validates `Blocked` with aggregate counts only.
+- Added the focused RED contract `index_exclusion_constraint_operator_procedure_transform_converter_initial_privileges_validation_contract.rs` so the validation boundary is exercised through the public crate surface rather than inferred from observation diagnostics.
+- Added `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-initial-privilege-recovery-validation.md` to trace the observation-versus-validation decision and recovery/publication gate.
 - Updated `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-initial-privileges-dangling-role-integrity.md` with PostgreSQL 18 catalog-source authority, BUG #19483/#19513, and the diagnostic-projection repair trace.
 
 ### Correctness
 
 - `IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant` continues to preserve nonzero dangling grantee/grantor OIDs as raw unresolved identities rather than requiring role lookup or stringifying the OID as a role name.
-- `IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial` now exposes unresolved grantee/grantor counts derived from the canonical initial ACL. Before this repair, the digest committed to dangling OIDs but downstream `validate`/recovery diagnostics could not determine from the immutable observation whether unresolved role references existed.
-- Derived unresolved-reference counts do not enter the digest. Existing resolved and unresolved ACL digest identity remains byte-for-byte stable; raw dangling OIDs remain committed inside the privacy-preserving digest rather than becoming a public diagnostic data surface.
+- `IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial` exposes unresolved grantee/grantor counts derived from the canonical initial ACL. Before this repair, the digest committed to dangling OIDs but downstream recovery governance could not determine from the immutable observation whether unresolved role references existed.
+- The new recovery validator closes the remaining governance gap: callers no longer need to invent policy for the aggregate diagnostics. Any nonzero unresolved-reference count deterministically blocks recovery/publication readiness, while legitimate row absence remains ready.
+- Derived unresolved-reference counts and the validation verdict do not enter the Source Observation digest. Existing resolved and unresolved ACL digest identity remains byte-for-byte stable; raw dangling OIDs remain committed inside the privacy-preserving digest rather than becoming a public diagnostic data surface.
 - Resolved role names and unresolved OIDs remain separate identity namespaces. A real role named `"16424"` does not alias raw dangling OID `16424`.
 - PUBLIC remains a grantee-only identity. OID zero is rejected by unresolved-role constructors and is never treated as a dangling role.
 - Current `pg_proc.proacl`, converter-function `deptype='e'`, complete `deptype='x'` sets, security labels, exact `pg_init_privs` baseline, immutable raw converter root, and transform-object `deptype='e'` remain separate facts.
@@ -26,7 +30,11 @@ The Source Observation decision surface before the dangling-role diagnostic-proj
 - Diagnostic-projection finding review: `5254787838` at exact pre-finding head `8348be96316f625525b3d89abb732e952c0240e5`.
 - Diagnostic structural RED: `6d5796fd2e2b1aa6d1df70ee380a76b24731f04a`; the dangling-role contract referenced unresolved-reference count accessors before production exposed them.
 - Diagnostic production causal repair: `fde6d3a8776b75e3dd014713b671734b9226a0fe`.
-- The focused contract requires resolved-only `0/0`, dangling grantee `1/0`, dangling grantor `0/1`, both dangling `1/1`, and PUBLIC with dangling grantor `0/1`.
+- Validation-boundary finding review: `5254918439` at exact pre-finding head `b88836369e5481f8f91eda86003af979f28bc7c9`.
+- Validation structural RED: `21817d01f0aaa69902699eb21109c2a057401a8c`; the public contract referenced the missing recovery validator before production defined or exported it.
+- Validation production repair: `97ff3903278bafbd2133a88ded475ca481e8b1b7`; public composition/export: `da84d2afc99d41f7af9273cd192047704d779a47`.
+- The focused diagnostic contract requires resolved-only `0/0`, dangling grantee `1/0`, dangling grantor `0/1`, both dangling `1/1`, and PUBLIC with dangling grantor `0/1`.
+- The focused validation contract requires row absence and resolved material to be `Ready`, any unresolved dimension to be `Blocked`, and public validation diagnostics to omit raw OID values.
 - Pre-diagnostic archives were created ordinary-forward as `docs/archive/CHANGELOG-through-8348be96.md` and `docs/archive/product-technical-gap-baseline-through-8348be96.md`.
 - Source/documentation repair itself is not native or hosted GREEN evidence. Exact-head Rust 1.98 fmt, strict workspace/all-target Clippy, focused/retained/workspace/doc tests, release build, rustdoc, owned production statement/branch/edge coverage, and PostgreSQL 18 bounded live differential remain gates.
 
