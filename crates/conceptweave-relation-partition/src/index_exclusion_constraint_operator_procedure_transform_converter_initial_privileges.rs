@@ -3,15 +3,11 @@
 //! Current `pg_proc.proacl` does not preserve the privilege baseline used by PostgreSQL extension
 //! dump/restore. `pg_init_privs` records non-default initial privileges set by `initdb` or an
 //! extension script. PostgreSQL `pg_dump` compares current privileges with that baseline when it
-//! emits the GRANT/REVOKE state needed to reconstruct extension objects. PostgreSQL also treats ACL
-//! array order as recovery-significant because grants with grant option must precede dependent
-//! grants, so this successor preserves the exact source-array order instead of normalizing it.
-//! This successor therefore preserves row absence versus presence, exact `privtype`, and the complete
-//! object-level EXECUTE ACL, including repeated source entries, for every exact converter-function
-//! direction without inferring the baseline from current ACL, extension membership, package state,
-//! or names. Existing catalog damage can leave ACL grantor or grantee OIDs dangling after a role
-//! disappears, so unresolved raw OIDs remain distinct from resolved role names instead of making the
-//! source observation itself impossible.
+//! emits the GRANT/REVOKE state needed to reconstruct extension objects. PostgreSQL ACLITEM identity
+//! is OID-based, while role names are separate catalog attributes; same-generation resolved role OIDs
+//! therefore remain part of the private evidence even when a readable role name is available.
+//! Source-array order and multiplicity are preserved because restore clients can depend on grant
+//! ordering and PostgreSQL does not impose an ACLITEM uniqueness invariant.
 
 use std::{collections::BTreeSet, fmt};
 
@@ -24,8 +20,8 @@ use super::{
     IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelSnapshot,
 };
 
-const INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_INITIAL_PRIVILEGE_MATERIAL_DIGEST_DOMAIN_V1: &[u8] =
-    b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.exclusion_constraint.operator.procedure.transform_converter.initial_privilege.material.v1";
+const INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_INITIAL_PRIVILEGE_MATERIAL_DIGEST_DOMAIN_V2: &[u8] =
+    b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.exclusion_constraint.operator.procedure.transform_converter.initial_privilege.material.v2";
 const INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_INITIAL_PRIVILEGE_DIGEST_DOMAIN_V1: &[u8] =
     b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.exclusion_constraint.operator.procedure.transform_converter.initial_privilege.v1";
 const SHA256_DIGEST_PREFIX: &str = "sha256:";
@@ -82,22 +78,39 @@ impl fmt::Debug for TransformConverterInitialExecuteGrantor {
 
 /// One object-level `EXECUTE` ACL entry from converter-function `pg_init_privs.initprivs`.
 ///
-/// Routine `Debug` output preserves grant shape and resolved role names but never renders unresolved
-/// raw role OIDs. Exact unresolved identifiers remain available only through the purpose-bound
-/// material and recovery-validation path.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+/// Resolved roles retain both their exact same-generation OID and readable name. The OIDs are private
+/// identity material: routine accessors and `Debug` expose names and resolution state, not numeric OIDs.
+#[derive(Clone, Eq, Ord, PartialEq, PartialOrd)]
 pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant {
     grantee: TransformConverterInitialExecuteGrantee,
     grantor: TransformConverterInitialExecuteGrantor,
+    resolved_grantee_role_oid: Option<u32>,
+    resolved_grantor_role_oid: Option<u32>,
     grant_option: bool,
 }
 
+impl fmt::Debug for IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant")
+            .field("grantee", &self.grantee)
+            .field("grantor", &self.grantor)
+            .field("grant_option", &self.grant_option)
+            .finish()
+    }
+}
+
 impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant {
-    /// Records an initial `EXECUTE` grant to `PUBLIC` with its exact resolved grantor role.
+    /// Records an initial `EXECUTE` grant to `PUBLIC` with the exact resolved grantor identity.
     pub fn public(
+        grantor_role_oid: u32,
         grantor_role_name: impl Into<String>,
         grant_option: bool,
     ) -> Result<Self, ObservationError> {
+        validate_nonzero_role_oid(
+            grantor_role_oid,
+            "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantor_role_oid",
+        )?;
         let grantor_role_name = grantor_role_name.into();
         validate_nonblank(
             &grantor_role_name,
@@ -106,6 +119,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
         Ok(Self {
             grantee: TransformConverterInitialExecuteGrantee::Public,
             grantor: TransformConverterInitialExecuteGrantor::Role(grantor_role_name),
+            resolved_grantee_role_oid: None,
+            resolved_grantor_role_oid: Some(grantor_role_oid),
             grant_option,
         })
     }
@@ -122,16 +137,28 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
         Ok(Self {
             grantee: TransformConverterInitialExecuteGrantee::Public,
             grantor: TransformConverterInitialExecuteGrantor::UnresolvedRoleOid(grantor_role_oid),
+            resolved_grantee_role_oid: None,
+            resolved_grantor_role_oid: None,
             grant_option,
         })
     }
 
-    /// Records an initial `EXECUTE` grant to one resolved role with its exact resolved grantor role.
+    /// Records an initial `EXECUTE` grant to one resolved role with its exact resolved grantor.
     pub fn role(
+        grantee_role_oid: u32,
         grantee_role_name: impl Into<String>,
+        grantor_role_oid: u32,
         grantor_role_name: impl Into<String>,
         grant_option: bool,
     ) -> Result<Self, ObservationError> {
+        validate_nonzero_role_oid(
+            grantee_role_oid,
+            "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantee_role_oid",
+        )?;
+        validate_nonzero_role_oid(
+            grantor_role_oid,
+            "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantor_role_oid",
+        )?;
         let grantee_role_name = grantee_role_name.into();
         let grantor_role_name = grantor_role_name.into();
         validate_nonblank(
@@ -145,41 +172,55 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
         Ok(Self {
             grantee: TransformConverterInitialExecuteGrantee::Role(grantee_role_name),
             grantor: TransformConverterInitialExecuteGrantor::Role(grantor_role_name),
+            resolved_grantee_role_oid: Some(grantee_role_oid),
+            resolved_grantor_role_oid: Some(grantor_role_oid),
             grant_option,
         })
     }
 
     /// Records a resolved grantee whose raw grantor OID no longer resolves to a role.
     pub fn role_with_unresolved_grantor_oid(
+        grantee_role_oid: u32,
         grantee_role_name: impl Into<String>,
         grantor_role_oid: u32,
         grant_option: bool,
     ) -> Result<Self, ObservationError> {
-        let grantee_role_name = grantee_role_name.into();
-        validate_nonblank(
-            &grantee_role_name,
-            "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantee_role_name",
+        validate_nonzero_role_oid(
+            grantee_role_oid,
+            "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantee_role_oid",
         )?;
         validate_nonzero_role_oid(
             grantor_role_oid,
             "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantor_role_oid",
         )?;
+        let grantee_role_name = grantee_role_name.into();
+        validate_nonblank(
+            &grantee_role_name,
+            "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantee_role_name",
+        )?;
         Ok(Self {
             grantee: TransformConverterInitialExecuteGrantee::Role(grantee_role_name),
             grantor: TransformConverterInitialExecuteGrantor::UnresolvedRoleOid(grantor_role_oid),
+            resolved_grantee_role_oid: Some(grantee_role_oid),
+            resolved_grantor_role_oid: None,
             grant_option,
         })
     }
 
-    /// Records an unresolved raw grantee OID with an exact resolved grantor role.
+    /// Records an unresolved raw grantee OID with an exact resolved grantor identity.
     pub fn unresolved_grantee_oid(
         grantee_role_oid: u32,
+        grantor_role_oid: u32,
         grantor_role_name: impl Into<String>,
         grant_option: bool,
     ) -> Result<Self, ObservationError> {
         validate_nonzero_role_oid(
             grantee_role_oid,
             "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantee_role_oid",
+        )?;
+        validate_nonzero_role_oid(
+            grantor_role_oid,
+            "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grantor_role_oid",
         )?;
         let grantor_role_name = grantor_role_name.into();
         validate_nonblank(
@@ -189,6 +230,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
         Ok(Self {
             grantee: TransformConverterInitialExecuteGrantee::UnresolvedRoleOid(grantee_role_oid),
             grantor: TransformConverterInitialExecuteGrantor::Role(grantor_role_name),
+            resolved_grantee_role_oid: None,
+            resolved_grantor_role_oid: Some(grantor_role_oid),
             grant_option,
         })
     }
@@ -210,6 +253,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
         Ok(Self {
             grantee: TransformConverterInitialExecuteGrantee::UnresolvedRoleOid(grantee_role_oid),
             grantor: TransformConverterInitialExecuteGrantor::UnresolvedRoleOid(grantor_role_oid),
+            resolved_grantee_role_oid: None,
+            resolved_grantor_role_oid: None,
             grant_option,
         })
     }
@@ -220,7 +265,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
         matches!(self.grantee, TransformConverterInitialExecuteGrantee::Public)
     }
 
-    /// Returns the resolved grantee role name, when this is a role grant with a live role lookup.
+    /// Returns the resolved grantee role name, when same-generation role lookup succeeded.
     #[must_use]
     pub fn resolved_grantee_role_name(&self) -> Option<&str> {
         match &self.grantee {
@@ -239,7 +284,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
         )
     }
 
-    /// Returns the resolved grantor role name when the same-generation role lookup succeeded.
+    /// Returns the resolved grantor role name when same-generation role lookup succeeded.
     #[must_use]
     pub fn resolved_grantor_role_name(&self) -> Option<&str> {
         match &self.grantor {
@@ -266,14 +311,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
 
 /// Privacy-conscious identity for one present converter-function `pg_init_privs` row.
 ///
-/// The adapter should resolve non-PUBLIC grantor/grantee OIDs against the same source generation.
-/// When a raw ACL OID has no matching role, it must preserve that nonzero OID explicitly instead of
-/// dropping the entry or converting the OID to a role-name string. Row absence is represented by
-/// `None` at the observation boundary, not by an empty material. PostgreSQL ACL array order and
-/// multiplicity are kept byte-semantically significant because source observation must remain
-/// lossless even when a catalog contains repeated entries. Exact unresolved role identifiers remain
-/// privately retained for the recovery-validation boundary while routine `Debug` output shows only
-/// aggregate counts and the immutable material digest.
+/// Resolved and unresolved ACL role identities are retained exactly. Source ACL order and
+/// multiplicity remain significant. Routine `Debug` reports only aggregate damage counts and digest.
 #[derive(Clone, Eq, PartialEq)]
 pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial {
     privilege_type: IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeType,
@@ -300,7 +339,7 @@ impl fmt::Debug for IndexExclusionConstraintOperatorProcedureTransformConverterI
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial {
-    /// Reduces exact `privtype` and source-order object-level EXECUTE grants to a stable digest.
+    /// Reduces exact `privtype` and source-order object-level EXECUTE grants to a stable v2 digest.
     pub fn new(
         privilege_type: IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeType,
         grants: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant>,
@@ -308,9 +347,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
         let unresolved_grantee_oids = grants
             .iter()
             .filter_map(|grant| match &grant.grantee {
-                TransformConverterInitialExecuteGrantee::UnresolvedRoleOid(role_oid) => {
-                    Some(*role_oid)
-                }
+                TransformConverterInitialExecuteGrantee::UnresolvedRoleOid(role_oid) => Some(*role_oid),
                 TransformConverterInitialExecuteGrantee::Public
                 | TransformConverterInitialExecuteGrantee::Role(_) => None,
             })
@@ -320,9 +357,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
         let unresolved_grantor_oids = grants
             .iter()
             .filter_map(|grant| match &grant.grantor {
-                TransformConverterInitialExecuteGrantor::UnresolvedRoleOid(role_oid) => {
-                    Some(*role_oid)
-                }
+                TransformConverterInitialExecuteGrantor::UnresolvedRoleOid(role_oid) => Some(*role_oid),
                 TransformConverterInitialExecuteGrantor::Role(_) => None,
             })
             .collect::<BTreeSet<_>>()
@@ -331,7 +366,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
 
         let mut hasher = Sha256::new();
         hasher.update(
-            INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_INITIAL_PRIVILEGE_MATERIAL_DIGEST_DOMAIN_V1,
+            INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_INITIAL_PRIVILEGE_MATERIAL_DIGEST_DOMAIN_V2,
         );
         encode_str(&mut hasher, privilege_type.token());
         encode_len(&mut hasher, grants.len());
@@ -340,6 +375,10 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
                 TransformConverterInitialExecuteGrantee::Public => hasher.update([0]),
                 TransformConverterInitialExecuteGrantee::Role(role_name) => {
                     hasher.update([1]);
+                    let role_oid = grant.resolved_grantee_role_oid.expect(
+                        "resolved grantee construction always retains its same-generation OID",
+                    );
+                    hasher.update(role_oid.to_be_bytes());
                     encode_str(&mut hasher, role_name);
                 }
                 TransformConverterInitialExecuteGrantee::UnresolvedRoleOid(role_oid) => {
@@ -349,13 +388,15 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
             }
             match &grant.grantor {
                 TransformConverterInitialExecuteGrantor::Role(role_name) => {
+                    hasher.update([0]);
+                    let role_oid = grant.resolved_grantor_role_oid.expect(
+                        "resolved grantor construction always retains its same-generation OID",
+                    );
+                    hasher.update(role_oid.to_be_bytes());
                     encode_str(&mut hasher, role_name);
                 }
                 TransformConverterInitialExecuteGrantor::UnresolvedRoleOid(role_oid) => {
-                    // Keep the historical resolved-role framing byte-for-byte stable. `u64::MAX`
-                    // cannot be a realizable Rust string length and therefore safely reserves the
-                    // grantor namespace for an unresolved raw OID without aliasing a role name.
-                    hasher.update(u64::MAX.to_be_bytes());
+                    hasher.update([1]);
                     hasher.update(role_oid.to_be_bytes());
                 }
             }
@@ -383,11 +424,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
 
     /// Returns the complete object-level EXECUTE ACL in exact PostgreSQL source-array order.
     ///
-    /// Source order and multiplicity are intentionally not canonicalized. PostgreSQL restore clients
-    /// can rely on grant-option providers appearing before dependent grants, and PostgreSQL's ACL
-    /// validator does not impose a uniqueness invariant on the array. Resolved role names, PUBLIC
-    /// shape and grant-option state remain directly inspectable. Raw dangling OIDs remain private
-    /// here and are exposed only by receipt-bound recovery validation.
+    /// Resolved names, PUBLIC shape and grant-option state are directly inspectable. Numeric role OIDs
+    /// stay private and participate in immutable identity rather than routine diagnostics.
     #[must_use]
     pub fn grants(
         &self,
