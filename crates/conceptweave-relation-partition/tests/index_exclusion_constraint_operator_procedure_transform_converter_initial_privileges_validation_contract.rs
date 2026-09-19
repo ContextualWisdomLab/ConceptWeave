@@ -5,7 +5,11 @@
 
 include!("index_exclusion_constraint_operator_procedure_transform_converter_initial_privileges_contract.rs");
 
-use conceptweave_relation_partition::validate_index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_recovery;
+use conceptweave_relation_partition::{
+    validate_index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_recovery,
+    IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeRecoveryValidation,
+    IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSourceReceipt,
+};
 
 fn initial_privilege_snapshot_with_materials(
     from_sql: Option<IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial>,
@@ -28,6 +32,25 @@ fn initial_privilege_snapshot_with_materials(
         ],
     )
     .expect("valid initial privilege snapshot")
+}
+
+fn assert_exact_receipt_binding(
+    validation: &IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeRecoveryValidation,
+    receipt: &IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSourceReceipt,
+) {
+    assert_eq!(validation.source_id(), receipt.source_id());
+    assert_eq!(
+        validation.connection_policy_binding(),
+        receipt.connection_policy_binding()
+    );
+    assert_eq!(validation.source_digest(), receipt.source_digest());
+    assert_eq!(validation.extractor_revision(), receipt.extractor_revision());
+    assert_eq!(validation.observed_at_utc(), receipt.observed_at_utc());
+    assert_eq!(
+        validation.canonical_location(),
+        receipt.location().canonical_location()
+    );
+    assert!(validation.matches_source_receipt(receipt));
 }
 
 #[test]
@@ -69,13 +92,11 @@ fn initial_privilege_recovery_validation_binds_identical_material_to_exact_obser
     assert!(from_validation.is_ready());
     assert!(to_validation.is_ready());
     assert_eq!(from_validation.material_digest(), to_validation.material_digest());
-    assert_eq!(from_validation.source_digest(), snapshot.snapshot_digest());
-    assert_eq!(to_validation.source_digest(), snapshot.snapshot_digest());
-    assert_ne!(
-        from_validation.canonical_location(),
-        to_validation.canonical_location(),
-        "byte-identical ACL material at two converter directions must remain distinct validation evidence"
-    );
+    assert_exact_receipt_binding(&from_validation, &from_receipt);
+    assert_exact_receipt_binding(&to_validation, &to_receipt);
+    assert_ne!(from_validation.canonical_location(), to_validation.canonical_location());
+    assert!(!from_validation.matches_source_receipt(&to_receipt));
+    assert!(!to_validation.matches_source_receipt(&from_receipt));
 }
 
 #[test]
@@ -122,10 +143,11 @@ fn initial_privilege_recovery_validation_binds_same_material_to_exact_snapshot_g
         );
 
     assert_eq!(validation_a.material_digest(), validation_b.material_digest());
+    assert_exact_receipt_binding(&validation_a, &receipt_a);
+    assert_exact_receipt_binding(&validation_b, &receipt_b);
     assert_ne!(validation_a.source_digest(), validation_b.source_digest());
-    assert_eq!(validation_a.source_digest(), generation_a.snapshot_digest());
-    assert_eq!(validation_b.source_digest(), generation_b.snapshot_digest());
-    assert_eq!(validation_a.canonical_location(), validation_b.canonical_location());
+    assert!(!validation_a.matches_source_receipt(&receipt_b));
+    assert!(!validation_b.matches_source_receipt(&receipt_a));
 }
 
 #[test]
@@ -160,9 +182,10 @@ fn initial_privilege_recovery_validation_binds_absence_to_exact_owner_receipt() 
     assert!(to_validation.is_ready());
     assert_eq!(from_validation.material_digest(), None);
     assert_eq!(to_validation.material_digest(), None);
-    assert_eq!(from_validation.source_digest(), snapshot.snapshot_digest());
-    assert_eq!(to_validation.source_digest(), snapshot.snapshot_digest());
-    assert_ne!(from_validation.canonical_location(), to_validation.canonical_location());
+    assert_exact_receipt_binding(&from_validation, &from_receipt);
+    assert_exact_receipt_binding(&to_validation, &to_receipt);
+    assert!(!from_validation.matches_source_receipt(&to_receipt));
+    assert!(!to_validation.matches_source_receipt(&from_receipt));
 }
 
 #[test]
@@ -197,8 +220,7 @@ fn initial_privilege_recovery_validation_blocks_damaged_receipt_without_exposing
         );
     assert!(!validation.is_ready());
     assert_eq!(validation.material_digest(), Some(expected_material_digest.as_str()));
-    assert_eq!(validation.source_digest(), snapshot.snapshot_digest());
-    assert_eq!(validation.canonical_location(), receipt.location().canonical_location());
+    assert_exact_receipt_binding(&validation, &receipt);
     assert_eq!(validation.unresolved_grantee_count(), 1);
     assert_eq!(validation.unresolved_grantor_count(), 1);
 
