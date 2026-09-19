@@ -151,23 +151,16 @@ fn ordinary_exclude_converter_security_labels_reject_blank_or_duplicate_provider
         "index_exclusion_constraint_operator_procedure_transform_converter_security_label_provider",
     );
 
-    let predecessor = converter_auto_extension_dependency_snapshot();
-    let duplicate = IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelSnapshot::new(
-        &predecessor,
+    let duplicate = IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelObservation::new(
+        coordinate(),
+        1,
+        custom_payload_type(),
+        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+        "public",
+        "payload_from_sql",
         vec![
-            converter_security_label_observation(
-                IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-                "payload_from_sql",
-                vec![
-                    converter_security_label("selinux", "first"),
-                    converter_security_label("selinux", "second"),
-                ],
-            ),
-            converter_security_label_observation(
-                IndexExclusionConstraintOperatorProcedureTransformConverterDirection::ToSql,
-                "payload_to_sql",
-                vec![],
-            ),
+            converter_security_label("selinux", "first"),
+            converter_security_label("selinux", "second"),
         ],
     )
     .expect_err("PostgreSQL permits at most one security label per provider per object");
