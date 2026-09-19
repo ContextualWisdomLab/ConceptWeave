@@ -11,6 +11,7 @@ use std::collections::BTreeSet;
 
 use sha2::{Digest, Sha256};
 
+use crate::column_identity::validate_postgresql_identifier;
 use crate::{ColumnGenerationObservation, ObservationError, RelationKind, RelationObservation};
 
 const SNAPSHOT_DIGEST_DOMAIN_V3_COLUMN_EXPRESSION_V1: &[u8] =
@@ -115,9 +116,9 @@ impl ColumnExpressionObservation {
         let schema_name = schema_name.into();
         let relation_name = relation_name.into();
         let column_name = column_name.into();
-        crate::model::validate_nonblank(&schema_name, "schema_name")?;
-        crate::model::validate_nonblank(&relation_name, "relation_name")?;
-        crate::model::validate_nonblank(&column_name, "column_name")?;
+        validate_postgresql_identifier(&schema_name, "schema_name")?;
+        validate_postgresql_identifier(&relation_name, "relation_name")?;
+        validate_postgresql_identifier(&column_name, "column_name")?;
         if let Some(value) = expression.as_deref() {
             crate::model::validate_nonblank(value, "column_expression")?;
         }
