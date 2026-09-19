@@ -106,9 +106,9 @@ impl ColumnIdentityObservation {
         let schema_name = schema_name.into();
         let relation_name = relation_name.into();
         let column_name = column_name.into();
-        crate::model::validate_nonblank(&schema_name, "schema_name")?;
-        crate::model::validate_nonblank(&relation_name, "relation_name")?;
-        crate::model::validate_nonblank(&column_name, "column_name")?;
+        validate_postgresql_identifier(&schema_name, "schema_name")?;
+        validate_postgresql_identifier(&relation_name, "relation_name")?;
+        validate_postgresql_identifier(&column_name, "column_name")?;
         Ok(Self {
             schema_name,
             relation_name,
@@ -159,6 +159,16 @@ impl ColumnIdentityObservation {
     pub const fn is_generated_by_default(&self) -> bool {
         matches!(self.mode, ColumnIdentityMode::GeneratedByDefault)
     }
+}
+
+fn validate_postgresql_identifier(
+    value: &str,
+    field: &'static str,
+) -> Result<(), ObservationError> {
+    if value.is_empty() || value.contains('\0') {
+        return Err(ObservationError::InvalidObservationField { field });
+    }
+    Ok(())
 }
 
 pub(crate) fn canonicalize_column_identities(
