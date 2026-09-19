@@ -28,6 +28,14 @@ Earlier repairs remain in force: complete material readback, source-order preser
 
 Focused doctoring is `docs/doctoring/postgresql-index-exclusion-constraint-operator-procedure-transform-converter-initial-privileges-integrity.md`; damaged-role and recovery-validation details remain in the neighboring dangling-role and recovery-validation doctoring documents.
 
+### Unresolved systemic PostgreSQL identifier boundary
+
+Review `5257069180` on predecessor exact `427587e8be39d38240e57a2ebcc9cdaf291f6ebe` established that the converter-specific repair above did not cover the shared Source Observation representation. `model::validate_nonblank()` still uses `value.trim().is_empty()` and is consumed by identifier-bearing legacy/v3 constructors. That policy rejects legal quoted PostgreSQL identifiers whose exact catalog content consists only of whitespace, while the same generic validator does not itself reject code zero.
+
+Systemic structural RED `a1638573b9d99f78c7fcd211fc93559d86d4f93a` requires `QualifiedTypeName`, `QualifiedCollationName`, `QualifiedOperatorClassName`, and `ColumnObservationV3` identifier coordinates to preserve whitespace-only quoted content byte-for-byte and to reject zero-length/code-zero identifiers. Bounded RED `9395d141c70f074a1b60ff1c5d26097973db768a` plus production repair `c2b247b24c45f9e45c90aad7b4fb68e296d0225e` applies the same exact identifier rule only to `ColumnIdentityObservation` schema/relation/column coordinates. This bounded repair is not systemic GREEN.
+
+The remaining production repair must introduce and apply a distinct PostgreSQL-identifier admission rule to identifier-bearing schema/relation/table/column/constraint/reference/type/collation/operator-class/catalog coordinates that still use presentation-oriented nonblank validation. Non-identifier fields such as rendered type text, reconstructed CHECK definitions, extractor revision, and other product metadata keep their existing field-specific nonblank policy; globally weakening `validate_nonblank()` is not an acceptable fix. Exact rationale and lineage are doctored in `docs/doctoring/postgresql-identifier-fidelity-systemic-integrity.md`.
+
 Primary authority:
 
 - PostgreSQL Global Development Group. (2026a). *PostgreSQL 18 documentation: 52.28. pg_init_privs*. https://www.postgresql.org/docs/18/catalog-pg-init-privs.html
@@ -40,22 +48,23 @@ Primary authority:
 
 ## Observation versus governance
 
-Source Observation records exact external database state before policy. A resolved role lookup enriches an ACLITEM with a readable role name; it does not replace the ACLITEM's OID identity. The immutable material therefore retains `(OID, name)` for resolved roles, raw OID for dangling roles, PUBLIC as the PostgreSQL grantee sentinel, source order, multiplicity, and grant option. Catalog identifier strings are preserved exactly rather than trimmed, case-folded, or otherwise normalized inside this boundary.
+Source Observation records exact external database state before policy. A resolved role lookup enriches an ACLITEM with a readable role name; it does not replace the ACLITEM's OID identity. The immutable material therefore retains `(OID, name)` for resolved roles, raw OID for dangling roles, PUBLIC as the PostgreSQL grantee sentinel, source order, multiplicity, and grant option. Catalog identifier strings are preserved exactly rather than trimmed, case-folded, or otherwise normalized inside this boundary. The current systemic RED shows that this invariant is not yet implemented consistently across every legacy/v3 identifier constructor.
 
 Recovery validation consumes an owner-issued source receipt, retains complete non-secret provenance and exact purpose-bound dangling-role sets, and blocks readiness whenever either dangling-role set is non-empty. ConceptWeave validates and governs publication; PostgreSQL role/catalog remediation remains outside this bounded context.
 
 ## Acceptance boundary
 
-**Source and traceability repaired is not GREEN.** The final exact head must independently demonstrate repository-pinned Rust 1.98 `fmt`, strict workspace/all-target Clippy, focused and retained tests, workspace/doc tests, release build, rustdoc, owned production statement/branch/edge coverage, and the bounded PostgreSQL 18 same-generation differential. No predecessor execution result transfers after source or documentation movement.
+**The current Source Observation head is RED / not GREEN.** In addition to exact-head execution evidence, the shared PostgreSQL identifier admission defect above requires a causal production repair. The final exact head must then independently demonstrate repository-pinned Rust 1.98 `fmt`, strict workspace/all-target Clippy, focused and retained tests, workspace/doc tests, release build, rustdoc, owned production statement/branch/edge coverage, and the bounded PostgreSQL 18 same-generation differential. No predecessor execution result transfers after source or documentation movement.
 
-The differential must resolve every selected converter and transform from one source generation and verify current function facts/ACL, extension lifecycle, complete security-label/dependency evidence, exact `pg_init_privs`, immutable raw converter-root lineage, and independent transform-object extension membership. For initial ACL evidence it must prove:
+The differential must resolve every selected converter and transform from one source generation and verify current function facts/ACL, extension lifecycle, complete security-label/dependency evidence, exact `pg_init_privs`, immutable raw converter-root lineage, and independent transform-object extension membership. For initial ACL and identifier evidence it must prove:
 
 - row absence versus present material and exact `privtype`;
 - exact source-array order and repeated-entry multiplicity;
 - PUBLIC, resolved grantee/grantor names and grant-option readback;
 - equal role names with different same-generation OIDs remain different material/source identity for both grantee and grantor;
-- legal quoted identifier content, including whitespace-only role/schema/function names, survives observation byte-for-byte rather than being rejected or trimmed;
+- legal quoted identifier content, including whitespace-only schema/relation/table/column/constraint/reference/type/collation/operator-class and converter role/schema/function names, survives observation byte-for-byte rather than being rejected or trimmed;
 - zero-length and code-zero identifiers remain rejected as impossible PostgreSQL identifier states;
+- non-identifier text validation remains unchanged by the identifier repair;
 - resolved numeric OIDs do not appear in routine grant/material `Debug`;
 - dangling grantee/grantor OIDs remain actionable only through recovery validation;
 - repeated dangling identities canonicalize only in derived remediation sets;
@@ -65,7 +74,9 @@ Synthetic Rust fixtures are unit-contract evidence only and do not substitute fo
 
 ## Residual material gap
 
-Complete ACL readability, exact OID/name identity, source order/multiplicity, exact quoted-identifier content, actionable dangling-role recovery identity, receipt binding, and routine-log safety are now represented in source and focused contracts. No further converter/transform successor is authorized merely because another catalog field or metadata row exists. A next semantic successor requires an independent buyer, semantic, security, lifecycle, recovery, or provenance distinction not represented by the current chain. Otherwise this sub-chain moves to exact-head acceptance and the PostgreSQL 18 differential.
+Within the converter/transform `pg_init_privs` slice, complete ACL readability, exact OID/name identity, source order/multiplicity, exact quoted-identifier content, actionable dangling-role recovery identity, receipt binding, and routine-log safety are represented in source and focused contracts. Across the wider Source Observation representation, PostgreSQL identifier admission remains an active RED until the shared legacy/v3 trim-based boundary is repaired and verified. No further converter/transform successor is authorized merely because another catalog field or metadata row exists.
+
+A next semantic successor requires an independent buyer, semantic, security, lifecycle, recovery, or provenance distinction not represented by the current chain. Otherwise, after the systemic identifier repair and exact-head acceptance, this sub-chain moves to complete adoption and release preparation.
 
 ## Canonical prerequisite state
 
@@ -80,4 +91,4 @@ Immediately before downstream acceptance, reread each owner PR's exact head, rev
 
 ## Required order
 
-#2271/#2268 must reach exact-head hosted acceptance and qualifying review on the accepted protected foundation. #2040 then requires its own exact-head hosted GREEN and qualifying independent approval. Only then may #35 obtain fresh compatible acceptance/normal landing. #46 requires final Rust/coverage GREEN plus the PostgreSQL 18 same-generation differential including resolved `(OID, name)` identity, source-order/multiplicity semantics, exact quoted-identifier fidelity, dangling-role recovery evidence, `Debug` redaction, and receipt-bound validation. After that, only independently proven semantic-gap work may extend the chain; otherwise #46 is completely ordinary/non-force adopted into #45, #45 obtains fresh acceptance, #6 propagates the accepted authority, and immutable governed release proceeds from an accepted protected head.
+#2271/#2268 must reach exact-head hosted acceptance and qualifying review on the accepted protected foundation. #2040 then requires its own exact-head hosted GREEN and qualifying independent approval. Only then may #35 obtain fresh compatible acceptance/normal landing. #46 must first complete the systemic PostgreSQL identifier production repair, then obtain final Rust/coverage GREEN plus the PostgreSQL 18 same-generation differential including resolved `(OID, name)` identity, source-order/multiplicity semantics, exact identifier fidelity, dangling-role recovery evidence, `Debug` redaction, and receipt-bound validation. After that, only independently proven semantic-gap work may extend the chain; otherwise #46 is completely ordinary/non-force adopted into #45, #45 obtains fresh acceptance, #6 propagates the accepted authority, and immutable governed release proceeds from an accepted protected head.
