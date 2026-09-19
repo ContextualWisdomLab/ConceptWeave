@@ -2,7 +2,7 @@ include!("index_exclusion_constraint_operator_procedure_transform_extension_memb
 
 #[test]
 fn ordinary_exclude_transform_extension_membership_rejects_same_generation_converter_direction_drift() {
-    let function_membership = converter_function_extension_membership_snapshot();
+    let function_lifecycle = converter_function_auto_extension_dependency_snapshot();
     let transform_types = selected_transform_types_predecessor();
     let definition = definition_snapshot();
     let from_sql_only = IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot::new(
@@ -25,12 +25,12 @@ fn ordinary_exclude_transform_extension_membership_rejects_same_generation_conve
     .unwrap();
 
     let error = IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapshot::new(
-        &function_membership,
+        &function_lifecycle,
         &from_sql_only,
         complete_transform_extension_membership_observations(),
     )
     .expect_err(
-        "transform-object extension membership must not combine a converter-membership predecessor with a different same-generation pg_transform direction set",
+        "transform-object extension membership must not combine a converter-lifecycle predecessor with a different same-generation pg_transform direction set",
     );
 
     assert_field(
@@ -41,7 +41,7 @@ fn ordinary_exclude_transform_extension_membership_rejects_same_generation_conve
 
 #[test]
 fn ordinary_exclude_transform_extension_membership_rejects_same_generation_converter_function_drift() {
-    let function_membership = converter_function_extension_membership_snapshot();
+    let function_lifecycle = converter_function_auto_extension_dependency_snapshot();
     let transform_types = selected_transform_types_predecessor();
     let definition = definition_snapshot();
     let drifted_converter = IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot::new(
@@ -68,7 +68,7 @@ fn ordinary_exclude_transform_extension_membership_rejects_same_generation_conve
     .unwrap();
 
     let error = IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapshot::new(
-        &function_membership,
+        &function_lifecycle,
         &drifted_converter,
         complete_transform_extension_membership_observations(),
     )
@@ -84,7 +84,7 @@ fn ordinary_exclude_transform_extension_membership_rejects_same_generation_conve
 
 #[test]
 fn ordinary_exclude_transform_extension_membership_rejects_same_name_converter_definition_drift() {
-    let function_membership = converter_function_extension_membership_snapshot();
+    let function_lifecycle = converter_function_auto_extension_dependency_snapshot();
     let transform_types = selected_transform_types_predecessor();
     let definition = definition_snapshot();
     let drifted_converter = IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot::new(
@@ -111,7 +111,7 @@ fn ordinary_exclude_transform_extension_membership_rejects_same_name_converter_d
     .unwrap();
 
     let error = IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapshot::new(
-        &function_membership,
+        &function_lifecycle,
         &drifted_converter,
         complete_transform_extension_membership_observations(),
     )
