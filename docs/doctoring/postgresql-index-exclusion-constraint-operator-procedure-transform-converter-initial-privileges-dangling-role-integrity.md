@@ -10,6 +10,8 @@ The first diagnostic repair retained only unresolved grantee/grantor counts outs
 
 A later log-safety review found one remaining escape hatch: the public ACL grant value itself still derived `Debug`, and its private unresolved-role enum variants also derived `Debug`. A caller could therefore log the raw dangling OID before the grant was reduced into the already-redacted material or recovery-validation types. The log boundary has to hold at every public routine `Debug` surface, not only after material construction.
 
+A subsequent semantic/recovery review found a different defect: material construction sorted and hashed the complete ACL but discarded the canonical grant vector afterward. The resulting material could prove that two ACLs differed, but downstream validate/review/recovery could not read the actual PUBLIC/resolved-role/grant-option/unresolved-kind semantics that the Source Observation contract claimed to preserve. A digest is integrity identity, not a substitute for evidence content.
+
 ## Source semantics
 
 `pg_init_privs` stores an `aclitem[]` initial privilege baseline for objects whose initial privileges are non-default. `privtype='i'` records an `initdb` baseline and `privtype='e'` records a baseline set during extension creation. ACL entries carry grantee and grantor identities. PUBLIC is the grantee OID zero; a grantor must identify a role.
@@ -26,11 +28,13 @@ The initial-privilege observation remains the canonical owner of the external re
 
 `IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant` preserves PUBLIC or resolved/unresolved grantee identity, resolved/unresolved grantor identity, and exact grant option. OID zero is rejected for unresolved-role constructors because zero is PUBLIC only in the grantee namespace and is not a dangling role identity. Existing resolved-role digest framing remains stable. Unresolved grantees use a separate digest tag; unresolved grantors use a reserved framing sentinel before the raw OID so they cannot collide with resolved role-name framing.
 
-`IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial` privately retains canonical sorted/deduplicated `unresolved_grantee_oids` and `unresolved_grantor_oids` in addition to the existing material digest. The material digest algorithm is unchanged and already commits every ACL identity, including raw dangling OIDs. The exact sets are therefore derived recovery evidence, not new digest identity. Aggregate count accessors are projections of those distinct canonical sets.
+`IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial` now retains the complete already-canonicalized grant vector as immutable evidence in addition to the stable material digest and canonical dangling-role sets. `grants()` returns those grants in deterministic order. Grant accessors expose PUBLIC shape, resolved grantee/grantor names, unresolved-role presence, and grant option without exposing the numeric dangling OID. Exact missing OIDs remain purpose-bound to recovery-validation evidence. The material/source digest framing is unchanged, so this repair changes evidence availability rather than identity.
 
-Grant, material, and recovery-validation routine `Debug` surfaces now all redact unresolved raw role OIDs. Grant-level formatting retains the grantee/grantor kind, resolved role names where present, and `grant_option`, but renders an unresolved role only as `UnresolvedRoleOid(<redacted>)`. Material and validation formatting retain only aggregate counts and existing digest/provenance. Exact raw OIDs remain available through explicit typed recovery accessors on non-forgeable validation evidence. PostgreSQL role OIDs are catalog identifiers rather than credentials, but this boundary avoids turning ordinary logs into a raw catalog dump.
+The material also privately retains canonical sorted/deduplicated `unresolved_grantee_oids` and `unresolved_grantor_oids`. The exact sets are derived recovery evidence, not new digest identity. Aggregate count accessors are projections of those distinct canonical sets.
 
-ConceptWeave still does not repair PostgreSQL catalogs or own role lifecycle. Observation preserves the damaged source faithfully; validate/review can block publication and identify the exact missing role identities that require external remediation.
+Grant, material, and recovery-validation routine `Debug` surfaces all redact unresolved raw role OIDs. Grant-level formatting retains the grantee/grantor kind, resolved role names where present, and `grant_option`, but renders an unresolved role only as `UnresolvedRoleOid(<redacted>)`. Material and validation formatting retain only aggregate counts and existing digest/provenance. Exact raw OIDs remain available through explicit typed recovery accessors on non-forgeable validation evidence. PostgreSQL role OIDs are catalog identifiers rather than credentials, but this boundary avoids turning ordinary logs into a raw catalog dump.
+
+ConceptWeave still does not repair PostgreSQL catalogs or own role lifecycle. Observation preserves both the ordinary ACL semantics and damaged source identity faithfully; validate/review can block publication and identify the exact missing role identities that require external remediation.
 
 ## RED → repair traceability
 
@@ -61,15 +65,23 @@ Grant-level log-safety review then found that the public grant value still bypas
 - structural RED `3626a658d45b59802f632845708bf8ec378296cb`, proving `Debug` must not contain `16424` or `16425` while preserving unresolved-role kind and grant-option diagnostics;
 - production causal repair `cfe4eba0e68eca6d4f4cf6b50f18478e61d14c23`, replacing unresolved-role derived `Debug` with redacted formatters while leaving equality, ordering, constructors, source identity, and digest framing unchanged.
 
-The immediate pre-repair decision surface is archived as `docs/archive/CHANGELOG-through-c1599559.md` and `docs/archive/product-technical-gap-baseline-through-c1599559.md`.
+Complete-ACL review then found that the material discarded the grant vector after hashing:
 
-Source repair is not exact-head GREEN. Repository-pinned Rust 1.98 fmt, strict Clippy, focused/retained/workspace/doc tests, release/rustdoc, owned production coverage, and the bounded PostgreSQL 18 live differential remain required after the final source/documentation head is known.
+- finding review `5255771158` at exact pre-finding head `ae86019978a9d1fbce6b905d65df92835e851b39`;
+- structural RED `3d03f9b9d3ce27ae2d96732ec03780a345493afc`, requiring canonical ACL readback with PUBLIC/resolved-role/grant-option/unresolved-kind semantics while keeping the raw dangling OID out of the ordinary material surface;
+- production causal repair `d406375f8989dae5dc06c50c1f4a776408a00bd8`, retaining the canonical grant vector and adding log-safe semantic accessors without changing digest framing.
+
+The immediate pre-repair decision surface is archived as `docs/archive/CHANGELOG-through-ae860199.md` and `docs/archive/product-technical-gap-baseline-through-ae860199.md`.
+
+Source repair is not exact-head GREEN. Repository-pinned Rust 1.98 fmt, strict Clippy, focused/retained/workspace/doc tests, release/rustdoc, owned production coverage, and the bounded PostgreSQL 18 live differential remain required after the final source/documentation head is known. The structural RED above is not represented as an executed failing run because the current Draft lane has no pull-request-triggered workflow generation.
 
 ## Differential requirement
 
 The PostgreSQL 18 differential must include at least one real or faithfully constructed catalog state in which `pg_init_privs.initprivs` contains a nonzero grantee or grantor OID with no row in `pg_roles`. Capture must preserve the raw OID and must not drop the ACL entry, fail source observation merely because role lookup fails, serialize the OID as role-name text, or resolve it by decimal-name coincidence.
 
-The resulting recovery evidence must expose the exact canonical missing grantee/grantor OID sets through typed accessors, keep those values out of routine grant/material/validation `Debug`, and derive counts consistently from the distinct sets. It must include direct formatting of unresolved public-grantor, grantee-only, grantor-only, and both-unresolved grant values; none may render the numeric raw OID. It must also include two damaged baselines with equal counts but different OID identities and a case where repeated OIDs canonicalize deterministically. A resolved-only baseline must report empty sets and zero counts.
+The resulting material must retain the complete canonical ACL for downstream inspection: PUBLIC/resolved grantee, resolved grantor, grant option, and unresolved-role shape must remain readable after construction rather than only affecting an opaque digest. The recovery evidence must expose the exact canonical missing grantee/grantor OID sets through typed accessors, keep those values out of routine grant/material/validation `Debug`, and derive counts consistently from the distinct sets.
+
+The differential must include direct formatting of unresolved public-grantor, grantee-only, grantor-only, and both-unresolved grant values; none may render the numeric raw OID. It must also include two damaged baselines with equal counts but different OID identities and a case where repeated OIDs canonicalize deterministically. A resolved-only baseline must report empty sets and zero counts.
 
 The same differential still has to bind the row to `classoid=pg_proc`, the exact converter function `objoid`, and `objsubid=0`, preserve `privtype`, the complete initial ACL, current function/ACL facts, converter extension lifecycle/security facts, immutable raw converter-root lineage, and transform-object extension membership from the same source generation.
 
