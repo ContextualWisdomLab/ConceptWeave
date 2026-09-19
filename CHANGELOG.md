@@ -1,12 +1,14 @@
 # Changelog
 
-The immediately preceding Source Observation/recovery-validation decision surface is preserved at `docs/archive/CHANGELOG-through-c1599559.md`; its matching product/technical surface is `docs/archive/product-technical-gap-baseline-through-c1599559.md`. Earlier recovery surfaces remain under the `through-440d5e3f`, `through-8348be96`, and `through-5daf2a57` archives. Focused rationale and primary-source traceability remain under `docs/doctoring/`.
+The immediately preceding Source Observation/recovery-validation decision surface is preserved at `docs/archive/CHANGELOG-through-ae860199.md`; its matching product/technical surface is `docs/archive/product-technical-gap-baseline-through-ae860199.md`. Earlier recovery surfaces remain under the `through-c1599559`, `through-440d5e3f`, `through-8348be96`, and `through-5daf2a57` archives. Focused rationale and primary-source traceability remain under `docs/doctoring/`.
 
 ## Unreleased
 
 ### Added
 
 - Retained the converter-function `pg_init_privs` successor: exact row absence/presence, `privtype` (`i`/`e`), complete object-level initial EXECUTE ACL, immutable receipt/snapshot, exact converter binding, and raw converter-root lineage remain authoritative.
+- The initial-privilege material now retains the complete canonical grant vector after digest construction instead of discarding it. `grants()` exposes deterministic ACL entries for semantic/recovery inspection while preserving the existing material/source digest framing.
+- Added log-safe grant semantics accessors for PUBLIC shape, resolved grantee role, unresolved-grantee presence, resolved grantor role, unresolved-grantor presence, and grant option. Raw dangling OIDs remain unavailable from the ordinary grant/material surface and stay purpose-bound to receipt-backed recovery validation.
 - Retained hostile dangling-role identity coverage for catalog states where an initial ACL still refers to a role OID after the role no longer exists.
 - Retained canonical sorted/deduplicated unresolved grantee/grantor OID sets inside initial-privilege material so recovery evidence preserves the exact missing PostgreSQL role identities rather than only aggregate counts.
 - Added purpose-bound `unresolved_grantee_oids()` and `unresolved_grantor_oids()` accessors on non-forgeable recovery-validation evidence. `unresolved_grantee_count()` / `unresolved_grantor_count()` are projections of those canonical identity sets.
@@ -16,11 +18,12 @@ The immediately preceding Source Observation/recovery-validation decision surfac
 - Retained complete non-secret receipt provenance in every verdict: source registry identity, connection-policy binding, source-content digest, extractor revision, observation timestamp, and canonical converter location. Present rows additionally carry the immutable material digest and exact canonical dangling-role sets.
 - `matches_source_receipt()` now compares complete receipt provenance, material absence/presence identity, and exact dangling-role identity sets.
 - Added focused contracts proving equal unresolved counts with different OIDs remain distinguishable and repeated OIDs canonicalize deterministically.
-- Updated initial-privilege doctoring and the product/technical gap baseline with the complete raw-OID log-safety boundary and acceptance requirements.
+- Updated initial-privilege doctoring and the product/technical gap baseline with the complete raw-OID log-safety and readable-ACL acceptance requirements.
 
 ### Correctness
 
 - `IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant` continues to preserve nonzero dangling grantee/grantor OIDs as raw unresolved identities rather than requiring role lookup or stringifying the OID as a role name.
+- `IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial` no longer reduces the complete ACL to an opaque digest plus counts. It retains the exact canonical grant sequence so `observe -> validate -> review` can inspect PUBLIC/resolved-role/grant-option/unresolved-kind semantics. Raw dangling OID disclosure remains restricted to recovery validation.
 - `IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial` retains exact canonical dangling-role sets without changing the existing ACL/material digest framing. The Source Observation digest continues to commit the original ACL identities and does not add derived diagnostic fields.
 - Recovery readiness is derived only from private validation evidence produced by the canonical validator; callers cannot manufacture a public `Ready` variant.
 - Validation consumes an owner-issued source receipt rather than detached ACL material, preventing evidence replay across converter directions, source snapshots, policies, extractors, or observation epochs.
@@ -42,7 +45,8 @@ The immediately preceding Source Observation/recovery-validation decision surfac
 - Complete-receipt finding review: `5255032673`; structural RED `c5f9686ec16c27311abeefd858b0d317ac3c4d6d`; production repair `b466a6fcb207061684e104a51010fed6a0bbca55`.
 - Exact dangling-role remediation finding review: `5255447654` at exact pre-finding head `440d5e3f1cd12011047025c499aec76792c95c83`; structural RED `f23aefdcb8416c9828d2a46c12fcf3b6190fcd47`; material repair `b7b9e3d1b17a840436fbde7420f88a9c9539335f`; validation repair `57b5b209e9ade1f84c1c036a2bca81e7dacbac73`; rustdoc/log-safety follow-up `a49243baddbc3142286de4c38c29bd5dd06cbdcb`; canonical-set contract `dd8d5adf65638ae5c5e2f61686b37d14df17062c`.
 - Grant-level raw-OID log-safety finding review: `5255638361` at exact pre-finding head `c159955939ddcfa7b69419816414a67d7424e69e`; structural RED `3626a658d45b59802f632845708bf8ec378296cb`; production causal repair `cfe4eba0e68eca6d4f4cf6b50f18478e61d14c23`.
-- The focused contracts require exact receipt-field retention, source/location-bound row absence, exact present-material digest binding, exact dangling-role identity sets, equal-count/different-identity separation, canonical sorting/deduplication, damaged-state blocking, and raw-OID redaction from grant/material/validation routine `Debug` surfaces.
+- Complete-ACL readability finding review: `5255771158` at exact pre-finding head `ae86019978a9d1fbce6b905d65df92835e851b39`; structural RED `3d03f9b9d3ce27ae2d96732ec03780a345493afc`; production causal repair `d406375f8989dae5dc06c50c1f4a776408a00bd8`. The RED is a source-level compile/test contract and is not claimed as executed GREEN evidence.
+- The focused contracts now require exact receipt-field retention, source/location-bound row absence, exact present-material digest binding, exact dangling-role identity sets, equal-count/different-identity separation, canonical sorting/deduplication, readable canonical ACL semantics, damaged-state blocking, and raw-OID redaction from grant/material/validation routine `Debug` surfaces.
 - Source/documentation repair itself is not native or hosted GREEN evidence. Exact-head Rust 1.98 fmt, strict workspace/all-target Clippy, focused/retained/workspace/doc tests, release build, rustdoc, owned production statement/branch/edge coverage, and PostgreSQL 18 bounded live differential remain gates.
 
 ### Retained
