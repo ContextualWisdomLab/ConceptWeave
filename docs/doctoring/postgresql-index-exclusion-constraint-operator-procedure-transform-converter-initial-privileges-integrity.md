@@ -10,6 +10,8 @@ PostgreSQL 18 `AclItem` stores `ai_grantee` and `ai_grantor` as OIDs. `pg_authid
 
 PostgreSQL also makes ACL array order recovery-significant. Client utilities such as `pg_dump` can need a grant-option provider before a dependent grant. `check_acl()` validates ACL array shape/nullability but does not impose uniqueness, and `aclnewowner()` contains duplicate-entry reconciliation for states that can arise during owner substitution. Source Observation therefore preserves exact array order and multiplicity instead of sorting, merging, or rejecting repeated ACLITEMs.
 
+Role, schema, and function names in this boundary are PostgreSQL identifiers, not free-form display labels. PostgreSQL 18 states that role names follow SQL identifier rules; a delimited identifier is an arbitrary character sequence in double quotes and may contain spaces or ampersands, with code zero excluded. PostgreSQL rejects zero-length delimited identifiers. Observation must therefore preserve legal whitespace exactly and must not use trimming as an admission rule.
+
 ## Owner and bounded context
 
 ConceptWeave owns observation of this PostgreSQL source fact because it changes immutable semantic evidence used by `observe -> discover -> propose -> align -> validate -> review -> publish`. It does not own role lifecycle, extension package files, enterprise authorization policy, PostgreSQL catalog repair, or restoration orchestration.
@@ -29,6 +31,8 @@ Row absence remains distinct from present material. A present row preserves exac
 - for a dangling nonzero role reference, the raw unresolved OID as recovery evidence;
 - exact grant-option state.
 
+Resolved role names and converter schema/function names preserve the exact catalog string. Whitespace-only quoted identifiers are valid source values and are retained byte-for-byte. Empty strings and code-zero content fail closed because they are not legal PostgreSQL identifier states. No trim, case folding, Unicode normalization, or display-oriented cleanup occurs in this Source Observation boundary.
+
 OID zero is PUBLIC only in the grantee position and is rejected anywhere the domain requires a role identity. Resolved role OIDs are never synthesized from names. Unresolved OIDs are not stringified as names.
 
 The material digest uses the versioned `.material.v2` domain. Resolved grantee/grantor identities commit both OID and role name, while PUBLIC and unresolved variants remain explicitly tagged. The outer snapshot digest continues to commit the versioned material digest. A drop/recreate event that preserves `rolname` but changes OID therefore changes material and snapshot identity.
@@ -47,6 +51,8 @@ Resolved-role OID identity finding review `5256559272` at pre-finding `a82dced2a
 
 Production repair `52e1c12d5e592e624d8d55badbdc24c52b428a00` retains exact resolved OIDs privately alongside names, validates nonzero resolved role OIDs, introduces the `.material.v2` digest domain, and commits both OID and name for resolved grantee/grantor identities. Test adoption `2780f5edb6c086a3d13b0dc47d6ca4b22963eec9`, dangling-role adaptation `a7274b7de87f904b8aae7fbdf0208ed8b3066d36`, and recovery-fixture adaptation `8ba4e304fa4b24cb4e49ae31474985b400aeddc7` move retained contracts to the exact-OID constructors without exposing OIDs through routine diagnostics.
 
+Identifier-fidelity finding review `5256811598` at pre-finding exact `69315444d91690886d165a2a9dbde2b193e786ca` found that `str::trim().is_empty()` rejected legal quoted PostgreSQL identifiers whose stored value consists only of whitespace. Structural RED `650a77aed375798ac2b241bc93ab3dc7cd5e328e` requires whitespace-only role/schema/function identifiers to be accepted and retained exactly while zero-length and code-zero identifiers remain rejected. Production repair `74aa0c47f8ec30ccc824831383e7c6dcf0b09e99` replaces trim-based admission with PostgreSQL-identifier validation across the bounded module. ACL identity/order/multiplicity, recovery behavior, and digest framing are otherwise unchanged.
+
 No predecessor Check or approval transfers across these head movements.
 
 ## Invariants
@@ -59,9 +65,10 @@ No predecessor Check or approval transfers across these head movements.
 6. PUBLIC, resolved role, and unresolved role identities remain separate namespaces.
 7. Resolved role identity is `(role_oid, role_name)` from the same source generation; neither component may substitute for the other.
 8. Zero resolved/unresolved role OIDs fail closed wherever a role identity is required.
-9. Routine diagnostics never render numeric role OIDs.
-10. Derived dangling-role remediation sets may sort/deduplicate OIDs but never rewrite the source ACL.
-11. Receipt-bound recovery validation remains the only public surface that exposes exact dangling OIDs for remediation.
+9. PostgreSQL identifier strings are preserved exactly; legal whitespace is not trimmed, while empty and code-zero strings fail closed.
+10. Routine diagnostics never render numeric role OIDs.
+11. Derived dangling-role remediation sets may sort/deduplicate OIDs but never rewrite the source ACL.
+12. Receipt-bound recovery validation remains the only public surface that exposes exact dangling OIDs for remediation.
 
 ## Alternatives considered
 
@@ -72,6 +79,14 @@ Rejected. PostgreSQL ACLITEM identity is OID-based. A role recreated under the s
 ### Preserve only role OIDs
 
 Rejected. Source Observation also needs readable semantic identity and same-generation lookup evidence. The pair `(OID, name)` preserves both exact catalog identity and resolved meaning without forcing downstream callers to perform mutable name lookup.
+
+### Trim identifier strings before admission
+
+Rejected. PostgreSQL quoted identifiers can legally contain whitespace, including identifiers whose stored content is whitespace-only. Trimming is presentation policy and changes source truth.
+
+### Accept arbitrary Rust strings as PostgreSQL identifiers
+
+Rejected. Empty identifiers and code-zero content are not valid PostgreSQL identifier states. The bounded constructor should preserve legal source content without admitting states PostgreSQL cannot represent.
 
 ### Expose resolved OIDs through ordinary accessors
 
@@ -96,6 +111,8 @@ The differential must prove at minimum:
 - PUBLIC, resolved grantee/grantor names and grant option readability;
 - equal role names with distinct same-generation OIDs yield distinct material/source identity;
 - controlled drop/recreate or equivalent fixture demonstrates OID/name non-aliasing for grantee and grantor;
+- whitespace-only quoted role/schema/function identifiers survive extraction and observation byte-for-byte;
+- empty/code-zero identifier states fail closed;
 - dangling grantee/grantor identities remain actionable through recovery validation without routine Debug leakage;
 - repeated dangling OIDs canonicalize only in the derived remediation sets;
 - immutable raw converter-root and downstream transform-object lineage remain intact.
@@ -115,3 +132,7 @@ PostgreSQL Global Development Group. (2026d). *PostgreSQL 18 source: ACL validat
 PostgreSQL Global Development Group. (2026e). *PostgreSQL 18 source: pg_dump initial-privilege capture (`src/bin/pg_dump/pg_dump.c`, REL_18_STABLE)*. https://github.com/postgres/postgres/blob/REL_18_STABLE/src/bin/pg_dump/pg_dump.c
 
 PostgreSQL Global Development Group. (2026f). *PostgreSQL 18 documentation: GRANT*. https://www.postgresql.org/docs/18/sql-grant.html
+
+PostgreSQL Global Development Group. (2026g). *PostgreSQL 18 documentation: 21.1. Database Roles*. https://www.postgresql.org/docs/18/database-roles.html
+
+PostgreSQL Global Development Group. (2026h). *PostgreSQL 18 documentation: 4.1. Lexical Structure*. https://www.postgresql.org/docs/18/sql-syntax-lexical.html
