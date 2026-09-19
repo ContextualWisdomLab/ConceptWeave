@@ -1,7 +1,7 @@
 use conceptweave_observation::{
     ColumnObservationV3, IndexAttributeKind, IndexAttributeObservation, IndexKeySemantics,
-    IndexObservation, IndexTablespace, ObservationError, PostgresSchemaSnapshotV3,
-    QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
+    IndexObservation, IndexTablespace, PostgresSchemaSnapshotV3, QualifiedOperatorClassName,
+    QualifiedTypeName, RelationKind, RelationObservation,
 };
 
 mod support;
@@ -119,13 +119,14 @@ fn explicit_named_tablespace_does_not_collapse_into_database_default_marker() {
 }
 
 #[test]
-fn blank_tablespace_name_fails_closed() {
-    let error = IndexTablespace::named(" ")
-        .expect_err("blank tablespace names are not valid catalog evidence");
-    assert_eq!(
-        error,
-        ObservationError::InvalidObservationField {
-            field: "index_tablespace_name"
-        }
-    );
+fn quoted_whitespace_tablespace_name_is_preserved() {
+    let tablespace = IndexTablespace::named(" \t")
+        .expect("PostgreSQL quoted tablespace identifiers may contain whitespace");
+    assert_eq!(tablespace.name(), " \t");
+}
+
+#[test]
+fn empty_and_code_zero_tablespace_names_fail_closed() {
+    assert!(IndexTablespace::named("").is_err());
+    assert!(IndexTablespace::named("bad\0tablespace").is_err());
 }
