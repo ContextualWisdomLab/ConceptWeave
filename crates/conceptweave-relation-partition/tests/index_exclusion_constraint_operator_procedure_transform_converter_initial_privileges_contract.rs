@@ -170,7 +170,7 @@ fn ordinary_exclude_converter_initial_privileges_preserve_privtype_and_source_ac
 
     let mut initdb_observations = complete_initial_privilege_observations();
     initdb_observations[0] = initial_privilege_observation(
-        IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeDirection::FromSql,
+        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "payload_from_sql",
         Some(initdb_material),
     );
