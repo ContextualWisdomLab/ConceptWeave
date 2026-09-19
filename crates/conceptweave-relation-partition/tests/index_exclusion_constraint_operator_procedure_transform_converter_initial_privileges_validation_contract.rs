@@ -308,6 +308,7 @@ fn initial_privilege_recovery_validation_canonicalizes_repeated_dangling_role_id
         .expect("second dangling grant"),
         IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::unresolved_grantee_oid(
             16_424,
+            10,
             "postgres",
             false,
         )
