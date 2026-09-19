@@ -22,6 +22,8 @@ Each converter direction now carries the complete canonical sorted set of exact 
 
 The transform-object extension-membership contract was ordinary-forward restacked at `458bd76f193906999a81c583da30dff152d0f9f8`, and production at `fcb0e2cdd8700ed56ee4d2a0b96bdf89c5bd4532` now takes the converter auto-extension dependency snapshot as its digest predecessor. It still receives the separately supplied raw transform-converter snapshot and first proves equal source generation plus exact immutable raw converter root. Only then does it validate complete FROM SQL / TO SQL cardinality and exact converter schema/function identity. Consequently a change in converter `deptype='x'` state changes the later transform-object successor digest instead of disappearing from the final chain.
 
+Fresh source review after that restack found the retained transform-object direction/function/raw-root lineage contract still constructed the removed membership-only predecessor helper. Ordinary-forward `60d90c3ed0b0793378707a39cd27397dba6ed3bb` restacks those hostile regressions on `converter_function_auto_extension_dependency_snapshot()` so the existing direction drift, function-name drift, and same-name/different-definition raw-root cases exercise the current production boundary rather than a stale predecessor shape. Focused doctoring was currentized at `98417ed8d92863fe3fddf97560b87bc37001a676`.
+
 Converter-function `deptype='e'`, converter-function `deptype='x'`, and transform-object `deptype='e'` remain three different facts. ConceptWeave does not infer one from another and does not copy extension-owned `extversion`, configuration, control/update scripts, package inventory, or application metadata.
 
 Primary authority:
@@ -37,7 +39,7 @@ Source Observation records exact external database state before policy. Validati
 
 ## Acceptance boundary
 
-**Source and traceability repaired is not GREEN.** The final exact head must independently demonstrate repository-pinned Rust 1.98 `fmt`, strict workspace/all-target Clippy, the new zero/one/multiple auto-extension dependency contract, retained immutable-root and direction/function regressions, focused and retained tests, workspace/doc tests, release build, rustdoc, and owned production statement/branch/edge coverage. No predecessor execution result transfers after source or documentation movement.
+**Source and traceability repaired is not GREEN.** The final exact head must independently demonstrate repository-pinned Rust 1.98 `fmt`, strict workspace/all-target Clippy, the new zero/one/multiple auto-extension dependency contract, retained immutable-root and direction/function regressions on the new predecessor shape, focused and retained tests, workspace/doc tests, release build, rustdoc, and owned production statement/branch/edge coverage. No predecessor execution result transfers after source or documentation movement.
 
 The bounded PostgreSQL 18 live differential must resolve every selected converter and transform from one source generation. For each exact converter function OID it must independently resolve `deptype='e'` membership and the complete `deptype='x'` dependency set from `pg_depend`, resolve extension OIDs to exact `pg_extension.extname`, preserve existing function facts and raw converter-root identity, and separately resolve the transform object's own `deptype='e'` membership. Reconstruction from naming conventions, installed packages, extension membership, another source generation, or application metadata is a capture failure.
 
