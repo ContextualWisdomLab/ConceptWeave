@@ -7,11 +7,11 @@
 //! array order as recovery-significant because grants with grant option must precede dependent
 //! grants, so this successor preserves the exact source-array order instead of normalizing it.
 //! This successor therefore preserves row absence versus presence, exact `privtype`, and the complete
-//! object-level EXECUTE ACL for every exact converter-function direction without inferring the
-//! baseline from current ACL, extension membership, package state, or names. Existing catalog damage
-//! can leave ACL grantor or grantee OIDs dangling after a role disappears, so unresolved raw OIDs
-//! remain distinct from resolved role names instead of making the source observation itself
-//! impossible.
+//! object-level EXECUTE ACL, including repeated source entries, for every exact converter-function
+//! direction without inferring the baseline from current ACL, extension membership, package state,
+//! or names. Existing catalog damage can leave ACL grantor or grantee OIDs dangling after a role
+//! disappears, so unresolved raw OIDs remain distinct from resolved role names instead of making the
+//! source observation itself impossible.
 
 use std::{collections::BTreeSet, fmt};
 
@@ -269,10 +269,11 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
 /// The adapter should resolve non-PUBLIC grantor/grantee OIDs against the same source generation.
 /// When a raw ACL OID has no matching role, it must preserve that nonzero OID explicitly instead of
 /// dropping the entry or converting the OID to a role-name string. Row absence is represented by
-/// `None` at the observation boundary, not by an empty material. PostgreSQL ACL array order is kept
-/// byte-semantically significant because restore tooling can depend on grant ordering. Exact
-/// unresolved role identifiers remain privately retained for the recovery-validation boundary while
-/// routine `Debug` output shows only aggregate counts and the immutable material digest.
+/// `None` at the observation boundary, not by an empty material. PostgreSQL ACL array order and
+/// multiplicity are kept byte-semantically significant because source observation must remain
+/// lossless even when a catalog contains repeated entries. Exact unresolved role identifiers remain
+/// privately retained for the recovery-validation boundary while routine `Debug` output shows only
+/// aggregate counts and the immutable material digest.
 #[derive(Clone, Eq, PartialEq)]
 pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial {
     privilege_type: IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeType,
@@ -304,12 +305,6 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
         privilege_type: IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeType,
         grants: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant>,
     ) -> Result<Self, ObservationError> {
-        if grants.iter().collect::<BTreeSet<_>>().len() != grants.len() {
-            return Err(invalid(
-                "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_grant",
-            ));
-        }
-
         let unresolved_grantee_oids = grants
             .iter()
             .filter_map(|grant| match &grant.grantee {
@@ -388,10 +383,11 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
 
     /// Returns the complete object-level EXECUTE ACL in exact PostgreSQL source-array order.
     ///
-    /// Source order is intentionally not canonicalized: PostgreSQL restore clients can rely on
-    /// grant-option providers appearing before dependent grants. Resolved role names, PUBLIC shape
-    /// and grant-option state remain directly inspectable. Raw dangling OIDs remain private here and
-    /// are exposed only by receipt-bound recovery validation.
+    /// Source order and multiplicity are intentionally not canonicalized. PostgreSQL restore clients
+    /// can rely on grant-option providers appearing before dependent grants, and PostgreSQL's ACL
+    /// validator does not impose a uniqueness invariant on the array. Resolved role names, PUBLIC
+    /// shape and grant-option state remain directly inspectable. Raw dangling OIDs remain private
+    /// here and are exposed only by receipt-bound recovery validation.
     #[must_use]
     pub fn grants(
         &self,
