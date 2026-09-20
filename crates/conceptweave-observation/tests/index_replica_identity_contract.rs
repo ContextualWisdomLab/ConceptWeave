@@ -83,11 +83,15 @@ fn expression_index() -> IndexObservation {
     .expect("replica-identity catalog flags are structurally constructible")
 }
 
-fn relation(nullable: bool, index: IndexObservation) -> RelationObservation {
+fn relation(
+    kind: RelationKind,
+    nullable: bool,
+    index: IndexObservation,
+) -> RelationObservation {
     RelationObservation::new(
         "public",
         "document",
-        RelationKind::Table,
+        kind,
         vec![ColumnObservationV3::new(
             "document_id",
             1,
@@ -101,6 +105,10 @@ fn relation(nullable: bool, index: IndexObservation) -> RelationObservation {
     .expect("relation fixture is valid")
     .with_indexes(vec![index])
     .expect("index fixture is valid before aggregate replica-identity validation")
+}
+
+fn table(nullable: bool, index: IndexObservation) -> RelationObservation {
+    relation(RelationKind::Table, nullable, index)
 }
 
 fn snapshot(relation: RelationObservation) -> Result<PostgresSchemaSnapshotV3, ObservationError> {
@@ -124,8 +132,17 @@ fn assert_replica_identity_error(result: Result<PostgresSchemaSnapshotV3, Observ
 }
 
 #[test]
-fn replica_identity_index_must_be_unique() {
+fn replica_identity_index_must_belong_to_a_table_relation() {
     assert_replica_identity_error(snapshot(relation(
+        RelationKind::MaterializedView,
+        false,
+        simple_index(true, true, true),
+    )));
+}
+
+#[test]
+fn replica_identity_index_must_be_unique() {
+    assert_replica_identity_error(snapshot(table(
         false,
         simple_index(false, true, true),
     )));
@@ -133,7 +150,7 @@ fn replica_identity_index_must_be_unique() {
 
 #[test]
 fn replica_identity_index_must_be_immediate_not_deferred() {
-    assert_replica_identity_error(snapshot(relation(
+    assert_replica_identity_error(snapshot(table(
         false,
         simple_index(true, false, true),
     )));
@@ -141,7 +158,7 @@ fn replica_identity_index_must_be_immediate_not_deferred() {
 
 #[test]
 fn replica_identity_index_must_not_be_partial() {
-    assert_replica_identity_error(snapshot(relation(
+    assert_replica_identity_error(snapshot(table(
         false,
         simple_index(true, true, true).with_predicate("document_id > 0"),
     )));
@@ -149,12 +166,12 @@ fn replica_identity_index_must_not_be_partial() {
 
 #[test]
 fn replica_identity_index_must_use_columns_not_expressions() {
-    assert_replica_identity_error(snapshot(relation(false, expression_index())));
+    assert_replica_identity_error(snapshot(table(false, expression_index())));
 }
 
 #[test]
 fn replica_identity_index_columns_must_be_not_null() {
-    assert_replica_identity_error(snapshot(relation(
+    assert_replica_identity_error(snapshot(table(
         true,
         simple_index(true, true, true),
     )));
@@ -162,13 +179,13 @@ fn replica_identity_index_columns_must_be_not_null() {
 
 #[test]
 fn eligible_replica_identity_index_remains_admissible() {
-    snapshot(relation(false, simple_index(true, true, true)))
+    snapshot(table(false, simple_index(true, true, true)))
         .expect("unique non-partial immediate column-only NOT NULL replica identity is admissible");
 }
 
 #[test]
 fn non_replica_indexes_do_not_import_replica_identity_restrictions() {
-    snapshot(relation(
+    snapshot(table(
         true,
         simple_index(false, false, false).with_predicate("document_id > 0"),
     ))
