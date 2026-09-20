@@ -107,6 +107,43 @@ fn relation(constraints: Vec<TableConstraintObservation>) -> RelationObservation
     relation_with_index(constraints, primary_index())
 }
 
+fn relation_with_same_name_wrong_key() -> RelationObservation {
+    let primary_key = TableConstraintObservation::PrimaryKey(
+        PrimaryKeyObservation::new("document_pkey", vec!["document_version".to_owned()])
+            .expect("wrong-key primary-key fixture is structurally valid"),
+    );
+    RelationObservation::new(
+        "public",
+        "document",
+        RelationKind::Table,
+        vec![
+            ColumnObservationV3::new(
+                "document_id",
+                1,
+                "bigint",
+                catalog_type("int8"),
+                false,
+                None,
+            )
+            .expect("document id fixture is valid"),
+            ColumnObservationV3::new(
+                "document_version",
+                2,
+                "bigint",
+                catalog_type("int8"),
+                false,
+                None,
+            )
+            .expect("document version fixture is valid"),
+        ],
+    )
+    .expect("two-column relation fixture is valid")
+    .with_constraints(vec![primary_key])
+    .expect("wrong-key constraint fixture is locally resolvable")
+    .with_indexes(vec![primary_index()])
+    .expect("primary index fixture is valid before snapshot reciprocity validation")
+}
+
 fn snapshot(relation: RelationObservation) -> Result<PostgresSchemaSnapshotV3, ObservationError> {
     PostgresSchemaSnapshotV3::new(
         &support::authorized_source("warehouse_primary", &["public"]),
@@ -140,6 +177,18 @@ fn primary_catalog_index_rejects_a_different_primary_key_constraint_name() {
 
     let error = snapshot(relation(vec![different_primary_key]))
         .expect_err("pg_index.indisprimary must resolve to its own primary-key constraint");
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "constraint_backing_index",
+        }
+    );
+}
+
+#[test]
+fn primary_catalog_index_rejects_a_same_name_primary_key_with_different_keys() {
+    let error = snapshot(relation_with_same_name_wrong_key())
+        .expect_err("primary index and primary constraint key shape must be reciprocal");
     assert_eq!(
         error,
         ObservationError::InvalidObservationField {
