@@ -46,6 +46,38 @@ fn primary_index() -> IndexObservation {
     .with_live(true)
 }
 
+fn primary_index_without_lifecycle() -> IndexObservation {
+    IndexObservation::new(
+        "document_pkey",
+        true,
+        Some(false),
+        vec![IndexAttributeObservation::column(
+            1,
+            IndexAttributeKind::Key,
+            "document_id",
+        )
+        .expect("primary key attribute fixture is valid")],
+        Vec::new(),
+    )
+    .expect("primary index fixture is structurally valid")
+    .with_access_method("btree")
+    .with_key_semantics(vec![
+        IndexKeySemantics::new(
+            1,
+            None,
+            QualifiedOperatorClassName::new("pg_catalog", "int8_ops")
+                .expect("operator-class fixture is valid"),
+            0,
+        )
+        .expect("key-semantics fixture is valid"),
+    ])
+    .expect("one semantic record matches the structural key")
+    .with_catalog_flags(IndexCatalogFlags::new(
+        true, false, true, false, false, false,
+    ))
+    .expect("primary catalog flags are structurally valid")
+}
+
 fn standalone_unique_index() -> IndexObservation {
     IndexObservation::new(
         "document_id_uix",
@@ -69,7 +101,7 @@ fn standalone_unique_index() -> IndexObservation {
                 .expect("operator-class fixture is valid"),
             0,
         )
-        .expect("key-semantics fixture is valid"),
+        .expect("one semantic record matches the structural key"),
     ])
     .expect("one semantic record matches the structural key")
     .with_catalog_flags(IndexCatalogFlags::new(
@@ -206,6 +238,20 @@ fn matching_primary_key_constraint_and_primary_catalog_index_remain_admissible()
 
     snapshot(relation(vec![primary_key]))
         .expect("coherent primary-key constraint and primary-index evidence must remain admissible");
+}
+
+#[test]
+fn base_primary_reciprocity_does_not_require_index_lifecycle_evidence() {
+    let primary_key = TableConstraintObservation::PrimaryKey(
+        PrimaryKeyObservation::new("document_pkey", vec!["document_id".to_owned()])
+            .expect("primary-key fixture is valid"),
+    );
+
+    snapshot(relation_with_index(
+        vec![primary_key],
+        primary_index_without_lifecycle(),
+    ))
+    .expect("base snapshot reciprocity must not import timing/PERIOD lifecycle completeness");
 }
 
 #[test]
