@@ -184,10 +184,30 @@ fn eligible_replica_identity_index_remains_admissible() {
 }
 
 #[test]
+fn partitioned_table_replica_identity_does_not_require_lifecycle_evidence() {
+    snapshot(relation(
+        RelationKind::PartitionedTable,
+        false,
+        simple_index(true, true, true),
+    ))
+    .expect("partitioned-table replica identity remains valid before optional lifecycle observation");
+}
+
+#[test]
 fn non_replica_indexes_do_not_import_replica_identity_restrictions() {
     snapshot(table(
         true,
         simple_index(false, false, false).with_predicate("document_id > 0"),
     ))
     .expect("ordinary non-replica indexes retain their independent catalog semantics");
+}
+
+#[test]
+fn materialized_view_non_replica_index_remains_admissible() {
+    snapshot(relation(
+        RelationKind::MaterializedView,
+        true,
+        simple_index(false, false, false).with_predicate("document_id > 0"),
+    ))
+    .expect("materialized-view indexes remain admissible when they do not claim replica identity");
 }
