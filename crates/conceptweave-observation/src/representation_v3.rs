@@ -1431,6 +1431,12 @@ impl RelationObservation {
                 });
             };
             validate_postgresql_identifier(access_method, "access_method")?;
+            if let Some(predicate) = index.predicate() {
+                validate_nonblank(predicate, "index_predicate")?;
+            }
+            if let Some(index_definition) = index.index_definition() {
+                validate_nonblank(index_definition, "index_definition")?;
+            }
             if !index_names.insert(index_name.to_owned()) {
                 return Err(ObservationError::DuplicateIndexObservation {
                     schema_name: self.schema_name.clone(),
