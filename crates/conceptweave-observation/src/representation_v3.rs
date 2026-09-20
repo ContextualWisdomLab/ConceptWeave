@@ -1411,8 +1411,8 @@ impl RelationObservation {
     /// expression attributes stay structurally separate. Index names must be unique; attribute
     /// layout validity is enforced by [`IndexObservation::new`] before an index reaches a relation.
     /// Because a governed snapshot may only carry complete index semantics, every index must supply
-    /// one per-key semantic record for each key attribute, and an index whose records carry
-    /// access-method option bits must also carry a nonblank observed access method.
+    /// one per-key semantic record for each key attribute and a valid observed PostgreSQL access-
+    /// method identifier.
     pub fn with_indexes(
         mut self,
         mut indexes: Vec<IndexObservation>,
@@ -1425,14 +1425,12 @@ impl RelationObservation {
                     field: "index_key_semantics",
                 });
             }
-            let has_blank_access_method = index
-                .access_method()
-                .is_none_or(|access_method| access_method.trim().is_empty());
-            if has_blank_access_method {
+            let Some(access_method) = index.access_method() else {
                 return Err(ObservationError::InvalidObservationField {
                     field: "access_method",
                 });
-            }
+            };
+            validate_postgresql_identifier(access_method, "access_method")?;
             if !index_names.insert(index_name.to_owned()) {
                 return Err(ObservationError::DuplicateIndexObservation {
                     schema_name: self.schema_name.clone(),
