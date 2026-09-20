@@ -101,7 +101,7 @@ fn standalone_unique_index() -> IndexObservation {
                 .expect("operator-class fixture is valid"),
             0,
         )
-        .expect("one semantic record matches the structural key"),
+        .expect("key-semantics fixture is valid"),
     ])
     .expect("one semantic record matches the structural key")
     .with_catalog_flags(IndexCatalogFlags::new(
