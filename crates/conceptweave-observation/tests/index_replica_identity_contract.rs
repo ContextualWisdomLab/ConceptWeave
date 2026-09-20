@@ -107,7 +107,7 @@ fn snapshot(relation: RelationObservation) -> Result<PostgresSchemaSnapshotV3, O
     PostgresSchemaSnapshotV3::new(
         &support::authorized_source("warehouse_primary", &["public"]),
         "postgres_introspector_v3",
-        "2026-09-21T06:58:00Z",
+        "2026-09-20T21:42:00Z",
         vec![relation],
         Vec::new(),
         Vec::new(),
