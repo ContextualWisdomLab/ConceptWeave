@@ -1135,6 +1135,30 @@ fn validate_schema_relation_invariants(
             }
         }
 
+        for primary_index in relation.indexes().iter().filter(|index| {
+            index
+                .catalog_flags()
+                .is_some_and(|catalog_flags| catalog_flags.primary())
+        }) {
+            let matching_primary_key = relation.constraints().iter().any(|constraint| {
+                matches!(constraint, TableConstraintObservation::PrimaryKey(_))
+                    && constraint.constraint_name() == primary_index.index_name()
+                    && primary_index.key_attributes().len() == constraint.column_names().len()
+                    && primary_index
+                        .key_attributes()
+                        .iter()
+                        .zip(constraint.column_names())
+                        .all(|(attribute, column_name)| {
+                            attribute.attribute_name() == Some(column_name.as_str())
+                        })
+            });
+            if !matching_primary_key {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "constraint_backing_index",
+                });
+            }
+        }
+
         let schema_name = relation.schema_name().to_owned();
         if !observed_names.insert((schema_name.clone(), relation.relation_name().to_owned())) {
             return Err(ObservationError::InvalidObservationField {
