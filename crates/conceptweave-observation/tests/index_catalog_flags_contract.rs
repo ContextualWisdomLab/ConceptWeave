@@ -1,7 +1,8 @@
 use conceptweave_observation::{
     ColumnObservationV3, IndexAttributeKind, IndexAttributeObservation, IndexCatalogFlags,
     IndexKeySemantics, IndexObservation, ObservationError, PostgresSchemaSnapshotV3,
-    QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
+    PrimaryKeyObservation, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
+    RelationObservation, TableConstraintObservation,
 };
 
 mod support;
@@ -61,7 +62,20 @@ fn complete_index(
 }
 
 fn digest(index: IndexObservation) -> String {
-    let relation = RelationObservation::new(
+    let primary_constraint = index
+        .catalog_flags()
+        .is_some_and(|flags| flags.primary())
+        .then(|| {
+            TableConstraintObservation::PrimaryKey(
+                PrimaryKeyObservation::new(
+                    "document_id_ix",
+                    vec!["document_id".to_owned()],
+                )
+                .expect("primary-key fixture is valid"),
+            )
+        });
+
+    let mut relation = RelationObservation::new(
         "public",
         "document",
         RelationKind::Table,
@@ -77,9 +91,15 @@ fn digest(index: IndexObservation) -> String {
             .expect("column fixture is valid"),
         ],
     )
-    .expect("relation fixture is valid")
-    .with_indexes(vec![index])
-    .expect("complete index fixture is valid");
+    .expect("relation fixture is valid");
+    if let Some(primary_constraint) = primary_constraint {
+        relation = relation
+            .with_constraints(vec![primary_constraint])
+            .expect("primary catalog fixture carries its matching primary-key constraint");
+    }
+    let relation = relation
+        .with_indexes(vec![index])
+        .expect("complete index fixture is valid");
 
     PostgresSchemaSnapshotV3::new(
         &support::authorized_source("warehouse_primary", &["public"]),
