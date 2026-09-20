@@ -1412,11 +1412,23 @@ impl RelationObservation {
     /// layout validity is enforced by [`IndexObservation::new`] before an index reaches a relation.
     /// Because a governed snapshot may only carry complete index semantics, every index must supply
     /// one per-key semantic record for each key attribute and a valid observed PostgreSQL access-
-    /// method identifier.
+    /// method identifier. Non-empty index evidence is valid only for table, partitioned-table, and
+    /// materialized-view relations; other relation kinds fail closed before index contents are used.
     pub fn with_indexes(
         mut self,
         mut indexes: Vec<IndexObservation>,
     ) -> Result<Self, ObservationError> {
+        if !indexes.is_empty()
+            && !matches!(
+                self.kind,
+                RelationKind::Table
+                    | RelationKind::PartitionedTable
+                    | RelationKind::MaterializedView
+            )
+        {
+            return Err(ObservationError::InvalidObservationField { field: "indexes" });
+        }
+
         let mut index_names = BTreeSet::new();
         for index in &indexes {
             let index_name = index.index_name();
