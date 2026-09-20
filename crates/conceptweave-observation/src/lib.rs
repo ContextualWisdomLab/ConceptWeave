@@ -1159,6 +1159,36 @@ fn validate_schema_relation_invariants(
             }
         }
 
+        for (replica_identity_index, catalog_flags) in relation.indexes().iter().filter_map(|index| {
+            let catalog_flags = index.catalog_flags()?;
+            catalog_flags
+                .replica_identity()
+                .then_some((index, catalog_flags))
+        }) {
+            let relation_kind_is_eligible = matches!(
+                relation.kind(),
+                RelationKind::Table | RelationKind::PartitionedTable
+            );
+            let key_columns_are_not_null = !replica_identity_index.key_attributes().is_empty()
+                && replica_identity_index.key_attributes().iter().all(|attribute| {
+                    attribute.attribute_name().is_some_and(|attribute_name| {
+                        relation.columns().iter().any(|column| {
+                            column.column_name() == attribute_name && !column.nullable()
+                        })
+                    })
+                });
+            if !relation_kind_is_eligible
+                || !replica_identity_index.is_unique()
+                || !catalog_flags.immediate()
+                || replica_identity_index.predicate().is_some()
+                || !key_columns_are_not_null
+            {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "index_replica_identity",
+                });
+            }
+        }
+
         let schema_name = relation.schema_name().to_owned();
         if !observed_names.insert((schema_name.clone(), relation.relation_name().to_owned())) {
             return Err(ObservationError::InvalidObservationField {
@@ -1442,7 +1472,7 @@ fn validate_type_bindings_with_type_kinds_and_arrays(
                 enums,
                 array_types,
                 type_kinds,
-            ) {
+        ) {
                 return Err(ObservationError::UnknownTypeBinding {
                     schema_name: column.type_binding().schema_name().to_owned(),
                     type_name: column.type_binding().type_name().to_owned(),
