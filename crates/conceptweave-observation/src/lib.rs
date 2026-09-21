@@ -1143,6 +1143,7 @@ fn validate_schema_relation_invariants(
             let matching_primary_key = relation.constraints().iter().any(|constraint| {
                 matches!(constraint, TableConstraintObservation::PrimaryKey(_))
                     && constraint.constraint_name() == primary_index.index_name()
+                    && primary_index.predicate().is_none()
                     && primary_index.key_attributes().len() == constraint.column_names().len()
                     && primary_index
                         .key_attributes()
