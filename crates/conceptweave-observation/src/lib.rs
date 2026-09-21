@@ -1159,6 +1159,21 @@ fn validate_schema_relation_invariants(
             }
         }
 
+        let replica_identity_index_count = relation
+            .indexes()
+            .iter()
+            .filter(|index| {
+                index
+                    .catalog_flags()
+                    .is_some_and(|catalog_flags| catalog_flags.replica_identity())
+            })
+            .count();
+        if replica_identity_index_count > 1 {
+            return Err(ObservationError::InvalidObservationField {
+                field: "index_replica_identity",
+            });
+        }
+
         for (replica_identity_index, catalog_flags) in relation.indexes().iter().filter_map(|index| {
             let catalog_flags = index.catalog_flags()?;
             catalog_flags
