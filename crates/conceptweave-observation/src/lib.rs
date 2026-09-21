@@ -1810,13 +1810,16 @@ fn canonicalize_constraint_timings(
             timing.deferrability(),
             ConstraintDeferrability::NotDeferrable
         );
-        let exclusion_access_method_matches =
-            !catalog_flags.exclusion() || backing_index.access_method() == Some("gist");
+        let backing_access_method_matches = if catalog_flags.exclusion() {
+            backing_index.access_method() == Some("gist")
+        } else {
+            backing_index.access_method() == Some("btree")
+        };
         if !key_constraint_backing_index_static_shape_matches(
             constraint,
             backing_index,
             catalog_flags,
-        ) || !exclusion_access_method_matches
+        ) || !backing_access_method_matches
             || catalog_flags.immediate() != expected_immediate
         {
             return Err(ObservationError::InvalidObservationField {
