@@ -1174,6 +1174,16 @@ fn validate_schema_relation_invariants(
                 field: "index_clustered",
             });
         }
+        if relation.indexes().iter().any(|index| {
+            index
+                .catalog_flags()
+                .is_some_and(|catalog_flags| catalog_flags.clustered())
+                && index.predicate().is_some()
+        }) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "index_clustered",
+            });
+        }
 
         let replica_identity_index_count = relation
             .indexes()
