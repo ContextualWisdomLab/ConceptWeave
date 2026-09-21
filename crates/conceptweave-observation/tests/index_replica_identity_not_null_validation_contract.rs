@@ -93,7 +93,7 @@ fn snapshot(
     PostgresSchemaSnapshotV3::new_with_not_null_constraints(
         &support::authorized_source("warehouse_primary", &["public"]),
         "postgres_introspector_v3",
-        "2026-09-22T05:43:43+09:00",
+        "2026-09-21T20:43:43Z",
         vec![relation(replica_identity)],
         Vec::new(),
         Vec::new(),
@@ -128,7 +128,7 @@ fn replica_identity_does_not_require_unobserved_not_null_family() {
     PostgresSchemaSnapshotV3::new(
         &support::authorized_source("warehouse_primary", &["public"]),
         "postgres_introspector_v3",
-        "2026-09-22T05:43:43+09:00",
+        "2026-09-21T20:43:43Z",
         vec![relation(true)],
         Vec::new(),
         Vec::new(),
