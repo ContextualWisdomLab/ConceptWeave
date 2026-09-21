@@ -502,6 +502,38 @@ pub(crate) fn canonicalize_not_null_constraints(
         });
     }
 
+    for relation in relations {
+        for index in relation.indexes() {
+            let is_replica_identity = index
+                .catalog_flags()
+                .is_some_and(|flags| flags.replica_identity());
+            if !is_replica_identity {
+                continue;
+            }
+            for key_attribute in index.key_attributes() {
+                let Some(column_name) = key_attribute.attribute_name() else {
+                    continue;
+                };
+                let not_null_constraint = constraints.iter().find(|constraint| {
+                    constraint.schema_name() == relation.schema_name()
+                        && constraint.relation_name() == relation.relation_name()
+                        && constraint.relation_kind() == relation.kind()
+                        && constraint.column_name() == column_name
+                });
+                let Some(not_null_constraint) = not_null_constraint else {
+                    return Err(ObservationError::InvalidObservationField {
+                        field: "index_replica_identity",
+                    });
+                };
+                if !not_null_constraint.validated() {
+                    return Err(ObservationError::InvalidObservationField {
+                        field: "index_replica_identity",
+                    });
+                }
+            }
+        }
+    }
+
     Ok(constraints)
 }
 
