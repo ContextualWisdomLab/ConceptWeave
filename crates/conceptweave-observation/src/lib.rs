@@ -518,7 +518,7 @@ impl PostgresSchemaSnapshotV3 {
 
         relations.sort_by(|left, right| {
             (left.schema_name(), left.relation_name())
-                .cmp(&(right.schema_name(), right.domain_name()))
+                .cmp(&(right.schema_name(), right.relation_name()))
         });
         domains.sort_by(|left, right| {
             (left.schema_name(), left.domain_name())
@@ -642,6 +642,12 @@ impl PostgresSchemaSnapshotV3 {
     }
 
     /// Adds one complete explicitly observed `pg_attribute.attcollation` family to this snapshot.
+    ///
+    /// The family is attached after any type-kind/array identity layer and before column-generation,
+    /// column-expression, column-identity, NOT NULL constraint, constraint timing, or PERIOD evidence,
+    /// preserving one canonical optional-family order. It validates exact bounded column coordinates,
+    /// completeness, repeated-collation determinism, and PostgreSQL's FK collation consistency rule
+    /// before extending the source digest.
     pub fn with_observed_column_collations(
         mut self,
         column_collations: Vec<ColumnCollationObservation>,
@@ -675,6 +681,12 @@ impl PostgresSchemaSnapshotV3 {
         Ok(self)
     }
 
+    /// Adds one complete explicitly observed `pg_attribute.attgenerated` family to this snapshot.
+    ///
+    /// The family is attached after type/array and column-collation evidence and before column-expression,
+    /// column-identity, NOT NULL constraint, constraint timing, or PERIOD evidence. It validates exact
+    /// bounded column coordinates, completeness, explicit not-generated state, canonical input order,
+    /// and extends source identity in a dedicated digest domain.
     pub fn with_observed_column_generations(
         mut self,
         column_generations: Vec<ColumnGenerationObservation>,
@@ -707,6 +719,12 @@ impl PostgresSchemaSnapshotV3 {
         Ok(self)
     }
 
+    /// Adds one complete explicitly observed `pg_attrdef` column-expression family to this snapshot.
+    ///
+    /// Generation declaration evidence must already be observed so default versus generated
+    /// expression kind is validated against source-authoritative `attgenerated` state. The family is
+    /// attached before identity, NOT NULL constraint, constraint timing, and PERIOD evidence; reverse-
+    /// order attachment is rejected so optional-family order cannot become a semantic escape hatch.
     pub fn with_observed_column_expressions(
         mut self,
         column_expressions: Vec<ColumnExpressionObservation>,
@@ -744,6 +762,13 @@ impl PostgresSchemaSnapshotV3 {
         Ok(self)
     }
 
+    /// Adds one complete explicitly observed `pg_attribute.attidentity` family to this snapshot.
+    ///
+    /// The family is attached after any type/array, column-collation, column-generation, and optional
+    /// column-expression evidence and before NOT NULL constraint, constraint timing, or PERIOD evidence.
+    /// It validates exact bounded column coordinates and completeness, keeps explicit not-identity
+    /// distinct from unobserved evidence, rejects a generated-column/identity contradiction,
+    /// canonicalizes input order, and extends source identity in its own digest domain.
     pub fn with_observed_column_identities(
         mut self,
         column_identities: Vec<ColumnIdentityObservation>,
@@ -784,6 +809,12 @@ impl PostgresSchemaSnapshotV3 {
         Ok(self)
     }
 
+    /// Adds one complete explicitly observed PostgreSQL 18 `pg_constraint.contype = 'n'` family.
+    ///
+    /// The family is attached after column-identity evidence, when present, and before key-constraint
+    /// timing or PERIOD evidence. It binds the exact first-class NOT NULL constraint rows to the
+    /// frozen column nullability summary, distinguishes observed-empty from unobserved state, and
+    /// extends source identity exactly once in its own digest domain.
     pub fn with_observed_not_null_constraints(
         mut self,
         not_null_constraints: Vec<NotNullConstraintObservation>,
@@ -824,6 +855,18 @@ impl PostgresSchemaSnapshotV3 {
         Ok(self)
     }
 
+    /// Adds one complete explicitly observed `pg_constraint.conperiod` family to this snapshot.
+    ///
+    /// The family is domain-separated from prior v3 identity and must cover every PRIMARY KEY,
+    /// UNIQUE, and FOREIGN KEY constraint in the bounded snapshot. Explicit `false` therefore remains
+    /// distinct from an unobserved family. Every `conperiod=true` local final column must resolve,
+    /// through source-authoritative observed type-kind/domain-base evidence, to a range or multirange.
+    /// `WITHOUT OVERLAPS` PRIMARY KEY/UNIQUE observations also require the exact resolved ordered
+    /// `pg_constraint.conexclop` operator signatures and coherent same-name GiST/exclusion backing
+    /// evidence; those facts never invent `conperiod`. A PERIOD foreign key targeting a relation
+    /// inside the same bounded snapshot must resolve to an explicitly observed `WITHOUT OVERLAPS`,
+    /// `NOT DEFERRABLE` key on the referenced columns; referenced-key timing is never inferred from
+    /// index shape. This consuming method may be applied only once.
     pub fn with_observed_constraint_periods(
         mut self,
         constraint_periods: Vec<ConstraintPeriodObservation>,
@@ -852,100 +895,127 @@ impl PostgresSchemaSnapshotV3 {
         Ok(self)
     }
 
+    /// Returns the stable source-connection registry reference, never a credential.
     #[must_use]
     pub fn source_connection_key(&self) -> &str {
         self.inner.source_connection_key()
     }
 
+    /// Returns the opaque immutable connection-policy revision authorized for this snapshot.
     #[must_use]
     pub fn connection_policy_binding(&self) -> &str {
         self.inner.connection_policy_binding()
     }
 
+    /// Returns the owner-computed canonical SHA-256 successor source-content digest.
     #[must_use]
     pub fn snapshot_digest(&self) -> &str {
         &self.snapshot_digest
     }
 
+    /// Returns the exact extractor implementation/configuration revision.
     #[must_use]
     pub fn extractor_revision(&self) -> &str {
         self.inner.extractor_revision()
     }
 
+    /// Returns the exact UTC observation-time evidence supplied by the adapter.
     #[must_use]
     pub fn observed_at_utc(&self) -> &str {
         self.inner.observed_at_utc()
     }
 
+    /// Returns qualified relations in deterministic exact-identifier order.
     #[must_use]
     pub fn relations(&self) -> &[RelationObservation] {
         &self.relations
     }
 
+    /// Returns qualified domains in deterministic exact-identifier order.
     #[must_use]
     pub fn domains(&self) -> &[DomainObservation] {
         &self.domains
     }
 
+    /// Returns qualified enums in deterministic exact-identifier order.
     #[must_use]
     pub fn enums(&self) -> &[EnumObservation] {
         &self.enums
     }
 
+    /// Returns explicitly observed true-array relationships, or `None` when that catalog family was
+    /// not observed by the constructor.
     #[must_use]
     pub fn array_types(&self) -> Option<&[ArrayTypeObservation]> {
         self.array_types_observed
             .then_some(self.array_types.as_slice())
     }
 
+    /// Returns explicitly observed PostgreSQL `pg_type`/`pg_range` evidence, or `None` when that
+    /// family was not observed.
     #[must_use]
     pub fn type_kinds(&self) -> Option<&[TypeKindObservation]> {
         self.type_kinds_observed
             .then_some(self.type_kinds.as_slice())
     }
 
+    /// Returns explicitly observed PostgreSQL column-collation evidence, or `None` when that catalog
+    /// family was not observed.
     #[must_use]
     pub fn column_collations(&self) -> Option<&[ColumnCollationObservation]> {
         self.column_collations_observed
             .then_some(self.column_collations.as_slice())
     }
 
+    /// Returns explicitly observed PostgreSQL generated-column evidence, or `None` when that catalog
+    /// family was not observed.
     #[must_use]
     pub fn column_generations(&self) -> Option<&[ColumnGenerationObservation]> {
         self.column_generations_observed
             .then_some(self.column_generations.as_slice())
     }
 
+    /// Returns explicitly observed PostgreSQL column default/generated-expression evidence, or `None`
+    /// when that catalog family was not observed.
     #[must_use]
     pub fn column_expressions(&self) -> Option<&[ColumnExpressionObservation]> {
         self.column_expressions_observed
             .then_some(self.column_expressions.as_slice())
     }
 
+    /// Returns explicitly observed PostgreSQL column-identity evidence, or `None` when that catalog
+    /// family was not observed.
     #[must_use]
     pub fn column_identities(&self) -> Option<&[ColumnIdentityObservation]> {
         self.column_identities_observed
             .then_some(self.column_identities.as_slice())
     }
 
+    /// Returns explicitly observed PostgreSQL 18 first-class NOT NULL constraint evidence, or `None`
+    /// when the adapter did not observe that catalog family.
     #[must_use]
     pub fn not_null_constraints(&self) -> Option<&[NotNullConstraintObservation]> {
         self.not_null_constraints_observed
             .then_some(self.not_null_constraints.as_slice())
     }
 
+    /// Returns explicitly observed PRIMARY KEY/UNIQUE timing, or `None` when that catalog family was
+    /// not observed by the constructor.
     #[must_use]
     pub fn constraint_timings(&self) -> Option<&[ConstraintTimingObservation]> {
         self.constraint_timings_observed
             .then_some(self.constraint_timings.as_slice())
     }
 
+    /// Returns explicitly observed PostgreSQL temporal-constraint state, or `None` when the
+    /// `pg_constraint.conperiod` family was not observed.
     #[must_use]
     pub fn constraint_periods(&self) -> Option<&[ConstraintPeriodObservation]> {
         self.constraint_periods_observed
             .then_some(self.constraint_periods.as_slice())
     }
 
+    /// Issues provenance for an exact successor coordinate only when it exists in this snapshot.
     pub fn source_receipt(
         &self,
         location: SchemaObjectLocation,
@@ -961,6 +1031,11 @@ impl PostgresSchemaSnapshotV3 {
         })
     }
 
+    /// Issues provenance for one exact observed true-array coordinate.
+    ///
+    /// This separate successor seam keeps all pre-array [`SchemaObjectLocation`] meanings frozen.
+    /// The receipt is available only when this snapshot explicitly observed the array family and the
+    /// requested exact array coordinate exists in that immutable inventory.
     pub fn array_type_source_receipt(
         &self,
         location: ArrayTypeLocation,
@@ -1082,21 +1157,6 @@ fn validate_schema_relation_invariants(
                     field: "constraint_backing_index",
                 });
             }
-        }
-
-        let replica_identity_index_count = relation
-            .indexes()
-            .iter()
-            .filter(|index| {
-                index
-                    .catalog_flags()
-                    .is_some_and(|catalog_flags| catalog_flags.replica_identity())
-            })
-            .count();
-        if replica_identity_index_count > 1 {
-            return Err(ObservationError::InvalidObservationField {
-                field: "index_replica_identity",
-            });
         }
 
         for (replica_identity_index, catalog_flags) in relation.indexes().iter().filter_map(|index| {
@@ -1412,7 +1472,7 @@ fn validate_type_bindings_with_type_kinds_and_arrays(
                 enums,
                 array_types,
                 type_kinds,
-            ) {
+        ) {
                 return Err(ObservationError::UnknownTypeBinding {
                     schema_name: column.type_binding().schema_name().to_owned(),
                     type_name: column.type_binding().type_name().to_owned(),
@@ -2419,6 +2479,10 @@ fn encode_sha256(hasher: Sha256) -> String {
 }
 
 /// Immutable receipt binding one exact observed source coordinate to snapshot provenance.
+///
+/// The receipt preserves the stable source key and the opaque immutable connection-policy binding
+/// that was authorized before source access. The binding is provider-independent provenance, never
+/// a credential or connection string.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SourceObservationReceipt {
     inner: model::SourceObservationReceipt,
@@ -2426,32 +2490,49 @@ pub struct SourceObservationReceipt {
 }
 
 impl SourceObservationReceipt {
+    /// Returns the stable source reference used by candidate evidence binding.
     #[must_use]
     pub fn source_id(&self) -> &str {
         self.inner.source_id()
     }
+
+    /// Returns the opaque immutable connection-policy revision used for this observation.
     #[must_use]
     pub fn connection_policy_binding(&self) -> &str {
         &self.connection_policy_binding
     }
+
+    /// Returns the immutable canonical snapshot digest.
     #[must_use]
     pub fn source_digest(&self) -> &str {
         self.inner.source_digest()
     }
+
+    /// Returns the exact extractor implementation/configuration revision.
     #[must_use]
     pub fn extractor_revision(&self) -> &str {
         self.inner.extractor_revision()
     }
+
+    /// Returns the exact UTC observation-time evidence supplied by the adapter.
     #[must_use]
     pub fn observed_at_utc(&self) -> &str {
         self.inner.observed_at_utc()
     }
+
+    /// Returns the verified exact source coordinate inside the snapshot.
     #[must_use]
     pub const fn location(&self) -> &ObservationLocation {
         self.inner.location()
     }
 }
 
+/// Immutable evidence that one bounded PostgreSQL schema snapshot was observed.
+///
+/// The snapshot digest is computed by ConceptWeave from a versioned, domain-separated,
+/// deterministic framing of the exact observed table, column, and constraint metadata. Source
+/// registry identity, connection-policy binding, extractor revision, and observation time remain
+/// separate provenance coordinates and do not participate in source-content identity.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PostgresSchemaSnapshot {
     inner: model::PostgresSchemaSnapshot,
@@ -2459,6 +2540,16 @@ pub struct PostgresSchemaSnapshot {
 }
 
 impl PostgresSchemaSnapshot {
+    /// Creates a deterministic snapshot contract from already-bounded, authorized source metadata.
+    ///
+    /// Collection order is canonicalized by exact qualified table identifier before the digest is
+    /// computed. Exact UTF-8 source text is preserved without Unicode, case, or quoting
+    /// normalization. The complete registry-authorized request is required so every observed local
+    /// table schema can be checked against the exact request allowlist before immutable evidence or
+    /// receipts are created and so the authorized immutable connection-policy binding is retained as
+    /// provenance. Referenced foreign-key schemas are relationship evidence and are not treated as
+    /// locally observed table schemas. The observation time remains explicit provenance and must use
+    /// the canonical UTC form enforced by the underlying observation contract.
     pub fn new(
         authorized_request: &AuthorizedObservationRequest,
         extractor_revision: impl Into<String>,
@@ -2477,6 +2568,7 @@ impl PostgresSchemaSnapshot {
                 });
             }
         }
+
         tables.sort_by(|left, right| {
             (left.schema_name(), left.table_name()).cmp(&(right.schema_name(), right.table_name()))
         });
@@ -2498,30 +2590,43 @@ impl PostgresSchemaSnapshot {
         })
     }
 
+    /// Returns the stable source-connection registry reference, never a credential.
     #[must_use]
     pub fn source_connection_key(&self) -> &str {
         self.inner.source_connection_key()
     }
+
+    /// Returns the opaque immutable connection-policy revision authorized for this snapshot.
     #[must_use]
     pub fn connection_policy_binding(&self) -> &str {
         &self.connection_policy_binding
     }
+
+    /// Returns the owner-computed canonical SHA-256 source-content digest.
     #[must_use]
     pub fn snapshot_digest(&self) -> &str {
         self.inner.snapshot_digest()
     }
+
+    /// Returns the exact extractor implementation/configuration revision.
     #[must_use]
     pub fn extractor_revision(&self) -> &str {
         self.inner.extractor_revision()
     }
+
+    /// Returns the exact UTC observation-time evidence supplied by the adapter.
     #[must_use]
     pub fn observed_at_utc(&self) -> &str {
         self.inner.observed_at_utc()
     }
+
+    /// Returns qualified tables in deterministic exact-identifier order.
     #[must_use]
     pub fn tables(&self) -> &[TableObservation] {
         self.inner.tables()
     }
+
+    /// Issues provenance for an exact coordinate only when that coordinate exists in this snapshot.
     pub fn source_receipt(
         &self,
         location: ObservationLocation,
@@ -2538,9 +2643,11 @@ fn compute_snapshot_digest(tables: &[TableObservation]) -> String {
     let mut hasher = Sha256::new();
     encode_bytes(&mut hasher, SNAPSHOT_DIGEST_DOMAIN_V2);
     encode_len(&mut hasher, tables.len());
+
     for table in tables {
         encode_str(&mut hasher, table.schema_name());
         encode_str(&mut hasher, table.table_name());
+
         encode_len(&mut hasher, table.columns().len());
         for column in table.columns() {
             encode_str(&mut hasher, column.column_name());
@@ -2549,6 +2656,7 @@ fn compute_snapshot_digest(tables: &[TableObservation]) -> String {
             encode_bool(&mut hasher, column.nullable());
             encode_optional_str(&mut hasher, column.source_comment());
         }
+
         encode_len(&mut hasher, table.constraints().len());
         for constraint in table.constraints() {
             match constraint {
@@ -2585,6 +2693,7 @@ fn compute_snapshot_digest(tables: &[TableObservation]) -> String {
             }
         }
     }
+
     encode_sha256(hasher)
 }
 
@@ -2618,6 +2727,7 @@ fn encode_foreign_key_action(hasher: &mut Sha256, action: ForeignKeyAction) {
     };
     hasher.update([tag]);
 }
+
 fn encode_foreign_key_match_type(hasher: &mut Sha256, match_type: ForeignKeyMatchType) {
     let tag = match match_type {
         ForeignKeyMatchType::Simple => 0,
@@ -2626,6 +2736,7 @@ fn encode_foreign_key_match_type(hasher: &mut Sha256, match_type: ForeignKeyMatc
     };
     hasher.update([tag]);
 }
+
 fn encode_foreign_key_deferrability(hasher: &mut Sha256, deferrability: ForeignKeyDeferrability) {
     let tag = match deferrability {
         ForeignKeyDeferrability::NotDeferrable => 0,
@@ -2634,6 +2745,7 @@ fn encode_foreign_key_deferrability(hasher: &mut Sha256, deferrability: ForeignK
     };
     hasher.update([tag]);
 }
+
 fn encode_optional_bool(hasher: &mut Sha256, value: Option<bool>) {
     match value {
         None => hasher.update([0]),
@@ -2643,6 +2755,7 @@ fn encode_optional_bool(hasher: &mut Sha256, value: Option<bool>) {
         }
     }
 }
+
 fn encode_optional_str(hasher: &mut Sha256, value: Option<&str>) {
     match value {
         None => hasher.update([0]),
@@ -2652,23 +2765,28 @@ fn encode_optional_str(hasher: &mut Sha256, value: Option<&str>) {
         }
     }
 }
+
 fn encode_str_slice(hasher: &mut Sha256, values: &[String]) {
     encode_len(hasher, values.len());
     for value in values {
         encode_str(hasher, value);
     }
 }
+
 fn encode_str(hasher: &mut Sha256, value: &str) {
     encode_bytes(hasher, value.as_bytes());
 }
+
 fn encode_bytes(hasher: &mut Sha256, value: &[u8]) {
     encode_len(hasher, value.len());
     hasher.update(value);
 }
+
 fn encode_len(hasher: &mut Sha256, value: usize) {
     let value = u64::try_from(value).expect("Rust target usize must fit into canonical u64 length");
     hasher.update(value.to_be_bytes());
 }
+
 fn encode_bool(hasher: &mut Sha256, value: bool) {
     hasher.update([u8::from(value)]);
 }
