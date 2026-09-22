@@ -34,6 +34,9 @@ jobs:
       - name: Validate Product CI contract
         run: python3 scripts/check_ci_contract.py
 
+      - name: Test staged Rust workspace adoption
+        run: python3 scripts/test_rust_workspace_adoption.py
+
       - name: Detect staged Rust workspace
         id: rust_workspace
         env:
