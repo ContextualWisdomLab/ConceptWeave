@@ -26,6 +26,7 @@ RUST_GUARDED_STEPS = (
     "Install pinned branch-coverage toolchain",
     "Exact owned coverage",
     "Lockfile freshness",
+    "Remove Rust build artifacts",
 )
 SEMANTIC_STEP_ORDER = (
     "Install pinned Node.js runtime",
@@ -96,6 +97,7 @@ def main() -> int:
         "BASE_SHA: ${{ github.event.pull_request.base.sha }}",
         "npm run check:json-contracts",
         "rm -rf node_modules",
+        "rm -rf target",
         "git ls-files --error-unmatch package-lock.json",
     )
     missing = [fragment for fragment in required_fragments if fragment not in workflow]
