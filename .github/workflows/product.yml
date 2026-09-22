@@ -51,6 +51,9 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
+      - name: Release build
+        run: cargo build --workspace --release --locked
+
       - name: Public documentation
         env:
           RUSTDOCFLAGS: -D warnings
