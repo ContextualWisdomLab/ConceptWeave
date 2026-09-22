@@ -1,5 +1,15 @@
 # ConceptWeave
 
+## Local Zotero research proposal
+
+With Zotero running locally:
+
+```sh
+cargo +1.98.0 run --bin conceptweave-zotero -- /tmp/conceptweave-zotero-classification.json
+```
+
+The command reads one stable library-version snapshot and creates a local, reviewable JSON report. Output is restricted to a new direct child of canonical `/tmp` or the system temporary directory, and the command never changes Zotero records.
+
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ContextualWisdomLab/ConceptWeave)
 
 **Automatic, evidence-bound ontology and semantic-layer engineering for governed enterprise meaning.**

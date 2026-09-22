@@ -54,6 +54,14 @@ Support stable adapters for `semantic-data-portal`, `LineageWeave`, `context-gra
 
 All LLM-backed induction uses `contextual-orchestrator`. Model output is untrusted proposal data and may not skip deterministic validation or review.
 
+### FR-9 Research evidence intake
+
+Preserve every observed source, including standalone files and notes outside the bibliographic proposals. Keep unresolved source relationships visible instead of treating a completed bibliography worksheet as a completed library review. All standalone sources and records without a valid path to a bibliographic parent need explicit reconciliation; notes, files and annotations must not acquire paper labels from their titles. Retraction and correction evidence remains separate from topic classification and approval. The current producer retains this inventory; downstream reconciliation, completion admission and independent governance remain required, not implemented by inventory generation alone.
+
+Library reads must finish within a bounded observation window or fail visibly without returning a partial classification. Slowly arriving pages cannot keep a run open indefinitely, and missing time budget must not be handled by silently dropping papers.
+
+Read a complete Zotero Local API observation with one consistent library version and propose exactly one research disposition for every top-level bibliographic item. This consistency check does not establish an atomic provider snapshot. A record claiming a revision newer than the observed library invalidates the complete read; it must not be omitted or assigned a different revision to make the read pass. Each proposal retains the item key/version, exact matched metadata values, rule revision, linked child records, and any model receipt. Weak evidence and evidence that matches multiple specific disposition families must abstain into steward review. Duplicate DOI/title identities are review candidates only: intake never merges, deletes, or silently mutates Zotero records.
+
 ## 6. First vertical slice
 
 Relational schema snapshot -> observed tables/columns/foreign keys -> concept/relation/dimension/measure/mapping candidates -> evidence-bound validation report -> reviewable proposal package.
