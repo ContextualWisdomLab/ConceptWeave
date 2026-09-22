@@ -1,4 +1,4 @@
-"""Fail closed when Product CI regresses on runner or coverage toolchain identity."""
+"""Fail closed when Product CI regresses on runner, Draft execution, or coverage identity."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ WORKFLOW_PATH = Path(".github/workflows/product.yml")
 
 
 def main() -> int:
-    """Validate queue-admission, supersession, and branch-coverage invariants."""
+    """Validate queue-admission, Draft execution, supersession, and coverage invariants."""
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
     required_fragments = (
@@ -17,7 +17,7 @@ def main() -> int:
         "types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]",
         "group: ${{ github.workflow }}-${{ github.repository }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}",
         "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
-        "if: ${{ github.event_name != 'pull_request' || (github.event.action != 'closed' && github.event.pull_request.draft == false) }}",
+        "if: ${{ github.event_name != 'pull_request' || github.event.action != 'closed' }}",
         "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
         "COVERAGE_TOOLCHAIN: nightly-2026-08-20",
         'rustup toolchain install "$COVERAGE_TOOLCHAIN" --profile minimal --component llvm-tools-preview',
@@ -36,6 +36,12 @@ def main() -> int:
 
     if "github.event.pull_request.number || github.ref" in workflow:
         raise SystemExit("Product CI must isolate non-PR runs by run_id")
+
+    if "github.event.pull_request.draft == false" in workflow:
+        raise SystemExit(
+            "Product CI must execute quality gates on Draft pull requests; "
+            "Ready is downstream of exact-head GREEN"
+        )
 
     return 0
 
