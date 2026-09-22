@@ -17,6 +17,7 @@ This is a bidirectional catalog-coherence rule, not a presentation rule. Postgre
 - Base-snapshot lifecycle control `abc26ac3b255ee43d9c1a82edb9a366ee6720168` proves exact name/key reciprocity must remain admissible when `ready`, `valid`, and `live` lifecycle evidence is unobserved.
 - Diagnostic-only normalization `de1895e1c12d3a567adccb328a4f6f056f7248bf` is the exact predecessor reviewed in COMMENT review `5261567427`.
 - Production repair `5789cfa1fd8707528edbfe9e7f4133b853a464ff` adds the inverse primary-index check to `validate_schema_relation_invariants()`. The exact predecessor comparison is one ordinary-forward commit changing only `crates/conceptweave-observation/src/lib.rs`, with 24 additions and no deletions.
+- Follow-on review `5276003307` at exact head `6331d11b8a91985925575adac7686af76c4046ae` found that exact name/key reciprocity still admitted a primary backing index carrying `NULLS NOT DISTINCT`. Focused RED `4962672ad64dbaba35088f87b15ca305200b1c1b` records that separate PostgreSQL invariant; focused rationale is `docs/doctoring/postgresql-primary-index-nulls-not-distinct-integrity.md`.
 
 ## Why the existing checks were insufficient
 
@@ -28,7 +29,7 @@ The optional constraint-timing family cannot repair this boundary. Timing is add
 
 The base aggregate now inspects every relation index whose observed `catalog_flags().is_some_and(|flags| flags.primary())` is true. It requires a same-relation `TableConstraintObservation::PrimaryKey` with the exact same constraint/index name and exact ordered key-column shape. A mismatch fails closed through the existing `constraint_backing_index` error vocabulary.
 
-The base seam intentionally does **not** call `key_constraint_backing_index_static_shape_matches()`. That helper is stronger because it also requires predicate/null-treatment/catalog-primary coherence plus `ready`, `valid`, and `live` lifecycle evidence and is used by timing/PERIOD validation. Importing those requirements into the base snapshot would reject a coherent catalog snapshot merely because optional lifecycle evidence was not observed yet.
+The base seam intentionally does **not** call `key_constraint_backing_index_static_shape_matches()`. That helper is stronger because it also requires predicate/catalog-primary coherence plus `ready`, `valid`, and `live` lifecycle evidence and is used by timing/PERIOD validation. Importing those lifecycle requirements into the base snapshot would reject a coherent catalog snapshot merely because optional lifecycle evidence was not observed yet.
 
 The repair preserves these distinctions:
 
@@ -36,7 +37,8 @@ The repair preserves these distinctions:
 - a primary index is different: `indisprimary` specifically states that it represents the table primary key;
 - PRIMARY KEY `INCLUDE` payload remains legal because the base reciprocity compares only ordered key attributes, not included payload attributes;
 - PostgreSQL 18 `WITHOUT OVERLAPS` primary keys may use GiST, so the inverse rule does not hard-code B-tree;
-- predicate, null-treatment, lifecycle, timing, exclusion and PERIOD completeness remain owned by their existing stronger backing-index validation seams rather than being duplicated in the base aggregate.
+- predicate, lifecycle, timing, exclusion and PERIOD completeness remain owned by their existing stronger validation seams rather than being duplicated in the base aggregate;
+- PRIMARY KEY null treatment is **not** delegated to `key_constraint_backing_index_static_shape_matches()`: its PRIMARY KEY branch currently leaves expected null treatment as `None`, so `is_none_or(...)` imposes no prohibition. PostgreSQL 18 separately rejects PRIMARY KEY indexes with `NULLS NOT DISTINCT`; follow-on RED `4962672ad64dbaba35088f87b15ca305200b1c1b` now owns that uncovered base invariant.
 
 ## Primary sources
 
@@ -48,6 +50,8 @@ PostgreSQL Global Development Group. (2026c). *PostgreSQL 18 documentation: CREA
 
 PostgreSQL Global Development Group. (2026d). *PostgreSQL 18 documentation: 5.5. Constraints*. https://www.postgresql.org/docs/18/ddl-constraints.html
 
+PostgreSQL Global Development Group. (2026e). *PostgreSQL 18 source: primary-key index validation (`src/backend/catalog/index.c`)* [Source code, `051db7737c18b1c5d25cdc4ad508608c4b53fafc`]. https://github.com/postgres/postgres/blob/051db7737c18b1c5d25cdc4ad508608c4b53fafc/src/backend/catalog/index.c
+
 ## Acceptance
 
-The source defect is repaired at `5789cfa1fd8707528edbfe9e7f4133b853a464ff`, but execution GREEN is not inferred from source inspection. Acceptance still requires the six focused reciprocity boundaries and retained constraint/index contracts to execute GREEN on the same exact head, followed by the normal ConceptWeave Rust 1.98, strict Clippy, workspace/doc tests, release/rustdoc/owned coverage, and PostgreSQL 18 same-generation differential evidence. Predecessor checks do not transfer.
+The exact name/key reciprocity defect was repaired at `5789cfa1fd8707528edbfe9e7f4133b853a464ff`, but the follow-on PRIMARY KEY `NULLS NOT DISTINCT` defect is currently RED-recorded and not source-repaired. Acceptance therefore requires the focused null-treatment contract plus the retained reciprocity boundaries to execute GREEN on one unchanged repaired head, followed by the normal ConceptWeave Rust 1.98, strict Clippy, workspace/doc tests, release/rustdoc/owned coverage, and PostgreSQL 18 same-generation differential evidence. Predecessor checks do not transfer.
