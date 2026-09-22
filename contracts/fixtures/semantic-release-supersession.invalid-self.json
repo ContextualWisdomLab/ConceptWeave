@@ -1,0 +1,11 @@
+{
+  "superseded": {
+    "release_id": "semantic_release_same_identity",
+    "artifact_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "successor": {
+    "release_id": "semantic_release_same_identity",
+    "artifact_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "rationale": "Invalid fixture: one stable release identity cannot supersede itself."
+}

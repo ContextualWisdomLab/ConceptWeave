@@ -1,0 +1,16 @@
+{
+  "release_id": "semantic-release-grc-2026-09-01",
+  "contract_version": "1.0.0",
+  "ontology_version": "grc-ontology-2026-09",
+  "truth_status": "authoritative",
+  "publication_state": "published",
+  "artifact_digest": "sha256:not-a-digest",
+  "provenance": [
+    {
+      "source_id": "snapshot:grc-schema-2026-09-01",
+      "source_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "location": "public.control_evidence.control_identifier"
+    }
+  ],
+  "concept_ids": ["control.evidence"]
+}
