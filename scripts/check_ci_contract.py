@@ -21,7 +21,7 @@ def main() -> int:
         "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
         "if: ${{ github.event_name != 'pull_request' || github.event.action != 'closed' }}",
         "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
-        "RUSTUP_TOOLCHAIN: 1.98.0",
+        "RUSTUP_TOOLCHAIN: 1.98.1",
         'rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt --component clippy',
         'test "$(rustc --version | awk \'{print $2}\')" = "$RUSTUP_TOOLCHAIN"',
         'rustup show active-toolchain | grep -Eq "^${RUSTUP_TOOLCHAIN}-"',
@@ -52,6 +52,7 @@ def main() -> int:
         "node-version: lts/",
         "node-version: latest",
         "RUSTUP_TOOLCHAIN: stable",
+        "RUSTUP_TOOLCHAIN: 1.98.0",
         "rustup default stable",
     )
     forbidden = [fragment for fragment in forbidden_fragments if fragment in workflow]
