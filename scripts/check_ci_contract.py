@@ -21,6 +21,9 @@ def main() -> int:
         "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
         "if: ${{ github.event_name != 'pull_request' || github.event.action != 'closed' }}",
         "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
+        "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+        "node-version: '24.21.0'",
+        "package-manager-cache: false",
         "COVERAGE_TOOLCHAIN: nightly-2026-08-20",
         'rustup toolchain install "$COVERAGE_TOOLCHAIN" --profile minimal --component llvm-tools-preview',
         "npm ci --ignore-scripts --no-audit --no-fund",
@@ -41,6 +44,9 @@ def main() -> int:
         "github.event.pull_request.number || github.ref",
         "github.event.pull_request.draft == false",
         "npx --yes",
+        "uses: actions/setup-node@v",
+        "node-version: lts/",
+        "node-version: latest",
     )
     forbidden = [fragment for fragment in forbidden_fragments if fragment in workflow]
     if forbidden:
