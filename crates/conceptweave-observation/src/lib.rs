@@ -393,9 +393,8 @@ impl PostgresSchemaSnapshotV3 {
     /// Creates a deterministic v3 snapshot with source-authoritative column generation and expression evidence.
     ///
     /// `pg_attribute.attgenerated` is attached before the corresponding `pg_attrdef` expression
-    /// family so generated/default expression kind can be checked against source-authoritative `attgenerated` state. The family is
-    /// attached before identity, NOT NULL constraint, constraint timing, and PERIOD evidence; reverse-
-    /// order attachment is rejected so optional-family order cannot become a semantic escape hatch.
+    /// family so generated/default expression kind can be checked against the same bounded column
+    /// inventory before the governed digest is extended.
     pub fn new_with_column_expressions(
         authorized_request: &AuthorizedObservationRequest,
         extractor_revision: impl Into<String>,
@@ -2744,7 +2743,6 @@ fn compute_snapshot_digest(tables: &[TableObservation]) -> String {
                 TableConstraintObservation::ForeignKey(observation) => {
                     hasher.update([2]);
                     encode_str(&mut hasher, observation.constraint_name());
-                    encode_str_slice(&mut hasher, observation.column_names());
                     encode_str(&mut hasher, observation.referenced_schema_name());
                     encode_str(&mut hasher, observation.referenced_table_name());
                     encode_str_slice(&mut hasher, observation.referenced_column_names());
