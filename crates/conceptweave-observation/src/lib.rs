@@ -37,7 +37,7 @@ pub use representation_v3::{
     IndexAttributeKind, IndexAttributeObservation, IndexAttributeSource, IndexCatalogFlags,
     IndexKeySemantics, IndexObservation, IndexStorageOption, IndexTablespace, OperatorClassOption,
     QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
-    RelationObservation, SchemaObjectLocation, SchemaObjectLocationKind,
+    RelationObservation, ReplicaIdentityMode, SchemaObjectLocation, SchemaObjectLocationKind,
 };
 pub use type_kind::{PostgresTypeKind, TypeKindObservation};
 
@@ -1580,6 +1580,9 @@ fn project_relation_type_kind_bindings(
         relation.kind(),
         columns,
     )?;
+    if let Some(replica_identity_mode) = relation.replica_identity_mode() {
+        projected = projected.with_replica_identity_mode(replica_identity_mode);
+    }
     if !relation.constraints().is_empty() {
         projected = projected.with_constraints(relation.constraints().to_vec())?;
     }
@@ -2316,6 +2319,9 @@ fn project_relation_array_bindings(
         relation.kind(),
         columns,
     )?;
+    if let Some(replica_identity_mode) = relation.replica_identity_mode() {
+        projected = projected.with_replica_identity_mode(replica_identity_mode);
+    }
     if !relation.constraints().is_empty() {
         projected = projected.with_constraints(relation.constraints().to_vec())?;
     }
