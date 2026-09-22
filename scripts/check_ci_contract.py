@@ -33,6 +33,7 @@ SEMANTIC_STEP_ORDER = (
     "Install pinned JSON Schema validator",
     "Test staged semantic contract adoption",
     "Validate public JSON contracts",
+    "Remove installed Node dependencies",
 )
 
 
@@ -94,6 +95,7 @@ def main() -> int:
         "node scripts/test_semantic_contract_adoption.mjs",
         "BASE_SHA: ${{ github.event.pull_request.base.sha }}",
         "npm run check:json-contracts",
+        "rm -rf node_modules",
         "git ls-files --error-unmatch package-lock.json",
     )
     missing = [fragment for fragment in required_fragments if fragment not in workflow]
