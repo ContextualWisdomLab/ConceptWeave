@@ -7,6 +7,7 @@ from pathlib import Path
 
 WORKFLOW_PATH = Path(".github/workflows/product.yml")
 COVERAGE_SCRIPT_PATH = Path("scripts/check_coverage.sh")
+SEMANTIC_CHECKER_PATH = Path("scripts/check_semantic_candidate_contracts.mjs")
 PACKAGE_JSON_PATH = Path("package.json")
 PACKAGE_LOCK_PATH = Path("package-lock.json")
 
@@ -37,6 +38,7 @@ def main() -> int:
         'rustup toolchain install "$COVERAGE_TOOLCHAIN" --profile minimal --component llvm-tools-preview',
         "bash scripts/check_coverage.sh",
         "npm ci --ignore-scripts --no-audit --no-fund",
+        "BASE_SHA: ${{ github.event.pull_request.base.sha }}",
         "npm run check:json-contracts",
         "git ls-files --error-unmatch package-lock.json",
     )
@@ -48,6 +50,30 @@ def main() -> int:
 
     if not COVERAGE_SCRIPT_PATH.is_file():
         raise SystemExit("Product CI requires tracked scripts/check_coverage.sh")
+
+    if not SEMANTIC_CHECKER_PATH.is_file():
+        raise SystemExit(
+            "Product CI requires tracked scripts/check_semantic_candidate_contracts.mjs"
+        )
+
+    semantic_checker = SEMANTIC_CHECKER_PATH.read_text(encoding="utf-8")
+    semantic_required_fragments = (
+        "process.env.BASE_SHA",
+        "git",
+        "cat-file",
+        "not_adopted",
+        "semantic_contract_incomplete",
+    )
+    semantic_missing = [
+        fragment
+        for fragment in semantic_required_fragments
+        if fragment not in semantic_checker
+    ]
+    if semantic_missing:
+        raise SystemExit(
+            "Semantic contract checker missing staged-adoption fragment(s): "
+            + ", ".join(semantic_missing)
+        )
 
     if not PACKAGE_JSON_PATH.is_file() or not PACKAGE_LOCK_PATH.is_file():
         raise SystemExit("Product CI requires tracked package.json and package-lock.json")
