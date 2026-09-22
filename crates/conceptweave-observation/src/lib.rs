@@ -393,8 +393,9 @@ impl PostgresSchemaSnapshotV3 {
     /// Creates a deterministic v3 snapshot with source-authoritative column generation and expression evidence.
     ///
     /// `pg_attribute.attgenerated` is attached before the corresponding `pg_attrdef` expression
-    /// family so generated/default expression kind can be checked against the same bounded column
-    /// inventory before the governed digest is extended.
+    /// family so generated/default expression kind can be checked against source-authoritative `attgenerated` state. The family is
+    /// attached before identity, NOT NULL constraint, constraint timing, and PERIOD evidence; reverse-
+    /// order attachment is rejected so optional-family order cannot become a semantic escape hatch.
     pub fn new_with_column_expressions(
         authorized_request: &AuthorizedObservationRequest,
         extractor_revision: impl Into<String>,
@@ -1205,6 +1206,15 @@ fn validate_schema_relation_invariants(
             })
             .count();
         if replica_identity_index_count > 1 {
+            return Err(ObservationError::InvalidObservationField {
+                field: "index_replica_identity",
+            });
+        }
+        if relation
+            .replica_identity_mode()
+            .is_some_and(|mode| mode != ReplicaIdentityMode::Index)
+            && replica_identity_index_count != 0
+        {
             return Err(ObservationError::InvalidObservationField {
                 field: "index_replica_identity",
             });
