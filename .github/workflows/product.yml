@@ -34,40 +34,56 @@ jobs:
       - name: Validate Product CI contract
         run: python3 scripts/check_ci_contract.py
 
+      - name: Detect staged Rust workspace
+        id: rust_workspace
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: python3 scripts/check_rust_workspace_adoption.py >> "$GITHUB_OUTPUT"
+
       - name: Install pinned Rust toolchain
+        if: steps.rust_workspace.outputs.adopted == 'true'
         run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt --component clippy
 
       - name: Verify pinned Rust toolchain
+        if: steps.rust_workspace.outputs.adopted == 'true'
         run: |
           test "$(rustc --version | awk '{print $2}')" = "$RUSTUP_TOOLCHAIN"
           rustup show active-toolchain | grep -Eq "^${RUSTUP_TOOLCHAIN}-"
 
       - name: Format
+        if: steps.rust_workspace.outputs.adopted == 'true'
         run: cargo fmt --all --check
 
       - name: Clippy
+        if: steps.rust_workspace.outputs.adopted == 'true'
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
       - name: Test
+        if: steps.rust_workspace.outputs.adopted == 'true'
         run: cargo test --workspace --locked
 
       - name: Release build
+        if: steps.rust_workspace.outputs.adopted == 'true'
         run: cargo build --workspace --release --locked
 
       - name: Public documentation
+        if: steps.rust_workspace.outputs.adopted == 'true'
         env:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc --workspace --no-deps --locked
 
       - name: Install cargo-llvm-cov
+        if: steps.rust_workspace.outputs.adopted == 'true'
         uses: taiki-e/install-action@1ed6d7be6168f6c9046541087ff549b6bc581fdf # v2.87.2
         with:
           tool: cargo-llvm-cov
 
       - name: Install pinned branch-coverage toolchain
+        if: steps.rust_workspace.outputs.adopted == 'true'
         run: rustup toolchain install "$COVERAGE_TOOLCHAIN" --profile minimal --component llvm-tools-preview
 
       - name: Exact owned coverage
+        if: steps.rust_workspace.outputs.adopted == 'true'
         run: bash scripts/check_coverage.sh
 
       - name: Install pinned Node.js runtime
@@ -88,6 +104,7 @@ jobs:
         run: npm run check:json-contracts
 
       - name: Lockfile freshness
+        if: steps.rust_workspace.outputs.adopted == 'true'
         run: |
           cargo generate-lockfile --locked
           git ls-files --error-unmatch Cargo.lock >/dev/null
