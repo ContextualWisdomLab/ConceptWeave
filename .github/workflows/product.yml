@@ -83,6 +83,8 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Validate public JSON contracts
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: npm run check:json-contracts
 
       - name: Lockfile freshness
