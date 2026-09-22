@@ -1145,6 +1145,7 @@ fn validate_schema_relation_invariants(
                 matches!(constraint, TableConstraintObservation::PrimaryKey(_))
                     && constraint.constraint_name() == primary_index.index_name()
                     && primary_index.predicate().is_none()
+                    && primary_index.nulls_not_distinct() != Some(true)
                     && primary_index.key_attributes().len() == constraint.column_names().len()
                     && primary_index
                         .key_attributes()
