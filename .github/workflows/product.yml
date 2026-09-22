@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   rust-quality:
+    name: ${{ github.event.action == 'edited' && github.event.changes.base == null && 'Product metadata-only' || 'Product acceptance' }}
     if: ${{ github.event.action != 'closed' && (github.event.action != 'edited' || github.event.changes.base != null) }}
     runs-on: ubuntu-24.04
     env:
