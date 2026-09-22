@@ -8,6 +8,7 @@ from pathlib import Path
 WORKFLOW_PATH = Path(".github/workflows/product.yml")
 COVERAGE_SCRIPT_PATH = Path("scripts/check_coverage.sh")
 RUST_ADOPTION_CHECKER_PATH = Path("scripts/check_rust_workspace_adoption.py")
+RUST_ADOPTION_TEST_PATH = Path("scripts/test_rust_workspace_adoption.py")
 SEMANTIC_CHECKER_PATH = Path("scripts/check_semantic_candidate_contracts.mjs")
 PACKAGE_JSON_PATH = Path("package.json")
 PACKAGE_LOCK_PATH = Path("package-lock.json")
@@ -48,6 +49,7 @@ def main() -> int:
         "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
         "if: ${{ github.event_name != 'pull_request' || github.event.action != 'closed' }}",
         "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
+        "python3 scripts/test_rust_workspace_adoption.py",
         "id: rust_workspace",
         'python3 scripts/check_rust_workspace_adoption.py >> "$GITHUB_OUTPUT"',
         "RUSTUP_TOOLCHAIN: 1.98.1",
@@ -88,6 +90,11 @@ def main() -> int:
     if not RUST_ADOPTION_CHECKER_PATH.is_file():
         raise SystemExit(
             "Product CI requires tracked scripts/check_rust_workspace_adoption.py"
+        )
+
+    if not RUST_ADOPTION_TEST_PATH.is_file():
+        raise SystemExit(
+            "Product CI requires tracked scripts/test_rust_workspace_adoption.py"
         )
 
     rust_adoption_checker = RUST_ADOPTION_CHECKER_PATH.read_text(encoding="utf-8")
