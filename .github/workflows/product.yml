@@ -16,7 +16,7 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'closed' }}
     runs-on: ubuntu-24.04
     env:
-      RUSTUP_TOOLCHAIN: 1.98.0
+      RUSTUP_TOOLCHAIN: 1.98.1
       COVERAGE_TOOLCHAIN: nightly-2026-08-20
     steps:
       - name: Checkout exact source revision
