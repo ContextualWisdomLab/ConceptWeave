@@ -399,6 +399,34 @@ impl RelationKind {
     }
 }
 
+/// PostgreSQL relation-level replica identity mode reported by `pg_class.relreplident`.
+///
+/// This source-owned state is distinct from per-index `pg_index.indisreplident`. PostgreSQL may
+/// retain `Index` after the selected identity index is dropped, so the mode is preserved directly
+/// and is never reconstructed from the surviving index set.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ReplicaIdentityMode {
+    /// `REPLICA IDENTITY DEFAULT` (`relreplident = 'd'`).
+    Default,
+    /// `REPLICA IDENTITY NOTHING` (`relreplident = 'n'`).
+    Nothing,
+    /// `REPLICA IDENTITY FULL` (`relreplident = 'f'`).
+    Full,
+    /// `REPLICA IDENTITY USING INDEX` (`relreplident = 'i'`).
+    Index,
+}
+
+impl ReplicaIdentityMode {
+    fn tag(self) -> u8 {
+        match self {
+            Self::Default => 0,
+            Self::Nothing => 1,
+            Self::Full => 2,
+            Self::Index => 3,
+        }
+    }
+}
+
 /// One immutable successor PostgreSQL column observation.
 ///
 /// Display text and identity stay separate: [`Self::data_type`] preserves the exact source
@@ -1303,6 +1331,7 @@ pub struct RelationObservation {
     schema_name: String,
     relation_name: String,
     kind: RelationKind,
+    replica_identity_mode: Option<ReplicaIdentityMode>,
     columns: Vec<ColumnObservationV3>,
     constraints: Vec<TableConstraintObservation>,
     indexes: Vec<IndexObservation>,
@@ -1352,6 +1381,7 @@ impl RelationObservation {
             schema_name,
             relation_name,
             kind,
+            replica_identity_mode: None,
             columns,
             constraints: Vec::new(),
             indexes: Vec::new(),
@@ -1395,6 +1425,16 @@ impl RelationObservation {
         constraints.sort_by(|left, right| left.constraint_name().cmp(right.constraint_name()));
         self.constraints = constraints;
         Ok(self)
+    }
+
+    /// Records the exact observed relation-level replica-identity mode.
+    #[must_use]
+    pub const fn with_replica_identity_mode(
+        mut self,
+        replica_identity_mode: ReplicaIdentityMode,
+    ) -> Self {
+        self.replica_identity_mode = Some(replica_identity_mode);
+        self
     }
 
     /// Records the exact optional relation comment without inventing missing metadata.
@@ -1499,6 +1539,12 @@ impl RelationObservation {
     #[must_use]
     pub const fn kind(&self) -> RelationKind {
         self.kind
+    }
+
+    /// Returns the exact observed relation-level replica-identity mode, or `None` when unobserved.
+    #[must_use]
+    pub const fn replica_identity_mode(&self) -> Option<ReplicaIdentityMode> {
+        self.replica_identity_mode
     }
 
     /// Returns columns in deterministic source ordinal order.
@@ -2301,6 +2347,13 @@ fn compute_snapshot_digest_v3(
         encode_str(&mut hasher, relation.schema_name());
         encode_str(&mut hasher, relation.relation_name());
         hasher.update([relation.kind().tag()]);
+        match relation.replica_identity_mode() {
+            None => hasher.update([0]),
+            Some(mode) => {
+                hasher.update([1]);
+                hasher.update([mode.tag()]);
+            }
+        }
         encode_optional_str(&mut hasher, relation.source_comment());
 
         encode_len(&mut hasher, relation.columns().len());
