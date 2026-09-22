@@ -27,6 +27,13 @@ RUST_GUARDED_STEPS = (
     "Exact owned coverage",
     "Lockfile freshness",
 )
+SEMANTIC_STEP_ORDER = (
+    "Install pinned Node.js runtime",
+    "Verify pinned Node.js runtime",
+    "Install pinned JSON Schema validator",
+    "Test staged semantic contract adoption",
+    "Validate public JSON contracts",
+)
 
 
 def _workflow_step_block(workflow: str, step_name: str) -> str:
@@ -34,9 +41,25 @@ def _workflow_step_block(workflow: str, step_name: str) -> str:
     marker = f"      - name: {step_name}\n"
     start = workflow.find(marker)
     if start < 0:
-        raise SystemExit(f"Product CI contract missing Rust step: {step_name}")
+        raise SystemExit(f"Product CI contract missing workflow step: {step_name}")
     next_step = workflow.find("\n      - name: ", start + len(marker))
     return workflow[start:] if next_step < 0 else workflow[start:next_step]
+
+
+def _require_step_order(workflow: str, step_names: tuple[str, ...]) -> None:
+    """Fail when an ordered validation chain is missing or reordered."""
+    offsets = []
+    for step_name in step_names:
+        marker = f"      - name: {step_name}\n"
+        offset = workflow.find(marker)
+        if offset < 0:
+            raise SystemExit(f"Product CI contract missing workflow step: {step_name}")
+        offsets.append(offset)
+    if offsets != sorted(offsets):
+        raise SystemExit(
+            "Product CI semantic validation steps must preserve pinned-runtime order: "
+            + " -> ".join(step_names)
+        )
 
 
 def main() -> int:
@@ -85,6 +108,8 @@ def main() -> int:
             raise SystemExit(
                 f"Product CI Rust step must be staged by workspace adoption: {step_name}"
             )
+
+    _require_step_order(workflow, SEMANTIC_STEP_ORDER)
 
     if not COVERAGE_SCRIPT_PATH.is_file():
         raise SystemExit("Product CI requires tracked scripts/check_coverage.sh")
