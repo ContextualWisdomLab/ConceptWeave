@@ -10,6 +10,7 @@ COVERAGE_SCRIPT_PATH = Path("scripts/check_coverage.sh")
 RUST_ADOPTION_CHECKER_PATH = Path("scripts/check_rust_workspace_adoption.py")
 RUST_ADOPTION_TEST_PATH = Path("scripts/test_rust_workspace_adoption.py")
 SEMANTIC_CHECKER_PATH = Path("scripts/check_semantic_candidate_contracts.mjs")
+SEMANTIC_ADOPTION_TEST_PATH = Path("scripts/test_semantic_contract_adoption.mjs")
 PACKAGE_JSON_PATH = Path("package.json")
 PACKAGE_LOCK_PATH = Path("package-lock.json")
 RUST_ADOPTION_GUARD = "if: steps.rust_workspace.outputs.adopted == 'true'"
@@ -67,6 +68,7 @@ def main() -> int:
         'rustup toolchain install "$COVERAGE_TOOLCHAIN" --profile minimal --component llvm-tools-preview',
         "bash scripts/check_coverage.sh",
         "npm ci --ignore-scripts --no-audit --no-fund",
+        "node scripts/test_semantic_contract_adoption.mjs",
         "BASE_SHA: ${{ github.event.pull_request.base.sha }}",
         "npm run check:json-contracts",
         "git ls-files --error-unmatch package-lock.json",
@@ -122,6 +124,11 @@ def main() -> int:
     if not SEMANTIC_CHECKER_PATH.is_file():
         raise SystemExit(
             "Product CI requires tracked scripts/check_semantic_candidate_contracts.mjs"
+        )
+
+    if not SEMANTIC_ADOPTION_TEST_PATH.is_file():
+        raise SystemExit(
+            "Product CI requires tracked scripts/test_semantic_contract_adoption.mjs"
         )
 
     semantic_checker = SEMANTIC_CHECKER_PATH.read_text(encoding="utf-8")
