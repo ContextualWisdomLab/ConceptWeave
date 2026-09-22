@@ -7,9 +7,34 @@ from pathlib import Path
 
 WORKFLOW_PATH = Path(".github/workflows/product.yml")
 COVERAGE_SCRIPT_PATH = Path("scripts/check_coverage.sh")
+RUST_ADOPTION_CHECKER_PATH = Path("scripts/check_rust_workspace_adoption.py")
 SEMANTIC_CHECKER_PATH = Path("scripts/check_semantic_candidate_contracts.mjs")
 PACKAGE_JSON_PATH = Path("package.json")
 PACKAGE_LOCK_PATH = Path("package-lock.json")
+RUST_ADOPTION_GUARD = "if: steps.rust_workspace.outputs.adopted == 'true'"
+RUST_GUARDED_STEPS = (
+    "Install pinned Rust toolchain",
+    "Verify pinned Rust toolchain",
+    "Format",
+    "Clippy",
+    "Test",
+    "Release build",
+    "Public documentation",
+    "Install cargo-llvm-cov",
+    "Install pinned branch-coverage toolchain",
+    "Exact owned coverage",
+    "Lockfile freshness",
+)
+
+
+def _workflow_step_block(workflow: str, step_name: str) -> str:
+    """Return one named workflow step without parsing unrelated YAML."""
+    marker = f"      - name: {step_name}\n"
+    start = workflow.find(marker)
+    if start < 0:
+        raise SystemExit(f"Product CI contract missing Rust step: {step_name}")
+    next_step = workflow.find("\n      - name: ", start + len(marker))
+    return workflow[start:] if next_step < 0 else workflow[start:next_step]
 
 
 def main() -> int:
@@ -23,6 +48,8 @@ def main() -> int:
         "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
         "if: ${{ github.event_name != 'pull_request' || github.event.action != 'closed' }}",
         "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
+        "id: rust_workspace",
+        'python3 scripts/check_rust_workspace_adoption.py >> "$GITHUB_OUTPUT"',
         "RUSTUP_TOOLCHAIN: 1.98.1",
         'rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt --component clippy',
         'test "$(rustc --version | awk \'{print $2}\')" = "$RUSTUP_TOOLCHAIN"',
@@ -48,8 +75,42 @@ def main() -> int:
             "Product CI contract missing required fragment(s): " + ", ".join(missing)
         )
 
+    for step_name in RUST_GUARDED_STEPS:
+        block = _workflow_step_block(workflow, step_name)
+        if RUST_ADOPTION_GUARD not in block:
+            raise SystemExit(
+                f"Product CI Rust step must be staged by workspace adoption: {step_name}"
+            )
+
     if not COVERAGE_SCRIPT_PATH.is_file():
         raise SystemExit("Product CI requires tracked scripts/check_coverage.sh")
+
+    if not RUST_ADOPTION_CHECKER_PATH.is_file():
+        raise SystemExit(
+            "Product CI requires tracked scripts/check_rust_workspace_adoption.py"
+        )
+
+    rust_adoption_checker = RUST_ADOPTION_CHECKER_PATH.read_text(encoding="utf-8")
+    rust_adoption_required_fragments = (
+        'os.environ.get("BASE_SHA")',
+        "cat-file",
+        "Cargo.toml",
+        "Cargo.lock",
+        "not_adopted",
+        "rust_workspace_incomplete",
+        "adopted=true",
+        "adopted=false",
+    )
+    rust_adoption_missing = [
+        fragment
+        for fragment in rust_adoption_required_fragments
+        if fragment not in rust_adoption_checker
+    ]
+    if rust_adoption_missing:
+        raise SystemExit(
+            "Rust workspace adoption checker missing staged-adoption fragment(s): "
+            + ", ".join(rust_adoption_missing)
+        )
 
     if not SEMANTIC_CHECKER_PATH.is_file():
         raise SystemExit(
