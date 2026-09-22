@@ -6,6 +6,7 @@ from pathlib import Path
 
 
 WORKFLOW_PATH = Path(".github/workflows/product.yml")
+COVERAGE_SCRIPT_PATH = Path("scripts/check_coverage.sh")
 PACKAGE_JSON_PATH = Path("package.json")
 PACKAGE_LOCK_PATH = Path("package-lock.json")
 
@@ -31,6 +32,7 @@ def main() -> int:
         "package-manager-cache: false",
         "COVERAGE_TOOLCHAIN: nightly-2026-08-20",
         'rustup toolchain install "$COVERAGE_TOOLCHAIN" --profile minimal --component llvm-tools-preview',
+        "bash scripts/check_coverage.sh",
         "npm ci --ignore-scripts --no-audit --no-fund",
         "npm run check:json-contracts",
         "git ls-files --error-unmatch package-lock.json",
@@ -40,6 +42,9 @@ def main() -> int:
         raise SystemExit(
             "Product CI contract missing required fragment(s): " + ", ".join(missing)
         )
+
+    if not COVERAGE_SCRIPT_PATH.is_file():
+        raise SystemExit("Product CI requires tracked scripts/check_coverage.sh")
 
     if not PACKAGE_JSON_PATH.is_file() or not PACKAGE_LOCK_PATH.is_file():
         raise SystemExit("Product CI requires tracked package.json and package-lock.json")
@@ -55,6 +60,7 @@ def main() -> int:
         "RUSTUP_TOOLCHAIN: stable",
         "RUSTUP_TOOLCHAIN: 1.98.0",
         "rustup default stable",
+        "./scripts/check_coverage.sh",
     )
     forbidden = [fragment for fragment in forbidden_fragments if fragment in workflow]
     if forbidden:
