@@ -11,11 +11,15 @@ fn catalog_type(type_name: &str) -> QualifiedTypeName {
     QualifiedTypeName::new("pg_catalog", type_name).expect("catalog type coordinate is valid")
 }
 
-fn index(index_name: &str, primary: bool, nulls_not_distinct: bool) -> IndexObservation {
+fn index(
+    index_name: &str,
+    primary: bool,
+    nulls_not_distinct: Option<bool>,
+) -> IndexObservation {
     IndexObservation::new(
         index_name,
         true,
-        Some(nulls_not_distinct),
+        nulls_not_distinct,
         vec![IndexAttributeObservation::column(
             1,
             IndexAttributeKind::Key,
@@ -68,6 +72,13 @@ fn relation(
     .expect("index fixture is valid before aggregate primary-key validation")
 }
 
+fn primary_key() -> TableConstraintObservation {
+    TableConstraintObservation::PrimaryKey(
+        PrimaryKeyObservation::new("document_pkey", vec!["document_id".to_owned()])
+            .expect("primary-key fixture is valid"),
+    )
+}
+
 fn snapshot(relation: RelationObservation) -> Result<PostgresSchemaSnapshotV3, ObservationError> {
     PostgresSchemaSnapshotV3::new(
         &support::authorized_source("warehouse_primary", &["public"]),
@@ -81,14 +92,9 @@ fn snapshot(relation: RelationObservation) -> Result<PostgresSchemaSnapshotV3, O
 
 #[test]
 fn primary_catalog_index_rejects_nulls_not_distinct() {
-    let primary_key = TableConstraintObservation::PrimaryKey(
-        PrimaryKeyObservation::new("document_pkey", vec!["document_id".to_owned()])
-            .expect("primary-key fixture is valid"),
-    );
-
     let error = snapshot(relation(
-        vec![primary_key],
-        index("document_pkey", true, true),
+        vec![primary_key()],
+        index("document_pkey", true, Some(true)),
     ))
     .expect_err("PostgreSQL primary keys cannot use NULLS NOT DISTINCT indexes");
 
@@ -101,10 +107,28 @@ fn primary_catalog_index_rejects_nulls_not_distinct() {
 }
 
 #[test]
+fn primary_catalog_index_accepts_explicit_nulls_distinct() {
+    snapshot(relation(
+        vec![primary_key()],
+        index("document_pkey", true, Some(false)),
+    ))
+    .expect("explicit NULLS DISTINCT is compatible with a primary-key index");
+}
+
+#[test]
+fn primary_catalog_index_accepts_unobserved_null_treatment() {
+    snapshot(relation(
+        vec![primary_key()],
+        index("document_pkey", true, None),
+    ))
+    .expect("an adapter that did not observe null treatment must not be rejected as NULLS NOT DISTINCT");
+}
+
+#[test]
 fn standalone_unique_nulls_not_distinct_index_remains_admissible() {
     snapshot(relation(
         Vec::new(),
-        index("document_id_uix", false, true),
+        index("document_id_uix", false, Some(true)),
     ))
     .expect("NULLS NOT DISTINCT remains valid for a standalone unique index");
 }
