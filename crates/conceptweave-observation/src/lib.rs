@@ -7,12 +7,18 @@
 #![deny(missing_docs)]
 
 mod model;
+mod representation_v3;
 
 pub use model::{
     CheckConstraintObservation, ColumnObservation, ForeignKeyAction, ForeignKeyDeferrability,
     ForeignKeyMatchType, ForeignKeyObservation, ForeignKeyReferenceBehavior, ObservationError,
     ObservationLocation, ObservationLocationKind, PrimaryKeyObservation,
     TableConstraintObservation, TableObservation, UniqueConstraintObservation,
+};
+pub use representation_v3::{
+    ColumnObservationV3, DomainCheckConstraintObservation, DomainObservation, EnumObservation,
+    PostgresSchemaSnapshotV3, QualifiedCollationName, QualifiedTypeName, RelationKind,
+    RelationObservation, SchemaObjectLocation, SchemaObjectLocationKind, SuccessorSourceReceipt,
 };
 
 use conceptweave_source_port::AuthorizedObservationRequest;
