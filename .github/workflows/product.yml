@@ -101,6 +101,9 @@ jobs:
       - name: Install pinned JSON Schema validator
         run: npm ci --ignore-scripts --no-audit --no-fund
 
+      - name: Test staged semantic contract adoption
+        run: node scripts/test_semantic_contract_adoption.mjs
+
       - name: Validate public JSON contracts
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
