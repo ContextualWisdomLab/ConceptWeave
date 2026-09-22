@@ -1,0 +1,13 @@
+{
+  "candidate_id": "candidate-1",
+  "kind": "concept",
+  "truth_status": "authoritative",
+  "publication_state": "published",
+  "evidence": [
+    {
+      "source_id": "source-1",
+      "source_digest": "sha256:abc",
+      "location": "public.orders"
+    }
+  ]
+}
