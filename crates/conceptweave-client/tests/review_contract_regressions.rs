@@ -33,7 +33,10 @@ fn release(
         publication_state,
         digest(digest_hex),
         vec![evidence()],
-        concept_ids.iter().map(|value| (*value).to_owned()).collect(),
+        concept_ids
+            .iter()
+            .map(|value| (*value).to_owned())
+            .collect(),
     )
     .expect("release fixture must be structurally valid")
 }
@@ -102,6 +105,88 @@ fn supersession_accepts_the_governed_superseded_predecessor_state() {
 }
 
 #[test]
+fn supersession_rejects_a_predecessor_with_only_one_superseded_state() {
+    let client = SemanticReleaseClient::new("1.0.0").expect("client policy must be valid");
+    let previous = release(
+        "semantic_release_previous",
+        'b',
+        TruthStatus::Authoritative,
+        PublicationState::Superseded,
+        &["control.evidence"],
+    );
+    let successor = release(
+        "semantic_release_successor",
+        'c',
+        TruthStatus::Authoritative,
+        PublicationState::Published,
+        &["control.evidence"],
+    );
+    let declaration = ReleaseSupersession::new(
+        SemanticReleaseReference::from_release(&previous),
+        SemanticReleaseReference::from_release(&successor),
+        "steward-approved immutable correction",
+    )
+    .unwrap();
+
+    assert!(
+        client
+            .validate_supersession(&declaration, &previous, &successor)
+            .is_err()
+    );
+}
+
+#[test]
+fn supersession_rejects_an_incompatible_governed_predecessor() {
+    let client = SemanticReleaseClient::new("1.0.0").expect("client policy must be valid");
+    let previous = SemanticRelease::new(
+        ReleaseMetadata::new(
+            "semantic_release_previous",
+            "2.0.0",
+            "ontology_client_review",
+        )
+        .unwrap(),
+        TruthStatus::Superseded,
+        PublicationState::Superseded,
+        digest('b'),
+        vec![evidence()],
+        vec!["control.evidence".to_owned()],
+    )
+    .unwrap();
+    let successor = release(
+        "semantic_release_successor",
+        'c',
+        TruthStatus::Authoritative,
+        PublicationState::Published,
+        &["control.evidence"],
+    );
+    let declaration = ReleaseSupersession::new(
+        SemanticReleaseReference::from_release(&previous),
+        SemanticReleaseReference::from_release(&successor),
+        "steward-approved immutable correction",
+    )
+    .unwrap();
+
+    assert!(
+        client
+            .validate_supersession(&declaration, &previous, &successor)
+            .is_err()
+    );
+}
+
+#[test]
+fn diff_accepts_reusing_the_same_release_object() {
+    let client = SemanticReleaseClient::new("1.0.0").expect("client policy must be valid");
+    let release = release(
+        "semantic_release_same_id",
+        'b',
+        TruthStatus::Authoritative,
+        PublicationState::Published,
+        &["control.evidence"],
+    );
+    assert!(client.diff(&release, &release).is_ok());
+}
+
+#[test]
 fn public_contract_and_coverage_gates_encode_the_reviewed_fail_closed_rules() {
     let root = repository_root();
     let release_schema = fs::read_to_string(root.join("contracts/semantic-release.schema.json"))
@@ -122,8 +207,9 @@ fn public_contract_and_coverage_gates_encode_the_reviewed_fail_closed_rules() {
         "the public contract gate must exercise a language-neutral self-supersession negative fixture through an explicit semantic validator"
     );
     assert!(
-        !coverage_gate.contains("select(.[6] == 0)")
-            && coverage_gate.contains(".data[0].totals.regions.percent == 100"),
-        "coverage must retain expansion regions and independently enforce LLVM total region coverage"
+        !coverage_gate.contains(".data[0].totals.regions.percent == 100")
+            && coverage_gate.contains("select(.name | contains(\"5tests\") | not)")
+            && coverage_gate.contains("all(.[]; .count > 0)"),
+        "coverage must aggregate owned production source coordinates instead of double-counting test-crate monomorphizations"
     );
 }

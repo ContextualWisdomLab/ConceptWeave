@@ -1,122 +1,158 @@
 # Product / Technical Gap Baseline
 
-**Snapshot:** 2026-09-09
+**Snapshot:** 2026-09-10
 
-This document records ConceptWeave's code-current product and technical gap baseline. Exact SHA/run coordinates are evidence snapshots, never mutable supplier dependencies. Live protected branch, PR, issue, review, and workflow state supersedes a recorded coordinate when it advances. This refresh was authored on Foundation pre-refresh head `b538470c963e6524ddc0c3f652a46a4fc8265150`; the resulting commit is the new Foundation exact head and resets exact-head execution evidence for that PR.
+This document records ConceptWeave's code-current product and technical gap baseline. Exact SHA/run coordinates are immutable evidence snapshots, never mutable supplier dependencies. Live protected branch, PR, issue, review, and workflow state supersedes recorded coordinates when it advances. Any head movement resets exact-head execution/review evidence unless the evidence was actually produced for that successor.
 
 ## Canonical product boundary
 
-ConceptWeave owns `observe -> discover -> propose -> align -> validate -> review -> publish`, ontology/semantic-layer generation and validation, governed immutable semantic release, and the canonical client contract for consuming those releases. It does not duplicate foreign domain truth.
+ConceptWeave owns `observe -> discover -> propose -> align -> validate -> review -> publish`, ontology/semantic-layer generation and validation, governed immutable semantic releases, and the canonical release-consumption contract. Source-system business truth stays with its canonical owner.
 
-- `semantic-data-portal`: catalog, governance, discovery and consumption surfaces.
-- `context-graph-contracts`: interop contract owner.
-- `enterprise-architecture-core`: enterprise-architecture truth owner.
-- `contextual-orchestrator`: production LLM routing/provider/capability owner.
-- consuming products: tenant/purpose authorization and physical execution remain local to the consumer.
+- `semantic-data-portal`: catalog/governance/consumption.
+- `context-graph-contracts`: interop contracts.
+- `enterprise-architecture-core`: enterprise-architecture truth.
+- `contextual-orchestrator`: production LLM/provider/capability routing.
+- consuming products: tenant/purpose authorization and physical execution.
 
 Consumers use released/versioned `semantic_release`/contract/ACL coordinates. Source copying, cross-service SQL, and mutable sibling-head dependencies are invalid integration mechanisms.
 
-## Protected truth and active prerequisites
+## Protected truth and active stack
 
-Protected/default ConceptWeave `main` is `f4f440dd58c77d7cd90dff8a1eb2eeb9a9940425`. It is the repository bootstrap only; there is no immutable ConceptWeave semantic release yet.
+Protected/default ConceptWeave `main` is `f4f440dd58c77d7cd90dff8a1eb2eeb9a9940425`; it remains repository bootstrap only and no immutable ConceptWeave semantic release exists.
 
-### Foundation PR #1
+1. Foundation #1 is `60f14a6e85a83d56c2eea43b34d52b3366bb1735`, OPEN Draft/mergeable on protected `main`.
+2. Product-CI bootstrap #35 is `22709ec9b4d969bf67ec74db402813e74d11f7ca`, OPEN non-Draft/mergeable on protected `main`. Its recorded leaf Security/SAST evidence succeeded; CodeQL remains blocked in the central owner path.
+3. Client Consumption #5 is `6873ec0c0a701b2c59f3e0785d48d8739f019d5b`, OPEN Draft/mergeable on current Foundation after ordinary two-parent non-force reconciliation. Predecessor execution/review evidence does not transfer.
+4. Source Observation #6 was exact `18d882088d95c4f6b6aee77e2f8bdbe5b73586fb`, OPEN Draft/mergeable on current Client, immediately before this baseline-only successor. Ordinary reconciliation at `b614fddc3331365da84733f660a429ed71b83182` preserved pre-restack source `331f8edcd7cebb1719e5cea3187f3848ce7b9e71`; later movement is active-gap documentation. No open PR currently targets #6 as its base, so this documentation successor does not create a dependent-branch restack.
+5. Research Intake #9 is `a67d9d66b35024d6f2155f50ee5c9fb7d2e1dbe9`, OPEN Draft/mergeable on Foundation. Pending-source resolution #40 is `4efe15c6318d8cb65c52a974a2c105363a4c82a5`, OPEN Draft/mergeable on #9.
+6. Golden-set evaluation #10 is `fdf8b8d70c05bcb76c55cb6336c9bf31b5e42ce4`, OPEN Draft/non-mergeable from historical #9 merge base `51c7df6d03f072449422fd58ca24b2f9d6026f07`; it is 35 commits ahead and 81 behind current #9. #11 `6dff8c2ee42cfeb7bf8688c1f7e95989b61be266` and later descendants remain dependent on a semantic non-force #10 repair.
+7. Later steward/full-text research remains preserved but is not independent root authority. #33 is `93faf6ab750a99469196cf71567498be83c22a6b`; #34 is `c51330e61bf5b3d2b18a561830151ba874b17a4c`, OPEN Draft/mergeable on #33. #34's live ancestry already carries normally merged #36 full-text-capture work. Terminal open #39 remains `aca2fe603477453fee071679a8aefef0cd784dd3`, OPEN Draft/mergeable on #38 `7678236ed3ec467e93b97bb2ad7ad26b3dc0e5b9`.
 
-Pre-refresh exact head: `b538470c963e6524ddc0c3f652a46a4fc8265150`, OPEN Draft/mergeable. This documentation refresh creates a successor, so predecessor checks/reviews do not transfer. Product CI still cannot execute from protected `main` until bootstrap #35 is normally integrated.
+No force push, destructive rebase, self-approval, review dismissal, fail-open scanner substitution, no-op retrigger, synthetic status, mutable supplier dependency, or routine administrator bypass is acceptance evidence.
 
-### Product-CI bootstrap PR #35
+## Product-CI and central CodeQL prerequisite
 
-Exact head `22709ec9b4d969bf67ec74db402813e74d11f7ca`, OPEN non-Draft/mergeable on protected `main`.
+ConceptWeave #35 remains the direct bootstrap prerequisite because protected `main` does not yet contain the repository-owned Product pull-request workflow.
 
-- Security Scan `34204381232`: success.
-- SAST Semgrep `34204381260`: success.
-- CodeQL PR `34204381235`: terminal failure.
+Protected central `.github/main` has advanced normally to `f578d8d960177ff113c25fd740619b4a483df300`. That intervening protected delta is current owner truth and must be adopted rather than treated as a race or ignored because an older PR remains mechanically mergeable.
 
-The ConceptWeave CodeQL dispatch completed, but compatibility admission ended pending an authenticated terminal verdict. Current evidence attributes this to the central CodeQL owner path, not to a ConceptWeave source defect. Do not manufacture a fresh result by no-op push or blind/manual rerun while the corrected central owner remains unmerged.
+The broad CodeQL producer/handler successor remains `.github#2040@6706c231ab06a3c91c43fdb5b989cfcd79fff593`. Fresh ancestry comparison against protected `f578d8d...` is `diverged`: #2040 is 144 commits ahead and 11 commits behind, with merge base `7fd571dbcdbae6acf29d8f4ee704d7ba6297e4db`. GitHub may report the PR mergeable when the trees are conflict-free, but that does not make old-base exact-head evidence current. Its valid #1902/#2004/#2043/#2044 producer, stacked-check, settlement, SARIF and base-bound evidence work must be preserved while the complete protected delta is adopted by ordinary non-force semantic integration. Review `5161498951` records this current stale-base repair contract. Do not close, force-push, destructively rebase, or select an entire side of the tree merely because protected main advanced.
 
-### Central CodeQL owner `.github#2051`
+The exact hosted generation on `#2040@6706c231...` is historical old-base evidence, not acceptance for a reconciled successor. Security Scan `34251822390`, SAST `34251822314`, Python Security `34251822251`, and Agent Review Runtime Quality `34251822381` were terminal success; CodeQL PR `34251822255` was terminal failure and is explicitly bound to the historical base. Its `Dispatch current-head CodeQL scan` job took one Jobs API snapshot and then failed with `CodeQL coordinator could not bind every pending language to an exact failed job.` This remains a valid reality RED for job-set convergence, but every execution/review lane must regenerate after current-base reconciliation.
 
-Current source authority: `.github#2051@70e8c1fcf19b2e56578e021e0b4d84a808104b24`, OPEN non-Draft/mergeable on protected `.github/main@7fd571dbcdbae6acf29d8f4ee704d7ba6297e4db`.
+The two verified CodeQL owner findings remain repair requirements to preserve and re-evaluate on that successor rather than reasons to bypass ancestry repair:
 
-The original sibling-rerun race is replaced by one post-matrix `wake-required-codeql` coordinator. Two distinct identity defects now have committed RED->repair lineages:
+1. **Pre-cutover evidence seam.** Transitional compatibility may accept only direct evidence authenticated to the exact protected handler source plus repository/PR/base/head/required-run/language/job/SARIF/artifact identity. Do not restore creator-only legacy status trust. Stale, ambiguous, cross-base and cross-run evidence remains non-passing.
+2. **Required-run job-set convergence.** Recovery must boundedly reread the exact required run until every detected language has exactly one stable terminal rerunnable job identity, or fail closed at a deterministic deadline. Partial/mixed inventories must not dispatch or wake a run.
 
-1. **Wake/base identity.** Changed-base RED `901af9f024836eadd10c6c98affbee037ffecd58`; base-aware fixtures `f9d46984e1ef35341e9535af245da8e6ab9c061e`; production repair `66a15d856c251f1db2f91cb3d4a2fa66afd8f48c`. The coordinator revalidates live PR/head/base and exact required-run pull-request metadata before one bounded failed-job rerun.
-2. **Terminal-verdict identity.** RED `cb164402518e948e6f88366b3f5187d790fb94b8`; production repair `70e8c1fcf19b2e56578e021e0b4d84a808104b24`. Required verdict admission and pending-language suppression no longer trust head-only `codeql-dispatch/<language>` commit statuses. They bind to immutable dispatch title `CodeQL Scan Dispatch <repo>#<PR>@<head>/<base>/<required_run_id>` plus the exact `CodeQL dispatch scan (<language>)` job conclusion. Commit statuses are observability only.
+`.github#2051@558693e0333e48012beea142f739bc634b0674a7` remains OPEN Draft and is independently `diverged` from protected `f578d8d...`: 18 commits ahead and 11 behind with the same historical merge base `7fd571db...`. Review `5161499908` requires ordinary non-force adoption of current protected truth while preserving the one-coordinator wake, exact PR/head/base/run evidence binding, stricter `{base_ref, base_sha}` identity and versioned backward-compatible handler rollout. `.github#2056@69ae472562c93cc17674af5e2085a58947d3fab8` remains OPEN non-Draft/mergeable on #2051 and preserves complete-failed-job-set validation plus atomic wake logic; review `5161501428` requires it to remain stacked and adopt the repaired exact #2051 successor afterwards rather than independently restacking to protected main.
 
-Current-head source inspection confirms the second repair preserves the first repair and the single coordinator. Acceptance is still incomplete: CodeQL PR `34330189823`, Python Security `34330189894`, Agent Review Runtime Quality CI `34330189849`, Security Scan `34330190193`, and SAST Semgrep `34330190098` remain queued/in flight, and formal reviews observed before `70e8c1f...` are historical. Normal protected central integration requires terminal exact-head checks, zero valid unresolved findings, and qualifying independent review.
+Canonical central order is: ordinary non-force adoption of current protected `.github/main` by the active CodeQL owner chain; RED->GREEN repair/revalidation of the authenticated pre-cutover evidence seam and bounded required-job-set convergence; semantic reconciliation of the valid #2051/#2056 identity/wake deltas without duplicate ownership; exact-current-base terminal GREEN, zero valid unresolved findings and qualifying independent review; normal protected integration. Keep #35 stable during that owner repair, then obtain fresh #35 exact-head CodeQL/review evidence before normal merge. Manual/no-op reruns or leaf source churn do not repair the owner contract.
 
-After central integration, #35 must obtain a fresh authenticated exact-head CodeQL result and independent approval before normal merge. Only then can Foundation obtain Product evidence from protected `main`.
+## Source Observation current contract
 
-## Current semantic-engineering roots
+Pre-restack Source Observation `331f8ed...` locally executed Rust 1.98 evidence: 132 tests across 42 suites including two doctests; fmt; strict Clippy; warnings-denied rustdoc; release build; Product CI contract/schema/fixture checks; normalized owned coverage 228/228 functions, 2,026/2,026 regions, and 194/194 branches. Raw LLVM diagnostics remained below 100% because source-embedded test/generic instrumentation is reported separately. Those results prove `331f8ed...` only and do not transfer to #6's current or later documentation/source successors.
 
-### Research Intake PR #9
+`ObservationRequestBudget` and the policy-admitted resource envelope bind exact-schema authorization metadata plus runtime row/byte/concurrency/deadline limits. `AuthorizedObservationRequest` is intentionally single-use at the execution seam. Retry after cancellation/failure/success requires a fresh authorization decision. Source lookup, policy binding, schema/resource authorization, adapter execution and cancellation consume one non-resetting operation budget; a concrete adapter may resolve credentials only for the exact authorized key-and-binding pair. Stale binding fails before source access.
 
-Exact head `0c935d805f01cdf548156743c20544ab4596f8c3`, OPEN Draft/mergeable on Foundation. Owner repair `9d2c7d612d9b4f38f350720a9e3f2558aa655278` keeps test-only Local API endpoint selection out of measured production, normalizes cfg-varying function identity, and preserves both primary report-publication failure and temporary-cleanup failure without rolling back a published final file.
+The current owner digest/receipt vocabulary preserves deterministic table/column/constraint evidence, exact identifiers, column comments, PK/UNIQUE/FK/CHECK evidence, UNIQUE NULL-comparison state, FK reference behavior, targeted `SET NULL`/`SET DEFAULT` columns, and observed validation/enforcement state. It does not yet losslessly represent all material PostgreSQL 18 evidence required by the planned adapter.
 
-Local exact-head evidence recorded for `0c935d8...`: locked Rust 1.98 workspace, fmt, strict all-target/all-feature Clippy, warnings-denied rustdoc/release; frozen coverage native functions 195/195, normalized owned functions 106/106, regions 1,187/1,187, branches 78/78. Hosted exact-head checks and qualifying independent review are absent, so #9 remains Draft and no semantic authority is promoted.
+Current public representation also has two versioning constraints that must not be silently broken:
 
-`ClassificationReport` provenance/snapshot/inventory state is private and constructor-bound with read-only accessors. This is an owner-controlled Rust aggregate boundary; it is not cryptographic authenticity or peer authentication.
+- digest framing is explicitly `conceptweave.postgres_schema_snapshot.v2`, which currently hashes table/column/constraint evidence only;
+- `ObservationLocation` requires `schema_name + table_name`, `ObservationLocationKind` exposes only Table/Column/Constraint, and receipt canonical locations always traverse `/schemas/{schema}/tables/{table}`.
 
-### Pending-source resolution PR #40
+## PostgreSQL 18 representation/version/authorization prerequisite
 
-Exact head `cc802740420dd4402ae2295e270af21530a682dd`, OPEN Draft/mergeable on #9 exact `0c935d8...`. Normal non-force merge `c47f8239cd4191b6948d8fb7adb69c048d559ee7` adopted the material #9 owner delta while retaining #40 report binding, strict stored-wire validation, private trusted construction, canonical pending-set admission, retained-inventory uniqueness, snapshot identity, and source-resolution authority boundaries.
+The next Source Observation P0 is representation before transport. Do not add the concrete PostgreSQL adapter while the owner model would silently discard or ambiguously bind source facts.
 
-A frozen Rust 1.98 coverage run has executed on current exact head `cc802740...`: locked tests passed; native LLVM functions 224/224; production-normalized functions 129/129, regions 1,371/1,371, branches 102/102. Raw LLVM line/region/branch totals include source-embedded test and generic-instantiation instrumentation and remain diagnostic. No unexecuted production symbol was identified. This advances only the current local coverage lane; exact-current fmt/strict Clippy/rustdoc/release, hosted required checks, and qualifying independent approval are still required. No Zotero write, semantic publication, or approval authority is added.
+The minimum successor adds deterministic owner value objects and collision-safe receipt coordinates for:
 
-### Full-text/write terminal PR #39
+- relation kind and relation/table comments;
+- first-class indexes preserving key versus INCLUDE attributes, expression positions, partial predicates, NULL uniqueness semantics, and readiness/validity/liveness;
+- qualified domains and enums as schema-scoped objects rather than manufactured table children;
+- explicit column-to-qualified-type evidence so a column binds to the exact built-in/domain/enum coordinate rather than a search-path-dependent display string;
+- domain semantics needed for semantic identity: qualified base type, relevant type modifier/array dimensions, collation, NOT NULL/default state, and domain CHECK constraints with validation/enforcement evidence where exposed;
+- enum label membership and ordering;
+- server-rendered `pg_get_constraintdef`, `pg_get_indexdef`, and `pg_get_expr` text labeled as reconstructed source evidence, never original DDL.
 
-#39 is an independently advancing downstream writer on #38; Foundation does not pin its mutable head. The latest observed coordinate during this refresh is `d986861db29b45ef176108317bca910b655d4ada`, OPEN Draft/mergeable.
+Authoritative PostgreSQL 18 catalog basis:
 
-The broad raw-region RED recorded at `2c09c0690edc5d3be363c40763c20f0d97adf2bd` was followed by a serialized pinned-nightly attribution run at `e78b616c1946005b48c75585639464b42a1462f8`: native functions 451/451, zero uncovered production-normalized regions out of 4,752, and zero uncovered production-normalized branch outcomes out of 784. Raw LLVM lines/regions/branches remain below total because of source-embedded test and generic-instantiation instrumentation; no production-symbol miss was identified. Do not invent production code or weaken a gate merely to change raw diagnostics. Subsequent observed commits through `d986861...` are documentation/coordination successors, so exact-current execution, hosted checks, and independent review must still be refreshed before lifecycle actions.
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: `pg_class`*. https://www.postgresql.org/docs/18/catalog-pg-class.html
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: `pg_index`*. https://www.postgresql.org/docs/18/catalog-pg-index.html
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: `pg_type`*. https://www.postgresql.org/docs/18/catalog-pg-type.html
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: `pg_enum`*. https://www.postgresql.org/docs/18/catalog-pg-enum.html
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: `pg_constraint`*. https://www.postgresql.org/docs/18/catalog-pg-constraint.html
+- PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: `pg_description`*. https://www.postgresql.org/docs/18/catalog-pg-description.html
 
-The live Local API replay remains acquisition/observation evidence only: 8,326 observed records, 3,715 bibliographic proposals, 4,611 retained non-bibliographic records, four pending sources, and zero classification failures were recorded; full-text availability reported 3,203 papers with nonempty text, 440 without attachment ancestry, 34 unmanifested attachments, 38 captured-empty, 471 needing review without text, and two unbound nonempty records. These counts do not create steward decisions, approval, semantic authority, publication, or Zotero write permission.
+`pg_type.typnamespace + typname` identifies qualified types and `typtype` distinguishes domains/enums. Domain material semantics include `typbasetype`, `typnotnull`, `typtypmod`, `typndims`, collation/default data and domain constraints linked by `pg_constraint.contypid`. `pg_enum` stores labels and `enumsortorder`; enum row OIDs are catalog join coordinates and must not be mistaken for stable governed semantic identity. `pg_index.indnkeyatts` distinguishes key from included attributes, zero `indkey` positions denote expressions, and index readiness/validity/liveness and partial predicates are independently material. `pg_description` stores object comments. `pg_class.relkind` distinguishes relation kinds.
+
+### Digest and receipt compatibility
+
+Review `5158484289` established that v2 must remain reproducible. Do not redefine the immutable v2 receipt family by appending new material fields under the same domain. Introduce successor digest framing (`v3` or an explicit equivalent) and bind every newly material source fact there.
+
+Review `5160201671` established that schema-scoped objects need a backward-compatible coordinate seam. Do not make the existing `table_name() -> &str` nullable and do not invent sentinel tables. Historical v2 table/column/constraint locations retain identical meaning. A versioned/tagged successor coordinate can represent genuine schema-scoped locations such as `/schemas/{schema}/domains/{name}` and `/schemas/{schema}/enums/{name}` with the existing escaping guarantees.
+
+Review `5160252371` adds a semantic binding prerequisite: current `ColumnObservation` stores only unqualified `data_type: String`. Creating qualified domain/enum objects without a qualified column type reference leaves the evidence graph ambiguous. The successor must keep presentation text separate from identity and bind each column to the exact immutable built-in/qualified source-type coordinate. Same-named types in two allowed schemas must remain distinguishishable even if existing `data_type()` text is identical. Do not infer a type from `search_path` during validation.
+
+### Authorization
+
+Current snapshot construction enforces schema scope by iterating observed tables. Schema-scoped domain/enum evidence must be checked directly against the exact `AuthorizedObservationRequest` allowlist, including a schema with zero observed tables. Otherwise a type-only schema could bypass the existing table-driven containment invariant.
+
+### Executable RED before production representation code
+
+- a frozen historical v2 fixture reproduces its original v2 digest and table/column/constraint coordinate meaning exactly;
+- otherwise-identical successor snapshots differing in one newly required material PostgreSQL fact have distinct v3 identities;
+- every new evidence kind has a verified receipt coordinate;
+- unauthorized domain/enum-only schema fails before immutable snapshot/receipt side effects;
+- authorized type-only schema succeeds;
+- same-name types in different allowed schemas remain distinct and columns resolve to their exact qualified type coordinate;
+- enum label/order changes alter successor identity;
+- material domain base/default/null/collation/check-constraint changes alter successor identity;
+- a schema-scoped receipt cannot be satisfied merely because an unrelated table exists in that schema;
+- fake table-scoped type coordinates fail;
+- input-order permutations of identical complete evidence remain digest-identical.
+
+Issue #2 and #6 reviews `5160201671` / `5160252371` are the live acceptance authority for this slice.
+
+Only after this representation/version/authorization/type-binding slice is exact-head GREEN should the concrete adapter be admitted behind `conceptweave-source-port`: maintained patched Rust PostgreSQL driver pinned by immutable lock coordinate, cargo-deny/SBOM review, least-privilege credential resolution from exact authorized key+binding, stale-binding rejection before credential/source I/O, one fresh authorization per attempt, explicit `REPEATABLE READ READ ONLY` catalog transaction, exact-schema `pg_catalog` capture, one remaining-operation budget across connect/transaction/query/cancellation, policy-admitted row/byte/concurrency ceilings, complete-or-fail snapshot construction, source disappearance handling, and deterministic replay against a frozen anonymized GRC-shaped fixture. `governance-risk-compliance` retains its business truth; no cross-service application-table SQL is introduced.
+
+## Research stack repair
+
+Current #9 is canonical Research Intake. #10 still carries useful golden-set source/test/fixture/docs delta, but its historical parent predates #9's Foundation reconciliation. Both lineages changed `crates/conceptweave-zotero/src/lib.rs`, `crates/conceptweave-zotero/tests/review_contract.rs`, `review_contract_followup.rs`, and this baseline. Whole-tree ours/theirs would discard valid work.
+
+Repair #10 by ordinary non-force semantic integration. Preserve current #9's private/constructor-bound `ClassificationReport` and read-only accessors. Do not reopen trusted aggregate fields to satisfy older #10 tests; corruption cases belong behind an internal test seam or explicitly untrusted wire/fixture. Likewise do not impose #10's mandatory caller-owned `ZoteroItem.source_record` as authenticity evidence; raw provider data needs a backward-compatible capture/wire boundary. Then propagate the repaired parent through #11+ without transferring predecessor GREEN.
+
+Issue #8 has been refreshed to this root authority and to the live later research coordinates. #34's PR body has also been repaired to exact `c51330e...` after live ancestry showed merged #36 full-text capture was already carried into the branch.
 
 ## Capability status
 
 | Area | Status | Evidence / next verification |
 | --- | --- | --- |
-| Product boundary | ACTIVE_PR | PRD/TRD/ADR/context map define ConceptWeave ownership and owner/consumer boundaries; foreign truth remains behind released/versioned ports and ACLs. |
-| Truth/publication lifecycle | SOURCE_REPAIRED_PENDING_PROTECTED_EVIDENCE | Publication-state/truth-status semantics and immutable/supersession direction are defined; no protected semantic release exists. |
-| Source Observation | ACTIVE_CHILD | Immutable source evidence and bounded observation contracts exist; concrete production PostgreSQL adapter remains a P0 gap. |
-| Research Intake / source resolution | LOCAL_GREEN_HOSTED_PENDING | #9 and #40 have current local source/coverage evidence within their stated scope; hosted checks and independent current-head review remain missing. |
-| Product CI | BLOCKED_OWNER | #35 leaf CodeQL failure waits on accepted central `.github#2051@70e8c1f...` and then a fresh #35 exact-head run. |
-| Quality gate | ACTIVE_PR | Rust 1.98, unsafe forbidden, public docs, exact checkout, fmt, strict Clippy, tests, rustdoc, owned production coverage, schema fixtures, lock freshness, and clean-tree checks. Head movement resets exact-head evidence. |
-| Security / review | PENDING_EXACT_HEAD | Scanner/reviewer status contexts are not substitutes for authenticated terminal checks and qualifying formal review. |
-| Standards / research | ACTIVE | Doctoring/TRACEABILITY must bind authoritative standards/primary research to exact implementation/module/API/test evidence and identify contradictions. |
-| UI / multilingual | NOT_YET_MATERIALIZED | When material UI appears, require reusable composition, token/Figma identity, normal/loading/empty/error/permission/responsive/interaction/a11y E2E, and KO/EN/JA/ZH/VI/ES/DE/FR label/font/text-expansion verification. |
-| Release | NOT_STARTED | Version/CHANGELOG/tag/package/immutable semantic release/SBOM/provenance/reproducibility/rollback must be executed on the exact protected release head. |
+| Product boundary | ACTIVE_PR | PRD/TRD/ADR/context map define canonical ConceptWeave ownership and foreign-owner seams. |
+| Truth/publication lifecycle | SOURCE_REPAIRED_PENDING_PROTECTED_EVIDENCE | Observed/inferred/proposed/authoritative/rejected/superseded distinctions exist; no protected immutable semantic release exists. |
+| Client Consumption | RESTACKED_HOSTED_PENDING | #5 consumes current Foundation through ordinary non-force ancestry; exact-head execution/review must regenerate. Its existing `SemanticReleaseClient::verify_detached_artifact` remains current: after admission it hashes the exact caller-supplied detached immutable artifact bytes against the declared digest, keeping digest syntax distinct from byte-integrity evidence. |
+| Source Observation | REPRESENTATION_V3_P0 | #6 is stack-current; PostgreSQL representation needs versioned digest/receipt + direct schema authorization + qualified column/type binding RED->GREEN before transport. |
+| Research Intake | RESTACKED_HOSTED_PENDING | #9 is current; predecessor local evidence is historical only. |
+| Golden-set evaluation | STALE_PARENT_REPAIR_P1 | #10 is non-mergeable and 81 commits behind current #9; preserve and semantically reconcile rather than close. |
+| Steward/full-text stack | ROOT_PROPAGATION_PENDING | Valid later deltas exist, but current #10 root repair must propagate before independent readiness claims. |
+| Product CI | BLOCKED_OWNER_RESTACK | #35 waits on central protected-base reconciliation, preservation/revalidation of the CodeQL causal repairs, exact central GREEN and downstream exact-head evidence. |
+| Quality gate | ACTIVE | Rust 1.98, unsafe forbidden, public docs, fmt, strict Clippy, tests, rustdoc, owned production coverage, fixture/schema/lock/clean-tree checks; every head movement resets exact-head acceptance. |
+| Security / review | PENDING_EXACT_HEAD | Scanner/reviewer status is accepted only when bound to exact current head and applicable protected policy. |
+| Release | NOT_STARTED | Version/CHANGELOG/tag/package/immutable semantic release/SBOM/provenance/reproducibility/rollback remain mandatory on the exact protected release head. |
 
-## P0 product gaps
+## Remaining commercial/semantic P0 sequence
 
-1. **Concrete Source Observation adapter** — maintained Rust PostgreSQL driver behind `conceptweave-source-port`; adapter-local registry/credential resolution; explicit read-only session/transaction; exact schema admission; total operation/statement deadlines; cancellation plus row/byte/concurrency budgets; complete immutable snapshot or fail closed; source-disappearance handling; deterministic replay against a frozen anonymized fixture.
-2. **Observed PostgreSQL surface completion** — domains/enums/indexes/comments, quoted identifiers and cross-schema collisions as generic observed evidence without importing source-system business truth.
-3. **Ontology discovery** — deterministic term/concept/taxonomy/non-taxonomic-relation candidate generation with exact source receipts and abstention for unsupported semantics.
-4. **Semantic-layer discovery** — dimensions, measures, grain, units, relationships and physical mappings with deterministic calculation contracts; relational structure alone is not business authority.
-5. **LLM proposal** — every production model call through a released `contextual-orchestrator`; outputs remain proposed/inferred and preserve source/model/prompt/provenance evidence.
-6. **Alignment / matching** — retrieval/pruning/structural evidence first, bounded optional LLM assistance, OAEI-style evaluation, deterministic reproducibility and steward-visible decisions.
-7. **Validation engine** — RDF/OWL/SKOS/SHACL and semantic-layer validation, consistency/conflict/duplicate detection, bounded reasoning and explicit unsupported-feature failure.
-8. **Governance persistence** — PostgreSQL 3NF candidates/evidence/validation/review/release/supersession receipts, transactional outbox, temporal history only where domain semantics require it, explicit idempotency/UPSERT/lock design.
-9. **Review workflow** — Keyverse identity context, tenant/role/purpose authorization, steward decisions, maker-checker where required, stale-decision protection and immutable publication receipt.
-10. **Publication adapters** — versioned OWL/RDFS/SKOS/SHACL/JSON-LD plus explicitly version-bound exports; draft/incubating formats cannot be represented as final standards.
-11. **Client completion** — language-neutral release/supersession contract, provenance/signature verification, relation/mapping/dimension/measure resolution, compatibility/deprecation and explain/query-plan contracts while downstream products retain physical authorization/execution.
-12. **CWL integration** — only released/versioned semantic-release/contract/ACL seams to sibling owners; no source copying, cross-service SQL or mutable supplier heads.
-13. **Evaluation / multilingual** — reviewed golden fixtures, ontology-learning/matching metrics, source-evidence binding, abstention, reproducibility, KO/EN/JA/ZH/VI/ES/DE/FR labels, CJK/font/text-expansion checks where material.
-14. **Observability / recovery / release** — structured telemetry, security evidence, backup/restore, package/SBOM/provenance/signing, reproducible build and rollback proof before immutable release.
-15. **Buyer-path performance** — when a buyer-facing web/API path is materialized, measure async+k6/E2E p95 <= 20 ms where applicable without sample shrinking or unrealistic cache warm-up; profile query/I/O/runtime/render/GC and move genuine hot paths Rust-first when the budget is missed.
+1. Finish Source Observation PostgreSQL 18 lossless representation with successor digest versioning, backward-compatible schema-scoped coordinates, direct type-only-schema authorization, qualified column/type binding, and exact-current Rust/coverage evidence.
+2. Add the concrete bounded read-only PostgreSQL adapter and frozen anonymized conformance fixture.
+3. Repair #10's stale Research Intake parent without discarding its golden-set delta, then propagate that exact repaired ancestry through #11+ and still-relevant later research/write Drafts.
+4. Build deterministic ontology discovery with source receipts and explicit abstention for unsupported semantics.
+5. Build semantic-layer discovery for dimensions/measures/grain/units/relationships/mappings without treating relational structure as business authority.
+6. Route every production LLM proposal through a released `contextual-orchestrator`; outputs remain proposed/inferred until steward validation/publication.
+7. Add alignment/matching, RDF/OWL/SKOS/SHACL validation, governed persistence/review/publication adapters, client completion, multilingual/evaluation, observability/recovery and immutable release evidence under their canonical owner boundaries.
 
-## DDD and governance fitness constraints
+## DDD and release fitness
 
-- Maintain explicit Subdomain/Bounded Context/Context Map/UL/Aggregate/Entity/VO/Domain Service/Repository/Event/Invariant alignment across code, API, DB and tests.
-- No generic domain `utils/helpers/services/common` buckets.
-- External DTOs cross Anti-Corruption Layers; adapters stay outside the core domain model.
-- Source Observation facts are evidence, not source-system business truth. Relational constraints are not semantic authority by themselves.
-- Client Consumption depends only on governed release contracts, never generator-private classes, prompts, persistence tables or orchestration state.
-- Published semantic truth is immutable; correction creates a new release and supersession evidence instead of in-place overwrite.
-- Production LLM output remains proposed/inferred until steward validation/publication. Provider/model/key discovery belongs to `contextual-orchestrator` released APIs and schemas.
-- Purpose-bound PII, least privilege, CSAP/SOC2 evidence readiness, deterministic receipts, recovery and auditability are release criteria rather than post-release documentation work.
+Adapters stay outside the core domain model and external DTOs cross explicit Anti-Corruption Layers. Source Observation facts are evidence, not source-system business truth. Client Consumption depends only on governed release contracts, never generator-private classes, prompts, persistence tables or orchestration state. Published semantic truth is immutable; corrections create a new release plus supersession evidence. Production LLM output cannot become authoritative before steward validation and governed publication.
 
-## Current merge/release rule
-
-No Foundation, #35, #9, #40, or downstream semantic publication is authorized by this snapshot. The closest prerequisite is central `.github#2051@70e8c1f...`: source repair is present, but exact-head required workflows and qualifying independent review are still pending. After its normal protected integration, #35 requires a fresh authenticated exact-head CodeQL run and independent approval; Foundation then requires its own exact-current Product and central evidence. Local predecessor evidence never transfers merely because a successor is docs-only.
-
-No force push, destructive rebase, self-approval, review dismissal, fail-open scanner substitution, provider bypass, no-op trigger, synthetic status, live Zotero mutation, premature semantic publication, or release is acceptance evidence.
+No Foundation, #35, Client, Source Observation, research child, semantic publication, or release is authorized by this snapshot alone. The closest shared infrastructure prerequisite is ordinary non-force adoption of central protected `.github/main@f578d8d...` by the active CodeQL successor chain, followed by fresh verification of the pre-cutover direct-evidence/job-set-convergence repairs and preservation of #2051/#2056's valid identity/wake deltas. The closest ConceptWeave-owned source delta is the PostgreSQL 18 representation/version/authorization/qualified-type RED->GREEN; the closest research-stack repair is #10's non-force semantic reconciliation onto current #9.

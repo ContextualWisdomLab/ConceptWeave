@@ -1,5 +1,10 @@
 [workspace]
-members = ["crates/conceptweave-domain", "crates/conceptweave-client"]
+members = [
+    "crates/conceptweave-domain",
+    "crates/conceptweave-client",
+    "crates/conceptweave-observation",
+    "crates/conceptweave-source-port",
+]
 resolver = "2"
 
 [workspace.package]
