@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   rust-quality:
-    if: ${{ github.event_name != 'pull_request' || (github.event.action != 'closed' && github.event.pull_request.draft == false) }}
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'closed' }}
     runs-on: ubuntu-24.04
     env:
       COVERAGE_TOOLCHAIN: nightly-2026-08-20
