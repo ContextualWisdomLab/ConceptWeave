@@ -109,6 +109,9 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: npm run check:json-contracts
 
+      - name: Remove installed Node dependencies
+        run: rm -rf node_modules
+
       - name: Lockfile freshness
         if: steps.rust_workspace.outputs.adopted == 'true'
         run: |
