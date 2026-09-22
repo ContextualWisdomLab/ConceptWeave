@@ -25,6 +25,7 @@ def main() -> int:
         'rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt --component clippy',
         'test "$(rustc --version | awk \'{print $2}\')" = "$RUSTUP_TOOLCHAIN"',
         'rustup show active-toolchain | grep -Eq "^${RUSTUP_TOOLCHAIN}-"',
+        "cargo build --workspace --release --locked",
         "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
         "node-version: '24.21.0'",
         "package-manager-cache: false",
