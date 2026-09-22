@@ -70,10 +70,10 @@ def main() -> int:
 
     required_fragments = (
         "runs-on: ubuntu-24.04",
-        "types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]",
+        "types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited, closed]",
         "group: ${{ github.workflow }}-${{ github.repository }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}",
         "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
-        "if: ${{ github.event_name != 'pull_request' || github.event.action != 'closed' }}",
+        "if: ${{ github.event.action != 'closed' && (github.event.action != 'edited' || github.event.changes.base != null) }}",
         "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
         "python3 scripts/test_rust_workspace_adoption.py",
         "id: rust_workspace",
