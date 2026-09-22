@@ -2586,7 +2586,7 @@ impl SourceObservationReceipt {
     /// Returns the exact UTC observation-time evidence supplied by the adapter.
     #[must_use]
     pub fn observed_at_utc(&self) -> &str {
-        self.inner.observed_at_utc()
+        &self.observed_at_utc
     }
 
     /// Returns the verified exact source coordinate inside the snapshot.
@@ -2743,6 +2743,7 @@ fn compute_snapshot_digest(tables: &[TableObservation]) -> String {
                 TableConstraintObservation::ForeignKey(observation) => {
                     hasher.update([2]);
                     encode_str(&mut hasher, observation.constraint_name());
+                    encode_str_slice(&mut hasher, observation.column_names());
                     encode_str(&mut hasher, observation.referenced_schema_name());
                     encode_str(&mut hasher, observation.referenced_table_name());
                     encode_str_slice(&mut hasher, observation.referenced_column_names());
