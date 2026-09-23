@@ -50,8 +50,8 @@ jobs:
         run: python3 ../trusted-product/scripts/check_ci_contract.py
 
       - name: Test staged Rust workspace adoption
-        working-directory: trusted-product
-        run: python3 scripts/test_rust_workspace_adoption.py
+        working-directory: candidate
+        run: python3 ../trusted-product/scripts/test_rust_workspace_adoption.py
 
       - name: Detect staged Rust workspace
         id: rust_workspace
