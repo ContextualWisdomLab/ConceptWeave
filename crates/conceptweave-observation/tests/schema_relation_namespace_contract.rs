@@ -101,6 +101,16 @@ fn index_name_colliding_with_relation_name_in_one_schema_fails_closed() {
 }
 
 #[test]
+fn index_name_colliding_with_own_relation_name_in_one_schema_fails_closed() {
+    let result = snapshot(vec![relation("public", "document", Some("document"))]);
+
+    assert!(
+        result.is_err(),
+        "an index cannot share its owning relation's pg_class name in the same schema"
+    );
+}
+
+#[test]
 fn same_index_name_in_different_schemas_remains_valid() {
     let result = snapshot(vec![
         relation("public", "document", Some("shared_idx")),
