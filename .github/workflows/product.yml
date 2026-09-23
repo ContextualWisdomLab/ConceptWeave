@@ -1,0 +1,165 @@
+name: Product
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited, closed]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.repository }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}-${{ github.event.action == 'edited' && github.event.changes.base == null && 'metadata-only' || 'validation' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  rust-quality:
+    name: ${{ github.event.action == 'edited' && github.event.changes.base == null && 'Product metadata-only' || 'Product acceptance' }}
+    if: ${{ github.event.action != 'closed' && (github.event.action != 'edited' || github.event.changes.base != null) }}
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.98.1
+      COVERAGE_TOOLCHAIN: nightly-2026-08-20
+    steps:
+      - name: Checkout trusted Product control plane
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: trusted-product
+          persist-credentials: false
+
+      - name: Checkout exact source revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify trusted Product control plane revision
+        env:
+          EXPECTED_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: test "$(git -C trusted-product rev-parse HEAD)" = "$EXPECTED_WORKFLOW_SHA"
+
+      - name: Verify exact source revision
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git -C candidate rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Validate Product CI contract
+        working-directory: candidate
+        run: python3 ../trusted-product/scripts/check_ci_contract.py
+
+      - name: Test staged Rust workspace adoption
+        working-directory: candidate
+        run: python3 ../trusted-product/scripts/test_rust_workspace_adoption.py
+
+      - name: Detect staged Rust workspace
+        id: rust_workspace
+        working-directory: candidate
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PRODUCT_CANDIDATE_ROOT: ${{ github.workspace }}/candidate
+        run: python3 ../trusted-product/scripts/check_rust_workspace_adoption.py >> "$GITHUB_OUTPUT"
+
+      - name: Install pinned Node.js runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24.21.0'
+          package-manager-cache: false
+
+      - name: Verify pinned Node.js runtime
+        run: test "$(node --version)" = "v24.21.0"
+
+      - name: Install pinned JSON Schema validator
+        working-directory: trusted-product
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Test staged semantic contract adoption
+        working-directory: trusted-product
+        run: node scripts/test_semantic_contract_adoption.mjs
+
+      - name: Validate public JSON contracts
+        working-directory: candidate
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PRODUCT_CANDIDATE_ROOT: ${{ github.workspace }}/candidate
+        run: node ../trusted-product/scripts/check_semantic_candidate_contracts.mjs
+
+      - name: Remove installed Node dependencies
+        working-directory: trusted-product
+        run: rm -rf node_modules
+
+      - name: Clean trusted Product control plane
+        working-directory: trusted-product
+        run: test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Install pinned Rust toolchain
+        if: steps.rust_workspace.outputs.adopted == 'true'
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt --component clippy
+
+      - name: Verify pinned Rust toolchain
+        if: steps.rust_workspace.outputs.adopted == 'true'
+        working-directory: candidate
+        run: |
+          test "$(rustc --version | awk '{print $2}')" = "$RUSTUP_TOOLCHAIN"
+          rustup show active-toolchain | grep -Eq "^${RUSTUP_TOOLCHAIN}-"
+
+      - name: Install cargo-llvm-cov
+        if: steps.rust_workspace.outputs.adopted == 'true'
+        uses: taiki-e/install-action@1ed6d7be6168f6c9046541087ff549b6bc581fdf # v2.87.2
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Install pinned branch-coverage toolchain
+        if: steps.rust_workspace.outputs.adopted == 'true'
+        run: rustup toolchain install "$COVERAGE_TOOLCHAIN" --profile minimal --component llvm-tools-preview
+
+      - name: Exact owned coverage
+        if: steps.rust_workspace.outputs.adopted == 'true'
+        working-directory: candidate
+        run: bash -c "$(cat ../trusted-product/scripts/check_coverage.sh)"
+
+      - name: Format
+        if: steps.rust_workspace.outputs.adopted == 'true'
+        working-directory: candidate
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        if: steps.rust_workspace.outputs.adopted == 'true'
+        working-directory: candidate
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Test
+        if: steps.rust_workspace.outputs.adopted == 'true'
+        working-directory: candidate
+        run: cargo test --workspace --locked
+
+      - name: Release build
+        if: steps.rust_workspace.outputs.adopted == 'true'
+        working-directory: candidate
+        run: cargo build --workspace --release --locked
+
+      - name: Public documentation
+        if: steps.rust_workspace.outputs.adopted == 'true'
+        working-directory: candidate
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --no-deps --locked
+
+      - name: Lockfile freshness
+        if: steps.rust_workspace.outputs.adopted == 'true'
+        working-directory: candidate
+        run: |
+          cargo generate-lockfile --locked
+          git ls-files --error-unmatch Cargo.lock >/dev/null
+          git ls-files --error-unmatch package-lock.json >/dev/null
+          test -z "$(git status --porcelain=v1 --untracked-files=all -- Cargo.lock package-lock.json)"
+
+      - name: Remove Rust build artifacts
+        if: steps.rust_workspace.outputs.adopted == 'true'
+        working-directory: candidate
+        run: rm -rf target
+
+      - name: Clean working tree
+        working-directory: candidate
+        run: test -z "$(git status --porcelain=v1 --untracked-files=all)"

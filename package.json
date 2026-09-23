@@ -1,0 +1,11 @@
+{
+  "name": "@contextualwisdomlab/conceptweave-ci",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "check:json-contracts": "node scripts/check_semantic_candidate_contracts.mjs"
+  },
+  "devDependencies": {
+    "ajv": "8.20.0"
+  }
+}
