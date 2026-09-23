@@ -63,6 +63,15 @@ class RustWorkspaceAdoptionTests(unittest.TestCase):
         self._write_complete_workspace()
         self.assertEqual(self._run(self.empty_base_sha), (0, "adopted=true\n"))
 
+    def test_explicit_candidate_root_controls_adoption(self) -> None:
+        self._write_complete_workspace()
+        with patch.dict(
+            os.environ,
+            {"PRODUCT_CANDIDATE_ROOT": str(self.repository_root)},
+            clear=False,
+        ):
+            self.assertEqual(self._run(self.empty_base_sha), (0, "adopted=true\n"))
+
     def test_partial_first_adoption_fails_closed(self) -> None:
         (self.repository_root / "Cargo.toml").write_text(
             '[workspace]\nmembers = []\n', encoding="utf-8"

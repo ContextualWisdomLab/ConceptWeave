@@ -20,29 +20,78 @@ jobs:
       RUSTUP_TOOLCHAIN: 1.98.1
       COVERAGE_TOOLCHAIN: nightly-2026-08-20
     steps:
+      - name: Checkout trusted Product control plane
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: trusted-product
+          persist-credentials: false
+
       - name: Checkout exact source revision
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: candidate
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Verify trusted Product control plane revision
+        env:
+          EXPECTED_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: test "$(git -C trusted-product rev-parse HEAD)" = "$EXPECTED_WORKFLOW_SHA"
 
       - name: Verify exact source revision
         env:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+        run: test "$(git -C candidate rev-parse HEAD)" = "$EXPECTED_SHA"
 
       - name: Validate Product CI contract
-        run: python3 scripts/check_ci_contract.py
+        working-directory: candidate
+        run: python3 ../trusted-product/scripts/check_ci_contract.py
 
       - name: Test staged Rust workspace adoption
+        working-directory: trusted-product
         run: python3 scripts/test_rust_workspace_adoption.py
 
       - name: Detect staged Rust workspace
         id: rust_workspace
+        working-directory: candidate
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: python3 scripts/check_rust_workspace_adoption.py >> "$GITHUB_OUTPUT"
+          PRODUCT_CANDIDATE_ROOT: ${{ github.workspace }}/candidate
+        run: python3 ../trusted-product/scripts/check_rust_workspace_adoption.py >> "$GITHUB_OUTPUT"
+
+      - name: Install pinned Node.js runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24.21.0'
+          package-manager-cache: false
+
+      - name: Verify pinned Node.js runtime
+        run: test "$(node --version)" = "v24.21.0"
+
+      - name: Install pinned JSON Schema validator
+        working-directory: trusted-product
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Test staged semantic contract adoption
+        working-directory: trusted-product
+        run: node scripts/test_semantic_contract_adoption.mjs
+
+      - name: Validate public JSON contracts
+        working-directory: candidate
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PRODUCT_CANDIDATE_ROOT: ${{ github.workspace }}/candidate
+        run: node ../trusted-product/scripts/check_semantic_candidate_contracts.mjs
+
+      - name: Remove installed Node dependencies
+        working-directory: trusted-product
+        run: rm -rf node_modules
+
+      - name: Clean trusted Product control plane
+        working-directory: trusted-product
+        run: test -z "$(git status --porcelain=v1 --untracked-files=all)"
 
       - name: Install pinned Rust toolchain
         if: steps.rust_workspace.outputs.adopted == 'true'
@@ -50,31 +99,10 @@ jobs:
 
       - name: Verify pinned Rust toolchain
         if: steps.rust_workspace.outputs.adopted == 'true'
+        working-directory: candidate
         run: |
           test "$(rustc --version | awk '{print $2}')" = "$RUSTUP_TOOLCHAIN"
           rustup show active-toolchain | grep -Eq "^${RUSTUP_TOOLCHAIN}-"
-
-      - name: Format
-        if: steps.rust_workspace.outputs.adopted == 'true'
-        run: cargo fmt --all --check
-
-      - name: Clippy
-        if: steps.rust_workspace.outputs.adopted == 'true'
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
-
-      - name: Test
-        if: steps.rust_workspace.outputs.adopted == 'true'
-        run: cargo test --workspace --locked
-
-      - name: Release build
-        if: steps.rust_workspace.outputs.adopted == 'true'
-        run: cargo build --workspace --release --locked
-
-      - name: Public documentation
-        if: steps.rust_workspace.outputs.adopted == 'true'
-        env:
-          RUSTDOCFLAGS: -D warnings
-        run: cargo doc --workspace --no-deps --locked
 
       - name: Install cargo-llvm-cov
         if: steps.rust_workspace.outputs.adopted == 'true'
@@ -88,33 +116,39 @@ jobs:
 
       - name: Exact owned coverage
         if: steps.rust_workspace.outputs.adopted == 'true'
-        run: bash scripts/check_coverage.sh
+        working-directory: candidate
+        run: bash -c "$(cat ../trusted-product/scripts/check_coverage.sh)"
 
-      - name: Install pinned Node.js runtime
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24.21.0'
-          package-manager-cache: false
+      - name: Format
+        if: steps.rust_workspace.outputs.adopted == 'true'
+        working-directory: candidate
+        run: cargo fmt --all --check
 
-      - name: Verify pinned Node.js runtime
-        run: test "$(node --version)" = "v24.21.0"
+      - name: Clippy
+        if: steps.rust_workspace.outputs.adopted == 'true'
+        working-directory: candidate
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
-      - name: Install pinned JSON Schema validator
-        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Test
+        if: steps.rust_workspace.outputs.adopted == 'true'
+        working-directory: candidate
+        run: cargo test --workspace --locked
 
-      - name: Test staged semantic contract adoption
-        run: node scripts/test_semantic_contract_adoption.mjs
+      - name: Release build
+        if: steps.rust_workspace.outputs.adopted == 'true'
+        working-directory: candidate
+        run: cargo build --workspace --release --locked
 
-      - name: Validate public JSON contracts
+      - name: Public documentation
+        if: steps.rust_workspace.outputs.adopted == 'true'
+        working-directory: candidate
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: npm run check:json-contracts
-
-      - name: Remove installed Node dependencies
-        run: rm -rf node_modules
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --no-deps --locked
 
       - name: Lockfile freshness
         if: steps.rust_workspace.outputs.adopted == 'true'
+        working-directory: candidate
         run: |
           cargo generate-lockfile --locked
           git ls-files --error-unmatch Cargo.lock >/dev/null
@@ -123,7 +157,9 @@ jobs:
 
       - name: Remove Rust build artifacts
         if: steps.rust_workspace.outputs.adopted == 'true'
+        working-directory: candidate
         run: rm -rf target
 
       - name: Clean working tree
+        working-directory: candidate
         run: test -z "$(git status --porcelain=v1 --untracked-files=all)"

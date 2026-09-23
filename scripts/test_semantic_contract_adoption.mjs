@@ -79,12 +79,12 @@ const writeCompleteContract = root => {
   }
 };
 
-const runChecker = (root, baseSha) =>
+const runChecker = (root, baseSha, extraEnv = {}) =>
   run(
     root,
     process.execPath,
     [join(root, "scripts/check_semantic_candidate_contracts.mjs")],
-    {BASE_SHA: baseSha},
+    {BASE_SHA: baseSha, ...extraEnv},
   );
 
 const expect = (condition, message) => {
@@ -116,6 +116,13 @@ const cases = [
     const result = runChecker(root, baseSha);
     expect(result.status === 0, `first adoption must validate: ${result.stderr}`);
     expect(result.stdout.includes('"status":"validated"'), "validated status missing");
+  }],
+  ["explicit candidate root", root => {
+    const baseSha = commit(root, "empty base", true);
+    writeCompleteContract(root);
+    const result = runChecker(root, baseSha, {PRODUCT_CANDIDATE_ROOT: root});
+    expect(result.status === 0, `explicit candidate root must validate: ${result.stderr}`);
+    expect(result.stdout.includes('"status":"validated"'), "candidate-root status missing");
   }],
   ["partial adoption", root => {
     const baseSha = commit(root, "empty base", true);

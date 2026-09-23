@@ -4,7 +4,9 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
 
-const repositoryRoot = fileURLToPath(new URL("../", import.meta.url));
+const repositoryRoot = process.env.PRODUCT_CANDIDATE_ROOT
+  ? resolve(process.env.PRODUCT_CANDIDATE_ROOT)
+  : fileURLToPath(new URL("../", import.meta.url));
 const readJson = path => JSON.parse(readFileSync(resolve(repositoryRoot, path), "utf8"));
 const SEMANTIC_SCHEMA_PATH = "contracts/semantic-candidate.schema.json";
 const cases = [
