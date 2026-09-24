@@ -22,15 +22,84 @@ use conceptweave_source_port::{
     SourceObservationPort,
 };
 use futures_util::TryStreamExt;
+use rustls::{ClientConfig, RootCertStore, pki_types::CertificateDer};
 use tokio_postgres::{
-    Config, IsolationLevel, NoTls, Row, Transaction, config::Host, error::SqlState, types::ToSql,
+    Config, IsolationLevel, NoTls, Row, Transaction,
+    config::{Host, SslMode},
+    error::SqlState,
+    types::ToSql,
 };
+use tokio_postgres_rustls::MakeRustlsConnect;
 
 /// Unix-socket PostgreSQL adapter with credential-bearing configurations keyed by the exact
-/// registry source key and immutable policy binding. TCP is rejected until a verifying TLS
-/// connector is configured; configurations and their credentials never enter domain values.
+/// registry source key and immutable policy binding. TCP is rejected by this transport;
+/// configurations and their credentials never enter domain values.
 pub struct PostgresUnixAdapter {
     connections: BTreeMap<String, (String, Config)>,
+}
+
+/// TCP PostgreSQL adapter that verifies the server certificate chain and configured host name
+/// against one adapter-local DER trust anchor per exact source binding.
+pub struct PostgresTlsAdapter {
+    connections: BTreeMap<String, (String, Config, MakeRustlsConnect)>,
+}
+
+impl PostgresTlsAdapter {
+    /// Installs TCP configurations with explicit DER trust anchors. Invalid anchors and non-TCP
+    /// hosts are rejected before any source I/O; TLS is required even if a config requested less.
+    pub fn new(
+        connections: BTreeMap<String, (String, Config, Vec<u8>)>,
+    ) -> Result<Self, SourceObservationFailure> {
+        let connections = connections
+            .into_iter()
+            .map(|(key, (binding, mut config, ca_der))| {
+                if config.get_hosts().is_empty()
+                    || config
+                        .get_hosts()
+                        .iter()
+                        .any(|host| !matches!(host, Host::Tcp(_)))
+                {
+                    return Err(SourceObservationFailure::SourceUnavailable);
+                }
+                let mut roots = RootCertStore::empty();
+                roots
+                    .add(CertificateDer::from(ca_der))
+                    .map_err(|_| SourceObservationFailure::SourceUnavailable)?;
+                config.ssl_mode(SslMode::Require);
+                let tls = MakeRustlsConnect::new(
+                    ClientConfig::builder()
+                        .with_root_certificates(roots)
+                        .with_no_client_auth(),
+                );
+                Ok((key, (binding, config, tls)))
+            })
+            .collect::<Result<_, _>>()?;
+        Ok(Self { connections })
+    }
+}
+
+impl SourceObservationPort for PostgresTlsAdapter {
+    type Snapshot = PostgresSchemaSnapshotV3;
+
+    async fn observe<'a>(
+        &'a self,
+        request: AuthorizedObservationRequest,
+        cancellation: &'a dyn ObservationCancellation,
+    ) -> Result<Self::Snapshot, SourceObservationFailure> {
+        let (active_binding, config, tls) = self
+            .connections
+            .get(request.source_connection().source_connection_key())
+            .ok_or(SourceObservationFailure::SourceUnavailable)?;
+        if active_binding != request.source_connection().connection_policy_binding() {
+            return Err(SourceObservationFailure::SourceUnavailable);
+        }
+        let (mut client, connection) =
+            bounded(&request, cancellation, config.connect(tls.clone())).await?;
+        let connection_task = tokio::spawn(connection);
+        let result = capture_catalog(&mut client, &request, cancellation).await;
+        connection_task.abort();
+        result
+    }
 }
 
 impl PostgresUnixAdapter {

@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, str::FromStr};
 
 use conceptweave_observation::{RelationKind, SchemaObjectLocation, TableConstraintObservation};
-use conceptweave_postgres_adapter::PostgresUnixAdapter;
+use conceptweave_postgres_adapter::{PostgresTlsAdapter, PostgresUnixAdapter};
 use conceptweave_source_port::{
     ObservationCancellation, ObservationLimits, ObservationRequest, ObservationRequestBudget,
     ObservationResourceEnvelope, ResolvedSourceConnection, SourceConnectionRegistry,
@@ -130,6 +130,70 @@ async fn missing_binding_and_tcp_transport_fail_before_source_io() {
             .await
             .err(),
         Some(SourceObservationFailure::Cancelled)
+    );
+}
+
+#[tokio::test]
+async fn postgres18_tcp_requires_valid_ca_and_host_name() {
+    let (Ok(dsn), Ok(ca_path), Ok(wrong_ca_path), Ok(plaintext_dsn)) = (
+        std::env::var("CONCEPTWEAVE_PG18_TLS_TEST_DSN"),
+        std::env::var("CONCEPTWEAVE_PG18_TLS_CA_DER"),
+        std::env::var("CONCEPTWEAVE_PG18_TLS_WRONG_CA_DER"),
+        std::env::var("CONCEPTWEAVE_PG18_PLAINTEXT_TEST_DSN"),
+    ) else {
+        return;
+    };
+    assert!(dsn.contains("host=localhost"));
+    let config = Config::from_str(&dsn).unwrap();
+    let ca = std::fs::read(ca_path).unwrap();
+    let wrong_ca = std::fs::read(wrong_ca_path).unwrap();
+    let connection = |config: Config, ca: Vec<u8>| {
+        PostgresTlsAdapter::new(BTreeMap::from([(
+            "fixture_source".to_owned(),
+            ("fixture_policy".to_owned(), config, ca),
+        )]))
+    };
+    assert!(connection(config.clone(), b"invalid certificate".to_vec()).is_err());
+    assert!(
+        connection(
+            Config::from_str("host=/tmp dbname=postgres").unwrap(),
+            ca.clone()
+        )
+        .is_err()
+    );
+
+    assert_eq!(
+        connection(config.clone(), wrong_ca)
+            .unwrap()
+            .observe(authorized("public"), &NotCancelled)
+            .await
+            .err(),
+        Some(SourceObservationFailure::SourceUnavailable)
+    );
+    assert_eq!(
+        connection(Config::from_str(&plaintext_dsn).unwrap(), ca.clone())
+            .unwrap()
+            .observe(authorized("public"), &NotCancelled)
+            .await
+            .err(),
+        Some(SourceObservationFailure::SourceUnavailable)
+    );
+
+    let adapter = connection(config.clone(), ca.clone()).unwrap();
+    let snapshot = adapter
+        .observe(authorized("public"), &NotCancelled)
+        .await
+        .unwrap();
+    assert!(snapshot.relations().is_empty());
+
+    let wrong_host = Config::from_str(&dsn.replace("host=localhost", "host=127.0.0.1")).unwrap();
+    assert_eq!(
+        connection(wrong_host, ca)
+            .unwrap()
+            .observe(authorized("public"), &NotCancelled)
+            .await
+            .err(),
+        Some(SourceObservationFailure::SourceUnavailable)
     );
 }
 
