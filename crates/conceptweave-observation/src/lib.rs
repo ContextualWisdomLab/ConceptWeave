@@ -7,6 +7,7 @@
 #![deny(missing_docs)]
 
 mod array_type;
+mod collation_definition;
 mod column_collation;
 mod column_expression;
 mod column_generation;
@@ -20,6 +21,10 @@ mod representation_v3;
 mod type_kind;
 
 pub use array_type::{ArrayTypeLocation, ArrayTypeObservation, ArrayTypeSourceReceipt};
+pub use collation_definition::{
+    CollationDefinitionObservation, CollationLocaleFields, CollationProvider,
+    DatabaseLocaleDefinition,
+};
 pub use column_collation::ColumnCollationObservation;
 pub use column_expression::ColumnExpressionObservation;
 pub use column_generation::ColumnGenerationObservation;
@@ -147,6 +152,8 @@ pub struct PostgresSchemaSnapshotV3 {
     constraint_periods_observed: bool,
     foreign_key_catalog: Vec<ForeignKeyCatalogObservation>,
     foreign_key_catalog_observed: bool,
+    collation_definitions: Vec<CollationDefinitionObservation>,
+    collation_definitions_observed: bool,
 }
 
 impl PostgresSchemaSnapshotV3 {
@@ -204,6 +211,8 @@ impl PostgresSchemaSnapshotV3 {
             constraint_periods_observed: false,
             foreign_key_catalog: Vec::new(),
             foreign_key_catalog_observed: false,
+            collation_definitions: Vec::new(),
+            collation_definitions_observed: false,
         })
     }
 
@@ -296,6 +305,8 @@ impl PostgresSchemaSnapshotV3 {
             constraint_periods_observed: false,
             foreign_key_catalog: Vec::new(),
             foreign_key_catalog_observed: false,
+            collation_definitions: Vec::new(),
+            collation_definitions_observed: false,
         })
     }
 
@@ -577,6 +588,8 @@ impl PostgresSchemaSnapshotV3 {
             constraint_periods_observed: false,
             foreign_key_catalog: Vec::new(),
             foreign_key_catalog_observed: false,
+            collation_definitions: Vec::new(),
+            collation_definitions_observed: false,
         })
     }
 
@@ -635,6 +648,7 @@ impl PostgresSchemaSnapshotV3 {
             || self.constraint_timings_observed
             || self.constraint_periods_observed
             || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "type_kind_observation_order",
@@ -688,6 +702,7 @@ impl PostgresSchemaSnapshotV3 {
             || self.constraint_timings_observed
             || self.constraint_periods_observed
             || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "column_collation_observation_order",
@@ -725,6 +740,7 @@ impl PostgresSchemaSnapshotV3 {
             || self.constraint_timings_observed
             || self.constraint_periods_observed
             || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "column_generation_observation_order",
@@ -768,6 +784,7 @@ impl PostgresSchemaSnapshotV3 {
             || self.constraint_timings_observed
             || self.constraint_periods_observed
             || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "column_expression_observation_order",
@@ -807,6 +824,7 @@ impl PostgresSchemaSnapshotV3 {
             || self.constraint_timings_observed
             || self.constraint_periods_observed
             || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "column_identity_observation_order",
@@ -851,6 +869,7 @@ impl PostgresSchemaSnapshotV3 {
         if self.constraint_timings_observed
             || self.constraint_periods_observed
             || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "not_null_constraint_observation_order",
@@ -878,6 +897,7 @@ impl PostgresSchemaSnapshotV3 {
         if self.constraint_timings_observed
             || self.constraint_periods_observed
             || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "constraint_timing_observation_order",
@@ -908,7 +928,10 @@ impl PostgresSchemaSnapshotV3 {
         mut self,
         constraint_periods: Vec<ConstraintPeriodObservation>,
     ) -> Result<Self, ObservationError> {
-        if self.constraint_periods_observed || self.foreign_key_catalog_observed {
+        if self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
+        {
             return Err(ObservationError::InvalidObservationField {
                 field: "constraint_period_already_observed",
             });
@@ -938,7 +961,7 @@ impl PostgresSchemaSnapshotV3 {
         mut self,
         observations: Vec<ForeignKeyCatalogObservation>,
     ) -> Result<Self, ObservationError> {
-        if self.foreign_key_catalog_observed {
+        if self.foreign_key_catalog_observed || self.collation_definitions_observed {
             return Err(ObservationError::InvalidObservationField {
                 field: "foreign_key_catalog_already_observed",
             });
@@ -947,6 +970,35 @@ impl PostgresSchemaSnapshotV3 {
         self.snapshot_digest = foreign_key_catalog::digest(&self.snapshot_digest, &observations);
         self.foreign_key_catalog = observations;
         self.foreign_key_catalog_observed = true;
+        Ok(self)
+    }
+
+    /// Adds the complete definitions of collations referenced by observed columns, domains, and
+    /// index keys. This final successor family binds stored and actual provider versions, and the
+    /// effective database locale when PostgreSQL's default collation is referenced.
+    pub fn with_observed_collation_definitions(
+        mut self,
+        definitions: Vec<CollationDefinitionObservation>,
+    ) -> Result<Self, ObservationError> {
+        if self.collation_definitions_observed
+            || (!self.relations.is_empty() && !self.column_collations_observed)
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "collation_definition_observation_order",
+            });
+        }
+        let columns = self
+            .column_collations_observed
+            .then_some(self.column_collations.as_slice());
+        let definitions = collation_definition::canonicalize(
+            &self.relations,
+            &self.domains,
+            columns,
+            definitions,
+        )?;
+        self.snapshot_digest = collation_definition::digest(&self.snapshot_digest, &definitions);
+        self.collation_definitions = definitions;
+        self.collation_definitions_observed = true;
         Ok(self)
     }
 
@@ -1077,12 +1129,19 @@ impl PostgresSchemaSnapshotV3 {
             .then_some(self.foreign_key_catalog.as_slice())
     }
 
+    /// Returns exact definitions for every collation referenced by the observed schema evidence.
+    #[must_use]
+    pub fn collation_definitions(&self) -> Option<&[CollationDefinitionObservation]> {
+        self.collation_definitions_observed
+            .then_some(self.collation_definitions.as_slice())
+    }
+
     /// Issues provenance for an exact successor coordinate only when it exists in this snapshot.
     pub fn source_receipt(
         &self,
         location: SchemaObjectLocation,
     ) -> Result<SuccessorSourceReceipt, ObservationError> {
-        if self.not_null_constraints_observed
+        let observed_not_null = self.not_null_constraints_observed
             && self.not_null_constraints.iter().any(|observation| {
                 SchemaObjectLocation::constraint(
                     observation.schema_name(),
@@ -1091,8 +1150,16 @@ impl PostgresSchemaSnapshotV3 {
                     observation.constraint_name(),
                 )
                 .is_ok_and(|observed_location| observed_location == location)
-            })
-        {
+            });
+        let observed_collation = self.collation_definitions_observed
+            && self.collation_definitions.iter().any(|definition| {
+                SchemaObjectLocation::collation(
+                    definition.collation().schema_name(),
+                    definition.collation().collation_name(),
+                )
+                .is_ok_and(|observed_location| observed_location == location)
+            });
+        if observed_not_null || observed_collation {
             return Ok(SuccessorSourceReceipt {
                 source_id: self.inner.source_connection_key().to_owned(),
                 connection_policy_binding: self.inner.connection_policy_binding().to_owned(),

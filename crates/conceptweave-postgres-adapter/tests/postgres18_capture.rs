@@ -1,8 +1,8 @@
 use std::{collections::BTreeMap, str::FromStr};
 
 use conceptweave_observation::{
-    ConstraintDeferrability, ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType,
-    RelationKind, SchemaObjectLocation, TableConstraintObservation,
+    CollationProvider, ConstraintDeferrability, ForeignKeyAction, ForeignKeyDeferrability,
+    ForeignKeyMatchType, RelationKind, SchemaObjectLocation, TableConstraintObservation,
 };
 use conceptweave_postgres_adapter::{PostgresTlsAdapter, PostgresUnixAdapter};
 use conceptweave_source_port::{
@@ -89,6 +89,74 @@ fn adapter(config: Config) -> PostgresUnixAdapter {
         "fixture_source".to_owned(),
         ("fixture_policy".to_owned(), config),
     )]))
+}
+
+#[tokio::test]
+async fn postgres18_collation_version_drift_changes_source_identity() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_collversion_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; \
+         CREATE COLLATION \"{schema}\".casefold \
+           (provider = icu, locale = 'und-u-ks-level1', deterministic = false, version = '0'); \
+         CREATE TABLE \"{schema}\".record (title text COLLATE \"{schema}\".casefold)"
+        ))
+        .await
+        .unwrap();
+    let result = async {
+        let before = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 128, 16_384), &NotCancelled)
+            .await?;
+        let [definition] = before.collation_definitions().unwrap() else {
+            panic!("one referenced collation definition must be captured");
+        };
+        assert_eq!(definition.provider(), CollationProvider::Icu);
+        assert_eq!(definition.fields().recorded_version(), Some("0"));
+        assert_ne!(
+            definition.fields().recorded_version(),
+            definition.fields().actual_version()
+        );
+        let location = SchemaObjectLocation::collation(&schema, "casefold").unwrap();
+        let receipt = before.source_receipt(location.clone()).unwrap();
+        assert_eq!(receipt.location(), &location);
+        assert_eq!(receipt.source_digest(), before.snapshot_digest());
+        assert!(
+            before
+                .source_receipt(SchemaObjectLocation::collation(&schema, "missing").unwrap())
+                .is_err()
+        );
+        client
+            .batch_execute(&format!(
+                "ALTER COLLATION \"{schema}\".casefold REFRESH VERSION"
+            ))
+            .await
+            .unwrap();
+        let after = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 128, 16_384), &NotCancelled)
+            .await?;
+        assert_ne!(before.snapshot_digest(), after.snapshot_digest());
+        let [refreshed] = after.collation_definitions().unwrap() else {
+            panic!("one referenced collation definition must be captured");
+        };
+        assert_eq!(
+            refreshed.fields().recorded_version(),
+            refreshed.fields().actual_version()
+        );
+        Ok::<_, SourceObservationFailure>(())
+    }
+    .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    result.unwrap();
 }
 
 #[tokio::test]

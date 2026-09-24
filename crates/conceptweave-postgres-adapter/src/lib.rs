@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+mod collations;
 mod foreign_keys;
 
 use std::{collections::BTreeMap, future::Future, time::Duration};
@@ -572,6 +573,16 @@ async fn capture_catalog(
         &foreign_key_triggers,
     )
     .await?;
+    let collation_definitions = collations::capture(
+        &transaction,
+        request,
+        cancellation,
+        &mut meter,
+        &domains,
+        &relations,
+        &column_collations,
+    )
+    .await?;
     let observed_at_utc: String = field(
         &bounded(
             request,
@@ -586,9 +597,9 @@ async fn capture_catalog(
     )?;
     let has_relations = !relations.is_empty();
     let extractor_revision = if !has_relations {
-        "postgres18_type_only_adapter_v2"
+        "postgres18_type_only_adapter_v3"
     } else {
-        "postgres18_foreign_key_adapter_v1"
+        "postgres18_collation_definition_adapter_v1"
     };
     let snapshot = if !has_relations {
         PostgresSchemaSnapshotV3::new(
@@ -624,6 +635,9 @@ async fn capture_catalog(
     } else {
         snapshot
     };
+    let snapshot = snapshot
+        .with_observed_collation_definitions(collation_definitions)
+        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
     bounded(request, cancellation, transaction.commit()).await?;
     Ok(snapshot)
 }
