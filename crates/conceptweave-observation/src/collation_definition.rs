@@ -143,7 +143,18 @@ impl DatabaseLocaleDefinition {
         provider: CollationProvider,
         fields: CollationLocaleFields,
     ) -> Result<Self, ObservationError> {
-        if provider == CollationProvider::DatabaseDefault {
+        let provider_shape = match provider {
+            CollationProvider::DatabaseDefault => false,
+            CollationProvider::Libc => {
+                fields.lc_collate().is_some()
+                    && fields.lc_ctype().is_some()
+                    && fields.locale().is_none()
+                    && fields.icu_rules().is_none()
+            }
+            CollationProvider::Builtin => fields.locale().is_some() && fields.icu_rules().is_none(),
+            CollationProvider::Icu => fields.locale().is_some(),
+        };
+        if !provider_shape {
             return Err(ObservationError::InvalidObservationField {
                 field: "database_locale_provider",
             });
@@ -467,6 +478,70 @@ mod tests {
                 None,
             )
             .is_err()
+        );
+    }
+
+    #[test]
+    fn database_locale_provider_requires_its_catalog_fields() {
+        let empty = CollationLocaleFields::new(None, None, None, None, None, None).unwrap();
+        assert!(DatabaseLocaleDefinition::new(CollationProvider::Icu, empty.clone()).is_err());
+        assert!(DatabaseLocaleDefinition::new(CollationProvider::Builtin, empty).is_err());
+
+        let libc_with_locale = CollationLocaleFields::new(
+            Some("en_US.UTF-8".to_owned()),
+            Some("en_US.UTF-8".to_owned()),
+            Some("und".to_owned()),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(DatabaseLocaleDefinition::new(CollationProvider::Libc, libc_with_locale).is_err());
+
+        let libc = CollationLocaleFields::new(
+            Some("en_US.UTF-8".to_owned()),
+            Some("en_US.UTF-8".to_owned()),
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(DatabaseLocaleDefinition::new(CollationProvider::Libc, libc).is_ok());
+    }
+
+    #[test]
+    fn effective_default_database_locale_changes_source_identity() {
+        let definition = |collate: &str| {
+            CollationDefinitionObservation::new(
+                QualifiedCollationName::new("pg_catalog", "default").unwrap(),
+                -1,
+                6,
+                CollationProvider::DatabaseDefault,
+                true,
+                CollationLocaleFields::new(None, None, None, None, None, None).unwrap(),
+                Some(
+                    DatabaseLocaleDefinition::new(
+                        CollationProvider::Libc,
+                        CollationLocaleFields::new(
+                            Some(collate.to_owned()),
+                            Some("en_US.UTF-8".to_owned()),
+                            None,
+                            None,
+                            None,
+                            None,
+                        )
+                        .unwrap(),
+                    )
+                    .unwrap(),
+                ),
+                None,
+            )
+            .unwrap()
+        };
+        assert_ne!(
+            digest("base", &[definition("en_US.UTF-8")]),
+            digest("base", &[definition("C")])
         );
     }
 }
