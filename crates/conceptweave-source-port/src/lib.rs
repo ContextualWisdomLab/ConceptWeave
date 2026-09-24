@@ -416,7 +416,7 @@ impl ObservationRequest {
 
         let mut seen_schema_names = BTreeSet::new();
         for schema_name in &allowed_schema_names {
-            if schema_name.trim().is_empty() {
+            if schema_name.is_empty() || schema_name.contains('\0') {
                 return Err(ObservationRequestError::InvalidSchemaName);
             }
             if !seen_schema_names.insert(schema_name.clone()) {

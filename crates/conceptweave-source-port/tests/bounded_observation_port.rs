@@ -197,7 +197,7 @@ fn request_rejects_non_registry_source_connection_keys_before_adapter_access() {
 }
 
 #[test]
-fn request_rejects_blank_source_empty_or_blank_schema_and_exact_duplicates() {
+fn request_rejects_blank_source_empty_or_nul_schema_and_exact_duplicates() {
     assert_eq!(
         ObservationRequest::new("  ", vec!["public".to_owned()], request_budget(), limits(),),
         Err(ObservationRequestError::InvalidSourceConnectionKey)
@@ -209,7 +209,16 @@ fn request_rejects_blank_source_empty_or_blank_schema_and_exact_duplicates() {
     assert_eq!(
         ObservationRequest::new(
             "source_ref",
-            vec!["\t".to_owned()],
+            vec!["".to_owned()],
+            request_budget(),
+            limits(),
+        ),
+        Err(ObservationRequestError::InvalidSchemaName)
+    );
+    assert_eq!(
+        ObservationRequest::new(
+            "source_ref",
+            vec!["bad\0schema".to_owned()],
             request_budget(),
             limits(),
         ),
@@ -228,7 +237,33 @@ fn request_rejects_blank_source_empty_or_blank_schema_and_exact_duplicates() {
     );
 }
 
-struct ExactRegistry;
+struct ExactRegistry {
+    allowed_schema_name: &'static str,
+}
+
+#[test]
+fn quoted_schema_name_is_authorized_as_exact_catalog_text() {
+    let request = ObservationRequest::new(
+        "grc_readonly_connection",
+        vec![" ".to_owned()],
+        request_budget(),
+        limits(),
+    )
+    .unwrap();
+    assert_eq!(request.allowed_schema_names(), [" "]);
+    assert_eq!(
+        request.clone().authorize(&ExactRegistry {
+            allowed_schema_name: "governance_core",
+        }),
+        Err(ObservationRequestError::UnauthorizedSchemaScope)
+    );
+    let authorized = request
+        .authorize(&ExactRegistry {
+            allowed_schema_name: " ",
+        })
+        .unwrap();
+    assert_eq!(authorized.request().allowed_schema_names(), [" "]);
+}
 
 impl SourceConnectionRegistry for ExactRegistry {
     fn contains_source_connection(&self, source_connection_key: &str) -> bool {
@@ -247,7 +282,7 @@ impl SourceConnectionRegistry for ExactRegistry {
         source_connection.source_connection_key() == "grc_readonly_connection"
             && source_connection.connection_policy_binding() == "policy_revision_a"
             && allowed_schema_names.len() == 1
-            && allowed_schema_names[0] == "governance_core"
+            && allowed_schema_names[0] == self.allowed_schema_name
     }
 
     fn authorizes_resource_envelope(
@@ -293,7 +328,9 @@ fn adapter_execution_requires_a_registry_authorized_request() {
     );
 
     let authorized = request
-        .authorize(&ExactRegistry)
+        .authorize(&ExactRegistry {
+            allowed_schema_name: "governance_core",
+        })
         .expect("registry authorization must issue the source-policy-schema-and-resource execution capability");
     assert_eq!(
         authorized.request().source_connection_key(),
@@ -357,7 +394,9 @@ fn explicit_port_carries_authorization_and_cancellation_without_inventing_succes
         limits(),
     )
     .expect("valid request")
-    .authorize(&ExactRegistry)
+    .authorize(&ExactRegistry {
+        allowed_schema_name: "governance_core",
+    })
     .expect("authorized request");
     let active_request = ObservationRequest::new(
         "grc_readonly_connection",
@@ -366,7 +405,9 @@ fn explicit_port_carries_authorization_and_cancellation_without_inventing_succes
         limits(),
     )
     .expect("valid request")
-    .authorize(&ExactRegistry)
+    .authorize(&ExactRegistry {
+        allowed_schema_name: "governance_core",
+    })
     .expect("authorized request");
 
     assert_eq!(
