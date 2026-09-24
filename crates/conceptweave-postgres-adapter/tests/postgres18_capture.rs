@@ -198,6 +198,92 @@ async fn postgres18_tcp_requires_valid_ca_and_host_name() {
 }
 
 #[tokio::test]
+async fn postgres18_column_collation_is_exact_source_evidence() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_collation_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; \
+             CREATE COLLATION \"{schema}\".casefold (provider = icu, locale = 'und-u-ks-level1', deterministic = false); \
+             CREATE TABLE \"{schema}\".records (id integer, title text, alias text COLLATE \"{schema}\".casefold)"
+        ))
+        .await
+        .unwrap();
+
+    let result = async {
+        let before = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        let title = before
+            .column_collations()
+            .unwrap()
+            .iter()
+            .find(|column| column.column_name() == "title")
+            .unwrap();
+        assert_eq!(title.collation().unwrap().schema_name(), "pg_catalog");
+        assert_eq!(title.collation().unwrap().collation_name(), "default");
+        assert_eq!(title.deterministic(), Some(true));
+        let alias = before
+            .column_collations()
+            .unwrap()
+            .iter()
+            .find(|column| column.column_name() == "alias")
+            .unwrap();
+        assert_eq!(alias.collation().unwrap().schema_name(), schema);
+        assert_eq!(alias.collation().unwrap().collation_name(), "casefold");
+        assert_eq!(alias.deterministic(), Some(false));
+        assert!(
+            before
+                .column_collations()
+                .unwrap()
+                .iter()
+                .find(|column| column.column_name() == "id")
+                .unwrap()
+                .collation()
+                .is_none()
+        );
+
+        client
+            .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".records ALTER COLUMN title TYPE text COLLATE \"C\""
+            ))
+            .await
+            .unwrap();
+        let after = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        assert_ne!(before.snapshot_digest(), after.snapshot_digest());
+        let title = after
+            .column_collations()
+            .unwrap()
+            .iter()
+            .find(|column| column.column_name() == "title")
+            .unwrap();
+        assert_eq!(title.collation().unwrap().collation_name(), "C");
+        let receipt = after
+            .source_receipt(
+                SchemaObjectLocation::column(&schema, "records", RelationKind::Table, "title")
+                    .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(receipt.source_digest(), after.snapshot_digest());
+        Ok::<_, SourceObservationFailure>(())
+    }
+    .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    result.unwrap();
+}
+
+#[tokio::test]
 async fn postgres18_catalog_is_observed_in_one_read_only_transaction() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
