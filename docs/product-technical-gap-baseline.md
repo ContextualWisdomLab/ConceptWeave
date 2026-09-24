@@ -86,6 +86,8 @@ The live Local API replay remains acquisition/observation evidence only: 8,326 o
 | UI / multilingual | NOT_YET_MATERIALIZED | When material UI appears, require reusable composition, token/Figma identity, normal/loading/empty/error/permission/responsive/interaction/a11y E2E, and KO/EN/JA/ZH/VI/ES/DE/FR label/font/text-expansion verification. |
 | Release | NOT_STARTED | Version/CHANGELOG/tag/package/immutable semantic release/SBOM/provenance/reproducibility/rollback must be executed on the exact protected release head. |
 
+Local Client coverage recheck on 2026-09-25: LLVM's raw region summary reported 706/707, while every distinct owned code/expansion source region was covered (707/707) and both outcomes of all source branches were covered (56/56). The gate checks those enumerated source coordinates; the raw summary remains visible as a diagnostic. This is local evidence, not a protected-head acceptance result.
+
 ## P0 product gaps
 
 1. **Concrete Source Observation adapter** — maintained Rust PostgreSQL driver behind `conceptweave-source-port`; adapter-local registry/credential resolution; explicit read-only session/transaction; exact schema admission; total operation/statement deadlines; cancellation plus row/byte/concurrency budgets; complete immutable snapshot or fail closed; source-disappearance handling; deterministic replay against a frozen anonymized fixture.
