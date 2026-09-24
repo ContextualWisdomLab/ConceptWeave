@@ -10,9 +10,7 @@ use std::collections::BTreeSet;
 use conceptweave_observation::ObservationError;
 use sha2::{Digest, Sha256};
 
-use super::{
-    IndexExclusionConstraintCoordinate, IndexExclusionConstraintTimingSnapshot,
-};
+use super::{IndexExclusionConstraintCoordinate, IndexExclusionConstraintTimingSnapshot};
 
 const INDEX_EXCLUSION_CONSTRAINT_ENFORCEMENT_DIGEST_DOMAIN_V1: &[u8] =
     b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.exclusion_constraint.enforcement.v1";
@@ -155,7 +153,8 @@ impl IndexExclusionConstraintEnforcementSnapshot {
             ));
         }
 
-        let snapshot_digest = compute_enforcement_digest(timing_snapshot.snapshot_digest(), &observations);
+        let snapshot_digest =
+            compute_enforcement_digest(timing_snapshot.snapshot_digest(), &observations);
         Ok(Self {
             source_connection_key: timing_snapshot.source_connection_key().to_owned(),
             connection_policy_binding: timing_snapshot.connection_policy_binding().to_owned(),

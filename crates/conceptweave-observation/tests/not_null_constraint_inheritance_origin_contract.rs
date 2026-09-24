@@ -20,8 +20,9 @@ fn constraint(
 
 #[test]
 fn inherited_not_null_requires_at_least_one_inheritance_ancestor() {
-    let error = constraint(false, 0)
-        .expect_err("a non-local NOT NULL constraint without an ancestor is not source-representable");
+    let error = constraint(false, 0).expect_err(
+        "a non-local NOT NULL constraint without an ancestor is not source-representable",
+    );
 
     assert_eq!(
         error,

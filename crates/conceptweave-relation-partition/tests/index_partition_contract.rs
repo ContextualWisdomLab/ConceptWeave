@@ -91,15 +91,17 @@ fn relation(name: &str, kind: RelationKind, index_name: &str) -> RelationObserva
         "public",
         name,
         kind,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            true,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                true,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
     .with_indexes(vec![index(index_name)])
@@ -221,8 +223,16 @@ fn index_partition_parent_must_match_relation_partition_parent() {
         "extractor-index-partition-v1",
         "2026-09-14T14:45:00Z",
         vec![
-            relation("events_a", RelationKind::PartitionedTable, "events_a_id_idx"),
-            relation("events_b", RelationKind::PartitionedTable, "events_b_id_idx"),
+            relation(
+                "events_a",
+                RelationKind::PartitionedTable,
+                "events_a_id_idx",
+            ),
+            relation(
+                "events_b",
+                RelationKind::PartitionedTable,
+                "events_b_id_idx",
+            ),
             relation("events_2026", RelationKind::Table, "events_2026_id_idx"),
         ],
         vec![],
@@ -315,11 +325,13 @@ fn complete_index_family_and_stable_attachment_are_required() {
     let incomplete = IndexPartitionSnapshot::new(
         &base,
         &relations,
-        vec![IndexPartitionObservation::non_partition(
-            parent_index(),
-            IndexRelationKind::PartitionedIndex,
-        )
-        .unwrap()],
+        vec![
+            IndexPartitionObservation::non_partition(
+                parent_index(),
+                IndexRelationKind::PartitionedIndex,
+            )
+            .unwrap(),
+        ],
     )
     .expect_err("every observed index needs relkind/relispartition evidence");
     assert_field(incomplete, "index_partition_completeness");

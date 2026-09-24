@@ -146,7 +146,8 @@ impl IndexExclusionConstraintIndexNameSnapshot {
 
         let mut observations = Vec::with_capacity(rebound_constraint.observations().len());
         for constraint in rebound_constraint.observations() {
-            if constraint.coordinate().constraint_name() != constraint.backing_index().index_name() {
+            if constraint.coordinate().constraint_name() != constraint.backing_index().index_name()
+            {
                 return Err(invalid("index_exclusion_constraint_index_name_state"));
             }
             validate_schema_relation_namespace(base_snapshot, constraint.backing_index())?;
@@ -156,10 +157,8 @@ impl IndexExclusionConstraintIndexNameSnapshot {
             });
         }
 
-        let snapshot_digest = compute_index_name_digest(
-            rebound_catalog_shape.snapshot_digest(),
-            &observations,
-        );
+        let snapshot_digest =
+            compute_index_name_digest(rebound_catalog_shape.snapshot_digest(), &observations);
         Ok(Self {
             source_connection_key: rebound_catalog_shape.source_connection_key().to_owned(),
             connection_policy_binding: rebound_catalog_shape.connection_policy_binding().to_owned(),
@@ -246,9 +245,7 @@ fn validate_schema_relation_namespace(
     if base_snapshot.relations().iter().any(|relation| {
         relation.schema_name() == schema_name && relation.relation_name() == index_name
     }) {
-        return Err(invalid(
-            "index_exclusion_constraint_index_name_namespace",
-        ));
+        return Err(invalid("index_exclusion_constraint_index_name_namespace"));
     }
 
     let mut matching_index_count = 0usize;
@@ -273,9 +270,7 @@ fn validate_schema_relation_namespace(
     }
 
     if matching_index_count != 1 || exact_backing_count != 1 {
-        return Err(invalid(
-            "index_exclusion_constraint_index_name_namespace",
-        ));
+        return Err(invalid("index_exclusion_constraint_index_name_namespace"));
     }
     Ok(())
 }

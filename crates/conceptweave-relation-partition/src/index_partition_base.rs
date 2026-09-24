@@ -176,7 +176,10 @@ impl IndexPartitionObservation {
         if is_partition != parent_index.is_some() {
             return Err(invalid("index_partition_parent_presence"));
         }
-        if parent_index.as_ref().is_some_and(|parent| parent == &coordinate) {
+        if parent_index
+            .as_ref()
+            .is_some_and(|parent| parent == &coordinate)
+        {
             return Err(invalid("index_partition_parent"));
         }
         Ok(Self {
@@ -318,7 +321,9 @@ impl IndexPartitionSnapshot {
             &observations,
         );
         Ok(Self {
-            source_connection_key: relation_partition_snapshot.source_connection_key().to_owned(),
+            source_connection_key: relation_partition_snapshot
+                .source_connection_key()
+                .to_owned(),
             connection_policy_binding: relation_partition_snapshot
                 .connection_policy_binding()
                 .to_owned(),

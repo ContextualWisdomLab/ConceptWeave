@@ -16,10 +16,7 @@ fn primary_key(name: &str, column_name: &str) -> TableConstraintObservation {
     )
 }
 
-fn relation(
-    nullable: bool,
-    constraints: Vec<TableConstraintObservation>,
-) -> RelationObservation {
+fn relation(nullable: bool, constraints: Vec<TableConstraintObservation>) -> RelationObservation {
     RelationObservation::new(
         "public",
         "document",

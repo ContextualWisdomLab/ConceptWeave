@@ -26,12 +26,10 @@ fn index(index_name: &str, clustered: bool) -> IndexObservation {
         index_name,
         false,
         None,
-        vec![IndexAttributeObservation::column(
-            1,
-            IndexAttributeKind::Key,
-            "document_id",
-        )
-        .expect("column key fixture is valid")],
+        vec![
+            IndexAttributeObservation::column(1, IndexAttributeKind::Key, "document_id")
+                .expect("column key fixture is valid"),
+        ],
         Vec::new(),
     )
     .expect("index fixture is structurally valid")
@@ -49,15 +47,17 @@ fn relation(indexes: Vec<IndexObservation>) -> RelationObservation {
         "public",
         "document",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "document_id",
-            1,
-            "bigint",
-            catalog_type("int8"),
-            false,
-            None,
-        )
-        .expect("column fixture is valid")],
+        vec![
+            ColumnObservationV3::new(
+                "document_id",
+                1,
+                "bigint",
+                catalog_type("int8"),
+                false,
+                None,
+            )
+            .expect("column fixture is valid"),
+        ],
     )
     .expect("relation fixture is valid")
     .with_indexes(indexes)

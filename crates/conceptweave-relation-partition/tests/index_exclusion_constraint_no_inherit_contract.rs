@@ -27,7 +27,11 @@ impl SourceConnectionRegistry for Registry {
         (key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
 
-    fn authorizes_schema_scope(&self, source: &ResolvedSourceConnection, schemas: &[String]) -> bool {
+    fn authorizes_schema_scope(
+        &self,
+        source: &ResolvedSourceConnection,
+        schemas: &[String],
+    ) -> bool {
         source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && schemas == ["public"]
@@ -82,7 +86,9 @@ fn exclusion_index(name: &str) -> IndexObservation {
         .unwrap(),
     ])
     .unwrap()
-    .with_catalog_flags(IndexCatalogFlags::new(false, true, true, false, false, false))
+    .with_catalog_flags(IndexCatalogFlags::new(
+        false, true, true, false, false, false,
+    ))
     .unwrap()
     .with_ready(true)
     .with_valid(true)
@@ -246,11 +252,13 @@ fn attached_preexisting_child_can_retain_no_inherit_true() {
     )
     .expect("ConstraintSetParentConstraint does not rewrite connoinherit on attachment");
 
-    assert!(snapshot
-        .source_receipt(child_constraint())
-        .unwrap()
-        .location()
-        .no_inherit());
+    assert!(
+        snapshot
+            .source_receipt(child_constraint())
+            .unwrap()
+            .location()
+            .no_inherit()
+    );
 }
 
 #[test]
@@ -316,8 +324,10 @@ fn exact_no_inherit_state_issues_provenance() {
         .expect("observed EXCLUDE no-inherit state must issue provenance");
     assert!(!receipt.location().no_inherit());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
-    assert!(receipt
-        .location()
-        .canonical_location()
-        .ends_with("/no-inherit"));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/no-inherit")
+    );
 }

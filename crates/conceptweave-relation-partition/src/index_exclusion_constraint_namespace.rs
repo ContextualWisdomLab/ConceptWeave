@@ -153,9 +153,7 @@ impl IndexExclusionConstraintNamespaceSnapshot {
             return Err(invalid("index_exclusion_constraint_namespace_coordinate"));
         }
         if observed != expected {
-            return Err(invalid(
-                "index_exclusion_constraint_namespace_completeness",
-            ));
+            return Err(invalid("index_exclusion_constraint_namespace_completeness"));
         }
 
         let snapshot_digest =

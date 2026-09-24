@@ -60,9 +60,24 @@ fn every_fk_only_payload_slot_fails_closed_independently() {
     let payloads = [
         IndexExclusionConstraintForeignPayloadPresence::new(true, false, [false; 3], false),
         IndexExclusionConstraintForeignPayloadPresence::new(false, true, [false; 3], false),
-        IndexExclusionConstraintForeignPayloadPresence::new(false, false, [true, false, false], false),
-        IndexExclusionConstraintForeignPayloadPresence::new(false, false, [false, true, false], false),
-        IndexExclusionConstraintForeignPayloadPresence::new(false, false, [false, false, true], false),
+        IndexExclusionConstraintForeignPayloadPresence::new(
+            false,
+            false,
+            [true, false, false],
+            false,
+        ),
+        IndexExclusionConstraintForeignPayloadPresence::new(
+            false,
+            false,
+            [false, true, false],
+            false,
+        ),
+        IndexExclusionConstraintForeignPayloadPresence::new(
+            false,
+            false,
+            [false, false, true],
+            false,
+        ),
         IndexExclusionConstraintForeignPayloadPresence::new(false, false, [false; 3], true),
     ];
 
@@ -73,15 +88,14 @@ fn every_fk_only_payload_slot_fails_closed_independently() {
 
 #[test]
 fn raw_foreign_payload_accessors_preserve_observed_presence() {
-    let payload = IndexExclusionConstraintForeignPayloadPresence::new(
-        true,
-        true,
-        [true, false, true],
-        true,
-    );
+    let payload =
+        IndexExclusionConstraintForeignPayloadPresence::new(true, true, [true, false, true], true);
     assert!(payload.foreign_relation_present());
     assert!(payload.foreign_key_columns_present());
-    assert_eq!(payload.equality_operator_vectors_present(), [true, false, true]);
+    assert_eq!(
+        payload.equality_operator_vectors_present(),
+        [true, false, true]
+    );
     assert!(payload.delete_set_columns_present());
 
     let actions = IndexExclusionConstraintForeignActionCodes::new('a', 'c', 'f');

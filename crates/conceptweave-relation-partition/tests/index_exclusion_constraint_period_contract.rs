@@ -27,7 +27,11 @@ impl SourceConnectionRegistry for Registry {
         (key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
 
-    fn authorizes_schema_scope(&self, source: &ResolvedSourceConnection, schemas: &[String]) -> bool {
+    fn authorizes_schema_scope(
+        &self,
+        source: &ResolvedSourceConnection,
+        schemas: &[String],
+    ) -> bool {
         source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && schemas == ["public"]
@@ -82,7 +86,9 @@ fn exclusion_index(name: &str) -> IndexObservation {
         .unwrap(),
     ])
     .unwrap()
-    .with_catalog_flags(IndexCatalogFlags::new(false, true, true, false, false, false))
+    .with_catalog_flags(IndexCatalogFlags::new(
+        false, true, true, false, false, false,
+    ))
     .unwrap()
     .with_ready(true)
     .with_valid(true)
@@ -94,15 +100,17 @@ fn relation(name: &str, kind: RelationKind, index_name: &str) -> RelationObserva
         "public",
         name,
         kind,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            false,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                false,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
     .with_indexes(vec![exclusion_index(index_name)])
@@ -244,11 +252,13 @@ fn ordinary_exclude_requires_conperiod_false() {
     )
     .expect("ordinary contype=x constraints carry explicit conperiod=false");
 
-    assert!(!snapshot
-        .source_receipt(child_constraint())
-        .unwrap()
-        .location()
-        .has_period_semantics());
+    assert!(
+        !snapshot
+            .source_receipt(child_constraint())
+            .unwrap()
+            .location()
+            .has_period_semantics()
+    );
 }
 
 #[test]
@@ -269,11 +279,7 @@ fn exclusion_constraint_period_inventory_must_be_complete() {
     let constraints = exclusion_constraint_snapshot();
     let error = IndexExclusionConstraintPeriodSnapshot::new(
         &constraints,
-        vec![IndexExclusionConstraintPeriodObservation::new(
-            parent_constraint(),
-            false,
-        )
-        .unwrap()],
+        vec![IndexExclusionConstraintPeriodObservation::new(parent_constraint(), false).unwrap()],
     )
     .expect_err("every ordinary EXCLUDE constraint must retain pg_constraint.conperiod");
 

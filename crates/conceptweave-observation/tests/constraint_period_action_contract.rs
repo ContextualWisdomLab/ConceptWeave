@@ -3,9 +3,9 @@ use conceptweave_observation::{
     ConstraintTimingObservation, ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType,
     ForeignKeyObservation, ForeignKeyReferenceBehavior, IndexAttributeKind,
     IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics, IndexObservation,
-    ObservationError, PostgresSchemaSnapshotV3, PrimaryKeyObservation,
-    QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
-    TableConstraintObservation, TypeKindObservation,
+    ObservationError, PostgresSchemaSnapshotV3, PrimaryKeyObservation, QualifiedOperatorClassName,
+    QualifiedTypeName, RelationKind, RelationObservation, TableConstraintObservation,
+    TypeKindObservation,
 };
 
 mod support;
@@ -31,14 +31,12 @@ fn temporal_key_semantics() -> Vec<IndexKeySemantics> {
 fn temporal_type_kinds() -> Vec<TypeKindObservation> {
     vec![
         TypeKindObservation::range(catalog_type("tstzrange"), catalog_type("tstzmultirange")),
-        TypeKindObservation::multirange(
-            catalog_type("tstzmultirange"),
-            catalog_type("tstzrange"),
-        ),
+        TypeKindObservation::multirange(catalog_type("tstzmultirange"), catalog_type("tstzrange")),
     ]
 }
 
-fn temporal_key_operator_signatures() -> Vec<(u32, String, String, QualifiedTypeName, QualifiedTypeName)> {
+fn temporal_key_operator_signatures()
+-> Vec<(u32, String, String, QualifiedTypeName, QualifiedTypeName)> {
     vec![
         (
             1,
@@ -253,11 +251,9 @@ fn temporal_foreign_key_rejects_unsupported_update_actions() {
         ForeignKeyAction::SetNull,
         ForeignKeyAction::SetDefault,
     ] {
-        let error = snapshot_with_temporal_fk(Some(reference_behavior(
-            action,
-            ForeignKeyAction::NoAction,
-        )))
-        .expect_err("PostgreSQL temporal foreign keys reject this ON UPDATE action");
+        let error =
+            snapshot_with_temporal_fk(Some(reference_behavior(action, ForeignKeyAction::NoAction)))
+                .expect_err("PostgreSQL temporal foreign keys reject this ON UPDATE action");
         assert_eq!(
             error,
             ObservationError::InvalidObservationField {
@@ -275,11 +271,9 @@ fn temporal_foreign_key_rejects_unsupported_delete_actions() {
         ForeignKeyAction::SetNull,
         ForeignKeyAction::SetDefault,
     ] {
-        let error = snapshot_with_temporal_fk(Some(reference_behavior(
-            ForeignKeyAction::NoAction,
-            action,
-        )))
-        .expect_err("PostgreSQL temporal foreign keys reject this ON DELETE action");
+        let error =
+            snapshot_with_temporal_fk(Some(reference_behavior(ForeignKeyAction::NoAction, action)))
+                .expect_err("PostgreSQL temporal foreign keys reject this ON DELETE action");
         assert_eq!(
             error,
             ObservationError::InvalidObservationField {

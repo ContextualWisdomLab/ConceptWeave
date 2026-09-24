@@ -1,8 +1,8 @@
 use conceptweave_observation::{
-    ColumnCollationObservation, ColumnObservationV3, IndexAttributeKind,
-    IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics, IndexObservation,
-    PostgresSchemaSnapshotV3, QualifiedCollationName, QualifiedOperatorClassName,
-    QualifiedTypeName, RelationKind, RelationObservation,
+    ColumnCollationObservation, ColumnObservationV3, IndexAttributeKind, IndexAttributeObservation,
+    IndexCatalogFlags, IndexKeySemantics, IndexObservation, PostgresSchemaSnapshotV3,
+    QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
+    RelationObservation,
 };
 use conceptweave_relation_partition::{
     CanonicalExpression, CanonicalExpressionField, CanonicalExpressionValue,
@@ -94,13 +94,8 @@ fn expression(complete_node_schema: bool) -> CanonicalExpression {
         field(
             "function",
             CanonicalExpressionValue::Function(
-                QualifiedFunctionSignature::new(
-                    "pg_catalog",
-                    "lower",
-                    vec![text.clone()],
-                    text,
-                )
-                .unwrap(),
+                QualifiedFunctionSignature::new("pg_catalog", "lower", vec![text.clone()], text)
+                    .unwrap(),
             ),
         ),
         field(
@@ -142,12 +137,14 @@ fn stack(complete_node_schema: bool) -> Stack {
         "accounts_email_idx",
         false,
         Some(false),
-        vec![IndexAttributeObservation::expression(
-            1,
-            IndexAttributeKind::Key,
-            "lower(account_email)",
-        )
-        .unwrap()],
+        vec![
+            IndexAttributeObservation::expression(
+                1,
+                IndexAttributeKind::Key,
+                "lower(account_email)",
+            )
+            .unwrap(),
+        ],
         vec![],
     )
     .unwrap()
@@ -162,7 +159,9 @@ fn stack(complete_node_schema: bool) -> Stack {
         .unwrap(),
     ])
     .unwrap()
-    .with_catalog_flags(IndexCatalogFlags::new(false, false, true, false, false, false))
+    .with_catalog_flags(IndexCatalogFlags::new(
+        false, false, true, false, false, false,
+    ))
     .unwrap()
     .with_valid(true);
 
@@ -170,15 +169,17 @@ fn stack(complete_node_schema: bool) -> Stack {
         "public",
         "accounts",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "account_email",
-            1,
-            "text",
-            QualifiedTypeName::new("pg_catalog", "text").unwrap(),
-            false,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "account_email",
+                1,
+                "text",
+                QualifiedTypeName::new("pg_catalog", "text").unwrap(),
+                false,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
     .with_indexes(vec![index])
@@ -208,71 +209,69 @@ fn stack(complete_node_schema: bool) -> Stack {
 
     let relations = RelationPartitionSnapshot::new(
         &base,
-        vec![RelationPartitionObservation::non_partition(
-            "public",
-            "accounts",
-            RelationKind::Table,
-        )
-        .unwrap()],
+        vec![
+            RelationPartitionObservation::non_partition("public", "accounts", RelationKind::Table)
+                .unwrap(),
+        ],
     )
     .unwrap();
     let indexes = IndexPartitionSnapshot::new(
         &base,
         &relations,
-        vec![IndexPartitionObservation::non_partition(
-            coordinate(),
-            IndexRelationKind::Index,
-        )
-        .unwrap()],
+        vec![
+            IndexPartitionObservation::non_partition(coordinate(), IndexRelationKind::Index)
+                .unwrap(),
+        ],
     )
     .unwrap();
     let families = IndexOperatorFamilySnapshot::new(
         &base,
         &relations,
         &indexes,
-        vec![IndexKeyOperatorFamilyObservation::new(
-            coordinate(),
-            1,
-            QualifiedOperatorClassName::new("pg_catalog", "text_ops").unwrap(),
-            QualifiedOperatorFamilyName::new("btree", "pg_catalog", "text_ops").unwrap(),
-        )
-        .unwrap()],
+        vec![
+            IndexKeyOperatorFamilyObservation::new(
+                coordinate(),
+                1,
+                QualifiedOperatorClassName::new("pg_catalog", "text_ops").unwrap(),
+                QualifiedOperatorFamilyName::new("btree", "pg_catalog", "text_ops").unwrap(),
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
-    let exclusions = IndexExclusionSemanticsSnapshot::new(
-        &base,
-        &relations,
-        &indexes,
-        &families,
-        vec![],
-    )
-    .unwrap();
+    let exclusions =
+        IndexExclusionSemanticsSnapshot::new(&base, &relations, &indexes, &families, vec![])
+            .unwrap();
     let expressions = IndexExpressionSemanticsSnapshot::new(
         &base,
         &relations,
         &indexes,
         &families,
         &exclusions,
-        vec![IndexExpressionSemanticsObservation::new(
-            coordinate(),
-            1,
-            expression(complete_node_schema),
-        )
-        .unwrap()],
+        vec![
+            IndexExpressionSemanticsObservation::new(
+                coordinate(),
+                1,
+                expression(complete_node_schema),
+            )
+            .unwrap(),
+        ],
         vec![],
     )
     .unwrap();
     let type_modifiers = RelationPartitionTypeModifierSnapshot::new(
         &base,
         &relations,
-        vec![ColumnTypeModifierObservation::new(
-            "public",
-            "accounts",
-            RelationKind::Table,
-            "account_email",
-            -1,
-        )
-        .unwrap()],
+        vec![
+            ColumnTypeModifierObservation::new(
+                "public",
+                "accounts",
+                RelationKind::Table,
+                "account_email",
+                -1,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
 
@@ -296,18 +295,20 @@ fn relation_vars(stack: &Stack) -> IndexExpressionRelationVarSnapshot {
         &stack.exclusions,
         &stack.expressions,
         &stack.type_modifiers,
-        vec![IndexExpressionRelationVarObservation::new(
-            IndexExpressionRelationVarLocation::expression(coordinate(), 1, 1).unwrap(),
-            "account_email",
-            QualifiedTypeName::new("pg_catalog", "text").unwrap(),
-            -1,
-            Some(QualifiedCollationName::new("pg_catalog", "default").unwrap()),
-            RelationVarRelationRole::IndexRelation,
-            true,
-            0,
-            RelationVarReturningType::Default,
-        )
-        .unwrap()],
+        vec![
+            IndexExpressionRelationVarObservation::new(
+                IndexExpressionRelationVarLocation::expression(coordinate(), 1, 1).unwrap(),
+                "account_email",
+                QualifiedTypeName::new("pg_catalog", "text").unwrap(),
+                -1,
+                Some(QualifiedCollationName::new("pg_catalog", "default").unwrap()),
+                RelationVarRelationRole::IndexRelation,
+                true,
+                0,
+                RelationVarReturningType::Default,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
 }
@@ -339,7 +340,10 @@ fn complete_node_schema_and_relation_var_proofs_compose_into_a_new_successor() {
     )
     .expect("exact node-schema v1 plus exact relation-Var v1 must compose");
 
-    assert_eq!(composed.node_schema_predecessor_digest(), node_schema.snapshot_digest());
+    assert_eq!(
+        composed.node_schema_predecessor_digest(),
+        node_schema.snapshot_digest()
+    );
     assert_eq!(
         composed.relation_var_predecessor_digest(),
         relation_vars.snapshot_digest()

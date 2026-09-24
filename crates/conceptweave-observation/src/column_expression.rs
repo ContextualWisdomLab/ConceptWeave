@@ -299,10 +299,7 @@ pub(crate) fn compute_column_expression_digest(
     column_expressions: &[ColumnExpressionObservation],
 ) -> String {
     let mut hasher = Sha256::new();
-    encode_bytes(
-        &mut hasher,
-        SNAPSHOT_DIGEST_DOMAIN_V3_COLUMN_EXPRESSION_V1,
-    );
+    encode_bytes(&mut hasher, SNAPSHOT_DIGEST_DOMAIN_V3_COLUMN_EXPRESSION_V1);
     encode_str(&mut hasher, base_snapshot_digest);
     encode_len(&mut hasher, column_expressions.len());
     for observation in column_expressions {

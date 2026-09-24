@@ -30,15 +30,10 @@ fn relation_with_match_type(match_type: ForeignKeyMatchType) -> RelationObservat
         "public",
         "document",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "parent_id",
-            1,
-            "int8",
-            catalog_type("int8"),
-            false,
-            None,
-        )
-        .expect("column fixture is valid")],
+        vec![
+            ColumnObservationV3::new("parent_id", 1, "int8", catalog_type("int8"), false, None)
+                .expect("column fixture is valid"),
+        ],
     )
     .expect("relation fixture is valid")
     .with_constraints(vec![TableConstraintObservation::ForeignKey(foreign_key)])

@@ -196,7 +196,9 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterCostSnapshot {
     /// Creates complete planner-cost evidence for every converter direction in the predecessor.
     pub fn new(
         planner_support_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportSnapshot,
-        mut observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterCostObservation>,
+        mut observations: Vec<
+            IndexExclusionConstraintOperatorProcedureTransformConverterCostObservation,
+        >,
     ) -> Result<Self, ObservationError> {
         observations.sort_by_key(cost_key);
 
@@ -254,9 +256,13 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterCostSnapshot {
         );
         Ok(Self {
             source_connection_key: planner_support_snapshot.source_connection_key().to_owned(),
-            connection_policy_binding: planner_support_snapshot.connection_policy_binding().to_owned(),
+            connection_policy_binding: planner_support_snapshot
+                .connection_policy_binding()
+                .to_owned(),
             snapshot_digest,
-            converter_snapshot_digest: planner_support_snapshot.converter_snapshot_digest().to_owned(),
+            converter_snapshot_digest: planner_support_snapshot
+                .converter_snapshot_digest()
+                .to_owned(),
             extractor_revision: planner_support_snapshot.extractor_revision().to_owned(),
             observed_at_utc: planner_support_snapshot.observed_at_utc().to_owned(),
             observations,
@@ -335,14 +341,16 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterCostSnapshot {
                     direction,
                 ),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureTransformConverterCostSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureTransformConverterCostSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 

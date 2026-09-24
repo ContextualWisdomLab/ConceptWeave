@@ -23,7 +23,8 @@ const SHA256_DIGEST_PREFIX: &str = "sha256:";
 
 /// Exact converter-function `pg_depend.deptype='e'` membership for one converter direction.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipObservation {
+pub struct IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipObservation
+{
     coordinate: IndexExclusionConstraintCoordinate,
     key_position: u32,
     transform_type: QualifiedTypeName,
@@ -133,13 +134,15 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembers
 
 /// Immutable provenance receipt for one exact converter-function extension-membership observation.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipSourceReceipt {
+pub struct IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipSourceReceipt
+{
     source_id: String,
     connection_policy_binding: String,
     source_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
-    location: IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipObservation,
+    location:
+        IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipObservation,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipSourceReceipt {
@@ -177,7 +180,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembers
     #[must_use]
     pub const fn location(
         &self,
-    ) -> &IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipObservation {
+    ) -> &IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipObservation
+    {
         &self.location
     }
 }
@@ -191,7 +195,9 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterExtensionM
     converter_snapshot_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
-    observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipObservation>,
+    observations: Vec<
+        IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipObservation,
+    >,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipSnapshot {
@@ -259,9 +265,13 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembers
         );
         Ok(Self {
             source_connection_key: transform_types_snapshot.source_connection_key().to_owned(),
-            connection_policy_binding: transform_types_snapshot.connection_policy_binding().to_owned(),
+            connection_policy_binding: transform_types_snapshot
+                .connection_policy_binding()
+                .to_owned(),
             snapshot_digest,
-            converter_snapshot_digest: transform_types_snapshot.converter_snapshot_digest().to_owned(),
+            converter_snapshot_digest: transform_types_snapshot
+                .converter_snapshot_digest()
+                .to_owned(),
             extractor_revision: transform_types_snapshot.extractor_revision().to_owned(),
             observed_at_utc: transform_types_snapshot.observed_at_utc().to_owned(),
             observations,
@@ -308,7 +318,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembers
     #[must_use]
     pub fn observations(
         &self,
-    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipObservation] {
+    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipObservation]{
         &self.observations
     }
 

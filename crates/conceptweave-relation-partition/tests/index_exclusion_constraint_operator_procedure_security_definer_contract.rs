@@ -51,13 +51,18 @@ fn ordinary_exclude_operator_procedure_security_definer_preserves_invoker_proven
         receipt.connection_policy_binding(),
         procedure_kind.connection_policy_binding()
     );
-    assert_eq!(receipt.extractor_revision(), procedure_kind.extractor_revision());
+    assert_eq!(
+        receipt.extractor_revision(),
+        procedure_kind.extractor_revision()
+    );
     assert_eq!(receipt.observed_at_utc(), procedure_kind.observed_at_utc());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
-    assert!(receipt
-        .location()
-        .canonical_location()
-        .ends_with("/1/procedure-security-definer"));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/1/procedure-security-definer")
+    );
 }
 
 #[test]
@@ -83,11 +88,13 @@ fn ordinary_exclude_operator_procedure_security_definer_distinguishes_execution_
     .unwrap();
 
     assert_ne!(invoker.snapshot_digest(), definer.snapshot_digest());
-    assert!(definer
-        .source_receipt(coordinate(), 1)
-        .unwrap()
-        .location()
-        .security_definer());
+    assert!(
+        definer
+            .source_receipt(coordinate(), 1)
+            .unwrap()
+            .location()
+            .security_definer()
+    );
 }
 
 #[test]
@@ -191,5 +198,7 @@ fn ordinary_exclude_operator_procedure_security_definer_rejects_unknown_receipt_
 
 #[test]
 fn ordinary_exclude_operator_procedure_security_definer_snapshot_is_publicly_composed() {
-    assert!(std::mem::size_of::<IndexExclusionConstraintOperatorProcedureSecurityDefinerSnapshot>() > 0);
+    assert!(
+        std::mem::size_of::<IndexExclusionConstraintOperatorProcedureSecurityDefinerSnapshot>() > 0
+    );
 }

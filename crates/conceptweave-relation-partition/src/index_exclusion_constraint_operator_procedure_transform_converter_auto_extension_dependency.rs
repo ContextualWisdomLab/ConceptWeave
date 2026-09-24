@@ -23,7 +23,8 @@ const SHA256_DIGEST_PREFIX: &str = "sha256:";
 
 /// Complete `pg_depend.deptype='x'` extension set for one exact converter function direction.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencyObservation {
+pub struct IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencyObservation
+{
     coordinate: IndexExclusionConstraintCoordinate,
     key_position: u32,
     transform_type: QualifiedTypeName,
@@ -148,7 +149,9 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtens
     location: IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencyObservation,
 }
 
-impl IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencySourceReceipt {
+impl
+    IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencySourceReceipt
+{
     /// Returns the stable source registry key, never credential material.
     #[must_use]
     pub fn source_id(&self) -> &str {
@@ -183,7 +186,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDep
     #[must_use]
     pub const fn location(
         &self,
-    ) -> &IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencyObservation {
+    ) -> &IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencyObservation{
         &self.location
     }
 }
@@ -274,7 +277,9 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDep
             converter_snapshot_digest: extension_membership_snapshot
                 .converter_snapshot_digest()
                 .to_owned(),
-            extractor_revision: extension_membership_snapshot.extractor_revision().to_owned(),
+            extractor_revision: extension_membership_snapshot
+                .extractor_revision()
+                .to_owned(),
             observed_at_utc: extension_membership_snapshot.observed_at_utc().to_owned(),
             observations,
         })
@@ -320,7 +325,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDep
     #[must_use]
     pub fn observations(
         &self,
-    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencyObservation] {
+    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencyObservation]{
         &self.observations
     }
 
@@ -334,7 +339,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDep
     ) -> Result<
         IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencySourceReceipt,
         ObservationError,
-    > {
+    >{
         let observation = self
             .observations
             .iter()

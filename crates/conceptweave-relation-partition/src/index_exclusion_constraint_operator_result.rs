@@ -216,16 +216,12 @@ impl IndexExclusionConstraintOperatorResultSnapshot {
             if observation.operator_result_type() != observation.procedure_result_type()
                 || !is_pg_catalog_bool(observation.operator_result_type())
             {
-                return Err(invalid(
-                    "index_exclusion_constraint_operator_result_state",
-                ));
+                return Err(invalid("index_exclusion_constraint_operator_result_state"));
             }
         }
 
-        let snapshot_digest = compute_result_digest(
-            procedure_snapshot.snapshot_digest(),
-            &observations,
-        );
+        let snapshot_digest =
+            compute_result_digest(procedure_snapshot.snapshot_digest(), &observations);
         Ok(Self {
             source_connection_key: procedure_snapshot.source_connection_key().to_owned(),
             connection_policy_binding: procedure_snapshot.connection_policy_binding().to_owned(),
@@ -322,10 +318,7 @@ fn compute_result_digest(
     format!("{SHA256_DIGEST_PREFIX}{:x}", hasher.finalize())
 }
 
-fn result_location(
-    coordinate: &IndexExclusionConstraintCoordinate,
-    key_position: u32,
-) -> String {
+fn result_location(coordinate: &IndexExclusionConstraintCoordinate, key_position: u32) -> String {
     format!(
         "{}/exclusion-operators/{key_position}/result-contract",
         coordinate.canonical_location()

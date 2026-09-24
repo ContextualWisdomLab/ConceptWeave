@@ -106,15 +106,17 @@ fn relation(
         "public",
         name,
         kind,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            false,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                false,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
 
@@ -169,12 +171,7 @@ fn base_snapshot(parent_constraint: bool) -> PostgresSchemaSnapshotV3 {
                 "events_pkey",
                 parent_constraint,
             ),
-            relation(
-                "events_2026",
-                RelationKind::Table,
-                "events_2026_pkey",
-                true,
-            ),
+            relation("events_2026", RelationKind::Table, "events_2026_pkey", true),
         ],
         vec![],
         vec![],
@@ -308,11 +305,8 @@ fn exact_constraint_parentage_is_admitted_and_receipted() {
         &indexes,
         vec![
             IndexConstraintParentageObservation::root(parent_constraint()).unwrap(),
-            IndexConstraintParentageObservation::partition(
-                child_constraint(),
-                parent_constraint(),
-            )
-            .unwrap(),
+            IndexConstraintParentageObservation::partition(child_constraint(), parent_constraint())
+                .unwrap(),
         ],
     )
     .expect("exact pg_constraint.conparentid parentage must be admitted");
@@ -320,7 +314,10 @@ fn exact_constraint_parentage_is_admitted_and_receipted() {
     let receipt = snapshot
         .source_receipt(child_constraint())
         .expect("observed child constraint parentage must issue provenance");
-    assert_eq!(receipt.location().parent_constraint(), Some(&parent_constraint()));
+    assert_eq!(
+        receipt.location().parent_constraint(),
+        Some(&parent_constraint())
+    );
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
 }
 

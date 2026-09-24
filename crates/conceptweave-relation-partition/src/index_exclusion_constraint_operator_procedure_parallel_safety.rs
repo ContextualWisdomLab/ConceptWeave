@@ -271,8 +271,10 @@ impl IndexExclusionConstraintOperatorProcedureParallelSafetySnapshot {
         &self,
         coordinate: IndexExclusionConstraintCoordinate,
         key_position: u32,
-    ) -> Result<IndexExclusionConstraintOperatorProcedureParallelSafetySourceReceipt, ObservationError>
-    {
+    ) -> Result<
+        IndexExclusionConstraintOperatorProcedureParallelSafetySourceReceipt,
+        ObservationError,
+    > {
         let observation = self
             .observations
             .iter()
@@ -283,14 +285,16 @@ impl IndexExclusionConstraintOperatorProcedureParallelSafetySnapshot {
             .ok_or_else(|| ObservationError::UnknownObservationLocation {
                 location: procedure_parallel_safety_location(&coordinate, key_position),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureParallelSafetySourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureParallelSafetySourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 
@@ -345,10 +349,7 @@ fn encode_procedure(hasher: &mut Sha256, procedure: &QualifiedProcedureSignature
     }
 }
 
-fn encode_type(
-    hasher: &mut Sha256,
-    qualified_type: &conceptweave_observation::QualifiedTypeName,
-) {
+fn encode_type(hasher: &mut Sha256, qualified_type: &conceptweave_observation::QualifiedTypeName) {
     encode_str(hasher, qualified_type.schema_name());
     encode_str(hasher, qualified_type.type_name());
 }
@@ -394,7 +395,9 @@ mod tests {
         QualifiedProcedureSignature::new("pg_catalog", "int4eq", vec![int4(), int4()]).unwrap()
     }
 
-    fn observation(state: char) -> IndexExclusionConstraintOperatorProcedureParallelSafetyObservation {
+    fn observation(
+        state: char,
+    ) -> IndexExclusionConstraintOperatorProcedureParallelSafetyObservation {
         IndexExclusionConstraintOperatorProcedureParallelSafetyObservation::new(
             coordinate(),
             1,
@@ -407,7 +410,8 @@ mod tests {
 
     #[test]
     fn parallel_safety_digest_domain_separates_all_postgres_states() {
-        let safe = compute_procedure_parallel_safety_digest("sha256:predecessor", &[observation('s')]);
+        let safe =
+            compute_procedure_parallel_safety_digest("sha256:predecessor", &[observation('s')]);
         let restricted =
             compute_procedure_parallel_safety_digest("sha256:predecessor", &[observation('r')]);
         let unsafe_state =

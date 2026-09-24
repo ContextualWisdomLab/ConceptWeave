@@ -193,7 +193,8 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterParallelSa
     converter_snapshot_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
-    observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterParallelSafetyObservation>,
+    observations:
+        Vec<IndexExclusionConstraintOperatorProcedureTransformConverterParallelSafetyObservation>,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterParallelSafetySnapshot {
@@ -312,7 +313,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterParallelSafetySn
     #[must_use]
     pub fn observations(
         &self,
-    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterParallelSafetyObservation] {
+    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterParallelSafetyObservation]
+    {
         &self.observations
     }
 

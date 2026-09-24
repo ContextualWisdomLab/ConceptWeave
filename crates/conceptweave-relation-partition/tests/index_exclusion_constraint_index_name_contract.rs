@@ -7,8 +7,8 @@ use conceptweave_relation_partition::{
     IndexExclusionConstraintCatalogShapeObservation, IndexExclusionConstraintCatalogShapeSnapshot,
     IndexExclusionConstraintCoordinate, IndexExclusionConstraintForeignActionCodes,
     IndexExclusionConstraintForeignPayloadPresence, IndexExclusionConstraintIndexNameSnapshot,
-    IndexExclusionConstraintObservation, IndexExclusionConstraintSnapshot, IndexPartitionCoordinate,
-    IndexPartitionObservation, IndexPartitionSnapshot, IndexRelationKind,
+    IndexExclusionConstraintObservation, IndexExclusionConstraintSnapshot,
+    IndexPartitionCoordinate, IndexPartitionObservation, IndexPartitionSnapshot, IndexRelationKind,
     RelationPartitionObservation, RelationPartitionSnapshot,
 };
 use conceptweave_source_port::{
@@ -28,7 +28,11 @@ impl SourceConnectionRegistry for Registry {
         (key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
 
-    fn authorizes_schema_scope(&self, source: &ResolvedSourceConnection, schemas: &[String]) -> bool {
+    fn authorizes_schema_scope(
+        &self,
+        source: &ResolvedSourceConnection,
+        schemas: &[String],
+    ) -> bool {
         source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && schemas == ["public"]
@@ -73,15 +77,19 @@ fn index(name: &str, exclusion: bool) -> IndexObservation {
     )
     .unwrap()
     .with_access_method("btree")
-    .with_key_semantics(vec![IndexKeySemantics::new(
-        1,
-        None,
-        QualifiedOperatorClassName::new("pg_catalog", "int8_ops").unwrap(),
-        0,
-    )
-    .unwrap()])
+    .with_key_semantics(vec![
+        IndexKeySemantics::new(
+            1,
+            None,
+            QualifiedOperatorClassName::new("pg_catalog", "int8_ops").unwrap(),
+            0,
+        )
+        .unwrap(),
+    ])
     .unwrap()
-    .with_catalog_flags(IndexCatalogFlags::new(false, exclusion, true, false, false, false))
+    .with_catalog_flags(IndexCatalogFlags::new(
+        false, exclusion, true, false, false, false,
+    ))
     .unwrap()
     .with_ready(true)
     .with_valid(true)
@@ -93,15 +101,17 @@ fn relation(name: &str, indexes: Vec<IndexObservation>) -> RelationObservation {
         "public",
         name,
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            false,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                false,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
     .with_indexes(indexes)
@@ -186,10 +196,13 @@ fn stack_from_base(base: &PostgresSchemaSnapshotV3, specs: &[(&str, &str, &str)]
 
     let shape_observations = specs
         .iter()
-        .map(|(relation_name, _, constraint_name)| shape(coordinate(relation_name, constraint_name)))
+        .map(|(relation_name, _, constraint_name)| {
+            shape(coordinate(relation_name, constraint_name))
+        })
         .collect();
     let shapes =
-        IndexExclusionConstraintCatalogShapeSnapshot::new(&constraints, shape_observations).unwrap();
+        IndexExclusionConstraintCatalogShapeSnapshot::new(&constraints, shape_observations)
+            .unwrap();
 
     Stack {
         base: base.clone(),
@@ -211,13 +224,7 @@ fn coordinate(relation_name: &str, constraint_name: &str) -> IndexExclusionConst
 }
 
 fn index_coordinate(relation_name: &str, index_name: &str) -> IndexPartitionCoordinate {
-    IndexPartitionCoordinate::new(
-        "public",
-        relation_name,
-        RelationKind::Table,
-        index_name,
-    )
-    .unwrap()
+    IndexPartitionCoordinate::new("public", relation_name, RelationKind::Table, index_name).unwrap()
 }
 
 fn shape(
@@ -250,8 +257,14 @@ fn matching_constraint_and_backing_index_name_is_admitted_and_receipted() {
     let receipt = snapshot
         .source_receipt(coordinate("bookings", "bookings_no_overlap"))
         .unwrap();
-    assert_eq!(receipt.location().coordinate().constraint_name(), "bookings_no_overlap");
-    assert_eq!(receipt.location().backing_index().index_name(), "bookings_no_overlap");
+    assert_eq!(
+        receipt.location().coordinate().constraint_name(),
+        "bookings_no_overlap"
+    );
+    assert_eq!(
+        receipt.location().backing_index().index_name(),
+        "bookings_no_overlap"
+    );
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
 }
 

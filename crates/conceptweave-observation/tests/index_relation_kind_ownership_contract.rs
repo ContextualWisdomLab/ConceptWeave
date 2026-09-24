@@ -1,7 +1,7 @@
 use conceptweave_observation::{
     ColumnObservationV3, IndexAttributeKind, IndexAttributeObservation, IndexKeySemantics,
-    IndexObservation, ObservationError, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
-    RelationObservation,
+    IndexObservation, ObservationError, QualifiedOperatorClassName, QualifiedTypeName,
+    RelationKind, RelationObservation,
 };
 
 fn catalog_type(type_name: &str) -> QualifiedTypeName {

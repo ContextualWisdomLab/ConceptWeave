@@ -65,7 +65,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesOb
         }
         if let Some(types) = transform_types.as_mut() {
             types.sort_by(|left, right| {
-                (left.schema_name(), left.type_name()).cmp(&(right.schema_name(), right.type_name()))
+                (left.schema_name(), left.type_name())
+                    .cmp(&(right.schema_name(), right.type_name()))
             });
             if types.windows(2).any(|pair| pair[0] == pair[1]) {
                 return Err(invalid(
@@ -200,14 +201,17 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterTransformT
     converter_snapshot_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
-    observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation>,
+    observations:
+        Vec<IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation>,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSnapshot {
     /// Creates complete converter-function transform-selection evidence for every converter direction.
     pub fn new(
         argument_names_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterArgumentNamesSnapshot,
-        mut observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation>,
+        mut observations: Vec<
+            IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation,
+        >,
     ) -> Result<Self, ObservationError> {
         observations.sort_by_key(transform_types_key);
 
@@ -268,9 +272,13 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSn
         );
         Ok(Self {
             source_connection_key: argument_names_snapshot.source_connection_key().to_owned(),
-            connection_policy_binding: argument_names_snapshot.connection_policy_binding().to_owned(),
+            connection_policy_binding: argument_names_snapshot
+                .connection_policy_binding()
+                .to_owned(),
             snapshot_digest,
-            converter_snapshot_digest: argument_names_snapshot.converter_snapshot_digest().to_owned(),
+            converter_snapshot_digest: argument_names_snapshot
+                .converter_snapshot_digest()
+                .to_owned(),
             extractor_revision: argument_names_snapshot.extractor_revision().to_owned(),
             observed_at_utc: argument_names_snapshot.observed_at_utc().to_owned(),
             observations,
@@ -317,7 +325,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSn
     #[must_use]
     pub fn observations(
         &self,
-    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation] {
+    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation]
+    {
         &self.observations
     }
 

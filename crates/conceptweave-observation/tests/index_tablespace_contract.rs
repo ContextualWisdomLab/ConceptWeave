@@ -72,18 +72,12 @@ fn digest(index: IndexObservation) -> String {
 
 #[test]
 fn named_tablespace_is_material_v3_identity() {
-    let fast = digest(
-        complete_index().with_tablespace(
-            IndexTablespace::named("fast_index_space")
-                .expect("named tablespace fixture is valid"),
-        ),
-    );
-    let archive = digest(
-        complete_index().with_tablespace(
-            IndexTablespace::named("archive_index_space")
-                .expect("named tablespace fixture is valid"),
-        ),
-    );
+    let fast = digest(complete_index().with_tablespace(
+        IndexTablespace::named("fast_index_space").expect("named tablespace fixture is valid"),
+    ));
+    let archive = digest(complete_index().with_tablespace(
+        IndexTablespace::named("archive_index_space").expect("named tablespace fixture is valid"),
+    ));
 
     assert_ne!(fast, archive);
 }
@@ -103,11 +97,9 @@ fn database_default_tablespace_is_distinct_from_unobserved_state() {
 
 #[test]
 fn explicit_named_tablespace_does_not_collapse_into_database_default_marker() {
-    let named = digest(
-        complete_index().with_tablespace(
-            IndexTablespace::named("pg_default").expect("named tablespace fixture is valid"),
-        ),
-    );
+    let named = digest(complete_index().with_tablespace(
+        IndexTablespace::named("pg_default").expect("named tablespace fixture is valid"),
+    ));
     let database_default = digest(
         complete_index().with_tablespace(
             IndexTablespace::database_default("pg_default")

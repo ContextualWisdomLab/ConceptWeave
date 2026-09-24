@@ -14,15 +14,10 @@ fn relation(kind: RelationKind) -> RelationObservation {
         "public",
         "metric",
         kind,
-        vec![ColumnObservationV3::new(
-            "metric_id",
-            1,
-            "numeric",
-            catalog_numeric(),
-            false,
-            None,
-        )
-        .expect("column fixture is valid")],
+        vec![
+            ColumnObservationV3::new("metric_id", 1, "numeric", catalog_numeric(), false, None)
+                .expect("column fixture is valid"),
+        ],
     )
     .expect("relation fixture is valid")
 }

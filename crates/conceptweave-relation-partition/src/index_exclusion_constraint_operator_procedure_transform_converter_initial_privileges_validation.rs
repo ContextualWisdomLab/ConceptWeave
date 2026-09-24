@@ -20,7 +20,8 @@ use super::IndexExclusionConstraintOperatorProcedureTransformConverterInitialPri
 /// cannot silently reuse validation evidence. Exact unresolved role OIDs remain typed evidence for
 /// repair tooling while routine debug formatting exposes only their counts.
 #[derive(Clone, Eq, PartialEq)]
-pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeRecoveryValidation {
+pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeRecoveryValidation
+{
     source_id: String,
     connection_policy_binding: String,
     source_digest: String,

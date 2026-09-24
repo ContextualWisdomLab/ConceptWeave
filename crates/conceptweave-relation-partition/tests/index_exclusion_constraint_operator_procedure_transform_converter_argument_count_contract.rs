@@ -1,12 +1,14 @@
-include!("index_exclusion_constraint_operator_procedure_transform_converter_return_set_contract.rs");
+include!(
+    "index_exclusion_constraint_operator_procedure_transform_converter_return_set_contract.rs"
+);
 
 use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountObservation,
     IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSnapshot,
 };
 
-fn converter_return_set_snapshot(
-) -> IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapshot {
+fn converter_return_set_snapshot()
+-> IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapshot {
     let predecessor = converter_kind_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapshot::new(
         &predecessor,
@@ -32,8 +34,8 @@ fn converter_argument_count_observation(
     .unwrap()
 }
 
-fn complete_converter_argument_count_observations(
-) -> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountObservation> {
+fn complete_converter_argument_count_observations()
+-> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountObservation> {
     vec![
         converter_argument_count_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
@@ -51,11 +53,12 @@ fn complete_converter_argument_count_observations(
 #[test]
 fn ordinary_exclude_transform_converter_argument_count_preserves_required_pronargs_one() {
     let predecessor = converter_return_set_snapshot();
-    let snapshot = IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSnapshot::new(
-        &predecessor,
-        complete_converter_argument_count_observations(),
-    )
-    .unwrap();
+    let snapshot =
+        IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSnapshot::new(
+            &predecessor,
+            complete_converter_argument_count_observations(),
+        )
+        .unwrap();
     let receipt = snapshot
         .source_receipt(
             coordinate(),
@@ -91,17 +94,19 @@ fn ordinary_exclude_transform_converter_argument_count_rejects_non_one_pronargs(
 }
 
 #[test]
-fn ordinary_exclude_transform_converter_argument_count_rejects_completeness_binding_and_duplicate_failures() {
+fn ordinary_exclude_transform_converter_argument_count_rejects_completeness_binding_and_duplicate_failures()
+ {
     let predecessor = converter_return_set_snapshot();
-    let missing = IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSnapshot::new(
-        &predecessor,
-        vec![converter_argument_count_observation(
-            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-            "payload_from_sql",
-            1,
-        )],
-    )
-    .expect_err("every return-set predecessor direction needs explicit pronargs evidence");
+    let missing =
+        IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSnapshot::new(
+            &predecessor,
+            vec![converter_argument_count_observation(
+                IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+                "payload_from_sql",
+                1,
+            )],
+        )
+        .expect_err("every return-set predecessor direction needs explicit pronargs evidence");
     assert_field(
         missing,
         "index_exclusion_constraint_operator_procedure_transform_converter_argument_count_completeness",
@@ -120,11 +125,12 @@ fn ordinary_exclude_transform_converter_argument_count_rejects_completeness_bind
         )
         .unwrap(),
     );
-    let extra_error = IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSnapshot::new(
-        &predecessor,
-        extra,
-    )
-    .expect_err("argument-count evidence cannot introduce an absent converter coordinate");
+    let extra_error =
+        IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSnapshot::new(
+            &predecessor,
+            extra,
+        )
+        .expect_err("argument-count evidence cannot introduce an absent converter coordinate");
     assert_field(
         extra_error,
         "index_exclusion_constraint_operator_procedure_transform_converter_argument_count_completeness",
@@ -135,11 +141,12 @@ fn ordinary_exclude_transform_converter_argument_count_rejects_completeness_bind
         "payload_from_sql",
         1,
     );
-    let duplicate = IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSnapshot::new(
-        &predecessor,
-        vec![observation.clone(), observation],
-    )
-    .expect_err("duplicate argument-count evidence must not collapse");
+    let duplicate =
+        IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSnapshot::new(
+            &predecessor,
+            vec![observation.clone(), observation],
+        )
+        .expect_err("duplicate argument-count evidence must not collapse");
     assert_field(
         duplicate,
         "index_exclusion_constraint_operator_procedure_transform_converter_argument_count_coordinate",
@@ -151,11 +158,12 @@ fn ordinary_exclude_transform_converter_argument_count_rejects_completeness_bind
         "different_from_sql",
         1,
     );
-    let binding = IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSnapshot::new(
-        &predecessor,
-        drift,
-    )
-    .expect_err("argument-count evidence must remain bound to the exact converter function");
+    let binding =
+        IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSnapshot::new(
+            &predecessor,
+            drift,
+        )
+        .expect_err("argument-count evidence must remain bound to the exact converter function");
     assert_field(
         binding,
         "index_exclusion_constraint_operator_procedure_transform_converter_argument_count_binding",
@@ -168,33 +176,43 @@ fn ordinary_exclude_transform_converter_argument_count_preserves_location_and_in
         conceptweave_observation::QualifiedTypeName::new("payload.domain", "json").unwrap();
     let dotted_type =
         conceptweave_observation::QualifiedTypeName::new("payload", "domain.json").unwrap();
-    let schema_location = IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountObservation::new(
-        coordinate(),
-        1,
-        dotted_schema,
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        1,
-    )
-    .unwrap()
-    .canonical_location();
-    let type_location = IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountObservation::new(
-        coordinate(),
-        1,
-        dotted_type,
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        1,
-    )
-    .unwrap()
-    .canonical_location();
+    let schema_location =
+        IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountObservation::new(
+            coordinate(),
+            1,
+            dotted_schema,
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            1,
+        )
+        .unwrap()
+        .canonical_location();
+    let type_location =
+        IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountObservation::new(
+            coordinate(),
+            1,
+            dotted_type,
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            1,
+        )
+        .unwrap()
+        .canonical_location();
     assert_ne!(schema_location, type_location);
 
     for (schema, function, field) in [
-        (" ", "payload_from_sql", "index_exclusion_constraint_operator_procedure_transform_converter_argument_count_function_schema"),
-        ("public", "\t", "index_exclusion_constraint_operator_procedure_transform_converter_argument_count_function_name"),
+        (
+            " ",
+            "payload_from_sql",
+            "index_exclusion_constraint_operator_procedure_transform_converter_argument_count_function_schema",
+        ),
+        (
+            "public",
+            "\t",
+            "index_exclusion_constraint_operator_procedure_transform_converter_argument_count_function_name",
+        ),
     ] {
         let error = IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountObservation::new(
             coordinate(),
@@ -209,27 +227,29 @@ fn ordinary_exclude_transform_converter_argument_count_preserves_location_and_in
         assert_field(error, field);
     }
 
-    let zero = IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountObservation::new(
-        coordinate(),
-        0,
-        custom_payload_type(),
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        1,
-    )
-    .expect_err("converter positions are one-based");
+    let zero =
+        IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountObservation::new(
+            coordinate(),
+            0,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            1,
+        )
+        .expect_err("converter positions are one-based");
     assert_eq!(zero, ObservationError::InvalidOrdinalPosition);
 }
 
 #[test]
 fn ordinary_exclude_transform_converter_argument_count_receipt_is_exact_and_publicly_composed() {
     let predecessor = converter_return_set_snapshot();
-    let snapshot = IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSnapshot::new(
-        &predecessor,
-        complete_converter_argument_count_observations(),
-    )
-    .unwrap();
+    let snapshot =
+        IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSnapshot::new(
+            &predecessor,
+            complete_converter_argument_count_observations(),
+        )
+        .unwrap();
     let error = snapshot
         .source_receipt(
             coordinate(),
@@ -238,8 +258,13 @@ fn ordinary_exclude_transform_converter_argument_count_receipt_is_exact_and_publ
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         )
         .expect_err("receipt lookup remains exact-coordinate bound");
-    assert!(matches!(error, ObservationError::UnknownObservationLocation { .. }));
-    assert!(std::mem::size_of::<
-        IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSnapshot,
-    >() > 0);
+    assert!(matches!(
+        error,
+        ObservationError::UnknownObservationLocation { .. }
+    ));
+    assert!(
+        std::mem::size_of::<
+            IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSnapshot,
+        >() > 0
+    );
 }

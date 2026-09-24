@@ -133,7 +133,9 @@ impl IndexExclusionConstraintOperatorProcedureStrictnessSourceReceipt {
 
     /// Returns the exact validated strictness observation.
     #[must_use]
-    pub const fn location(&self) -> &IndexExclusionConstraintOperatorProcedureStrictnessObservation {
+    pub const fn location(
+        &self,
+    ) -> &IndexExclusionConstraintOperatorProcedureStrictnessObservation {
         &self.location
     }
 }
@@ -196,9 +198,7 @@ impl IndexExclusionConstraintOperatorProcedureStrictnessSnapshot {
                         && candidate.key_position() == observation.key_position()
                 })
                 .ok_or_else(|| {
-                    invalid(
-                        "index_exclusion_constraint_operator_procedure_strictness_completeness",
-                    )
+                    invalid("index_exclusion_constraint_operator_procedure_strictness_completeness")
                 })?;
             if predecessor.operator() != observation.operator()
                 || predecessor.procedure() != observation.procedure()
@@ -209,10 +209,8 @@ impl IndexExclusionConstraintOperatorProcedureStrictnessSnapshot {
             }
         }
 
-        let snapshot_digest = compute_procedure_strictness_digest(
-            scalar_snapshot.snapshot_digest(),
-            &observations,
-        );
+        let snapshot_digest =
+            compute_procedure_strictness_digest(scalar_snapshot.snapshot_digest(), &observations);
         Ok(Self {
             source_connection_key: scalar_snapshot.source_connection_key().to_owned(),
             connection_policy_binding: scalar_snapshot.connection_policy_binding().to_owned(),
@@ -255,7 +253,9 @@ impl IndexExclusionConstraintOperatorProcedureStrictnessSnapshot {
 
     /// Returns complete strictness observations in deterministic coordinate/key order.
     #[must_use]
-    pub fn observations(&self) -> &[IndexExclusionConstraintOperatorProcedureStrictnessObservation] {
+    pub fn observations(
+        &self,
+    ) -> &[IndexExclusionConstraintOperatorProcedureStrictnessObservation] {
         &self.observations
     }
 
@@ -264,7 +264,8 @@ impl IndexExclusionConstraintOperatorProcedureStrictnessSnapshot {
         &self,
         coordinate: IndexExclusionConstraintCoordinate,
         key_position: u32,
-    ) -> Result<IndexExclusionConstraintOperatorProcedureStrictnessSourceReceipt, ObservationError> {
+    ) -> Result<IndexExclusionConstraintOperatorProcedureStrictnessSourceReceipt, ObservationError>
+    {
         let observation = self
             .observations
             .iter()
@@ -275,14 +276,16 @@ impl IndexExclusionConstraintOperatorProcedureStrictnessSnapshot {
             .ok_or_else(|| ObservationError::UnknownObservationLocation {
                 location: procedure_strictness_location(&coordinate, key_position),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureStrictnessSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureStrictnessSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 
@@ -337,10 +340,7 @@ fn encode_procedure(hasher: &mut Sha256, procedure: &QualifiedProcedureSignature
     }
 }
 
-fn encode_type(
-    hasher: &mut Sha256,
-    qualified_type: &conceptweave_observation::QualifiedTypeName,
-) {
+fn encode_type(hasher: &mut Sha256, qualified_type: &conceptweave_observation::QualifiedTypeName) {
     encode_str(hasher, qualified_type.schema_name());
     encode_str(hasher, qualified_type.type_name());
 }

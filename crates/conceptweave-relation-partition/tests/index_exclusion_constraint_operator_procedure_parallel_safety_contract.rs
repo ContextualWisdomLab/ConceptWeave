@@ -42,9 +42,11 @@ fn ordinary_exclude_parallel_safety_preserves_every_postgres_catalog_state() {
         assert_eq!(observation.parallel_safety(), expected);
         assert_eq!(observation.operator(), &operator());
         assert_eq!(observation.procedure(), &procedure());
-        assert!(observation
-            .canonical_location()
-            .ends_with("/1/procedure-parallel-safety"));
+        assert!(
+            observation
+                .canonical_location()
+                .ends_with("/1/procedure-parallel-safety")
+        );
     }
 }
 
@@ -81,5 +83,7 @@ fn ordinary_exclude_parallel_safety_rejects_zero_position() {
 
 #[test]
 fn ordinary_exclude_parallel_safety_snapshot_is_publicly_composed() {
-    assert!(std::mem::size_of::<IndexExclusionConstraintOperatorProcedureParallelSafetySnapshot>() > 0);
+    assert!(
+        std::mem::size_of::<IndexExclusionConstraintOperatorProcedureParallelSafetySnapshot>() > 0
+    );
 }

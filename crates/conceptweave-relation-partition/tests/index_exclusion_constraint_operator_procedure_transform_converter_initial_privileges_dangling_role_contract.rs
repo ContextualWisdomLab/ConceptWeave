@@ -1,14 +1,12 @@
-include!("index_exclusion_constraint_operator_procedure_transform_converter_initial_privileges_contract.rs");
+include!(
+    "index_exclusion_constraint_operator_procedure_transform_converter_initial_privileges_contract.rs"
+);
 
 #[test]
 fn ordinary_exclude_converter_initial_privileges_preserve_dangling_role_oid_identity() {
     let resolved_numeric_name =
         IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::role(
-            26_424,
-            "16424",
-            10,
-            "postgres",
-            false,
+            26_424, "16424", 10, "postgres", false,
         )
         .unwrap();
     let dangling_grantee =
@@ -211,9 +209,7 @@ fn ordinary_exclude_converter_initial_privileges_reject_public_oid_as_unresolved
 
     let resolved_grantor =
         IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::public(
-            0,
-            "postgres",
-            false,
+            0, "postgres", false,
         )
         .expect_err("resolved grantor OID zero is not a role identity");
     assert_field(

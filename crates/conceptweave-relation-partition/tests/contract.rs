@@ -71,15 +71,17 @@ fn relation(name: &str, kind: RelationKind, nullable: bool) -> RelationObservati
         "public",
         name,
         kind,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            nullable,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                nullable,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
 }
@@ -162,12 +164,14 @@ fn complete_family_is_required_and_input_order_is_canonical() {
 
     let incomplete = RelationPartitionSnapshot::new(
         &base,
-        vec![RelationPartitionObservation::non_partition(
-            "public",
-            "events",
-            RelationKind::PartitionedTable,
-        )
-        .unwrap()],
+        vec![
+            RelationPartitionObservation::non_partition(
+                "public",
+                "events",
+                RelationKind::PartitionedTable,
+            )
+            .unwrap(),
+        ],
     )
     .expect_err("missing relispartition evidence must fail closed");
     assert_field(incomplete, "relation_partition_completeness");
@@ -220,14 +224,16 @@ fn partition_parent_must_resolve_to_observed_partitioned_table() {
     let missing_parent = snapshot(vec![relation("events_2026", RelationKind::Table, true)]);
     let error = RelationPartitionSnapshot::new(
         &missing_parent,
-        vec![RelationPartitionObservation::partition(
-            "public",
-            "events_2026",
-            RelationKind::Table,
-            PartitionParentRelationCoordinate::new("public", "events").unwrap(),
-            false,
-        )
-        .unwrap()],
+        vec![
+            RelationPartitionObservation::partition(
+                "public",
+                "events_2026",
+                RelationKind::Table,
+                PartitionParentRelationCoordinate::new("public", "events").unwrap(),
+                false,
+            )
+            .unwrap(),
+        ],
     )
     .expect_err("an unresolved declarative-partition parent must fail closed");
     assert_field(error, "relation_partition_parent_coordinate");
@@ -394,15 +400,21 @@ fn relation_membership_must_agree_with_not_null_partition_witness() {
 
 #[test]
 fn receipt_is_bound_to_exact_observed_relation_coordinate() {
-    let base = snapshot(vec![relation("events", RelationKind::PartitionedTable, true)]);
+    let base = snapshot(vec![relation(
+        "events",
+        RelationKind::PartitionedTable,
+        true,
+    )]);
     let governed = RelationPartitionSnapshot::new(
         &base,
-        vec![RelationPartitionObservation::non_partition(
-            "public",
-            "events",
-            RelationKind::PartitionedTable,
-        )
-        .unwrap()],
+        vec![
+            RelationPartitionObservation::non_partition(
+                "public",
+                "events",
+                RelationKind::PartitionedTable,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
 
@@ -415,7 +427,10 @@ fn receipt_is_bound_to_exact_observed_relation_coordinate() {
     assert_eq!(receipt.source_id(), "warehouse_primary");
     assert_eq!(receipt.connection_policy_binding(), POLICY_BINDING);
     assert_eq!(receipt.source_digest(), governed.snapshot_digest());
-    assert_eq!(receipt.extractor_revision(), "extractor-relation-partition-v1");
+    assert_eq!(
+        receipt.extractor_revision(),
+        "extractor-relation-partition-v1"
+    );
     assert_eq!(receipt.observed_at_utc(), "2026-09-14T12:00:00Z");
 
     let unknown = governed

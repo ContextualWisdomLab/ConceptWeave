@@ -28,7 +28,11 @@ impl SourceConnectionRegistry for Registry {
         (key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
 
-    fn authorizes_schema_scope(&self, source: &ResolvedSourceConnection, schemas: &[String]) -> bool {
+    fn authorizes_schema_scope(
+        &self,
+        source: &ResolvedSourceConnection,
+        schemas: &[String],
+    ) -> bool {
         source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && schemas == ["public"]
@@ -103,15 +107,17 @@ fn relation(
         "public",
         name,
         kind,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            false,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                false,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
     .with_indexes(vec![exclusion_index(index_name, unique, primary)])
@@ -330,9 +336,7 @@ fn ordinary_exclusion_requires_nonunique_nonprimary_exclusion_index() {
     let snapshot = build_role(false, false)
         .expect("ordinary EXCLUDE must retain the PostgreSQL backing-index role vector");
     assert!(snapshot.observations().iter().all(|observation| {
-        !observation.index_unique()
-            && !observation.index_primary()
-            && observation.index_exclusion()
+        !observation.index_unique() && !observation.index_primary() && observation.index_exclusion()
     }));
 
     let receipt = snapshot

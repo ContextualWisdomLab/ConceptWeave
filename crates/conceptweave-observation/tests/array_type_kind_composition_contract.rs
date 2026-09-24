@@ -24,15 +24,17 @@ fn ticket_with_status_array_binding() -> RelationObservation {
         "public",
         "ticket",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "statuses",
-            1,
-            "public.status[]",
-            type_name("public", "_status"),
-            true,
-            None,
-        )
-        .expect("array-bound column fixture is valid")],
+        vec![
+            ColumnObservationV3::new(
+                "statuses",
+                1,
+                "public.status[]",
+                type_name("public", "_status"),
+                true,
+                None,
+            )
+            .expect("array-bound column fixture is valid"),
+        ],
     )
     .expect("relation fixture is valid")
 }
@@ -42,15 +44,17 @@ fn ticket_with_custom_base_binding() -> RelationObservation {
         "public",
         "vector_ticket",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "embedding",
-            1,
-            "public.vector3",
-            type_name("public", "vector3"),
-            false,
-            None,
-        )
-        .expect("custom base-bound column fixture is valid")],
+        vec![
+            ColumnObservationV3::new(
+                "embedding",
+                1,
+                "public.vector3",
+                type_name("public", "vector3"),
+                false,
+                None,
+            )
+            .expect("custom base-bound column fixture is valid"),
+        ],
     )
     .expect("relation fixture is valid")
 }
@@ -60,31 +64,27 @@ fn ticket_with_cross_schema_custom_base_binding() -> RelationObservation {
         "app",
         "vector_ticket",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "embedding",
-            1,
-            "types.vector3",
-            type_name("types", "vector3"),
-            false,
-            None,
-        )
-        .expect("cross-schema base-bound column fixture is valid")],
+        vec![
+            ColumnObservationV3::new(
+                "embedding",
+                1,
+                "types.vector3",
+                type_name("types", "vector3"),
+                false,
+                None,
+            )
+            .expect("cross-schema base-bound column fixture is valid"),
+        ],
     )
     .expect("relation fixture is valid")
 }
 
 fn status_type_kinds() -> Vec<TypeKindObservation> {
     vec![
-        TypeKindObservation::plain(
-            type_name("public", "_status"),
-            PostgresTypeKind::Base,
-        )
-        .expect("PostgreSQL true arrays are base-kind pg_type rows"),
-        TypeKindObservation::plain(
-            type_name("public", "status"),
-            PostgresTypeKind::Enum,
-        )
-        .expect("enum type-kind fixture is valid"),
+        TypeKindObservation::plain(type_name("public", "_status"), PostgresTypeKind::Base)
+            .expect("PostgreSQL true arrays are base-kind pg_type rows"),
+        TypeKindObservation::plain(type_name("public", "status"), PostgresTypeKind::Enum)
+            .expect("enum type-kind fixture is valid"),
     ]
 }
 
@@ -142,11 +142,10 @@ fn ordinary_user_defined_base_type_kind_resolves_its_exact_binding() {
         vec![ticket_with_custom_base_binding()],
         Vec::new(),
         Vec::new(),
-        vec![TypeKindObservation::plain(
-            type_name("public", "vector3"),
-            PostgresTypeKind::Base,
-        )
-        .expect("custom base type-kind fixture is valid")],
+        vec![
+            TypeKindObservation::plain(type_name("public", "vector3"), PostgresTypeKind::Base)
+                .expect("custom base type-kind fixture is valid"),
+        ],
     )
     .expect("an exact user-defined base type coordinate must be a resolvable binding");
 
@@ -163,13 +162,14 @@ fn authorized_cross_schema_user_defined_base_type_resolves_without_local_schema_
         vec![ticket_with_cross_schema_custom_base_binding()],
         Vec::new(),
         Vec::new(),
-        vec![TypeKindObservation::plain(
-            type_name("types", "vector3"),
-            PostgresTypeKind::Base,
-        )
-        .expect("cross-schema custom base type-kind fixture is valid")],
+        vec![
+            TypeKindObservation::plain(type_name("types", "vector3"), PostgresTypeKind::Base)
+                .expect("cross-schema custom base type-kind fixture is valid"),
+        ],
     )
-    .expect("an explicitly authorized qualified type schema must not require unrelated local objects");
+    .expect(
+        "an explicitly authorized qualified type schema must not require unrelated local objects",
+    );
 
     let type_kinds = snapshot
         .type_kinds()
@@ -196,11 +196,10 @@ fn unapproved_cross_schema_type_kind_coordinate_still_fails_closed() {
         vec![ticket_with_cross_schema_custom_base_binding()],
         Vec::new(),
         Vec::new(),
-        vec![TypeKindObservation::plain(
-            type_name("types", "vector3"),
-            PostgresTypeKind::Base,
-        )
-        .expect("cross-schema custom base type-kind fixture is valid")],
+        vec![
+            TypeKindObservation::plain(type_name("types", "vector3"), PostgresTypeKind::Base)
+                .expect("cross-schema custom base type-kind fixture is valid"),
+        ],
     )
     .expect_err("an unapproved type schema must not enter governed source evidence");
 

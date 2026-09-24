@@ -1,9 +1,9 @@
 use conceptweave_observation::{
     ColumnObservationV3, ConstraintPeriodObservation, IndexAttributeKind,
     IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics, IndexObservation,
-    ObservationError, PostgresSchemaSnapshotV3, PrimaryKeyObservation,
-    QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
-    TableConstraintObservation, TypeKindObservation,
+    ObservationError, PostgresSchemaSnapshotV3, PrimaryKeyObservation, QualifiedOperatorClassName,
+    QualifiedTypeName, RelationKind, RelationObservation, TableConstraintObservation,
+    TypeKindObservation,
 };
 
 mod support;
@@ -38,12 +38,7 @@ fn key_semantics(key_columns: &[&str]) -> Vec<IndexKeySemantics> {
         .collect()
 }
 
-fn column(
-    name: &str,
-    position: u32,
-    data_type: &str,
-    type_name: &str,
-) -> ColumnObservationV3 {
+fn column(name: &str, position: u32, data_type: &str, type_name: &str) -> ColumnObservationV3 {
     ColumnObservationV3::new(
         name,
         position,
@@ -58,10 +53,7 @@ fn column(
 fn temporal_type_kinds() -> Vec<TypeKindObservation> {
     vec![
         TypeKindObservation::range(catalog_type("tstzrange"), catalog_type("tstzmultirange")),
-        TypeKindObservation::multirange(
-            catalog_type("tstzmultirange"),
-            catalog_type("tstzrange"),
-        ),
+        TypeKindObservation::multirange(catalog_type("tstzmultirange"), catalog_type("tstzrange")),
     ]
 }
 
@@ -136,11 +128,7 @@ fn temporal_backing_index(with_catalog_flags: bool) -> IndexObservation {
     temporal_backing_index_for_columns(with_catalog_flags, &["document_id", "valid_during"])
 }
 
-fn temporal_backing_index_with_lifecycle(
-    ready: bool,
-    valid: bool,
-    live: bool,
-) -> IndexObservation {
+fn temporal_backing_index_with_lifecycle(ready: bool, valid: bool, live: bool) -> IndexObservation {
     temporal_backing_index(true)
         .with_ready(ready)
         .with_valid(valid)
@@ -223,13 +211,10 @@ fn temporal_key_rejects_backing_index_without_material_catalog_flags() {
 
 #[test]
 fn temporal_key_rejects_same_name_gist_exclusion_with_mismatched_key_shape() {
-    let mismatched = temporal_backing_index_for_columns(
-        true,
-        &["valid_during", "document_id"],
-    )
-    .with_ready(true)
-    .with_valid(true)
-    .with_live(true);
+    let mismatched = temporal_backing_index_for_columns(true, &["valid_during", "document_id"])
+        .with_ready(true)
+        .with_valid(true)
+        .with_live(true);
     let error = PostgresSchemaSnapshotV3::new(
         &support::authorized_source("warehouse_primary", &["public"]),
         "postgres_introspector_v3",

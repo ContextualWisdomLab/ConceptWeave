@@ -206,9 +206,7 @@ impl IndexExclusionConstraintOperatorProcedureScalarSnapshot {
                         && candidate.key_position() == observation.key_position()
                 })
                 .ok_or_else(|| {
-                    invalid(
-                        "index_exclusion_constraint_operator_procedure_scalar_completeness",
-                    )
+                    invalid("index_exclusion_constraint_operator_procedure_scalar_completeness")
                 })?;
             if predecessor.operator() != observation.operator()
                 || predecessor.procedure() != observation.procedure()
@@ -224,10 +222,8 @@ impl IndexExclusionConstraintOperatorProcedureScalarSnapshot {
             }
         }
 
-        let snapshot_digest = compute_procedure_scalar_digest(
-            kind_snapshot.snapshot_digest(),
-            &observations,
-        );
+        let snapshot_digest =
+            compute_procedure_scalar_digest(kind_snapshot.snapshot_digest(), &observations);
         Ok(Self {
             source_connection_key: kind_snapshot.source_connection_key().to_owned(),
             connection_policy_binding: kind_snapshot.connection_policy_binding().to_owned(),
@@ -279,7 +275,8 @@ impl IndexExclusionConstraintOperatorProcedureScalarSnapshot {
         &self,
         coordinate: IndexExclusionConstraintCoordinate,
         key_position: u32,
-    ) -> Result<IndexExclusionConstraintOperatorProcedureScalarSourceReceipt, ObservationError> {
+    ) -> Result<IndexExclusionConstraintOperatorProcedureScalarSourceReceipt, ObservationError>
+    {
         let observation = self
             .observations
             .iter()
@@ -290,14 +287,16 @@ impl IndexExclusionConstraintOperatorProcedureScalarSnapshot {
             .ok_or_else(|| ObservationError::UnknownObservationLocation {
                 location: procedure_scalar_location(&coordinate, key_position),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureScalarSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureScalarSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 
@@ -352,10 +351,7 @@ fn encode_procedure(hasher: &mut Sha256, procedure: &QualifiedProcedureSignature
     }
 }
 
-fn encode_type(
-    hasher: &mut Sha256,
-    qualified_type: &conceptweave_observation::QualifiedTypeName,
-) {
+fn encode_type(hasher: &mut Sha256, qualified_type: &conceptweave_observation::QualifiedTypeName) {
     encode_str(hasher, qualified_type.schema_name());
     encode_str(hasher, qualified_type.type_name());
 }

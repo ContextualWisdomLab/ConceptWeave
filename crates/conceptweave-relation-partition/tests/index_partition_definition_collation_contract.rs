@@ -97,15 +97,17 @@ fn relation(
         "public",
         name,
         kind,
-        vec![ColumnObservationV3::new(
-            "label",
-            1,
-            "text",
-            QualifiedTypeName::new("pg_catalog", "text").unwrap(),
-            true,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "label",
+                1,
+                "text",
+                QualifiedTypeName::new("pg_catalog", "text").unwrap(),
+                true,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
     .with_indexes(vec![index(index_name, collation_name)])

@@ -5,7 +5,8 @@ use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureCostSnapshot,
 };
 
-fn planner_support_predecessor() -> IndexExclusionConstraintOperatorProcedurePlannerSupportSnapshot {
+fn planner_support_predecessor() -> IndexExclusionConstraintOperatorProcedurePlannerSupportSnapshot
+{
     let access_control = access_control_snapshot();
     IndexExclusionConstraintOperatorProcedurePlannerSupportSnapshot::new(
         &access_control,
@@ -38,24 +39,25 @@ fn ordinary_exclude_operator_procedure_cost_preserves_exact_pg_proc_procost() {
     let predecessor = planner_support_predecessor();
     let snapshot = IndexExclusionConstraintOperatorProcedureCostSnapshot::new(
         &predecessor,
-        vec![cost_observation(
-            operator("="),
-            procedure("int4eq"),
-            1.0,
-        )],
+        vec![cost_observation(operator("="), procedure("int4eq"), 1.0)],
     )
     .unwrap();
     let receipt = snapshot.source_receipt(coordinate(), 1).unwrap();
 
     assert_eq!(receipt.location().operator(), &operator("="));
     assert_eq!(receipt.location().procedure(), &procedure("int4eq"));
-    assert_eq!(receipt.location().execution_cost().to_bits(), 1.0_f32.to_bits());
+    assert_eq!(
+        receipt.location().execution_cost().to_bits(),
+        1.0_f32.to_bits()
+    );
     assert_eq!(receipt.source_id(), predecessor.source_connection_key());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
-    assert!(receipt
-        .location()
-        .canonical_location()
-        .ends_with("/1/procedure-cost"));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/1/procedure-cost")
+    );
 }
 
 #[test]
@@ -63,20 +65,12 @@ fn ordinary_exclude_operator_procedure_cost_distinguishes_planner_cost() {
     let predecessor = planner_support_predecessor();
     let cheap = IndexExclusionConstraintOperatorProcedureCostSnapshot::new(
         &predecessor,
-        vec![cost_observation(
-            operator("="),
-            procedure("int4eq"),
-            1.0,
-        )],
+        vec![cost_observation(operator("="), procedure("int4eq"), 1.0)],
     )
     .unwrap();
     let expensive = IndexExclusionConstraintOperatorProcedureCostSnapshot::new(
         &predecessor,
-        vec![cost_observation(
-            operator("="),
-            procedure("int4eq"),
-            100.0,
-        )],
+        vec![cost_observation(operator("="), procedure("int4eq"), 100.0)],
     )
     .unwrap();
 
@@ -94,10 +88,7 @@ fn ordinary_exclude_operator_procedure_cost_rejects_non_positive_or_non_finite_v
             execution_cost,
         )
         .expect_err("pg_proc.procost evidence must be a positive finite float4 value");
-        assert_field(
-            error,
-            "index_exclusion_constraint_operator_procedure_cost",
-        );
+        assert_field(error, "index_exclusion_constraint_operator_procedure_cost");
     }
 }
 
@@ -106,11 +97,7 @@ fn ordinary_exclude_operator_procedure_cost_rejects_procedure_binding_drift() {
     let predecessor = planner_support_predecessor();
     let error = IndexExclusionConstraintOperatorProcedureCostSnapshot::new(
         &predecessor,
-        vec![cost_observation(
-            operator("="),
-            procedure("int4ne"),
-            1.0,
-        )],
+        vec![cost_observation(operator("="), procedure("int4ne"), 1.0)],
     )
     .expect_err("cost evidence must bind to the exact pg_operator.oprcode function");
     assert_field(
@@ -124,11 +111,7 @@ fn ordinary_exclude_operator_procedure_cost_rejects_operator_binding_drift() {
     let predecessor = planner_support_predecessor();
     let error = IndexExclusionConstraintOperatorProcedureCostSnapshot::new(
         &predecessor,
-        vec![cost_observation(
-            operator("<>"),
-            procedure("int4eq"),
-            1.0,
-        )],
+        vec![cost_observation(operator("<>"), procedure("int4eq"), 1.0)],
     )
     .expect_err("cost evidence must stay on the exact governed conexclop position");
     assert_field(
@@ -181,11 +164,7 @@ fn ordinary_exclude_operator_procedure_cost_rejects_unknown_receipt_coordinate()
     let predecessor = planner_support_predecessor();
     let snapshot = IndexExclusionConstraintOperatorProcedureCostSnapshot::new(
         &predecessor,
-        vec![cost_observation(
-            operator("="),
-            procedure("int4eq"),
-            1.0,
-        )],
+        vec![cost_observation(operator("="), procedure("int4eq"), 1.0)],
     )
     .unwrap();
     let error = snapshot

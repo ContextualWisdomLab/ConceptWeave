@@ -1,9 +1,9 @@
 use conceptweave_observation::{
     ColumnObservationV3, ConstraintDeferrability, ConstraintTimingObservation, IndexAttributeKind,
     IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics, IndexObservation,
-    ObservationError, PostgresSchemaSnapshotV3, PrimaryKeyObservation,
-    QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
-    TableConstraintObservation, UniqueConstraintObservation,
+    ObservationError, PostgresSchemaSnapshotV3, PrimaryKeyObservation, QualifiedOperatorClassName,
+    QualifiedTypeName, RelationKind, RelationObservation, TableConstraintObservation,
+    UniqueConstraintObservation,
 };
 
 mod support;
@@ -56,30 +56,17 @@ fn backing_index(
         true,
         Some(false),
         vec![
-            IndexAttributeObservation::new(
-                1,
-                IndexAttributeKind::Key,
-                "document_id",
-            )
-            .expect("first key fixture is valid"),
-            IndexAttributeObservation::new(
-                2,
-                IndexAttributeKind::Key,
-                "valid_during",
-            )
-            .expect("period key fixture is valid"),
+            IndexAttributeObservation::new(1, IndexAttributeKind::Key, "document_id")
+                .expect("first key fixture is valid"),
+            IndexAttributeObservation::new(2, IndexAttributeKind::Key, "valid_during")
+                .expect("period key fixture is valid"),
         ],
         Vec::new(),
     )?
     .with_access_method(access_method)
     .with_key_semantics(key_semantics(access_method))?
     .with_catalog_flags(IndexCatalogFlags::new(
-        primary,
-        exclusion,
-        true,
-        false,
-        false,
-        false,
+        primary, exclusion, true, false, false, false,
     ))?
     .with_ready(true)
     .with_valid(true)
@@ -132,14 +119,16 @@ fn snapshot(
         vec![relation(primary, exclusion, access_method)?],
         Vec::new(),
         Vec::new(),
-        vec![ConstraintTimingObservation::new(
-            "public",
-            "document",
-            RelationKind::Table,
-            "document_temporal_key",
-            ConstraintDeferrability::NotDeferrable,
-        )
-        .expect("constraint timing fixture is valid")],
+        vec![
+            ConstraintTimingObservation::new(
+                "public",
+                "document",
+                RelationKind::Table,
+                "document_temporal_key",
+                ConstraintDeferrability::NotDeferrable,
+            )
+            .expect("constraint timing fixture is valid"),
+        ],
     )
 }
 
@@ -166,6 +155,5 @@ fn unique_temporal_catalog_flags_require_gist_backing_index() {
 fn temporal_gist_and_ordinary_btree_controls_remain_admissible() {
     snapshot(true, true, "gist")
         .expect("PostgreSQL WITHOUT OVERLAPS primary-key catalog shape is coherent");
-    snapshot(false, false, "btree")
-        .expect("ordinary unique B-tree catalog shape remains coherent");
+    snapshot(false, false, "btree").expect("ordinary unique B-tree catalog shape remains coherent");
 }

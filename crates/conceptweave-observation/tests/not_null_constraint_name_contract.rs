@@ -1,7 +1,7 @@
 use conceptweave_observation::{
-    CheckConstraintObservation, ColumnObservationV3, NotNullConstraintObservation, ObservationError,
-    PostgresSchemaSnapshotV3, QualifiedTypeName, RelationKind, RelationObservation,
-    TableConstraintObservation,
+    CheckConstraintObservation, ColumnObservationV3, NotNullConstraintObservation,
+    ObservationError, PostgresSchemaSnapshotV3, QualifiedTypeName, RelationKind,
+    RelationObservation, TableConstraintObservation,
 };
 
 mod support;

@@ -45,14 +45,12 @@ fn key_semantics(columns: &[&str], access_method: &str) -> Vec<IndexKeySemantics
 fn temporal_type_kinds() -> Vec<TypeKindObservation> {
     vec![
         TypeKindObservation::range(catalog_type("tstzrange"), catalog_type("tstzmultirange")),
-        TypeKindObservation::multirange(
-            catalog_type("tstzmultirange"),
-            catalog_type("tstzrange"),
-        ),
+        TypeKindObservation::multirange(catalog_type("tstzmultirange"), catalog_type("tstzrange")),
     ]
 }
 
-fn temporal_key_operator_signatures() -> Vec<(u32, String, String, QualifiedTypeName, QualifiedTypeName)> {
+fn temporal_key_operator_signatures()
+-> Vec<(u32, String, String, QualifiedTypeName, QualifiedTypeName)> {
     vec![
         (
             1,
@@ -114,12 +112,7 @@ fn backing_index(
         .with_key_semantics(key_semantics(columns, access_method))
         .expect("one semantic record matches each backing-index key")
         .with_catalog_flags(IndexCatalogFlags::new(
-            primary,
-            exclusion,
-            true,
-            false,
-            false,
-            false,
+            primary, exclusion, true, false, false, false,
         ))
         .expect("catalog-flag fixture is coherent")
         .with_ready(true)
@@ -215,13 +208,7 @@ fn single_column_foreign_key_relation() -> RelationObservation {
         "public",
         "document_version",
         RelationKind::Table,
-        vec![column(
-            "valid_during",
-            1,
-            "tstzrange",
-            "tstzrange",
-            false,
-        )],
+        vec![column("valid_during", 1, "tstzrange", "tstzrange", false)],
     )
     .expect("single-column child relation fixture is valid")
     .with_constraints(vec![TableConstraintObservation::ForeignKey(
@@ -309,7 +296,10 @@ fn observed_false_period_state_is_distinct_from_unobserved() {
         .with_observed_constraint_periods(vec![period("document", "document_id_key", false)])
         .expect("ordinary UNIQUE has explicit conperiod=false");
 
-    assert_ne!(unobserved.snapshot_digest(), observed_false.snapshot_digest());
+    assert_ne!(
+        unobserved.snapshot_digest(),
+        observed_false.snapshot_digest()
+    );
     assert_eq!(unobserved.constraint_periods(), None);
     assert!(
         !observed_false
@@ -322,21 +312,15 @@ fn observed_false_period_state_is_distinct_from_unobserved() {
 #[test]
 fn temporal_primary_key_requires_matching_exclusion_backing_index_evidence() {
     let accepted = base_snapshot(vec![temporal_parent_relation()])
-        .with_observed_constraint_periods(vec![period(
-            "document",
-            "document_temporal_key",
-            true,
-        )])
+        .with_observed_constraint_periods(vec![period("document", "document_temporal_key", true)])
         .expect("WITHOUT OVERLAPS primary key has coherent explicit conperiod=true evidence");
     assert!(accepted.constraint_periods().is_some());
 
     let error = base_snapshot(vec![temporal_parent_relation()])
-        .with_observed_constraint_periods(vec![period(
-            "document",
-            "document_temporal_key",
-            false,
-        )])
-        .expect_err("explicit conperiod=false cannot contradict an observed exclusion backing index");
+        .with_observed_constraint_periods(vec![period("document", "document_temporal_key", false)])
+        .expect_err(
+            "explicit conperiod=false cannot contradict an observed exclusion backing index",
+        );
     assert_eq!(
         error,
         ObservationError::InvalidObservationField {
@@ -352,23 +336,25 @@ fn period_foreign_key_and_referenced_temporal_key_are_preserved_together() {
             period("document_version", "document_version_period_fk", true),
             period("document", "document_temporal_key", true),
         ])
-        .expect("PERIOD foreign key targets an observed non-deferrable WITHOUT OVERLAPS primary key");
+        .expect(
+            "PERIOD foreign key targets an observed non-deferrable WITHOUT OVERLAPS primary key",
+        );
 
     let periods = snapshot
         .constraint_periods()
         .expect("period family was explicitly observed");
     assert_eq!(periods.len(), 2);
-    assert!(periods.iter().all(ConstraintPeriodObservation::has_period_semantics));
+    assert!(
+        periods
+            .iter()
+            .all(ConstraintPeriodObservation::has_period_semantics)
+    );
 }
 
 #[test]
 fn observed_period_family_must_cover_keys_and_foreign_keys() {
     let error = base_snapshot(vec![temporal_parent_relation(), period_child_relation()])
-        .with_observed_constraint_periods(vec![period(
-            "document",
-            "document_temporal_key",
-            true,
-        )])
+        .with_observed_constraint_periods(vec![period("document", "document_temporal_key", true)])
         .expect_err("observed conperiod family cannot silently omit a foreign key");
     assert_eq!(
         error,
@@ -405,23 +391,13 @@ fn period_observation_cannot_target_check_constraint() {
     )
     .expect("relation fixture is valid")
     .with_constraints(vec![TableConstraintObservation::Check(
-        CheckConstraintObservation::new(
-            "document_positive",
-            "document_id > 0",
-            true,
-            true,
-            false,
-        )
-        .expect("check fixture is valid"),
+        CheckConstraintObservation::new("document_positive", "document_id > 0", true, true, false)
+            .expect("check fixture is valid"),
     )])
     .expect("check constraint fixture is valid");
 
     let error = base_snapshot(vec![relation])
-        .with_observed_constraint_periods(vec![period(
-            "document",
-            "document_positive",
-            false,
-        )])
+        .with_observed_constraint_periods(vec![period("document", "document_positive", false)])
         .expect_err("conperiod semantics apply only to PRIMARY KEY, UNIQUE, and FOREIGN KEY rows");
     assert_eq!(
         error,

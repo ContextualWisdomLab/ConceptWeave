@@ -67,7 +67,8 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterArgumentMo
     direction: IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
     converter_schema_name: String,
     converter_function_name: String,
-    argument_modes: Option<Vec<IndexExclusionConstraintOperatorProcedureTransformConverterArgumentMode>>,
+    argument_modes:
+        Option<Vec<IndexExclusionConstraintOperatorProcedureTransformConverterArgumentMode>>,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterArgumentModesObservation {
@@ -84,7 +85,9 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterArgumentModesObs
         direction: IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
         converter_schema_name: impl Into<String>,
         converter_function_name: impl Into<String>,
-        argument_modes: Option<Vec<IndexExclusionConstraintOperatorProcedureTransformConverterArgumentMode>>,
+        argument_modes: Option<
+            Vec<IndexExclusionConstraintOperatorProcedureTransformConverterArgumentMode>,
+        >,
     ) -> Result<Self, ObservationError> {
         if key_position == 0 {
             return Err(ObservationError::InvalidOrdinalPosition);
@@ -230,14 +233,17 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterArgumentMo
     converter_snapshot_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
-    observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterArgumentModesObservation>,
+    observations:
+        Vec<IndexExclusionConstraintOperatorProcedureTransformConverterArgumentModesObservation>,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterArgumentModesSnapshot {
     /// Creates complete raw argument-mode evidence for every converter direction in the predecessor.
     pub fn new(
         argument_count_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSnapshot,
-        mut observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterArgumentModesObservation>,
+        mut observations: Vec<
+            IndexExclusionConstraintOperatorProcedureTransformConverterArgumentModesObservation,
+        >,
     ) -> Result<Self, ObservationError> {
         observations.sort_by_key(argument_modes_key);
 
@@ -298,9 +304,13 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterArgumentModesSna
         );
         Ok(Self {
             source_connection_key: argument_count_snapshot.source_connection_key().to_owned(),
-            connection_policy_binding: argument_count_snapshot.connection_policy_binding().to_owned(),
+            connection_policy_binding: argument_count_snapshot
+                .connection_policy_binding()
+                .to_owned(),
             snapshot_digest,
-            converter_snapshot_digest: argument_count_snapshot.converter_snapshot_digest().to_owned(),
+            converter_snapshot_digest: argument_count_snapshot
+                .converter_snapshot_digest()
+                .to_owned(),
             extractor_revision: argument_count_snapshot.extractor_revision().to_owned(),
             observed_at_utc: argument_count_snapshot.observed_at_utc().to_owned(),
             observations,
@@ -347,7 +357,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterArgumentModesSna
     #[must_use]
     pub fn observations(
         &self,
-    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterArgumentModesObservation] {
+    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterArgumentModesObservation]
+    {
         &self.observations
     }
 
@@ -379,14 +390,16 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterArgumentModesSna
                     direction,
                 ),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureTransformConverterArgumentModesSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureTransformConverterArgumentModesSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 

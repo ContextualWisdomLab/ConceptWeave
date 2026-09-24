@@ -40,8 +40,9 @@ fn legacy_model_preserves_quoted_whitespace_identifiers() {
     let table = TableObservation::new(
         "  ",
         "\t",
-        vec![ColumnObservation::new(" \t", 1, "text", false, None)
-            .expect("fixture column is valid")],
+        vec![
+            ColumnObservation::new(" \t", 1, "text", false, None).expect("fixture column is valid"),
+        ],
     )
     .expect("quoted schema/table identifiers preserve whitespace");
     assert_eq!(table.schema_name(), "  ");

@@ -196,9 +196,7 @@ impl IndexExclusionConstraintOperatorProcedureKindSnapshot {
                         && candidate.key_position() == observation.key_position()
                 })
                 .ok_or_else(|| {
-                    invalid(
-                        "index_exclusion_constraint_operator_procedure_kind_completeness",
-                    )
+                    invalid("index_exclusion_constraint_operator_procedure_kind_completeness")
                 })?;
             if predecessor.operator() != observation.operator()
                 || predecessor.procedure() != observation.procedure()
@@ -215,7 +213,9 @@ impl IndexExclusionConstraintOperatorProcedureKindSnapshot {
         );
         Ok(Self {
             source_connection_key: parallel_safety_snapshot.source_connection_key().to_owned(),
-            connection_policy_binding: parallel_safety_snapshot.connection_policy_binding().to_owned(),
+            connection_policy_binding: parallel_safety_snapshot
+                .connection_policy_binding()
+                .to_owned(),
             snapshot_digest,
             extractor_revision: parallel_safety_snapshot.extractor_revision().to_owned(),
             observed_at_utc: parallel_safety_snapshot.observed_at_utc().to_owned(),
@@ -337,10 +337,7 @@ fn encode_procedure(hasher: &mut Sha256, procedure: &QualifiedProcedureSignature
     }
 }
 
-fn encode_type(
-    hasher: &mut Sha256,
-    qualified_type: &conceptweave_observation::QualifiedTypeName,
-) {
+fn encode_type(hasher: &mut Sha256, qualified_type: &conceptweave_observation::QualifiedTypeName) {
     encode_str(hasher, qualified_type.schema_name());
     encode_str(hasher, qualified_type.type_name());
 }

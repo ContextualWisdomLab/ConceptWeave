@@ -266,12 +266,8 @@ fn validate_foreign_key_collations(
                 .iter()
                 .zip(foreign_key.referenced_column_names())
             {
-                let local = find_column_collation(
-                    column_collations,
-                    relation,
-                    local_column_name,
-                )
-                .expect("complete bounded column-collation family contains local FK column");
+                let local = find_column_collation(column_collations, relation, local_column_name)
+                    .expect("complete bounded column-collation family contains local FK column");
                 let referenced = find_column_collation(
                     column_collations,
                     referenced_relation,
@@ -315,8 +311,8 @@ fn foreign_key_collation_pair_is_valid(
         return true;
     };
 
-    let both_deterministic = local.deterministic() == Some(true)
-        && referenced.deterministic() == Some(true);
+    let both_deterministic =
+        local.deterministic() == Some(true) && referenced.deterministic() == Some(true);
     let exact_same_collation = local_collation.schema_name() == referenced_collation.schema_name()
         && local_collation.collation_name() == referenced_collation.collation_name();
     both_deterministic || exact_same_collation
@@ -337,10 +333,7 @@ pub(crate) fn compute_column_collation_digest(
     column_collations: &[ColumnCollationObservation],
 ) -> String {
     let mut hasher = Sha256::new();
-    encode_bytes(
-        &mut hasher,
-        SNAPSHOT_DIGEST_DOMAIN_V3_COLUMN_COLLATIONS_V1,
-    );
+    encode_bytes(&mut hasher, SNAPSHOT_DIGEST_DOMAIN_V3_COLUMN_COLLATIONS_V1);
     encode_str(&mut hasher, base_snapshot_digest);
     encode_len(&mut hasher, column_collations.len());
     for observation in column_collations {
@@ -350,10 +343,7 @@ pub(crate) fn compute_column_collation_digest(
         encode_str(&mut hasher, observation.column_name());
         match (&observation.state, observation.deterministic()) {
             (ColumnCollationState::Uncollatable, None) => hasher.update([0]),
-            (
-                ColumnCollationState::Collatable { collation, .. },
-                Some(deterministic),
-            ) => {
+            (ColumnCollationState::Collatable { collation, .. }, Some(deterministic)) => {
                 hasher.update([1]);
                 encode_str(&mut hasher, collation.schema_name());
                 encode_str(&mut hasher, collation.collation_name());

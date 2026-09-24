@@ -8,9 +8,9 @@ use conceptweave_relation_partition::{
     IndexExclusionConstraintEnforcementSnapshot, IndexExclusionConstraintObservation,
     IndexExclusionConstraintSnapshot, IndexExclusionConstraintTimingObservation,
     IndexExclusionConstraintTimingSnapshot, IndexExclusionConstraintValidationObservation,
-    IndexExclusionConstraintValidationSnapshot, IndexPartitionCoordinate, IndexPartitionObservation,
-    IndexPartitionSnapshot, IndexRelationKind, PartitionParentRelationCoordinate,
-    RelationPartitionObservation, RelationPartitionSnapshot,
+    IndexExclusionConstraintValidationSnapshot, IndexPartitionCoordinate,
+    IndexPartitionObservation, IndexPartitionSnapshot, IndexRelationKind,
+    PartitionParentRelationCoordinate, RelationPartitionObservation, RelationPartitionSnapshot,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationLimits, ObservationRequest, ObservationRequestBudget,
@@ -29,7 +29,11 @@ impl SourceConnectionRegistry for Registry {
         (key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
 
-    fn authorizes_schema_scope(&self, source: &ResolvedSourceConnection, schemas: &[String]) -> bool {
+    fn authorizes_schema_scope(
+        &self,
+        source: &ResolvedSourceConnection,
+        schemas: &[String],
+    ) -> bool {
         source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && schemas == ["public"]
@@ -84,7 +88,9 @@ fn exclusion_index(name: &str) -> IndexObservation {
         .unwrap(),
     ])
     .unwrap()
-    .with_catalog_flags(IndexCatalogFlags::new(false, true, true, false, false, false))
+    .with_catalog_flags(IndexCatalogFlags::new(
+        false, true, true, false, false, false,
+    ))
     .unwrap()
     .with_ready(true)
     .with_valid(true)
@@ -303,5 +309,10 @@ fn validated_exclusion_constraint_issues_exact_provenance() {
         .expect("observed EXCLUDE validation must issue provenance");
     assert!(receipt.location().validated());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
-    assert!(receipt.location().canonical_location().ends_with("/validation"));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/validation")
+    );
 }

@@ -7,19 +7,21 @@ use conceptweave_relation_partition::{
     IndexExclusionConstraintCoordinate, IndexExclusionConstraintKeyObservation,
     IndexExclusionConstraintKeySnapshot, IndexExclusionConstraintObservation,
     IndexExclusionConstraintOperatorKindObservation, IndexExclusionConstraintOperatorKindSnapshot,
-    IndexExclusionConstraintOperatorObservation, IndexExclusionConstraintOperatorProcedureObservation,
+    IndexExclusionConstraintOperatorObservation,
+    IndexExclusionConstraintOperatorProcedureObservation,
     IndexExclusionConstraintOperatorProcedureScalarObservation,
     IndexExclusionConstraintOperatorProcedureScalarSnapshot,
-    IndexExclusionConstraintOperatorProcedureSnapshot, IndexExclusionConstraintOperatorResultObservation,
+    IndexExclusionConstraintOperatorProcedureSnapshot,
+    IndexExclusionConstraintOperatorResultObservation,
     IndexExclusionConstraintOperatorResultSnapshot,
     IndexExclusionConstraintOperatorSemanticsLineage, IndexExclusionConstraintOperatorSnapshot,
     IndexExclusionConstraintOperatorSourceLineage, IndexExclusionConstraintPeriodObservation,
     IndexExclusionConstraintPeriodSnapshot, IndexExclusionConstraintSnapshot,
     IndexExclusionSemanticsSnapshot, IndexKeyExclusionSemanticsObservation,
     IndexKeyOperatorFamilyObservation, IndexOperatorFamilySnapshot, IndexPartitionCoordinate,
-    IndexPartitionObservation, IndexPartitionSnapshot, IndexRelationKind, QualifiedOperatorFamilyName,
-    QualifiedOperatorSignature, QualifiedProcedureSignature, RelationPartitionObservation,
-    RelationPartitionSnapshot,
+    IndexPartitionObservation, IndexPartitionSnapshot, IndexRelationKind,
+    QualifiedOperatorFamilyName, QualifiedOperatorSignature, QualifiedProcedureSignature,
+    RelationPartitionObservation, RelationPartitionSnapshot,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationLimits, ObservationRequest, ObservationRequestBudget,
@@ -38,7 +40,11 @@ impl SourceConnectionRegistry for Registry {
         (key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
 
-    fn authorizes_schema_scope(&self, source: &ResolvedSourceConnection, schemas: &[String]) -> bool {
+    fn authorizes_schema_scope(
+        &self,
+        source: &ResolvedSourceConnection,
+        schemas: &[String],
+    ) -> bool {
         source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && schemas == ["public"]
@@ -117,25 +123,24 @@ fn result_and_kind_snapshots() -> (
         "bookings_no_overlap",
         false,
         Some(false),
-        vec![IndexAttributeObservation::column(
-            1,
-            IndexAttributeKind::Key,
-            "resource_id",
-        )
-        .unwrap()],
+        vec![IndexAttributeObservation::column(1, IndexAttributeKind::Key, "resource_id").unwrap()],
         vec![],
     )
     .unwrap()
     .with_access_method("btree")
-    .with_key_semantics(vec![IndexKeySemantics::new(
-        1,
-        None,
-        QualifiedOperatorClassName::new("pg_catalog", "int4_ops").unwrap(),
-        0,
-    )
-    .unwrap()])
+    .with_key_semantics(vec![
+        IndexKeySemantics::new(
+            1,
+            None,
+            QualifiedOperatorClassName::new("pg_catalog", "int4_ops").unwrap(),
+            0,
+        )
+        .unwrap(),
+    ])
     .unwrap()
-    .with_catalog_flags(IndexCatalogFlags::new(false, true, true, false, false, false))
+    .with_catalog_flags(IndexCatalogFlags::new(
+        false, true, true, false, false, false,
+    ))
     .unwrap()
     .with_ready(true)
     .with_valid(true)
@@ -144,15 +149,7 @@ fn result_and_kind_snapshots() -> (
         "public",
         "bookings",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "resource_id",
-            1,
-            "integer",
-            int4(),
-            false,
-            None,
-        )
-        .unwrap()],
+        vec![ColumnObservationV3::new("resource_id", 1, "integer", int4(), false, None).unwrap()],
     )
     .unwrap()
     .with_indexes(vec![index])
@@ -168,33 +165,26 @@ fn result_and_kind_snapshots() -> (
     .unwrap();
     let relations = RelationPartitionSnapshot::new(
         &base,
-        vec![RelationPartitionObservation::non_partition(
-            "public",
-            "bookings",
-            RelationKind::Table,
-        )
-        .unwrap()],
+        vec![
+            RelationPartitionObservation::non_partition("public", "bookings", RelationKind::Table)
+                .unwrap(),
+        ],
     )
     .unwrap();
     let indexes = IndexPartitionSnapshot::new(
         &base,
         &relations,
-        vec![IndexPartitionObservation::non_partition(
-            index_coordinate(),
-            IndexRelationKind::Index,
-        )
-        .unwrap()],
+        vec![
+            IndexPartitionObservation::non_partition(index_coordinate(), IndexRelationKind::Index)
+                .unwrap(),
+        ],
     )
     .unwrap();
     let constraints = IndexExclusionConstraintSnapshot::new(
         &base,
         &relations,
         &indexes,
-        vec![IndexExclusionConstraintObservation::root(
-            coordinate(),
-            index_coordinate(),
-        )
-        .unwrap()],
+        vec![IndexExclusionConstraintObservation::root(coordinate(), index_coordinate()).unwrap()],
     )
     .unwrap();
     let periods = IndexExclusionConstraintPeriodSnapshot::new(
@@ -215,13 +205,15 @@ fn result_and_kind_snapshots() -> (
         &base,
         &relations,
         &indexes,
-        vec![IndexKeyOperatorFamilyObservation::new(
-            index_coordinate(),
-            1,
-            QualifiedOperatorClassName::new("pg_catalog", "int4_ops").unwrap(),
-            QualifiedOperatorFamilyName::new("btree", "pg_catalog", "integer_ops").unwrap(),
-        )
-        .unwrap()],
+        vec![
+            IndexKeyOperatorFamilyObservation::new(
+                index_coordinate(),
+                1,
+                QualifiedOperatorClassName::new("pg_catalog", "int4_ops").unwrap(),
+                QualifiedOperatorFamilyName::new("btree", "pg_catalog", "integer_ops").unwrap(),
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
     let semantics = IndexExclusionSemanticsSnapshot::new(
@@ -229,14 +221,16 @@ fn result_and_kind_snapshots() -> (
         &relations,
         &indexes,
         &families,
-        vec![IndexKeyExclusionSemanticsObservation::new(
-            index_coordinate(),
-            1,
-            operator("="),
-            procedure("int4eq"),
-            3,
-        )
-        .unwrap()],
+        vec![
+            IndexKeyExclusionSemanticsObservation::new(
+                index_coordinate(),
+                1,
+                operator("="),
+                procedure("int4eq"),
+                3,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
     let operators = IndexExclusionConstraintOperatorSnapshot::new(
@@ -249,46 +243,51 @@ fn result_and_kind_snapshots() -> (
             &keys,
         ),
         IndexExclusionConstraintOperatorSemanticsLineage::new(&families, &semantics),
-        vec![IndexExclusionConstraintOperatorObservation::new(
-            coordinate(),
-            vec![operator("=")],
-        )
-        .unwrap()],
+        vec![
+            IndexExclusionConstraintOperatorObservation::new(coordinate(), vec![operator("=")])
+                .unwrap(),
+        ],
     )
     .unwrap();
     let procedures = IndexExclusionConstraintOperatorProcedureSnapshot::new(
         &operators,
-        vec![IndexExclusionConstraintOperatorProcedureObservation::new(
-            coordinate(),
-            1,
-            operator("="),
-            procedure("int4eq"),
-        )
-        .unwrap()],
+        vec![
+            IndexExclusionConstraintOperatorProcedureObservation::new(
+                coordinate(),
+                1,
+                operator("="),
+                procedure("int4eq"),
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
     let results = IndexExclusionConstraintOperatorResultSnapshot::new(
         &procedures,
-        vec![IndexExclusionConstraintOperatorResultObservation::new(
-            coordinate(),
-            1,
-            operator("="),
-            procedure("int4eq"),
-            bool_type(),
-            bool_type(),
-        )
-        .unwrap()],
+        vec![
+            IndexExclusionConstraintOperatorResultObservation::new(
+                coordinate(),
+                1,
+                operator("="),
+                procedure("int4eq"),
+                bool_type(),
+                bool_type(),
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
     let kinds = IndexExclusionConstraintOperatorKindSnapshot::new(
         &results,
-        vec![IndexExclusionConstraintOperatorKindObservation::new(
-            coordinate(),
-            1,
-            operator("="),
-            'b',
-        )
-        .unwrap()],
+        vec![
+            IndexExclusionConstraintOperatorKindObservation::new(
+                coordinate(),
+                1,
+                operator("="),
+                'b',
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
     (results, kinds)
@@ -322,7 +321,11 @@ fn ordinary_exclude_preserves_scalar_operator_procedure_state() {
     let snapshot = IndexExclusionConstraintOperatorProcedureScalarSnapshot::new(
         &results,
         &kinds,
-        vec![scalar_observation(operator("="), procedure("int4eq"), false)],
+        vec![scalar_observation(
+            operator("="),
+            procedure("int4eq"),
+            false,
+        )],
     )
     .expect("ordinary EXCLUDE enforcement procedures must be scalar");
 
@@ -331,11 +334,19 @@ fn ordinary_exclude_preserves_scalar_operator_procedure_state() {
     assert_eq!(receipt.location().operator(), &operator("="));
     assert_eq!(receipt.location().procedure(), &procedure("int4eq"));
     assert_eq!(receipt.source_id(), kinds.source_connection_key());
-    assert_eq!(receipt.connection_policy_binding(), kinds.connection_policy_binding());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        kinds.connection_policy_binding()
+    );
     assert_eq!(receipt.extractor_revision(), kinds.extractor_revision());
     assert_eq!(receipt.observed_at_utc(), kinds.observed_at_utc());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
-    assert!(receipt.location().canonical_location().ends_with("/1/procedure-scalar"));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/1/procedure-scalar")
+    );
 }
 
 #[test]
@@ -347,7 +358,10 @@ fn ordinary_exclude_rejects_set_returning_operator_procedure() {
         vec![scalar_observation(operator("="), procedure("int4eq"), true)],
     )
     .expect_err("scalar exclusion enforcement must not accept pg_proc.proretset=true");
-    assert_field(error, "index_exclusion_constraint_operator_procedure_scalar_state");
+    assert_field(
+        error,
+        "index_exclusion_constraint_operator_procedure_scalar_state",
+    );
 }
 
 #[test]
@@ -356,10 +370,17 @@ fn ordinary_exclude_rejects_procedure_scalar_binding_drift() {
     let error = IndexExclusionConstraintOperatorProcedureScalarSnapshot::new(
         &results,
         &kinds,
-        vec![scalar_observation(operator("="), procedure("int4ne"), false)],
+        vec![scalar_observation(
+            operator("="),
+            procedure("int4ne"),
+            false,
+        )],
     )
     .expect_err("proretset evidence must bind to the exact pg_operator.oprcode procedure");
-    assert_field(error, "index_exclusion_constraint_operator_procedure_scalar_binding");
+    assert_field(
+        error,
+        "index_exclusion_constraint_operator_procedure_scalar_binding",
+    );
 }
 
 #[test]
@@ -368,18 +389,29 @@ fn ordinary_exclude_rejects_operator_scalar_binding_drift() {
     let error = IndexExclusionConstraintOperatorProcedureScalarSnapshot::new(
         &results,
         &kinds,
-        vec![scalar_observation(operator("<>"), procedure("int4eq"), false)],
+        vec![scalar_observation(
+            operator("<>"),
+            procedure("int4eq"),
+            false,
+        )],
     )
     .expect_err("proretset evidence must remain on the exact governed conexclop position");
-    assert_field(error, "index_exclusion_constraint_operator_procedure_scalar_binding");
+    assert_field(
+        error,
+        "index_exclusion_constraint_operator_procedure_scalar_binding",
+    );
 }
 
 #[test]
 fn ordinary_exclude_rejects_missing_procedure_scalar_evidence() {
     let (results, kinds) = result_and_kind_snapshots();
-    let error = IndexExclusionConstraintOperatorProcedureScalarSnapshot::new(&results, &kinds, vec![])
-        .expect_err("every governed ordinary EXCLUDE procedure needs raw proretset evidence");
-    assert_field(error, "index_exclusion_constraint_operator_procedure_scalar_completeness");
+    let error =
+        IndexExclusionConstraintOperatorProcedureScalarSnapshot::new(&results, &kinds, vec![])
+            .expect_err("every governed ordinary EXCLUDE procedure needs raw proretset evidence");
+    assert_field(
+        error,
+        "index_exclusion_constraint_operator_procedure_scalar_completeness",
+    );
 }
 
 #[test]
@@ -392,7 +424,10 @@ fn ordinary_exclude_rejects_duplicate_procedure_scalar_coordinate() {
         vec![observation.clone(), observation],
     )
     .expect_err("duplicate raw procedure evidence must not collapse during canonicalization");
-    assert_field(error, "index_exclusion_constraint_operator_procedure_scalar_coordinate");
+    assert_field(
+        error,
+        "index_exclusion_constraint_operator_procedure_scalar_coordinate",
+    );
 }
 
 #[test]
@@ -414,11 +449,18 @@ fn procedure_scalar_receipt_rejects_unknown_position() {
     let snapshot = IndexExclusionConstraintOperatorProcedureScalarSnapshot::new(
         &results,
         &kinds,
-        vec![scalar_observation(operator("="), procedure("int4eq"), false)],
+        vec![scalar_observation(
+            operator("="),
+            procedure("int4eq"),
+            false,
+        )],
     )
     .unwrap();
     let error = snapshot
         .source_receipt(coordinate(), 2)
         .expect_err("receipts may only be issued for governed positions");
-    assert!(matches!(error, ObservationError::UnknownObservationLocation { .. }));
+    assert!(matches!(
+        error,
+        ObservationError::UnknownObservationLocation { .. }
+    ));
 }

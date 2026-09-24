@@ -16,12 +16,10 @@ fn primary_index() -> IndexObservation {
         "document_pkey",
         true,
         Some(false),
-        vec![IndexAttributeObservation::column(
-            1,
-            IndexAttributeKind::Key,
-            "document_id",
-        )
-        .expect("primary key attribute fixture is valid")],
+        vec![
+            IndexAttributeObservation::column(1, IndexAttributeKind::Key, "document_id")
+                .expect("primary key attribute fixture is valid"),
+        ],
         Vec::new(),
     )
     .expect("primary index fixture is structurally valid")
@@ -51,12 +49,10 @@ fn primary_index_without_lifecycle() -> IndexObservation {
         "document_pkey",
         true,
         Some(false),
-        vec![IndexAttributeObservation::column(
-            1,
-            IndexAttributeKind::Key,
-            "document_id",
-        )
-        .expect("primary key attribute fixture is valid")],
+        vec![
+            IndexAttributeObservation::column(1, IndexAttributeKind::Key, "document_id")
+                .expect("primary key attribute fixture is valid"),
+        ],
         Vec::new(),
     )
     .expect("primary index fixture is structurally valid")
@@ -83,12 +79,10 @@ fn standalone_unique_index() -> IndexObservation {
         "document_id_uix",
         true,
         Some(false),
-        vec![IndexAttributeObservation::column(
-            1,
-            IndexAttributeKind::Key,
-            "document_id",
-        )
-        .expect("unique key attribute fixture is valid")],
+        vec![
+            IndexAttributeObservation::column(1, IndexAttributeKind::Key, "document_id")
+                .expect("unique key attribute fixture is valid"),
+        ],
         Vec::new(),
     )
     .expect("unique index fixture is structurally valid")
@@ -118,15 +112,17 @@ fn relation_with_index(
         "public",
         "document",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "document_id",
-            1,
-            "bigint",
-            catalog_type("int8"),
-            false,
-            None,
-        )
-        .expect("column fixture is valid")],
+        vec![
+            ColumnObservationV3::new(
+                "document_id",
+                1,
+                "bigint",
+                catalog_type("int8"),
+                false,
+                None,
+            )
+            .expect("column fixture is valid"),
+        ],
     )
     .expect("relation fixture is valid")
     .with_constraints(constraints)
@@ -236,8 +232,9 @@ fn matching_primary_key_constraint_and_primary_catalog_index_remain_admissible()
             .expect("primary-key fixture is valid"),
     );
 
-    snapshot(relation(vec![primary_key]))
-        .expect("coherent primary-key constraint and primary-index evidence must remain admissible");
+    snapshot(relation(vec![primary_key])).expect(
+        "coherent primary-key constraint and primary-index evidence must remain admissible",
+    );
 }
 
 #[test]

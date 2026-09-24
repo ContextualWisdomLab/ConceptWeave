@@ -163,9 +163,11 @@ impl IndexCollationDatabaseEncodingSnapshot {
             }
         }
 
-        let key_collation_predecessor_digest = key_collation_predecessor.snapshot_digest().to_owned();
-        let expression_collation_predecessor_digest =
-            expression_collation_predecessor.snapshot_digest().to_owned();
+        let key_collation_predecessor_digest =
+            key_collation_predecessor.snapshot_digest().to_owned();
+        let expression_collation_predecessor_digest = expression_collation_predecessor
+            .snapshot_digest()
+            .to_owned();
         let snapshot_digest = compute_digest(
             &key_collation_predecessor_digest,
             &expression_collation_predecessor_digest,
@@ -182,8 +184,12 @@ impl IndexCollationDatabaseEncodingSnapshot {
             key_collation_predecessor_digest,
             expression_collation_predecessor_digest,
             snapshot_digest,
-            extractor_revision: expression_collation_predecessor.extractor_revision().to_owned(),
-            observed_at_utc: expression_collation_predecessor.observed_at_utc().to_owned(),
+            extractor_revision: expression_collation_predecessor
+                .extractor_revision()
+                .to_owned(),
+            observed_at_utc: expression_collation_predecessor
+                .observed_at_utc()
+                .to_owned(),
             database_encoding,
         })
     }

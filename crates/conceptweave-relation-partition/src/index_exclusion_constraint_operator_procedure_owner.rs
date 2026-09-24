@@ -14,8 +14,9 @@ use conceptweave_observation::ObservationError;
 use sha2::{Digest, Sha256};
 
 use super::{
-    IndexExclusionConstraintCoordinate, IndexExclusionConstraintOperatorProcedureDefinitionSnapshot,
-    QualifiedOperatorSignature, QualifiedProcedureSignature,
+    IndexExclusionConstraintCoordinate,
+    IndexExclusionConstraintOperatorProcedureDefinitionSnapshot, QualifiedOperatorSignature,
+    QualifiedProcedureSignature,
 };
 
 const INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_OWNER_DIGEST_DOMAIN_V1: &[u8] =
@@ -216,9 +217,7 @@ impl IndexExclusionConstraintOperatorProcedureOwnerSnapshot {
                         && candidate.key_position() == observation.key_position()
                 })
                 .ok_or_else(|| {
-                    invalid(
-                        "index_exclusion_constraint_operator_procedure_owner_completeness",
-                    )
+                    invalid("index_exclusion_constraint_operator_procedure_owner_completeness")
                 })?;
             if predecessor.operator() != observation.operator()
                 || predecessor.procedure() != observation.procedure()
@@ -293,14 +292,16 @@ impl IndexExclusionConstraintOperatorProcedureOwnerSnapshot {
             .ok_or_else(|| ObservationError::UnknownObservationLocation {
                 location: procedure_owner_location(&coordinate, key_position),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureOwnerSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureOwnerSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 
@@ -356,10 +357,7 @@ fn encode_procedure(hasher: &mut Sha256, procedure: &QualifiedProcedureSignature
     }
 }
 
-fn encode_type(
-    hasher: &mut Sha256,
-    qualified_type: &conceptweave_observation::QualifiedTypeName,
-) {
+fn encode_type(hasher: &mut Sha256, qualified_type: &conceptweave_observation::QualifiedTypeName) {
     encode_str(hasher, qualified_type.schema_name());
     encode_str(hasher, qualified_type.type_name());
 }

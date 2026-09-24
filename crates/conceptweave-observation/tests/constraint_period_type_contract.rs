@@ -40,12 +40,7 @@ fn column_with_binding(
         .expect("column fixture is valid")
 }
 
-fn column(
-    name: &str,
-    position: u32,
-    data_type: &str,
-    type_name: &str,
-) -> ColumnObservationV3 {
+fn column(name: &str, position: u32, data_type: &str, type_name: &str) -> ColumnObservationV3 {
     column_with_binding(name, position, data_type, catalog_type(type_name))
 }
 
@@ -219,12 +214,9 @@ fn without_overlaps_rejects_scalar_final_key_column() {
 
 #[test]
 fn without_overlaps_preserves_domain_over_range_positive_control() {
-    let period_domain = DomainObservation::new(
-        "public",
-        "active_period",
-        catalog_type("tstzrange"),
-    )
-    .expect("domain-over-range fixture is valid");
+    let period_domain =
+        DomainObservation::new("public", "active_period", catalog_type("tstzrange"))
+            .expect("domain-over-range fixture is valid");
     let mut type_kinds = catalog_range_family("tstzrange", "tstzmultirange");
     type_kinds.push(TypeKindObservation::domain(
         user_type("public", "active_period"),
@@ -275,7 +267,9 @@ fn without_overlaps_preserves_domain_over_user_defined_range() {
         Vec::new(),
         type_kinds,
     )
-    .expect("domain over a user-defined range remains representable through the compatibility seam");
+    .expect(
+        "domain over a user-defined range remains representable through the compatibility seam",
+    );
 
     snapshot
         .with_observed_constraint_periods(vec![temporal_period()])
@@ -284,12 +278,8 @@ fn without_overlaps_preserves_domain_over_user_defined_range() {
 
 #[test]
 fn without_overlaps_rejects_domain_over_scalar() {
-    let period_domain = DomainObservation::new(
-        "public",
-        "active_period",
-        catalog_type("text"),
-    )
-    .expect("domain-over-scalar fixture is valid");
+    let period_domain = DomainObservation::new("public", "active_period", catalog_type("text"))
+        .expect("domain-over-scalar fixture is valid");
     let snapshot = PostgresSchemaSnapshotV3::new(
         &support::authorized_source("warehouse_primary", &["public"]),
         "postgres_introspector_v3",
@@ -300,10 +290,7 @@ fn without_overlaps_rejects_domain_over_scalar() {
     )
     .expect("domain-over-scalar schema is structurally representable")
     .with_observed_type_kinds(vec![
-        TypeKindObservation::domain(
-            user_type("public", "active_period"),
-            catalog_type("text"),
-        ),
+        TypeKindObservation::domain(user_type("public", "active_period"), catalog_type("text")),
         TypeKindObservation::plain(catalog_type("text"), PostgresTypeKind::Base)
             .expect("scalar type-kind fixture is valid"),
     ])

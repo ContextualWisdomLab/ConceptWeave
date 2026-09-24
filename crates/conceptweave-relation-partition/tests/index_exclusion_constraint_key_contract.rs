@@ -28,7 +28,11 @@ impl SourceConnectionRegistry for Registry {
         (key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
 
-    fn authorizes_schema_scope(&self, source: &ResolvedSourceConnection, schemas: &[String]) -> bool {
+    fn authorizes_schema_scope(
+        &self,
+        source: &ResolvedSourceConnection,
+        schemas: &[String],
+    ) -> bool {
         source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && schemas == ["public"]
@@ -70,14 +74,10 @@ fn base_snapshot() -> PostgresSchemaSnapshotV3 {
         Some(false),
         vec![
             IndexAttributeObservation::column(1, IndexAttributeKind::Key, "resource_id").unwrap(),
-            IndexAttributeObservation::expression(2, IndexAttributeKind::Key, "lower(note)").unwrap(),
+            IndexAttributeObservation::expression(2, IndexAttributeKind::Key, "lower(note)")
+                .unwrap(),
         ],
-        vec![IndexAttributeObservation::column(
-            3,
-            IndexAttributeKind::Include,
-            "payload",
-        )
-        .unwrap()],
+        vec![IndexAttributeObservation::column(3, IndexAttributeKind::Include, "payload").unwrap()],
     )
     .unwrap()
     .with_access_method("btree")
@@ -98,7 +98,9 @@ fn base_snapshot() -> PostgresSchemaSnapshotV3 {
         .unwrap(),
     ])
     .unwrap()
-    .with_catalog_flags(IndexCatalogFlags::new(false, true, true, false, false, false))
+    .with_catalog_flags(IndexCatalogFlags::new(
+        false, true, true, false, false, false,
+    ))
     .unwrap()
     .with_ready(true)
     .with_valid(true)
@@ -183,42 +185,36 @@ fn predecessor_snapshots() -> (
     let base = base_snapshot();
     let relations = RelationPartitionSnapshot::new(
         &base,
-        vec![RelationPartitionObservation::non_partition(
-            "public",
-            "bookings",
-            RelationKind::Table,
-        )
-        .unwrap()],
+        vec![
+            RelationPartitionObservation::non_partition("public", "bookings", RelationKind::Table)
+                .unwrap(),
+        ],
     )
     .unwrap();
     let indexes = IndexPartitionSnapshot::new(
         &base,
         &relations,
-        vec![IndexPartitionObservation::non_partition(
-            index_coordinate(),
-            IndexRelationKind::Index,
-        )
-        .unwrap()],
+        vec![
+            IndexPartitionObservation::non_partition(index_coordinate(), IndexRelationKind::Index)
+                .unwrap(),
+        ],
     )
     .unwrap();
     let constraints = IndexExclusionConstraintSnapshot::new(
         &base,
         &relations,
         &indexes,
-        vec![IndexExclusionConstraintObservation::root(
-            constraint_coordinate(),
-            index_coordinate(),
-        )
-        .unwrap()],
+        vec![
+            IndexExclusionConstraintObservation::root(constraint_coordinate(), index_coordinate())
+                .unwrap(),
+        ],
     )
     .unwrap();
     let period = IndexExclusionConstraintPeriodSnapshot::new(
         &constraints,
-        vec![IndexExclusionConstraintPeriodObservation::new(
-            constraint_coordinate(),
-            false,
-        )
-        .unwrap()],
+        vec![
+            IndexExclusionConstraintPeriodObservation::new(constraint_coordinate(), false).unwrap(),
+        ],
     )
     .unwrap();
     (base, relations, indexes, constraints, period)
@@ -233,11 +229,10 @@ fn ordinary_exclude_preserves_exact_conkey_with_expression_zero_and_omits_includ
         &indexes,
         &constraints,
         &period,
-        vec![IndexExclusionConstraintKeyObservation::new(
-            constraint_coordinate(),
-            vec![1, 0],
-        )
-        .unwrap()],
+        vec![
+            IndexExclusionConstraintKeyObservation::new(constraint_coordinate(), vec![1, 0])
+                .unwrap(),
+        ],
     )
     .expect("conkey preserves key attnums/expression zero and excludes INCLUDE payload");
 
@@ -260,13 +255,14 @@ fn ordinary_exclude_rejects_conkey_that_disagrees_with_backing_index_key_layout(
         &indexes,
         &constraints,
         &period,
-        vec![IndexExclusionConstraintKeyObservation::new(
-            constraint_coordinate(),
-            vec![2, 0],
-        )
-        .unwrap()],
+        vec![
+            IndexExclusionConstraintKeyObservation::new(constraint_coordinate(), vec![2, 0])
+                .unwrap(),
+        ],
     )
-    .expect_err("conkey is independently stored catalog evidence and must match pg_index.indkey keys");
+    .expect_err(
+        "conkey is independently stored catalog evidence and must match pg_index.indkey keys",
+    );
 
     assert_eq!(
         error,
@@ -306,15 +302,19 @@ fn exact_conkey_issues_domain_separated_provenance() {
         &indexes,
         &constraints,
         &period,
-        vec![IndexExclusionConstraintKeyObservation::new(
-            constraint_coordinate(),
-            vec![1, 0],
-        )
-        .unwrap()],
+        vec![
+            IndexExclusionConstraintKeyObservation::new(constraint_coordinate(), vec![1, 0])
+                .unwrap(),
+        ],
     )
     .unwrap();
 
     let receipt = snapshot.source_receipt(constraint_coordinate()).unwrap();
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
-    assert!(receipt.location().canonical_location().ends_with("/key-attributes"));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/key-attributes")
+    );
 }

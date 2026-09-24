@@ -1,14 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use conceptweave_observation::{
-    ObservationError, PostgresSchemaSnapshotV3, QualifiedTypeName,
-};
+use conceptweave_observation::{ObservationError, PostgresSchemaSnapshotV3, QualifiedTypeName};
 use sha2::{Digest, Sha256};
 
+use super::{IndexOperatorFamilySnapshot, IndexPartitionCoordinate, IndexPartitionSnapshot};
 use crate::RelationPartitionSnapshot;
-use super::{
-    IndexOperatorFamilySnapshot, IndexPartitionCoordinate, IndexPartitionSnapshot,
-};
 
 const INDEX_EXCLUSION_DIGEST_DOMAIN_V1: &[u8] = b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.operator_family.exclusion.v1";
 const SHA256_DIGEST_PREFIX: &str = "sha256:";
@@ -189,7 +185,11 @@ impl IndexKeyExclusionSemanticsObservation {
     /// Returns the collision-safe evidence location for this exclusion-key fact.
     #[must_use]
     pub fn canonical_location(&self) -> String {
-        format!("{}/keys/{}/exclusion", self.index.canonical_location(), self.key_position)
+        format!(
+            "{}/keys/{}/exclusion",
+            self.index.canonical_location(),
+            self.key_position
+        )
     }
 }
 
@@ -283,13 +283,13 @@ impl IndexExclusionSemanticsSnapshot {
             index_partition_snapshot,
             observations,
         )?;
-        let snapshot_digest = compute_exclusion_digest(
-            operator_family_snapshot.snapshot_digest(),
-            &observations,
-        );
+        let snapshot_digest =
+            compute_exclusion_digest(operator_family_snapshot.snapshot_digest(), &observations);
         Ok(Self {
             source_connection_key: operator_family_snapshot.source_connection_key().to_owned(),
-            connection_policy_binding: operator_family_snapshot.connection_policy_binding().to_owned(),
+            connection_policy_binding: operator_family_snapshot
+                .connection_policy_binding()
+                .to_owned(),
             snapshot_digest,
             extractor_revision: operator_family_snapshot.extractor_revision().to_owned(),
             observed_at_utc: operator_family_snapshot.observed_at_utc().to_owned(),
@@ -342,9 +342,14 @@ impl IndexExclusionSemanticsSnapshot {
         let observation = self
             .observations
             .iter()
-            .find(|observation| observation.index() == index && observation.key_position() == key_position)
+            .find(|observation| {
+                observation.index() == index && observation.key_position() == key_position
+            })
             .ok_or_else(|| ObservationError::UnknownObservationLocation {
-                location: format!("{}/keys/{key_position}/exclusion", index.canonical_location()),
+                location: format!(
+                    "{}/keys/{key_position}/exclusion",
+                    index.canonical_location()
+                ),
             })?;
         Ok(IndexExclusionSourceReceipt {
             source_id: self.source_connection_key.clone(),
@@ -425,7 +430,12 @@ fn canonicalize_exclusion_semantics(
 
     let by_key = observations
         .iter()
-        .map(|observation| ((observation.index().clone(), observation.key_position()), observation))
+        .map(|observation| {
+            (
+                (observation.index().clone(), observation.key_position()),
+                observation,
+            )
+        })
         .collect::<BTreeMap<_, _>>();
 
     for membership in index_partition_snapshot.observations() {
@@ -460,7 +470,9 @@ fn canonicalize_exclusion_semantics(
     Ok(observations)
 }
 
-fn exclusion_flag(index: &conceptweave_observation::IndexObservation) -> Result<bool, ObservationError> {
+fn exclusion_flag(
+    index: &conceptweave_observation::IndexObservation,
+) -> Result<bool, ObservationError> {
     index
         .catalog_flags()
         .map(|flags| flags.exclusion())

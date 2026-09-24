@@ -133,7 +133,9 @@ impl IndexExclusionConstraintOperatorProcedureSecurityDefinerSourceReceipt {
 
     /// Returns the exact validated security-context observation.
     #[must_use]
-    pub const fn location(&self) -> &IndexExclusionConstraintOperatorProcedureSecurityDefinerObservation {
+    pub const fn location(
+        &self,
+    ) -> &IndexExclusionConstraintOperatorProcedureSecurityDefinerObservation {
         &self.location
     }
 }
@@ -213,7 +215,9 @@ impl IndexExclusionConstraintOperatorProcedureSecurityDefinerSnapshot {
         );
         Ok(Self {
             source_connection_key: procedure_kind_snapshot.source_connection_key().to_owned(),
-            connection_policy_binding: procedure_kind_snapshot.connection_policy_binding().to_owned(),
+            connection_policy_binding: procedure_kind_snapshot
+                .connection_policy_binding()
+                .to_owned(),
             snapshot_digest,
             extractor_revision: procedure_kind_snapshot.extractor_revision().to_owned(),
             observed_at_utc: procedure_kind_snapshot.observed_at_utc().to_owned(),
@@ -253,7 +257,9 @@ impl IndexExclusionConstraintOperatorProcedureSecurityDefinerSnapshot {
 
     /// Returns complete security-context observations in deterministic coordinate/key order.
     #[must_use]
-    pub fn observations(&self) -> &[IndexExclusionConstraintOperatorProcedureSecurityDefinerObservation] {
+    pub fn observations(
+        &self,
+    ) -> &[IndexExclusionConstraintOperatorProcedureSecurityDefinerObservation] {
         &self.observations
     }
 
@@ -262,7 +268,10 @@ impl IndexExclusionConstraintOperatorProcedureSecurityDefinerSnapshot {
         &self,
         coordinate: IndexExclusionConstraintCoordinate,
         key_position: u32,
-    ) -> Result<IndexExclusionConstraintOperatorProcedureSecurityDefinerSourceReceipt, ObservationError> {
+    ) -> Result<
+        IndexExclusionConstraintOperatorProcedureSecurityDefinerSourceReceipt,
+        ObservationError,
+    > {
         let observation = self
             .observations
             .iter()
@@ -273,14 +282,16 @@ impl IndexExclusionConstraintOperatorProcedureSecurityDefinerSnapshot {
             .ok_or_else(|| ObservationError::UnknownObservationLocation {
                 location: procedure_security_definer_location(&coordinate, key_position),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureSecurityDefinerSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureSecurityDefinerSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 
@@ -335,10 +346,7 @@ fn encode_procedure(hasher: &mut Sha256, procedure: &QualifiedProcedureSignature
     }
 }
 
-fn encode_type(
-    hasher: &mut Sha256,
-    qualified_type: &conceptweave_observation::QualifiedTypeName,
-) {
+fn encode_type(hasher: &mut Sha256, qualified_type: &conceptweave_observation::QualifiedTypeName) {
     encode_str(hasher, qualified_type.schema_name());
     encode_str(hasher, qualified_type.type_name());
 }

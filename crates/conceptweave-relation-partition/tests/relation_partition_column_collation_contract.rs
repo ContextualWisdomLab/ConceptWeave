@@ -67,15 +67,17 @@ fn relation(name: &str, kind: RelationKind) -> RelationObservation {
         "public",
         name,
         kind,
-        vec![ColumnObservationV3::new(
-            "label",
-            1,
-            "text",
-            QualifiedTypeName::new("pg_catalog", "text").unwrap(),
-            true,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "label",
+                1,
+                "text",
+                QualifiedTypeName::new("pg_catalog", "text").unwrap(),
+                true,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
 }
@@ -134,11 +136,7 @@ fn snapshot(
         vec![],
         vec![],
         vec![
-            collation(
-                "labels",
-                RelationKind::PartitionedTable,
-                parent_collation,
-            ),
+            collation("labels", RelationKind::PartitionedTable, parent_collation),
             collation("labels_2026", RelationKind::Table, child_collation),
         ],
     )?;

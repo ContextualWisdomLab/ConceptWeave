@@ -30,7 +30,11 @@ impl SourceConnectionRegistry for Registry {
         (key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
 
-    fn authorizes_schema_scope(&self, source: &ResolvedSourceConnection, schemas: &[String]) -> bool {
+    fn authorizes_schema_scope(
+        &self,
+        source: &ResolvedSourceConnection,
+        schemas: &[String],
+    ) -> bool {
         source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && schemas == ["public"]
@@ -99,15 +103,19 @@ fn index_with_lifecycle(
     )
     .unwrap()
     .with_access_method("btree")
-    .with_key_semantics(vec![IndexKeySemantics::new(
-        1,
-        None,
-        QualifiedOperatorClassName::new("pg_catalog", "int8_ops").unwrap(),
-        0,
-    )
-    .unwrap()])
+    .with_key_semantics(vec![
+        IndexKeySemantics::new(
+            1,
+            None,
+            QualifiedOperatorClassName::new("pg_catalog", "int8_ops").unwrap(),
+            0,
+        )
+        .unwrap(),
+    ])
     .unwrap()
-    .with_catalog_flags(IndexCatalogFlags::new(false, true, true, false, false, false))
+    .with_catalog_flags(IndexCatalogFlags::new(
+        false, true, true, false, false, false,
+    ))
     .unwrap();
 
     if let Some(value) = ready {
@@ -127,15 +135,17 @@ fn base_with_index(index: IndexObservation) -> PostgresSchemaSnapshotV3 {
         "public",
         "bookings",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            false,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                false,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
     .with_indexes(vec![index])
@@ -161,47 +171,44 @@ fn stack(ready: Option<bool>, valid: Option<bool>, live: Option<bool>) -> Stack 
     let base = base_with_index(index_with_lifecycle(ready, valid, live));
     let relations = RelationPartitionSnapshot::new(
         &base,
-        vec![RelationPartitionObservation::non_partition(
-            "public",
-            "bookings",
-            RelationKind::Table,
-        )
-        .unwrap()],
+        vec![
+            RelationPartitionObservation::non_partition("public", "bookings", RelationKind::Table)
+                .unwrap(),
+        ],
     )
     .unwrap();
     let indexes = IndexPartitionSnapshot::new(
         &base,
         &relations,
-        vec![IndexPartitionObservation::non_partition(
-            index_coordinate(),
-            IndexRelationKind::Index,
-        )
-        .unwrap()],
+        vec![
+            IndexPartitionObservation::non_partition(index_coordinate(), IndexRelationKind::Index)
+                .unwrap(),
+        ],
     )
     .unwrap();
     let constraints = IndexExclusionConstraintSnapshot::new(
         &base,
         &relations,
         &indexes,
-        vec![IndexExclusionConstraintObservation::root(
-            coordinate(),
-            index_coordinate(),
-        )
-        .unwrap()],
+        vec![IndexExclusionConstraintObservation::root(coordinate(), index_coordinate()).unwrap()],
     )
     .unwrap();
     let shapes = IndexExclusionConstraintCatalogShapeSnapshot::new(
         &constraints,
-        vec![IndexExclusionConstraintCatalogShapeObservation::new(
-            coordinate(),
-            'x',
-            true,
-            false,
-            IndexExclusionConstraintForeignActionCodes::new(' ', ' ', ' '),
-            IndexExclusionConstraintForeignPayloadPresence::new(false, false, [false; 3], false),
-            false,
-        )
-        .unwrap()],
+        vec![
+            IndexExclusionConstraintCatalogShapeObservation::new(
+                coordinate(),
+                'x',
+                true,
+                false,
+                IndexExclusionConstraintForeignActionCodes::new(' ', ' ', ' '),
+                IndexExclusionConstraintForeignPayloadPresence::new(
+                    false, false, [false; 3], false,
+                ),
+                false,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
     let names = IndexExclusionConstraintIndexNameSnapshot::new(
@@ -214,12 +221,14 @@ fn stack(ready: Option<bool>, valid: Option<bool>, live: Option<bool>) -> Stack 
     .unwrap();
     let namespaces = IndexExclusionConstraintIndexNamespaceSnapshot::new(
         &names,
-        vec![IndexExclusionConstraintIndexNamespaceObservation::new(
-            coordinate(),
-            index_coordinate(),
-            "public",
-        )
-        .unwrap()],
+        vec![
+            IndexExclusionConstraintIndexNamespaceObservation::new(
+                coordinate(),
+                index_coordinate(),
+                "public",
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
 
@@ -229,11 +238,9 @@ fn stack(ready: Option<bool>, valid: Option<bool>, live: Option<bool>) -> Stack 
 #[test]
 fn exact_backing_index_lifecycle_is_retained_and_receipted() {
     let stack = stack(Some(true), Some(true), Some(true));
-    let snapshot = IndexExclusionConstraintIndexLifecycleSnapshot::new(
-        &stack.base,
-        &stack.namespaces,
-    )
-    .expect("an ordinary EXCLUDE backing index must be ready, valid, and live");
+    let snapshot =
+        IndexExclusionConstraintIndexLifecycleSnapshot::new(&stack.base, &stack.namespaces)
+            .expect("an ordinary EXCLUDE backing index must be ready, valid, and live");
 
     let receipt = snapshot.source_receipt(coordinate()).unwrap();
     assert_eq!(receipt.location().backing_index(), &index_coordinate());
@@ -256,11 +263,11 @@ fn missing_backing_index_lifecycle_evidence_fails_closed() {
         stack(Some(true), None, Some(true)),
         stack(Some(true), Some(true), None),
     ] {
-        let error = IndexExclusionConstraintIndexLifecycleSnapshot::new(
-            &stack.base,
-            &stack.namespaces,
-        )
-        .expect_err("missing pg_index lifecycle bits must not be synthesized from constraint state");
+        let error =
+            IndexExclusionConstraintIndexLifecycleSnapshot::new(&stack.base, &stack.namespaces)
+                .expect_err(
+                    "missing pg_index lifecycle bits must not be synthesized from constraint state",
+                );
         assert_eq!(
             error,
             ObservationError::InvalidObservationField {
@@ -277,11 +284,11 @@ fn non_enforceable_backing_index_lifecycle_fails_closed() {
         stack(Some(true), Some(false), Some(true)),
         stack(Some(true), Some(true), Some(false)),
     ] {
-        let error = IndexExclusionConstraintIndexLifecycleSnapshot::new(
-            &stack.base,
-            &stack.namespaces,
-        )
-        .expect_err("ordinary EXCLUDE must not publish against a non-ready, invalid, or dead index");
+        let error =
+            IndexExclusionConstraintIndexLifecycleSnapshot::new(&stack.base, &stack.namespaces)
+                .expect_err(
+                    "ordinary EXCLUDE must not publish against a non-ready, invalid, or dead index",
+                );
         assert_eq!(
             error,
             ObservationError::InvalidObservationField {
@@ -303,24 +310,24 @@ fn lifecycle_rejects_a_different_base_index_generation() {
     )
     .unwrap()
     .with_access_method("btree")
-    .with_key_semantics(vec![IndexKeySemantics::new(
-        1,
-        None,
-        QualifiedOperatorClassName::new("pg_catalog", "int8_ops").unwrap(),
-        0,
-    )
-    .unwrap()])
+    .with_key_semantics(vec![
+        IndexKeySemantics::new(
+            1,
+            None,
+            QualifiedOperatorClassName::new("pg_catalog", "int8_ops").unwrap(),
+            0,
+        )
+        .unwrap(),
+    ])
     .unwrap()
     .with_ready(true)
     .with_valid(true)
     .with_live(true);
     let unrelated_base = base_with_index(unrelated);
 
-    let error = IndexExclusionConstraintIndexLifecycleSnapshot::new(
-        &unrelated_base,
-        &stack.namespaces,
-    )
-    .expect_err("lifecycle evidence must come from the exact conindid backing index");
+    let error =
+        IndexExclusionConstraintIndexLifecycleSnapshot::new(&unrelated_base, &stack.namespaces)
+            .expect_err("lifecycle evidence must come from the exact conindid backing index");
     assert_eq!(
         error,
         ObservationError::InvalidObservationField {
@@ -342,11 +349,11 @@ fn lifecycle_rejects_a_different_source_generation() {
     )
     .unwrap();
 
-    let error = IndexExclusionConstraintIndexLifecycleSnapshot::new(
-        &mismatched_base,
-        &stack.namespaces,
-    )
-    .expect_err("lifecycle evidence from another source generation must not be rebound silently");
+    let error =
+        IndexExclusionConstraintIndexLifecycleSnapshot::new(&mismatched_base, &stack.namespaces)
+            .expect_err(
+                "lifecycle evidence from another source generation must not be rebound silently",
+            );
     assert_eq!(
         error,
         ObservationError::InvalidObservationField {
@@ -370,13 +377,16 @@ fn lifecycle_rejects_different_content_with_identical_provenance_coordinates() {
         vec![],
     )
     .unwrap();
-    assert_ne!(mismatched_base.snapshot_digest(), stack.base.snapshot_digest());
+    assert_ne!(
+        mismatched_base.snapshot_digest(),
+        stack.base.snapshot_digest()
+    );
 
-    let error = IndexExclusionConstraintIndexLifecycleSnapshot::new(
-        &mismatched_base,
-        &stack.namespaces,
-    )
-    .expect_err("same provenance coordinates must not permit a different v3 content generation");
+    let error =
+        IndexExclusionConstraintIndexLifecycleSnapshot::new(&mismatched_base, &stack.namespaces)
+            .expect_err(
+                "same provenance coordinates must not permit a different v3 content generation",
+            );
     assert_eq!(
         error,
         ObservationError::InvalidObservationField {
@@ -388,11 +398,9 @@ fn lifecycle_rejects_different_content_with_identical_provenance_coordinates() {
 #[test]
 fn unknown_backing_index_lifecycle_receipt_fails_closed() {
     let stack = stack(Some(true), Some(true), Some(true));
-    let snapshot = IndexExclusionConstraintIndexLifecycleSnapshot::new(
-        &stack.base,
-        &stack.namespaces,
-    )
-    .unwrap();
+    let snapshot =
+        IndexExclusionConstraintIndexLifecycleSnapshot::new(&stack.base, &stack.namespaces)
+            .unwrap();
     let unknown = IndexExclusionConstraintCoordinate::new(
         "public",
         "other",

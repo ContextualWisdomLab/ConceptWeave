@@ -246,7 +246,10 @@ impl CanonicalExpression {
         let node_kind = node_kind.into();
         validate_nonblank(&node_kind, "canonical_expression_node_kind")?;
         fields.sort_by(|left, right| left.name().cmp(right.name()));
-        if fields.windows(2).any(|pair| pair[0].name() == pair[1].name()) {
+        if fields
+            .windows(2)
+            .any(|pair| pair[0].name() == pair[1].name())
+        {
             return Err(invalid("canonical_expression_field"));
         }
         Ok(Self::Node { node_kind, fields })
@@ -768,9 +771,7 @@ fn validate_attached_expression_equivalence(
                 .get(&(parent.clone(), observation.key_position()))
                 .ok_or_else(|| invalid("index_expression_semantics_completeness"))?;
             if child_expression.contains_whole_row() {
-                return Err(invalid(
-                    "index_partition_definition_expression_whole_row",
-                ));
+                return Err(invalid("index_partition_definition_expression_whole_row"));
             }
             if child_expression != *parent_expression {
                 return Err(invalid("index_partition_definition_expression"));
@@ -780,9 +781,7 @@ fn validate_attached_expression_equivalence(
         let child_predicate = predicates.get(membership.coordinate()).copied();
         let parent_predicate = predicates.get(parent).copied();
         if child_predicate.is_some_and(CanonicalExpression::contains_whole_row) {
-            return Err(invalid(
-                "index_partition_definition_predicate_whole_row",
-            ));
+            return Err(invalid("index_partition_definition_predicate_whole_row"));
         }
         if child_predicate != parent_predicate {
             return Err(invalid("index_partition_definition_predicate"));
@@ -795,9 +794,9 @@ fn validate_attached_expression_equivalence(
 fn value_contains_whole_row(value: &CanonicalExpressionValue) -> bool {
     match value {
         CanonicalExpressionValue::Expression(expression) => expression.contains_whole_row(),
-        CanonicalExpressionValue::ExpressionList(expressions) => {
-            expressions.iter().any(CanonicalExpression::contains_whole_row)
-        }
+        CanonicalExpressionValue::ExpressionList(expressions) => expressions
+            .iter()
+            .any(CanonicalExpression::contains_whole_row),
         CanonicalExpressionValue::ValueList(values) => values.iter().any(value_contains_whole_row),
         CanonicalExpressionValue::Null
         | CanonicalExpressionValue::Boolean(_)

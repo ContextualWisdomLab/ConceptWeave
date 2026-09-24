@@ -46,10 +46,7 @@ impl ColumnTypeModifierObservation {
             &relation_name,
             "relation_partition_type_modifier_relation_name",
         )?;
-        validate_nonblank(
-            &column_name,
-            "relation_partition_type_modifier_column_name",
-        )?;
+        validate_nonblank(&column_name, "relation_partition_type_modifier_column_name")?;
         Ok(Self {
             schema_name,
             relation_name,
@@ -242,14 +239,19 @@ impl RelationPartitionTypeModifierSnapshot {
     ) -> Result<Self, ObservationError> {
         validate_predecessor(base_snapshot, relation_partition_snapshot)?;
         let observations = canonicalize_type_modifiers(base_snapshot, observations)?;
-        validate_partition_type_modifiers(relation_partition_snapshot.observations(), &observations)?;
+        validate_partition_type_modifiers(
+            relation_partition_snapshot.observations(),
+            &observations,
+        )?;
         let snapshot_digest = compute_type_modifier_digest(
             relation_partition_snapshot.snapshot_digest(),
             &observations,
         );
 
         Ok(Self {
-            source_connection_key: relation_partition_snapshot.source_connection_key().to_owned(),
+            source_connection_key: relation_partition_snapshot
+                .source_connection_key()
+                .to_owned(),
             connection_policy_binding: relation_partition_snapshot
                 .connection_policy_binding()
                 .to_owned(),
@@ -393,7 +395,9 @@ fn canonicalize_type_modifiers(
         .collect::<BTreeSet<_>>();
 
     if observed_coordinates.len() != observations.len() {
-        return Err(invalid("relation_partition_column_type_modifier_coordinate"));
+        return Err(invalid(
+            "relation_partition_column_type_modifier_coordinate",
+        ));
     }
     if observed_coordinates != expected_coordinates {
         return Err(invalid(
@@ -422,7 +426,10 @@ fn validate_partition_type_modifiers(
         })
         .collect::<BTreeMap<_, _>>();
 
-    for membership in memberships.iter().filter(|membership| membership.is_partition()) {
+    for membership in memberships
+        .iter()
+        .filter(|membership| membership.is_partition())
+    {
         let Some(parent) = membership.parent_relation() else {
             continue;
         };
@@ -438,9 +445,9 @@ fn validate_partition_type_modifiers(
                 RelationKind::PartitionedTable.token().to_owned(),
                 child.column_name().to_owned(),
             );
-            let parent_type_modifier = by_coordinate.get(&parent_key).ok_or_else(|| {
-                invalid("relation_partition_column_type_modifier_completeness")
-            })?;
+            let parent_type_modifier = by_coordinate
+                .get(&parent_key)
+                .ok_or_else(|| invalid("relation_partition_column_type_modifier_completeness"))?;
             if *parent_type_modifier != child.type_modifier() {
                 return Err(invalid("relation_partition_column_type_modifier"));
             }

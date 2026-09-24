@@ -14,8 +14,10 @@ fn relation_fixture() -> RelationObservation {
         "public",
         "items",
         RelationKind::Table,
-        vec![ColumnObservationV3::new("id", 1, "text", catalog_text(), false, None)
-            .expect("fixture column is valid")],
+        vec![
+            ColumnObservationV3::new("id", 1, "text", catalog_text(), false, None)
+                .expect("fixture column is valid"),
+        ],
     )
     .expect("fixture relation is valid")
 }
@@ -25,8 +27,10 @@ fn index_with_access_method(access_method: &str) -> IndexObservation {
         "items_idx",
         false,
         None,
-        vec![IndexAttributeObservation::column(1, IndexAttributeKind::Key, "id")
-            .expect("fixture attribute is valid")],
+        vec![
+            IndexAttributeObservation::column(1, IndexAttributeKind::Key, "id")
+                .expect("fixture attribute is valid"),
+        ],
         vec![],
     )
     .expect("fixture index is valid")
@@ -73,13 +77,8 @@ fn representation_v3_catalog_identifiers_preserve_quoted_whitespace() {
         .expect("quoted index identifiers may contain whitespace");
     assert_eq!(index.index_name(), "\t ");
 
-    let location = SchemaObjectLocation::constraint(
-        " \t",
-        "\t ",
-        RelationKind::Table,
-        "  ",
-    )
-    .expect("quoted successor coordinates may contain whitespace");
+    let location = SchemaObjectLocation::constraint(" \t", "\t ", RelationKind::Table, "  ")
+        .expect("quoted successor coordinates may contain whitespace");
     assert_eq!(location.schema_name(), " \t");
     assert_eq!(location.relation_name(), Some("\t "));
     assert_eq!(location.constraint_name(), Some("  "));
@@ -87,23 +86,32 @@ fn representation_v3_catalog_identifiers_preserve_quoted_whitespace() {
 
 #[test]
 fn representation_v3_catalog_identifiers_reject_empty_and_code_zero() {
-    assert!(DomainCheckConstraintObservation::new("bad\0constraint", "VALUE IS NOT NULL", true, true).is_err());
+    assert!(
+        DomainCheckConstraintObservation::new("bad\0constraint", "VALUE IS NOT NULL", true, true)
+            .is_err()
+    );
     assert!(DomainObservation::new("", "domain_name", catalog_text()).is_err());
     assert!(EnumObservation::new("public", "bad\0enum", vec![]).is_err());
-    assert!(RelationObservation::new("public", "bad\0relation", RelationKind::Table, vec![]).is_err());
+    assert!(
+        RelationObservation::new("public", "bad\0relation", RelationKind::Table, vec![]).is_err()
+    );
     assert!(IndexAttributeObservation::column(1, IndexAttributeKind::Key, "bad\0column").is_err());
     assert!(
         IndexObservation::new(
             "bad\0index",
             false,
             None,
-            vec![IndexAttributeObservation::column(1, IndexAttributeKind::Key, "id")
-                .expect("fixture attribute is valid")],
+            vec![
+                IndexAttributeObservation::column(1, IndexAttributeKind::Key, "id")
+                    .expect("fixture attribute is valid")
+            ],
             vec![],
         )
         .is_err()
     );
-    assert!(SchemaObjectLocation::relation("bad\0schema", "relation", RelationKind::Table).is_err());
+    assert!(
+        SchemaObjectLocation::relation("bad\0schema", "relation", RelationKind::Table).is_err()
+    );
 }
 
 #[test]

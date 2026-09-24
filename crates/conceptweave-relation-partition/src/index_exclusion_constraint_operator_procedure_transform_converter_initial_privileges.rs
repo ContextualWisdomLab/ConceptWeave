@@ -92,7 +92,9 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialExe
 impl fmt::Debug for IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant")
+            .debug_struct(
+                "IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant",
+            )
             .field("grantee", &self.grantee)
             .field("grantor", &self.grantor)
             .field("grant_option", &self.grant_option)
@@ -262,7 +264,10 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGr
     /// Returns whether this grant targets PostgreSQL `PUBLIC`.
     #[must_use]
     pub fn is_public_grantee(&self) -> bool {
-        matches!(self.grantee, TransformConverterInitialExecuteGrantee::Public)
+        matches!(
+            self.grantee,
+            TransformConverterInitialExecuteGrantee::Public
+        )
     }
 
     /// Returns the resolved grantee role name, when same-generation role lookup succeeded.
@@ -323,7 +328,9 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialPri
     digest: String,
 }
 
-impl fmt::Debug for IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial {
+impl fmt::Debug
+    for IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial
+{
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct(
@@ -347,7 +354,9 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
         let unresolved_grantee_oids = grants
             .iter()
             .filter_map(|grant| match &grant.grantee {
-                TransformConverterInitialExecuteGrantee::UnresolvedRoleOid(role_oid) => Some(*role_oid),
+                TransformConverterInitialExecuteGrantee::UnresolvedRoleOid(role_oid) => {
+                    Some(*role_oid)
+                }
                 TransformConverterInitialExecuteGrantee::Public
                 | TransformConverterInitialExecuteGrantee::Role(_) => None,
             })
@@ -357,7 +366,9 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
         let unresolved_grantor_oids = grants
             .iter()
             .filter_map(|grant| match &grant.grantor {
-                TransformConverterInitialExecuteGrantor::UnresolvedRoleOid(role_oid) => Some(*role_oid),
+                TransformConverterInitialExecuteGrantor::UnresolvedRoleOid(role_oid) => {
+                    Some(*role_oid)
+                }
                 TransformConverterInitialExecuteGrantor::Role(_) => None,
             })
             .collect::<BTreeSet<_>>()
@@ -477,7 +488,8 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialPri
     direction: IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
     converter_schema_name: String,
     converter_function_name: String,
-    initial_privileges: Option<IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial>,
+    initial_privileges:
+        Option<IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial>,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeObservation {
@@ -489,7 +501,9 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
         direction: IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
         converter_schema_name: impl Into<String>,
         converter_function_name: impl Into<String>,
-        initial_privileges: Option<IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial>,
+        initial_privileges: Option<
+            IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial,
+        >,
     ) -> Result<Self, ObservationError> {
         if key_position == 0 {
             return Err(ObservationError::InvalidOrdinalPosition);
@@ -557,7 +571,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
     #[must_use]
     pub const fn initial_privileges(
         &self,
-    ) -> Option<&IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial> {
+    ) -> Option<&IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial>
+    {
         self.initial_privileges.as_ref()
     }
 
@@ -575,13 +590,15 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
 
 /// Immutable provenance receipt for one converter-function initial-privilege observation.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSourceReceipt {
+pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSourceReceipt
+{
     source_id: String,
     connection_policy_binding: String,
     source_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
-    location: IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeObservation,
+    location:
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeObservation,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSourceReceipt {
@@ -619,7 +636,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
     #[must_use]
     pub const fn location(
         &self,
-    ) -> &IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeObservation {
+    ) -> &IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeObservation
+    {
         &self.location
     }
 }
@@ -633,14 +651,17 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterInitialPri
     converter_snapshot_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
-    observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeObservation>,
+    observations:
+        Vec<IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeObservation>,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot {
     /// Creates complete same-generation `pg_init_privs` evidence for every converter direction.
     pub fn new(
         security_label_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelSnapshot,
-        mut observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeObservation>,
+        mut observations: Vec<
+            IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeObservation,
+        >,
     ) -> Result<Self, ObservationError> {
         observations.sort_by_key(initial_privilege_key);
 
@@ -701,9 +722,13 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
         );
         Ok(Self {
             source_connection_key: security_label_snapshot.source_connection_key().to_owned(),
-            connection_policy_binding: security_label_snapshot.connection_policy_binding().to_owned(),
+            connection_policy_binding: security_label_snapshot
+                .connection_policy_binding()
+                .to_owned(),
             snapshot_digest,
-            converter_snapshot_digest: security_label_snapshot.converter_snapshot_digest().to_owned(),
+            converter_snapshot_digest: security_label_snapshot
+                .converter_snapshot_digest()
+                .to_owned(),
             extractor_revision: security_label_snapshot.extractor_revision().to_owned(),
             observed_at_utc: security_label_snapshot.observed_at_utc().to_owned(),
             observations,
@@ -750,7 +775,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilege
     #[must_use]
     pub fn observations(
         &self,
-    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeObservation] {
+    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeObservation]
+    {
         &self.observations
     }
 
@@ -926,7 +952,10 @@ fn encode_str(hasher: &mut Sha256, value: &str) {
     hasher.update(value.as_bytes());
 }
 
-fn validate_postgresql_identifier(value: &str, field: &'static str) -> Result<(), ObservationError> {
+fn validate_postgresql_identifier(
+    value: &str,
+    field: &'static str,
+) -> Result<(), ObservationError> {
     if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }

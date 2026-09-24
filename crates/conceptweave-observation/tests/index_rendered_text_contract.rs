@@ -15,13 +15,8 @@ fn relation() -> RelationObservation {
     )
     .expect("column fixture is valid");
 
-    RelationObservation::new(
-        "public",
-        "event_record",
-        RelationKind::Table,
-        vec![column],
-    )
-    .expect("relation fixture is valid")
+    RelationObservation::new("public", "event_record", RelationKind::Table, vec![column])
+        .expect("relation fixture is valid")
 }
 
 fn complete_index() -> IndexObservation {
@@ -70,8 +65,7 @@ fn relation_rejects_whitespace_only_reconstructed_index_definition() {
 #[test]
 fn relation_preserves_exact_nonblank_rendered_index_text() {
     let predicate = " (event_key IS NOT NULL) ";
-    let definition =
-        "\tCREATE INDEX event_key_ix ON public.event_record USING btree (event_key) WHERE (event_key IS NOT NULL)\n";
+    let definition = "\tCREATE INDEX event_key_ix ON public.event_record USING btree (event_key) WHERE (event_key IS NOT NULL)\n";
     let observed = relation()
         .with_indexes(vec![
             complete_index()

@@ -11,21 +11,15 @@ fn catalog_type(type_name: &str) -> QualifiedTypeName {
     QualifiedTypeName::new("pg_catalog", type_name).expect("catalog type coordinate is valid")
 }
 
-fn index(
-    index_name: &str,
-    primary: bool,
-    nulls_not_distinct: Option<bool>,
-) -> IndexObservation {
+fn index(index_name: &str, primary: bool, nulls_not_distinct: Option<bool>) -> IndexObservation {
     IndexObservation::new(
         index_name,
         true,
         nulls_not_distinct,
-        vec![IndexAttributeObservation::column(
-            1,
-            IndexAttributeKind::Key,
-            "document_id",
-        )
-        .expect("index key fixture is valid")],
+        vec![
+            IndexAttributeObservation::column(1, IndexAttributeKind::Key, "document_id")
+                .expect("index key fixture is valid"),
+        ],
         Vec::new(),
     )
     .expect("unique index fixture is structurally valid")
@@ -55,15 +49,17 @@ fn relation(
         "public",
         "document",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "document_id",
-            1,
-            "bigint",
-            catalog_type("int8"),
-            false,
-            None,
-        )
-        .expect("column fixture is valid")],
+        vec![
+            ColumnObservationV3::new(
+                "document_id",
+                1,
+                "bigint",
+                catalog_type("int8"),
+                false,
+                None,
+            )
+            .expect("column fixture is valid"),
+        ],
     )
     .expect("relation fixture is valid")
     .with_constraints(constraints)
@@ -121,7 +117,9 @@ fn primary_catalog_index_accepts_unobserved_null_treatment() {
         vec![primary_key()],
         index("document_pkey", true, None),
     ))
-    .expect("an adapter that did not observe null treatment must not be rejected as NULLS NOT DISTINCT");
+    .expect(
+        "an adapter that did not observe null treatment must not be rejected as NULLS NOT DISTINCT",
+    );
 }
 
 #[test]

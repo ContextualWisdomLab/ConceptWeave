@@ -67,15 +67,17 @@ fn relation(name: &str, kind: RelationKind) -> RelationObservation {
         "public",
         name,
         kind,
-        vec![ColumnObservationV3::new(
-            "metric_id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            false,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "metric_id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                false,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
 }
@@ -139,23 +141,12 @@ fn generation_snapshot(
 }
 
 fn identity_always(relation_name: &str, kind: RelationKind) -> ColumnIdentityObservation {
-    ColumnIdentityObservation::generated_always(
-        "public",
-        relation_name,
-        kind,
-        "metric_id",
-    )
-    .unwrap()
+    ColumnIdentityObservation::generated_always("public", relation_name, kind, "metric_id").unwrap()
 }
 
 fn identity_by_default(relation_name: &str, kind: RelationKind) -> ColumnIdentityObservation {
-    ColumnIdentityObservation::generated_by_default(
-        "public",
-        relation_name,
-        kind,
-        "metric_id",
-    )
-    .unwrap()
+    ColumnIdentityObservation::generated_by_default("public", relation_name, kind, "metric_id")
+        .unwrap()
 }
 
 fn generation_stored(relation_name: &str, kind: RelationKind) -> ColumnGenerationObservation {

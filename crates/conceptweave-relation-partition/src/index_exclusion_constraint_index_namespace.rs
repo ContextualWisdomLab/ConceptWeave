@@ -175,16 +175,12 @@ impl IndexExclusionConstraintIndexNamespaceSnapshot {
             if observation.index_schema_name() != observation.backing_index().schema_name()
                 || observation.index_schema_name() != observation.coordinate().schema_name()
             {
-                return Err(invalid(
-                    "index_exclusion_constraint_index_namespace_state",
-                ));
+                return Err(invalid("index_exclusion_constraint_index_namespace_state"));
             }
         }
 
-        let snapshot_digest = compute_index_namespace_digest(
-            index_name_snapshot.snapshot_digest(),
-            &observations,
-        );
+        let snapshot_digest =
+            compute_index_namespace_digest(index_name_snapshot.snapshot_digest(), &observations);
         Ok(Self {
             source_connection_key: index_name_snapshot.source_connection_key().to_owned(),
             connection_policy_binding: index_name_snapshot.connection_policy_binding().to_owned(),
@@ -295,7 +291,10 @@ fn compute_index_namespace_digest(
 }
 
 fn index_namespace_location(coordinate: &IndexExclusionConstraintCoordinate) -> String {
-    format!("{}/backing-index-namespace", coordinate.canonical_location())
+    format!(
+        "{}/backing-index-namespace",
+        coordinate.canonical_location()
+    )
 }
 
 fn encode_constraint_coordinate(

@@ -189,14 +189,17 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCo
     converter_snapshot_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
-    observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountObservation>,
+    observations:
+        Vec<IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountObservation>,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSnapshot {
     /// Creates complete raw argument-count evidence for every converter direction in the predecessor.
     pub fn new(
         return_set_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapshot,
-        mut observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountObservation>,
+        mut observations: Vec<
+            IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountObservation,
+        >,
     ) -> Result<Self, ObservationError> {
         observations.sort_by_key(argument_count_key);
 
@@ -306,7 +309,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSna
     #[must_use]
     pub fn observations(
         &self,
-    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountObservation] {
+    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountObservation]
+    {
         &self.observations
     }
 
@@ -338,14 +342,16 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSna
                     direction,
                 ),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureTransformConverterArgumentCountSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 

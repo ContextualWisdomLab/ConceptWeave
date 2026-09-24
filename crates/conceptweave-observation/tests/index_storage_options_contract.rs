@@ -127,10 +127,7 @@ fn unobserved_reloptions_do_not_collapse_into_observed_empty_set() {
 #[test]
 fn duplicate_storage_option_names_fail_closed() {
     let error = complete_index()
-        .with_storage_options(vec![
-            option("fillfactor", "70"),
-            option("fillfactor", "90"),
-        ])
+        .with_storage_options(vec![option("fillfactor", "70"), option("fillfactor", "90")])
         .expect_err("one exact option name cannot carry two observed values");
 
     assert_eq!(

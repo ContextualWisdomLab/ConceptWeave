@@ -9,7 +9,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use conceptweave_observation::{ObservationError, PostgresSchemaSnapshotV3, QualifiedCollationName};
+use conceptweave_observation::{
+    ObservationError, PostgresSchemaSnapshotV3, QualifiedCollationName,
+};
 use sha2::{Digest, Sha256};
 
 use crate::RelationPartitionSnapshot;
@@ -171,7 +173,10 @@ impl IndexExpressionCollationIdentityObservation {
         location: IndexExpressionCollationIdentityLocation,
         collation: CollationCatalogIdentity,
     ) -> Result<Self, ObservationError> {
-        Ok(Self { location, collation })
+        Ok(Self {
+            location,
+            collation,
+        })
     }
 
     /// Returns the exact canonical expression/predicate occurrence location.
@@ -200,7 +205,10 @@ impl IndexRelationVarCollationIdentityObservation {
         location: IndexExpressionRelationVarLocation,
         collation: Option<CollationCatalogIdentity>,
     ) -> Result<Self, ObservationError> {
-        Ok(Self { location, collation })
+        Ok(Self {
+            location,
+            collation,
+        })
     }
 
     /// Returns the exact canonical relation-`Var` leaf location.
@@ -291,22 +299,24 @@ impl IndexExpressionCollationIdentitySnapshot {
             return Err(invalid("index_expression_collation_predecessor_provenance"));
         }
 
-        let expression_observations = canonicalize_expression_collations(
-            expression_snapshot,
-            expression_observations,
-        )?;
+        let expression_observations =
+            canonicalize_expression_collations(expression_snapshot, expression_observations)?;
         let relation_var_observations = canonicalize_relation_var_collations(
             relation_var_predecessor,
             relation_var_observations,
         )?;
-        validate_attached_expression_collations(index_partition_snapshot, &expression_observations)?;
+        validate_attached_expression_collations(
+            index_partition_snapshot,
+            &expression_observations,
+        )?;
         validate_attached_relation_var_collations(
             index_partition_snapshot,
             &relation_var_observations,
         )?;
 
         let whole_tree_predecessor_digest = whole_tree_predecessor.snapshot_digest().to_owned();
-        let key_collation_predecessor_digest = key_collation_predecessor.snapshot_digest().to_owned();
+        let key_collation_predecessor_digest =
+            key_collation_predecessor.snapshot_digest().to_owned();
         let snapshot_digest = compute_digest(
             &whole_tree_predecessor_digest,
             &key_collation_predecessor_digest,
@@ -472,9 +482,9 @@ fn canonicalize_relation_var_collations(
         let expected_name = expected
             .get(&observation.location().canonical_location())
             .ok_or_else(|| invalid("index_relation_var_collation_catalog_coordinate"))?;
-        let actual_name = observation.collation().map(|collation| {
-            (collation.schema_name(), collation.collation_name())
-        });
+        let actual_name = observation
+            .collation()
+            .map(|collation| (collation.schema_name(), collation.collation_name()));
         let expected_name = expected_name
             .as_ref()
             .map(|collation| (collation.schema_name(), collation.collation_name()));
@@ -593,7 +603,8 @@ fn validate_attached_relation_var_collations(
             .iter()
             .filter(|observation| observation.location().index() == membership.coordinate())
         {
-            let parent_location = relation_var_location_with_index(child.location(), parent_index.clone());
+            let parent_location =
+                relation_var_location_with_index(child.location(), parent_index.clone());
             let parent = by_location
                 .get(&parent_location.canonical_location())
                 .ok_or_else(|| invalid("index_relation_var_collation_catalog_completeness"))?;
@@ -614,15 +625,12 @@ fn relation_var_location_with_index(
             key_position,
             leaf_position,
             ..
-        } => IndexExpressionRelationVarLocation::expression(
-            index,
-            *key_position,
-            *leaf_position,
-        )
-        .expect("an existing relation-Var location has positive positions"),
-        IndexExpressionRelationVarLocation::Predicate { leaf_position, .. } =>
+        } => IndexExpressionRelationVarLocation::expression(index, *key_position, *leaf_position)
+            .expect("an existing relation-Var location has positive positions"),
+        IndexExpressionRelationVarLocation::Predicate { leaf_position, .. } => {
             IndexExpressionRelationVarLocation::predicate(index, *leaf_position)
-                .expect("an existing relation-Var location has a positive position"),
+                .expect("an existing relation-Var location has a positive position")
+        }
     }
 }
 

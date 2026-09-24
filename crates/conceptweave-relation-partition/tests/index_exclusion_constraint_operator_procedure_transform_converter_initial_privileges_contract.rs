@@ -1,4 +1,6 @@
-include!("index_exclusion_constraint_operator_procedure_transform_converter_security_label_contract.rs");
+include!(
+    "index_exclusion_constraint_operator_procedure_transform_converter_security_label_contract.rs"
+);
 
 use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant,
@@ -8,8 +10,8 @@ use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeType,
 };
 
-fn converter_security_label_snapshot(
-) -> IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelSnapshot {
+fn converter_security_label_snapshot()
+-> IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelSnapshot {
     let predecessor = converter_auto_extension_dependency_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelSnapshot::new(
         &predecessor,
@@ -58,7 +60,9 @@ fn extension_initial_privileges(
 fn initial_privilege_observation(
     direction: IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
     function_name: &str,
-    initial_privileges: Option<IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial>,
+    initial_privileges: Option<
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial,
+    >,
 ) -> IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeObservation {
     IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeObservation::new(
         coordinate(),
@@ -72,8 +76,8 @@ fn initial_privilege_observation(
     .unwrap()
 }
 
-fn complete_initial_privilege_observations(
-) -> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeObservation> {
+fn complete_initial_privilege_observations()
+-> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeObservation> {
     vec![
         initial_privilege_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
@@ -91,26 +95,27 @@ fn complete_initial_privilege_observations(
 #[test]
 fn ordinary_exclude_converter_initial_privileges_distinguish_absent_and_extension_baselines() {
     let predecessor = converter_security_label_snapshot();
-    let absent = IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot::new(
-        &predecessor,
-        complete_initial_privilege_observations(),
-    )
-    .unwrap();
+    let absent =
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot::new(
+            &predecessor,
+            complete_initial_privilege_observations(),
+        )
+        .unwrap();
 
     let mut extension_observations = complete_initial_privilege_observations();
     extension_observations[0] = initial_privilege_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "payload_from_sql",
         Some(extension_initial_privileges(vec![initial_public_execute(
-            "postgres",
-            false,
+            "postgres", false,
         )])),
     );
-    let extension = IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot::new(
-        &predecessor,
-        extension_observations,
-    )
-    .unwrap();
+    let extension =
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot::new(
+            &predecessor,
+            extension_observations,
+        )
+        .unwrap();
 
     assert!(absent.observations()[0].initial_privileges().is_none());
     let material = extension.observations()[0].initial_privileges().unwrap();
@@ -165,11 +170,12 @@ fn ordinary_exclude_converter_initial_privileges_preserve_privtype_and_source_ac
         "payload_from_sql",
         Some(left_material),
     );
-    let extension = IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot::new(
-        &predecessor,
-        extension_observations,
-    )
-    .unwrap();
+    let extension =
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot::new(
+            &predecessor,
+            extension_observations,
+        )
+        .unwrap();
 
     let mut initdb_observations = complete_initial_privilege_observations();
     initdb_observations[0] = initial_privilege_observation(
@@ -177,16 +183,18 @@ fn ordinary_exclude_converter_initial_privileges_preserve_privtype_and_source_ac
         "payload_from_sql",
         Some(initdb_material),
     );
-    let initdb = IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot::new(
-        &predecessor,
-        initdb_observations,
-    )
-    .unwrap();
+    let initdb =
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot::new(
+            &predecessor,
+            initdb_observations,
+        )
+        .unwrap();
     assert_ne!(extension.snapshot_digest(), initdb.snapshot_digest());
 }
 
 #[test]
-fn ordinary_exclude_converter_initial_privileges_preserve_duplicate_acl_entries_and_postgresql_identifier_content() {
+fn ordinary_exclude_converter_initial_privileges_preserve_duplicate_acl_entries_and_postgresql_identifier_content()
+ {
     let single = extension_initial_privileges(vec![initial_public_execute("postgres", false)]);
     let duplicate = extension_initial_privileges(vec![
         initial_public_execute("postgres", false),
@@ -200,17 +208,10 @@ fn ordinary_exclude_converter_initial_privileges_preserve_duplicate_acl_entries_
 
     let quoted_whitespace =
         IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::role(
-            20,
-            "  ",
-            10,
-            "\t",
-            false,
+            20, "  ", 10, "\t", false,
         )
         .expect("quoted PostgreSQL role identifiers may consist of whitespace");
-    assert_eq!(
-        quoted_whitespace.resolved_grantee_role_name(),
-        Some("  ")
-    );
+    assert_eq!(quoted_whitespace.resolved_grantee_role_name(), Some("  "));
     assert_eq!(quoted_whitespace.resolved_grantor_role_name(), Some("\t"));
 
     let quoted_converter =
@@ -229,11 +230,7 @@ fn ordinary_exclude_converter_initial_privileges_preserve_duplicate_acl_entries_
 
     let empty =
         IndexExclusionConstraintOperatorProcedureTransformConverterInitialExecuteGrant::role(
-            20,
-            "",
-            10,
-            "postgres",
-            false,
+            20, "", 10, "postgres", false,
         )
         .expect_err("zero-length PostgreSQL role identifiers remain invalid");
     assert_field(
@@ -302,17 +299,19 @@ fn ordinary_exclude_converter_initial_privileges_bind_resolved_acl_oid_identity(
 }
 
 #[test]
-fn ordinary_exclude_converter_initial_privileges_reject_completeness_binding_and_duplicate_coordinates() {
+fn ordinary_exclude_converter_initial_privileges_reject_completeness_binding_and_duplicate_coordinates()
+ {
     let predecessor = converter_security_label_snapshot();
-    let missing = IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot::new(
-        &predecessor,
-        vec![initial_privilege_observation(
-            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-            "payload_from_sql",
-            None,
-        )],
-    )
-    .expect_err("every converter direction needs explicit pg_init_privs evidence");
+    let missing =
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot::new(
+            &predecessor,
+            vec![initial_privilege_observation(
+                IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+                "payload_from_sql",
+                None,
+            )],
+        )
+        .expect_err("every converter direction needs explicit pg_init_privs evidence");
     assert_field(
         missing,
         "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_completeness",
@@ -323,11 +322,12 @@ fn ordinary_exclude_converter_initial_privileges_reject_completeness_binding_and
         "payload_from_sql",
         None,
     );
-    let duplicate = IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot::new(
-        &predecessor,
-        vec![observation.clone(), observation],
-    )
-    .expect_err("duplicate converter coordinates must not collapse");
+    let duplicate =
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot::new(
+            &predecessor,
+            vec![observation.clone(), observation],
+        )
+        .expect_err("duplicate converter coordinates must not collapse");
     assert_field(
         duplicate,
         "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_coordinate",
@@ -339,11 +339,12 @@ fn ordinary_exclude_converter_initial_privileges_reject_completeness_binding_and
         "different_from_sql",
         None,
     );
-    let binding = IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot::new(
-        &predecessor,
-        drift,
-    )
-    .expect_err("initial privileges must remain bound to the exact converter function");
+    let binding =
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot::new(
+            &predecessor,
+            drift,
+        )
+        .expect_err("initial privileges must remain bound to the exact converter function");
     assert_field(
         binding,
         "index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_binding",
@@ -353,12 +354,16 @@ fn ordinary_exclude_converter_initial_privileges_reject_completeness_binding_and
 #[test]
 fn ordinary_exclude_converter_initial_privileges_preserve_raw_root_location_and_exact_receipt() {
     let predecessor = converter_security_label_snapshot();
-    let snapshot = IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot::new(
-        &predecessor,
-        complete_initial_privilege_observations(),
-    )
-    .unwrap();
-    assert_eq!(snapshot.converter_snapshot_digest(), predecessor.converter_snapshot_digest());
+    let snapshot =
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot::new(
+            &predecessor,
+            complete_initial_privilege_observations(),
+        )
+        .unwrap();
+    assert_eq!(
+        snapshot.converter_snapshot_digest(),
+        predecessor.converter_snapshot_digest()
+    );
 
     let receipt = snapshot
         .source_receipt(
@@ -403,5 +408,8 @@ fn ordinary_exclude_converter_initial_privileges_preserve_raw_root_location_and_
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         )
         .expect_err("receipt lookup remains exact-coordinate bound");
-    assert!(matches!(missing, ObservationError::UnknownObservationLocation { .. }));
+    assert!(matches!(
+        missing,
+        ObservationError::UnknownObservationLocation { .. }
+    ));
 }

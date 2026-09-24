@@ -183,23 +183,17 @@ impl IndexExclusionConstraintOperatorKindSnapshot {
                     candidate.coordinate() == observation.coordinate()
                         && candidate.key_position() == observation.key_position()
                 })
-                .ok_or_else(|| {
-                    invalid("index_exclusion_constraint_operator_kind_completeness")
-                })?;
+                .ok_or_else(|| invalid("index_exclusion_constraint_operator_kind_completeness"))?;
             if predecessor.operator() != observation.operator() {
-                return Err(invalid(
-                    "index_exclusion_constraint_operator_kind_binding",
-                ));
+                return Err(invalid("index_exclusion_constraint_operator_kind_binding"));
             }
             if observation.operator_kind() != 'b' {
                 return Err(invalid("index_exclusion_constraint_operator_kind_state"));
             }
         }
 
-        let snapshot_digest = compute_operator_kind_digest(
-            result_snapshot.snapshot_digest(),
-            &observations,
-        );
+        let snapshot_digest =
+            compute_operator_kind_digest(result_snapshot.snapshot_digest(), &observations);
         Ok(Self {
             source_connection_key: result_snapshot.source_connection_key().to_owned(),
             connection_policy_binding: result_snapshot.connection_policy_binding().to_owned(),
@@ -314,10 +308,7 @@ fn encode_operator(hasher: &mut Sha256, operator: &QualifiedOperatorSignature) {
     encode_type(hasher, operator.right_type());
 }
 
-fn encode_type(
-    hasher: &mut Sha256,
-    qualified_type: &conceptweave_observation::QualifiedTypeName,
-) {
+fn encode_type(hasher: &mut Sha256, qualified_type: &conceptweave_observation::QualifiedTypeName) {
     encode_str(hasher, qualified_type.schema_name());
     encode_str(hasher, qualified_type.type_name());
 }

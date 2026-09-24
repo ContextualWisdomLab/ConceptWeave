@@ -151,14 +151,18 @@ impl IndexExclusionConstraintKeySnapshot {
             constraint_snapshot.observations().to_vec(),
         )?;
         if rebound_constraint.snapshot_digest() != constraint_snapshot.snapshot_digest() {
-            return Err(invalid("index_exclusion_constraint_key_predecessor_binding"));
+            return Err(invalid(
+                "index_exclusion_constraint_key_predecessor_binding",
+            ));
         }
         let rebound_period = IndexExclusionConstraintPeriodSnapshot::new(
             &rebound_constraint,
             period_snapshot.observations().to_vec(),
         )?;
         if rebound_period.snapshot_digest() != period_snapshot.snapshot_digest() {
-            return Err(invalid("index_exclusion_constraint_key_predecessor_binding"));
+            return Err(invalid(
+                "index_exclusion_constraint_key_predecessor_binding",
+            ));
         }
 
         observations.sort_by(|left, right| left.coordinate().cmp(right.coordinate()));

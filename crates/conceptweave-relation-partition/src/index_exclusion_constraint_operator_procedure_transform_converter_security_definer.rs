@@ -169,7 +169,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerS
     #[must_use]
     pub const fn location(
         &self,
-    ) -> &IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerObservation {
+    ) -> &IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerObservation
+    {
         &self.location
     }
 }
@@ -257,9 +258,13 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerS
         );
         Ok(Self {
             source_connection_key: configuration_snapshot.source_connection_key().to_owned(),
-            connection_policy_binding: configuration_snapshot.connection_policy_binding().to_owned(),
+            connection_policy_binding: configuration_snapshot
+                .connection_policy_binding()
+                .to_owned(),
             snapshot_digest,
-            converter_snapshot_digest: configuration_snapshot.converter_snapshot_digest().to_owned(),
+            converter_snapshot_digest: configuration_snapshot
+                .converter_snapshot_digest()
+                .to_owned(),
             extractor_revision: configuration_snapshot.extractor_revision().to_owned(),
             observed_at_utc: configuration_snapshot.observed_at_utc().to_owned(),
             observations,
@@ -306,7 +311,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerS
     #[must_use]
     pub fn observations(
         &self,
-    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerObservation] {
+    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerObservation]
+    {
         &self.observations
     }
 

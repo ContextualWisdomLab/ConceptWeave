@@ -188,14 +188,17 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetS
     converter_snapshot_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
-    observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetObservation>,
+    observations:
+        Vec<IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetObservation>,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapshot {
     /// Creates complete set-return evidence for every converter direction in the predecessor.
     pub fn new(
         kind_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterKindSnapshot,
-        mut observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetObservation>,
+        mut observations: Vec<
+            IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetObservation,
+        >,
     ) -> Result<Self, ObservationError> {
         observations.sort_by_key(return_set_key);
 
@@ -337,14 +340,16 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapsho
                     direction,
                 ),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 

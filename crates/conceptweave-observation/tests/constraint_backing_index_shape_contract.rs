@@ -94,7 +94,9 @@ fn backing_index(
     .with_access_method("btree")
     .with_key_semantics(key_semantics(key_count))
     .expect("one semantic record matches each structural key")
-    .with_catalog_flags(IndexCatalogFlags::new(false, false, true, false, false, false))
+    .with_catalog_flags(IndexCatalogFlags::new(
+        false, false, true, false, false, false,
+    ))
     .expect("unique non-primary catalog flags are valid")
     .with_ready(true)
     .with_valid(true)
@@ -105,17 +107,12 @@ fn snapshot(
     constraint: TableConstraintObservation,
     index: IndexObservation,
 ) -> Result<PostgresSchemaSnapshotV3, ObservationError> {
-    let relation = RelationObservation::new(
-        "public",
-        "document",
-        RelationKind::Table,
-        columns(),
-    )
-    .expect("relation fixture is valid")
-    .with_constraints(vec![constraint])
-    .expect("constraint fixture is valid")
-    .with_indexes(vec![index])
-    .expect("index fixture is valid");
+    let relation = RelationObservation::new("public", "document", RelationKind::Table, columns())
+        .expect("relation fixture is valid")
+        .with_constraints(vec![constraint])
+        .expect("constraint fixture is valid")
+        .with_indexes(vec![index])
+        .expect("index fixture is valid");
 
     let timing = ConstraintTimingObservation::new(
         "public",
@@ -171,12 +168,8 @@ fn key_constraint_rejects_expression_or_partial_backing_index() {
 
     assert_backing_index_error(snapshot(
         unique_constraint(&["document_id"], Some(false)),
-        backing_index(
-            vec![simple_key(1, "document_id")],
-            Vec::new(),
-            Some(false),
-        )
-        .with_predicate("tenant_id > 0"),
+        backing_index(vec![simple_key(1, "document_id")], Vec::new(), Some(false))
+            .with_predicate("tenant_id > 0"),
     ));
 }
 
@@ -184,20 +177,12 @@ fn key_constraint_rejects_expression_or_partial_backing_index() {
 fn observed_unique_null_treatment_must_match_backing_index() {
     assert_backing_index_error(snapshot(
         unique_constraint(&["document_id"], Some(true)),
-        backing_index(
-            vec![simple_key(1, "document_id")],
-            Vec::new(),
-            Some(false),
-        ),
+        backing_index(vec![simple_key(1, "document_id")], Vec::new(), Some(false)),
     ));
 
     assert_backing_index_error(snapshot(
         unique_constraint(&["document_id"], Some(false)),
-        backing_index(
-            vec![simple_key(1, "document_id")],
-            Vec::new(),
-            Some(true),
-        ),
+        backing_index(vec![simple_key(1, "document_id")], Vec::new(), Some(true)),
     ));
 }
 

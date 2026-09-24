@@ -20,9 +20,8 @@ use conceptweave_observation::ObservationError;
 use sha2::{Digest, Sha256};
 
 use super::{
-    IndexExclusionConstraintCoordinate,
-    IndexExclusionConstraintOperatorProcedureLeakproofSnapshot, QualifiedOperatorSignature,
-    QualifiedProcedureSignature,
+    IndexExclusionConstraintCoordinate, IndexExclusionConstraintOperatorProcedureLeakproofSnapshot,
+    QualifiedOperatorSignature, QualifiedProcedureSignature,
 };
 
 const INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_DEFINITION_DIGEST_DOMAIN_V1: &[u8] =
@@ -200,7 +199,9 @@ impl IndexExclusionConstraintOperatorProcedureDefinitionSourceReceipt {
 
     /// Returns the exact validated implementation-definition observation.
     #[must_use]
-    pub const fn location(&self) -> &IndexExclusionConstraintOperatorProcedureDefinitionObservation {
+    pub const fn location(
+        &self,
+    ) -> &IndexExclusionConstraintOperatorProcedureDefinitionObservation {
         &self.location
     }
 }
@@ -261,9 +262,7 @@ impl IndexExclusionConstraintOperatorProcedureDefinitionSnapshot {
                         && candidate.key_position() == observation.key_position()
                 })
                 .ok_or_else(|| {
-                    invalid(
-                        "index_exclusion_constraint_operator_procedure_definition_completeness",
-                    )
+                    invalid("index_exclusion_constraint_operator_procedure_definition_completeness")
                 })?;
             if predecessor.operator() != observation.operator()
                 || predecessor.procedure() != observation.procedure()
@@ -320,7 +319,9 @@ impl IndexExclusionConstraintOperatorProcedureDefinitionSnapshot {
 
     /// Returns complete definition observations in deterministic constraint/key order.
     #[must_use]
-    pub fn observations(&self) -> &[IndexExclusionConstraintOperatorProcedureDefinitionObservation] {
+    pub fn observations(
+        &self,
+    ) -> &[IndexExclusionConstraintOperatorProcedureDefinitionObservation] {
         &self.observations
     }
 
@@ -341,14 +342,16 @@ impl IndexExclusionConstraintOperatorProcedureDefinitionSnapshot {
             .ok_or_else(|| ObservationError::UnknownObservationLocation {
                 location: procedure_definition_location(&coordinate, key_position),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureDefinitionSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureDefinitionSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 
@@ -359,7 +362,8 @@ fn compute_definition_material_digest(
     prosqlbody: Option<&str>,
 ) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_DEFINITION_MATERIAL_DIGEST_DOMAIN_V1);
+    hasher
+        .update(INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_DEFINITION_MATERIAL_DIGEST_DOMAIN_V1);
     encode_str(&mut hasher, language_name);
     encode_str(&mut hasher, prosrc);
     encode_optional_str(&mut hasher, probin);
@@ -419,10 +423,7 @@ fn encode_procedure(hasher: &mut Sha256, procedure: &QualifiedProcedureSignature
     }
 }
 
-fn encode_type(
-    hasher: &mut Sha256,
-    qualified_type: &conceptweave_observation::QualifiedTypeName,
-) {
+fn encode_type(hasher: &mut Sha256, qualified_type: &conceptweave_observation::QualifiedTypeName) {
     encode_str(hasher, qualified_type.schema_name());
     encode_str(hasher, qualified_type.type_name());
 }

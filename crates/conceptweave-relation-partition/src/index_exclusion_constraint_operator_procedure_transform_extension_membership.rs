@@ -168,7 +168,8 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformExtensionMembership
     snapshot_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
-    observations: Vec<IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipObservation>,
+    observations:
+        Vec<IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipObservation>,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapshot {
@@ -182,7 +183,9 @@ impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapsh
     pub fn new(
         converter_initial_privilege_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot,
         transform_converter_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot,
-        mut observations: Vec<IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipObservation>,
+        mut observations: Vec<
+            IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipObservation,
+        >,
     ) -> Result<Self, ObservationError> {
         if converter_initial_privilege_snapshot.source_connection_key()
             != transform_converter_snapshot.source_connection_key()
@@ -312,8 +315,12 @@ impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapsh
                 .connection_policy_binding()
                 .to_owned(),
             snapshot_digest,
-            extractor_revision: converter_initial_privilege_snapshot.extractor_revision().to_owned(),
-            observed_at_utc: converter_initial_privilege_snapshot.observed_at_utc().to_owned(),
+            extractor_revision: converter_initial_privilege_snapshot
+                .extractor_revision()
+                .to_owned(),
+            observed_at_utc: converter_initial_privilege_snapshot
+                .observed_at_utc()
+                .to_owned(),
             observations,
         })
     }
@@ -384,14 +391,16 @@ impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapsh
                     target_language_name,
                 ),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 
@@ -516,7 +525,10 @@ fn encode_str(hasher: &mut Sha256, value: &str) {
     hasher.update(value.as_bytes());
 }
 
-fn validate_postgresql_identifier(value: &str, field: &'static str) -> Result<(), ObservationError> {
+fn validate_postgresql_identifier(
+    value: &str,
+    field: &'static str,
+) -> Result<(), ObservationError> {
     if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }

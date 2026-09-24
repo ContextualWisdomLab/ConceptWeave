@@ -276,12 +276,7 @@ fn attached_child_must_preserve_key_and_include_cardinality() {
 
 #[test]
 fn matching_modeled_attribute_mapping_remains_admissible() {
-    let (base, relations) = snapshots(
-        &["account_id"],
-        &["payload"],
-        &["account_id"],
-        &["payload"],
-    );
+    let (base, relations) = snapshots(&["account_id"], &["payload"], &["account_id"], &["payload"]);
 
     attached_snapshot(&base, &relations)
         .expect("matching key and INCLUDE column mapping must remain admissible");

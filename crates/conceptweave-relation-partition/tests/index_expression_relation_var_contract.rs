@@ -52,10 +52,16 @@ fn relation_var_observation_preserves_postgresql_equal_state_without_raw_rte_or_
     assert_eq!(observation.value_type(), &text_type());
     assert_eq!(observation.type_modifier(), -1);
     assert_eq!(observation.collation(), Some(&c_collation()));
-    assert_eq!(observation.relation_role(), RelationVarRelationRole::IndexRelation);
+    assert_eq!(
+        observation.relation_role(),
+        RelationVarRelationRole::IndexRelation
+    );
     assert!(observation.nulling_relations_empty());
     assert_eq!(observation.levels_up(), 0);
-    assert_eq!(observation.returning_type(), RelationVarReturningType::Default);
+    assert_eq!(
+        observation.returning_type(),
+        RelationVarReturningType::Default
+    );
 }
 
 #[test]

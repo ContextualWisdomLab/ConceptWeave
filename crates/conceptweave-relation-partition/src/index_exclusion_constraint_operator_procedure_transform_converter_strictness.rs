@@ -189,7 +189,8 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterStrictness
     converter_snapshot_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
-    observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessObservation>,
+    observations:
+        Vec<IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessObservation>,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessSnapshot {
@@ -340,14 +341,16 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessSnapsh
                     direction,
                 ),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 

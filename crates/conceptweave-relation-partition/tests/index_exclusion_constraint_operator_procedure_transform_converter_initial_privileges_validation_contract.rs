@@ -3,17 +3,23 @@
 //! Reuse the full Source Observation fixture chain so validation is exercised against owner-issued
 //! provenance rather than detached ACL material.
 
-include!("index_exclusion_constraint_operator_procedure_transform_converter_initial_privileges_contract.rs");
+include!(
+    "index_exclusion_constraint_operator_procedure_transform_converter_initial_privileges_contract.rs"
+);
 
 use conceptweave_relation_partition::{
-    validate_index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_recovery,
     IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeRecoveryValidation,
     IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSourceReceipt,
+    validate_index_exclusion_constraint_operator_procedure_transform_converter_initial_privilege_recovery,
 };
 
 fn initial_privilege_snapshot_with_materials(
-    from_sql: Option<IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial>,
-    to_sql: Option<IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial>,
+    from_sql: Option<
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial,
+    >,
+    to_sql: Option<
+        IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeMaterial,
+    >,
 ) -> IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot {
     let predecessor = converter_security_label_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterInitialPrivilegeSnapshot::new(
@@ -44,7 +50,10 @@ fn assert_exact_receipt_binding(
         receipt.connection_policy_binding()
     );
     assert_eq!(validation.source_digest(), receipt.source_digest());
-    assert_eq!(validation.extractor_revision(), receipt.extractor_revision());
+    assert_eq!(
+        validation.extractor_revision(),
+        receipt.extractor_revision()
+    );
     assert_eq!(validation.observed_at_utc(), receipt.observed_at_utc());
     assert_eq!(
         validation.canonical_location(),
@@ -55,10 +64,8 @@ fn assert_exact_receipt_binding(
 
 #[test]
 fn initial_privilege_recovery_validation_binds_identical_material_to_exact_observation_location() {
-    let shared_material = extension_initial_privileges(vec![initial_public_execute(
-        "postgres",
-        false,
-    )]);
+    let shared_material =
+        extension_initial_privileges(vec![initial_public_execute("postgres", false)]);
     let snapshot = initial_privilege_snapshot_with_materials(
         Some(shared_material.clone()),
         Some(shared_material),
@@ -91,22 +98,24 @@ fn initial_privilege_recovery_validation_binds_identical_material_to_exact_obser
 
     assert!(from_validation.is_ready());
     assert!(to_validation.is_ready());
-    assert_eq!(from_validation.material_digest(), to_validation.material_digest());
+    assert_eq!(
+        from_validation.material_digest(),
+        to_validation.material_digest()
+    );
     assert_exact_receipt_binding(&from_validation, &from_receipt);
     assert_exact_receipt_binding(&to_validation, &to_receipt);
-    assert_ne!(from_validation.canonical_location(), to_validation.canonical_location());
+    assert_ne!(
+        from_validation.canonical_location(),
+        to_validation.canonical_location()
+    );
     assert!(!from_validation.matches_source_receipt(&to_receipt));
     assert!(!to_validation.matches_source_receipt(&from_receipt));
 }
 
 #[test]
 fn initial_privilege_recovery_validation_binds_same_material_to_exact_snapshot_generation() {
-    let shared_from = extension_initial_privileges(vec![initial_public_execute(
-        "postgres",
-        false,
-    )]);
-    let generation_a =
-        initial_privilege_snapshot_with_materials(Some(shared_from.clone()), None);
+    let shared_from = extension_initial_privileges(vec![initial_public_execute("postgres", false)]);
+    let generation_a = initial_privilege_snapshot_with_materials(Some(shared_from.clone()), None);
     let generation_b = initial_privilege_snapshot_with_materials(
         Some(shared_from),
         Some(extension_initial_privileges(vec![initial_role_execute(
@@ -115,7 +124,10 @@ fn initial_privilege_recovery_validation_binds_same_material_to_exact_snapshot_g
             false,
         )])),
     );
-    assert_ne!(generation_a.snapshot_digest(), generation_b.snapshot_digest());
+    assert_ne!(
+        generation_a.snapshot_digest(),
+        generation_b.snapshot_digest()
+    );
 
     let receipt_a = generation_a
         .source_receipt(
@@ -142,7 +154,10 @@ fn initial_privilege_recovery_validation_binds_same_material_to_exact_snapshot_g
             &receipt_b,
         );
 
-    assert_eq!(validation_a.material_digest(), validation_b.material_digest());
+    assert_eq!(
+        validation_a.material_digest(),
+        validation_b.material_digest()
+    );
     assert_exact_receipt_binding(&validation_a, &receipt_a);
     assert_exact_receipt_binding(&validation_b, &receipt_b);
     assert_ne!(validation_a.source_digest(), validation_b.source_digest());
@@ -219,7 +234,10 @@ fn initial_privilege_recovery_validation_blocks_damaged_receipt_without_logging_
             &receipt,
         );
     assert!(!validation.is_ready());
-    assert_eq!(validation.material_digest(), Some(expected_material_digest.as_str()));
+    assert_eq!(
+        validation.material_digest(),
+        Some(expected_material_digest.as_str())
+    );
     assert_exact_receipt_binding(&validation, &receipt);
     assert_eq!(validation.unresolved_grantee_count(), 1);
     assert_eq!(validation.unresolved_grantor_count(), 1);

@@ -1,7 +1,7 @@
 use conceptweave_observation::{
     ColumnExpressionObservation, ColumnGenerationObservation, ColumnIdentityObservation,
-    ColumnObservationV3, ObservationError, PostgresSchemaSnapshotV3, QualifiedTypeName, RelationKind,
-    RelationObservation,
+    ColumnObservationV3, ObservationError, PostgresSchemaSnapshotV3, QualifiedTypeName,
+    RelationKind, RelationObservation,
 };
 
 mod support;
@@ -40,43 +40,23 @@ fn two_column_relation() -> RelationObservation {
 }
 
 fn ordinary(column_name: &str) -> ColumnGenerationObservation {
-    ColumnGenerationObservation::not_generated(
-        "public",
-        "metric",
-        RelationKind::Table,
-        column_name,
-    )
-    .expect("ordinary-column generation evidence is valid")
+    ColumnGenerationObservation::not_generated("public", "metric", RelationKind::Table, column_name)
+        .expect("ordinary-column generation evidence is valid")
 }
 
 fn stored(column_name: &str) -> ColumnGenerationObservation {
-    ColumnGenerationObservation::stored(
-        "public",
-        "metric",
-        RelationKind::Table,
-        column_name,
-    )
-    .expect("stored generation evidence is valid")
+    ColumnGenerationObservation::stored("public", "metric", RelationKind::Table, column_name)
+        .expect("stored generation evidence is valid")
 }
 
 fn not_identity(column_name: &str) -> ColumnIdentityObservation {
-    ColumnIdentityObservation::not_identity(
-        "public",
-        "metric",
-        RelationKind::Table,
-        column_name,
-    )
-    .expect("non-identity evidence is valid")
+    ColumnIdentityObservation::not_identity("public", "metric", RelationKind::Table, column_name)
+        .expect("non-identity evidence is valid")
 }
 
 fn no_expression(column_name: &str) -> ColumnExpressionObservation {
-    ColumnExpressionObservation::no_expression(
-        "public",
-        "metric",
-        RelationKind::Table,
-        column_name,
-    )
-    .expect("explicit no-expression evidence is valid")
+    ColumnExpressionObservation::no_expression("public", "metric", RelationKind::Table, column_name)
+        .expect("explicit no-expression evidence is valid")
 }
 
 fn default_expression(column_name: &str, expression: &str) -> ColumnExpressionObservation {

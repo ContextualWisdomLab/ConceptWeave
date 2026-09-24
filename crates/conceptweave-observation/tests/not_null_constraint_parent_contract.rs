@@ -15,15 +15,17 @@ fn relation(relation_name: &str, relation_kind: RelationKind) -> RelationObserva
         "public",
         relation_name,
         relation_kind,
-        vec![ColumnObservationV3::new(
-            "raw_value",
-            1,
-            "numeric",
-            catalog_type("numeric"),
-            false,
-            None,
-        )
-        .expect("column fixture is valid")],
+        vec![
+            ColumnObservationV3::new(
+                "raw_value",
+                1,
+                "numeric",
+                catalog_type("numeric"),
+                false,
+                None,
+            )
+            .expect("column fixture is valid"),
+        ],
     )
     .expect("relation fixture is valid")
 }
@@ -337,8 +339,16 @@ fn partition_parent_link_requires_exactly_one_inheritance_ancestor() {
 fn partition_parent_link_rejects_no_inherit_child_constraint() {
     assert_eq!(
         NotNullConstraintObservation::new(
-            "public", "metric_2026", RelationKind::Table, "metric_raw_value_not_null",
-            "raw_value", true, true, false, 1, true,
+            "public",
+            "metric_2026",
+            RelationKind::Table,
+            "metric_raw_value_not_null",
+            "raw_value",
+            true,
+            true,
+            false,
+            1,
+            true,
         ),
         Err(ObservationError::InvalidObservationField {
             field: "not_null_constraint_no_inherit_origin",

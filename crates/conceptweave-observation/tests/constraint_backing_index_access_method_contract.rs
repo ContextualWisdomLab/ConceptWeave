@@ -36,12 +36,7 @@ fn backing_index(
         0,
     )?])?
     .with_catalog_flags(IndexCatalogFlags::new(
-        primary,
-        false,
-        true,
-        false,
-        false,
-        false,
+        primary, false, true, false, false, false,
     ))
     .map(|index| index.with_ready(true).with_valid(true).with_live(true))
 }

@@ -54,7 +54,13 @@ fn ordinary_exclude_operator_procedure_configuration_preserves_exact_proconfig_i
 
     assert!(receipt.location().configuration().is_configured());
     assert_eq!(receipt.location().configuration().entry_count(), 1);
-    assert!(receipt.location().configuration().digest().starts_with("sha256:"));
+    assert!(
+        receipt
+            .location()
+            .configuration()
+            .digest()
+            .starts_with("sha256:")
+    );
     assert_eq!(receipt.location().operator(), &operator("="));
     assert_eq!(receipt.location().procedure(), &procedure("int4eq"));
     assert_eq!(receipt.source_id(), owner.source_connection_key());
@@ -65,10 +71,12 @@ fn ordinary_exclude_operator_procedure_configuration_preserves_exact_proconfig_i
     assert_eq!(receipt.extractor_revision(), owner.extractor_revision());
     assert_eq!(receipt.observed_at_utc(), owner.observed_at_utc());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
-    assert!(receipt
-        .location()
-        .canonical_location()
-        .ends_with("/1/procedure-configuration"));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/1/procedure-configuration")
+    );
 }
 
 #[test]
@@ -244,5 +252,7 @@ fn ordinary_exclude_operator_procedure_configuration_rejects_unknown_receipt_coo
 
 #[test]
 fn ordinary_exclude_operator_procedure_configuration_snapshot_is_publicly_composed() {
-    assert!(std::mem::size_of::<IndexExclusionConstraintOperatorProcedureConfigurationSnapshot>() > 0);
+    assert!(
+        std::mem::size_of::<IndexExclusionConstraintOperatorProcedureConfigurationSnapshot>() > 0
+    );
 }

@@ -7,10 +7,11 @@ use conceptweave_relation_partition::{
     IndexExclusionConstraintCatalogShapeObservation, IndexExclusionConstraintCatalogShapeSnapshot,
     IndexExclusionConstraintCoordinate, IndexExclusionConstraintForeignActionCodes,
     IndexExclusionConstraintForeignPayloadPresence, IndexExclusionConstraintIndexNameSnapshot,
-    IndexExclusionConstraintIndexNamespaceObservation, IndexExclusionConstraintIndexNamespaceSnapshot,
-    IndexExclusionConstraintObservation, IndexExclusionConstraintSnapshot, IndexPartitionCoordinate,
-    IndexPartitionObservation, IndexPartitionSnapshot, IndexRelationKind,
-    RelationPartitionObservation, RelationPartitionSnapshot,
+    IndexExclusionConstraintIndexNamespaceObservation,
+    IndexExclusionConstraintIndexNamespaceSnapshot, IndexExclusionConstraintObservation,
+    IndexExclusionConstraintSnapshot, IndexPartitionCoordinate, IndexPartitionObservation,
+    IndexPartitionSnapshot, IndexRelationKind, RelationPartitionObservation,
+    RelationPartitionSnapshot,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationLimits, ObservationRequest, ObservationRequestBudget,
@@ -21,11 +22,17 @@ const POLICY_BINDING: &str = "fixture_policy_revision_a";
 
 struct Registry;
 impl SourceConnectionRegistry for Registry {
-    fn contains_source_connection(&self, key: &str) -> bool { key == "warehouse_primary" }
+    fn contains_source_connection(&self, key: &str) -> bool {
+        key == "warehouse_primary"
+    }
     fn connection_policy_binding(&self, key: &str) -> Option<String> {
         (key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
-    fn authorizes_schema_scope(&self, source: &ResolvedSourceConnection, schemas: &[String]) -> bool {
+    fn authorizes_schema_scope(
+        &self,
+        source: &ResolvedSourceConnection,
+        schemas: &[String],
+    ) -> bool {
         source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && schemas == ["public"]
@@ -61,14 +68,20 @@ fn authorized_source() -> AuthorizedObservationRequest {
 
 fn coordinate() -> IndexExclusionConstraintCoordinate {
     IndexExclusionConstraintCoordinate::new(
-        "public", "bookings", RelationKind::Table, "bookings_no_overlap",
+        "public",
+        "bookings",
+        RelationKind::Table,
+        "bookings_no_overlap",
     )
     .unwrap()
 }
 
 fn index_coordinate() -> IndexPartitionCoordinate {
     IndexPartitionCoordinate::new(
-        "public", "bookings", RelationKind::Table, "bookings_no_overlap",
+        "public",
+        "bookings",
+        RelationKind::Table,
+        "bookings_no_overlap",
     )
     .unwrap()
 }
@@ -83,15 +96,19 @@ fn index() -> IndexObservation {
     )
     .unwrap()
     .with_access_method("btree")
-    .with_key_semantics(vec![IndexKeySemantics::new(
-        1,
-        None,
-        QualifiedOperatorClassName::new("pg_catalog", "int8_ops").unwrap(),
-        0,
-    )
-    .unwrap()])
+    .with_key_semantics(vec![
+        IndexKeySemantics::new(
+            1,
+            None,
+            QualifiedOperatorClassName::new("pg_catalog", "int8_ops").unwrap(),
+            0,
+        )
+        .unwrap(),
+    ])
     .unwrap()
-    .with_catalog_flags(IndexCatalogFlags::new(false, true, true, false, false, false))
+    .with_catalog_flags(IndexCatalogFlags::new(
+        false, true, true, false, false, false,
+    ))
     .unwrap()
     .with_ready(true)
     .with_valid(true)
@@ -107,15 +124,17 @@ fn stack() -> Stack {
         "public",
         "bookings",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            false,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                false,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
     .with_indexes(vec![index()])
@@ -131,20 +150,19 @@ fn stack() -> Stack {
     .unwrap();
     let relations = RelationPartitionSnapshot::new(
         &base,
-        vec![RelationPartitionObservation::non_partition(
-            "public", "bookings", RelationKind::Table,
-        )
-        .unwrap()],
+        vec![
+            RelationPartitionObservation::non_partition("public", "bookings", RelationKind::Table)
+                .unwrap(),
+        ],
     )
     .unwrap();
     let indexes = IndexPartitionSnapshot::new(
         &base,
         &relations,
-        vec![IndexPartitionObservation::non_partition(
-            index_coordinate(),
-            IndexRelationKind::Index,
-        )
-        .unwrap()],
+        vec![
+            IndexPartitionObservation::non_partition(index_coordinate(), IndexRelationKind::Index)
+                .unwrap(),
+        ],
     )
     .unwrap();
     let constraints = IndexExclusionConstraintSnapshot::new(
@@ -156,16 +174,20 @@ fn stack() -> Stack {
     .unwrap();
     let shapes = IndexExclusionConstraintCatalogShapeSnapshot::new(
         &constraints,
-        vec![IndexExclusionConstraintCatalogShapeObservation::new(
-            coordinate(),
-            'x',
-            true,
-            false,
-            IndexExclusionConstraintForeignActionCodes::new(' ', ' ', ' '),
-            IndexExclusionConstraintForeignPayloadPresence::new(false, false, [false; 3], false),
-            false,
-        )
-        .unwrap()],
+        vec![
+            IndexExclusionConstraintCatalogShapeObservation::new(
+                coordinate(),
+                'x',
+                true,
+                false,
+                IndexExclusionConstraintForeignActionCodes::new(' ', ' ', ' '),
+                IndexExclusionConstraintForeignPayloadPresence::new(
+                    false, false, [false; 3], false,
+                ),
+                false,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
     let names = IndexExclusionConstraintIndexNameSnapshot::new(
@@ -201,7 +223,12 @@ fn exact_backing_index_namespace_is_retained_and_receipted() {
     assert_eq!(receipt.location().index_schema_name(), "public");
     assert_eq!(receipt.location().backing_index(), &index_coordinate());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
-    assert!(receipt.location().canonical_location().ends_with("/backing-index-namespace"));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/backing-index-namespace")
+    );
 }
 
 #[test]
@@ -213,8 +240,11 @@ fn mismatched_backing_index_namespace_fails_closed() {
         "archive",
     )
     .unwrap();
-    let error = IndexExclusionConstraintIndexNamespaceSnapshot::new(&stack.names, vec![observation])
-        .expect_err("pg_class.relnamespace must not be normalized from the owning relation schema");
+    let error =
+        IndexExclusionConstraintIndexNamespaceSnapshot::new(&stack.names, vec![observation])
+            .expect_err(
+                "pg_class.relnamespace must not be normalized from the owning relation schema",
+            );
     assert_eq!(
         error,
         ObservationError::InvalidObservationField {
@@ -255,16 +285,17 @@ fn backing_index_namespace_inventory_must_be_complete() {
 #[test]
 fn backing_index_namespace_must_bind_the_exact_predecessor_index() {
     let stack = stack();
-    let wrong_index = IndexPartitionCoordinate::new(
-        "public", "bookings", RelationKind::Table, "other_index",
-    )
-    .unwrap();
-    let observation = IndexExclusionConstraintIndexNamespaceObservation::new(
-        coordinate(), wrong_index, "public",
-    )
-    .unwrap();
-    let error = IndexExclusionConstraintIndexNamespaceSnapshot::new(&stack.names, vec![observation])
-        .expect_err("namespace evidence must bind the exact conindid index proven by the predecessor");
+    let wrong_index =
+        IndexPartitionCoordinate::new("public", "bookings", RelationKind::Table, "other_index")
+            .unwrap();
+    let observation =
+        IndexExclusionConstraintIndexNamespaceObservation::new(coordinate(), wrong_index, "public")
+            .unwrap();
+    let error =
+        IndexExclusionConstraintIndexNamespaceSnapshot::new(&stack.names, vec![observation])
+            .expect_err(
+                "namespace evidence must bind the exact conindid index proven by the predecessor",
+            );
     assert_eq!(
         error,
         ObservationError::InvalidObservationField {
@@ -299,7 +330,10 @@ fn unknown_backing_index_namespace_receipt_fails_closed() {
     )
     .unwrap();
     let unknown = IndexExclusionConstraintCoordinate::new(
-        "public", "other", RelationKind::Table, "other_no_overlap",
+        "public",
+        "other",
+        RelationKind::Table,
+        "other_no_overlap",
     )
     .unwrap();
     assert!(matches!(

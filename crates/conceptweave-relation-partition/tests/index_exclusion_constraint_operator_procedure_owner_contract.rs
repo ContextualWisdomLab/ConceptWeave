@@ -62,13 +62,18 @@ fn ordinary_exclude_operator_procedure_owner_preserves_exact_proowner_and_role_r
         receipt.connection_policy_binding(),
         definition.connection_policy_binding()
     );
-    assert_eq!(receipt.extractor_revision(), definition.extractor_revision());
+    assert_eq!(
+        receipt.extractor_revision(),
+        definition.extractor_revision()
+    );
     assert_eq!(receipt.observed_at_utc(), definition.observed_at_utc());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
-    assert!(receipt
-        .location()
-        .canonical_location()
-        .ends_with("/1/procedure-owner"));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/1/procedure-owner")
+    );
 }
 
 #[test]

@@ -21,21 +21,15 @@ fn key_semantics(position: u32) -> IndexKeySemantics {
     .expect("key-semantics fixture is valid")
 }
 
-fn simple_index(
-    is_unique: bool,
-    immediate: bool,
-    replica_identity: bool,
-) -> IndexObservation {
+fn simple_index(is_unique: bool, immediate: bool, replica_identity: bool) -> IndexObservation {
     IndexObservation::new(
         "document_replica_identity_ix",
         is_unique,
         Some(false),
-        vec![IndexAttributeObservation::column(
-            1,
-            IndexAttributeKind::Key,
-            "document_id",
-        )
-        .expect("column key fixture is valid")],
+        vec![
+            IndexAttributeObservation::column(1, IndexAttributeKind::Key, "document_id")
+                .expect("column key fixture is valid"),
+        ],
         Vec::new(),
     )
     .expect("index fixture is structurally valid")
@@ -81,18 +75,14 @@ fn covering_replica_identity_index() -> IndexObservation {
         "document_replica_identity_ix",
         true,
         Some(false),
-        vec![IndexAttributeObservation::column(
-            1,
-            IndexAttributeKind::Key,
-            "document_id",
-        )
-        .expect("key fixture is valid")],
-        vec![IndexAttributeObservation::column(
-            2,
-            IndexAttributeKind::Include,
-            "payload",
-        )
-        .expect("INCLUDE fixture is valid")],
+        vec![
+            IndexAttributeObservation::column(1, IndexAttributeKind::Key, "document_id")
+                .expect("key fixture is valid"),
+        ],
+        vec![
+            IndexAttributeObservation::column(2, IndexAttributeKind::Include, "payload")
+                .expect("INCLUDE fixture is valid"),
+        ],
     )
     .expect("covering index fixture is structurally valid")
     .with_access_method("btree")
@@ -109,12 +99,10 @@ fn expression_index() -> IndexObservation {
         "document_replica_identity_ix",
         true,
         Some(false),
-        vec![IndexAttributeObservation::expression(
-            1,
-            IndexAttributeKind::Key,
-            "document_id + 0",
-        )
-        .expect("expression key fixture is valid")],
+        vec![
+            IndexAttributeObservation::expression(1, IndexAttributeKind::Key, "document_id + 0")
+                .expect("expression key fixture is valid"),
+        ],
         Vec::new(),
     )
     .expect("expression index fixture is structurally valid")
@@ -127,31 +115,32 @@ fn expression_index() -> IndexObservation {
     .expect("replica-identity catalog flags are structurally constructible")
 }
 
-fn relation(
-    kind: RelationKind,
-    nullable: bool,
-    index: IndexObservation,
-) -> RelationObservation {
+fn relation(kind: RelationKind, nullable: bool, index: IndexObservation) -> RelationObservation {
     RelationObservation::new(
         "public",
         "document",
         kind,
-        vec![ColumnObservationV3::new(
-            "document_id",
-            1,
-            "bigint",
-            catalog_type("int8"),
-            nullable,
-            None,
-        )
-        .expect("column fixture is valid")],
+        vec![
+            ColumnObservationV3::new(
+                "document_id",
+                1,
+                "bigint",
+                catalog_type("int8"),
+                nullable,
+                None,
+            )
+            .expect("column fixture is valid"),
+        ],
     )
     .expect("relation fixture is valid")
     .with_indexes(vec![index])
     .expect("index fixture is valid before aggregate replica-identity validation")
 }
 
-fn multi_column_relation(second_key_nullable: bool, index: IndexObservation) -> RelationObservation {
+fn multi_column_relation(
+    second_key_nullable: bool,
+    index: IndexObservation,
+) -> RelationObservation {
     RelationObservation::new(
         "public",
         "document",
@@ -197,15 +186,8 @@ fn covering_relation(index: IndexObservation) -> RelationObservation {
                 None,
             )
             .expect("replica key column fixture is valid"),
-            ColumnObservationV3::new(
-                "payload",
-                2,
-                "bigint",
-                catalog_type("int8"),
-                true,
-                None,
-            )
-            .expect("nullable INCLUDE payload fixture is valid"),
+            ColumnObservationV3::new("payload", 2, "bigint", catalog_type("int8"), true, None)
+                .expect("nullable INCLUDE payload fixture is valid"),
         ],
     )
     .expect("covering relation fixture is valid")
@@ -248,18 +230,12 @@ fn replica_identity_index_must_belong_to_a_table_relation() {
 
 #[test]
 fn replica_identity_index_must_be_unique() {
-    assert_replica_identity_error(snapshot(table(
-        false,
-        simple_index(false, true, true),
-    )));
+    assert_replica_identity_error(snapshot(table(false, simple_index(false, true, true))));
 }
 
 #[test]
 fn replica_identity_index_must_be_immediate_not_deferred() {
-    assert_replica_identity_error(snapshot(table(
-        false,
-        simple_index(true, false, true),
-    )));
+    assert_replica_identity_error(snapshot(table(false, simple_index(true, false, true))));
 }
 
 #[test]
@@ -277,10 +253,7 @@ fn replica_identity_index_must_use_columns_not_expressions() {
 
 #[test]
 fn replica_identity_index_columns_must_be_not_null() {
-    assert_replica_identity_error(snapshot(table(
-        true,
-        simple_index(true, true, true),
-    )));
+    assert_replica_identity_error(snapshot(table(true, simple_index(true, true, true))));
 }
 
 #[test]
@@ -311,7 +284,9 @@ fn partitioned_table_replica_identity_does_not_require_lifecycle_evidence() {
         false,
         simple_index(true, true, true),
     ))
-    .expect("partitioned-table replica identity remains valid before optional lifecycle observation");
+    .expect(
+        "partitioned-table replica identity remains valid before optional lifecycle observation",
+    );
 }
 
 #[test]

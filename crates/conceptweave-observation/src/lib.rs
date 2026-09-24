@@ -292,7 +292,10 @@ impl PostgresSchemaSnapshotV3 {
     }
 
     /// Creates a type-kind-aware v3 snapshot with explicit PRIMARY KEY/UNIQUE timing evidence.
-    #[expect(clippy::too_many_arguments, reason = "preserve public constructor compatibility")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "preserve public constructor compatibility"
+    )]
     pub fn new_with_type_kinds_and_constraint_timings(
         authorized_request: &AuthorizedObservationRequest,
         extractor_revision: impl Into<String>,
@@ -397,7 +400,10 @@ impl PostgresSchemaSnapshotV3 {
     /// family so generated/default expression kind can be checked against source-authoritative `attgenerated` state. The family is
     /// attached before identity, NOT NULL constraint, constraint timing, and PERIOD evidence; reverse-
     /// order attachment is rejected so optional-family order cannot become a semantic escape hatch.
-    #[expect(clippy::too_many_arguments, reason = "preserve public constructor compatibility")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "preserve public constructor compatibility"
+    )]
     pub fn new_with_column_expressions(
         authorized_request: &AuthorizedObservationRequest,
         extractor_revision: impl Into<String>,
@@ -569,7 +575,10 @@ impl PostgresSchemaSnapshotV3 {
     /// The array-aware digest is computed first; timing evidence then adds its own domain-separated
     /// layer. This keeps each observed catalog family explicit while supporting one immutable source
     /// snapshot containing both families.
-    #[expect(clippy::too_many_arguments, reason = "preserve public constructor compatibility")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "preserve public constructor compatibility"
+    )]
     pub fn new_with_array_types_and_constraint_timings(
         authorized_request: &AuthorizedObservationRequest,
         extractor_revision: impl Into<String>,
@@ -672,10 +681,8 @@ impl PostgresSchemaSnapshotV3 {
                 field: "column_collation_observation_order",
             });
         }
-        let column_collations = column_collation::canonicalize_column_collations(
-            &self.relations,
-            column_collations,
-        )?;
+        let column_collations =
+            column_collation::canonicalize_column_collations(&self.relations, column_collations)?;
         self.snapshot_digest = column_collation::compute_column_collation_digest(
             &self.snapshot_digest,
             &column_collations,
@@ -790,10 +797,8 @@ impl PostgresSchemaSnapshotV3 {
                 field: "column_identity_observation_order",
             });
         }
-        let column_identities = column_identity::canonicalize_column_identities(
-            &self.relations,
-            column_identities,
-        )?;
+        let column_identities =
+            column_identity::canonicalize_column_identities(&self.relations, column_identities)?;
         if self.column_generations_observed
             && column_generation::generated_identity_conflicts(
                 &self.column_generations,
@@ -1112,9 +1117,9 @@ fn validate_schema_relation_invariants(
 
         for constraint in relation.constraints() {
             if let TableConstraintObservation::ForeignKey(foreign_key) = constraint
-                && foreign_key.reference_behavior().is_some_and(|behavior| {
-                    behavior.match_type() == ForeignKeyMatchType::Partial
-                })
+                && foreign_key
+                    .reference_behavior()
+                    .is_some_and(|behavior| behavior.match_type() == ForeignKeyMatchType::Partial)
             {
                 return Err(ObservationError::InvalidObservationField {
                     field: "foreign_key_match_type",
@@ -1232,24 +1237,29 @@ fn validate_schema_relation_invariants(
             });
         }
 
-        for (replica_identity_index, catalog_flags) in relation.indexes().iter().filter_map(|index| {
-            let catalog_flags = index.catalog_flags()?;
-            catalog_flags
-                .replica_identity()
-                .then_some((index, catalog_flags))
-        }) {
+        for (replica_identity_index, catalog_flags) in
+            relation.indexes().iter().filter_map(|index| {
+                let catalog_flags = index.catalog_flags()?;
+                catalog_flags
+                    .replica_identity()
+                    .then_some((index, catalog_flags))
+            })
+        {
             let relation_kind_is_eligible = matches!(
                 relation.kind(),
                 RelationKind::Table | RelationKind::PartitionedTable
             );
             let key_columns_are_not_null = !replica_identity_index.key_attributes().is_empty()
-                && replica_identity_index.key_attributes().iter().all(|attribute| {
-                    attribute.attribute_name().is_some_and(|attribute_name| {
-                        relation.columns().iter().any(|column| {
-                            column.column_name() == attribute_name && !column.nullable()
+                && replica_identity_index
+                    .key_attributes()
+                    .iter()
+                    .all(|attribute| {
+                        attribute.attribute_name().is_some_and(|attribute_name| {
+                            relation.columns().iter().any(|column| {
+                                column.column_name() == attribute_name && !column.nullable()
+                            })
                         })
-                    })
-                });
+                    });
             if !relation_kind_is_eligible
                 || !replica_identity_index.is_unique()
                 || !catalog_flags.immediate()
@@ -1281,14 +1291,10 @@ fn canonicalize_type_kind_observations(
     mut type_kinds: Vec<TypeKindObservation>,
 ) -> Result<Vec<TypeKindObservation>, ObservationError> {
     type_kinds.sort_by(|left, right| {
-        (
-            left.type_name().schema_name(),
-            left.type_name().type_name(),
-        )
-            .cmp(&(
-                right.type_name().schema_name(),
-                right.type_name().type_name(),
-            ))
+        (left.type_name().schema_name(), left.type_name().type_name()).cmp(&(
+            right.type_name().schema_name(),
+            right.type_name().type_name(),
+        ))
     });
     for pair in type_kinds.windows(2) {
         if same_type_coordinate(pair[0].type_name(), pair[1].type_name()) {
@@ -1302,7 +1308,11 @@ fn canonicalize_type_kind_observations(
         .iter()
         .map(|relation| relation.schema_name())
         .chain(domains.iter().map(|domain| domain.schema_name()))
-        .chain(enums.iter().map(|observed_enum| observed_enum.schema_name()))
+        .chain(
+            enums
+                .iter()
+                .map(|observed_enum| observed_enum.schema_name()),
+        )
         .collect::<BTreeSet<_>>();
 
     for type_kind in &type_kinds {
@@ -1440,9 +1450,7 @@ fn type_binding_is_resolvable_with_type_kinds(
         same_type_coordinate(type_kind.type_name(), binding)
             && matches!(
                 type_kind.kind(),
-                PostgresTypeKind::Base
-                    | PostgresTypeKind::Range
-                    | PostgresTypeKind::Multirange
+                PostgresTypeKind::Base | PostgresTypeKind::Range | PostgresTypeKind::Multirange
             )
     })
 }
@@ -1498,11 +1506,7 @@ fn type_binding_is_resolvable_with_type_kinds_and_arrays(
         .iter()
         .any(|array_type| same_type_coordinate(array_type.array_type(), binding))
         || type_binding_is_resolvable_with_type_kinds(
-            binding,
-            relations,
-            domains,
-            enums,
-            type_kinds,
+            binding, relations, domains, enums, type_kinds,
         )
 }
 
@@ -1537,7 +1541,7 @@ fn validate_type_bindings_with_type_kinds_and_arrays(
                 enums,
                 array_types,
                 type_kinds,
-        ) {
+            ) {
                 return Err(ObservationError::UnknownTypeBinding {
                     schema_name: column.type_binding().schema_name().to_owned(),
                     type_name: column.type_binding().type_name().to_owned(),
@@ -1557,9 +1561,7 @@ fn projected_type_kind_binding(
             same_type_coordinate(type_kind.type_name(), binding)
                 && matches!(
                     type_kind.kind(),
-                    PostgresTypeKind::Base
-                        | PostgresTypeKind::Range
-                        | PostgresTypeKind::Multirange
+                    PostgresTypeKind::Base | PostgresTypeKind::Range | PostgresTypeKind::Multirange
                 )
         });
     if needs_projection {
@@ -1716,9 +1718,7 @@ fn key_constraint_backing_index_static_shape_matches(
     catalog_flags: &IndexCatalogFlags,
 ) -> bool {
     let (constraint_columns, expected_nulls_not_distinct) = match constraint {
-        TableConstraintObservation::PrimaryKey(primary_key) => {
-            (primary_key.column_names(), None)
-        }
+        TableConstraintObservation::PrimaryKey(primary_key) => (primary_key.column_names(), None),
         TableConstraintObservation::Unique(unique) => {
             (unique.column_names(), unique.nulls_not_distinct())
         }
@@ -1782,20 +1782,24 @@ fn canonicalize_constraint_timings(
     let expected_key_coordinates = relations
         .iter()
         .flat_map(|relation| {
-            relation.constraints().iter().filter(|constraint| {
-                matches!(
-                    constraint,
-                    TableConstraintObservation::PrimaryKey(_)
-                        | TableConstraintObservation::Unique(_)
-                )
-            }).map(move |constraint| {
-                (
+            relation
+                .constraints()
+                .iter()
+                .filter(|constraint| {
+                    matches!(
+                        constraint,
+                        TableConstraintObservation::PrimaryKey(_)
+                            | TableConstraintObservation::Unique(_)
+                    )
+                })
+                .map(move |constraint| {
+                    (
                         relation.schema_name().to_owned(),
                         relation.relation_name().to_owned(),
                         relation.kind().token().to_owned(),
                         constraint.constraint_name().to_owned(),
-                )
-            })
+                    )
+                })
         })
         .collect::<BTreeSet<_>>();
     let mut observed_key_coordinates = BTreeSet::new();
@@ -1916,21 +1920,25 @@ fn canonicalize_constraint_periods(
     let expected_period_coordinates = relations
         .iter()
         .flat_map(|relation| {
-            relation.constraints().iter().filter(|constraint| {
-                matches!(
-                    constraint,
-                    TableConstraintObservation::PrimaryKey(_)
-                        | TableConstraintObservation::Unique(_)
-                        | TableConstraintObservation::ForeignKey(_)
-                )
-            }).map(move |constraint| {
-                (
+            relation
+                .constraints()
+                .iter()
+                .filter(|constraint| {
+                    matches!(
+                        constraint,
+                        TableConstraintObservation::PrimaryKey(_)
+                            | TableConstraintObservation::Unique(_)
+                            | TableConstraintObservation::ForeignKey(_)
+                    )
+                })
+                .map(move |constraint| {
+                    (
                         relation.schema_name().to_owned(),
                         relation.relation_name().to_owned(),
                         relation.kind().token().to_owned(),
                         constraint.constraint_name().to_owned(),
-                )
-            })
+                    )
+                })
         })
         .collect::<BTreeSet<_>>();
     let mut observed_period_coordinates = BTreeSet::new();
@@ -2043,27 +2051,29 @@ fn canonicalize_constraint_periods(
                             field: "constraint_period_reference",
                         });
                     };
-                    let referenced_temporal_key = referenced_relation.constraints().iter().find(
-                        |candidate_constraint| {
-                            matches!(
-                                candidate_constraint,
-                                TableConstraintObservation::PrimaryKey(_)
-                                    | TableConstraintObservation::Unique(_)
-                            ) && candidate_constraint.column_names()
-                                == foreign_key.referenced_column_names()
-                                && constraint_periods.iter().any(|candidate_period| {
-                                    candidate_period.schema_name()
-                                        == referenced_relation.schema_name()
-                                        && candidate_period.relation_name()
-                                            == referenced_relation.relation_name()
-                                        && candidate_period.relation_kind()
-                                            == referenced_relation.kind()
-                                        && candidate_period.constraint_name()
-                                            == candidate_constraint.constraint_name()
-                                        && candidate_period.has_period_semantics()
-                                })
-                        },
-                    );
+                    let referenced_temporal_key =
+                        referenced_relation
+                            .constraints()
+                            .iter()
+                            .find(|candidate_constraint| {
+                                matches!(
+                                    candidate_constraint,
+                                    TableConstraintObservation::PrimaryKey(_)
+                                        | TableConstraintObservation::Unique(_)
+                                ) && candidate_constraint.column_names()
+                                    == foreign_key.referenced_column_names()
+                                    && constraint_periods.iter().any(|candidate_period| {
+                                        candidate_period.schema_name()
+                                            == referenced_relation.schema_name()
+                                            && candidate_period.relation_name()
+                                                == referenced_relation.relation_name()
+                                            && candidate_period.relation_kind()
+                                                == referenced_relation.kind()
+                                            && candidate_period.constraint_name()
+                                                == candidate_constraint.constraint_name()
+                                            && candidate_period.has_period_semantics()
+                                    })
+                            });
                     let Some(referenced_temporal_key) = referenced_temporal_key else {
                         return Err(ObservationError::InvalidObservationField {
                             field: "constraint_period_reference",
@@ -2485,10 +2495,7 @@ fn compute_constraint_timing_digest(
     constraint_timings: &[ConstraintTimingObservation],
 ) -> String {
     let mut hasher = Sha256::new();
-    encode_bytes(
-        &mut hasher,
-        SNAPSHOT_DIGEST_DOMAIN_V3_CONSTRAINT_TIMINGS_V1,
-    );
+    encode_bytes(&mut hasher, SNAPSHOT_DIGEST_DOMAIN_V3_CONSTRAINT_TIMINGS_V1);
     encode_str(&mut hasher, base_snapshot_digest);
     encode_len(&mut hasher, constraint_timings.len());
     for timing in constraint_timings {
@@ -2506,10 +2513,7 @@ fn compute_constraint_period_digest(
     constraint_periods: &[ConstraintPeriodObservation],
 ) -> String {
     let mut hasher = Sha256::new();
-    encode_bytes(
-        &mut hasher,
-        SNAPSHOT_DIGEST_DOMAIN_V3_CONSTRAINT_PERIODS_V2,
-    );
+    encode_bytes(&mut hasher, SNAPSHOT_DIGEST_DOMAIN_V3_CONSTRAINT_PERIODS_V2);
     encode_str(&mut hasher, base_snapshot_digest);
     encode_len(&mut hasher, constraint_periods.len());
     for period in constraint_periods {

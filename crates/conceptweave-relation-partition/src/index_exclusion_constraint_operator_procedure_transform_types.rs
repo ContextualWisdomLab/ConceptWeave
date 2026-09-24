@@ -152,7 +152,9 @@ impl IndexExclusionConstraintOperatorProcedureTransformTypesSourceReceipt {
 
     /// Returns the exact validated transform-type observation.
     #[must_use]
-    pub const fn location(&self) -> &IndexExclusionConstraintOperatorProcedureTransformTypesObservation {
+    pub const fn location(
+        &self,
+    ) -> &IndexExclusionConstraintOperatorProcedureTransformTypesObservation {
         &self.location
     }
 }
@@ -268,7 +270,9 @@ impl IndexExclusionConstraintOperatorProcedureTransformTypesSnapshot {
 
     /// Returns complete transform-type observations in deterministic constraint/key order.
     #[must_use]
-    pub fn observations(&self) -> &[IndexExclusionConstraintOperatorProcedureTransformTypesObservation] {
+    pub fn observations(
+        &self,
+    ) -> &[IndexExclusionConstraintOperatorProcedureTransformTypesObservation] {
         &self.observations
     }
 
@@ -277,7 +281,10 @@ impl IndexExclusionConstraintOperatorProcedureTransformTypesSnapshot {
         &self,
         coordinate: IndexExclusionConstraintCoordinate,
         key_position: u32,
-    ) -> Result<IndexExclusionConstraintOperatorProcedureTransformTypesSourceReceipt, ObservationError> {
+    ) -> Result<
+        IndexExclusionConstraintOperatorProcedureTransformTypesSourceReceipt,
+        ObservationError,
+    > {
         let observation = self
             .observations
             .iter()
@@ -288,14 +295,16 @@ impl IndexExclusionConstraintOperatorProcedureTransformTypesSnapshot {
             .ok_or_else(|| ObservationError::UnknownObservationLocation {
                 location: procedure_transform_types_location(&coordinate, key_position),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureTransformTypesSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureTransformTypesSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 

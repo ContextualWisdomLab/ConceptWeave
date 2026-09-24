@@ -63,10 +63,12 @@ fn ordinary_exclude_operator_procedure_planner_support_preserves_exact_catalog_s
     assert_eq!(receipt.location().planner_support(), Some(&support));
     assert_eq!(receipt.source_id(), access_control.source_connection_key());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
-    assert!(receipt
-        .location()
-        .canonical_location()
-        .ends_with("/1/procedure-planner-support"));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/1/procedure-planner-support")
+    );
 }
 
 #[test]

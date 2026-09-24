@@ -1,5 +1,7 @@
 use conceptweave_observation::ObservationError;
-use conceptweave_relation_partition::{CollationCatalogIdentity, PostgresDatabaseEncodingObservation};
+use conceptweave_relation_partition::{
+    CollationCatalogIdentity, PostgresDatabaseEncodingObservation,
+};
 
 #[test]
 fn postgres18_database_encoding_rejects_catalog_identity_from_another_database_encoding() {

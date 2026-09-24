@@ -87,25 +87,34 @@ fn index(name: &str, exclusion: bool) -> IndexObservation {
         .unwrap(),
     ])
     .unwrap()
-    .with_catalog_flags(IndexCatalogFlags::new(false, exclusion, true, false, false, false))
+    .with_catalog_flags(IndexCatalogFlags::new(
+        false, exclusion, true, false, false, false,
+    ))
     .unwrap()
     .with_valid(true)
 }
 
-fn relation(name: &str, kind: RelationKind, index_name: &str, exclusion: bool) -> RelationObservation {
+fn relation(
+    name: &str,
+    kind: RelationKind,
+    index_name: &str,
+    exclusion: bool,
+) -> RelationObservation {
     RelationObservation::new(
         "public",
         name,
         kind,
-        vec![ColumnObservationV3::new(
-            "account_id",
-            1,
-            "integer",
-            QualifiedTypeName::new("pg_catalog", "int4").unwrap(),
-            false,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "account_id",
+                1,
+                "integer",
+                QualifiedTypeName::new("pg_catalog", "int4").unwrap(),
+                false,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
     .with_indexes(vec![index(index_name, exclusion)])
@@ -206,10 +215,7 @@ fn predecessor(
         &base,
         &relations,
         &indexes,
-        vec![
-            family(parent_index()),
-            family(child_index()),
-        ],
+        vec![family(parent_index()), family(child_index())],
     )
     .unwrap();
     (base, relations, indexes, families)
@@ -235,19 +241,10 @@ fn exclusion(
     IndexKeyExclusionSemanticsObservation::new(
         index,
         1,
-        QualifiedOperatorSignature::new(
-            "pg_catalog",
-            operator_name,
-            int4.clone(),
-            int4.clone(),
-        )
-        .unwrap(),
-        QualifiedProcedureSignature::new(
-            "pg_catalog",
-            procedure_name,
-            vec![int4.clone(), int4],
-        )
-        .unwrap(),
+        QualifiedOperatorSignature::new("pg_catalog", operator_name, int4.clone(), int4.clone())
+            .unwrap(),
+        QualifiedProcedureSignature::new("pg_catalog", procedure_name, vec![int4.clone(), int4])
+            .unwrap(),
         strategy,
     )
     .unwrap()
@@ -257,8 +254,9 @@ fn exclusion(
 fn attached_child_must_preserve_exclusion_presence() {
     let (base, relations, indexes, families) = predecessor(true, false);
 
-    let error = IndexExclusionSemanticsSnapshot::new(&base, &relations, &indexes, &families, vec![])
-        .expect_err("PostgreSQL CompareIndexInfo rejects one-sided exclusion semantics");
+    let error =
+        IndexExclusionSemanticsSnapshot::new(&base, &relations, &indexes, &families, vec![])
+            .expect_err("PostgreSQL CompareIndexInfo rejects one-sided exclusion semantics");
 
     assert_eq!(
         error,
@@ -273,9 +271,24 @@ fn attached_child_must_preserve_exclusion_operator_procedure_and_strategy() {
     let (base, relations, indexes, families) = predecessor(true, true);
 
     for (child_operator, child_procedure, child_strategy, expected_field) in [
-        ("<", "int4lt", 3, "index_partition_definition_exclusion_operator"),
-        ("=", "int4lt", 3, "index_partition_definition_exclusion_procedure"),
-        ("=", "int4eq", 1, "index_partition_definition_exclusion_strategy"),
+        (
+            "<",
+            "int4lt",
+            3,
+            "index_partition_definition_exclusion_operator",
+        ),
+        (
+            "=",
+            "int4lt",
+            3,
+            "index_partition_definition_exclusion_procedure",
+        ),
+        (
+            "=",
+            "int4eq",
+            1,
+            "index_partition_definition_exclusion_strategy",
+        ),
     ] {
         let error = IndexExclusionSemanticsSnapshot::new(
             &base,
@@ -284,7 +297,12 @@ fn attached_child_must_preserve_exclusion_operator_procedure_and_strategy() {
             &families,
             vec![
                 exclusion(parent_index(), "=", "int4eq", 3),
-                exclusion(child_index(), child_operator, child_procedure, child_strategy),
+                exclusion(
+                    child_index(),
+                    child_operator,
+                    child_procedure,
+                    child_strategy,
+                ),
             ],
         )
         .expect_err("every exclusion key semantic must match its attached parent");

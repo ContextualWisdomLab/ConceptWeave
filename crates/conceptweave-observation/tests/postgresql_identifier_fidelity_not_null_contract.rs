@@ -4,13 +4,9 @@ use conceptweave_observation::{
 
 #[test]
 fn not_null_identifiers_preserve_quoted_whitespace() {
-    let parent = ParentNotNullConstraintCoordinate::new(
-        "  ",
-        "\t",
-        RelationKind::PartitionedTable,
-        " \t",
-    )
-    .expect("quoted PostgreSQL identifiers may consist of whitespace");
+    let parent =
+        ParentNotNullConstraintCoordinate::new("  ", "\t", RelationKind::PartitionedTable, " \t")
+            .expect("quoted PostgreSQL identifiers may consist of whitespace");
     assert_eq!(parent.schema_name(), "  ");
     assert_eq!(parent.relation_name(), "\t");
     assert_eq!(parent.constraint_name(), " \t");

@@ -165,9 +165,9 @@ impl IndexExclusionConstraintImmediacySnapshot {
                 .find(|candidate| candidate.coordinate() == timing.coordinate())
                 .ok_or_else(|| invalid("index_exclusion_constraint_immediacy_completeness"))?;
             let backing_index = find_backing_index(base_snapshot, constraint.backing_index())?;
-            let flags = backing_index.catalog_flags().ok_or_else(|| {
-                invalid("index_exclusion_constraint_immediacy_catalog_flags")
-            })?;
+            let flags = backing_index
+                .catalog_flags()
+                .ok_or_else(|| invalid("index_exclusion_constraint_immediacy_catalog_flags"))?;
             let index_immediate = flags.immediate();
             if index_immediate == timing.deferrable() {
                 return Err(invalid("index_exclusion_constraint_immediacy_state"));

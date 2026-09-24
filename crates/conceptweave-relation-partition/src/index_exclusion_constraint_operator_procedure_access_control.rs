@@ -267,7 +267,9 @@ impl IndexExclusionConstraintOperatorProcedureAccessControlSourceReceipt {
 
     /// Returns the exact validated access-control observation without exposing role ACL plaintext.
     #[must_use]
-    pub const fn location(&self) -> &IndexExclusionConstraintOperatorProcedureAccessControlObservation {
+    pub const fn location(
+        &self,
+    ) -> &IndexExclusionConstraintOperatorProcedureAccessControlObservation {
         &self.location
     }
 }
@@ -343,7 +345,9 @@ impl IndexExclusionConstraintOperatorProcedureAccessControlSnapshot {
         );
         Ok(Self {
             source_connection_key: configuration_snapshot.source_connection_key().to_owned(),
-            connection_policy_binding: configuration_snapshot.connection_policy_binding().to_owned(),
+            connection_policy_binding: configuration_snapshot
+                .connection_policy_binding()
+                .to_owned(),
             snapshot_digest,
             extractor_revision: configuration_snapshot.extractor_revision().to_owned(),
             observed_at_utc: configuration_snapshot.observed_at_utc().to_owned(),
@@ -383,7 +387,9 @@ impl IndexExclusionConstraintOperatorProcedureAccessControlSnapshot {
 
     /// Returns complete access-control observations in deterministic constraint/key order.
     #[must_use]
-    pub fn observations(&self) -> &[IndexExclusionConstraintOperatorProcedureAccessControlObservation] {
+    pub fn observations(
+        &self,
+    ) -> &[IndexExclusionConstraintOperatorProcedureAccessControlObservation] {
         &self.observations
     }
 
@@ -404,14 +410,16 @@ impl IndexExclusionConstraintOperatorProcedureAccessControlSnapshot {
             .ok_or_else(|| ObservationError::UnknownObservationLocation {
                 location: procedure_access_control_location(&coordinate, key_position),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureAccessControlSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureAccessControlSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 
@@ -466,10 +474,7 @@ fn encode_procedure(hasher: &mut Sha256, procedure: &QualifiedProcedureSignature
     }
 }
 
-fn encode_type(
-    hasher: &mut Sha256,
-    qualified_type: &conceptweave_observation::QualifiedTypeName,
-) {
+fn encode_type(hasher: &mut Sha256, qualified_type: &conceptweave_observation::QualifiedTypeName) {
     encode_str(hasher, qualified_type.schema_name());
     encode_str(hasher, qualified_type.type_name());
 }

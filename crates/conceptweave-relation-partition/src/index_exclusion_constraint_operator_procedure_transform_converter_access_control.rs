@@ -157,7 +157,8 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterAccessCont
     direction: IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
     converter_schema_name: String,
     converter_function_name: String,
-    access_control: IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlMaterial,
+    access_control:
+        IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlMaterial,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlObservation {
@@ -313,9 +314,8 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterAccessCont
     converter_snapshot_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
-    observations: Vec<
-        IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlObservation,
-    >,
+    observations:
+        Vec<IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlObservation>,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot {
@@ -434,7 +434,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSna
     #[must_use]
     pub fn observations(
         &self,
-    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlObservation] {
+    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlObservation]
+    {
         &self.observations
     }
 
@@ -466,14 +467,16 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSna
                     direction,
                 ),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 

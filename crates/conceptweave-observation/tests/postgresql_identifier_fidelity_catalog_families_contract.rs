@@ -5,13 +5,9 @@ use conceptweave_observation::{
 
 #[test]
 fn catalog_family_coordinates_preserve_quoted_whitespace_identifiers() {
-    let generation = ColumnGenerationObservation::not_generated(
-        "  ",
-        "\t",
-        RelationKind::Table,
-        " \t ",
-    )
-    .expect("generated-column coordinates preserve exact quoted identifiers");
+    let generation =
+        ColumnGenerationObservation::not_generated("  ", "\t", RelationKind::Table, " \t ")
+            .expect("generated-column coordinates preserve exact quoted identifiers");
     assert_eq!(generation.schema_name(), "  ");
     assert_eq!(generation.relation_name(), "\t");
     assert_eq!(generation.column_name(), " \t ");
@@ -28,14 +24,8 @@ fn catalog_family_coordinates_preserve_quoted_whitespace_identifiers() {
     assert_eq!(timing.relation_name(), "  ");
     assert_eq!(timing.constraint_name(), "\t");
 
-    let period = ConstraintPeriodObservation::new(
-        " ",
-        "\t ",
-        RelationKind::Table,
-        "  ",
-        false,
-    )
-    .expect("temporal-constraint coordinates preserve exact quoted identifiers");
+    let period = ConstraintPeriodObservation::new(" ", "\t ", RelationKind::Table, "  ", false)
+        .expect("temporal-constraint coordinates preserve exact quoted identifiers");
     assert_eq!(period.schema_name(), " ");
     assert_eq!(period.relation_name(), "\t ");
     assert_eq!(period.constraint_name(), "  ");

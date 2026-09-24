@@ -17,8 +17,7 @@ use super::{
 };
 
 const COMPOSED_SCHEMA_DIGEST_DOMAIN_V1: &[u8] = b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.operator_family.exclusion.expression_semantics.relation_var.node_schema.v1";
-const COMPOSED_SCHEMA_REVISION_V1: &str =
-    "postgresql-18-equal-node-schema-plus-relation-var-v1";
+const COMPOSED_SCHEMA_REVISION_V1: &str = "postgresql-18-equal-node-schema-plus-relation-var-v1";
 const SHA256_DIGEST_PREFIX: &str = "sha256:";
 
 /// Immutable proof that one exact Var-bearing expression predecessor satisfies both historical
@@ -60,7 +59,9 @@ impl IndexExpressionRelationVarNodeSchemaSnapshot {
             || rebound_node_schema.predecessor_digest()
                 != node_schema_predecessor.predecessor_digest()
         {
-            return Err(invalid("index_expression_relation_var_node_schema_predecessor"));
+            return Err(invalid(
+                "index_expression_relation_var_node_schema_predecessor",
+            ));
         }
 
         let rebound_relation_var = IndexExpressionRelationVarSnapshot::new(
@@ -86,7 +87,9 @@ impl IndexExpressionRelationVarNodeSchemaSnapshot {
             || node_schema_predecessor.observed_at_utc()
                 != relation_var_predecessor.observed_at_utc()
         {
-            return Err(invalid("index_expression_relation_var_node_schema_provenance"));
+            return Err(invalid(
+                "index_expression_relation_var_node_schema_provenance",
+            ));
         }
 
         let node_schema_predecessor_digest = node_schema_predecessor.snapshot_digest().to_owned();

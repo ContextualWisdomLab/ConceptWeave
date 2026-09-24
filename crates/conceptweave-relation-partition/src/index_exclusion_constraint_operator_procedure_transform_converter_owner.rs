@@ -169,7 +169,9 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterOwnerObservation
 
     /// Returns the exact raw and resolved owner identity.
     #[must_use]
-    pub const fn owner(&self) -> &IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity {
+    pub const fn owner(
+        &self,
+    ) -> &IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity {
         &self.owner
     }
 
@@ -295,10 +297,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot {
                 })
             })
             .collect::<BTreeSet<_>>();
-        let observed = observations
-            .iter()
-            .map(owner_key)
-            .collect::<BTreeSet<_>>();
+        let observed = observations.iter().map(owner_key).collect::<BTreeSet<_>>();
         if observed.len() != observations.len() {
             return Err(invalid(
                 "index_exclusion_constraint_operator_procedure_transform_converter_owner_coordinate",
@@ -420,8 +419,10 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot {
         key_position: u32,
         transform_type: QualifiedTypeName,
         direction: IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
-    ) -> Result<IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSourceReceipt, ObservationError>
-    {
+    ) -> Result<
+        IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSourceReceipt,
+        ObservationError,
+    > {
         let observation = self
             .observations
             .iter()
@@ -439,14 +440,16 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot {
                     direction,
                 ),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 

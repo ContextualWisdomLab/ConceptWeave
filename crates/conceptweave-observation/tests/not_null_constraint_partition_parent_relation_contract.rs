@@ -14,15 +14,17 @@ fn child_relation() -> RelationObservation {
         "public",
         "metric_2026",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "raw_value",
-            1,
-            "numeric",
-            catalog_type("numeric"),
-            false,
-            None,
-        )
-        .expect("column fixture is valid")],
+        vec![
+            ColumnObservationV3::new(
+                "raw_value",
+                1,
+                "numeric",
+                catalog_type("numeric"),
+                false,
+                None,
+            )
+            .expect("column fixture is valid"),
+        ],
     )
     .expect("child relation fixture is valid")
 }
@@ -94,7 +96,9 @@ fn direct_partition_parent_witness_without_conparentid_is_rejected() {
         Vec::new(),
         vec![child],
     )
-    .expect_err("a pg_inherits witness without nonzero conparentid is contradictory source evidence");
+    .expect_err(
+        "a pg_inherits witness without nonzero conparentid is contradictory source evidence",
+    );
 
     assert_eq!(
         error,

@@ -285,10 +285,7 @@ pub(crate) fn compute_column_identity_digest(
     column_identities: &[ColumnIdentityObservation],
 ) -> String {
     let mut hasher = Sha256::new();
-    encode_bytes(
-        &mut hasher,
-        SNAPSHOT_DIGEST_DOMAIN_V3_COLUMN_IDENTITY_V1,
-    );
+    encode_bytes(&mut hasher, SNAPSHOT_DIGEST_DOMAIN_V3_COLUMN_IDENTITY_V1);
     encode_str(&mut hasher, base_snapshot_digest);
     encode_len(&mut hasher, column_identities.len());
     for observation in column_identities {

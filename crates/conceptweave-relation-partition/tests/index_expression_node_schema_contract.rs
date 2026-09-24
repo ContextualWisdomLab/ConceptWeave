@@ -1,8 +1,8 @@
 use conceptweave_observation::{ObservationError, QualifiedTypeName};
 use conceptweave_relation_partition::{
-    validate_postgres18_equal_schema, validate_postgres18_equal_schema_v2, CanonicalExpression,
-    CanonicalExpressionField, CanonicalExpressionValue, QualifiedFunctionSignature,
-    QualifiedOperatorSignature,
+    CanonicalExpression, CanonicalExpressionField, CanonicalExpressionValue,
+    QualifiedFunctionSignature, QualifiedOperatorSignature, validate_postgres18_equal_schema,
+    validate_postgres18_equal_schema_v2,
 };
 
 fn field(name: &str, value: CanonicalExpressionValue) -> CanonicalExpressionField {
@@ -45,13 +45,7 @@ fn incomplete_op_expr() -> CanonicalExpression {
             field(
                 "operator",
                 CanonicalExpressionValue::Operator(
-                    QualifiedOperatorSignature::new(
-                        "pg_catalog",
-                        ">",
-                        int4.clone(),
-                        int4,
-                    )
-                    .unwrap(),
+                    QualifiedOperatorSignature::new("pg_catalog", ">", int4.clone(), int4).unwrap(),
                 ),
             ),
             field(
@@ -74,13 +68,7 @@ fn complete_zero_arg_func_expr() -> CanonicalExpression {
             field(
                 "function",
                 CanonicalExpressionValue::Function(
-                    QualifiedFunctionSignature::new(
-                        "pg_catalog",
-                        "pi",
-                        vec![],
-                        float8,
-                    )
-                    .unwrap(),
+                    QualifiedFunctionSignature::new("pg_catalog", "pi", vec![], float8).unwrap(),
                 ),
             ),
             field("returns_set", CanonicalExpressionValue::Boolean(false)),
@@ -105,13 +93,8 @@ fn complete_zero_arg_op_expr() -> CanonicalExpression {
             field(
                 "operator",
                 CanonicalExpressionValue::Operator(
-                    QualifiedOperatorSignature::new(
-                        "pg_catalog",
-                        ">",
-                        float8.clone(),
-                        float8,
-                    )
-                    .unwrap(),
+                    QualifiedOperatorSignature::new("pg_catalog", ">", float8.clone(), float8)
+                        .unwrap(),
                 ),
             ),
             field("result_type", CanonicalExpressionValue::Type(bool_type)),
@@ -197,10 +180,9 @@ fn v1_relation_var_admission_is_preserved_for_digest_family_stability() {
 
 #[test]
 fn v2_relation_var_leaves_fail_closed_until_complete_var_semantics_are_versioned() {
-    let column_error = validate_postgres18_equal_schema_v2(
-        &CanonicalExpression::column("account_email").unwrap(),
-    )
-    .expect_err("node_schema.v2 must not certify a column-name-only Var leaf");
+    let column_error =
+        validate_postgres18_equal_schema_v2(&CanonicalExpression::column("account_email").unwrap())
+            .expect_err("node_schema.v2 must not certify a column-name-only Var leaf");
     assert_eq!(
         column_error,
         ObservationError::InvalidObservationField {

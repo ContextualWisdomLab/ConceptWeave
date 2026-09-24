@@ -104,15 +104,17 @@ fn relation(
         "public",
         name,
         kind,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            true,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                true,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
     .with_indexes(vec![index(
@@ -259,6 +261,7 @@ fn attached_child_must_preserve_access_method_definition() {
 fn matching_modeled_definition_properties_remain_admissible() {
     let (base, relations) = snapshots(true, true, Some(true), Some(true), "btree", "btree");
 
-    attached_snapshot(&base, &relations)
-        .expect("matching uniqueness, NULLS NOT DISTINCT, and access method must remain admissible");
+    attached_snapshot(&base, &relations).expect(
+        "matching uniqueness, NULLS NOT DISTINCT, and access method must remain admissible",
+    );
 }

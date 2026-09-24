@@ -19,7 +19,8 @@ use conceptweave_observation::{ObservationError, QualifiedTypeName};
 use sha2::{Digest, Sha256};
 
 use super::{
-    IndexExclusionConstraintCoordinate, IndexExclusionConstraintOperatorProcedureDefinitionSnapshot,
+    IndexExclusionConstraintCoordinate,
+    IndexExclusionConstraintOperatorProcedureDefinitionSnapshot,
     IndexExclusionConstraintOperatorProcedureTransformTypesSnapshot, QualifiedOperatorSignature,
     QualifiedProcedureSignature,
 };
@@ -256,8 +257,14 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterObservation {
             "index_exclusion_constraint_operator_procedure_transform_converter_target_language",
         )?;
         converters.sort_by(|left, right| {
-            (left.transform_type().schema_name(), left.transform_type().type_name())
-                .cmp(&(right.transform_type().schema_name(), right.transform_type().type_name()))
+            (
+                left.transform_type().schema_name(),
+                left.transform_type().type_name(),
+            )
+                .cmp(&(
+                    right.transform_type().schema_name(),
+                    right.transform_type().type_name(),
+                ))
         });
         if converters
             .windows(2)
@@ -389,7 +396,9 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot {
     pub fn new(
         transform_types_snapshot: &IndexExclusionConstraintOperatorProcedureTransformTypesSnapshot,
         definition_snapshot: &IndexExclusionConstraintOperatorProcedureDefinitionSnapshot,
-        mut observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterObservation>,
+        mut observations: Vec<
+            IndexExclusionConstraintOperatorProcedureTransformConverterObservation,
+        >,
     ) -> Result<Self, ObservationError> {
         if transform_types_snapshot.source_connection_key()
             != definition_snapshot.source_connection_key()
@@ -574,14 +583,16 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot {
             .ok_or_else(|| ObservationError::UnknownObservationLocation {
                 location: procedure_transform_converter_location(&coordinate, key_position),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureTransformConverterSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureTransformConverterSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 
@@ -607,7 +618,8 @@ fn compute_transform_converter_digest(
     observations: &[IndexExclusionConstraintOperatorProcedureTransformConverterObservation],
 ) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_DIGEST_DOMAIN_V1);
+    hasher
+        .update(INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_DIGEST_DOMAIN_V1);
     encode_str(&mut hasher, predecessor_digest);
     encode_len(&mut hasher, observations.len());
     for observation in observations {

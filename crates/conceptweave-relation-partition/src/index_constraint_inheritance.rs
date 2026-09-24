@@ -172,10 +172,8 @@ impl IndexConstraintInheritanceSnapshot {
             }
         }
 
-        let snapshot_digest = compute_inheritance_digest(
-            parentage_snapshot.snapshot_digest(),
-            &observations,
-        );
+        let snapshot_digest =
+            compute_inheritance_digest(parentage_snapshot.snapshot_digest(), &observations);
         Ok(Self {
             source_connection_key: parentage_snapshot.source_connection_key().to_owned(),
             connection_policy_binding: parentage_snapshot.connection_policy_binding().to_owned(),

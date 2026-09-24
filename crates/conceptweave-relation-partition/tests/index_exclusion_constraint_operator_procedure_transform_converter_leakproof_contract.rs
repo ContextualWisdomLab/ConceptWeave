@@ -1,12 +1,14 @@
-include!("index_exclusion_constraint_operator_procedure_transform_converter_security_definer_contract.rs");
+include!(
+    "index_exclusion_constraint_operator_procedure_transform_converter_security_definer_contract.rs"
+);
 
 use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofObservation,
     IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofSnapshot,
 };
 
-fn converter_security_definer_snapshot(
-) -> IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerSnapshot {
+fn converter_security_definer_snapshot()
+-> IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerSnapshot {
     let predecessor = converter_configuration_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerSnapshot::new(
         &predecessor,
@@ -32,8 +34,8 @@ fn converter_leakproof_observation(
     .unwrap()
 }
 
-fn complete_leakproof_observations(
-) -> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofObservation> {
+fn complete_leakproof_observations()
+-> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofObservation> {
     vec![
         converter_leakproof_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
@@ -51,11 +53,12 @@ fn complete_leakproof_observations(
 #[test]
 fn ordinary_exclude_transform_converter_leakproof_preserves_raw_proleakproof() {
     let predecessor = converter_security_definer_snapshot();
-    let snapshot = IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofSnapshot::new(
-        &predecessor,
-        complete_leakproof_observations(),
-    )
-    .unwrap();
+    let snapshot =
+        IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofSnapshot::new(
+            &predecessor,
+            complete_leakproof_observations(),
+        )
+        .unwrap();
     let receipt = snapshot
         .source_receipt(
             coordinate(),
@@ -72,38 +75,44 @@ fn ordinary_exclude_transform_converter_leakproof_preserves_raw_proleakproof() {
         receipt.connection_policy_binding(),
         predecessor.connection_policy_binding()
     );
-    assert_eq!(receipt.extractor_revision(), predecessor.extractor_revision());
+    assert_eq!(
+        receipt.extractor_revision(),
+        predecessor.extractor_revision()
+    );
     assert_eq!(receipt.observed_at_utc(), predecessor.observed_at_utc());
 }
 
 #[test]
-fn ordinary_exclude_transform_converter_leakproof_location_is_collision_safe_for_quoted_type_names() {
+fn ordinary_exclude_transform_converter_leakproof_location_is_collision_safe_for_quoted_type_names()
+{
     let dotted_schema =
         conceptweave_observation::QualifiedTypeName::new("payload.domain", "json").unwrap();
     let dotted_type =
         conceptweave_observation::QualifiedTypeName::new("payload", "domain.json").unwrap();
-    let schema_location = IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofObservation::new(
-        coordinate(),
-        1,
-        dotted_schema,
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        false,
-    )
-    .unwrap()
-    .canonical_location();
-    let type_location = IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofObservation::new(
-        coordinate(),
-        1,
-        dotted_type,
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        false,
-    )
-    .unwrap()
-    .canonical_location();
+    let schema_location =
+        IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofObservation::new(
+            coordinate(),
+            1,
+            dotted_schema,
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            false,
+        )
+        .unwrap()
+        .canonical_location();
+    let type_location =
+        IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofObservation::new(
+            coordinate(),
+            1,
+            dotted_type,
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            false,
+        )
+        .unwrap()
+        .canonical_location();
 
     assert_ne!(schema_location, type_location);
 }
@@ -123,11 +132,12 @@ fn ordinary_exclude_transform_converter_leakproof_distinguishes_false_from_true(
         "payload_from_sql",
         true,
     );
-    let leakproof = IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofSnapshot::new(
-        &predecessor,
-        changed,
-    )
-    .unwrap();
+    let leakproof =
+        IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofSnapshot::new(
+            &predecessor,
+            changed,
+        )
+        .unwrap();
 
     assert_ne!(nonleakproof.snapshot_digest(), leakproof.snapshot_digest());
 }
@@ -191,27 +201,29 @@ fn ordinary_exclude_transform_converter_leakproof_rejects_duplicate_coordinate()
 
 #[test]
 fn ordinary_exclude_transform_converter_leakproof_rejects_zero_position() {
-    let error = IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofObservation::new(
-        coordinate(),
-        0,
-        custom_payload_type(),
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        false,
-    )
-    .expect_err("converter positions are one-based");
+    let error =
+        IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofObservation::new(
+            coordinate(),
+            0,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            false,
+        )
+        .expect_err("converter positions are one-based");
     assert_eq!(error, ObservationError::InvalidOrdinalPosition);
 }
 
 #[test]
 fn ordinary_exclude_transform_converter_leakproof_rejects_unknown_receipt_coordinate() {
     let predecessor = converter_security_definer_snapshot();
-    let snapshot = IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofSnapshot::new(
-        &predecessor,
-        complete_leakproof_observations(),
-    )
-    .unwrap();
+    let snapshot =
+        IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofSnapshot::new(
+            &predecessor,
+            complete_leakproof_observations(),
+        )
+        .unwrap();
     let error = snapshot
         .source_receipt(
             coordinate(),
@@ -228,7 +240,9 @@ fn ordinary_exclude_transform_converter_leakproof_rejects_unknown_receipt_coordi
 
 #[test]
 fn ordinary_exclude_transform_converter_leakproof_snapshot_is_publicly_composed() {
-    assert!(std::mem::size_of::<
-        IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofSnapshot,
-    >() > 0);
+    assert!(
+        std::mem::size_of::<
+            IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofSnapshot,
+        >() > 0
+    );
 }

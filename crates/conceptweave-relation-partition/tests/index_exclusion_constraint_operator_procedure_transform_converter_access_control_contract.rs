@@ -7,7 +7,8 @@ use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterExecuteGrant,
 };
 
-fn converter_owner_snapshot() -> IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot {
+fn converter_owner_snapshot()
+-> IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot {
     let predecessor = converter_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot::new(
         &predecessor,
@@ -57,8 +58,8 @@ fn access_control_observation(
     .unwrap()
 }
 
-fn complete_access_control_observations(
-) -> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlObservation> {
+fn complete_access_control_observations()
+-> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlObservation> {
     vec![
         access_control_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
@@ -78,11 +79,12 @@ fn complete_access_control_observations(
 #[test]
 fn ordinary_exclude_transform_converter_acl_preserves_proacl_state_and_execute_grants() {
     let predecessor = converter_owner_snapshot();
-    let snapshot = IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
-        &predecessor,
-        complete_access_control_observations(),
-    )
-    .unwrap();
+    let snapshot =
+        IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
+            &predecessor,
+            complete_access_control_observations(),
+        )
+        .unwrap();
     let receipt = snapshot
         .source_receipt(
             coordinate(),
@@ -100,11 +102,12 @@ fn ordinary_exclude_transform_converter_acl_preserves_proacl_state_and_execute_g
 #[test]
 fn ordinary_exclude_transform_converter_acl_distinguishes_null_from_explicit_acl() {
     let predecessor = converter_owner_snapshot();
-    let explicit = IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
-        &predecessor,
-        complete_access_control_observations(),
-    )
-    .unwrap();
+    let explicit =
+        IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
+            &predecessor,
+            complete_access_control_observations(),
+        )
+        .unwrap();
     let mut null_acl = complete_access_control_observations();
     null_acl[0] = access_control_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
@@ -112,22 +115,24 @@ fn ordinary_exclude_transform_converter_acl_distinguishes_null_from_explicit_acl
         true,
         "transform_client",
     );
-    let implicit = IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
-        &predecessor,
-        null_acl,
-    )
-    .unwrap();
+    let implicit =
+        IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
+            &predecessor,
+            null_acl,
+        )
+        .unwrap();
     assert_ne!(explicit.snapshot_digest(), implicit.snapshot_digest());
 }
 
 #[test]
 fn ordinary_exclude_transform_converter_acl_distinguishes_execute_grant_changes() {
     let predecessor = converter_owner_snapshot();
-    let left = IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
-        &predecessor,
-        complete_access_control_observations(),
-    )
-    .unwrap();
+    let left =
+        IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
+            &predecessor,
+            complete_access_control_observations(),
+        )
+        .unwrap();
     let mut changed = complete_access_control_observations();
     changed[0] = access_control_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
@@ -135,27 +140,29 @@ fn ordinary_exclude_transform_converter_acl_distinguishes_execute_grant_changes(
         false,
         "transform_auditor",
     );
-    let right = IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
-        &predecessor,
-        changed,
-    )
-    .unwrap();
+    let right =
+        IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
+            &predecessor,
+            changed,
+        )
+        .unwrap();
     assert_ne!(left.snapshot_digest(), right.snapshot_digest());
 }
 
 #[test]
 fn ordinary_exclude_transform_converter_acl_rejects_missing_direction() {
     let predecessor = converter_owner_snapshot();
-    let error = IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
-        &predecessor,
-        vec![access_control_observation(
-            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-            "payload_from_sql",
-            false,
-            "transform_client",
-        )],
-    )
-    .expect_err("every nonzero converter direction must carry one ACL observation");
+    let error =
+        IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
+            &predecessor,
+            vec![access_control_observation(
+                IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+                "payload_from_sql",
+                false,
+                "transform_client",
+            )],
+        )
+        .expect_err("every nonzero converter direction must carry one ACL observation");
     assert_field(
         error,
         "index_exclusion_constraint_operator_procedure_transform_converter_access_control_completeness",
@@ -172,11 +179,12 @@ fn ordinary_exclude_transform_converter_acl_rejects_binding_drift() {
         false,
         "transform_client",
     );
-    let error = IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
-        &predecessor,
-        observations,
-    )
-    .expect_err("ACL evidence must remain bound to the exact converter function");
+    let error =
+        IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
+            &predecessor,
+            observations,
+        )
+        .expect_err("ACL evidence must remain bound to the exact converter function");
     assert_field(
         error,
         "index_exclusion_constraint_operator_procedure_transform_converter_access_control_binding",
@@ -190,11 +198,12 @@ fn ordinary_exclude_transform_converter_acl_rejects_duplicate_grant() {
         false,
     )
     .unwrap();
-    let error = IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlMaterial::new(
-        false,
-        vec![grant.clone(), grant],
-    )
-    .expect_err("duplicate effective EXECUTE grant evidence must fail closed");
+    let error =
+        IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlMaterial::new(
+            false,
+            vec![grant.clone(), grant],
+        )
+        .expect_err("duplicate effective EXECUTE grant evidence must fail closed");
     assert_field(
         error,
         "index_exclusion_constraint_operator_procedure_transform_converter_access_control_grant",
@@ -203,5 +212,9 @@ fn ordinary_exclude_transform_converter_acl_rejects_duplicate_grant() {
 
 #[test]
 fn ordinary_exclude_transform_converter_acl_snapshot_is_publicly_composed() {
-    assert!(std::mem::size_of::<IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot>() > 0);
+    assert!(
+        std::mem::size_of::<
+            IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot,
+        >() > 0
+    );
 }

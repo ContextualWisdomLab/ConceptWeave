@@ -50,18 +50,29 @@ fn ordinary_exclude_operator_procedure_leakproof_preserves_raw_provenance() {
     assert!(!receipt.location().leakproof());
     assert_eq!(receipt.location().operator(), &operator("="));
     assert_eq!(receipt.location().procedure(), &procedure("int4eq"));
-    assert_eq!(receipt.source_id(), security_definer.source_connection_key());
+    assert_eq!(
+        receipt.source_id(),
+        security_definer.source_connection_key()
+    );
     assert_eq!(
         receipt.connection_policy_binding(),
         security_definer.connection_policy_binding()
     );
-    assert_eq!(receipt.extractor_revision(), security_definer.extractor_revision());
-    assert_eq!(receipt.observed_at_utc(), security_definer.observed_at_utc());
+    assert_eq!(
+        receipt.extractor_revision(),
+        security_definer.extractor_revision()
+    );
+    assert_eq!(
+        receipt.observed_at_utc(),
+        security_definer.observed_at_utc()
+    );
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
-    assert!(receipt
-        .location()
-        .canonical_location()
-        .ends_with("/1/procedure-leakproof"));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/1/procedure-leakproof")
+    );
 }
 
 #[test]
@@ -87,11 +98,13 @@ fn ordinary_exclude_operator_procedure_leakproof_distinguishes_security_planner_
     .unwrap();
 
     assert_ne!(not_leakproof.snapshot_digest(), leakproof.snapshot_digest());
-    assert!(leakproof
-        .source_receipt(coordinate(), 1)
-        .unwrap()
-        .location()
-        .leakproof());
+    assert!(
+        leakproof
+            .source_receipt(coordinate(), 1)
+            .unwrap()
+            .location()
+            .leakproof()
+    );
 }
 
 #[test]
@@ -133,11 +146,9 @@ fn ordinary_exclude_operator_procedure_leakproof_rejects_operator_binding_drift(
 #[test]
 fn ordinary_exclude_operator_procedure_leakproof_rejects_missing_evidence() {
     let security_definer = security_definer_snapshot();
-    let error = IndexExclusionConstraintOperatorProcedureLeakproofSnapshot::new(
-        &security_definer,
-        vec![],
-    )
-    .expect_err("every governed operator function needs raw proleakproof evidence");
+    let error =
+        IndexExclusionConstraintOperatorProcedureLeakproofSnapshot::new(&security_definer, vec![])
+            .expect_err("every governed operator function needs raw proleakproof evidence");
     assert_field(
         error,
         "index_exclusion_constraint_operator_procedure_leakproof_completeness",

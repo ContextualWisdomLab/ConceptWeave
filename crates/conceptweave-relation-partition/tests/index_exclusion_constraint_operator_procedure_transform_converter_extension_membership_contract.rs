@@ -1,12 +1,14 @@
-include!("index_exclusion_constraint_operator_procedure_transform_converter_transform_types_contract.rs");
+include!(
+    "index_exclusion_constraint_operator_procedure_transform_converter_transform_types_contract.rs"
+);
 
 use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipObservation,
     IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipSnapshot,
 };
 
-fn converter_transform_types_snapshot(
-) -> IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSnapshot {
+fn converter_transform_types_snapshot()
+-> IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSnapshot {
     let predecessor = converter_argument_names_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSnapshot::new(
         &predecessor,
@@ -32,8 +34,8 @@ fn converter_extension_membership_observation(
     .unwrap()
 }
 
-fn complete_converter_extension_membership_observations(
-) -> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipObservation> {
+fn complete_converter_extension_membership_observations()
+-> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipObservation> {
     vec![
         converter_extension_membership_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
@@ -69,7 +71,10 @@ fn ordinary_exclude_converter_extension_membership_preserves_absence_and_exact_m
         member_observations,
     )
     .unwrap();
-    assert_eq!(member.observations()[0].extension_name(), Some("payload_codec"));
+    assert_eq!(
+        member.observations()[0].extension_name(),
+        Some("payload_codec")
+    );
     assert_ne!(absent.snapshot_digest(), member.snapshot_digest());
 
     let mut other_observations = complete_converter_extension_membership_observations();
@@ -105,7 +110,8 @@ fn ordinary_exclude_converter_extension_membership_rejects_blank_member_name() {
 }
 
 #[test]
-fn ordinary_exclude_converter_extension_membership_rejects_completeness_binding_and_duplicate_coordinates() {
+fn ordinary_exclude_converter_extension_membership_rejects_completeness_binding_and_duplicate_coordinates()
+ {
     let predecessor = converter_transform_types_snapshot();
     let missing = IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipSnapshot::new(
         &predecessor,
@@ -222,8 +228,16 @@ fn ordinary_exclude_converter_extension_membership_preserves_location_receipt_an
     assert_ne!(schema_location, type_location);
 
     for (schema, function, field) in [
-        (" ", "payload_from_sql", "index_exclusion_constraint_operator_procedure_transform_converter_extension_membership_function_schema"),
-        ("public", "\t", "index_exclusion_constraint_operator_procedure_transform_converter_extension_membership_function_name"),
+        (
+            " ",
+            "payload_from_sql",
+            "index_exclusion_constraint_operator_procedure_transform_converter_extension_membership_function_schema",
+        ),
+        (
+            "public",
+            "\t",
+            "index_exclusion_constraint_operator_procedure_transform_converter_extension_membership_function_name",
+        ),
     ] {
         let error = IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipObservation::new(
             coordinate(),
@@ -258,5 +272,8 @@ fn ordinary_exclude_converter_extension_membership_preserves_location_receipt_an
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         )
         .expect_err("receipt lookup remains exact-coordinate bound");
-    assert!(matches!(missing, ObservationError::UnknownObservationLocation { .. }));
+    assert!(matches!(
+        missing,
+        ObservationError::UnknownObservationLocation { .. }
+    ));
 }

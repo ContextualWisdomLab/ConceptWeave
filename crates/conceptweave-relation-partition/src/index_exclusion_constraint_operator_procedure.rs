@@ -227,10 +227,8 @@ impl IndexExclusionConstraintOperatorProcedureSnapshot {
             }
         }
 
-        let snapshot_digest = compute_procedure_digest(
-            operator_snapshot.snapshot_digest(),
-            &observations,
-        );
+        let snapshot_digest =
+            compute_procedure_digest(operator_snapshot.snapshot_digest(), &observations);
         Ok(Self {
             source_connection_key: operator_snapshot.source_connection_key().to_owned(),
             connection_policy_binding: operator_snapshot.connection_policy_binding().to_owned(),

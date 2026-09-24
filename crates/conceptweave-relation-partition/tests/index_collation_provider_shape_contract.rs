@@ -7,9 +7,7 @@ fn identity(name: &str, encoding: i32) -> CollationCatalogIdentity {
     CollationCatalogIdentity::new("pg_catalog", name, encoding).unwrap()
 }
 
-fn assert_provider_shape_error(
-    result: Result<CollationDefinitionObservation, ObservationError>,
-) {
+fn assert_provider_shape_error(result: Result<CollationDefinitionObservation, ObservationError>) {
     assert_eq!(
         result.expect_err("impossible PostgreSQL 18 provider/field shapes must fail closed"),
         ObservationError::InvalidObservationField {
@@ -114,11 +112,7 @@ fn nondeterminism_and_icu_rules_are_icu_only() {
 
 #[test]
 fn builtin_provider_accepts_only_postgresql18_builtin_locales() {
-    for (locale, encoding) in [
-        ("C", -1),
-        ("C.UTF-8", 6),
-        ("PG_UNICODE_FAST", 6),
-    ] {
+    for (locale, encoding) in [("C", -1), ("C.UTF-8", 6), ("PG_UNICODE_FAST", 6)] {
         CollationDefinitionObservation::new(
             identity("builtin", encoding),
             PostgresCollationProvider::Builtin,
@@ -130,7 +124,9 @@ fn builtin_provider_accepts_only_postgresql18_builtin_locales() {
             Some("1".to_owned()),
             Some("1".to_owned()),
         )
-        .expect("PostgreSQL 18 built-in locale with its canonical catalog encoding must be admitted");
+        .expect(
+            "PostgreSQL 18 built-in locale with its canonical catalog encoding must be admitted",
+        );
     }
 
     assert_provider_shape_error(CollationDefinitionObservation::new(

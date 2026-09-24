@@ -151,7 +151,10 @@ fn modifier(
     .unwrap()
 }
 
-fn complete_modifiers(parent_varchar: i32, child_varchar: i32) -> Vec<ColumnTypeModifierObservation> {
+fn complete_modifiers(
+    parent_varchar: i32,
+    child_varchar: i32,
+) -> Vec<ColumnTypeModifierObservation> {
     vec![
         modifier(
             "accounts",
@@ -165,12 +168,7 @@ fn complete_modifiers(parent_varchar: i32, child_varchar: i32) -> Vec<ColumnType
             "account_email",
             -1,
         ),
-        modifier(
-            "accounts_2026",
-            RelationKind::Table,
-            "account_email",
-            -1,
-        ),
+        modifier("accounts_2026", RelationKind::Table, "account_email", -1),
         modifier(
             "accounts_2026",
             RelationKind::Table,
@@ -246,8 +244,9 @@ fn structured_type_modifier_evidence_must_cover_every_bounded_column_once() {
     let mut observations = complete_modifiers(36, 36);
     observations.pop();
 
-    let error = RelationPartitionTypeModifierSnapshot::new(&base, &relation_partition, observations)
-        .expect_err("absence is not equivalent to atttypmod=-1");
+    let error =
+        RelationPartitionTypeModifierSnapshot::new(&base, &relation_partition, observations)
+            .expect_err("absence is not equivalent to atttypmod=-1");
     assert_eq!(
         error,
         ObservationError::InvalidObservationField {
@@ -273,7 +272,10 @@ fn structured_type_modifier_changes_successor_identity_without_rewriting_predece
     )
     .unwrap();
 
-    assert_ne!(varchar_32.snapshot_digest(), unconstrained.snapshot_digest());
+    assert_ne!(
+        varchar_32.snapshot_digest(),
+        unconstrained.snapshot_digest()
+    );
     assert_eq!(
         relation_partition.snapshot_digest(),
         relation_partition_snapshot(&base).snapshot_digest()
@@ -302,8 +304,10 @@ fn exact_column_receipt_uses_structured_modifier_successor_digest() {
 
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
     assert_eq!(receipt.location().column_name(), "account_code");
-    assert!(receipt
-        .location()
-        .canonical_location()
-        .ends_with("/columns/account_code/type-modifier"));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/columns/account_code/type-modifier")
+    );
 }

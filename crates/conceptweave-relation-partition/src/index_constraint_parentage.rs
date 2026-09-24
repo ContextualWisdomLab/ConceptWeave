@@ -125,9 +125,7 @@ pub struct IndexConstraintParentageObservation {
 
 impl IndexConstraintParentageObservation {
     /// Records a key constraint with no parent constraint (`conparentid = 0`).
-    pub fn root(
-        coordinate: IndexConstraintParentageCoordinate,
-    ) -> Result<Self, ObservationError> {
+    pub fn root(coordinate: IndexConstraintParentageCoordinate) -> Result<Self, ObservationError> {
         Self::new(coordinate, None)
     }
 
@@ -253,15 +251,10 @@ impl IndexConstraintParentageSnapshot {
             return Err(invalid("index_constraint_parentage_predecessor_binding"));
         }
 
-        let observations = canonicalize_parentage(
-            base_snapshot,
-            index_partition_snapshot,
-            observations,
-        )?;
-        let snapshot_digest = compute_parentage_digest(
-            index_partition_snapshot.snapshot_digest(),
-            &observations,
-        );
+        let observations =
+            canonicalize_parentage(base_snapshot, index_partition_snapshot, observations)?;
+        let snapshot_digest =
+            compute_parentage_digest(index_partition_snapshot.snapshot_digest(), &observations);
         Ok(Self {
             source_connection_key: index_partition_snapshot.source_connection_key().to_owned(),
             connection_policy_binding: index_partition_snapshot

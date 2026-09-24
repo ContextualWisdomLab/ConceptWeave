@@ -21,30 +21,25 @@ fn backing_index(
         name,
         true,
         Some(false),
-        vec![IndexAttributeObservation::new(
-            1,
-            IndexAttributeKind::Key,
-            "document_id",
-        )
-        .expect("key fixture is valid")],
+        vec![
+            IndexAttributeObservation::new(1, IndexAttributeKind::Key, "document_id")
+                .expect("key fixture is valid"),
+        ],
         Vec::new(),
     )?
     .with_access_method("btree")
-    .with_key_semantics(vec![IndexKeySemantics::new(
-        1,
-        None,
-        QualifiedOperatorClassName::new("pg_catalog", "int8_ops")
-            .expect("operator-class fixture is valid"),
-        0,
-    )
-    .expect("key semantics fixture is valid")])?
+    .with_key_semantics(vec![
+        IndexKeySemantics::new(
+            1,
+            None,
+            QualifiedOperatorClassName::new("pg_catalog", "int8_ops")
+                .expect("operator-class fixture is valid"),
+            0,
+        )
+        .expect("key semantics fixture is valid"),
+    ])?
     .with_catalog_flags(IndexCatalogFlags::new(
-        primary,
-        false,
-        immediate,
-        false,
-        false,
-        false,
+        primary, false, immediate, false, false, false,
     ))
 }
 
@@ -67,15 +62,17 @@ fn relation(
         "public",
         "document",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "document_id",
-            1,
-            "bigint",
-            catalog_type("int8"),
-            false,
-            None,
-        )
-        .expect("column fixture is valid")],
+        vec![
+            ColumnObservationV3::new(
+                "document_id",
+                1,
+                "bigint",
+                catalog_type("int8"),
+                false,
+                None,
+            )
+            .expect("column fixture is valid"),
+        ],
     )
     .expect("relation fixture is valid")
     .with_constraints(vec![constraint])
@@ -146,8 +143,10 @@ fn observed_primary_key_requires_same_name_primary_unique_backing_index() {
     assert_backing_index_error(snapshot(
         relation(
             primary_key(),
-            vec![usable_backing_index("document_pkey", false, true)
-                .expect("non-primary unique index is structurally valid")],
+            vec![
+                usable_backing_index("document_pkey", false, true)
+                    .expect("non-primary unique index is structurally valid"),
+            ],
         ),
         timing("document_pkey", ConstraintDeferrability::NotDeferrable),
     ));
@@ -158,8 +157,10 @@ fn observed_unique_constraint_requires_same_name_unique_nonprimary_backing_index
     assert_backing_index_error(snapshot(
         relation(
             unique_key(),
-            vec![usable_backing_index("other_unique_index", false, true)
-                .expect("differently named unique index is structurally valid")],
+            vec![
+                usable_backing_index("other_unique_index", false, true)
+                    .expect("differently named unique index is structurally valid"),
+            ],
         ),
         timing("document_id_key", ConstraintDeferrability::NotDeferrable),
     ));
@@ -167,8 +168,10 @@ fn observed_unique_constraint_requires_same_name_unique_nonprimary_backing_index
     assert_backing_index_error(snapshot(
         relation(
             unique_key(),
-            vec![usable_backing_index("document_id_key", true, true)
-                .expect("primary unique index is structurally valid")],
+            vec![
+                usable_backing_index("document_id_key", true, true)
+                    .expect("primary unique index is structurally valid"),
+            ],
         ),
         timing("document_id_key", ConstraintDeferrability::NotDeferrable),
     ));
@@ -179,20 +182,21 @@ fn deferrable_key_constraint_requires_nonimmediate_backing_index() {
     assert_backing_index_error(snapshot(
         relation(
             primary_key(),
-            vec![usable_backing_index("document_pkey", true, true)
-                .expect("immediate primary index is structurally valid")],
+            vec![
+                usable_backing_index("document_pkey", true, true)
+                    .expect("immediate primary index is structurally valid"),
+            ],
         ),
-        timing(
-            "document_pkey",
-            ConstraintDeferrability::InitiallyImmediate,
-        ),
+        timing("document_pkey", ConstraintDeferrability::InitiallyImmediate),
     ));
 
     assert_backing_index_error(snapshot(
         relation(
             unique_key(),
-            vec![usable_backing_index("document_id_key", false, true)
-                .expect("immediate unique index is structurally valid")],
+            vec![
+                usable_backing_index("document_id_key", false, true)
+                    .expect("immediate unique index is structurally valid"),
+            ],
         ),
         timing(
             "document_id_key",
@@ -247,8 +251,10 @@ fn observed_key_constraint_rejects_unobserved_backing_index_lifecycle() {
     assert_backing_index_error(snapshot(
         relation(
             primary_key(),
-            vec![backing_index("document_pkey", true, true)
-                .expect("lifecycle-unobserved primary index fixture is structurally valid")],
+            vec![
+                backing_index("document_pkey", true, true)
+                    .expect("lifecycle-unobserved primary index fixture is structurally valid"),
+            ],
         ),
         timing("document_pkey", ConstraintDeferrability::NotDeferrable),
     ));
@@ -259,8 +265,10 @@ fn coherent_key_constraint_and_backing_index_evidence_is_admitted() {
     snapshot(
         relation(
             primary_key(),
-            vec![usable_backing_index("document_pkey", true, true)
-                .expect("nondeferrable primary index fixture is valid")],
+            vec![
+                usable_backing_index("document_pkey", true, true)
+                    .expect("nondeferrable primary index fixture is valid"),
+            ],
         ),
         timing("document_pkey", ConstraintDeferrability::NotDeferrable),
     )
@@ -269,8 +277,10 @@ fn coherent_key_constraint_and_backing_index_evidence_is_admitted() {
     snapshot(
         relation(
             unique_key(),
-            vec![usable_backing_index("document_id_key", false, false)
-                .expect("deferrable unique index fixture is valid")],
+            vec![
+                usable_backing_index("document_id_key", false, false)
+                    .expect("deferrable unique index fixture is valid"),
+            ],
         ),
         timing(
             "document_id_key",
@@ -282,8 +292,10 @@ fn coherent_key_constraint_and_backing_index_evidence_is_admitted() {
     snapshot(
         relation(
             primary_key(),
-            vec![usable_backing_index("document_pkey", true, true)
-                .expect("primary index fixture is valid")],
+            vec![
+                usable_backing_index("document_pkey", true, true)
+                    .expect("primary index fixture is valid"),
+            ],
         ),
         timing("document_pkey", ConstraintDeferrability::NotDeferrable),
     )

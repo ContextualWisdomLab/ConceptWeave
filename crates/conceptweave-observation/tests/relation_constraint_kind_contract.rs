@@ -12,8 +12,14 @@ fn catalog_type(type_name: &str) -> QualifiedTypeName {
 
 fn check_constraint() -> TableConstraintObservation {
     TableConstraintObservation::Check(
-        CheckConstraintObservation::new("document_id_positive", "document_id > 0", true, true, false)
-            .expect("CHECK fixture is valid"),
+        CheckConstraintObservation::new(
+            "document_id_positive",
+            "document_id > 0",
+            true,
+            true,
+            false,
+        )
+        .expect("CHECK fixture is valid"),
     )
 }
 
@@ -83,10 +89,7 @@ fn snapshot(
     )
 }
 
-fn assert_constraint_kind_error(
-    kind: RelationKind,
-    constraints: Vec<TableConstraintObservation>,
-) {
+fn assert_constraint_kind_error(kind: RelationKind, constraints: Vec<TableConstraintObservation>) {
     let error = snapshot(kind, constraints)
         .expect_err("impossible PostgreSQL relation/constraint combinations must fail closed");
     assert_eq!(

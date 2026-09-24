@@ -301,7 +301,9 @@ impl IndexExclusionConstraintCatalogShapeSnapshot {
             .collect::<BTreeSet<_>>();
 
         if observed.len() != observations.len() {
-            return Err(invalid("index_exclusion_constraint_catalog_shape_coordinate"));
+            return Err(invalid(
+                "index_exclusion_constraint_catalog_shape_coordinate",
+            ));
         }
         if observed != expected {
             return Err(invalid(
@@ -309,10 +311,8 @@ impl IndexExclusionConstraintCatalogShapeSnapshot {
             ));
         }
 
-        let snapshot_digest = compute_catalog_shape_digest(
-            constraint_snapshot.snapshot_digest(),
-            &observations,
-        );
+        let snapshot_digest =
+            compute_catalog_shape_digest(constraint_snapshot.snapshot_digest(), &observations);
         Ok(Self {
             source_connection_key: constraint_snapshot.source_connection_key().to_owned(),
             connection_policy_binding: constraint_snapshot.connection_policy_binding().to_owned(),

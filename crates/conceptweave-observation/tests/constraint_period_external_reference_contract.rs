@@ -14,10 +14,7 @@ fn catalog_type(type_name: &str) -> QualifiedTypeName {
 fn temporal_type_kinds() -> Vec<TypeKindObservation> {
     vec![
         TypeKindObservation::range(catalog_type("tstzrange"), catalog_type("tstzmultirange")),
-        TypeKindObservation::multirange(
-            catalog_type("tstzmultirange"),
-            catalog_type("tstzrange"),
-        ),
+        TypeKindObservation::multirange(catalog_type("tstzmultirange"), catalog_type("tstzrange")),
     ]
 }
 

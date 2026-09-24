@@ -223,7 +223,9 @@ impl DatabaseDefaultCollationDefinitionObservation {
                 !matches!(self.locale(), Some("C.UTF-8" | "PG_UNICODE_FAST"))
                     || encoding == POSTGRES18_UTF8_ENCODING_ID
             }
-            PostgresDatabaseLocaleProvider::Icu => postgres18_database_encoding_supports_icu(encoding),
+            PostgresDatabaseLocaleProvider::Icu => {
+                postgres18_database_encoding_supports_icu(encoding)
+            }
             PostgresDatabaseLocaleProvider::Libc => {
                 ![self.lc_collate(), self.lc_ctype()]
                     .into_iter()
@@ -348,18 +350,16 @@ impl IndexEffectiveCollationDefinitionSnapshot {
             return Err(invalid("database_default_collation_definition_presence"));
         }
         if let Some(definition) = database_default_definition.as_ref() {
-            definition.validate_database_encoding(database_encoding_predecessor.database_encoding())?;
-            let material_default_definition = material_default_definition.ok_or_else(|| {
-                invalid("database_default_collation_material_definition")
-            })?;
+            definition
+                .validate_database_encoding(database_encoding_predecessor.database_encoding())?;
+            let material_default_definition = material_default_definition
+                .ok_or_else(|| invalid("database_default_collation_material_definition"))?;
             definition.validate_material_default_collation(material_default_definition)?;
         }
 
         let predecessor_digest = material_definition_predecessor.snapshot_digest().to_owned();
-        let snapshot_digest = compute_snapshot_digest(
-            &predecessor_digest,
-            database_default_definition.as_ref(),
-        );
+        let snapshot_digest =
+            compute_snapshot_digest(&predecessor_digest, database_default_definition.as_ref());
         Ok(Self {
             source_connection_key: material_definition_predecessor
                 .source_connection_key()
@@ -369,7 +369,9 @@ impl IndexEffectiveCollationDefinitionSnapshot {
                 .to_owned(),
             predecessor_digest,
             snapshot_digest,
-            extractor_revision: material_definition_predecessor.extractor_revision().to_owned(),
+            extractor_revision: material_definition_predecessor
+                .extractor_revision()
+                .to_owned(),
             observed_at_utc: material_definition_predecessor.observed_at_utc().to_owned(),
             database_default_definition,
         })
@@ -457,8 +459,7 @@ fn validate_database_provider_shape(
     let provider_fields_valid = match provider {
         PostgresDatabaseLocaleProvider::Libc => locale.is_none() && icu_rules.is_none(),
         PostgresDatabaseLocaleProvider::Builtin => {
-            icu_rules.is_none()
-                && matches!(locale, Some("C" | "C.UTF-8" | "PG_UNICODE_FAST"))
+            icu_rules.is_none() && matches!(locale, Some("C" | "C.UTF-8" | "PG_UNICODE_FAST"))
         }
         PostgresDatabaseLocaleProvider::Icu => locale.is_some(),
     };

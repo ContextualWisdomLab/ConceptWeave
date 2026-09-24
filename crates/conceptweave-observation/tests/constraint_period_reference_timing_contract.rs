@@ -3,9 +3,9 @@ use conceptweave_observation::{
     ConstraintTimingObservation, ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType,
     ForeignKeyObservation, ForeignKeyReferenceBehavior, IndexAttributeKind,
     IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics, IndexObservation,
-    ObservationError, PostgresSchemaSnapshotV3, PrimaryKeyObservation,
-    QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
-    TableConstraintObservation, TypeKindObservation,
+    ObservationError, PostgresSchemaSnapshotV3, PrimaryKeyObservation, QualifiedOperatorClassName,
+    QualifiedTypeName, RelationKind, RelationObservation, TableConstraintObservation,
+    TypeKindObservation,
 };
 
 mod support;
@@ -31,14 +31,12 @@ fn temporal_key_semantics() -> Vec<IndexKeySemantics> {
 fn temporal_type_kinds() -> Vec<TypeKindObservation> {
     vec![
         TypeKindObservation::range(catalog_type("tstzrange"), catalog_type("tstzmultirange")),
-        TypeKindObservation::multirange(
-            catalog_type("tstzmultirange"),
-            catalog_type("tstzrange"),
-        ),
+        TypeKindObservation::multirange(catalog_type("tstzmultirange"), catalog_type("tstzrange")),
     ]
 }
 
-fn temporal_key_operator_signatures() -> Vec<(u32, String, String, QualifiedTypeName, QualifiedTypeName)> {
+fn temporal_key_operator_signatures()
+-> Vec<(u32, String, String, QualifiedTypeName, QualifiedTypeName)> {
     vec![
         (
             1,

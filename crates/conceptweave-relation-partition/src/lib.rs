@@ -43,10 +43,7 @@ impl PartitionParentRelationCoordinate {
         let schema_name = schema_name.into();
         let relation_name = relation_name.into();
         validate_nonblank(&schema_name, "relation_partition_parent_schema_name")?;
-        validate_nonblank(
-            &relation_name,
-            "relation_partition_parent_relation_name",
-        )?;
+        validate_nonblank(&relation_name, "relation_partition_parent_relation_name")?;
         Ok(Self {
             schema_name,
             relation_name,
@@ -220,10 +217,7 @@ impl RelationPartitionLocation {
         let schema_name = schema_name.into();
         let relation_name = relation_name.into();
         validate_nonblank(&schema_name, "relation_partition_location_schema_name")?;
-        validate_nonblank(
-            &relation_name,
-            "relation_partition_location_relation_name",
-        )?;
+        validate_nonblank(&relation_name, "relation_partition_location_relation_name")?;
         Ok(Self {
             schema_name,
             relation_name,
@@ -482,7 +476,10 @@ fn validate_partition_rowtypes(
     base_snapshot: &PostgresSchemaSnapshotV3,
     observations: &[RelationPartitionObservation],
 ) -> Result<(), ObservationError> {
-    for membership in observations.iter().filter(|observation| observation.is_partition()) {
+    for membership in observations
+        .iter()
+        .filter(|observation| observation.is_partition())
+    {
         let Some(parent_coordinate) = membership.parent_relation() else {
             continue;
         };
@@ -548,7 +545,10 @@ fn validate_partition_column_collations(
         return Ok(());
     };
 
-    for membership in observations.iter().filter(|observation| observation.is_partition()) {
+    for membership in observations
+        .iter()
+        .filter(|observation| observation.is_partition())
+    {
         let Some(parent) = membership.parent_relation() else {
             continue;
         };
@@ -583,7 +583,10 @@ fn validate_partition_column_declarations(
     observations: &[RelationPartitionObservation],
 ) -> Result<(), ObservationError> {
     if let Some(identities) = base_snapshot.column_identities() {
-        for membership in observations.iter().filter(|observation| observation.is_partition()) {
+        for membership in observations
+            .iter()
+            .filter(|observation| observation.is_partition())
+        {
             let Some(parent) = membership.parent_relation() else {
                 continue;
             };
@@ -609,7 +612,10 @@ fn validate_partition_column_declarations(
     }
 
     if let Some(generations) = base_snapshot.column_generations() {
-        for membership in observations.iter().filter(|observation| observation.is_partition()) {
+        for membership in observations
+            .iter()
+            .filter(|observation| observation.is_partition())
+        {
             let Some(parent) = membership.parent_relation() else {
                 continue;
             };
@@ -730,7 +736,10 @@ fn validate_not_null_partition_witnesses(
     // partitioned-table parent. Relation membership therefore also constrains the NOT NULL family:
     // each observed parent row must have the corresponding child row linked back to that exact
     // parent constraint. Child-local constraints that do not correspond to a parent row remain legal.
-    for membership in observations.iter().filter(|observation| observation.is_partition()) {
+    for membership in observations
+        .iter()
+        .filter(|observation| observation.is_partition())
+    {
         let Some(parent_relation) = membership.parent_relation() else {
             continue;
         };
@@ -745,13 +754,17 @@ fn validate_not_null_partition_witnesses(
                     && child_not_null.relation_name() == membership.relation_name()
                     && child_not_null.relation_kind() == membership.relation_kind()
                     && child_not_null.column_name() == parent_not_null.column_name()
-                    && child_not_null.parent_constraint().is_some_and(|parent_constraint| {
-                        parent_constraint.schema_name() == parent_not_null.schema_name()
-                            && parent_constraint.relation_name() == parent_not_null.relation_name()
-                            && parent_constraint.relation_kind() == parent_not_null.relation_kind()
-                            && parent_constraint.constraint_name()
-                                == parent_not_null.constraint_name()
-                    })
+                    && child_not_null
+                        .parent_constraint()
+                        .is_some_and(|parent_constraint| {
+                            parent_constraint.schema_name() == parent_not_null.schema_name()
+                                && parent_constraint.relation_name()
+                                    == parent_not_null.relation_name()
+                                && parent_constraint.relation_kind()
+                                    == parent_not_null.relation_kind()
+                                && parent_constraint.constraint_name()
+                                    == parent_not_null.constraint_name()
+                        })
             });
             if !inherited {
                 return Err(invalid("relation_partition_not_null_inheritance"));

@@ -5,8 +5,8 @@ use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterKindSnapshot,
 };
 
-fn converter_cost_snapshot(
-) -> IndexExclusionConstraintOperatorProcedureTransformConverterCostSnapshot {
+fn converter_cost_snapshot()
+-> IndexExclusionConstraintOperatorProcedureTransformConverterCostSnapshot {
     let predecessor = converter_planner_support_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterCostSnapshot::new(
         &predecessor,
@@ -32,8 +32,8 @@ fn converter_kind_observation(
     .unwrap()
 }
 
-fn complete_converter_kind_observations(
-) -> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation> {
+fn complete_converter_kind_observations()
+-> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation> {
     vec![
         converter_kind_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
@@ -73,23 +73,27 @@ fn ordinary_exclude_transform_converter_kind_preserves_required_normal_function_
         receipt.connection_policy_binding(),
         predecessor.connection_policy_binding()
     );
-    assert_eq!(receipt.extractor_revision(), predecessor.extractor_revision());
+    assert_eq!(
+        receipt.extractor_revision(),
+        predecessor.extractor_revision()
+    );
     assert_eq!(receipt.observed_at_utc(), predecessor.observed_at_utc());
 }
 
 #[test]
 fn ordinary_exclude_transform_converter_kind_rejects_non_function_prokind() {
     for invalid_kind in ['p', 'a', 'w', 'x'] {
-        let error = IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation::new(
-            coordinate(),
-            1,
-            custom_payload_type(),
-            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-            "public",
-            "payload_from_sql",
-            invalid_kind,
-        )
-        .expect_err("PostgreSQL transform converters must resolve to prokind='f'");
+        let error =
+            IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation::new(
+                coordinate(),
+                1,
+                custom_payload_type(),
+                IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+                "public",
+                "payload_from_sql",
+                invalid_kind,
+            )
+            .expect_err("PostgreSQL transform converters must resolve to prokind='f'");
         assert_field(
             error,
             "index_exclusion_constraint_operator_procedure_transform_converter_kind",
@@ -179,74 +183,80 @@ fn ordinary_exclude_transform_converter_kind_location_is_collision_safe_for_quot
         conceptweave_observation::QualifiedTypeName::new("payload.domain", "json").unwrap();
     let dotted_type =
         conceptweave_observation::QualifiedTypeName::new("payload", "domain.json").unwrap();
-    let schema_location = IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation::new(
-        coordinate(),
-        1,
-        dotted_schema,
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        'f',
-    )
-    .unwrap()
-    .canonical_location();
-    let type_location = IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation::new(
-        coordinate(),
-        1,
-        dotted_type,
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        'f',
-    )
-    .unwrap()
-    .canonical_location();
+    let schema_location =
+        IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation::new(
+            coordinate(),
+            1,
+            dotted_schema,
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            'f',
+        )
+        .unwrap()
+        .canonical_location();
+    let type_location =
+        IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation::new(
+            coordinate(),
+            1,
+            dotted_type,
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            'f',
+        )
+        .unwrap()
+        .canonical_location();
 
     assert_ne!(schema_location, type_location);
 }
 
 #[test]
-fn ordinary_exclude_transform_converter_kind_rejects_blank_identifiers_zero_position_and_unknown_receipt() {
-    let blank_schema = IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation::new(
-        coordinate(),
-        1,
-        custom_payload_type(),
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        " ",
-        "payload_from_sql",
-        'f',
-    )
-    .expect_err("converter schema is part of the exact function binding");
+fn ordinary_exclude_transform_converter_kind_rejects_blank_identifiers_zero_position_and_unknown_receipt()
+ {
+    let blank_schema =
+        IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation::new(
+            coordinate(),
+            1,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            " ",
+            "payload_from_sql",
+            'f',
+        )
+        .expect_err("converter schema is part of the exact function binding");
     assert_field(
         blank_schema,
         "index_exclusion_constraint_operator_procedure_transform_converter_kind_function_schema",
     );
 
-    let blank_name = IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation::new(
-        coordinate(),
-        1,
-        custom_payload_type(),
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "\t",
-        'f',
-    )
-    .expect_err("converter function name is part of the exact function binding");
+    let blank_name =
+        IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation::new(
+            coordinate(),
+            1,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "\t",
+            'f',
+        )
+        .expect_err("converter function name is part of the exact function binding");
     assert_field(
         blank_name,
         "index_exclusion_constraint_operator_procedure_transform_converter_kind_function_name",
     );
 
-    let zero_position = IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation::new(
-        coordinate(),
-        0,
-        custom_payload_type(),
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        'f',
-    )
-    .expect_err("converter positions are one-based");
+    let zero_position =
+        IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation::new(
+            coordinate(),
+            0,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            'f',
+        )
+        .expect_err("converter positions are one-based");
     assert_eq!(zero_position, ObservationError::InvalidOrdinalPosition);
 
     let predecessor = converter_cost_snapshot();
@@ -262,7 +272,9 @@ fn ordinary_exclude_transform_converter_kind_rejects_blank_identifiers_zero_posi
             custom_payload_type(),
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         )
-        .expect_err("receipt lookup must remain exact-coordinate, position, type, and direction bound");
+        .expect_err(
+            "receipt lookup must remain exact-coordinate, position, type, and direction bound",
+        );
     assert!(matches!(
         unknown,
         ObservationError::UnknownObservationLocation { .. }
@@ -271,7 +283,8 @@ fn ordinary_exclude_transform_converter_kind_rejects_blank_identifiers_zero_posi
 
 #[test]
 fn ordinary_exclude_transform_converter_kind_snapshot_is_publicly_composed() {
-    assert!(std::mem::size_of::<
-        IndexExclusionConstraintOperatorProcedureTransformConverterKindSnapshot,
-    >() > 0);
+    assert!(
+        std::mem::size_of::<IndexExclusionConstraintOperatorProcedureTransformConverterKindSnapshot>(
+        ) > 0
+    );
 }

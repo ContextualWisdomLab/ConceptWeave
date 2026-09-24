@@ -1,8 +1,8 @@
 use conceptweave_observation::{
-    ColumnCollationObservation, ColumnObservationV3, IndexAttributeKind,
-    IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics, IndexObservation,
-    ObservationError, PostgresSchemaSnapshotV3, QualifiedCollationName,
-    QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
+    ColumnCollationObservation, ColumnObservationV3, IndexAttributeKind, IndexAttributeObservation,
+    IndexCatalogFlags, IndexKeySemantics, IndexObservation, ObservationError,
+    PostgresSchemaSnapshotV3, QualifiedCollationName, QualifiedOperatorClassName,
+    QualifiedTypeName, RelationKind, RelationObservation,
 };
 use conceptweave_relation_partition::{
     CanonicalExpression, CanonicalExpressionField, CanonicalExpressionValue,
@@ -78,12 +78,14 @@ fn index(name: &str) -> IndexObservation {
         name,
         false,
         Some(false),
-        vec![IndexAttributeObservation::expression(
-            1,
-            IndexAttributeKind::Key,
-            "lower(account_email)",
-        )
-        .unwrap()],
+        vec![
+            IndexAttributeObservation::expression(
+                1,
+                IndexAttributeKind::Key,
+                "lower(account_email)",
+            )
+            .unwrap(),
+        ],
         vec![],
     )
     .unwrap()
@@ -98,13 +100,20 @@ fn index(name: &str) -> IndexObservation {
         .unwrap(),
     ])
     .unwrap()
-    .with_catalog_flags(IndexCatalogFlags::new(false, false, true, false, false, false))
+    .with_catalog_flags(IndexCatalogFlags::new(
+        false, false, true, false, false, false,
+    ))
     .unwrap()
     .with_predicate("account_id > 0")
     .with_valid(true)
 }
 
-fn relation(name: &str, kind: RelationKind, index_name: &str, reverse: bool) -> RelationObservation {
+fn relation(
+    name: &str,
+    kind: RelationKind,
+    index_name: &str,
+    reverse: bool,
+) -> RelationObservation {
     let account_id = ColumnObservationV3::new(
         "account_id",
         if reverse { 2 } else { 1 },
@@ -254,13 +263,8 @@ fn predicate_root() -> CanonicalExpression {
             field(
                 "operator",
                 CanonicalExpressionValue::Operator(
-                    QualifiedOperatorSignature::new(
-                        "pg_catalog",
-                        ">",
-                        int4.clone(),
-                        int4.clone(),
-                    )
-                    .unwrap(),
+                    QualifiedOperatorSignature::new("pg_catalog", ">", int4.clone(), int4.clone())
+                        .unwrap(),
                 ),
             ),
             field(
@@ -355,14 +359,9 @@ fn stack() -> Stack {
         ],
     )
     .unwrap();
-    let exclusions = IndexExclusionSemanticsSnapshot::new(
-        &base,
-        &relations,
-        &indexes,
-        &families,
-        vec![],
-    )
-    .unwrap();
+    let exclusions =
+        IndexExclusionSemanticsSnapshot::new(&base, &relations, &indexes, &families, vec![])
+            .unwrap();
     let expressions = IndexExpressionSemanticsSnapshot::new(
         &base,
         &relations,

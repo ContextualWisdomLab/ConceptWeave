@@ -23,7 +23,11 @@ fn relation(
             ColumnObservationV3::new(
                 column_name,
                 1,
-                format!("{}.{}", type_binding.schema_name(), type_binding.type_name()),
+                format!(
+                    "{}.{}",
+                    type_binding.schema_name(),
+                    type_binding.type_name()
+                ),
                 type_binding,
                 true,
                 None,

@@ -67,11 +67,8 @@ fn digest(index: IndexObservation) -> String {
         .is_some_and(|flags| flags.primary())
         .then(|| {
             TableConstraintObservation::PrimaryKey(
-                PrimaryKeyObservation::new(
-                    "document_id_ix",
-                    vec!["document_id".to_owned()],
-                )
-                .expect("primary-key fixture is valid"),
+                PrimaryKeyObservation::new("document_id_ix", vec!["document_id".to_owned()])
+                    .expect("primary-key fixture is valid"),
             )
         });
 
@@ -133,9 +130,8 @@ fn each_observed_pg_index_catalog_flag_is_material_identity() {
     ];
 
     for (index, flags) in variants.into_iter().enumerate() {
-        let variant = digest(
-            complete_index(true, Some(flags)).expect("catalog-flag variant is admissible"),
-        );
+        let variant =
+            digest(complete_index(true, Some(flags)).expect("catalog-flag variant is admissible"));
         assert_ne!(
             base, variant,
             "material pg_index catalog-flag variant {index} must change v3 identity"

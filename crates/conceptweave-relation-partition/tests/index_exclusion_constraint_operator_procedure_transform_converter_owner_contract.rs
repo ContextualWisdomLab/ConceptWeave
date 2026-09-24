@@ -57,7 +57,8 @@ fn converter_owner_observation(
     .unwrap()
 }
 
-fn complete_owner_observations() -> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterOwnerObservation> {
+fn complete_owner_observations()
+-> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterOwnerObservation> {
     vec![
         converter_owner_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
@@ -92,14 +93,19 @@ fn ordinary_exclude_transform_converter_owner_preserves_exact_pg_proc_owner() {
         .unwrap();
 
     assert_eq!(receipt.location().converter_schema_name(), "public");
-    assert_eq!(receipt.location().converter_function_name(), "payload_from_sql");
+    assert_eq!(
+        receipt.location().converter_function_name(),
+        "payload_from_sql"
+    );
     assert_eq!(receipt.location().owner_oid(), 16_384);
     assert_eq!(receipt.location().owner_role_name(), "transform_runtime");
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
-    assert!(receipt
-        .location()
-        .canonical_location()
-        .contains("procedure-transform-converters"));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .contains("procedure-transform-converters")
+    );
 }
 
 #[test]
@@ -182,8 +188,7 @@ fn ordinary_exclude_transform_converter_owner_rejects_zero_owner_oid() {
 #[test]
 fn ordinary_exclude_transform_converter_owner_rejects_blank_owner_role_name() {
     let error = IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity::new(
-        16_384,
-        "   ",
+        16_384, "   ",
     )
     .expect_err("owner OID resolution must retain a nonblank same-generation role name");
     assert_field(
@@ -232,5 +237,8 @@ fn ordinary_exclude_transform_converter_owner_rejects_unknown_receipt_coordinate
 
 #[test]
 fn ordinary_exclude_transform_converter_owner_snapshot_is_publicly_composed() {
-    assert!(std::mem::size_of::<IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot>() > 0);
+    assert!(
+        std::mem::size_of::<IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot>(
+        ) > 0
+    );
 }

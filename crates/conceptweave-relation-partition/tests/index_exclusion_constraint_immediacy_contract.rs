@@ -27,7 +27,11 @@ impl SourceConnectionRegistry for Registry {
         (key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
 
-    fn authorizes_schema_scope(&self, source: &ResolvedSourceConnection, schemas: &[String]) -> bool {
+    fn authorizes_schema_scope(
+        &self,
+        source: &ResolvedSourceConnection,
+        schemas: &[String],
+    ) -> bool {
         source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && schemas == ["public"]
@@ -101,15 +105,17 @@ fn relation(
         "public",
         name,
         kind,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            false,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                false,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
     .with_indexes(vec![exclusion_index(index_name, immediate)])
@@ -340,15 +346,19 @@ fn both_deferrable_initial_modes_share_non_immediate_index_but_remain_distinct()
     assert!(receipt.location().constraint_deferrable());
     assert!(!receipt.location().index_immediate());
     assert_eq!(receipt.location().backing_index(), &child_index());
-    assert_eq!(receipt.source_digest(), initially_deferred.snapshot_digest());
+    assert_eq!(
+        receipt.source_digest(),
+        initially_deferred.snapshot_digest()
+    );
 }
 
 #[test]
 fn nondeferrable_exclusion_with_immediate_index_is_admitted() {
     let snapshot = build_immediacy(true, false, false)
         .expect("NOT DEFERRABLE ordinary EXCLUDE must retain indimmediate=true");
-    assert!(snapshot
-        .observations()
-        .iter()
-        .all(|observation| !observation.constraint_deferrable() && observation.index_immediate()));
+    assert!(
+        snapshot.observations().iter().all(
+            |observation| !observation.constraint_deferrable() && observation.index_immediate()
+        )
+    );
 }

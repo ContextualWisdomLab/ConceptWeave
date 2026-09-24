@@ -6,8 +6,8 @@ use conceptweave_observation::{
 use conceptweave_relation_partition::{
     IndexExclusionConstraintAccessMethodCapabilityObservation,
     IndexExclusionConstraintAccessMethodCapabilitySnapshot, IndexExclusionConstraintCoordinate,
-    IndexExclusionConstraintObservation, IndexExclusionConstraintSnapshot, IndexPartitionCoordinate,
-    IndexPartitionObservation, IndexPartitionSnapshot, IndexRelationKind,
+    IndexExclusionConstraintObservation, IndexExclusionConstraintSnapshot,
+    IndexPartitionCoordinate, IndexPartitionObservation, IndexPartitionSnapshot, IndexRelationKind,
     RelationPartitionObservation, RelationPartitionSnapshot,
 };
 use conceptweave_source_port::{
@@ -28,7 +28,11 @@ impl SourceConnectionRegistry for Registry {
         (key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
 
-    fn authorizes_schema_scope(&self, source: &ResolvedSourceConnection, schemas: &[String]) -> bool {
+    fn authorizes_schema_scope(
+        &self,
+        source: &ResolvedSourceConnection,
+        schemas: &[String],
+    ) -> bool {
         source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && schemas == ["public"]
@@ -83,7 +87,9 @@ fn exclusion_index(access_method: &str) -> IndexObservation {
         .unwrap(),
     ])
     .unwrap()
-    .with_catalog_flags(IndexCatalogFlags::new(false, true, true, false, false, false))
+    .with_catalog_flags(IndexCatalogFlags::new(
+        false, true, true, false, false, false,
+    ))
     .unwrap()
     .with_ready(true)
     .with_valid(true)
@@ -95,15 +101,17 @@ fn base_snapshot(access_method: &str) -> PostgresSchemaSnapshotV3 {
         "public",
         "bookings",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            false,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                false,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
     .with_indexes(vec![exclusion_index(access_method)])
@@ -123,24 +131,17 @@ fn base_snapshot(access_method: &str) -> PostgresSchemaSnapshotV3 {
 fn relation_partitions(base: &PostgresSchemaSnapshotV3) -> RelationPartitionSnapshot {
     RelationPartitionSnapshot::new(
         base,
-        vec![RelationPartitionObservation::non_partition(
-            "public",
-            "bookings",
-            RelationKind::Table,
-        )
-        .unwrap()],
+        vec![
+            RelationPartitionObservation::non_partition("public", "bookings", RelationKind::Table)
+                .unwrap(),
+        ],
     )
     .unwrap()
 }
 
 fn backing_index() -> IndexPartitionCoordinate {
-    IndexPartitionCoordinate::new(
-        "public",
-        "bookings",
-        RelationKind::Table,
-        CONSTRAINT_NAME,
-    )
-    .unwrap()
+    IndexPartitionCoordinate::new("public", "bookings", RelationKind::Table, CONSTRAINT_NAME)
+        .unwrap()
 }
 
 fn index_partitions(
@@ -150,11 +151,10 @@ fn index_partitions(
     IndexPartitionSnapshot::new(
         base,
         relations,
-        vec![IndexPartitionObservation::non_partition(
-            backing_index(),
-            IndexRelationKind::Index,
-        )
-        .unwrap()],
+        vec![
+            IndexPartitionObservation::non_partition(backing_index(), IndexRelationKind::Index)
+                .unwrap(),
+        ],
     )
     .unwrap()
 }
@@ -178,11 +178,10 @@ fn exclusion_constraints(
         base,
         relations,
         indexes,
-        vec![IndexExclusionConstraintObservation::root(
-            constraint_coordinate(),
-            backing_index(),
-        )
-        .unwrap()],
+        vec![
+            IndexExclusionConstraintObservation::root(constraint_coordinate(), backing_index())
+                .unwrap(),
+        ],
     )
     .unwrap()
 }
@@ -201,13 +200,15 @@ fn build_capability(
         &relations,
         &indexes,
         &constraints,
-        vec![IndexExclusionConstraintAccessMethodCapabilityObservation::new(
-            constraint_coordinate(),
-            backing_index(),
-            observed_access_method,
-            can_exclude,
-        )
-        .unwrap()],
+        vec![
+            IndexExclusionConstraintAccessMethodCapabilityObservation::new(
+                constraint_coordinate(),
+                backing_index(),
+                observed_access_method,
+                can_exclude,
+            )
+            .unwrap(),
+        ],
     )
 }
 
@@ -241,25 +242,23 @@ fn ordinary_exclusion_rejects_backing_index_binding_drift() {
     let relations = relation_partitions(&base);
     let indexes = index_partitions(&base, &relations);
     let constraints = exclusion_constraints(&base, &relations, &indexes);
-    let wrong_backing = IndexPartitionCoordinate::new(
-        "public",
-        "bookings",
-        RelationKind::Table,
-        "other_index",
-    )
-    .unwrap();
+    let wrong_backing =
+        IndexPartitionCoordinate::new("public", "bookings", RelationKind::Table, "other_index")
+            .unwrap();
     let error = IndexExclusionConstraintAccessMethodCapabilitySnapshot::new(
         &base,
         &relations,
         &indexes,
         &constraints,
-        vec![IndexExclusionConstraintAccessMethodCapabilityObservation::new(
-            constraint_coordinate(),
-            wrong_backing,
-            "gist",
-            true,
-        )
-        .unwrap()],
+        vec![
+            IndexExclusionConstraintAccessMethodCapabilityObservation::new(
+                constraint_coordinate(),
+                wrong_backing,
+                "gist",
+                true,
+            )
+            .unwrap(),
+        ],
     )
     .expect_err("capability evidence must bind to the exact conindid backing index");
     assert_eq!(
@@ -368,5 +367,8 @@ fn capability_receipt_rejects_unknown_constraint_coordinate() {
     let error = snapshot
         .source_receipt(unknown)
         .expect_err("unobserved constraint capability cannot issue provenance");
-    assert!(matches!(error, ObservationError::UnknownObservationLocation { .. }));
+    assert!(matches!(
+        error,
+        ObservationError::UnknownObservationLocation { .. }
+    ));
 }

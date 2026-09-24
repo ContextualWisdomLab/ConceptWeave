@@ -107,15 +107,17 @@ fn relation(
         "public",
         name,
         kind,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            false,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                false,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
 
@@ -170,12 +172,7 @@ fn base_snapshot(parent_constraint: bool) -> PostgresSchemaSnapshotV3 {
                 "events_pkey",
                 parent_constraint,
             ),
-            relation(
-                "events_2026",
-                RelationKind::Table,
-                "events_2026_pkey",
-                true,
-            ),
+            relation("events_2026", RelationKind::Table, "events_2026_pkey", true),
         ],
         vec![],
         vec![],
@@ -281,11 +278,8 @@ fn parentage(
     let observations = if parent_constraint_backed {
         vec![
             IndexConstraintParentageObservation::root(parent_constraint()).unwrap(),
-            IndexConstraintParentageObservation::partition(
-                child_constraint(),
-                parent_constraint(),
-            )
-            .unwrap(),
+            IndexConstraintParentageObservation::partition(child_constraint(), parent_constraint())
+                .unwrap(),
         ]
     } else {
         vec![IndexConstraintParentageObservation::root(child_constraint()).unwrap()]
@@ -351,12 +345,7 @@ fn constraint_child_below_nonconstraint_parent_index_remains_local() {
 
     let snapshot = IndexConstraintInheritanceSnapshot::new(
         &parentage,
-        vec![IndexConstraintInheritanceObservation::new(
-            child_constraint(),
-            true,
-            0,
-        )
-        .unwrap()],
+        vec![IndexConstraintInheritanceObservation::new(child_constraint(), true, 0).unwrap()],
     )
     .expect("a child constraint without conparentid remains local with no inheritance parent");
 

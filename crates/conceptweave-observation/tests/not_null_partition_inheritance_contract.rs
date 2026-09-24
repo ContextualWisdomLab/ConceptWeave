@@ -1,6 +1,4 @@
-use conceptweave_observation::{
-    NotNullConstraintObservation, ObservationError, RelationKind,
-};
+use conceptweave_observation::{NotNullConstraintObservation, ObservationError, RelationKind};
 
 #[test]
 fn partitioned_table_not_null_constraint_cannot_be_no_inherit() {

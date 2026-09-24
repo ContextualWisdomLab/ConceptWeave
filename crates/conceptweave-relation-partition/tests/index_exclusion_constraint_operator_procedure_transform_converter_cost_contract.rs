@@ -1,12 +1,14 @@
-include!("index_exclusion_constraint_operator_procedure_transform_converter_planner_support_contract.rs");
+include!(
+    "index_exclusion_constraint_operator_procedure_transform_converter_planner_support_contract.rs"
+);
 
 use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterCostObservation,
     IndexExclusionConstraintOperatorProcedureTransformConverterCostSnapshot,
 };
 
-fn converter_planner_support_snapshot(
-) -> IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportSnapshot {
+fn converter_planner_support_snapshot()
+-> IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportSnapshot {
     let predecessor = converter_parallel_safety_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportSnapshot::new(
         &predecessor,
@@ -32,8 +34,8 @@ fn converter_cost_observation(
     .unwrap()
 }
 
-fn complete_converter_cost_observations(
-) -> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterCostObservation> {
+fn complete_converter_cost_observations()
+-> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterCostObservation> {
     vec![
         converter_cost_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
@@ -65,14 +67,20 @@ fn ordinary_exclude_transform_converter_cost_preserves_exact_procost_float4() {
         )
         .unwrap();
 
-    assert_eq!(receipt.location().execution_cost().to_bits(), 1.0_f32.to_bits());
+    assert_eq!(
+        receipt.location().execution_cost().to_bits(),
+        1.0_f32.to_bits()
+    );
     assert_eq!(receipt.source_id(), predecessor.source_connection_key());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
     assert_eq!(
         receipt.connection_policy_binding(),
         predecessor.connection_policy_binding()
     );
-    assert_eq!(receipt.extractor_revision(), predecessor.extractor_revision());
+    assert_eq!(
+        receipt.extractor_revision(),
+        predecessor.extractor_revision()
+    );
     assert_eq!(receipt.observed_at_utc(), predecessor.observed_at_utc());
 }
 
@@ -101,17 +109,25 @@ fn ordinary_exclude_transform_converter_cost_distinguishes_catalog_values() {
 
 #[test]
 fn ordinary_exclude_transform_converter_cost_rejects_nonpositive_or_nonfinite_values() {
-    for invalid_cost in [0.0_f32, -0.0_f32, -1.0_f32, f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
-        let error = IndexExclusionConstraintOperatorProcedureTransformConverterCostObservation::new(
-            coordinate(),
-            1,
-            custom_payload_type(),
-            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-            "public",
-            "payload_from_sql",
-            invalid_cost,
-        )
-        .expect_err("PostgreSQL procost must be positive and finite");
+    for invalid_cost in [
+        0.0_f32,
+        -0.0_f32,
+        -1.0_f32,
+        f32::NAN,
+        f32::INFINITY,
+        f32::NEG_INFINITY,
+    ] {
+        let error =
+            IndexExclusionConstraintOperatorProcedureTransformConverterCostObservation::new(
+                coordinate(),
+                1,
+                custom_payload_type(),
+                IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+                "public",
+                "payload_from_sql",
+                invalid_cost,
+            )
+            .expect_err("PostgreSQL procost must be positive and finite");
         assert_field(
             error,
             "index_exclusion_constraint_operator_procedure_transform_converter_cost",
@@ -125,28 +141,30 @@ fn ordinary_exclude_transform_converter_cost_location_is_collision_safe_for_quot
         conceptweave_observation::QualifiedTypeName::new("payload.domain", "json").unwrap();
     let dotted_type =
         conceptweave_observation::QualifiedTypeName::new("payload", "domain.json").unwrap();
-    let schema_location = IndexExclusionConstraintOperatorProcedureTransformConverterCostObservation::new(
-        coordinate(),
-        1,
-        dotted_schema,
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        1.0,
-    )
-    .unwrap()
-    .canonical_location();
-    let type_location = IndexExclusionConstraintOperatorProcedureTransformConverterCostObservation::new(
-        coordinate(),
-        1,
-        dotted_type,
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        1.0,
-    )
-    .unwrap()
-    .canonical_location();
+    let schema_location =
+        IndexExclusionConstraintOperatorProcedureTransformConverterCostObservation::new(
+            coordinate(),
+            1,
+            dotted_schema,
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            1.0,
+        )
+        .unwrap()
+        .canonical_location();
+    let type_location =
+        IndexExclusionConstraintOperatorProcedureTransformConverterCostObservation::new(
+            coordinate(),
+            1,
+            dotted_type,
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            1.0,
+        )
+        .unwrap()
+        .canonical_location();
 
     assert_ne!(schema_location, type_location);
 }
@@ -162,7 +180,9 @@ fn ordinary_exclude_transform_converter_cost_rejects_missing_direction() {
             1.0,
         )],
     )
-    .expect_err("every planner-support predecessor converter direction needs explicit procost evidence");
+    .expect_err(
+        "every planner-support predecessor converter direction needs explicit procost evidence",
+    );
     assert_field(
         error,
         "index_exclusion_constraint_operator_procedure_transform_converter_cost_completeness",
@@ -237,31 +257,33 @@ fn ordinary_exclude_transform_converter_cost_rejects_duplicate_coordinate() {
 
 #[test]
 fn ordinary_exclude_transform_converter_cost_rejects_blank_converter_identifiers() {
-    let blank_schema = IndexExclusionConstraintOperatorProcedureTransformConverterCostObservation::new(
-        coordinate(),
-        1,
-        custom_payload_type(),
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        " ",
-        "payload_from_sql",
-        1.0,
-    )
-    .expect_err("converter schema is part of the exact function binding");
+    let blank_schema =
+        IndexExclusionConstraintOperatorProcedureTransformConverterCostObservation::new(
+            coordinate(),
+            1,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            " ",
+            "payload_from_sql",
+            1.0,
+        )
+        .expect_err("converter schema is part of the exact function binding");
     assert_field(
         blank_schema,
         "index_exclusion_constraint_operator_procedure_transform_converter_cost_function_schema",
     );
 
-    let blank_name = IndexExclusionConstraintOperatorProcedureTransformConverterCostObservation::new(
-        coordinate(),
-        1,
-        custom_payload_type(),
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "\t",
-        1.0,
-    )
-    .expect_err("converter function name is part of the exact function binding");
+    let blank_name =
+        IndexExclusionConstraintOperatorProcedureTransformConverterCostObservation::new(
+            coordinate(),
+            1,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "\t",
+            1.0,
+        )
+        .expect_err("converter function name is part of the exact function binding");
     assert_field(
         blank_name,
         "index_exclusion_constraint_operator_procedure_transform_converter_cost_function_name",
@@ -298,7 +320,9 @@ fn ordinary_exclude_transform_converter_cost_rejects_unknown_receipt_coordinate(
             custom_payload_type(),
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         )
-        .expect_err("receipt lookup must remain exact-coordinate, position, type, and direction bound");
+        .expect_err(
+            "receipt lookup must remain exact-coordinate, position, type, and direction bound",
+        );
     assert!(matches!(
         error,
         ObservationError::UnknownObservationLocation { .. }
@@ -307,7 +331,8 @@ fn ordinary_exclude_transform_converter_cost_rejects_unknown_receipt_coordinate(
 
 #[test]
 fn ordinary_exclude_transform_converter_cost_snapshot_is_publicly_composed() {
-    assert!(std::mem::size_of::<
-        IndexExclusionConstraintOperatorProcedureTransformConverterCostSnapshot,
-    >() > 0);
+    assert!(
+        std::mem::size_of::<IndexExclusionConstraintOperatorProcedureTransformConverterCostSnapshot>(
+        ) > 0
+    );
 }

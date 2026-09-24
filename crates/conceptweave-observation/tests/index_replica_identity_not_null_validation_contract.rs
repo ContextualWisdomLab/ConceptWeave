@@ -27,12 +27,10 @@ fn index(replica_identity: bool) -> IndexObservation {
         "document_replica_identity_ix",
         true,
         Some(false),
-        vec![IndexAttributeObservation::column(
-            1,
-            IndexAttributeKind::Key,
-            "document_id",
-        )
-        .expect("column key fixture is valid")],
+        vec![
+            IndexAttributeObservation::column(1, IndexAttributeKind::Key, "document_id")
+                .expect("column key fixture is valid"),
+        ],
         Vec::new(),
     )
     .expect("index fixture is structurally valid")
@@ -55,15 +53,17 @@ fn relation(replica_identity: bool) -> RelationObservation {
         "public",
         "document",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "document_id",
-            1,
-            "bigint",
-            catalog_type("int8"),
-            false,
-            None,
-        )
-        .expect("column fixture is valid")],
+        vec![
+            ColumnObservationV3::new(
+                "document_id",
+                1,
+                "bigint",
+                catalog_type("int8"),
+                false,
+                None,
+            )
+            .expect("column fixture is valid"),
+        ],
     )
     .expect("relation fixture is valid")
     .with_indexes(vec![index(replica_identity)])

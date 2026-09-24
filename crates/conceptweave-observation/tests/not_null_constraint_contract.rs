@@ -287,15 +287,7 @@ fn not_null_constraint_on_nullable_column_fails_closed() {
                 0,
                 false,
             ),
-            not_null(
-                "metric_note_not_null",
-                "note",
-                true,
-                true,
-                true,
-                0,
-                false,
-            ),
+            not_null("metric_note_not_null", "note", true, true, true, 0, false),
         ],
     )
     .expect_err("nullable summary and NOT NULL constraint inventory cannot contradict");
@@ -357,30 +349,14 @@ fn not_null_constraint_input_order_does_not_change_identity() {
                 0,
                 false,
             ),
-            not_null(
-                "metric_note_not_null",
-                "note",
-                true,
-                true,
-                true,
-                0,
-                false,
-            ),
+            not_null("metric_note_not_null", "note", true, true, true, 0, false),
         ],
     )
     .expect("first order is valid");
     let second = snapshot(
         &["raw_value", "note"],
         vec![
-            not_null(
-                "metric_note_not_null",
-                "note",
-                true,
-                true,
-                true,
-                0,
-                false,
-            ),
+            not_null("metric_note_not_null", "note", true, true, true, 0, false),
             not_null(
                 "metric_raw_value_not_null",
                 "raw_value",

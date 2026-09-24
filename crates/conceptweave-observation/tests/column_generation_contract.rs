@@ -14,15 +14,17 @@ fn one_column_relation() -> RelationObservation {
         "public",
         "metric",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "value_normalized",
-            1,
-            "numeric",
-            catalog_type("numeric"),
-            true,
-            None,
-        )
-        .expect("generated-column candidate fixture is valid")],
+        vec![
+            ColumnObservationV3::new(
+                "value_normalized",
+                1,
+                "numeric",
+                catalog_type("numeric"),
+                true,
+                None,
+            )
+            .expect("generated-column candidate fixture is valid"),
+        ],
     )
     .expect("metric relation fixture is valid")
 }
@@ -33,15 +35,8 @@ fn two_column_relation() -> RelationObservation {
         "metric",
         RelationKind::Table,
         vec![
-            ColumnObservationV3::new(
-                "metric_id",
-                1,
-                "int8",
-                catalog_type("int8"),
-                false,
-                None,
-            )
-            .expect("identity candidate fixture is valid"),
+            ColumnObservationV3::new("metric_id", 1, "int8", catalog_type("int8"), false, None)
+                .expect("identity candidate fixture is valid"),
             ColumnObservationV3::new(
                 "value_normalized",
                 2,
@@ -57,23 +52,13 @@ fn two_column_relation() -> RelationObservation {
 }
 
 fn not_generated(column_name: &str) -> ColumnGenerationObservation {
-    ColumnGenerationObservation::not_generated(
-        "public",
-        "metric",
-        RelationKind::Table,
-        column_name,
-    )
-    .expect("explicit ordinary-column generation evidence is valid")
+    ColumnGenerationObservation::not_generated("public", "metric", RelationKind::Table, column_name)
+        .expect("explicit ordinary-column generation evidence is valid")
 }
 
 fn stored(column_name: &str) -> ColumnGenerationObservation {
-    ColumnGenerationObservation::stored(
-        "public",
-        "metric",
-        RelationKind::Table,
-        column_name,
-    )
-    .expect("stored generated-column evidence is valid")
+    ColumnGenerationObservation::stored("public", "metric", RelationKind::Table, column_name)
+        .expect("stored generated-column evidence is valid")
 }
 
 fn virtual_generated(column_name: &str) -> ColumnGenerationObservation {
@@ -113,8 +98,11 @@ fn snapshot(
 
 #[test]
 fn stored_and_virtual_generation_modes_have_distinct_governed_identity() {
-    let stored_snapshot = snapshot(vec![one_column_relation()], vec![stored("value_normalized")])
-        .expect("stored generated-column snapshot is valid");
+    let stored_snapshot = snapshot(
+        vec![one_column_relation()],
+        vec![stored("value_normalized")],
+    )
+    .expect("stored generated-column snapshot is valid");
     let virtual_snapshot = snapshot(
         vec![one_column_relation()],
         vec![virtual_generated("value_normalized")],
@@ -176,7 +164,10 @@ fn observed_generation_family_must_cover_every_bounded_column() {
 fn duplicate_column_generation_coordinate_fails_closed() {
     let error = snapshot(
         vec![one_column_relation()],
-        vec![stored("value_normalized"), virtual_generated("value_normalized")],
+        vec![
+            stored("value_normalized"),
+            virtual_generated("value_normalized"),
+        ],
     )
     .expect_err("one exact column cannot have two attgenerated states");
 

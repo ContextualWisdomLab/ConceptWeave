@@ -94,15 +94,17 @@ fn relation(name: &str, kind: RelationKind, index_name: &str) -> RelationObserva
         "public",
         name,
         kind,
-        vec![ColumnObservationV3::new(
-            "label",
-            1,
-            "text",
-            QualifiedTypeName::new("pg_catalog", "text").unwrap(),
-            true,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "label",
+                1,
+                "text",
+                QualifiedTypeName::new("pg_catalog", "text").unwrap(),
+                true,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
     .with_indexes(vec![index(index_name)])
@@ -139,16 +141,8 @@ fn snapshots() -> (
         "extractor-index-collation-catalog-identity-v1",
         "2026-09-15T00:00:00Z",
         vec![
-            relation(
-                "events",
-                RelationKind::PartitionedTable,
-                "events_label_idx",
-            ),
-            relation(
-                "events_2026",
-                RelationKind::Table,
-                "events_2026_label_idx",
-            ),
+            relation("events", RelationKind::PartitionedTable, "events_label_idx"),
+            relation("events_2026", RelationKind::Table, "events_2026_label_idx"),
         ],
         vec![],
         vec![],
@@ -247,7 +241,10 @@ fn same_qualified_name_with_different_catalog_encoding_is_not_the_same_collation
         &base,
         &relations,
         &indexes,
-        vec![observation(parent_index(), -1), observation(child_index(), 6)],
+        vec![
+            observation(parent_index(), -1),
+            observation(child_index(), 6),
+        ],
     )
     .expect_err(
         "pg_collation is unique by name+encoding+namespace, so two distinct rows must not collapse",
@@ -315,7 +312,10 @@ fn matching_catalog_row_identity_remains_admissible_and_receiptable() {
         &base,
         &relations,
         &indexes,
-        vec![observation(parent_index(), 6), observation(child_index(), 6)],
+        vec![
+            observation(parent_index(), 6),
+            observation(child_index(), 6),
+        ],
     )
     .expect("the same resolved pg_collation row must remain admissible");
 

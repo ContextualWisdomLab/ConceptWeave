@@ -70,22 +70,22 @@ fn relation(name: &str, kind: RelationKind) -> RelationObservation {
         "public",
         name,
         kind,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            false,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                false,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
 }
 
-fn base_snapshot(
-    child: NotNullConstraintObservation,
-) -> PostgresSchemaSnapshotV3 {
+fn base_snapshot(child: NotNullConstraintObservation) -> PostgresSchemaSnapshotV3 {
     let parent = NotNullConstraintObservation::new(
         "public",
         "events",

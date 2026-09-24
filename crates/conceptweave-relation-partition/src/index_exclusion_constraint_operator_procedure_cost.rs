@@ -195,9 +195,7 @@ impl IndexExclusionConstraintOperatorProcedureCostSnapshot {
                         && candidate.key_position() == observation.key_position()
                 })
                 .ok_or_else(|| {
-                    invalid(
-                        "index_exclusion_constraint_operator_procedure_cost_completeness",
-                    )
+                    invalid("index_exclusion_constraint_operator_procedure_cost_completeness")
                 })?;
             if predecessor.operator() != observation.operator()
                 || predecessor.procedure() != observation.procedure()
@@ -214,7 +212,9 @@ impl IndexExclusionConstraintOperatorProcedureCostSnapshot {
         );
         Ok(Self {
             source_connection_key: planner_support_snapshot.source_connection_key().to_owned(),
-            connection_policy_binding: planner_support_snapshot.connection_policy_binding().to_owned(),
+            connection_policy_binding: planner_support_snapshot
+                .connection_policy_binding()
+                .to_owned(),
             snapshot_digest,
             extractor_revision: planner_support_snapshot.extractor_revision().to_owned(),
             observed_at_utc: planner_support_snapshot.observed_at_utc().to_owned(),

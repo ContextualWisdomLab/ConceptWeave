@@ -1,8 +1,8 @@
 use conceptweave_observation::{
-    ColumnCollationObservation, ColumnObservationV3, IndexAttributeKind,
-    IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics, IndexObservation,
-    ObservationError, PostgresSchemaSnapshotV3, QualifiedCollationName,
-    QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
+    ColumnCollationObservation, ColumnObservationV3, IndexAttributeKind, IndexAttributeObservation,
+    IndexCatalogFlags, IndexKeySemantics, IndexObservation, ObservationError,
+    PostgresSchemaSnapshotV3, QualifiedCollationName, QualifiedOperatorClassName,
+    QualifiedTypeName, RelationKind, RelationObservation,
 };
 use conceptweave_relation_partition::{
     CanonicalExpression, CanonicalExpressionField, CanonicalExpressionValue,
@@ -13,12 +13,12 @@ use conceptweave_relation_partition::{
     IndexExpressionRelationVarObservation, IndexExpressionRelationVarSnapshot,
     IndexExpressionSemanticsObservation, IndexExpressionSemanticsSnapshot,
     IndexKeyCollationIdentityObservation, IndexKeyOperatorFamilyObservation,
-    IndexOperatorFamilySnapshot, IndexPartitionCollationIdentitySnapshot,
-    IndexPartitionCoordinate, IndexPartitionObservation, IndexPartitionSnapshot,
-    IndexRelationKind, IndexRelationVarCollationIdentityObservation,
-    PartitionParentRelationCoordinate, QualifiedFunctionSignature,
-    QualifiedOperatorFamilyName, RelationPartitionObservation, RelationPartitionSnapshot,
-    RelationPartitionTypeModifierSnapshot, RelationVarRelationRole, RelationVarReturningType,
+    IndexOperatorFamilySnapshot, IndexPartitionCollationIdentitySnapshot, IndexPartitionCoordinate,
+    IndexPartitionObservation, IndexPartitionSnapshot, IndexRelationKind,
+    IndexRelationVarCollationIdentityObservation, PartitionParentRelationCoordinate,
+    QualifiedFunctionSignature, QualifiedOperatorFamilyName, RelationPartitionObservation,
+    RelationPartitionSnapshot, RelationPartitionTypeModifierSnapshot, RelationVarRelationRole,
+    RelationVarReturningType,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationLimits, ObservationRequest, ObservationRequestBudget,
@@ -154,12 +154,14 @@ fn index(name: &str) -> IndexObservation {
         name,
         false,
         Some(false),
-        vec![IndexAttributeObservation::expression(
-            1,
-            IndexAttributeKind::Key,
-            "lower(account_email)",
-        )
-        .unwrap()],
+        vec![
+            IndexAttributeObservation::expression(
+                1,
+                IndexAttributeKind::Key,
+                "lower(account_email)",
+            )
+            .unwrap(),
+        ],
         vec![],
     )
     .unwrap()
@@ -174,7 +176,9 @@ fn index(name: &str) -> IndexObservation {
         .unwrap(),
     ])
     .unwrap()
-    .with_catalog_flags(IndexCatalogFlags::new(false, false, true, false, false, false))
+    .with_catalog_flags(IndexCatalogFlags::new(
+        false, false, true, false, false, false,
+    ))
     .unwrap()
     .with_valid(true)
 }
@@ -184,15 +188,17 @@ fn relation(name: &str, kind: RelationKind, index_name: &str) -> RelationObserva
         "public",
         name,
         kind,
-        vec![ColumnObservationV3::new(
-            "account_email",
-            1,
-            "text",
-            QualifiedTypeName::new("pg_catalog", "text").unwrap(),
-            false,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "account_email",
+                1,
+                "text",
+                QualifiedTypeName::new("pg_catalog", "text").unwrap(),
+                false,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
     .with_indexes(vec![index(index_name)])
@@ -320,14 +326,9 @@ fn stack() -> Stack {
     )
     .unwrap();
 
-    let exclusions = IndexExclusionSemanticsSnapshot::new(
-        &base,
-        &relations,
-        &indexes,
-        &families,
-        vec![],
-    )
-    .unwrap();
+    let exclusions =
+        IndexExclusionSemanticsSnapshot::new(&base, &relations, &indexes, &families, vec![])
+            .unwrap();
 
     let expressions = IndexExpressionSemanticsSnapshot::new(
         &base,
@@ -461,7 +462,8 @@ fn expression_collation(
     encoding: i32,
 ) -> IndexExpressionCollationIdentityObservation {
     IndexExpressionCollationIdentityObservation::new(
-        IndexExpressionCollationIdentityLocation::expression(index, 1, occurrence_position).unwrap(),
+        IndexExpressionCollationIdentityLocation::expression(index, 1, occurrence_position)
+            .unwrap(),
         catalog_default_collation(encoding),
     )
     .unwrap()
@@ -548,7 +550,10 @@ fn matching_catalog_identities_compose_with_the_existing_whole_tree_and_key_proo
     )
     .expect("catalog-exact collation identity must compose when every attached occurrence matches");
 
-    assert_eq!(snapshot.whole_tree_predecessor_digest(), stack.composed.snapshot_digest());
+    assert_eq!(
+        snapshot.whole_tree_predecessor_digest(),
+        stack.composed.snapshot_digest()
+    );
     assert_eq!(
         snapshot.key_collation_predecessor_digest(),
         stack.key_collations.snapshot_digest()

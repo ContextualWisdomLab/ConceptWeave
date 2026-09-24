@@ -1,9 +1,8 @@
 use conceptweave_observation::{
-    ColumnObservationV3, ConstraintDeferrability, ConstraintTimingObservation,
-    IndexAttributeKind, IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics,
-    IndexObservation, ObservationError, PostgresSchemaSnapshotV3, PrimaryKeyObservation,
-    QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
-    TableConstraintObservation,
+    ColumnObservationV3, ConstraintDeferrability, ConstraintTimingObservation, IndexAttributeKind,
+    IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics, IndexObservation,
+    ObservationError, PostgresSchemaSnapshotV3, PrimaryKeyObservation, QualifiedOperatorClassName,
+    QualifiedTypeName, RelationKind, RelationObservation, TableConstraintObservation,
 };
 use conceptweave_relation_partition::{
     IndexPartitionCoordinate, IndexPartitionObservation, IndexPartitionSnapshot, IndexRelationKind,
@@ -105,15 +104,17 @@ fn relation(
         "public",
         name,
         kind,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            false,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                false,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
 

@@ -7,17 +7,19 @@ use conceptweave_relation_partition::{
     IndexExclusionConstraintCoordinate, IndexExclusionConstraintKeyObservation,
     IndexExclusionConstraintKeySnapshot, IndexExclusionConstraintObservation,
     IndexExclusionConstraintOperatorKindObservation, IndexExclusionConstraintOperatorKindSnapshot,
-    IndexExclusionConstraintOperatorObservation, IndexExclusionConstraintOperatorProcedureObservation,
-    IndexExclusionConstraintOperatorProcedureSnapshot, IndexExclusionConstraintOperatorResultObservation,
+    IndexExclusionConstraintOperatorObservation,
+    IndexExclusionConstraintOperatorProcedureObservation,
+    IndexExclusionConstraintOperatorProcedureSnapshot,
+    IndexExclusionConstraintOperatorResultObservation,
     IndexExclusionConstraintOperatorResultSnapshot,
     IndexExclusionConstraintOperatorSemanticsLineage, IndexExclusionConstraintOperatorSnapshot,
     IndexExclusionConstraintOperatorSourceLineage, IndexExclusionConstraintPeriodObservation,
     IndexExclusionConstraintPeriodSnapshot, IndexExclusionConstraintSnapshot,
     IndexExclusionSemanticsSnapshot, IndexKeyExclusionSemanticsObservation,
     IndexKeyOperatorFamilyObservation, IndexOperatorFamilySnapshot, IndexPartitionCoordinate,
-    IndexPartitionObservation, IndexPartitionSnapshot, IndexRelationKind, QualifiedOperatorFamilyName,
-    QualifiedOperatorSignature, QualifiedProcedureSignature, RelationPartitionObservation,
-    RelationPartitionSnapshot,
+    IndexPartitionObservation, IndexPartitionSnapshot, IndexRelationKind,
+    QualifiedOperatorFamilyName, QualifiedOperatorSignature, QualifiedProcedureSignature,
+    RelationPartitionObservation, RelationPartitionSnapshot,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationLimits, ObservationRequest, ObservationRequestBudget,
@@ -36,7 +38,11 @@ impl SourceConnectionRegistry for Registry {
         (key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
 
-    fn authorizes_schema_scope(&self, source: &ResolvedSourceConnection, schemas: &[String]) -> bool {
+    fn authorizes_schema_scope(
+        &self,
+        source: &ResolvedSourceConnection,
+        schemas: &[String],
+    ) -> bool {
         source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && schemas == ["public"]
@@ -112,25 +118,24 @@ fn result_snapshot() -> IndexExclusionConstraintOperatorResultSnapshot {
         "bookings_no_overlap",
         false,
         Some(false),
-        vec![IndexAttributeObservation::column(
-            1,
-            IndexAttributeKind::Key,
-            "resource_id",
-        )
-        .unwrap()],
+        vec![IndexAttributeObservation::column(1, IndexAttributeKind::Key, "resource_id").unwrap()],
         vec![],
     )
     .unwrap()
     .with_access_method("btree")
-    .with_key_semantics(vec![IndexKeySemantics::new(
-        1,
-        None,
-        QualifiedOperatorClassName::new("pg_catalog", "int4_ops").unwrap(),
-        0,
-    )
-    .unwrap()])
+    .with_key_semantics(vec![
+        IndexKeySemantics::new(
+            1,
+            None,
+            QualifiedOperatorClassName::new("pg_catalog", "int4_ops").unwrap(),
+            0,
+        )
+        .unwrap(),
+    ])
     .unwrap()
-    .with_catalog_flags(IndexCatalogFlags::new(false, true, true, false, false, false))
+    .with_catalog_flags(IndexCatalogFlags::new(
+        false, true, true, false, false, false,
+    ))
     .unwrap()
     .with_ready(true)
     .with_valid(true)
@@ -139,15 +144,7 @@ fn result_snapshot() -> IndexExclusionConstraintOperatorResultSnapshot {
         "public",
         "bookings",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "resource_id",
-            1,
-            "integer",
-            int4(),
-            false,
-            None,
-        )
-        .unwrap()],
+        vec![ColumnObservationV3::new("resource_id", 1, "integer", int4(), false, None).unwrap()],
     )
     .unwrap()
     .with_indexes(vec![index])
@@ -163,33 +160,26 @@ fn result_snapshot() -> IndexExclusionConstraintOperatorResultSnapshot {
     .unwrap();
     let relations = RelationPartitionSnapshot::new(
         &base,
-        vec![RelationPartitionObservation::non_partition(
-            "public",
-            "bookings",
-            RelationKind::Table,
-        )
-        .unwrap()],
+        vec![
+            RelationPartitionObservation::non_partition("public", "bookings", RelationKind::Table)
+                .unwrap(),
+        ],
     )
     .unwrap();
     let indexes = IndexPartitionSnapshot::new(
         &base,
         &relations,
-        vec![IndexPartitionObservation::non_partition(
-            index_coordinate(),
-            IndexRelationKind::Index,
-        )
-        .unwrap()],
+        vec![
+            IndexPartitionObservation::non_partition(index_coordinate(), IndexRelationKind::Index)
+                .unwrap(),
+        ],
     )
     .unwrap();
     let constraints = IndexExclusionConstraintSnapshot::new(
         &base,
         &relations,
         &indexes,
-        vec![IndexExclusionConstraintObservation::root(
-            coordinate(),
-            index_coordinate(),
-        )
-        .unwrap()],
+        vec![IndexExclusionConstraintObservation::root(coordinate(), index_coordinate()).unwrap()],
     )
     .unwrap();
     let periods = IndexExclusionConstraintPeriodSnapshot::new(
@@ -210,13 +200,15 @@ fn result_snapshot() -> IndexExclusionConstraintOperatorResultSnapshot {
         &base,
         &relations,
         &indexes,
-        vec![IndexKeyOperatorFamilyObservation::new(
-            index_coordinate(),
-            1,
-            QualifiedOperatorClassName::new("pg_catalog", "int4_ops").unwrap(),
-            QualifiedOperatorFamilyName::new("btree", "pg_catalog", "integer_ops").unwrap(),
-        )
-        .unwrap()],
+        vec![
+            IndexKeyOperatorFamilyObservation::new(
+                index_coordinate(),
+                1,
+                QualifiedOperatorClassName::new("pg_catalog", "int4_ops").unwrap(),
+                QualifiedOperatorFamilyName::new("btree", "pg_catalog", "integer_ops").unwrap(),
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
     let semantics = IndexExclusionSemanticsSnapshot::new(
@@ -224,14 +216,16 @@ fn result_snapshot() -> IndexExclusionConstraintOperatorResultSnapshot {
         &relations,
         &indexes,
         &families,
-        vec![IndexKeyExclusionSemanticsObservation::new(
-            index_coordinate(),
-            1,
-            operator("="),
-            procedure("int4eq"),
-            3,
-        )
-        .unwrap()],
+        vec![
+            IndexKeyExclusionSemanticsObservation::new(
+                index_coordinate(),
+                1,
+                operator("="),
+                procedure("int4eq"),
+                3,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
     let operators = IndexExclusionConstraintOperatorSnapshot::new(
@@ -244,35 +238,38 @@ fn result_snapshot() -> IndexExclusionConstraintOperatorResultSnapshot {
             &keys,
         ),
         IndexExclusionConstraintOperatorSemanticsLineage::new(&families, &semantics),
-        vec![IndexExclusionConstraintOperatorObservation::new(
-            coordinate(),
-            vec![operator("=")],
-        )
-        .unwrap()],
+        vec![
+            IndexExclusionConstraintOperatorObservation::new(coordinate(), vec![operator("=")])
+                .unwrap(),
+        ],
     )
     .unwrap();
     let procedures = IndexExclusionConstraintOperatorProcedureSnapshot::new(
         &operators,
-        vec![IndexExclusionConstraintOperatorProcedureObservation::new(
-            coordinate(),
-            1,
-            operator("="),
-            procedure("int4eq"),
-        )
-        .unwrap()],
+        vec![
+            IndexExclusionConstraintOperatorProcedureObservation::new(
+                coordinate(),
+                1,
+                operator("="),
+                procedure("int4eq"),
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
     IndexExclusionConstraintOperatorResultSnapshot::new(
         &procedures,
-        vec![IndexExclusionConstraintOperatorResultObservation::new(
-            coordinate(),
-            1,
-            operator("="),
-            procedure("int4eq"),
-            bool_type(),
-            bool_type(),
-        )
-        .unwrap()],
+        vec![
+            IndexExclusionConstraintOperatorResultObservation::new(
+                coordinate(),
+                1,
+                operator("="),
+                procedure("int4eq"),
+                bool_type(),
+                bool_type(),
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
 }
@@ -310,11 +307,19 @@ fn ordinary_exclude_preserves_raw_binary_operator_kind() {
     assert_eq!(receipt.location().operator_kind(), 'b');
     assert_eq!(receipt.location().operator(), &operator("="));
     assert_eq!(receipt.source_id(), results.source_connection_key());
-    assert_eq!(receipt.connection_policy_binding(), results.connection_policy_binding());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        results.connection_policy_binding()
+    );
     assert_eq!(receipt.extractor_revision(), results.extractor_revision());
     assert_eq!(receipt.observed_at_utc(), results.observed_at_utc());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
-    assert!(receipt.location().canonical_location().ends_with("/1/operator-kind"));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/1/operator-kind")
+    );
 }
 
 #[test]
@@ -355,7 +360,10 @@ fn ordinary_exclude_rejects_missing_operator_kind_evidence() {
     let results = result_snapshot();
     let error = IndexExclusionConstraintOperatorKindSnapshot::new(&results, vec![])
         .expect_err("every governed ordinary EXCLUDE operator position needs raw oprkind evidence");
-    assert_field(error, "index_exclusion_constraint_operator_kind_completeness");
+    assert_field(
+        error,
+        "index_exclusion_constraint_operator_kind_completeness",
+    );
 }
 
 #[test]
@@ -374,13 +382,9 @@ fn ordinary_exclude_rejects_duplicate_operator_kind_coordinate() {
 
 #[test]
 fn operator_kind_observation_rejects_zero_position() {
-    let error = IndexExclusionConstraintOperatorKindObservation::new(
-        coordinate(),
-        0,
-        operator("="),
-        'b',
-    )
-    .expect_err("operator kind positions are one-based");
+    let error =
+        IndexExclusionConstraintOperatorKindObservation::new(coordinate(), 0, operator("="), 'b')
+            .expect_err("operator kind positions are one-based");
     assert_eq!(error, ObservationError::InvalidOrdinalPosition);
 }
 
@@ -395,5 +399,8 @@ fn operator_kind_receipt_rejects_unknown_position() {
     let error = snapshot
         .source_receipt(coordinate(), 2)
         .expect_err("receipts may only be issued for governed positions");
-    assert!(matches!(error, ObservationError::UnknownObservationLocation { .. }));
+    assert!(matches!(
+        error,
+        ObservationError::UnknownObservationLocation { .. }
+    ));
 }

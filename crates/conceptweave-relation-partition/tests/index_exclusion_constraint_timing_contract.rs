@@ -27,7 +27,11 @@ impl SourceConnectionRegistry for Registry {
         (key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
 
-    fn authorizes_schema_scope(&self, source: &ResolvedSourceConnection, schemas: &[String]) -> bool {
+    fn authorizes_schema_scope(
+        &self,
+        source: &ResolvedSourceConnection,
+        schemas: &[String],
+    ) -> bool {
         source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && schemas == ["public"]
@@ -82,7 +86,9 @@ fn exclusion_index(name: &str) -> IndexObservation {
         .unwrap(),
     ])
     .unwrap()
-    .with_catalog_flags(IndexCatalogFlags::new(false, true, true, false, false, false))
+    .with_catalog_flags(IndexCatalogFlags::new(
+        false, true, true, false, false, false,
+    ))
     .unwrap()
     .with_ready(true)
     .with_valid(true)
@@ -269,8 +275,7 @@ fn exclusion_constraint_initial_timing_changes_governed_identity() {
         vec![
             IndexExclusionConstraintTimingObservation::new(parent_constraint(), true, true)
                 .unwrap(),
-            IndexExclusionConstraintTimingObservation::new(child_constraint(), true, true)
-                .unwrap(),
+            IndexExclusionConstraintTimingObservation::new(child_constraint(), true, true).unwrap(),
         ],
     )
     .expect("DEFERRABLE INITIALLY DEFERRED exclusion timing must be governed evidence");

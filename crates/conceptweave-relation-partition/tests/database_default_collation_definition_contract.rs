@@ -50,11 +50,17 @@ fn same_recorded_database_version_with_changed_actual_provider_version_changes_i
     let before = database_default("en-US-u-ks-level2", "153.80", "153.80");
     let provider_upgraded = database_default("en-US-u-ks-level2", "153.80", "154.10");
 
-    assert_eq!(before.recorded_version(), provider_upgraded.recorded_version());
+    assert_eq!(
+        before.recorded_version(),
+        provider_upgraded.recorded_version()
+    );
     assert!(!before.has_version_mismatch());
     assert!(provider_upgraded.has_version_mismatch());
     assert_ne!(before.actual_version(), provider_upgraded.actual_version());
-    assert_ne!(before.canonical_digest(), provider_upgraded.canonical_digest());
+    assert_ne!(
+        before.canonical_digest(),
+        provider_upgraded.canonical_digest()
+    );
 }
 
 #[test]
@@ -274,8 +280,8 @@ fn icu_database_default_accepts_exact_postgresql18_icu_supported_encoding_set() 
     let definition = database_default("und", "153.80", "153.80");
 
     for encoding_id in [
-        1, 2, 3, 4, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 22, 23, 24, 25, 26,
-        27, 28, 29, 30, 31, 32, 33, 34,
+        1, 2, 3, 4, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 22, 23, 24, 25, 26, 27, 28,
+        29, 30, 31, 32, 33, 34,
     ] {
         let encoding = PostgresDatabaseEncodingObservation::new(encoding_id)
             .expect("the ICU-positive witnesses are valid PostgreSQL 18 backend encodings");

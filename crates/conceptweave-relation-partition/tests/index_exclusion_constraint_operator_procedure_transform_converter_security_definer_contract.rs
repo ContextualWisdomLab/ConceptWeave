@@ -1,12 +1,14 @@
-include!("index_exclusion_constraint_operator_procedure_transform_converter_configuration_contract.rs");
+include!(
+    "index_exclusion_constraint_operator_procedure_transform_converter_configuration_contract.rs"
+);
 
 use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerObservation,
     IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerSnapshot,
 };
 
-fn converter_configuration_snapshot(
-) -> IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationSnapshot {
+fn converter_configuration_snapshot()
+-> IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationSnapshot {
     let predecessor = converter_access_control_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationSnapshot::new(
         &predecessor,
@@ -32,8 +34,8 @@ fn converter_security_definer_observation(
     .unwrap()
 }
 
-fn complete_security_definer_observations(
-) -> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerObservation> {
+fn complete_security_definer_observations()
+-> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerObservation> {
     vec![
         converter_security_definer_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
@@ -73,7 +75,10 @@ fn ordinary_exclude_transform_converter_security_context_preserves_raw_prosecdef
         receipt.connection_policy_binding(),
         predecessor.connection_policy_binding()
     );
-    assert_eq!(receipt.extractor_revision(), predecessor.extractor_revision());
+    assert_eq!(
+        receipt.extractor_revision(),
+        predecessor.extractor_revision()
+    );
     assert_eq!(receipt.observed_at_utc(), predecessor.observed_at_utc());
 }
 
@@ -203,7 +208,9 @@ fn ordinary_exclude_transform_converter_security_context_rejects_unknown_receipt
 
 #[test]
 fn ordinary_exclude_transform_converter_security_context_snapshot_is_publicly_composed() {
-    assert!(std::mem::size_of::<
-        IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerSnapshot,
-    >() > 0);
+    assert!(
+        std::mem::size_of::<
+            IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerSnapshot,
+        >() > 0
+    );
 }

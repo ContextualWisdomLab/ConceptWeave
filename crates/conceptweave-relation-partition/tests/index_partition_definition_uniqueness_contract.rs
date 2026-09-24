@@ -87,25 +87,22 @@ fn index(name: &str, unique: bool) -> IndexObservation {
     .with_valid(true)
 }
 
-fn relation(
-    name: &str,
-    kind: RelationKind,
-    index_name: &str,
-    unique: bool,
-) -> RelationObservation {
+fn relation(name: &str, kind: RelationKind, index_name: &str, unique: bool) -> RelationObservation {
     RelationObservation::new(
         "public",
         name,
         kind,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            true,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                true,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
     .with_indexes(vec![index(index_name, unique)])
@@ -139,8 +136,18 @@ fn attached_child_must_preserve_parent_uniqueness_definition() {
         "extractor-index-definition-equivalence-v1",
         "2026-09-14T15:20:00Z",
         vec![
-            relation("events", RelationKind::PartitionedTable, "events_id_idx", true),
-            relation("events_2026", RelationKind::Table, "events_2026_id_idx", false),
+            relation(
+                "events",
+                RelationKind::PartitionedTable,
+                "events_id_idx",
+                true,
+            ),
+            relation(
+                "events_2026",
+                RelationKind::Table,
+                "events_2026_id_idx",
+                false,
+            ),
         ],
         vec![],
         vec![],

@@ -22,9 +22,7 @@ fn material_default(
     )
 }
 
-fn database_default(
-    actual_version: Option<&str>,
-) -> DatabaseDefaultCollationDefinitionObservation {
+fn database_default(actual_version: Option<&str>) -> DatabaseDefaultCollationDefinitionObservation {
     DatabaseDefaultCollationDefinitionObservation::new(
         PostgresDatabaseLocaleProvider::Icu,
         Some("C.UTF-8".to_owned()),
@@ -71,13 +69,16 @@ fn postgres18_default_bootstrap_row_rejects_stored_pg_collation_version() {
 fn default_collation_actual_version_matches_database_default_actual_version() {
     let material = material_default(None, Some("153.80")).unwrap();
     let same = database_default(Some("153.80"));
-    same.validate_material_default_collation(&material)
-        .expect("both PostgreSQL 18 actual-version functions resolve the same current database locale");
+    same.validate_material_default_collation(&material).expect(
+        "both PostgreSQL 18 actual-version functions resolve the same current database locale",
+    );
 
     let contradictory = database_default(Some("154.10"));
     let error = contradictory
         .validate_material_default_collation(&material)
-        .expect_err("one bounded observation cannot contain two actual versions for pg_catalog.default");
+        .expect_err(
+            "one bounded observation cannot contain two actual versions for pg_catalog.default",
+        );
     assert_eq!(
         error,
         ObservationError::InvalidObservationField {

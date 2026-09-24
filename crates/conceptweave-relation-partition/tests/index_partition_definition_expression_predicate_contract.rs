@@ -75,12 +75,14 @@ fn index(name: &str) -> IndexObservation {
         name,
         false,
         Some(false),
-        vec![IndexAttributeObservation::expression(
-            1,
-            IndexAttributeKind::Key,
-            "lower(account_email)",
-        )
-        .unwrap()],
+        vec![
+            IndexAttributeObservation::expression(
+                1,
+                IndexAttributeKind::Key,
+                "lower(account_email)",
+            )
+            .unwrap(),
+        ],
         vec![],
     )
     .unwrap()
@@ -95,7 +97,9 @@ fn index(name: &str) -> IndexObservation {
         .unwrap(),
     ])
     .unwrap()
-    .with_catalog_flags(IndexCatalogFlags::new(false, false, true, false, false, false))
+    .with_catalog_flags(IndexCatalogFlags::new(
+        false, false, true, false, false, false,
+    ))
     .unwrap()
     .with_predicate("account_id > 0")
     .with_valid(true)
@@ -236,14 +240,9 @@ fn predecessor() -> (
     )
     .unwrap();
 
-    let exclusions = IndexExclusionSemanticsSnapshot::new(
-        &base,
-        &relations,
-        &indexes,
-        &families,
-        vec![],
-    )
-    .unwrap();
+    let exclusions =
+        IndexExclusionSemanticsSnapshot::new(&base, &relations, &indexes, &families, vec![])
+            .unwrap();
 
     (base, relations, indexes, families, exclusions)
 }

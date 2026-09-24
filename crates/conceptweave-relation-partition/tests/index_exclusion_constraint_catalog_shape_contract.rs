@@ -28,7 +28,11 @@ impl SourceConnectionRegistry for Registry {
         (key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
 
-    fn authorizes_schema_scope(&self, source: &ResolvedSourceConnection, schemas: &[String]) -> bool {
+    fn authorizes_schema_scope(
+        &self,
+        source: &ResolvedSourceConnection,
+        schemas: &[String],
+    ) -> bool {
         source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && schemas == ["public"]
@@ -73,15 +77,19 @@ fn exclusion_index(name: &str) -> IndexObservation {
     )
     .unwrap()
     .with_access_method("btree")
-    .with_key_semantics(vec![IndexKeySemantics::new(
-        1,
-        None,
-        QualifiedOperatorClassName::new("pg_catalog", "int8_ops").unwrap(),
-        0,
-    )
-    .unwrap()])
+    .with_key_semantics(vec![
+        IndexKeySemantics::new(
+            1,
+            None,
+            QualifiedOperatorClassName::new("pg_catalog", "int8_ops").unwrap(),
+            0,
+        )
+        .unwrap(),
+    ])
     .unwrap()
-    .with_catalog_flags(IndexCatalogFlags::new(false, true, true, false, false, false))
+    .with_catalog_flags(IndexCatalogFlags::new(
+        false, true, true, false, false, false,
+    ))
     .unwrap()
     .with_ready(true)
     .with_valid(true)
@@ -93,15 +101,17 @@ fn relation(name: &str, kind: RelationKind, index_name: &str) -> RelationObserva
         "public",
         name,
         kind,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            false,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                false,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
     .with_indexes(vec![exclusion_index(index_name)])
@@ -114,8 +124,16 @@ fn base_snapshot() -> PostgresSchemaSnapshotV3 {
         "extractor-index-exclusion-catalog-shape-v1",
         "2026-09-16T12:30:00Z",
         vec![
-            relation("bookings", RelationKind::PartitionedTable, "bookings_excl_idx"),
-            relation("bookings_2026", RelationKind::Table, "bookings_2026_excl_idx"),
+            relation(
+                "bookings",
+                RelationKind::PartitionedTable,
+                "bookings_excl_idx",
+            ),
+            relation(
+                "bookings_2026",
+                RelationKind::Table,
+                "bookings_2026_excl_idx",
+            ),
         ],
         vec![],
         vec![],
@@ -260,7 +278,12 @@ fn exact_exclusion_catalog_family_shape_is_retained() {
     assert!(receipt.location().relation_owner_present());
     assert!(!receipt.location().domain_owner_present());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
-    assert!(receipt.location().canonical_location().ends_with("/catalog-family-shape"));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/catalog-family-shape")
+    );
 }
 
 #[test]

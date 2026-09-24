@@ -183,9 +183,9 @@ impl IndexExclusionConstraintIndexRoleSnapshot {
         let mut observations = Vec::with_capacity(rebound_constraint.observations().len());
         for constraint in rebound_constraint.observations() {
             let backing_index = find_backing_index(base_snapshot, constraint.backing_index())?;
-            let flags = backing_index.catalog_flags().ok_or_else(|| {
-                invalid("index_exclusion_constraint_index_role_catalog_flags")
-            })?;
+            let flags = backing_index
+                .catalog_flags()
+                .ok_or_else(|| invalid("index_exclusion_constraint_index_role_catalog_flags"))?;
             let index_unique = backing_index.is_unique();
             let index_primary = flags.primary();
             let index_exclusion = flags.exclusion();

@@ -1,4 +1,6 @@
-include!("index_exclusion_constraint_operator_procedure_transform_converter_access_control_contract.rs");
+include!(
+    "index_exclusion_constraint_operator_procedure_transform_converter_access_control_contract.rs"
+);
 
 use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationMaterial,
@@ -6,8 +8,8 @@ use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationSnapshot,
 };
 
-fn converter_access_control_snapshot(
-) -> IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot {
+fn converter_access_control_snapshot()
+-> IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot {
     let predecessor = converter_owner_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
         &predecessor,
@@ -37,8 +39,8 @@ fn converter_configuration_observation(
     .unwrap()
 }
 
-fn complete_configuration_observations(
-) -> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationObservation> {
+fn complete_configuration_observations()
+-> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationObservation> {
     vec![
         converter_configuration_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
@@ -73,14 +75,23 @@ fn ordinary_exclude_transform_converter_configuration_preserves_exact_proconfig_
 
     assert!(receipt.location().configuration().is_configured());
     assert_eq!(receipt.location().configuration().entry_count(), 1);
-    assert!(receipt.location().configuration().digest().starts_with("sha256:"));
+    assert!(
+        receipt
+            .location()
+            .configuration()
+            .digest()
+            .starts_with("sha256:")
+    );
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
     assert_eq!(receipt.source_id(), predecessor.source_connection_key());
     assert_eq!(
         receipt.connection_policy_binding(),
         predecessor.connection_policy_binding()
     );
-    assert_eq!(receipt.extractor_revision(), predecessor.extractor_revision());
+    assert_eq!(
+        receipt.extractor_revision(),
+        predecessor.extractor_revision()
+    );
     assert_eq!(receipt.observed_at_utc(), predecessor.observed_at_utc());
 }
 
@@ -272,7 +283,9 @@ fn ordinary_exclude_transform_converter_configuration_rejects_unknown_receipt_co
 
 #[test]
 fn ordinary_exclude_transform_converter_configuration_snapshot_is_publicly_composed() {
-    assert!(std::mem::size_of::<
-        IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationSnapshot,
-    >() > 0);
+    assert!(
+        std::mem::size_of::<
+            IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationSnapshot,
+        >() > 0
+    );
 }

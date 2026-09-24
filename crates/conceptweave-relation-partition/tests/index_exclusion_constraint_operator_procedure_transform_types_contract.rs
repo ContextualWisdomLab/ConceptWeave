@@ -9,11 +9,7 @@ fn cost_predecessor() -> IndexExclusionConstraintOperatorProcedureCostSnapshot {
     let planner_support = planner_support_predecessor();
     IndexExclusionConstraintOperatorProcedureCostSnapshot::new(
         &planner_support,
-        vec![cost_observation(
-            operator("="),
-            procedure("int4eq"),
-            1.0,
-        )],
+        vec![cost_observation(operator("="), procedure("int4eq"), 1.0)],
     )
     .unwrap()
 }
@@ -50,13 +46,18 @@ fn ordinary_exclude_operator_procedure_transform_types_preserve_exact_pg_proc_pr
 
     assert_eq!(receipt.location().operator(), &operator("="));
     assert_eq!(receipt.location().procedure(), &procedure("int4eq"));
-    assert_eq!(receipt.location().transform_types(), Some(&[transformed][..]));
+    assert_eq!(
+        receipt.location().transform_types(),
+        Some(&[transformed][..])
+    );
     assert_eq!(receipt.source_id(), predecessor.source_connection_key());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
-    assert!(receipt
-        .location()
-        .canonical_location()
-        .ends_with("/1/procedure-transform-types"));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/1/procedure-transform-types")
+    );
 }
 
 #[test]
@@ -76,7 +77,9 @@ fn ordinary_exclude_operator_procedure_transform_types_distinguish_null_and_tran
         vec![transform_types_observation(
             operator("="),
             procedure("int4eq"),
-            Some(vec![QualifiedTypeName::new("public", "custom_payload").unwrap()]),
+            Some(vec![
+                QualifiedTypeName::new("public", "custom_payload").unwrap(),
+            ]),
         )],
     )
     .unwrap();
@@ -183,11 +186,9 @@ fn ordinary_exclude_operator_procedure_transform_types_reject_operator_binding_d
 #[test]
 fn ordinary_exclude_operator_procedure_transform_types_reject_missing_evidence() {
     let predecessor = cost_predecessor();
-    let error = IndexExclusionConstraintOperatorProcedureTransformTypesSnapshot::new(
-        &predecessor,
-        vec![],
-    )
-    .expect_err("every governed operator function needs explicit protrftypes evidence");
+    let error =
+        IndexExclusionConstraintOperatorProcedureTransformTypesSnapshot::new(&predecessor, vec![])
+            .expect_err("every governed operator function needs explicit protrftypes evidence");
     assert_field(
         error,
         "index_exclusion_constraint_operator_procedure_transform_types_completeness",
@@ -245,5 +246,7 @@ fn ordinary_exclude_operator_procedure_transform_types_reject_unknown_receipt_co
 
 #[test]
 fn ordinary_exclude_operator_procedure_transform_types_snapshot_is_publicly_composed() {
-    assert!(std::mem::size_of::<IndexExclusionConstraintOperatorProcedureTransformTypesSnapshot>() > 0);
+    assert!(
+        std::mem::size_of::<IndexExclusionConstraintOperatorProcedureTransformTypesSnapshot>() > 0
+    );
 }

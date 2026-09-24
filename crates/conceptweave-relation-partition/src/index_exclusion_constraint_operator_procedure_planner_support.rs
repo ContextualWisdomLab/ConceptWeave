@@ -141,7 +141,9 @@ impl IndexExclusionConstraintOperatorProcedurePlannerSupportSourceReceipt {
 
     /// Returns the exact validated planner-support observation.
     #[must_use]
-    pub const fn location(&self) -> &IndexExclusionConstraintOperatorProcedurePlannerSupportObservation {
+    pub const fn location(
+        &self,
+    ) -> &IndexExclusionConstraintOperatorProcedurePlannerSupportObservation {
         &self.location
     }
 }
@@ -217,7 +219,9 @@ impl IndexExclusionConstraintOperatorProcedurePlannerSupportSnapshot {
         );
         Ok(Self {
             source_connection_key: access_control_snapshot.source_connection_key().to_owned(),
-            connection_policy_binding: access_control_snapshot.connection_policy_binding().to_owned(),
+            connection_policy_binding: access_control_snapshot
+                .connection_policy_binding()
+                .to_owned(),
             snapshot_digest,
             extractor_revision: access_control_snapshot.extractor_revision().to_owned(),
             observed_at_utc: access_control_snapshot.observed_at_utc().to_owned(),
@@ -257,7 +261,9 @@ impl IndexExclusionConstraintOperatorProcedurePlannerSupportSnapshot {
 
     /// Returns complete planner-support observations in deterministic constraint/key order.
     #[must_use]
-    pub fn observations(&self) -> &[IndexExclusionConstraintOperatorProcedurePlannerSupportObservation] {
+    pub fn observations(
+        &self,
+    ) -> &[IndexExclusionConstraintOperatorProcedurePlannerSupportObservation] {
         &self.observations
     }
 
@@ -266,8 +272,10 @@ impl IndexExclusionConstraintOperatorProcedurePlannerSupportSnapshot {
         &self,
         coordinate: IndexExclusionConstraintCoordinate,
         key_position: u32,
-    ) -> Result<IndexExclusionConstraintOperatorProcedurePlannerSupportSourceReceipt, ObservationError>
-    {
+    ) -> Result<
+        IndexExclusionConstraintOperatorProcedurePlannerSupportSourceReceipt,
+        ObservationError,
+    > {
         let observation = self
             .observations
             .iter()
@@ -278,14 +286,16 @@ impl IndexExclusionConstraintOperatorProcedurePlannerSupportSnapshot {
             .ok_or_else(|| ObservationError::UnknownObservationLocation {
                 location: procedure_planner_support_location(&coordinate, key_position),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedurePlannerSupportSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedurePlannerSupportSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 

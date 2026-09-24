@@ -1,12 +1,14 @@
-include!("index_exclusion_constraint_operator_procedure_transform_converter_argument_names_contract.rs");
+include!(
+    "index_exclusion_constraint_operator_procedure_transform_converter_argument_names_contract.rs"
+);
 
 use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation,
     IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSnapshot,
 };
 
-fn converter_argument_names_snapshot(
-) -> IndexExclusionConstraintOperatorProcedureTransformConverterArgumentNamesSnapshot {
+fn converter_argument_names_snapshot()
+-> IndexExclusionConstraintOperatorProcedureTransformConverterArgumentNamesSnapshot {
     let predecessor = converter_argument_modes_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterArgumentNamesSnapshot::new(
         &predecessor,
@@ -32,8 +34,8 @@ fn converter_transform_types_observation(
     .unwrap()
 }
 
-fn complete_converter_transform_types_observations(
-) -> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation> {
+fn complete_converter_transform_types_observations()
+-> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation> {
     vec![
         converter_transform_types_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
@@ -51,11 +53,12 @@ fn complete_converter_transform_types_observations(
 #[test]
 fn ordinary_exclude_converter_transform_types_preserve_null_and_selected_set_distinctly() {
     let predecessor = converter_argument_names_snapshot();
-    let absent = IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSnapshot::new(
-        &predecessor,
-        complete_converter_transform_types_observations(),
-    )
-    .unwrap();
+    let absent =
+        IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSnapshot::new(
+            &predecessor,
+            complete_converter_transform_types_observations(),
+        )
+        .unwrap();
     assert_eq!(absent.observations()[0].transform_types(), None);
 
     let mut selected_observations = complete_converter_transform_types_observations();
@@ -67,11 +70,12 @@ fn ordinary_exclude_converter_transform_types_preserve_null_and_selected_set_dis
             QualifiedTypeName::new("ext", "alpha").unwrap(),
         ]),
     );
-    let selected = IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSnapshot::new(
-        &predecessor,
-        selected_observations,
-    )
-    .unwrap();
+    let selected =
+        IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSnapshot::new(
+            &predecessor,
+            selected_observations,
+        )
+        .unwrap();
     assert_eq!(
         selected.observations()[0].transform_types(),
         Some(
@@ -86,31 +90,33 @@ fn ordinary_exclude_converter_transform_types_preserve_null_and_selected_set_dis
 
 #[test]
 fn ordinary_exclude_converter_transform_types_reject_empty_and_duplicate_sets() {
-    let empty = IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation::new(
-        coordinate(),
-        1,
-        custom_payload_type(),
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        Some(vec![]),
-    )
-    .expect_err("PostgreSQL stores NULL rather than an empty protrftypes array");
+    let empty =
+        IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation::new(
+            coordinate(),
+            1,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            Some(vec![]),
+        )
+        .expect_err("PostgreSQL stores NULL rather than an empty protrftypes array");
     assert_field(
         empty,
         "index_exclusion_constraint_operator_procedure_transform_converter_transform_types_empty",
     );
 
-    let duplicate = IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation::new(
-        coordinate(),
-        1,
-        custom_payload_type(),
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        Some(vec![custom_payload_type(), custom_payload_type()]),
-    )
-    .expect_err("duplicate selected transform types must not collapse");
+    let duplicate =
+        IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation::new(
+            coordinate(),
+            1,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            Some(vec![custom_payload_type(), custom_payload_type()]),
+        )
+        .expect_err("duplicate selected transform types must not collapse");
     assert_field(
         duplicate,
         "index_exclusion_constraint_operator_procedure_transform_converter_transform_types_duplicate",
@@ -118,17 +124,19 @@ fn ordinary_exclude_converter_transform_types_reject_empty_and_duplicate_sets() 
 }
 
 #[test]
-fn ordinary_exclude_converter_transform_types_reject_completeness_binding_and_duplicate_coordinates() {
+fn ordinary_exclude_converter_transform_types_reject_completeness_binding_and_duplicate_coordinates()
+ {
     let predecessor = converter_argument_names_snapshot();
-    let missing = IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSnapshot::new(
-        &predecessor,
-        vec![converter_transform_types_observation(
-            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-            "payload_from_sql",
-            None,
-        )],
-    )
-    .expect_err("every converter direction needs explicit protrftypes evidence");
+    let missing =
+        IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSnapshot::new(
+            &predecessor,
+            vec![converter_transform_types_observation(
+                IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+                "payload_from_sql",
+                None,
+            )],
+        )
+        .expect_err("every converter direction needs explicit protrftypes evidence");
     assert_field(
         missing,
         "index_exclusion_constraint_operator_procedure_transform_converter_transform_types_completeness",
@@ -147,11 +155,12 @@ fn ordinary_exclude_converter_transform_types_reject_completeness_binding_and_du
         )
         .unwrap(),
     );
-    let extra_error = IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSnapshot::new(
-        &predecessor,
-        extra,
-    )
-    .expect_err("converter protrftypes cannot introduce an absent coordinate");
+    let extra_error =
+        IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSnapshot::new(
+            &predecessor,
+            extra,
+        )
+        .expect_err("converter protrftypes cannot introduce an absent coordinate");
     assert_field(
         extra_error,
         "index_exclusion_constraint_operator_procedure_transform_converter_transform_types_completeness",
@@ -162,11 +171,12 @@ fn ordinary_exclude_converter_transform_types_reject_completeness_binding_and_du
         "payload_from_sql",
         None,
     );
-    let duplicate = IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSnapshot::new(
-        &predecessor,
-        vec![observation.clone(), observation],
-    )
-    .expect_err("duplicate converter protrftypes coordinates must not collapse");
+    let duplicate =
+        IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSnapshot::new(
+            &predecessor,
+            vec![observation.clone(), observation],
+        )
+        .expect_err("duplicate converter protrftypes coordinates must not collapse");
     assert_field(
         duplicate,
         "index_exclusion_constraint_operator_procedure_transform_converter_transform_types_coordinate",
@@ -178,11 +188,12 @@ fn ordinary_exclude_converter_transform_types_reject_completeness_binding_and_du
         "different_from_sql",
         None,
     );
-    let binding = IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSnapshot::new(
-        &predecessor,
-        drift,
-    )
-    .expect_err("converter protrftypes must remain bound to the exact converter function");
+    let binding =
+        IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSnapshot::new(
+            &predecessor,
+            drift,
+        )
+        .expect_err("converter protrftypes must remain bound to the exact converter function");
     assert_field(
         binding,
         "index_exclusion_constraint_operator_procedure_transform_converter_transform_types_binding",
@@ -192,11 +203,12 @@ fn ordinary_exclude_converter_transform_types_reject_completeness_binding_and_du
 #[test]
 fn ordinary_exclude_converter_transform_types_preserve_location_receipt_and_input_edges() {
     let predecessor = converter_argument_names_snapshot();
-    let snapshot = IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSnapshot::new(
-        &predecessor,
-        complete_converter_transform_types_observations(),
-    )
-    .unwrap();
+    let snapshot =
+        IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesSnapshot::new(
+            &predecessor,
+            complete_converter_transform_types_observations(),
+        )
+        .unwrap();
     let receipt = snapshot
         .source_receipt(
             coordinate(),
@@ -210,33 +222,43 @@ fn ordinary_exclude_converter_transform_types_preserve_location_receipt_and_inpu
 
     let dotted_schema = QualifiedTypeName::new("payload.domain", "json").unwrap();
     let dotted_type = QualifiedTypeName::new("payload", "domain.json").unwrap();
-    let schema_location = IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation::new(
-        coordinate(),
-        1,
-        dotted_schema,
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        None,
-    )
-    .unwrap()
-    .canonical_location();
-    let type_location = IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation::new(
-        coordinate(),
-        1,
-        dotted_type,
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        None,
-    )
-    .unwrap()
-    .canonical_location();
+    let schema_location =
+        IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation::new(
+            coordinate(),
+            1,
+            dotted_schema,
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            None,
+        )
+        .unwrap()
+        .canonical_location();
+    let type_location =
+        IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation::new(
+            coordinate(),
+            1,
+            dotted_type,
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            None,
+        )
+        .unwrap()
+        .canonical_location();
     assert_ne!(schema_location, type_location);
 
     for (schema, function, field) in [
-        (" ", "payload_from_sql", "index_exclusion_constraint_operator_procedure_transform_converter_transform_types_function_schema"),
-        ("public", "\t", "index_exclusion_constraint_operator_procedure_transform_converter_transform_types_function_name"),
+        (
+            " ",
+            "payload_from_sql",
+            "index_exclusion_constraint_operator_procedure_transform_converter_transform_types_function_schema",
+        ),
+        (
+            "public",
+            "\t",
+            "index_exclusion_constraint_operator_procedure_transform_converter_transform_types_function_name",
+        ),
     ] {
         let error = IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation::new(
             coordinate(),
@@ -251,16 +273,17 @@ fn ordinary_exclude_converter_transform_types_preserve_location_receipt_and_inpu
         assert_field(error, field);
     }
 
-    let zero = IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation::new(
-        coordinate(),
-        0,
-        custom_payload_type(),
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        None,
-    )
-    .expect_err("converter positions are one-based");
+    let zero =
+        IndexExclusionConstraintOperatorProcedureTransformConverterTransformTypesObservation::new(
+            coordinate(),
+            0,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            None,
+        )
+        .expect_err("converter positions are one-based");
     assert_eq!(zero, ObservationError::InvalidOrdinalPosition);
 
     let missing = snapshot
@@ -271,5 +294,8 @@ fn ordinary_exclude_converter_transform_types_preserve_location_receipt_and_inpu
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         )
         .expect_err("receipt lookup remains exact-coordinate bound");
-    assert!(matches!(missing, ObservationError::UnknownObservationLocation { .. }));
+    assert!(matches!(
+        missing,
+        ObservationError::UnknownObservationLocation { .. }
+    ));
 }

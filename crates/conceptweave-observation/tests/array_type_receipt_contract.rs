@@ -38,8 +38,8 @@ fn array_aware_snapshot() -> PostgresSchemaSnapshotV3 {
 #[test]
 fn array_type_receipt_verifies_exact_coordinate_and_public_digest() {
     let snapshot = array_aware_snapshot();
-    let location = ArrayTypeLocation::new("public", "_status")
-        .expect("array-type location is valid");
+    let location =
+        ArrayTypeLocation::new("public", "_status").expect("array-type location is valid");
     let receipt = snapshot
         .array_type_source_receipt(location.clone())
         .expect("observed array type has an exact receipt");
@@ -72,8 +72,8 @@ fn unknown_or_unobserved_array_type_coordinate_fails_closed() {
         ],
     )
     .expect("legacy v3 snapshot remains valid");
-    let location = ArrayTypeLocation::new("public", "_status")
-        .expect("array-type location is valid");
+    let location =
+        ArrayTypeLocation::new("public", "_status").expect("array-type location is valid");
     assert!(legacy.array_type_source_receipt(location).is_err());
 }
 

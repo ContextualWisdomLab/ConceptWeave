@@ -11,7 +11,10 @@ fn identity(name: &str, encoding: i32) -> CollationCatalogIdentity {
     identity_in("pg_catalog", name, encoding)
 }
 
-fn builtin(locale: &str, encoding: i32) -> Result<CollationDefinitionObservation, ObservationError> {
+fn builtin(
+    locale: &str,
+    encoding: i32,
+) -> Result<CollationDefinitionObservation, ObservationError> {
     CollationDefinitionObservation::new(
         identity("builtin", encoding),
         PostgresCollationProvider::Builtin,
@@ -43,7 +46,9 @@ fn assert_provider_encoding_error(
     result: Result<CollationDefinitionObservation, ObservationError>,
 ) {
     assert_eq!(
-        result.expect_err("impossible PostgreSQL 18 provider/catalog-encoding tuple must fail closed"),
+        result.expect_err(
+            "impossible PostgreSQL 18 provider/catalog-encoding tuple must fail closed"
+        ),
         ObservationError::InvalidObservationField {
             field: "index_collation_definition_provider_encoding",
         }
@@ -57,8 +62,7 @@ fn builtin_catalog_encoding_is_derived_from_the_builtin_locale_or_copied_source(
         "PostgreSQL 18 CREATE COLLATION FROM pg_catalog.ucs_basic preserves UTF8 built-in C",
     );
     builtin("C.UTF-8", 6).expect("PostgreSQL 18 built-in C.UTF-8 is UTF8-only");
-    builtin("PG_UNICODE_FAST", 6)
-        .expect("PostgreSQL 18 built-in PG_UNICODE_FAST is UTF8-only");
+    builtin("PG_UNICODE_FAST", 6).expect("PostgreSQL 18 built-in PG_UNICODE_FAST is UTF8-only");
 
     assert_provider_encoding_error(builtin("C", 8));
     assert_provider_encoding_error(builtin("C.UTF-8", -1));
@@ -91,7 +95,9 @@ fn postgresql18_ucs_basic_and_its_copies_are_utf8_builtin_c() {
         Some("1".to_owned()),
         Some("1".to_owned()),
     )
-    .expect("CREATE COLLATION public.ucs_basic_copy FROM pg_catalog.ucs_basic preserves encoding 6");
+    .expect(
+        "CREATE COLLATION public.ucs_basic_copy FROM pg_catalog.ucs_basic preserves encoding 6",
+    );
 }
 
 #[test]

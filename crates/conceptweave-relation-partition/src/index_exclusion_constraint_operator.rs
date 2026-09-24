@@ -60,7 +60,10 @@ impl IndexExclusionConstraintOperatorObservation {
     /// Returns the collision-safe evidence location for this constraint-side operator vector.
     #[must_use]
     pub fn canonical_location(&self) -> String {
-        format!("{}/exclusion-operators", self.coordinate.canonical_location())
+        format!(
+            "{}/exclusion-operators",
+            self.coordinate.canonical_location()
+        )
     }
 }
 
@@ -281,9 +284,7 @@ impl IndexExclusionConstraintOperatorSnapshot {
             return Err(invalid("index_exclusion_constraint_operator_coordinate"));
         }
         if observed != expected {
-            return Err(invalid(
-                "index_exclusion_constraint_operator_completeness",
-            ));
+            return Err(invalid("index_exclusion_constraint_operator_completeness"));
         }
 
         let mut backing_procedures = Vec::new();
@@ -292,9 +293,7 @@ impl IndexExclusionConstraintOperatorSnapshot {
                 .observations()
                 .iter()
                 .find(|candidate| candidate.coordinate() == observation.coordinate())
-                .ok_or_else(|| {
-                    invalid("index_exclusion_constraint_operator_completeness")
-                })?;
+                .ok_or_else(|| invalid("index_exclusion_constraint_operator_completeness"))?;
             let mut backing = rebound_semantics
                 .observations()
                 .iter()
@@ -382,9 +381,7 @@ impl IndexExclusionConstraintOperatorSnapshot {
     ) -> Option<&QualifiedProcedureSignature> {
         self.backing_procedures
             .iter()
-            .find(|(candidate, position, _)| {
-                candidate == coordinate && *position == key_position
-            })
+            .find(|(candidate, position, _)| candidate == coordinate && *position == key_position)
             .map(|(_, _, procedure)| procedure)
     }
 

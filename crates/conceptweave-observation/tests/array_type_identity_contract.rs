@@ -142,12 +142,8 @@ fn observed_domain_and_relation_row_type_arrays_resolve() {
 
 #[test]
 fn collision_adjusted_array_name_is_observed_not_inferred_from_underscore_convention() {
-    let reserved = EnumObservation::new(
-        "public",
-        "reserved",
-        vec!["reserved".to_owned()],
-    )
-    .expect("reserved enum fixture is valid");
+    let reserved = EnumObservation::new("public", "reserved", vec!["reserved".to_owned()])
+        .expect("reserved enum fixture is valid");
     let renamed_reserved_array = ArrayTypeObservation::new(
         type_name("public", "_status"),
         type_name("public", "reserved"),

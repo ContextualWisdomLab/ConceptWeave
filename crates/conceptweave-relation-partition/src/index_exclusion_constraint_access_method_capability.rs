@@ -204,9 +204,10 @@ impl IndexExclusionConstraintAccessMethodCapabilitySnapshot {
                     "index_exclusion_constraint_access_method_capability_binding",
                 ));
             }
-            let index = find_base_index(base_snapshot, observation.backing_index()).ok_or_else(|| {
-                invalid("index_exclusion_constraint_access_method_capability_binding")
-            })?;
+            let index =
+                find_base_index(base_snapshot, observation.backing_index()).ok_or_else(|| {
+                    invalid("index_exclusion_constraint_access_method_capability_binding")
+                })?;
             let access_method = index.access_method().ok_or_else(|| {
                 invalid("index_exclusion_constraint_access_method_capability_binding")
             })?;
@@ -222,10 +223,8 @@ impl IndexExclusionConstraintAccessMethodCapabilitySnapshot {
             }
         }
 
-        let snapshot_digest = compute_capability_digest(
-            rebound_constraint.snapshot_digest(),
-            &observations,
-        );
+        let snapshot_digest =
+            compute_capability_digest(rebound_constraint.snapshot_digest(), &observations);
         Ok(Self {
             source_connection_key: rebound_constraint.source_connection_key().to_owned(),
             connection_policy_binding: rebound_constraint.connection_policy_binding().to_owned(),
@@ -284,14 +283,16 @@ impl IndexExclusionConstraintAccessMethodCapabilitySnapshot {
             .ok_or_else(|| ObservationError::UnknownObservationLocation {
                 location: capability_location(&coordinate),
             })?;
-        Ok(IndexExclusionConstraintAccessMethodCapabilitySourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintAccessMethodCapabilitySourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 

@@ -10,12 +10,8 @@ fn type_name(schema: &str, name: &str) -> QualifiedTypeName {
 }
 
 fn observed_enum(name: &str) -> EnumObservation {
-    EnumObservation::new(
-        "public",
-        name,
-        vec!["open".to_owned(), "closed".to_owned()],
-    )
-    .expect("enum fixture is valid")
+    EnumObservation::new("public", name, vec!["open".to_owned(), "closed".to_owned()])
+        .expect("enum fixture is valid")
 }
 
 fn array_type(array_name: &str, element_name: &str) -> ArrayTypeObservation {
@@ -84,9 +80,21 @@ fn array_inventory_is_order_independent_identity_bearing_and_receipt_bound() {
     .expect("legacy v3 construction remains valid");
 
     assert_eq!(first.snapshot_digest(), reordered.snapshot_digest());
-    assert_ne!(renamed_array.snapshot_digest(), original_name.snapshot_digest());
-    assert_ne!(original_name.snapshot_digest(), legacy_unobserved.snapshot_digest());
-    assert_eq!(first.array_types().expect("array inventory was observed").len(), 2);
+    assert_ne!(
+        renamed_array.snapshot_digest(),
+        original_name.snapshot_digest()
+    );
+    assert_ne!(
+        original_name.snapshot_digest(),
+        legacy_unobserved.snapshot_digest()
+    );
+    assert_eq!(
+        first
+            .array_types()
+            .expect("array inventory was observed")
+            .len(),
+        2
+    );
 
     let receipt = first
         .source_receipt(
@@ -105,30 +113,34 @@ fn exact_array_binding_remains_identity_even_when_private_validation_projects_to
         "public",
         "ticket",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "statuses",
-            1,
-            "public.status[]",
-            type_name("public", "_status"),
-            false,
-            None,
-        )
-        .expect("array-bound column is valid")],
+        vec![
+            ColumnObservationV3::new(
+                "statuses",
+                1,
+                "public.status[]",
+                type_name("public", "_status"),
+                false,
+                None,
+            )
+            .expect("array-bound column is valid"),
+        ],
     )
     .expect("relation is valid");
     let element_bound = RelationObservation::new(
         "public",
         "ticket",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "statuses",
-            1,
-            "public.status[]",
-            type_name("public", "status"),
-            false,
-            None,
-        )
-        .expect("element-bound control column is structurally valid")],
+        vec![
+            ColumnObservationV3::new(
+                "statuses",
+                1,
+                "public.status[]",
+                type_name("public", "status"),
+                false,
+                None,
+            )
+            .expect("element-bound control column is structurally valid"),
+        ],
     )
     .expect("control relation is valid");
 
@@ -153,7 +165,10 @@ fn exact_array_binding_remains_identity_even_when_private_validation_projects_to
     )
     .expect("element-bound control snapshot is valid");
 
-    assert_ne!(array_snapshot.snapshot_digest(), element_snapshot.snapshot_digest());
+    assert_ne!(
+        array_snapshot.snapshot_digest(),
+        element_snapshot.snapshot_digest()
+    );
 }
 
 #[test]
@@ -180,5 +195,8 @@ fn observed_empty_array_inventory_does_not_collapse_into_unobserved_state() {
 
     assert!(observed_empty.array_types().is_some());
     assert!(unobserved.array_types().is_none());
-    assert_ne!(observed_empty.snapshot_digest(), unobserved.snapshot_digest());
+    assert_ne!(
+        observed_empty.snapshot_digest(),
+        unobserved.snapshot_digest()
+    );
 }

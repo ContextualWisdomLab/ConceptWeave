@@ -1,7 +1,10 @@
-include!("index_exclusion_constraint_operator_procedure_transform_extension_membership_contract.rs");
+include!(
+    "index_exclusion_constraint_operator_procedure_transform_extension_membership_contract.rs"
+);
 
 #[test]
-fn ordinary_exclude_transform_extension_membership_rejects_same_generation_converter_direction_drift() {
+fn ordinary_exclude_transform_extension_membership_rejects_same_generation_converter_direction_drift()
+ {
     let function_lifecycle = converter_function_initial_privilege_snapshot();
     let transform_types = selected_transform_types_predecessor();
     let definition = definition_snapshot();
@@ -40,32 +43,34 @@ fn ordinary_exclude_transform_extension_membership_rejects_same_generation_conve
 }
 
 #[test]
-fn ordinary_exclude_transform_extension_membership_rejects_same_generation_converter_function_drift() {
+fn ordinary_exclude_transform_extension_membership_rejects_same_generation_converter_function_drift()
+ {
     let function_lifecycle = converter_function_initial_privilege_snapshot();
     let transform_types = selected_transform_types_predecessor();
     let definition = definition_snapshot();
-    let drifted_converter = IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot::new(
-        &transform_types,
-        &definition,
-        vec![converter_observation(
-            operator("="),
-            procedure("int4eq"),
-            "internal",
-            vec![converter_binding(
-                Some(converter_function(
-                    "different_from_sql",
-                    internal_type(),
-                    "payload_from_sql_v1",
-                )),
-                Some(converter_function(
-                    "payload_to_sql",
-                    custom_payload_type(),
-                    "payload_to_sql_v1",
-                )),
+    let drifted_converter =
+        IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot::new(
+            &transform_types,
+            &definition,
+            vec![converter_observation(
+                operator("="),
+                procedure("int4eq"),
+                "internal",
+                vec![converter_binding(
+                    Some(converter_function(
+                        "different_from_sql",
+                        internal_type(),
+                        "payload_from_sql_v1",
+                    )),
+                    Some(converter_function(
+                        "payload_to_sql",
+                        custom_payload_type(),
+                        "payload_to_sql_v1",
+                    )),
+                )],
             )],
-        )],
-    )
-    .unwrap();
+        )
+        .unwrap();
 
     let error = IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapshot::new(
         &function_lifecycle,
@@ -87,28 +92,29 @@ fn ordinary_exclude_transform_extension_membership_rejects_same_name_converter_d
     let function_lifecycle = converter_function_initial_privilege_snapshot();
     let transform_types = selected_transform_types_predecessor();
     let definition = definition_snapshot();
-    let drifted_converter = IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot::new(
-        &transform_types,
-        &definition,
-        vec![converter_observation(
-            operator("="),
-            procedure("int4eq"),
-            "internal",
-            vec![converter_binding(
-                Some(converter_function(
-                    "payload_from_sql",
-                    internal_type(),
-                    "payload_from_sql_v2",
-                )),
-                Some(converter_function(
-                    "payload_to_sql",
-                    custom_payload_type(),
-                    "payload_to_sql_v1",
-                )),
+    let drifted_converter =
+        IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot::new(
+            &transform_types,
+            &definition,
+            vec![converter_observation(
+                operator("="),
+                procedure("int4eq"),
+                "internal",
+                vec![converter_binding(
+                    Some(converter_function(
+                        "payload_from_sql",
+                        internal_type(),
+                        "payload_from_sql_v2",
+                    )),
+                    Some(converter_function(
+                        "payload_to_sql",
+                        custom_payload_type(),
+                        "payload_to_sql_v1",
+                    )),
+                )],
             )],
-        )],
-    )
-    .unwrap();
+        )
+        .unwrap();
 
     let error = IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipSnapshot::new(
         &function_lifecycle,

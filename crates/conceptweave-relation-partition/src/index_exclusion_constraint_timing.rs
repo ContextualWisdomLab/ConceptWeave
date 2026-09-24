@@ -174,7 +174,9 @@ impl IndexExclusionConstraintTimingSnapshot {
                 .connection_policy_binding()
                 .to_owned(),
             snapshot_digest,
-            extractor_revision: exclusion_constraint_snapshot.extractor_revision().to_owned(),
+            extractor_revision: exclusion_constraint_snapshot
+                .extractor_revision()
+                .to_owned(),
             observed_at_utc: exclusion_constraint_snapshot.observed_at_utc().to_owned(),
             observations,
         })

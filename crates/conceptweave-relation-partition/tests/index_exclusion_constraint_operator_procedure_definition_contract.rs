@@ -70,7 +70,12 @@ fn ordinary_exclude_operator_procedure_definition_preserves_content_bound_proven
     let receipt = snapshot.source_receipt(coordinate(), 1).unwrap();
 
     assert_eq!(receipt.location().language_name(), "internal");
-    assert!(receipt.location().definition_digest().starts_with("sha256:"));
+    assert!(
+        receipt
+            .location()
+            .definition_digest()
+            .starts_with("sha256:")
+    );
     assert_eq!(receipt.location().definition_digest().len(), 71);
     assert_eq!(receipt.location().operator(), &operator("="));
     assert_eq!(receipt.location().procedure(), &procedure("int4eq"));
@@ -82,10 +87,12 @@ fn ordinary_exclude_operator_procedure_definition_preserves_content_bound_proven
     assert_eq!(receipt.extractor_revision(), leakproof.extractor_revision());
     assert_eq!(receipt.observed_at_utc(), leakproof.observed_at_utc());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
-    assert!(receipt
-        .location()
-        .canonical_location()
-        .ends_with("/1/procedure-definition"));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/1/procedure-definition")
+    );
 }
 
 #[test]
@@ -118,8 +125,16 @@ fn ordinary_exclude_operator_procedure_definition_distinguishes_prosrc_changes()
 
     assert_ne!(first.snapshot_digest(), second.snapshot_digest());
     assert_ne!(
-        first.source_receipt(coordinate(), 1).unwrap().location().definition_digest(),
-        second.source_receipt(coordinate(), 1).unwrap().location().definition_digest()
+        first
+            .source_receipt(coordinate(), 1)
+            .unwrap()
+            .location()
+            .definition_digest(),
+        second
+            .source_receipt(coordinate(), 1)
+            .unwrap()
+            .location()
+            .definition_digest()
     );
 }
 
@@ -219,10 +234,7 @@ fn ordinary_exclude_operator_procedure_definition_distinguishes_language_changes
 #[test]
 fn ordinary_exclude_operator_procedure_definition_rejects_blank_language() {
     let error = IndexExclusionConstraintOperatorProcedureDefinitionMaterial::new(
-        "   ",
-        "int4eq",
-        None,
-        None,
+        "   ", "int4eq", None, None,
     )
     .expect_err("resolved pg_language identity must not be blank");
     assert_field(
@@ -276,8 +288,9 @@ fn ordinary_exclude_operator_procedure_definition_rejects_operator_binding_drift
 #[test]
 fn ordinary_exclude_operator_procedure_definition_rejects_missing_evidence() {
     let leakproof = leakproof_snapshot();
-    let error = IndexExclusionConstraintOperatorProcedureDefinitionSnapshot::new(&leakproof, vec![])
-        .expect_err("every governed operator function needs definition evidence");
+    let error =
+        IndexExclusionConstraintOperatorProcedureDefinitionSnapshot::new(&leakproof, vec![])
+            .expect_err("every governed operator function needs definition evidence");
     assert_field(
         error,
         "index_exclusion_constraint_operator_procedure_definition_completeness",

@@ -353,7 +353,9 @@ impl IndexCollationDefinitionSnapshot {
                 .to_owned(),
             predecessor_digest,
             snapshot_digest,
-            extractor_revision: database_encoding_predecessor.extractor_revision().to_owned(),
+            extractor_revision: database_encoding_predecessor
+                .extractor_revision()
+                .to_owned(),
             observed_at_utc: database_encoding_predecessor.observed_at_utc().to_owned(),
             definitions,
         })

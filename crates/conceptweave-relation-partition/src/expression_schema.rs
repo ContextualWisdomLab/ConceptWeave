@@ -11,8 +11,7 @@ use super::{
 const EXPRESSION_NODE_SCHEMA_DIGEST_DOMAIN_V1: &[u8] = b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.operator_family.exclusion.expression_semantics.node_schema.v1";
 const EXPRESSION_NODE_SCHEMA_REVISION_V1: &str = "postgresql-18-equal-supported-v1";
 const EXPRESSION_NODE_SCHEMA_DIGEST_DOMAIN_V2: &[u8] = b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.operator_family.exclusion.expression_semantics.node_schema.v2";
-const EXPRESSION_NODE_SCHEMA_REVISION_V2: &str =
-    "postgresql-18-equal-supported-v2-var-safe";
+const EXPRESSION_NODE_SCHEMA_REVISION_V2: &str = "postgresql-18-equal-supported-v2-var-safe";
 const SHA256_DIGEST_PREFIX: &str = "sha256:";
 
 /// Validates the historical PostgreSQL 18 equality-schema v1 contract.
@@ -383,7 +382,9 @@ fn reject_incomplete_var_leaves(expression: &CanonicalExpression) -> Result<(), 
 
 fn reject_incomplete_var_value(value: &CanonicalExpressionValue) -> Result<(), ObservationError> {
     match value {
-        CanonicalExpressionValue::Expression(expression) => reject_incomplete_var_leaves(expression),
+        CanonicalExpressionValue::Expression(expression) => {
+            reject_incomplete_var_leaves(expression)
+        }
         CanonicalExpressionValue::ExpressionList(expressions) => {
             for expression in expressions {
                 reject_incomplete_var_leaves(expression)?;

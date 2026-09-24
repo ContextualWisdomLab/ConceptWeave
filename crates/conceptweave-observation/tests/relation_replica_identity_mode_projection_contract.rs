@@ -26,13 +26,13 @@ fn compatibility_projections_copy_observed_relation_replica_identity_mode() {
     ] {
         let body = function_body(function);
         assert!(
-            body.contains(
-                "if let Some(replica_identity_mode) = relation.replica_identity_mode()"
-            ),
+            body.contains("if let Some(replica_identity_mode) = relation.replica_identity_mode()"),
             "{function} must preserve observed relreplident without inventing an unobserved mode"
         );
         assert!(
-            body.contains("projected = projected.with_replica_identity_mode(replica_identity_mode)"),
+            body.contains(
+                "projected = projected.with_replica_identity_mode(replica_identity_mode)"
+            ),
             "{function} must carry the exact observed mode into its rebuilt relation"
         );
     }

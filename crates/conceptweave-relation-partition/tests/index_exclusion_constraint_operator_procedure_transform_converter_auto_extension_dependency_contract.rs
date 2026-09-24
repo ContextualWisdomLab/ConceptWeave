@@ -1,12 +1,14 @@
-include!("index_exclusion_constraint_operator_procedure_transform_converter_extension_membership_contract.rs");
+include!(
+    "index_exclusion_constraint_operator_procedure_transform_converter_extension_membership_contract.rs"
+);
 
 use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencyObservation,
     IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencySnapshot,
 };
 
-fn converter_extension_membership_snapshot(
-) -> IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipSnapshot {
+fn converter_extension_membership_snapshot()
+-> IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipSnapshot {
     let predecessor = converter_transform_types_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterExtensionMembershipSnapshot::new(
         &predecessor,
@@ -32,8 +34,9 @@ fn converter_auto_extension_dependency_observation(
     .unwrap()
 }
 
-fn complete_converter_auto_extension_dependency_observations(
-) -> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencyObservation> {
+fn complete_converter_auto_extension_dependency_observations() -> Vec<
+    IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencyObservation,
+> {
     vec![
         converter_auto_extension_dependency_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
@@ -69,7 +72,10 @@ fn ordinary_exclude_converter_auto_extension_dependency_preserves_zero_one_and_m
         one_observations,
     )
     .unwrap();
-    assert_eq!(one.observations()[0].extension_names(), &["payload_runtime"]);
+    assert_eq!(
+        one.observations()[0].extension_names(),
+        &["payload_runtime"]
+    );
     assert_ne!(none.snapshot_digest(), one.snapshot_digest());
 
     let mut multiple_observations = complete_converter_auto_extension_dependency_observations();
@@ -125,7 +131,8 @@ fn ordinary_exclude_converter_auto_extension_dependency_canonicalizes_set_order(
 }
 
 #[test]
-fn ordinary_exclude_converter_auto_extension_dependency_rejects_blank_and_duplicate_extension_names() {
+fn ordinary_exclude_converter_auto_extension_dependency_rejects_blank_and_duplicate_extension_names()
+ {
     let blank = IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencyObservation::new(
         coordinate(),
         1,
@@ -158,7 +165,8 @@ fn ordinary_exclude_converter_auto_extension_dependency_rejects_blank_and_duplic
 }
 
 #[test]
-fn ordinary_exclude_converter_auto_extension_dependency_rejects_completeness_binding_and_duplicate_coordinates() {
+fn ordinary_exclude_converter_auto_extension_dependency_rejects_completeness_binding_and_duplicate_coordinates()
+ {
     let predecessor = converter_extension_membership_snapshot();
     let missing = IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencySnapshot::new(
         &predecessor,
@@ -262,5 +270,8 @@ fn ordinary_exclude_converter_auto_extension_dependency_preserves_root_location_
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         )
         .expect_err("receipt lookup remains exact-coordinate bound");
-    assert!(matches!(missing, ObservationError::UnknownObservationLocation { .. }));
+    assert!(matches!(
+        missing,
+        ObservationError::UnknownObservationLocation { .. }
+    ));
 }

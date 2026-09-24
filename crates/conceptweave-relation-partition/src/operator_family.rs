@@ -5,8 +5,8 @@ use conceptweave_observation::{
 };
 use sha2::{Digest, Sha256};
 
-use crate::RelationPartitionSnapshot;
 use super::{IndexPartitionCoordinate, IndexPartitionSnapshot};
+use crate::RelationPartitionSnapshot;
 
 const INDEX_OPERATOR_FAMILY_DIGEST_DOMAIN_V1: &[u8] =
     b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.operator_family.v1";
@@ -120,7 +120,11 @@ impl IndexKeyOperatorFamilyObservation {
     /// Returns the collision-safe evidence location for this key-family fact.
     #[must_use]
     pub fn canonical_location(&self) -> String {
-        format!("{}/keys/{}/operator-family", self.index.canonical_location(), self.key_position)
+        format!(
+            "{}/keys/{}/operator-family",
+            self.index.canonical_location(),
+            self.key_position
+        )
     }
 }
 
@@ -209,18 +213,17 @@ impl IndexOperatorFamilySnapshot {
             return Err(invalid("index_operator_family_predecessor_binding"));
         }
 
-        let observations = canonicalize_operator_families(
-            base_snapshot,
-            index_partition_snapshot,
-            observations,
-        )?;
+        let observations =
+            canonicalize_operator_families(base_snapshot, index_partition_snapshot, observations)?;
         let snapshot_digest = compute_operator_family_digest(
             index_partition_snapshot.snapshot_digest(),
             &observations,
         );
         Ok(Self {
             source_connection_key: index_partition_snapshot.source_connection_key().to_owned(),
-            connection_policy_binding: index_partition_snapshot.connection_policy_binding().to_owned(),
+            connection_policy_binding: index_partition_snapshot
+                .connection_policy_binding()
+                .to_owned(),
             snapshot_digest,
             extractor_revision: index_partition_snapshot.extractor_revision().to_owned(),
             observed_at_utc: index_partition_snapshot.observed_at_utc().to_owned(),
@@ -273,9 +276,14 @@ impl IndexOperatorFamilySnapshot {
         let observation = self
             .observations
             .iter()
-            .find(|observation| observation.index() == index && observation.key_position() == key_position)
+            .find(|observation| {
+                observation.index() == index && observation.key_position() == key_position
+            })
             .ok_or_else(|| ObservationError::UnknownObservationLocation {
-                location: format!("{}/keys/{key_position}/operator-family", index.canonical_location()),
+                location: format!(
+                    "{}/keys/{key_position}/operator-family",
+                    index.canonical_location()
+                ),
             })?;
         Ok(IndexOperatorFamilySourceReceipt {
             source_id: self.source_connection_key.clone(),
@@ -337,7 +345,12 @@ fn canonicalize_operator_families(
 
     let by_key = observations
         .iter()
-        .map(|observation| ((observation.index().clone(), observation.key_position()), observation))
+        .map(|observation| {
+            (
+                (observation.index().clone(), observation.key_position()),
+                observation,
+            )
+        })
         .collect::<BTreeMap<_, _>>();
 
     for observation in &observations {

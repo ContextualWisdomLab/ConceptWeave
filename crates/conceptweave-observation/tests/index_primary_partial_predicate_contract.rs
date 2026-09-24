@@ -13,15 +13,17 @@ fn catalog_type(type_name: &str) -> QualifiedTypeName {
 
 fn index(primary: bool, predicate: Option<&str>) -> IndexObservation {
     let mut index = IndexObservation::new(
-        if primary { "document_pkey" } else { "document_id_uix" },
+        if primary {
+            "document_pkey"
+        } else {
+            "document_id_uix"
+        },
         true,
         Some(false),
-        vec![IndexAttributeObservation::column(
-            1,
-            IndexAttributeKind::Key,
-            "document_id",
-        )
-        .expect("index key fixture is valid")],
+        vec![
+            IndexAttributeObservation::column(1, IndexAttributeKind::Key, "document_id")
+                .expect("index key fixture is valid"),
+        ],
         Vec::new(),
     )
     .expect("index fixture is structurally valid")
@@ -62,15 +64,17 @@ fn relation(index: IndexObservation, include_primary_key: bool) -> RelationObser
         "public",
         "document",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "document_id",
-            1,
-            "bigint",
-            catalog_type("int8"),
-            false,
-            None,
-        )
-        .expect("column fixture is valid")],
+        vec![
+            ColumnObservationV3::new(
+                "document_id",
+                1,
+                "bigint",
+                catalog_type("int8"),
+                false,
+                None,
+            )
+            .expect("column fixture is valid"),
+        ],
     )
     .expect("relation fixture is valid")
     .with_constraints(constraints)
@@ -111,9 +115,6 @@ fn matching_non_partial_primary_index_remains_admissible_without_lifecycle_evide
 
 #[test]
 fn standalone_partial_unique_index_remains_admissible() {
-    snapshot(relation(
-        index(false, Some("(document_id > 0)")),
-        false,
-    ))
-    .expect("partial indexes remain valid when they do not claim PRIMARY KEY ownership");
+    snapshot(relation(index(false, Some("(document_id > 0)")), false))
+        .expect("partial indexes remain valid when they do not claim PRIMARY KEY ownership");
 }

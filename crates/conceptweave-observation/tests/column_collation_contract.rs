@@ -20,15 +20,10 @@ fn parent_relation() -> RelationObservation {
         "public",
         "parent",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "text",
-            catalog_type("text"),
-            false,
-            None,
-        )
-        .expect("parent column fixture is valid")],
+        vec![
+            ColumnObservationV3::new("id", 1, "text", catalog_type("text"), false, None)
+                .expect("parent column fixture is valid"),
+        ],
     )
     .expect("parent relation fixture is valid")
     .with_constraints(vec![TableConstraintObservation::PrimaryKey(
@@ -58,15 +53,10 @@ fn child_relation() -> RelationObservation {
         "public",
         "child",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "parent_id",
-            1,
-            "text",
-            catalog_type("text"),
-            false,
-            None,
-        )
-        .expect("child column fixture is valid")],
+        vec![
+            ColumnObservationV3::new("parent_id", 1, "text", catalog_type("text"), false, None)
+                .expect("child column fixture is valid"),
+        ],
     )
     .expect("child relation fixture is valid")
     .with_constraints(vec![TableConstraintObservation::ForeignKey(foreign_key)])
@@ -127,21 +117,18 @@ fn exact_column_collation_changes_governed_identity() {
 
 #[test]
 fn observed_uncollatable_is_distinct_from_unobserved_collation_family() {
-    let relations = vec![RelationObservation::new(
-        "public",
-        "metric",
-        RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "value",
-            1,
-            "int8",
-            catalog_type("int8"),
-            false,
-            None,
+    let relations = vec![
+        RelationObservation::new(
+            "public",
+            "metric",
+            RelationKind::Table,
+            vec![
+                ColumnObservationV3::new("value", 1, "int8", catalog_type("int8"), false, None)
+                    .expect("metric column fixture is valid"),
+            ],
         )
-        .expect("metric column fixture is valid")],
-    )
-    .expect("metric relation fixture is valid")];
+        .expect("metric relation fixture is valid"),
+    ];
 
     let unobserved = PostgresSchemaSnapshotV3::new(
         &support::authorized_source("warehouse_primary", &["public"]),
@@ -154,13 +141,15 @@ fn observed_uncollatable_is_distinct_from_unobserved_collation_family() {
     .expect("legacy-compatible unobserved snapshot is valid");
     let observed = snapshot(
         relations,
-        vec![ColumnCollationObservation::uncollatable(
-            "public",
-            "metric",
-            RelationKind::Table,
-            "value",
-        )
-        .expect("explicit uncollatable evidence is valid")],
+        vec![
+            ColumnCollationObservation::uncollatable(
+                "public",
+                "metric",
+                RelationKind::Table,
+                "value",
+            )
+            .expect("explicit uncollatable evidence is valid"),
+        ],
     )
     .expect("observed-uncollatable snapshot is valid");
 

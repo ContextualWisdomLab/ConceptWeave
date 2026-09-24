@@ -1,12 +1,14 @@
-include!("index_exclusion_constraint_operator_procedure_transform_converter_strictness_contract.rs");
+include!(
+    "index_exclusion_constraint_operator_procedure_transform_converter_strictness_contract.rs"
+);
 
 use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterVolatilityObservation,
     IndexExclusionConstraintOperatorProcedureTransformConverterVolatilitySnapshot,
 };
 
-fn converter_strictness_snapshot(
-) -> IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessSnapshot {
+fn converter_strictness_snapshot()
+-> IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessSnapshot {
     let predecessor = converter_leakproof_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessSnapshot::new(
         &predecessor,
@@ -32,8 +34,8 @@ fn converter_volatility_observation(
     .unwrap()
 }
 
-fn complete_converter_volatility_observations(
-) -> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterVolatilityObservation> {
+fn complete_converter_volatility_observations()
+-> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterVolatilityObservation> {
     vec![
         converter_volatility_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
@@ -51,11 +53,12 @@ fn complete_converter_volatility_observations(
 #[test]
 fn ordinary_exclude_transform_converter_volatility_preserves_raw_provolatile() {
     let predecessor = converter_strictness_snapshot();
-    let snapshot = IndexExclusionConstraintOperatorProcedureTransformConverterVolatilitySnapshot::new(
-        &predecessor,
-        complete_converter_volatility_observations(),
-    )
-    .unwrap();
+    let snapshot =
+        IndexExclusionConstraintOperatorProcedureTransformConverterVolatilitySnapshot::new(
+            &predecessor,
+            complete_converter_volatility_observations(),
+        )
+        .unwrap();
     let receipt = snapshot
         .source_receipt(
             coordinate(),
@@ -72,38 +75,44 @@ fn ordinary_exclude_transform_converter_volatility_preserves_raw_provolatile() {
         receipt.connection_policy_binding(),
         predecessor.connection_policy_binding()
     );
-    assert_eq!(receipt.extractor_revision(), predecessor.extractor_revision());
+    assert_eq!(
+        receipt.extractor_revision(),
+        predecessor.extractor_revision()
+    );
     assert_eq!(receipt.observed_at_utc(), predecessor.observed_at_utc());
 }
 
 #[test]
-fn ordinary_exclude_transform_converter_volatility_location_is_collision_safe_for_quoted_type_names() {
+fn ordinary_exclude_transform_converter_volatility_location_is_collision_safe_for_quoted_type_names()
+ {
     let dotted_schema =
         conceptweave_observation::QualifiedTypeName::new("payload.domain", "json").unwrap();
     let dotted_type =
         conceptweave_observation::QualifiedTypeName::new("payload", "domain.json").unwrap();
-    let schema_location = IndexExclusionConstraintOperatorProcedureTransformConverterVolatilityObservation::new(
-        coordinate(),
-        1,
-        dotted_schema,
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        'i',
-    )
-    .unwrap()
-    .canonical_location();
-    let type_location = IndexExclusionConstraintOperatorProcedureTransformConverterVolatilityObservation::new(
-        coordinate(),
-        1,
-        dotted_type,
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        'i',
-    )
-    .unwrap()
-    .canonical_location();
+    let schema_location =
+        IndexExclusionConstraintOperatorProcedureTransformConverterVolatilityObservation::new(
+            coordinate(),
+            1,
+            dotted_schema,
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            'i',
+        )
+        .unwrap()
+        .canonical_location();
+    let type_location =
+        IndexExclusionConstraintOperatorProcedureTransformConverterVolatilityObservation::new(
+            coordinate(),
+            1,
+            dotted_type,
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            'i',
+        )
+        .unwrap()
+        .canonical_location();
 
     assert_ne!(schema_location, type_location);
 }
@@ -111,22 +120,24 @@ fn ordinary_exclude_transform_converter_volatility_location_is_collision_safe_fo
 #[test]
 fn ordinary_exclude_transform_converter_volatility_distinguishes_catalog_states() {
     let predecessor = converter_strictness_snapshot();
-    let immutable = IndexExclusionConstraintOperatorProcedureTransformConverterVolatilitySnapshot::new(
-        &predecessor,
-        complete_converter_volatility_observations(),
-    )
-    .unwrap();
+    let immutable =
+        IndexExclusionConstraintOperatorProcedureTransformConverterVolatilitySnapshot::new(
+            &predecessor,
+            complete_converter_volatility_observations(),
+        )
+        .unwrap();
     let mut changed = complete_converter_volatility_observations();
     changed[0] = converter_volatility_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "payload_from_sql",
         'v',
     );
-    let volatile = IndexExclusionConstraintOperatorProcedureTransformConverterVolatilitySnapshot::new(
-        &predecessor,
-        changed,
-    )
-    .unwrap();
+    let volatile =
+        IndexExclusionConstraintOperatorProcedureTransformConverterVolatilitySnapshot::new(
+            &predecessor,
+            changed,
+        )
+        .unwrap();
 
     assert_ne!(immutable.snapshot_digest(), volatile.snapshot_digest());
 }
@@ -149,16 +160,17 @@ fn ordinary_exclude_transform_converter_volatility_preserves_post_creation_volat
 
 #[test]
 fn ordinary_exclude_transform_converter_volatility_rejects_unknown_catalog_state() {
-    let error = IndexExclusionConstraintOperatorProcedureTransformConverterVolatilityObservation::new(
-        coordinate(),
-        1,
-        custom_payload_type(),
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        'x',
-    )
-    .expect_err("PostgreSQL provolatile must be one of i, s, or v");
+    let error =
+        IndexExclusionConstraintOperatorProcedureTransformConverterVolatilityObservation::new(
+            coordinate(),
+            1,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            'x',
+        )
+        .expect_err("PostgreSQL provolatile must be one of i, s, or v");
     assert_field(
         error,
         "index_exclusion_constraint_operator_procedure_transform_converter_volatility",
@@ -203,7 +215,9 @@ fn ordinary_exclude_transform_converter_volatility_rejects_extra_coordinate() {
         &predecessor,
         observations,
     )
-    .expect_err("volatility evidence cannot introduce a converter coordinate absent from predecessor");
+    .expect_err(
+        "volatility evidence cannot introduce a converter coordinate absent from predecessor",
+    );
     assert_field(
         error,
         "index_exclusion_constraint_operator_procedure_transform_converter_volatility_completeness",
@@ -251,31 +265,33 @@ fn ordinary_exclude_transform_converter_volatility_rejects_duplicate_coordinate(
 
 #[test]
 fn ordinary_exclude_transform_converter_volatility_rejects_blank_converter_identifiers() {
-    let blank_schema = IndexExclusionConstraintOperatorProcedureTransformConverterVolatilityObservation::new(
-        coordinate(),
-        1,
-        custom_payload_type(),
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        " ",
-        "payload_from_sql",
-        'i',
-    )
-    .expect_err("converter schema is part of the exact function binding");
+    let blank_schema =
+        IndexExclusionConstraintOperatorProcedureTransformConverterVolatilityObservation::new(
+            coordinate(),
+            1,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            " ",
+            "payload_from_sql",
+            'i',
+        )
+        .expect_err("converter schema is part of the exact function binding");
     assert_field(
         blank_schema,
         "index_exclusion_constraint_operator_procedure_transform_converter_volatility_function_schema",
     );
 
-    let blank_name = IndexExclusionConstraintOperatorProcedureTransformConverterVolatilityObservation::new(
-        coordinate(),
-        1,
-        custom_payload_type(),
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "\t",
-        'i',
-    )
-    .expect_err("converter function name is part of the exact function binding");
+    let blank_name =
+        IndexExclusionConstraintOperatorProcedureTransformConverterVolatilityObservation::new(
+            coordinate(),
+            1,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "\t",
+            'i',
+        )
+        .expect_err("converter function name is part of the exact function binding");
     assert_field(
         blank_name,
         "index_exclusion_constraint_operator_procedure_transform_converter_volatility_function_name",
@@ -284,27 +300,29 @@ fn ordinary_exclude_transform_converter_volatility_rejects_blank_converter_ident
 
 #[test]
 fn ordinary_exclude_transform_converter_volatility_rejects_zero_position() {
-    let error = IndexExclusionConstraintOperatorProcedureTransformConverterVolatilityObservation::new(
-        coordinate(),
-        0,
-        custom_payload_type(),
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        'i',
-    )
-    .expect_err("converter positions are one-based");
+    let error =
+        IndexExclusionConstraintOperatorProcedureTransformConverterVolatilityObservation::new(
+            coordinate(),
+            0,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            'i',
+        )
+        .expect_err("converter positions are one-based");
     assert_eq!(error, ObservationError::InvalidOrdinalPosition);
 }
 
 #[test]
 fn ordinary_exclude_transform_converter_volatility_rejects_unknown_receipt_coordinate() {
     let predecessor = converter_strictness_snapshot();
-    let snapshot = IndexExclusionConstraintOperatorProcedureTransformConverterVolatilitySnapshot::new(
-        &predecessor,
-        complete_converter_volatility_observations(),
-    )
-    .unwrap();
+    let snapshot =
+        IndexExclusionConstraintOperatorProcedureTransformConverterVolatilitySnapshot::new(
+            &predecessor,
+            complete_converter_volatility_observations(),
+        )
+        .unwrap();
     let error = snapshot
         .source_receipt(
             coordinate(),
@@ -321,7 +339,9 @@ fn ordinary_exclude_transform_converter_volatility_rejects_unknown_receipt_coord
 
 #[test]
 fn ordinary_exclude_transform_converter_volatility_snapshot_is_publicly_composed() {
-    assert!(std::mem::size_of::<
-        IndexExclusionConstraintOperatorProcedureTransformConverterVolatilitySnapshot,
-    >() > 0);
+    assert!(
+        std::mem::size_of::<
+            IndexExclusionConstraintOperatorProcedureTransformConverterVolatilitySnapshot,
+        >() > 0
+    );
 }

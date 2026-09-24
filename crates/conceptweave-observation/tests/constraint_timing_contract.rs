@@ -17,15 +17,17 @@ fn base_relation() -> RelationObservation {
         "public",
         "document",
         RelationKind::Table,
-        vec![ColumnObservationV3::new(
-            "document_id",
-            1,
-            "bigint",
-            catalog_type("int8"),
-            false,
-            None,
-        )
-        .expect("column fixture is valid")],
+        vec![
+            ColumnObservationV3::new(
+                "document_id",
+                1,
+                "bigint",
+                catalog_type("int8"),
+                false,
+                None,
+            )
+            .expect("column fixture is valid"),
+        ],
     )
     .expect("relation fixture is valid")
 }
@@ -46,32 +48,27 @@ fn backing_index(
         constraint_name,
         true,
         Some(false),
-        vec![IndexAttributeObservation::new(
-            1,
-            IndexAttributeKind::Key,
-            "document_id",
-        )
-        .expect("key fixture is valid")],
+        vec![
+            IndexAttributeObservation::new(1, IndexAttributeKind::Key, "document_id")
+                .expect("key fixture is valid"),
+        ],
         Vec::new(),
     )
     .expect("backing-index fixture is structurally valid")
     .with_access_method("btree")
-    .with_key_semantics(vec![IndexKeySemantics::new(
-        1,
-        None,
-        QualifiedOperatorClassName::new("pg_catalog", "int8_ops")
-            .expect("operator-class fixture is valid"),
-        0,
-    )
-    .expect("key semantics fixture is valid")])
+    .with_key_semantics(vec![
+        IndexKeySemantics::new(
+            1,
+            None,
+            QualifiedOperatorClassName::new("pg_catalog", "int8_ops")
+                .expect("operator-class fixture is valid"),
+            0,
+        )
+        .expect("key semantics fixture is valid"),
+    ])
     .expect("one semantic record matches the single key position")
     .with_catalog_flags(IndexCatalogFlags::new(
-        primary,
-        false,
-        immediate,
-        false,
-        false,
-        false,
+        primary, false, immediate, false, false, false,
     ))
     .expect("catalog-flag fixture is coherent")
     .with_ready(true)
@@ -125,12 +122,9 @@ fn snapshot(
         TableConstraintObservation::ForeignKey(_) | TableConstraintObservation::Check(_) => None,
     });
     let observed_relation = match key_shape {
-        Some((constraint_name, primary, deferrability)) => relation(constraint)
-            .with_indexes(vec![backing_index(
-                &constraint_name,
-                primary,
-                deferrability,
-            )])?,
+        Some((constraint_name, primary, deferrability)) => relation(constraint).with_indexes(
+            vec![backing_index(&constraint_name, primary, deferrability)],
+        )?,
         None => relation(constraint),
     };
 
@@ -172,9 +166,18 @@ fn coherent_primary_key_deferrability_states_change_governed_identity() {
     )
     .expect("DEFERRABLE INITIALLY DEFERRED primary key is valid");
 
-    assert_ne!(not_deferrable.snapshot_digest(), initially_immediate.snapshot_digest());
-    assert_ne!(not_deferrable.snapshot_digest(), initially_deferred.snapshot_digest());
-    assert_ne!(initially_immediate.snapshot_digest(), initially_deferred.snapshot_digest());
+    assert_ne!(
+        not_deferrable.snapshot_digest(),
+        initially_immediate.snapshot_digest()
+    );
+    assert_ne!(
+        not_deferrable.snapshot_digest(),
+        initially_deferred.snapshot_digest()
+    );
+    assert_ne!(
+        initially_immediate.snapshot_digest(),
+        initially_deferred.snapshot_digest()
+    );
 }
 
 #[test]
@@ -222,7 +225,10 @@ fn observed_empty_timing_inventory_differs_from_unobserved() {
     )
     .expect("explicitly observed-empty timing family is valid when no key constraints exist");
 
-    assert_ne!(unobserved.snapshot_digest(), observed_empty.snapshot_digest());
+    assert_ne!(
+        unobserved.snapshot_digest(),
+        observed_empty.snapshot_digest()
+    );
     assert_eq!(unobserved.constraint_timings(), None);
     assert_eq!(observed_empty.constraint_timings(), Some(&[][..]));
 }
@@ -243,14 +249,8 @@ fn observed_timing_inventory_must_cover_every_key_constraint() {
 #[test]
 fn timing_cannot_target_non_key_constraint() {
     let check = TableConstraintObservation::Check(
-        CheckConstraintObservation::new(
-            "document_positive",
-            "document_id > 0",
-            true,
-            true,
-            false,
-        )
-        .expect("check fixture is valid"),
+        CheckConstraintObservation::new("document_positive", "document_id > 0", true, true, false)
+            .expect("check fixture is valid"),
     );
     let error = snapshot(
         check,

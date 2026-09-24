@@ -276,11 +276,9 @@ impl IndexPartitionCollationIdentitySnapshot {
         if key_position == 0 {
             return Err(ObservationError::InvalidOrdinalPosition);
         }
-        if !self
-            .observations
-            .iter()
-            .any(|observation| observation.index() == index && observation.key_position() == key_position)
-        {
+        if !self.observations.iter().any(|observation| {
+            observation.index() == index && observation.key_position() == key_position
+        }) {
             return Err(ObservationError::UnknownObservationLocation {
                 location: format!(
                     "{}/keys/{key_position}/collation-catalog-identity",
@@ -364,7 +362,9 @@ fn canonicalize_and_validate(
         .iter()
         .map(|observation| (observation.index().clone(), observation.key_position()))
         .collect::<BTreeSet<_>>();
-    if observed_keys.len() != observations.len() || observed_keys != expected.keys().cloned().collect() {
+    if observed_keys.len() != observations.len()
+        || observed_keys != expected.keys().cloned().collect()
+    {
         return Err(invalid("index_partition_collation_catalog_completeness"));
     }
 

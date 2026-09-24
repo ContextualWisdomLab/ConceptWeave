@@ -186,14 +186,17 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterArgumentNa
     converter_snapshot_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
-    observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterArgumentNamesObservation>,
+    observations:
+        Vec<IndexExclusionConstraintOperatorProcedureTransformConverterArgumentNamesObservation>,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterArgumentNamesSnapshot {
     /// Creates complete raw argument-name evidence for every converter direction in the predecessor.
     pub fn new(
         argument_modes_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterArgumentModesSnapshot,
-        mut observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterArgumentNamesObservation>,
+        mut observations: Vec<
+            IndexExclusionConstraintOperatorProcedureTransformConverterArgumentNamesObservation,
+        >,
     ) -> Result<Self, ObservationError> {
         observations.sort_by_key(argument_names_key);
 
@@ -263,9 +266,13 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterArgumentNamesSna
         );
         Ok(Self {
             source_connection_key: argument_modes_snapshot.source_connection_key().to_owned(),
-            connection_policy_binding: argument_modes_snapshot.connection_policy_binding().to_owned(),
+            connection_policy_binding: argument_modes_snapshot
+                .connection_policy_binding()
+                .to_owned(),
             snapshot_digest,
-            converter_snapshot_digest: argument_modes_snapshot.converter_snapshot_digest().to_owned(),
+            converter_snapshot_digest: argument_modes_snapshot
+                .converter_snapshot_digest()
+                .to_owned(),
             extractor_revision: argument_modes_snapshot.extractor_revision().to_owned(),
             observed_at_utc: argument_modes_snapshot.observed_at_utc().to_owned(),
             observations,
@@ -312,7 +319,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterArgumentNamesSna
     #[must_use]
     pub fn observations(
         &self,
-    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterArgumentNamesObservation] {
+    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterArgumentNamesObservation]
+    {
         &self.observations
     }
 
@@ -344,14 +352,16 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterArgumentNamesSna
                     direction,
                 ),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureTransformConverterArgumentNamesSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureTransformConverterArgumentNamesSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 

@@ -82,7 +82,9 @@ fn relation(
     RelationObservation::new("public", name, kind, columns).unwrap()
 }
 
-fn snapshot(child_columns: Vec<ColumnObservationV3>) -> Result<RelationPartitionSnapshot, ObservationError> {
+fn snapshot(
+    child_columns: Vec<ColumnObservationV3>,
+) -> Result<RelationPartitionSnapshot, ObservationError> {
     let base = PostgresSchemaSnapshotV3::new(
         &authorized_source(),
         "extractor-relation-partition-column-map-v1",
@@ -171,12 +173,22 @@ fn partition_child_must_preserve_type_modifier_rendering_until_typmod_is_structu
             relation(
                 "accounts",
                 RelationKind::PartitionedTable,
-                vec![column("account_code", 1, "character varying(32)", "varchar")],
+                vec![column(
+                    "account_code",
+                    1,
+                    "character varying(32)",
+                    "varchar",
+                )],
             ),
             relation(
                 "accounts_2026",
                 RelationKind::Table,
-                vec![column("account_code", 1, "character varying(64)", "varchar")],
+                vec![column(
+                    "account_code",
+                    1,
+                    "character varying(64)",
+                    "varchar",
+                )],
             ),
         ],
         vec![],
@@ -218,5 +230,7 @@ fn different_physical_column_order_remains_admissible() {
         column("account_email", 1, "text", "text"),
         column("account_id", 2, "integer", "int4"),
     ])
-    .expect("PostgreSQL build_attrmap_by_name allows a valid name/type map across different ordinals");
+    .expect(
+        "PostgreSQL build_attrmap_by_name allows a valid name/type map across different ordinals",
+    );
 }

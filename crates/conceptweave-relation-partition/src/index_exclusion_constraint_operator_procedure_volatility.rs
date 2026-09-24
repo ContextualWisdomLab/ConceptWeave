@@ -138,7 +138,9 @@ impl IndexExclusionConstraintOperatorProcedureVolatilitySourceReceipt {
 
     /// Returns the exact validated procedure-volatility observation.
     #[must_use]
-    pub const fn location(&self) -> &IndexExclusionConstraintOperatorProcedureVolatilityObservation {
+    pub const fn location(
+        &self,
+    ) -> &IndexExclusionConstraintOperatorProcedureVolatilityObservation {
         &self.location
     }
 }
@@ -199,9 +201,7 @@ impl IndexExclusionConstraintOperatorProcedureVolatilitySnapshot {
                         && candidate.key_position() == observation.key_position()
                 })
                 .ok_or_else(|| {
-                    invalid(
-                        "index_exclusion_constraint_operator_procedure_volatility_completeness",
-                    )
+                    invalid("index_exclusion_constraint_operator_procedure_volatility_completeness")
                 })?;
             if predecessor.operator() != observation.operator()
                 || predecessor.procedure() != observation.procedure()
@@ -258,7 +258,9 @@ impl IndexExclusionConstraintOperatorProcedureVolatilitySnapshot {
 
     /// Returns complete volatility observations in deterministic coordinate/key order.
     #[must_use]
-    pub fn observations(&self) -> &[IndexExclusionConstraintOperatorProcedureVolatilityObservation] {
+    pub fn observations(
+        &self,
+    ) -> &[IndexExclusionConstraintOperatorProcedureVolatilityObservation] {
         &self.observations
     }
 
@@ -267,7 +269,8 @@ impl IndexExclusionConstraintOperatorProcedureVolatilitySnapshot {
         &self,
         coordinate: IndexExclusionConstraintCoordinate,
         key_position: u32,
-    ) -> Result<IndexExclusionConstraintOperatorProcedureVolatilitySourceReceipt, ObservationError> {
+    ) -> Result<IndexExclusionConstraintOperatorProcedureVolatilitySourceReceipt, ObservationError>
+    {
         let observation = self
             .observations
             .iter()
@@ -278,14 +281,16 @@ impl IndexExclusionConstraintOperatorProcedureVolatilitySnapshot {
             .ok_or_else(|| ObservationError::UnknownObservationLocation {
                 location: procedure_volatility_location(&coordinate, key_position),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureVolatilitySourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureVolatilitySourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 
@@ -340,10 +345,7 @@ fn encode_procedure(hasher: &mut Sha256, procedure: &QualifiedProcedureSignature
     }
 }
 
-fn encode_type(
-    hasher: &mut Sha256,
-    qualified_type: &conceptweave_observation::QualifiedTypeName,
-) {
+fn encode_type(hasher: &mut Sha256, qualified_type: &conceptweave_observation::QualifiedTypeName) {
     encode_str(hasher, qualified_type.schema_name());
     encode_str(hasher, qualified_type.type_name());
 }

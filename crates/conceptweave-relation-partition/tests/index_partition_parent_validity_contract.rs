@@ -101,15 +101,17 @@ fn relation(
         "public",
         name,
         kind,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            true,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                true,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
     .with_indexes(vec![index(index_name, index_valid)])
@@ -121,15 +123,17 @@ fn foreign_relation(name: &str) -> RelationObservation {
         "public",
         name,
         RelationKind::ForeignTable,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            true,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                true,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
 }
@@ -164,15 +168,17 @@ fn foreign_partition_base_snapshot(parent_unique: bool) -> PostgresSchemaSnapsho
         "public",
         "events",
         RelationKind::PartitionedTable,
-        vec![ColumnObservationV3::new(
-            "id",
-            1,
-            "bigint",
-            QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
-            true,
-            None,
-        )
-        .unwrap()],
+        vec![
+            ColumnObservationV3::new(
+                "id",
+                1,
+                "bigint",
+                QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
+                true,
+                None,
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
     .with_indexes(vec![index_with_uniqueness(
@@ -309,11 +315,13 @@ fn foreign_partition_index_topology(
     IndexPartitionSnapshot::new(
         base,
         relations,
-        vec![IndexPartitionObservation::non_partition(
-            parent_index(),
-            IndexRelationKind::PartitionedIndex,
-        )
-        .unwrap()],
+        vec![
+            IndexPartitionObservation::non_partition(
+                parent_index(),
+                IndexRelationKind::PartitionedIndex,
+            )
+            .unwrap(),
+        ],
     )
 }
 

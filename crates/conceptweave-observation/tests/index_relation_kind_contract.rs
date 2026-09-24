@@ -92,9 +92,7 @@ fn index_evidence_is_admitted_only_for_postgresql_indexable_relation_kinds() {
         );
         assert_eq!(
             error,
-            ObservationError::InvalidObservationField {
-                field: "indexes",
-            },
+            ObservationError::InvalidObservationField { field: "indexes" },
             "unexpected admission result for {kind:?}"
         );
     }

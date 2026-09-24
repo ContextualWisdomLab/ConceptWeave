@@ -31,10 +31,7 @@ fn temporal_key_semantics() -> Vec<IndexKeySemantics> {
 fn temporal_type_kinds() -> Vec<TypeKindObservation> {
     vec![
         TypeKindObservation::range(catalog_type("tstzrange"), catalog_type("tstzmultirange")),
-        TypeKindObservation::multirange(
-            catalog_type("tstzmultirange"),
-            catalog_type("tstzrange"),
-        ),
+        TypeKindObservation::multirange(catalog_type("tstzmultirange"), catalog_type("tstzrange")),
     ]
 }
 
@@ -173,13 +170,12 @@ fn temporal_key_requires_observed_conexclop_operator_vector() {
 
 #[test]
 fn temporal_key_requires_one_exclusion_operator_per_key_column() {
-    let error = base_snapshot()
-        .with_observed_constraint_periods(vec![period_with_operators(vec![exclusion_operator(
-            1,
-            "&&",
-            "tstzrange",
-        )])])
-        .expect_err("conexclop arity must match the temporal key column arity");
+    let error =
+        base_snapshot()
+            .with_observed_constraint_periods(vec![period_with_operators(vec![
+                exclusion_operator(1, "&&", "tstzrange"),
+            ])])
+            .expect_err("conexclop arity must match the temporal key column arity");
 
     assert_eq!(
         error,
@@ -195,7 +191,9 @@ fn coherent_temporal_key_preserves_exact_exclusion_operator_signatures() {
         .with_observed_constraint_periods(vec![period_with_operators(expected_operators("="))])
         .expect("complete temporal exclusion operator evidence is admissible");
 
-    let period = &snapshot.constraint_periods().expect("period family is observed")[0];
+    let period = &snapshot
+        .constraint_periods()
+        .expect("period family is observed")[0];
     let first = period
         .exclusion_operator_signature(1)
         .expect("first operator signature is retained");
@@ -221,7 +219,9 @@ fn temporal_key_preserves_custom_operator_names_selected_by_opclass_compare_tran
         .with_observed_constraint_periods(vec![period_with_operators(custom_operators)])
         .expect("operator spelling is provenance, not temporal semantic authority");
 
-    let period = &snapshot.constraint_periods().expect("period family is observed")[0];
+    let period = &snapshot
+        .constraint_periods()
+        .expect("period family is observed")[0];
     assert_eq!(
         period
             .exclusion_operator_signature(1)

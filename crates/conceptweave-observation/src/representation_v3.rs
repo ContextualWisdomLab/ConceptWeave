@@ -306,9 +306,8 @@ impl IndexKeySemantics {
         mut self,
         mut operator_class_options: Vec<OperatorClassOption>,
     ) -> Result<Self, ObservationError> {
-        operator_class_options.sort_by(|left, right| {
-            (left.name(), left.value()).cmp(&(right.name(), right.value()))
-        });
+        operator_class_options
+            .sort_by(|left, right| (left.name(), left.value()).cmp(&(right.name(), right.value())));
         if operator_class_options
             .windows(2)
             .any(|pair| pair[0].name() == pair[1].name())
@@ -863,9 +862,8 @@ impl IndexObservation {
         mut self,
         mut storage_options: Vec<IndexStorageOption>,
     ) -> Result<Self, ObservationError> {
-        storage_options.sort_by(|left, right| {
-            (left.name(), left.value()).cmp(&(right.name(), right.value()))
-        });
+        storage_options
+            .sort_by(|left, right| (left.name(), left.value()).cmp(&(right.name(), right.value())));
         if storage_options
             .windows(2)
             .any(|pair| pair[0].name() == pair[1].name())
@@ -2098,7 +2096,6 @@ impl SuccessorSourceReceipt {
     pub fn observed_at_utc(&self) -> &str {
         &self.observed_at_utc
     }
-
 }
 
 /// Immutable evidence that one bounded PostgreSQL schema snapshot was observed.

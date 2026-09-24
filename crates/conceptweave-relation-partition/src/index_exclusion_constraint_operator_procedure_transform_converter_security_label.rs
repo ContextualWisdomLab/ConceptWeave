@@ -81,7 +81,9 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelObs
         direction: IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
         converter_schema_name: impl Into<String>,
         converter_function_name: impl Into<String>,
-        mut security_labels: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabel>,
+        mut security_labels: Vec<
+            IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabel,
+        >,
     ) -> Result<Self, ObservationError> {
         if key_position == 0 {
             return Err(ObservationError::InvalidOrdinalPosition);
@@ -236,14 +238,17 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLa
     converter_snapshot_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
-    observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelObservation>,
+    observations:
+        Vec<IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelObservation>,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelSnapshot {
     /// Creates complete security-label evidence for every exact converter-function direction.
     pub fn new(
         auto_extension_dependency_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterAutoExtensionDependencySnapshot,
-        mut observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelObservation>,
+        mut observations: Vec<
+            IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelObservation,
+        >,
     ) -> Result<Self, ObservationError> {
         observations.sort_by_key(security_label_key);
 
@@ -313,8 +318,12 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelSna
             converter_snapshot_digest: auto_extension_dependency_snapshot
                 .converter_snapshot_digest()
                 .to_owned(),
-            extractor_revision: auto_extension_dependency_snapshot.extractor_revision().to_owned(),
-            observed_at_utc: auto_extension_dependency_snapshot.observed_at_utc().to_owned(),
+            extractor_revision: auto_extension_dependency_snapshot
+                .extractor_revision()
+                .to_owned(),
+            observed_at_utc: auto_extension_dependency_snapshot
+                .observed_at_utc()
+                .to_owned(),
             observations,
         })
     }
@@ -359,7 +368,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelSna
     #[must_use]
     pub fn observations(
         &self,
-    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelObservation] {
+    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelObservation]
+    {
         &self.observations
     }
 
@@ -391,14 +401,16 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelSna
                     direction,
                 ),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 

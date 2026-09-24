@@ -13,9 +13,10 @@ use conceptweave_observation::{ObservationError, QualifiedTypeName};
 use sha2::{Digest, Sha256};
 
 use super::{
-    IndexExclusionConstraintCoordinate, QualifiedProcedureSignature,
+    IndexExclusionConstraintCoordinate,
     IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
     IndexExclusionConstraintOperatorProcedureTransformConverterParallelSafetySnapshot,
+    QualifiedProcedureSignature,
 };
 
 const INDEX_EXCLUSION_CONSTRAINT_OPERATOR_PROCEDURE_TRANSFORM_CONVERTER_PLANNER_SUPPORT_DIGEST_DOMAIN_V1: &[u8] =
@@ -189,7 +190,8 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSup
     converter_snapshot_digest: String,
     extractor_revision: String,
     observed_at_utc: String,
-    observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportObservation>,
+    observations:
+        Vec<IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportObservation>,
 }
 
 impl IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportSnapshot {
@@ -259,9 +261,13 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportSn
         );
         Ok(Self {
             source_connection_key: parallel_safety_snapshot.source_connection_key().to_owned(),
-            connection_policy_binding: parallel_safety_snapshot.connection_policy_binding().to_owned(),
+            connection_policy_binding: parallel_safety_snapshot
+                .connection_policy_binding()
+                .to_owned(),
             snapshot_digest,
-            converter_snapshot_digest: parallel_safety_snapshot.converter_snapshot_digest().to_owned(),
+            converter_snapshot_digest: parallel_safety_snapshot
+                .converter_snapshot_digest()
+                .to_owned(),
             extractor_revision: parallel_safety_snapshot.extractor_revision().to_owned(),
             observed_at_utc: parallel_safety_snapshot.observed_at_utc().to_owned(),
             observations,
@@ -308,7 +314,8 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportSn
     #[must_use]
     pub fn observations(
         &self,
-    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportObservation] {
+    ) -> &[IndexExclusionConstraintOperatorProcedureTransformConverterPlannerSupportObservation]
+    {
         &self.observations
     }
 

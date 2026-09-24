@@ -10,9 +10,7 @@ use std::collections::BTreeSet;
 use conceptweave_observation::ObservationError;
 use sha2::{Digest, Sha256};
 
-use super::{
-    IndexExclusionConstraintCoordinate, IndexExclusionConstraintEnforcementSnapshot,
-};
+use super::{IndexExclusionConstraintCoordinate, IndexExclusionConstraintEnforcementSnapshot};
 
 const INDEX_EXCLUSION_CONSTRAINT_VALIDATION_DIGEST_DOMAIN_V1: &[u8] =
     b"conceptweave.postgres_schema_snapshot.v3.relation_partition.index_partition.exclusion_constraint.validation.v1";

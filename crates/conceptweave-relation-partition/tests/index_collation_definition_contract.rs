@@ -46,7 +46,10 @@ fn provider_upgrade_before_refresh_changes_governed_definition_identity() {
     assert!(!before.has_version_mismatch());
     assert!(provider_upgraded.has_version_mismatch());
     assert_ne!(before.actual_version(), provider_upgraded.actual_version());
-    assert_ne!(before.canonical_digest(), provider_upgraded.canonical_digest());
+    assert_ne!(
+        before.canonical_digest(),
+        provider_upgraded.canonical_digest()
+    );
 }
 
 #[test]
@@ -83,9 +86,7 @@ fn postgres18_libc_c_family_has_no_capture_time_actual_version() {
             Some("operator-supplied-recorded-version".to_owned()),
             Some("fabricated-provider-version".to_owned()),
         )
-        .expect_err(
-            "PostgreSQL 18 returns NULL actual version for libc C, C.*, and POSIX locales",
-        );
+        .expect_err("PostgreSQL 18 returns NULL actual version for libc C, C.*, and POSIX locales");
         assert_eq!(
             error,
             ObservationError::InvalidObservationField {
@@ -107,7 +108,10 @@ fn postgres18_libc_c_family_has_no_capture_time_actual_version() {
         .expect(
             "direct database-encoding libc C-family rows may retain explicit stored versions while actual provider version is NULL",
         );
-        assert_eq!(observation.version(), Some("operator-supplied-recorded-version"));
+        assert_eq!(
+            observation.version(),
+            Some("operator-supplied-recorded-version")
+        );
         assert_eq!(observation.actual_version(), None);
         assert!(observation.has_version_mismatch());
     }

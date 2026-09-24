@@ -33,10 +33,7 @@ impl ConstraintExclusionOperatorObservation {
             &operator_schema_name,
             "constraint_exclusion_operator_schema_name",
         )?;
-        validate_postgresql_identifier(
-            &operator_name,
-            "constraint_exclusion_operator_name",
-        )?;
+        validate_postgresql_identifier(&operator_name, "constraint_exclusion_operator_name")?;
         Ok(Self {
             position,
             operator_schema_name,

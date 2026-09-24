@@ -5,8 +5,8 @@ use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapshot,
 };
 
-fn converter_kind_snapshot(
-) -> IndexExclusionConstraintOperatorProcedureTransformConverterKindSnapshot {
+fn converter_kind_snapshot()
+-> IndexExclusionConstraintOperatorProcedureTransformConverterKindSnapshot {
     let predecessor = converter_cost_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterKindSnapshot::new(
         &predecessor,
@@ -32,8 +32,8 @@ fn converter_return_set_observation(
     .unwrap()
 }
 
-fn complete_converter_return_set_observations(
-) -> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetObservation> {
+fn complete_converter_return_set_observations()
+-> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetObservation> {
     vec![
         converter_return_set_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
@@ -51,11 +51,12 @@ fn complete_converter_return_set_observations(
 #[test]
 fn ordinary_exclude_transform_converter_return_set_preserves_required_false_proretset() {
     let predecessor = converter_kind_snapshot();
-    let snapshot = IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapshot::new(
-        &predecessor,
-        complete_converter_return_set_observations(),
-    )
-    .unwrap();
+    let snapshot =
+        IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapshot::new(
+            &predecessor,
+            complete_converter_return_set_observations(),
+        )
+        .unwrap();
     let receipt = snapshot
         .source_receipt(
             coordinate(),
@@ -72,16 +73,17 @@ fn ordinary_exclude_transform_converter_return_set_preserves_required_false_pror
 
 #[test]
 fn ordinary_exclude_transform_converter_return_set_rejects_true_proretset() {
-    let error = IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetObservation::new(
-        coordinate(),
-        1,
-        custom_payload_type(),
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        true,
-    )
-    .expect_err("PostgreSQL transform converters must not return a set");
+    let error =
+        IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetObservation::new(
+            coordinate(),
+            1,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            true,
+        )
+        .expect_err("PostgreSQL transform converters must not return a set");
     assert_field(
         error,
         "index_exclusion_constraint_operator_procedure_transform_converter_return_set",
@@ -89,17 +91,19 @@ fn ordinary_exclude_transform_converter_return_set_rejects_true_proretset() {
 }
 
 #[test]
-fn ordinary_exclude_transform_converter_return_set_rejects_missing_extra_duplicate_or_binding_drift() {
+fn ordinary_exclude_transform_converter_return_set_rejects_missing_extra_duplicate_or_binding_drift()
+ {
     let predecessor = converter_kind_snapshot();
-    let missing = IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapshot::new(
-        &predecessor,
-        vec![converter_return_set_observation(
-            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-            "payload_from_sql",
-            false,
-        )],
-    )
-    .expect_err("every kind predecessor direction needs explicit proretset evidence");
+    let missing =
+        IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapshot::new(
+            &predecessor,
+            vec![converter_return_set_observation(
+                IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+                "payload_from_sql",
+                false,
+            )],
+        )
+        .expect_err("every kind predecessor direction needs explicit proretset evidence");
     assert_field(
         missing,
         "index_exclusion_constraint_operator_procedure_transform_converter_return_set_completeness",
@@ -122,7 +126,9 @@ fn ordinary_exclude_transform_converter_return_set_rejects_missing_extra_duplica
         &predecessor,
         extra,
     )
-    .expect_err("return-set evidence cannot introduce a converter coordinate absent from predecessor");
+    .expect_err(
+        "return-set evidence cannot introduce a converter coordinate absent from predecessor",
+    );
     assert_field(
         error,
         "index_exclusion_constraint_operator_procedure_transform_converter_return_set_completeness",
@@ -133,11 +139,12 @@ fn ordinary_exclude_transform_converter_return_set_rejects_missing_extra_duplica
         "payload_from_sql",
         false,
     );
-    let duplicate = IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapshot::new(
-        &predecessor,
-        vec![observation.clone(), observation],
-    )
-    .expect_err("duplicate return-set evidence must not collapse");
+    let duplicate =
+        IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapshot::new(
+            &predecessor,
+            vec![observation.clone(), observation],
+        )
+        .expect_err("duplicate return-set evidence must not collapse");
     assert_field(
         duplicate,
         "index_exclusion_constraint_operator_procedure_transform_converter_return_set_coordinate",
@@ -149,11 +156,12 @@ fn ordinary_exclude_transform_converter_return_set_rejects_missing_extra_duplica
         "different_from_sql",
         false,
     );
-    let binding = IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapshot::new(
-        &predecessor,
-        drift,
-    )
-    .expect_err("return-set evidence must remain bound to the exact converter function");
+    let binding =
+        IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapshot::new(
+            &predecessor,
+            drift,
+        )
+        .expect_err("return-set evidence must remain bound to the exact converter function");
     assert_field(
         binding,
         "index_exclusion_constraint_operator_procedure_transform_converter_return_set_binding",
@@ -166,68 +174,81 @@ fn ordinary_exclude_transform_converter_return_set_keeps_collision_safe_location
         conceptweave_observation::QualifiedTypeName::new("payload.domain", "json").unwrap();
     let dotted_type =
         conceptweave_observation::QualifiedTypeName::new("payload", "domain.json").unwrap();
-    let schema_location = IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetObservation::new(
-        coordinate(),
-        1,
-        dotted_schema,
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        false,
-    )
-    .unwrap()
-    .canonical_location();
-    let type_location = IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetObservation::new(
-        coordinate(),
-        1,
-        dotted_type,
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        false,
-    )
-    .unwrap()
-    .canonical_location();
+    let schema_location =
+        IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetObservation::new(
+            coordinate(),
+            1,
+            dotted_schema,
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            false,
+        )
+        .unwrap()
+        .canonical_location();
+    let type_location =
+        IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetObservation::new(
+            coordinate(),
+            1,
+            dotted_type,
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            false,
+        )
+        .unwrap()
+        .canonical_location();
     assert_ne!(schema_location, type_location);
 
     for (schema, function, field) in [
-        (" ", "payload_from_sql", "index_exclusion_constraint_operator_procedure_transform_converter_return_set_function_schema"),
-        ("public", "\t", "index_exclusion_constraint_operator_procedure_transform_converter_return_set_function_name"),
+        (
+            " ",
+            "payload_from_sql",
+            "index_exclusion_constraint_operator_procedure_transform_converter_return_set_function_schema",
+        ),
+        (
+            "public",
+            "\t",
+            "index_exclusion_constraint_operator_procedure_transform_converter_return_set_function_name",
+        ),
     ] {
-        let error = IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetObservation::new(
-            coordinate(),
-            1,
-            custom_payload_type(),
-            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-            schema,
-            function,
-            false,
-        )
-        .expect_err("converter identifiers are exact binding inputs");
+        let error =
+            IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetObservation::new(
+                coordinate(),
+                1,
+                custom_payload_type(),
+                IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+                schema,
+                function,
+                false,
+            )
+            .expect_err("converter identifiers are exact binding inputs");
         assert_field(error, field);
     }
 
-    let zero = IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetObservation::new(
-        coordinate(),
-        0,
-        custom_payload_type(),
-        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-        "public",
-        "payload_from_sql",
-        false,
-    )
-    .expect_err("converter positions are one-based");
+    let zero =
+        IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetObservation::new(
+            coordinate(),
+            0,
+            custom_payload_type(),
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "public",
+            "payload_from_sql",
+            false,
+        )
+        .expect_err("converter positions are one-based");
     assert_eq!(zero, ObservationError::InvalidOrdinalPosition);
 }
 
 #[test]
 fn ordinary_exclude_transform_converter_return_set_receipt_is_exact_and_publicly_composed() {
     let predecessor = converter_kind_snapshot();
-    let snapshot = IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapshot::new(
-        &predecessor,
-        complete_converter_return_set_observations(),
-    )
-    .unwrap();
+    let snapshot =
+        IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapshot::new(
+            &predecessor,
+            complete_converter_return_set_observations(),
+        )
+        .unwrap();
     let error = snapshot
         .source_receipt(
             coordinate(),
@@ -236,8 +257,13 @@ fn ordinary_exclude_transform_converter_return_set_receipt_is_exact_and_publicly
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         )
         .expect_err("receipt lookup remains exact-coordinate bound");
-    assert!(matches!(error, ObservationError::UnknownObservationLocation { .. }));
-    assert!(std::mem::size_of::<
-        IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapshot,
-    >() > 0);
+    assert!(matches!(
+        error,
+        ObservationError::UnknownObservationLocation { .. }
+    ));
+    assert!(
+        std::mem::size_of::<
+            IndexExclusionConstraintOperatorProcedureTransformConverterReturnSetSnapshot,
+        >() > 0
+    );
 }

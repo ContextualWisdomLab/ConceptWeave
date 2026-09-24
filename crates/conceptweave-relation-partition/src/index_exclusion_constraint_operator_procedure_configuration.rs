@@ -271,10 +271,8 @@ impl IndexExclusionConstraintOperatorProcedureConfigurationSnapshot {
             }
         }
 
-        let snapshot_digest = compute_procedure_configuration_digest(
-            owner_snapshot.snapshot_digest(),
-            &observations,
-        );
+        let snapshot_digest =
+            compute_procedure_configuration_digest(owner_snapshot.snapshot_digest(), &observations);
         Ok(Self {
             source_connection_key: owner_snapshot.source_connection_key().to_owned(),
             connection_policy_binding: owner_snapshot.connection_policy_binding().to_owned(),
@@ -340,14 +338,16 @@ impl IndexExclusionConstraintOperatorProcedureConfigurationSnapshot {
             .ok_or_else(|| ObservationError::UnknownObservationLocation {
                 location: procedure_configuration_location(&coordinate, key_position),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureConfigurationSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureConfigurationSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 
@@ -402,10 +402,7 @@ fn encode_procedure(hasher: &mut Sha256, procedure: &QualifiedProcedureSignature
     }
 }
 
-fn encode_type(
-    hasher: &mut Sha256,
-    qualified_type: &conceptweave_observation::QualifiedTypeName,
-) {
+fn encode_type(hasher: &mut Sha256, qualified_type: &conceptweave_observation::QualifiedTypeName) {
     encode_str(hasher, qualified_type.schema_name());
     encode_str(hasher, qualified_type.type_name());
 }

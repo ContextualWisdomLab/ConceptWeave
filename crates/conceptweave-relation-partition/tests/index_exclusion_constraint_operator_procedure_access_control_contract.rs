@@ -22,12 +22,8 @@ fn configuration_snapshot() -> IndexExclusionConstraintOperatorProcedureConfigur
 
 fn default_execute_grants() -> Vec<IndexExclusionConstraintOperatorProcedureExecuteGrant> {
     vec![
-        IndexExclusionConstraintOperatorProcedureExecuteGrant::role(
-            "postgres",
-            "postgres",
-            true,
-        )
-        .unwrap(),
+        IndexExclusionConstraintOperatorProcedureExecuteGrant::role("postgres", "postgres", true)
+            .unwrap(),
         IndexExclusionConstraintOperatorProcedureExecuteGrant::public("postgres", false).unwrap(),
     ]
 }
@@ -70,23 +66,28 @@ fn ordinary_exclude_operator_procedure_access_control_preserves_effective_execut
 
     assert!(receipt.location().access_control().proacl_was_null());
     assert_eq!(receipt.location().access_control().grant_count(), 2);
-    assert!(receipt
-        .location()
-        .access_control()
-        .digest()
-        .starts_with("sha256:"));
+    assert!(
+        receipt
+            .location()
+            .access_control()
+            .digest()
+            .starts_with("sha256:")
+    );
     assert_eq!(receipt.location().operator(), &operator("="));
     assert_eq!(receipt.location().procedure(), &procedure("int4eq"));
     assert_eq!(receipt.source_id(), configuration.source_connection_key());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
-    assert!(receipt
-        .location()
-        .canonical_location()
-        .ends_with("/1/procedure-access-control"));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/1/procedure-access-control")
+    );
 }
 
 #[test]
-fn ordinary_exclude_operator_procedure_access_control_distinguishes_default_from_explicit_equivalent_acl() {
+fn ordinary_exclude_operator_procedure_access_control_distinguishes_default_from_explicit_equivalent_acl()
+ {
     let configuration = configuration_snapshot();
     let implicit = IndexExclusionConstraintOperatorProcedureAccessControlSnapshot::new(
         &configuration,
@@ -143,7 +144,8 @@ fn ordinary_exclude_operator_procedure_access_control_canonicalizes_acl_set_orde
 }
 
 #[test]
-fn ordinary_exclude_operator_procedure_access_control_distinguishes_grantee_grantor_and_grant_option() {
+fn ordinary_exclude_operator_procedure_access_control_distinguishes_grantee_grantor_and_grant_option()
+ {
     let configuration = configuration_snapshot();
     let baseline = IndexExclusionConstraintOperatorProcedureAccessControlSnapshot::new(
         &configuration,
@@ -151,12 +153,12 @@ fn ordinary_exclude_operator_procedure_access_control_distinguishes_grantee_gran
             operator("="),
             procedure("int4eq"),
             false,
-            vec![IndexExclusionConstraintOperatorProcedureExecuteGrant::role(
-                "app_role",
-                "postgres",
-                false,
-            )
-            .unwrap()],
+            vec![
+                IndexExclusionConstraintOperatorProcedureExecuteGrant::role(
+                    "app_role", "postgres", false,
+                )
+                .unwrap(),
+            ],
         )],
     )
     .unwrap();
@@ -166,12 +168,14 @@ fn ordinary_exclude_operator_procedure_access_control_distinguishes_grantee_gran
             operator("="),
             procedure("int4eq"),
             false,
-            vec![IndexExclusionConstraintOperatorProcedureExecuteGrant::role(
-                "report_role",
-                "postgres",
-                false,
-            )
-            .unwrap()],
+            vec![
+                IndexExclusionConstraintOperatorProcedureExecuteGrant::role(
+                    "report_role",
+                    "postgres",
+                    false,
+                )
+                .unwrap(),
+            ],
         )],
     )
     .unwrap();
@@ -181,12 +185,14 @@ fn ordinary_exclude_operator_procedure_access_control_distinguishes_grantee_gran
             operator("="),
             procedure("int4eq"),
             false,
-            vec![IndexExclusionConstraintOperatorProcedureExecuteGrant::role(
-                "app_role",
-                "security_admin",
-                false,
-            )
-            .unwrap()],
+            vec![
+                IndexExclusionConstraintOperatorProcedureExecuteGrant::role(
+                    "app_role",
+                    "security_admin",
+                    false,
+                )
+                .unwrap(),
+            ],
         )],
     )
     .unwrap();
@@ -196,12 +202,12 @@ fn ordinary_exclude_operator_procedure_access_control_distinguishes_grantee_gran
             operator("="),
             procedure("int4eq"),
             false,
-            vec![IndexExclusionConstraintOperatorProcedureExecuteGrant::role(
-                "app_role",
-                "postgres",
-                true,
-            )
-            .unwrap()],
+            vec![
+                IndexExclusionConstraintOperatorProcedureExecuteGrant::role(
+                    "app_role", "postgres", true,
+                )
+                .unwrap(),
+            ],
         )],
     )
     .unwrap();
@@ -213,12 +219,9 @@ fn ordinary_exclude_operator_procedure_access_control_distinguishes_grantee_gran
 
 #[test]
 fn ordinary_exclude_operator_procedure_access_control_rejects_duplicate_effective_grant() {
-    let grant = IndexExclusionConstraintOperatorProcedureExecuteGrant::role(
-        "app_role",
-        "postgres",
-        false,
-    )
-    .unwrap();
+    let grant =
+        IndexExclusionConstraintOperatorProcedureExecuteGrant::role("app_role", "postgres", false)
+            .unwrap();
     let error = IndexExclusionConstraintOperatorProcedureAccessControlMaterial::new(
         false,
         vec![grant.clone(), grant],
@@ -232,12 +235,8 @@ fn ordinary_exclude_operator_procedure_access_control_rejects_duplicate_effectiv
 
 #[test]
 fn ordinary_exclude_operator_procedure_access_control_rejects_blank_role_identity() {
-    let error = IndexExclusionConstraintOperatorProcedureExecuteGrant::role(
-        " ",
-        "postgres",
-        false,
-    )
-    .expect_err("grantee role identity must be explicit");
+    let error = IndexExclusionConstraintOperatorProcedureExecuteGrant::role(" ", "postgres", false)
+        .expect_err("grantee role identity must be explicit");
     assert_field(
         error,
         "index_exclusion_constraint_operator_procedure_access_control_grantee_role_name",
@@ -285,11 +284,9 @@ fn ordinary_exclude_operator_procedure_access_control_rejects_operator_binding_d
 #[test]
 fn ordinary_exclude_operator_procedure_access_control_rejects_missing_evidence() {
     let configuration = configuration_snapshot();
-    let error = IndexExclusionConstraintOperatorProcedureAccessControlSnapshot::new(
-        &configuration,
-        vec![],
-    )
-    .expect_err("every governed operator function needs ACL evidence");
+    let error =
+        IndexExclusionConstraintOperatorProcedureAccessControlSnapshot::new(&configuration, vec![])
+            .expect_err("every governed operator function needs ACL evidence");
     assert_field(
         error,
         "index_exclusion_constraint_operator_procedure_access_control_completeness",
@@ -357,5 +354,7 @@ fn ordinary_exclude_operator_procedure_access_control_rejects_unknown_receipt_co
 
 #[test]
 fn ordinary_exclude_operator_procedure_access_control_snapshot_is_publicly_composed() {
-    assert!(std::mem::size_of::<IndexExclusionConstraintOperatorProcedureAccessControlSnapshot>() > 0);
+    assert!(
+        std::mem::size_of::<IndexExclusionConstraintOperatorProcedureAccessControlSnapshot>() > 0
+    );
 }

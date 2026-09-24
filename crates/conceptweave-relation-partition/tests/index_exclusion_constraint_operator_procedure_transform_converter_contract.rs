@@ -8,21 +8,24 @@ use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot,
 };
 
-fn selected_transform_types_predecessor(
-) -> IndexExclusionConstraintOperatorProcedureTransformTypesSnapshot {
+fn selected_transform_types_predecessor()
+-> IndexExclusionConstraintOperatorProcedureTransformTypesSnapshot {
     let predecessor = cost_predecessor();
     IndexExclusionConstraintOperatorProcedureTransformTypesSnapshot::new(
         &predecessor,
         vec![transform_types_observation(
             operator("="),
             procedure("int4eq"),
-            Some(vec![QualifiedTypeName::new("public", "custom_payload").unwrap()]),
+            Some(vec![
+                QualifiedTypeName::new("public", "custom_payload").unwrap(),
+            ]),
         )],
     )
     .unwrap()
 }
 
-fn null_transform_types_predecessor() -> IndexExclusionConstraintOperatorProcedureTransformTypesSnapshot {
+fn null_transform_types_predecessor()
+-> IndexExclusionConstraintOperatorProcedureTransformTypesSnapshot {
     let predecessor = cost_predecessor();
     IndexExclusionConstraintOperatorProcedureTransformTypesSnapshot::new(
         &predecessor,
@@ -138,10 +141,12 @@ fn ordinary_exclude_operator_procedure_transform_converter_preserves_pg_transfor
     assert!(receipt.location().converters()[0].to_sql().is_some());
     assert_eq!(receipt.source_id(), transform_types.source_connection_key());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
-    assert!(receipt
-        .location()
-        .canonical_location()
-        .ends_with("/1/procedure-transform-converters"));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/1/procedure-transform-converters")
+    );
 }
 
 #[test]
@@ -225,7 +230,8 @@ fn ordinary_exclude_operator_procedure_transform_converter_accepts_one_direction
 }
 
 #[test]
-fn ordinary_exclude_operator_procedure_transform_converter_rejects_missing_selected_transform_row() {
+fn ordinary_exclude_operator_procedure_transform_converter_rejects_missing_selected_transform_row()
+{
     let transform_types = selected_transform_types_predecessor();
     let definition = definition_snapshot();
     let error = IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot::new(
@@ -442,5 +448,8 @@ fn ordinary_exclude_operator_procedure_transform_converter_rejects_unknown_recei
 
 #[test]
 fn ordinary_exclude_operator_procedure_transform_converter_snapshot_is_publicly_composed() {
-    assert!(std::mem::size_of::<IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot>() > 0);
+    assert!(
+        std::mem::size_of::<IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot>()
+            > 0
+    );
 }

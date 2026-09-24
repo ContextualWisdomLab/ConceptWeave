@@ -196,7 +196,9 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterKindSnapshot {
     /// Creates complete routine-kind evidence for every converter direction in the predecessor.
     pub fn new(
         cost_snapshot: &IndexExclusionConstraintOperatorProcedureTransformConverterCostSnapshot,
-        mut observations: Vec<IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation>,
+        mut observations: Vec<
+            IndexExclusionConstraintOperatorProcedureTransformConverterKindObservation,
+        >,
     ) -> Result<Self, ObservationError> {
         observations.sort_by_key(kind_key);
 
@@ -333,14 +335,16 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterKindSnapshot {
                     direction,
                 ),
             })?;
-        Ok(IndexExclusionConstraintOperatorProcedureTransformConverterKindSourceReceipt {
-            source_id: self.source_connection_key.clone(),
-            connection_policy_binding: self.connection_policy_binding.clone(),
-            source_digest: self.snapshot_digest.clone(),
-            extractor_revision: self.extractor_revision.clone(),
-            observed_at_utc: self.observed_at_utc.clone(),
-            location: observation.clone(),
-        })
+        Ok(
+            IndexExclusionConstraintOperatorProcedureTransformConverterKindSourceReceipt {
+                source_id: self.source_connection_key.clone(),
+                connection_policy_binding: self.connection_policy_binding.clone(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.extractor_revision.clone(),
+                observed_at_utc: self.observed_at_utc.clone(),
+                location: observation.clone(),
+            },
+        )
     }
 }
 

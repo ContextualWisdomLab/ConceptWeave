@@ -513,7 +513,9 @@ fn validate_predecessors(
         expression_snapshot.predicate_observations().to_vec(),
     )?;
     if rebound_expression.snapshot_digest() != expression_snapshot.snapshot_digest() {
-        return Err(invalid("index_expression_relation_var_expression_predecessor"));
+        return Err(invalid(
+            "index_expression_relation_var_expression_predecessor",
+        ));
     }
 
     let rebound_type_modifier = RelationPartitionTypeModifierSnapshot::new(
@@ -522,7 +524,9 @@ fn validate_predecessors(
         type_modifier_snapshot.observations().to_vec(),
     )?;
     if rebound_type_modifier.snapshot_digest() != type_modifier_snapshot.snapshot_digest() {
-        return Err(invalid("index_expression_relation_var_type_modifier_predecessor"));
+        return Err(invalid(
+            "index_expression_relation_var_type_modifier_predecessor",
+        ));
     }
 
     if expression_snapshot.source_connection_key() != type_modifier_snapshot.source_connection_key()
@@ -531,7 +535,9 @@ fn validate_predecessors(
         || expression_snapshot.extractor_revision() != type_modifier_snapshot.extractor_revision()
         || expression_snapshot.observed_at_utc() != type_modifier_snapshot.observed_at_utc()
     {
-        return Err(invalid("index_expression_relation_var_predecessor_provenance"));
+        return Err(invalid(
+            "index_expression_relation_var_predecessor_provenance",
+        ));
     }
     Ok(())
 }
@@ -734,7 +740,9 @@ fn validate_attached_var_equivalence(
                 .get(&parent_location.canonical_location())
                 .ok_or_else(|| invalid("index_expression_relation_var_parent_evidence"))?;
             if !child.semantic_equal(parent) {
-                return Err(invalid("index_expression_relation_var_attached_equivalence"));
+                return Err(invalid(
+                    "index_expression_relation_var_attached_equivalence",
+                ));
             }
         }
     }
@@ -762,10 +770,7 @@ fn compute_digest(
             &mut hasher,
             observation.value_type().schema_name().as_bytes(),
         );
-        encode_bytes(
-            &mut hasher,
-            observation.value_type().type_name().as_bytes(),
-        );
+        encode_bytes(&mut hasher, observation.value_type().type_name().as_bytes());
         hasher.update(observation.type_modifier().to_be_bytes());
         match observation.collation() {
             Some(collation) => {

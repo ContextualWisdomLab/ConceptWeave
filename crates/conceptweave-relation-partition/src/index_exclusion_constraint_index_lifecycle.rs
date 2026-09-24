@@ -155,15 +155,15 @@ impl IndexExclusionConstraintIndexLifecycleSnapshot {
         let mut observations = Vec::with_capacity(namespace_snapshot.observations().len());
         for namespace in namespace_snapshot.observations() {
             let backing_index = find_backing_index(base_snapshot, namespace.backing_index())?;
-            let index_ready = backing_index.ready().ok_or_else(|| {
-                invalid("index_exclusion_constraint_index_lifecycle_presence")
-            })?;
-            let index_valid = backing_index.valid().ok_or_else(|| {
-                invalid("index_exclusion_constraint_index_lifecycle_presence")
-            })?;
-            let index_live = backing_index.live().ok_or_else(|| {
-                invalid("index_exclusion_constraint_index_lifecycle_presence")
-            })?;
+            let index_ready = backing_index
+                .ready()
+                .ok_or_else(|| invalid("index_exclusion_constraint_index_lifecycle_presence"))?;
+            let index_valid = backing_index
+                .valid()
+                .ok_or_else(|| invalid("index_exclusion_constraint_index_lifecycle_presence"))?;
+            let index_live = backing_index
+                .live()
+                .ok_or_else(|| invalid("index_exclusion_constraint_index_lifecycle_presence"))?;
 
             if !index_ready || !index_valid || !index_live {
                 return Err(invalid("index_exclusion_constraint_index_lifecycle_state"));
@@ -294,7 +294,10 @@ fn compute_index_lifecycle_digest(
 }
 
 fn index_lifecycle_location(coordinate: &IndexExclusionConstraintCoordinate) -> String {
-    format!("{}/backing-index-lifecycle", coordinate.canonical_location())
+    format!(
+        "{}/backing-index-lifecycle",
+        coordinate.canonical_location()
+    )
 }
 
 fn encode_constraint_coordinate(
