@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, str::FromStr};
 
-use conceptweave_observation::SchemaObjectLocation;
+use conceptweave_observation::{RelationKind, SchemaObjectLocation};
 use conceptweave_postgres_adapter::PostgresUnixAdapter;
 use conceptweave_source_port::{
     ObservationCancellation, ObservationLimits, ObservationRequest, ObservationRequestBudget,
@@ -69,6 +69,18 @@ fn authorized(schema: &str) -> conceptweave_source_port::AuthorizedObservationRe
     authorized_with_limits(schema, 64, 8_192)
 }
 
+fn authorized_two(schemas: [&str; 2]) -> conceptweave_source_port::AuthorizedObservationRequest {
+    ObservationRequest::new(
+        "fixture_source",
+        schemas.map(str::to_owned).to_vec(),
+        ObservationRequestBudget::new(2, 256).unwrap(),
+        ObservationLimits::with_timeouts(10_000, 3_000, 64, 8_192, 1).unwrap(),
+    )
+    .unwrap()
+    .authorize(&Registry)
+    .unwrap()
+}
+
 fn adapter(config: Config) -> PostgresUnixAdapter {
     PostgresUnixAdapter::new(BTreeMap::from([(
         "fixture_source".to_owned(),
@@ -122,7 +134,7 @@ async fn missing_binding_and_tcp_transport_fail_before_source_io() {
 }
 
 #[tokio::test]
-async fn postgres18_type_only_catalog_is_observed_in_one_read_only_transaction() {
+async fn postgres18_catalog_is_observed_in_one_read_only_transaction() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
     };
@@ -130,6 +142,7 @@ async fn postgres18_type_only_catalog_is_observed_in_one_read_only_transaction()
     let (client, connection) = config.connect(NoTls).await.unwrap();
     let connection_task = tokio::spawn(connection);
     let schema = format!("cw_type_fixture_{}", std::process::id());
+    let second_schema = format!("cw_type_fixture_{}_b", std::process::id());
     let fixture = format!(
         "CREATE SCHEMA \"{schema}\"; \
          CREATE TYPE \"{schema}\".stage AS ENUM ('new', 'done'); \
@@ -189,7 +202,106 @@ async fn postgres18_type_only_catalog_is_observed_in_one_read_only_transaction()
         );
 
         client
-            .batch_execute(&format!("CREATE TABLE \"{schema}\".item (id integer)"))
+            .batch_execute(&format!(
+                "CREATE TABLE \"{schema}\".item (id integer); \
+                 COMMENT ON TABLE \"{schema}\".item IS 'items'"
+            ))
+            .await
+            .unwrap();
+        let with_table = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        assert_eq!(with_table.relations().len(), 1);
+        assert_eq!(with_table.relations()[0].source_comment(), Some("items"));
+        assert_eq!(with_table.relations()[0].columns().len(), 1);
+        assert_eq!(
+            with_table.relations()[0].columns()[0]
+                .type_binding()
+                .schema_name(),
+            "pg_catalog"
+        );
+        with_table
+            .source_receipt(
+                SchemaObjectLocation::relation(&schema, "item", RelationKind::Table).unwrap(),
+            )
+            .unwrap();
+        with_table
+            .source_receipt(
+                SchemaObjectLocation::column(&schema, "item", RelationKind::Table, "id").unwrap(),
+            )
+            .unwrap();
+        client
+            .batch_execute(&format!(
+                "COMMENT ON COLUMN \"{schema}\".item.id IS 'identifier'"
+            ))
+            .await
+            .unwrap();
+        let with_column_comment = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        assert_ne!(
+            with_column_comment.snapshot_digest(),
+            with_table.snapshot_digest()
+        );
+
+        client
+            .batch_execute(&format!("CREATE TABLE \"{schema}\".\" \" (\" \" integer)"))
+            .await
+            .unwrap();
+        let quoted = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        assert!(quoted.relations().iter().any(|relation| {
+            relation.relation_name() == " " && relation.columns()[0].column_name() == " "
+        }));
+        quoted
+            .source_receipt(
+                SchemaObjectLocation::column(&schema, " ", RelationKind::Table, " ").unwrap(),
+            )
+            .unwrap();
+
+        client
+            .batch_execute(&format!(
+                "CREATE SCHEMA \"{second_schema}\"; \
+                 CREATE TYPE \"{second_schema}\".stage AS ENUM ('other')"
+            ))
+            .await
+            .unwrap();
+        let forward = adapter(config.clone())
+            .observe(authorized_two([&schema, &second_schema]), &NotCancelled)
+            .await?;
+        let reverse = adapter(config.clone())
+            .observe(authorized_two([&second_schema, &schema]), &NotCancelled)
+            .await?;
+        assert_eq!(forward.snapshot_digest(), reverse.snapshot_digest());
+        assert_eq!(forward.enums().len(), 2);
+        assert_ne!(forward.enums()[0].labels(), forward.enums()[1].labels());
+        forward
+            .source_receipt(SchemaObjectLocation::enum_(&second_schema, "stage").unwrap())
+            .unwrap();
+
+        client
+            .batch_execute(&format!(
+                "CREATE TABLE \"{schema}\".defaulted (id integer DEFAULT 1)"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            adapter(config.clone())
+                .observe(authorized(&schema), &NotCancelled)
+                .await
+                .err(),
+            Some(SourceObservationFailure::InvalidCapturedMetadata)
+        );
+        client
+            .batch_execute(&format!("DROP TABLE \"{schema}\".defaulted"))
+            .await
+            .unwrap();
+
+        client
+            .batch_execute(&format!(
+                "CREATE INDEX item_id_idx ON \"{schema}\".item (id)"
+            ))
             .await
             .unwrap();
         assert_eq!(
@@ -204,7 +316,10 @@ async fn postgres18_type_only_catalog_is_observed_in_one_read_only_transaction()
     .await;
 
     client
-        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .batch_execute(&format!(
+            "DROP SCHEMA IF EXISTS \"{second_schema}\" CASCADE; \
+             DROP SCHEMA \"{schema}\" CASCADE"
+        ))
         .await
         .unwrap();
     connection_task.abort();

@@ -1,16 +1,16 @@
 //! PostgreSQL 18 catalog observation behind the Source Observation capability.
 //!
-//! This first adapter path admits complete schema-scoped domain and enum evidence when the
-//! selected schemas contain no modeled relations. Relation-bearing captures fail closed until
-//! their catalog families can be mapped without dropping material facts.
+//! This bounded path admits schema-scoped domains, enums, and simple ordinary tables. Unsupported
+//! relation metadata fails closed until its catalog families can be mapped without losing facts.
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
 use std::{collections::BTreeMap, future::Future, time::Duration};
 
 use conceptweave_observation::{
-    DomainCheckConstraintObservation, DomainObservation, EnumObservation, PostgresSchemaSnapshotV3,
-    QualifiedCollationName, QualifiedTypeName,
+    ColumnObservationV3, DomainCheckConstraintObservation, DomainObservation, EnumObservation,
+    PostgresSchemaSnapshotV3, QualifiedCollationName, QualifiedTypeName, RelationKind,
+    RelationObservation, ReplicaIdentityMode,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, SourceObservationFailure,
@@ -18,7 +18,7 @@ use conceptweave_source_port::{
 };
 use futures_util::TryStreamExt;
 use tokio_postgres::{
-    Config, IsolationLevel, NoTls, Row, config::Host, error::SqlState, types::ToSql,
+    Config, IsolationLevel, NoTls, Row, Transaction, config::Host, error::SqlState, types::ToSql,
 };
 
 /// Unix-socket PostgreSQL adapter with credential-bearing configurations keyed by the exact
@@ -63,7 +63,7 @@ impl SourceObservationPort for PostgresUnixAdapter {
         let (mut client, connection) =
             bounded(&request, cancellation, config.connect(NoTls)).await?;
         let connection_task = tokio::spawn(connection);
-        let result = capture_type_only(&mut client, &request, cancellation).await;
+        let result = capture_catalog(&mut client, &request, cancellation).await;
         connection_task.abort();
         result
     }
@@ -114,7 +114,15 @@ struct TypeRow {
     oversized: bool,
 }
 
-async fn capture_type_only(
+struct RelationRow {
+    schema: String,
+    oid: u32,
+    name: String,
+    replica_identity: ReplicaIdentityMode,
+    comment: Option<String>,
+}
+
+async fn capture_catalog(
     client: &mut tokio_postgres::Client,
     request: &AuthorizedObservationRequest,
     cancellation: &dyn ObservationCancellation,
@@ -142,7 +150,8 @@ async fn capture_type_only(
         request,
         cancellation,
         transaction.batch_execute(&format!(
-            "SET LOCAL transaction_timeout = '{transaction_timeout}ms'; \
+            "SET LOCAL search_path = pg_catalog; \
+             SET LOCAL transaction_timeout = '{transaction_timeout}ms'; \
              SET LOCAL statement_timeout = '{statement_timeout}ms'; \
              SET LOCAL lock_timeout = '{lock_timeout}ms'"
         )),
@@ -176,6 +185,7 @@ async fn capture_type_only(
     let mut meter = CaptureMeter::default();
     let max_bytes = limits.max_bytes().min(i64::MAX as u64) as i64;
     let mut types = Vec::new();
+    let mut relation_rows = Vec::new();
     for schema in request.request().allowed_schema_names() {
         let schema_row = bounded(
             request,
@@ -189,18 +199,66 @@ async fn capture_type_only(
         .ok_or(SourceObservationFailure::SourceUnavailable)?;
         meter.add(request, schema.len() + 4)?;
         let schema_oid: u32 = field(&schema_row, 0)?;
-        let relation_exists = bounded(
+        let relation_stream = bounded(
             request,
             cancellation,
-            transaction.query_opt(
-                "SELECT 1 FROM pg_catalog.pg_class WHERE relnamespace = $1 AND relkind IN ('r','p','v','m','f','S','c') LIMIT 1",
-                &[&schema_oid],
+            transaction.query_raw(
+                "SELECT c.oid, c.relname::text, c.relkind::text, c.relpersistence::text, \
+                 c.relispartition, c.relreplident::text, c.relrowsecurity, c.relforcerowsecurity, \
+                 c.relhasrules, c.relhastriggers, c.reloptions IS NOT NULL, c.relacl IS NOT NULL, \
+                 c.reloftype <> 0, \
+                 CASE WHEN octet_length(pg_catalog.obj_description(c.oid, 'pg_class')) <= $2::bigint \
+                   THEN pg_catalog.obj_description(c.oid, 'pg_class') END, \
+                 COALESCE(octet_length(pg_catalog.obj_description(c.oid, 'pg_class')) > $2::bigint, false) \
+                 FROM pg_catalog.pg_class c WHERE c.relnamespace = $1 \
+                   AND c.relkind IN ('r','p','v','m','f','S','c') ORDER BY c.relname",
+                vec![&schema_oid as &(dyn ToSql + Sync), &max_bytes],
             ),
         )
-        .await?
-        .is_some();
-        if relation_exists {
-            return Err(SourceObservationFailure::InvalidCapturedMetadata);
+        .await?;
+        tokio::pin!(relation_stream);
+        while let Some(row) = bounded(request, cancellation, relation_stream.try_next()).await? {
+            let oid: u32 = field(&row, 0)?;
+            let name: String = field(&row, 1)?;
+            let kind: String = field(&row, 2)?;
+            let persistence: String = field(&row, 3)?;
+            let replica: String = field(&row, 5)?;
+            let comment: Option<String> = field(&row, 13)?;
+            if field::<bool>(&row, 14)? {
+                return Err(SourceObservationFailure::ByteLimitExceeded {
+                    max_bytes: limits.max_bytes(),
+                });
+            }
+            meter.add(
+                request,
+                24 + name.len()
+                    + kind.len()
+                    + persistence.len()
+                    + replica.len()
+                    + comment.as_ref().map_or(0, String::len),
+            )?;
+            if kind != "r"
+                || persistence != "p"
+                || [4, 6, 7, 8, 9, 10, 11, 12]
+                    .into_iter()
+                    .any(|index| field::<bool>(&row, index) != Ok(false))
+            {
+                return Err(SourceObservationFailure::InvalidCapturedMetadata);
+            }
+            let replica_identity = match replica.as_str() {
+                "d" => ReplicaIdentityMode::Default,
+                "n" => ReplicaIdentityMode::Nothing,
+                "f" => ReplicaIdentityMode::Full,
+                "i" => ReplicaIdentityMode::Index,
+                _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
+            };
+            relation_rows.push(RelationRow {
+                schema: schema.clone(),
+                oid,
+                name,
+                replica_identity,
+                comment,
+            });
         }
 
         let stream = bounded(
@@ -388,6 +446,20 @@ async fn capture_type_only(
             _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
         }
     }
+    let mut relations = Vec::new();
+    for relation in relation_rows {
+        relations.push(
+            capture_relation(
+                &transaction,
+                request,
+                cancellation,
+                &mut meter,
+                max_bytes,
+                relation,
+            )
+            .await?,
+        );
+    }
     let observed_at_utc: String = field(
         &bounded(
             request,
@@ -400,17 +472,133 @@ async fn capture_type_only(
         .await?,
         0,
     )?;
+    let extractor_revision = if relations.is_empty() {
+        "postgres18_type_only_adapter_v1"
+    } else {
+        "postgres18_simple_relation_adapter_v1"
+    };
     let snapshot = PostgresSchemaSnapshotV3::new(
         request,
-        "postgres18_type_only_adapter_v1",
+        extractor_revision,
         observed_at_utc,
-        Vec::new(),
+        relations,
         domains,
         enums,
     )
     .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
     bounded(request, cancellation, transaction.commit()).await?;
     Ok(snapshot)
+}
+
+async fn capture_relation(
+    transaction: &Transaction<'_>,
+    request: &AuthorizedObservationRequest,
+    cancellation: &dyn ObservationCancellation,
+    meter: &mut CaptureMeter,
+    max_bytes: i64,
+    relation: RelationRow,
+) -> Result<RelationObservation, SourceObservationFailure> {
+    let unsupported = bounded(
+        request,
+        cancellation,
+        transaction.query_one(
+            "SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid = $1), \
+             EXISTS(SELECT 1 FROM pg_catalog.pg_index WHERE indrelid = $1), \
+             EXISTS(SELECT 1 FROM pg_catalog.pg_inherits WHERE inhrelid = $1 OR inhparent = $1), \
+             EXISTS(SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid = $1), \
+             EXISTS(SELECT 1 FROM pg_catalog.pg_rewrite WHERE ev_class = $1), \
+             EXISTS(SELECT 1 FROM pg_catalog.pg_policy WHERE polrelid = $1), \
+             EXISTS(SELECT 1 FROM pg_catalog.pg_seclabel WHERE classoid = 'pg_class'::regclass AND objoid = $1), \
+             EXISTS(SELECT 1 FROM pg_catalog.pg_depend WHERE classid = 'pg_class'::regclass AND objid = $1 AND deptype = 'e')",
+            &[&relation.oid],
+        ),
+    )
+    .await?;
+    meter.add(request, 8)?;
+    if (0..8).any(|index| field::<bool>(&unsupported, index) != Ok(false)) {
+        return Err(SourceObservationFailure::InvalidCapturedMetadata);
+    }
+
+    let stream = bounded(
+        request,
+        cancellation,
+        transaction.query_raw(
+            "SELECT a.attname::text, a.attnum, \
+             CASE WHEN a.attisdropped THEN NULL ELSE pg_catalog.format_type(a.atttypid, a.atttypmod) END, \
+             tn.nspname::text, t.typname::text, a.attnotnull, \
+             CASE WHEN octet_length(pg_catalog.col_description(a.attrelid, a.attnum)) <= $2::bigint \
+               THEN pg_catalog.col_description(a.attrelid, a.attnum) END, \
+             a.atthasdef, a.attgenerated::text, a.attidentity::text, a.attisdropped, \
+             a.attcollation <> 0, a.attacl IS NOT NULL, a.attoptions IS NOT NULL, \
+             COALESCE(octet_length(pg_catalog.col_description(a.attrelid, a.attnum)) > $2::bigint, false) \
+             FROM pg_catalog.pg_attribute a \
+             LEFT JOIN pg_catalog.pg_type t ON t.oid = a.atttypid \
+             LEFT JOIN pg_catalog.pg_namespace tn ON tn.oid = t.typnamespace \
+             WHERE a.attrelid = $1 AND a.attnum > 0 ORDER BY a.attnum",
+            vec![&relation.oid as &(dyn ToSql + Sync), &max_bytes],
+        ),
+    )
+    .await?;
+    tokio::pin!(stream);
+    let mut columns = Vec::new();
+    while let Some(row) = bounded(request, cancellation, stream.try_next()).await? {
+        let name: String = field(&row, 0)?;
+        let ordinal: i16 = field(&row, 1)?;
+        let data_type: Option<String> = field(&row, 2)?;
+        let type_schema: Option<String> = field(&row, 3)?;
+        let type_name: Option<String> = field(&row, 4)?;
+        let not_null: bool = field(&row, 5)?;
+        let comment: Option<String> = field(&row, 6)?;
+        let generated: String = field(&row, 8)?;
+        let identity: String = field(&row, 9)?;
+        if field::<bool>(&row, 14)? {
+            return Err(SourceObservationFailure::ByteLimitExceeded {
+                max_bytes: request.request().limits().max_bytes(),
+            });
+        }
+        meter.add(
+            request,
+            20 + name.len()
+                + data_type.as_ref().map_or(0, String::len)
+                + type_schema.as_ref().map_or(0, String::len)
+                + type_name.as_ref().map_or(0, String::len)
+                + comment.as_ref().map_or(0, String::len),
+        )?;
+        if ordinal <= 0
+            || !generated.is_empty()
+            || !identity.is_empty()
+            || [7, 10, 11, 12, 13]
+                .into_iter()
+                .any(|index| field::<bool>(&row, index) != Ok(false))
+        {
+            return Err(SourceObservationFailure::InvalidCapturedMetadata);
+        }
+        let (Some(data_type), Some(type_schema), Some(type_name)) =
+            (data_type, type_schema, type_name)
+        else {
+            return Err(SourceObservationFailure::InvalidCapturedMetadata);
+        };
+        columns.push(
+            ColumnObservationV3::new(
+                name,
+                ordinal as u32,
+                data_type,
+                QualifiedTypeName::new(type_schema, type_name)
+                    .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+                !not_null,
+                comment,
+            )
+            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+        );
+    }
+    let mut observed =
+        RelationObservation::new(relation.schema, relation.name, RelationKind::Table, columns)
+            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
+            .with_replica_identity_mode(relation.replica_identity);
+    if let Some(comment) = relation.comment {
+        observed = observed.with_source_comment(comment);
+    }
+    Ok(observed)
 }
 
 fn field<T>(row: &Row, index: usize) -> Result<T, SourceObservationFailure>
