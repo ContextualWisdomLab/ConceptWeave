@@ -1,7 +1,8 @@
 use std::{collections::BTreeMap, str::FromStr};
 
 use conceptweave_observation::{
-    ConstraintDeferrability, RelationKind, SchemaObjectLocation, TableConstraintObservation,
+    ConstraintDeferrability, ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType,
+    RelationKind, SchemaObjectLocation, TableConstraintObservation,
 };
 use conceptweave_postgres_adapter::{PostgresTlsAdapter, PostgresUnixAdapter};
 use conceptweave_source_port::{
@@ -88,6 +89,177 @@ fn adapter(config: Config) -> PostgresUnixAdapter {
         "fixture_source".to_owned(),
         ("fixture_policy".to_owned(), config),
     )]))
+}
+
+#[tokio::test]
+async fn postgres18_foreign_key_preserves_comparison_and_referential_evidence() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_fk_fixture_{}", std::process::id());
+    let external_schema = format!("cw_fk_external_fixture_{}", std::process::id());
+    client.batch_execute(&format!(
+        "CREATE SCHEMA \"{schema}\"; \
+         CREATE TABLE \"{schema}\".parent (a integer, b integer, CONSTRAINT parent_key UNIQUE (a, b)); \
+         CREATE TABLE \"{schema}\".child (x integer, y integer, \
+           CONSTRAINT child_parent_fk FOREIGN KEY (x, y) REFERENCES \"{schema}\".parent (b, a) \
+           ON UPDATE CASCADE ON DELETE SET NULL (x) DEFERRABLE INITIALLY DEFERRED)"
+    )).await.unwrap();
+
+    let result = async {
+        let snapshot = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await?;
+        let child = snapshot
+            .relations()
+            .iter()
+            .find(|relation| relation.relation_name() == "child")
+            .unwrap();
+        let TableConstraintObservation::ForeignKey(foreign_key) = child
+            .constraints()
+            .iter()
+            .find(|constraint| constraint.constraint_name() == "child_parent_fk")
+            .unwrap()
+        else {
+            panic!("captured constraint must be a foreign key");
+        };
+        assert_eq!(foreign_key.column_names(), &["x", "y"]);
+        assert_eq!(foreign_key.referenced_column_names(), &["b", "a"]);
+        let behavior = foreign_key.reference_behavior().unwrap();
+        assert_eq!(behavior.update_action(), ForeignKeyAction::Cascade);
+        assert_eq!(behavior.delete_action(), ForeignKeyAction::SetNull);
+        assert_eq!(
+            behavior.delete_target_columns(),
+            Some(["x".to_owned()].as_slice())
+        );
+        assert_eq!(
+            behavior.deferrability(),
+            ForeignKeyDeferrability::InitiallyDeferred
+        );
+        let catalog = snapshot.foreign_key_catalog().unwrap();
+        assert_eq!(catalog.len(), 1);
+        assert_eq!(catalog[0].referenced_index_name(), "parent_key");
+        assert_eq!(catalog[0].primary_foreign_operators().len(), 2);
+        let receipt = snapshot
+            .source_receipt(
+                SchemaObjectLocation::constraint(
+                    &schema,
+                    "child",
+                    RelationKind::Table,
+                    "child_parent_fk",
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+        let replay = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await?;
+        assert_eq!(snapshot.snapshot_digest(), replay.snapshot_digest());
+        client
+            .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".child DROP CONSTRAINT child_parent_fk; \
+             ALTER TABLE \"{schema}\".child ADD CONSTRAINT child_parent_fk \
+             FOREIGN KEY (x, y) REFERENCES \"{schema}\".parent (b, a) \
+             DEFERRABLE INITIALLY IMMEDIATE"
+            ))
+            .await
+            .unwrap();
+        let changed = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await?;
+        assert_ne!(snapshot.snapshot_digest(), changed.snapshot_digest());
+        let changed_child = changed
+            .relations()
+            .iter()
+            .find(|relation| relation.relation_name() == "child")
+            .unwrap();
+        let TableConstraintObservation::ForeignKey(changed_key) = changed_child
+            .constraints()
+            .iter()
+            .find(|constraint| constraint.constraint_name() == "child_parent_fk")
+            .unwrap()
+        else {
+            panic!("captured constraint must be a foreign key");
+        };
+        assert_eq!(
+            changed_key.reference_behavior().unwrap().update_action(),
+            ForeignKeyAction::NoAction
+        );
+        assert_eq!(
+            changed_key.reference_behavior().unwrap().deferrability(),
+            ForeignKeyDeferrability::InitiallyImmediate
+        );
+        client
+            .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".child DROP CONSTRAINT child_parent_fk; \
+                 ALTER TABLE \"{schema}\".child ADD CONSTRAINT child_parent_fk \
+                 FOREIGN KEY (x, y) REFERENCES \"{schema}\".parent (b, a) MATCH FULL NOT VALID"
+            ))
+            .await
+            .unwrap();
+        let not_valid = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await?;
+        let not_valid_child = not_valid
+            .relations()
+            .iter()
+            .find(|relation| relation.relation_name() == "child")
+            .unwrap();
+        let TableConstraintObservation::ForeignKey(not_valid_key) = not_valid_child
+            .constraints()
+            .iter()
+            .find(|constraint| constraint.constraint_name() == "child_parent_fk")
+            .unwrap()
+        else {
+            panic!("captured constraint must be a foreign key");
+        };
+        assert_eq!(not_valid_key.validated(), Some(false));
+        assert_eq!(
+            not_valid_key.reference_behavior().unwrap().match_type(),
+            ForeignKeyMatchType::Full
+        );
+        client
+            .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".child VALIDATE CONSTRAINT child_parent_fk"
+            ))
+            .await
+            .unwrap();
+        let valid = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await?;
+        assert_ne!(not_valid.snapshot_digest(), valid.snapshot_digest());
+        client
+            .batch_execute(&format!(
+                "CREATE SCHEMA \"{external_schema}\"; \
+             CREATE TABLE \"{external_schema}\".other_parent (id integer PRIMARY KEY); \
+             ALTER TABLE \"{schema}\".child ADD COLUMN outside_id integer; \
+             ALTER TABLE \"{schema}\".child ADD CONSTRAINT outside_fk \
+             FOREIGN KEY (outside_id) REFERENCES \"{external_schema}\".other_parent (id)"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            adapter(config.clone())
+                .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+                .await
+                .err(),
+            Some(SourceObservationFailure::InvalidCapturedMetadata)
+        );
+        Ok::<_, SourceObservationFailure>(())
+    }
+    .await;
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA IF EXISTS \"{external_schema}\" CASCADE; DROP SCHEMA \"{schema}\" CASCADE"
+        ))
+        .await
+        .unwrap();
+    connection_task.abort();
+    result.unwrap();
 }
 
 #[tokio::test]

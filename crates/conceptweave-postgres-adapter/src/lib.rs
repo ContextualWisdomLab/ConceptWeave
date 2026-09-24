@@ -1,16 +1,14 @@
 //! PostgreSQL 18 catalog observation behind the Source Observation capability.
 //!
 //! This bounded path admits schema-scoped domains, enums, ordinary tables, local CHECK,
-//! NOT NULL, and ordinary key constraints, and bounded indexes.
+//! NOT NULL, ordinary key and foreign-key constraints, and bounded indexes.
 //! Unsupported relation metadata fails closed until it can be mapped without losing facts.
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    future::Future,
-    time::Duration,
-};
+mod foreign_keys;
+
+use std::{collections::BTreeMap, future::Future, time::Duration};
 
 use conceptweave_observation::{
     CheckConstraintObservation, ColumnCollationObservation, ColumnExpressionObservation,
@@ -529,12 +527,15 @@ async fn capture_catalog(
         }
     }
     let mut relations = Vec::new();
+    let mut relation_oids = Vec::new();
+    let mut key_timings = Vec::new();
     let mut column_collations = Vec::new();
     let mut column_generations = Vec::new();
     let mut column_expressions = Vec::new();
     let mut not_null_constraints = Vec::new();
     let mut constraint_timings = Vec::new();
     for relation in relation_rows {
+        relation_oids.push(relation.oid);
         let (observed, collations, generations, expressions, not_null, timings) = capture_relation(
             &transaction,
             request,
@@ -549,8 +550,28 @@ async fn capture_catalog(
         column_generations.extend(generations);
         column_expressions.extend(expressions);
         not_null_constraints.extend(not_null);
+        key_timings.push(timings.clone());
         constraint_timings.extend(timings);
     }
+    let (foreign_key_catalog, foreign_key_triggers) = foreign_keys::capture(
+        &transaction,
+        request,
+        cancellation,
+        &mut meter,
+        &relation_oids,
+        &mut relations,
+    )
+    .await?;
+    foreign_keys::validate_triggers(
+        &transaction,
+        request,
+        cancellation,
+        &mut meter,
+        &relation_oids,
+        &key_timings,
+        &foreign_key_triggers,
+    )
+    .await?;
     let observed_at_utc: String = field(
         &bounded(
             request,
@@ -567,7 +588,7 @@ async fn capture_catalog(
     let extractor_revision = if !has_relations {
         "postgres18_type_only_adapter_v2"
     } else {
-        "postgres18_constraint_timing_adapter_v1"
+        "postgres18_foreign_key_adapter_v1"
     };
     let snapshot = if !has_relations {
         PostgresSchemaSnapshotV3::new(
@@ -597,6 +618,8 @@ async fn capture_catalog(
     let snapshot = if has_relations {
         snapshot
             .with_observed_constraint_timings(constraint_timings)
+            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
+            .with_observed_foreign_key_catalog(foreign_key_catalog)
             .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
     } else {
         snapshot
@@ -831,15 +854,6 @@ async fn capture_relation(
         (&columns, &indexes),
     )
     .await?;
-    validate_constraint_triggers(
-        transaction,
-        request,
-        cancellation,
-        meter,
-        relation.oid,
-        &timings,
-    )
-    .await?;
     let mut observed =
         RelationObservation::new(relation.schema, relation.name, RelationKind::Table, columns)
             .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
@@ -931,6 +945,9 @@ async fn capture_constraints(
                 + key.as_ref().map_or(0, |values| values.len() * 2)
                 + backing_name.as_ref().map_or(0, String::len),
         )?;
+        if kind == "f" {
+            continue;
+        }
         if field::<i16>(&row, 8)? != 0
             || [9, 13, 14, 17]
                 .into_iter()
@@ -1081,62 +1098,6 @@ async fn capture_constraints(
         return Err(SourceObservationFailure::InvalidCapturedMetadata);
     }
     Ok((constraints, not_null, timings))
-}
-
-async fn validate_constraint_triggers(
-    transaction: &Transaction<'_>,
-    request: &AuthorizedObservationRequest,
-    cancellation: &dyn ObservationCancellation,
-    meter: &mut CaptureMeter,
-    relation_oid: u32,
-    timings: &[ConstraintTimingObservation],
-) -> Result<(), SourceObservationFailure> {
-    // PostgreSQL 18 uses tgtype 21 (ROW | INSERT | UPDATE, AFTER) for the one
-    // internal uniqueness recheck trigger of each deferrable key constraint.
-    let expected = timings
-        .iter()
-        .filter(|timing| timing.deferrability() != ConstraintDeferrability::NotDeferrable)
-        .map(|timing| timing.constraint_name().to_owned())
-        .collect::<BTreeSet<_>>();
-    let stream = bounded(
-        request,
-        cancellation,
-        transaction.query_raw(
-            "SELECT c.conname::text, COALESCE( \
-             t.tgisinternal AND c.conrelid = $1 AND c.contype IN ('p', 'u') \
-             AND c.condeferrable AND c.conindid <> 0 \
-             AND pn.nspname = 'pg_catalog' AND p.proname = 'unique_key_recheck' \
-             AND t.tgenabled = 'O' AND t.tgtype = 21 AND t.tgnargs = 0 \
-             AND octet_length(t.tgargs) = 0 \
-             AND t.tgattr::text = '' AND t.tgqual IS NULL \
-             AND t.tgoldtable IS NULL AND t.tgnewtable IS NULL \
-             AND t.tgparentid = 0 AND t.tgconstrrelid = 0 \
-             AND t.tgconstrindid = c.conindid \
-             AND t.tgdeferrable = c.condeferrable \
-             AND t.tginitdeferred = c.condeferred, false) \
-             FROM pg_catalog.pg_trigger t \
-             LEFT JOIN pg_catalog.pg_constraint c ON c.oid = t.tgconstraint \
-             LEFT JOIN pg_catalog.pg_proc p ON p.oid = t.tgfoid \
-             LEFT JOIN pg_catalog.pg_namespace pn ON pn.oid = p.pronamespace \
-             WHERE t.tgrelid = $1 ORDER BY t.tgname, t.oid",
-            vec![&relation_oid as &(dyn ToSql + Sync)],
-        ),
-    )
-    .await?;
-    tokio::pin!(stream);
-    let mut observed = BTreeSet::new();
-    while let Some(row) = bounded(request, cancellation, stream.try_next()).await? {
-        let name: Option<String> = field(&row, 0)?;
-        meter.add(request, 32 + name.as_ref().map_or(0, String::len))?;
-        let name = name.ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
-        if !field::<bool>(&row, 1)? || !expected.contains(&name) || !observed.insert(name) {
-            return Err(SourceObservationFailure::InvalidCapturedMetadata);
-        }
-    }
-    if observed != expected {
-        return Err(SourceObservationFailure::InvalidCapturedMetadata);
-    }
-    Ok(())
 }
 
 async fn capture_indexes(
