@@ -92,6 +92,74 @@ fn adapter(config: Config) -> PostgresUnixAdapter {
 }
 
 #[tokio::test]
+async fn postgres18_anonymized_governance_shape_replays_without_business_rows() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_governance_shape_{}", std::process::id());
+    client
+        .batch_execute(&include_str!("fixtures/grc_shape.sql").replace("__SCHEMA__", &schema))
+        .await
+        .unwrap();
+
+    let result = async {
+        let source_adapter = adapter(config.clone());
+        let observe = || {
+            source_adapter.observe(
+                authorized_with_limits(&schema, 1024, 262_144),
+                &NotCancelled,
+            )
+        };
+        let first = observe().await?;
+        let replay = observe().await?;
+        assert_eq!(first.snapshot_digest(), replay.snapshot_digest());
+        assert_eq!(first.relations().len(), 4);
+        assert_eq!(first.domains().len(), 1);
+        assert_eq!(first.enums().len(), 1);
+        assert_eq!(first.foreign_key_catalog().unwrap().len(), 4);
+        let receipt = first
+            .source_receipt(
+                SchemaObjectLocation::constraint(
+                    &schema,
+                    "risk_control_link",
+                    RelationKind::Table,
+                    "risk_control_risk_fk",
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(receipt.source_digest(), first.snapshot_digest());
+        client
+            .batch_execute(&format!(
+                "COMMENT ON COLUMN \"{schema}\".risk_record.title IS 'Revised review title'"
+            ))
+            .await
+            .unwrap();
+        let changed = observe().await?;
+        assert_ne!(first.snapshot_digest(), changed.snapshot_digest());
+        client
+            .batch_execute(&format!(
+                "COMMENT ON COLUMN \"{schema}\".risk_record.title IS 'Reviewable risk title'"
+            ))
+            .await
+            .unwrap();
+        let restored = observe().await?;
+        assert_eq!(first.snapshot_digest(), restored.snapshot_digest());
+        Ok::<_, SourceObservationFailure>(())
+    }
+    .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    result.unwrap();
+}
+
+#[tokio::test]
 async fn postgres18_foreign_key_preserves_comparison_and_referential_evidence() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
