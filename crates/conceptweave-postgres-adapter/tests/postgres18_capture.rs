@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, str::FromStr};
 
-use conceptweave_observation::{RelationKind, SchemaObjectLocation};
+use conceptweave_observation::{RelationKind, SchemaObjectLocation, TableConstraintObservation};
 use conceptweave_postgres_adapter::PostgresUnixAdapter;
 use conceptweave_source_port::{
     ObservationCancellation, ObservationLimits, ObservationRequest, ObservationRequestBudget,
@@ -243,6 +243,70 @@ async fn postgres18_catalog_is_observed_in_one_read_only_transaction() {
             with_column_comment.snapshot_digest(),
             with_table.snapshot_digest()
         );
+
+        client
+            .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".item ADD CONSTRAINT item_nonnegative CHECK (id >= 0) NOT VALID"
+            ))
+            .await
+            .unwrap();
+        let unvalidated = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        let item = unvalidated
+            .relations()
+            .iter()
+            .find(|relation| relation.relation_name() == "item")
+            .unwrap();
+        assert!(matches!(
+            &item.constraints()[0],
+            TableConstraintObservation::Check(check)
+                if check.constraint_name() == "item_nonnegative"
+                    && check.definition().contains("id >= 0")
+                    && !check.validated()
+                    && check.enforced()
+                    && !check.no_inherit()
+        ));
+        unvalidated
+            .source_receipt(
+                SchemaObjectLocation::constraint(
+                    &schema,
+                    "item",
+                    RelationKind::Table,
+                    "item_nonnegative",
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        client
+            .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".item VALIDATE CONSTRAINT item_nonnegative"
+            ))
+            .await
+            .unwrap();
+        let validated = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        assert_ne!(unvalidated.snapshot_digest(), validated.snapshot_digest());
+        client
+            .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".item ADD CONSTRAINT item_unique UNIQUE (id)"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            adapter(config.clone())
+                .observe(authorized(&schema), &NotCancelled)
+                .await
+                .err(),
+            Some(SourceObservationFailure::InvalidCapturedMetadata)
+        );
+        client
+            .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".item DROP CONSTRAINT item_unique"
+            ))
+            .await
+            .unwrap();
 
         client
             .batch_execute(&format!("CREATE TABLE \"{schema}\".\" \" (\" \" integer)"))

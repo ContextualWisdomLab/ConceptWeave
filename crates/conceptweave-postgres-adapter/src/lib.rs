@@ -8,12 +8,13 @@
 use std::{collections::BTreeMap, future::Future, time::Duration};
 
 use conceptweave_observation::{
-    ColumnExpressionObservation, ColumnGenerationObservation, ColumnObservationV3,
-    DomainCheckConstraintObservation, DomainObservation, EnumObservation, IndexAttributeKind,
-    IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics, IndexObservation,
-    IndexStorageOption, IndexTablespace, OperatorClassOption, PostgresSchemaSnapshotV3,
-    QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
-    RelationObservation, ReplicaIdentityMode,
+    CheckConstraintObservation, ColumnExpressionObservation, ColumnGenerationObservation,
+    ColumnObservationV3, DomainCheckConstraintObservation, DomainObservation, EnumObservation,
+    IndexAttributeKind, IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics,
+    IndexObservation, IndexStorageOption, IndexTablespace, OperatorClassOption,
+    PostgresSchemaSnapshotV3, QualifiedCollationName, QualifiedOperatorClassName,
+    QualifiedTypeName, RelationKind, RelationObservation, ReplicaIdentityMode,
+    TableConstraintObservation,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, SourceObservationFailure,
@@ -481,7 +482,7 @@ async fn capture_catalog(
     let extractor_revision = if relations.is_empty() {
         "postgres18_type_only_adapter_v1"
     } else {
-        "postgres18_index_options_adapter_v1"
+        "postgres18_check_constraint_adapter_v1"
     };
     let snapshot = if relations.is_empty() {
         PostgresSchemaSnapshotV3::new(
@@ -528,19 +529,23 @@ async fn capture_relation(
         request,
         cancellation,
         transaction.query_one(
-            "SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid = $1), \
-             EXISTS(SELECT 1 FROM pg_catalog.pg_inherits WHERE inhrelid = $1 OR inhparent = $1), \
+            "SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_inherits WHERE inhrelid = $1 OR inhparent = $1), \
              EXISTS(SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid = $1), \
              EXISTS(SELECT 1 FROM pg_catalog.pg_rewrite WHERE ev_class = $1), \
              EXISTS(SELECT 1 FROM pg_catalog.pg_policy WHERE polrelid = $1), \
              EXISTS(SELECT 1 FROM pg_catalog.pg_seclabel WHERE classoid = 'pg_class'::regclass AND objoid = $1), \
-             EXISTS(SELECT 1 FROM pg_catalog.pg_depend WHERE classid = 'pg_class'::regclass AND objid = $1 AND deptype = 'e')",
+             EXISTS(SELECT 1 FROM pg_catalog.pg_depend WHERE classid = 'pg_class'::regclass AND objid = $1 AND deptype = 'e'), \
+             (SELECT relchecks FROM pg_catalog.pg_class WHERE oid = $1)",
             &[&relation.oid],
         ),
     )
     .await?;
-    meter.add(request, 7)?;
-    if (0..7).any(|index| field::<bool>(&unsupported, index) != Ok(false)) {
+    meter.add(request, 8)?;
+    if (0..6).any(|index| field::<bool>(&unsupported, index) != Ok(false)) {
+        return Err(SourceObservationFailure::InvalidCapturedMetadata);
+    }
+    let expected_check_count: i16 = field(&unsupported, 6)?;
+    if expected_check_count < 0 {
         return Err(SourceObservationFailure::InvalidCapturedMetadata);
     }
 
@@ -674,6 +679,16 @@ async fn capture_relation(
             .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
         );
     }
+    let constraints = capture_checks(
+        transaction,
+        request,
+        cancellation,
+        meter,
+        max_bytes,
+        relation.oid,
+        expected_check_count,
+    )
+    .await?;
     let indexes = capture_indexes(
         transaction,
         request,
@@ -687,12 +702,91 @@ async fn capture_relation(
         RelationObservation::new(relation.schema, relation.name, RelationKind::Table, columns)
             .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
             .with_replica_identity_mode(relation.replica_identity)
+            .with_constraints(constraints)
+            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
             .with_indexes(indexes)
             .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
     if let Some(comment) = relation.comment {
         observed = observed.with_source_comment(comment);
     }
     Ok((observed, generations, expressions))
+}
+
+async fn capture_checks(
+    transaction: &Transaction<'_>,
+    request: &AuthorizedObservationRequest,
+    cancellation: &dyn ObservationCancellation,
+    meter: &mut CaptureMeter,
+    max_bytes: i64,
+    relation_oid: u32,
+    expected_count: i16,
+) -> Result<Vec<TableConstraintObservation>, SourceObservationFailure> {
+    let stream = bounded(
+        request,
+        cancellation,
+        transaction.query_raw(
+            "SELECT c.conname::text, c.contype::text, \
+             CASE WHEN octet_length(pg_catalog.pg_get_constraintdef(c.oid, false)) <= $2::bigint \
+               THEN pg_catalog.pg_get_constraintdef(c.oid, false) END, \
+             COALESCE(octet_length(pg_catalog.pg_get_constraintdef(c.oid, false)) > $2::bigint, false), \
+             c.convalidated, c.conenforced, c.connoinherit, c.conislocal, c.coninhcount, \
+             c.conparentid = 0, c.condeferrable, c.condeferred, c.conindid = 0, \
+             c.confrelid = 0, c.contypid = 0, c.conperiod, c.conbin IS NOT NULL, \
+             c.connamespace = t.relnamespace, \
+             EXISTS(SELECT 1 FROM pg_catalog.pg_description \
+               WHERE classoid = 'pg_constraint'::regclass AND objoid = c.oid), \
+             EXISTS(SELECT 1 FROM pg_catalog.pg_seclabel \
+               WHERE classoid = 'pg_constraint'::regclass AND objoid = c.oid) \
+             FROM pg_catalog.pg_constraint c \
+             JOIN pg_catalog.pg_class t ON t.oid = c.conrelid \
+             WHERE c.conrelid = $1 ORDER BY c.conname, c.oid",
+            vec![&relation_oid as &(dyn ToSql + Sync), &max_bytes],
+        ),
+    )
+    .await?;
+    tokio::pin!(stream);
+    let mut checks = Vec::new();
+    while let Some(row) = bounded(request, cancellation, stream.try_next()).await? {
+        let name: String = field(&row, 0)?;
+        let kind: String = field(&row, 1)?;
+        let definition: Option<String> = field(&row, 2)?;
+        if field::<bool>(&row, 3)? {
+            return Err(SourceObservationFailure::ByteLimitExceeded {
+                max_bytes: request.request().limits().max_bytes(),
+            });
+        }
+        meter.add(
+            request,
+            24 + name.len() + kind.len() + definition.as_ref().map_or(0, String::len),
+        )?;
+        if kind != "c"
+            || definition.is_none()
+            || field::<i16>(&row, 8)? != 0
+            || [9, 12, 13, 14, 16, 17]
+                .into_iter()
+                .any(|index| field::<bool>(&row, index) != Ok(true))
+            || [10, 11, 15, 18, 19]
+                .into_iter()
+                .any(|index| field::<bool>(&row, index) != Ok(false))
+            || !field::<bool>(&row, 7)?
+        {
+            return Err(SourceObservationFailure::InvalidCapturedMetadata);
+        }
+        checks.push(TableConstraintObservation::Check(
+            CheckConstraintObservation::new(
+                name,
+                definition.unwrap(),
+                field(&row, 4)?,
+                field(&row, 5)?,
+                field(&row, 6)?,
+            )
+            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+        ));
+    }
+    if checks.len() != expected_count as usize {
+        return Err(SourceObservationFailure::InvalidCapturedMetadata);
+    }
+    Ok(checks)
 }
 
 async fn capture_indexes(
