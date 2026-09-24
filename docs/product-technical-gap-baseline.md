@@ -76,7 +76,7 @@ The live Local API replay remains acquisition/observation evidence only: 8,326 o
 | Area | Status | Evidence / next verification |
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | PRD/TRD/ADR/context map define ConceptWeave ownership and owner/consumer boundaries; foreign truth remains behind released/versioned ports and ACLs. |
-| Truth/publication lifecycle | SOURCE_REPAIRED_PENDING_PROTECTED_EVIDENCE | Publication-state/truth-status semantics and immutable/supersession direction are defined; no protected semantic release exists. |
+| Truth/publication lifecycle | SOURCE_REPAIRED_PENDING_PROTECTED_EVIDENCE | Publication-state/truth-status semantics and immutable/supersession direction are defined; Client read-only diff now admits a governed Superseded+Superseded predecessor while current-use admission remains Published+Authoritative. `verify_detached_artifact` checks caller-supplied exact bytes against the declared digest; no protected semantic release exists. |
 | Source Observation | ACTIVE_CHILD | Immutable source evidence and bounded observation contracts exist; concrete production PostgreSQL adapter remains a P0 gap. |
 | Research Intake / source resolution | LOCAL_GREEN_HOSTED_PENDING | #9 and #40 have current local source/coverage evidence within their stated scope; hosted checks and independent current-head review remain missing. |
 | Product CI | BLOCKED_OWNER | #35 leaf CodeQL failure waits on accepted central `.github#2051@70e8c1f...` and then a fresh #35 exact-head run. |
@@ -85,6 +85,8 @@ The live Local API replay remains acquisition/observation evidence only: 8,326 o
 | Standards / research | ACTIVE | Doctoring/TRACEABILITY must bind authoritative standards/primary research to exact implementation/module/API/test evidence and identify contradictions. |
 | UI / multilingual | NOT_YET_MATERIALIZED | When material UI appears, require reusable composition, token/Figma identity, normal/loading/empty/error/permission/responsive/interaction/a11y E2E, and KO/EN/JA/ZH/VI/ES/DE/FR label/font/text-expansion verification. |
 | Release | NOT_STARTED | Version/CHANGELOG/tag/package/immutable semantic release/SBOM/provenance/reproducibility/rollback must be executed on the exact protected release head. |
+
+Local Client coverage recheck on 2026-09-25: LLVM's raw region summary reported 706/707, while every distinct owned code/expansion source region was covered (707/707) and both outcomes of all source branches were covered (56/56). The gate checks those enumerated source coordinates; the raw summary remains visible as a diagnostic. This is local evidence, not a protected-head acceptance result.
 
 ## P0 product gaps
 

@@ -16,7 +16,6 @@ jq -r '
   | select(
       .summary.lines.percent != 100
       or .summary.functions.percent != 100
-      or .summary.regions.percent != 100
     )
   | "COVERAGE_GAP file=\(.filename) lines=\(.summary.lines.percent) functions=\(.summary.functions.percent) regions=\(.summary.regions.percent)"
 ' coverage.json
@@ -33,18 +32,22 @@ jq '
         column_start: .[1],
         line_end: .[2],
         column_end: .[3],
-        count: .[4]
+        count: .[4],
+        expanded_file_id: .[6],
+        kind: .[7]
       }
     | select(.file | contains("/tests/") | not)
   ]
-  | sort_by(.file, .line_start, .column_start, .line_end, .column_end)
-  | group_by([.file, .line_start, .column_start, .line_end, .column_end])
+  | sort_by(.file, .line_start, .column_start, .line_end, .column_end, .expanded_file_id, .kind)
+  | group_by([.file, .line_start, .column_start, .line_end, .column_end, .expanded_file_id, .kind])
   | map({
       file: .[0].file,
       line_start: .[0].line_start,
       column_start: .[0].column_start,
       line_end: .[0].line_end,
       column_end: .[0].column_end,
+      expanded_file_id: .[0].expanded_file_id,
+      kind: .[0].kind,
       count: (map(.count) | add)
     })
 ' coverage.json > source-regions.json
@@ -109,9 +112,11 @@ jq -r '
 
 jq -e '
   .data[0].totals.lines.percent == 100 and
-  .data[0].totals.functions.percent == 100 and
-  .data[0].totals.regions.percent == 100
+  .data[0].totals.functions.percent == 100
 ' coverage.json >/dev/null
 
-jq -e 'all(.[]; .count > 0)' source-regions.json >/dev/null
+# LLVM's raw region summary can disagree across Rust generic instantiations.
+# Deduplicate repeated instantiations only when source coordinates, expansion target,
+# and region kind are identical; code and expansion regions must not mask each other.
+jq -e 'length > 0 and all(.[]; .count > 0)' source-regions.json >/dev/null
 jq -e 'all(.[]; .true_count > 0 and .false_count > 0)' source-branches.json >/dev/null
