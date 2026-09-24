@@ -13,6 +13,7 @@ mod column_generation;
 mod column_identity;
 mod constraint_period;
 mod constraint_timing;
+mod foreign_key_catalog;
 mod model;
 mod not_null_constraint;
 mod representation_v3;
@@ -25,6 +26,7 @@ pub use column_generation::ColumnGenerationObservation;
 pub use column_identity::ColumnIdentityObservation;
 pub use constraint_period::ConstraintPeriodObservation;
 pub use constraint_timing::{ConstraintDeferrability, ConstraintTimingObservation};
+pub use foreign_key_catalog::{ForeignKeyCatalogObservation, ForeignKeyOperatorObservation};
 pub use model::{
     CheckConstraintObservation, ColumnObservation, ForeignKeyAction, ForeignKeyDeferrability,
     ForeignKeyMatchType, ForeignKeyObservation, ForeignKeyReferenceBehavior, ObservationError,
@@ -143,6 +145,8 @@ pub struct PostgresSchemaSnapshotV3 {
     constraint_timings_observed: bool,
     constraint_periods: Vec<ConstraintPeriodObservation>,
     constraint_periods_observed: bool,
+    foreign_key_catalog: Vec<ForeignKeyCatalogObservation>,
+    foreign_key_catalog_observed: bool,
 }
 
 impl PostgresSchemaSnapshotV3 {
@@ -198,6 +202,8 @@ impl PostgresSchemaSnapshotV3 {
             constraint_timings_observed: false,
             constraint_periods: Vec::new(),
             constraint_periods_observed: false,
+            foreign_key_catalog: Vec::new(),
+            foreign_key_catalog_observed: false,
         })
     }
 
@@ -288,6 +294,8 @@ impl PostgresSchemaSnapshotV3 {
             constraint_timings_observed: false,
             constraint_periods: Vec::new(),
             constraint_periods_observed: false,
+            foreign_key_catalog: Vec::new(),
+            foreign_key_catalog_observed: false,
         })
     }
 
@@ -567,6 +575,8 @@ impl PostgresSchemaSnapshotV3 {
             constraint_timings_observed: false,
             constraint_periods: Vec::new(),
             constraint_periods_observed: false,
+            foreign_key_catalog: Vec::new(),
+            foreign_key_catalog_observed: false,
         })
     }
 
@@ -624,6 +634,7 @@ impl PostgresSchemaSnapshotV3 {
             || self.not_null_constraints_observed
             || self.constraint_timings_observed
             || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "type_kind_observation_order",
@@ -676,6 +687,7 @@ impl PostgresSchemaSnapshotV3 {
             || self.not_null_constraints_observed
             || self.constraint_timings_observed
             || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "column_collation_observation_order",
@@ -712,6 +724,7 @@ impl PostgresSchemaSnapshotV3 {
             || self.not_null_constraints_observed
             || self.constraint_timings_observed
             || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "column_generation_observation_order",
@@ -754,6 +767,7 @@ impl PostgresSchemaSnapshotV3 {
             || self.not_null_constraints_observed
             || self.constraint_timings_observed
             || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "column_expression_observation_order",
@@ -792,6 +806,7 @@ impl PostgresSchemaSnapshotV3 {
         if self.not_null_constraints_observed
             || self.constraint_timings_observed
             || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "column_identity_observation_order",
@@ -833,7 +848,10 @@ impl PostgresSchemaSnapshotV3 {
                 field: "not_null_constraint_already_observed",
             });
         }
-        if self.constraint_timings_observed || self.constraint_periods_observed {
+        if self.constraint_timings_observed
+            || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+        {
             return Err(ObservationError::InvalidObservationField {
                 field: "not_null_constraint_observation_order",
             });
@@ -857,7 +875,10 @@ impl PostgresSchemaSnapshotV3 {
         mut self,
         constraint_timings: Vec<ConstraintTimingObservation>,
     ) -> Result<Self, ObservationError> {
-        if self.constraint_timings_observed || self.constraint_periods_observed {
+        if self.constraint_timings_observed
+            || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+        {
             return Err(ObservationError::InvalidObservationField {
                 field: "constraint_timing_observation_order",
             });
@@ -887,7 +908,7 @@ impl PostgresSchemaSnapshotV3 {
         mut self,
         constraint_periods: Vec<ConstraintPeriodObservation>,
     ) -> Result<Self, ObservationError> {
-        if self.constraint_periods_observed {
+        if self.constraint_periods_observed || self.foreign_key_catalog_observed {
             return Err(ObservationError::InvalidObservationField {
                 field: "constraint_period_already_observed",
             });
@@ -908,6 +929,24 @@ impl PostgresSchemaSnapshotV3 {
             compute_constraint_period_digest(&self.snapshot_digest, &constraint_periods);
         self.constraint_periods = constraint_periods;
         self.constraint_periods_observed = true;
+        Ok(self)
+    }
+
+    /// Adds a complete foreign-key catalog family after all other observed families.
+    /// The referenced relation and selected unique index must be in this bounded snapshot.
+    pub fn with_observed_foreign_key_catalog(
+        mut self,
+        observations: Vec<ForeignKeyCatalogObservation>,
+    ) -> Result<Self, ObservationError> {
+        if self.foreign_key_catalog_observed {
+            return Err(ObservationError::InvalidObservationField {
+                field: "foreign_key_catalog_already_observed",
+            });
+        }
+        let observations = foreign_key_catalog::canonicalize(&self.relations, observations)?;
+        self.snapshot_digest = foreign_key_catalog::digest(&self.snapshot_digest, &observations);
+        self.foreign_key_catalog = observations;
+        self.foreign_key_catalog_observed = true;
         Ok(self)
     }
 
@@ -1029,6 +1068,13 @@ impl PostgresSchemaSnapshotV3 {
     pub fn constraint_periods(&self) -> Option<&[ConstraintPeriodObservation]> {
         self.constraint_periods_observed
             .then_some(self.constraint_periods.as_slice())
+    }
+
+    /// Returns the complete observed foreign-key comparison and backing-index catalog family.
+    #[must_use]
+    pub fn foreign_key_catalog(&self) -> Option<&[ForeignKeyCatalogObservation]> {
+        self.foreign_key_catalog_observed
+            .then_some(self.foreign_key_catalog.as_slice())
     }
 
     /// Issues provenance for an exact successor coordinate only when it exists in this snapshot.
