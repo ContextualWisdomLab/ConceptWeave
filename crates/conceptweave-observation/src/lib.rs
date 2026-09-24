@@ -1067,6 +1067,14 @@ fn validate_schema_relation_invariants(
 ) -> Result<(), ObservationError> {
     let mut observed_names = BTreeSet::new();
     for relation in relations {
+        if !observed_names.insert((relation.schema_name(), relation.relation_name())) {
+            return Err(ObservationError::DuplicateRelationObservation {
+                schema_name: relation.schema_name().to_owned(),
+                relation_name: relation.relation_name().to_owned(),
+            });
+        }
+    }
+    for relation in relations {
         if !relation.indexes().is_empty()
             && !matches!(
                 relation.kind(),
@@ -1251,14 +1259,8 @@ fn validate_schema_relation_invariants(
             }
         }
 
-        let schema_name = relation.schema_name().to_owned();
-        if !observed_names.insert((schema_name.clone(), relation.relation_name().to_owned())) {
-            return Err(ObservationError::InvalidObservationField {
-                field: "schema_relation_namespace",
-            });
-        }
         for index in relation.indexes() {
-            if !observed_names.insert((schema_name.clone(), index.index_name().to_owned())) {
+            if !observed_names.insert((relation.schema_name(), index.index_name())) {
                 return Err(ObservationError::InvalidObservationField {
                     field: "schema_relation_namespace",
                 });
@@ -1710,7 +1712,7 @@ fn validate_constraint_period_column_type(
 fn key_constraint_backing_index_static_shape_matches(
     constraint: &TableConstraintObservation,
     backing_index: &IndexObservation,
-    catalog_flags: IndexCatalogFlags,
+    catalog_flags: &IndexCatalogFlags,
 ) -> bool {
     let (constraint_columns, expected_nulls_not_distinct) = match constraint {
         TableConstraintObservation::PrimaryKey(primary_key) => {

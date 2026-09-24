@@ -107,6 +107,8 @@ Synthetic Rust fixtures are unit-contract evidence only and do not substitute fo
 
 Within the converter/transform `pg_init_privs` slice, complete ACL readability, exact OID/name identity, source order/multiplicity, exact quoted-identifier content, actionable dangling-role recovery identity, receipt binding, and routine-log safety are represented in source and focused contracts. Across wider Source Observation, the shared legacy model, separately exported catalog families, `representation_v3.rs` identifier-bearing constructors including tablespace/access-method identity, rendered-index completion boundary, relation-kind/index-ownership boundary, and primary-index/primary-constraint reciprocity boundary are source-repaired. The residual gap in these demonstrated slices is exact-head execution/coverage/PostgreSQL differential acceptance rather than a known unpatched call site.
 
+The v3 snapshot constructor rejects schema-local `pg_class` name collisions across top-level relations and their relation-owned indexes before it computes a digest or issues receipts. Duplicate top-level relation observations retain their dedicated coordinate error; index collisions fail as namespace violations. Identical index names in different schemas remain admissible. This boundary still needs exact-head execution and PostgreSQL 18 differential evidence before adoption.
+
 A next semantic successor requires an independent buyer, semantic, security, lifecycle, recovery, or provenance distinction not represented by the current chain. Otherwise, after exact-head acceptance, this sub-chain moves to complete adoption and release preparation.
 
 ## Canonical prerequisite state

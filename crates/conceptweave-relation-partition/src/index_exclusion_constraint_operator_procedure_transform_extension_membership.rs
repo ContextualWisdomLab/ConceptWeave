@@ -516,15 +516,13 @@ fn encode_str(hasher: &mut Sha256, value: &str) {
     hasher.update(value.as_bytes());
 }
 
-fn validate_nonblank(value: &str, field: &str) -> Result<(), ObservationError> {
+fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
     if value.trim().is_empty() {
         return Err(invalid(field));
     }
     Ok(())
 }
 
-fn invalid(field: &str) -> ObservationError {
-    ObservationError::InvalidCatalogValue {
-        field: field.to_owned(),
-    }
+fn invalid(field: &'static str) -> ObservationError {
+    ObservationError::InvalidObservationField { field }
 }

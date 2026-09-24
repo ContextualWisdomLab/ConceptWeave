@@ -1,7 +1,7 @@
 use conceptweave_observation::{
     ColumnObservationV3, IndexAttributeKind, IndexAttributeObservation, IndexKeySemantics,
-    IndexObservation, PostgresSchemaSnapshotV3, QualifiedOperatorClassName, QualifiedTypeName,
-    RelationKind, RelationObservation,
+    IndexObservation, ObservationError, PostgresSchemaSnapshotV3, QualifiedOperatorClassName,
+    QualifiedTypeName, RelationKind, RelationObservation,
 };
 
 mod support;
@@ -36,7 +36,11 @@ fn complete_index(index_name: &str) -> IndexObservation {
     .expect("complete key semantics are valid")
 }
 
-fn relation(schema_name: &str, relation_name: &str, index_name: Option<&str>) -> RelationObservation {
+fn relation(
+    schema_name: &str,
+    relation_name: &str,
+    index_name: Option<&str>,
+) -> RelationObservation {
     let relation = RelationObservation::new(
         schema_name,
         relation_name,
@@ -63,7 +67,9 @@ fn relation(schema_name: &str, relation_name: &str, index_name: Option<&str>) ->
     }
 }
 
-fn snapshot(relations: Vec<RelationObservation>) -> Result<PostgresSchemaSnapshotV3, conceptweave_observation::ObservationError> {
+fn snapshot(
+    relations: Vec<RelationObservation>,
+) -> Result<PostgresSchemaSnapshotV3, conceptweave_observation::ObservationError> {
     PostgresSchemaSnapshotV3::new(
         &support::authorized_source("warehouse_primary", &["public", "archive"]),
         "postgres_introspector_v3",
@@ -81,9 +87,11 @@ fn duplicate_index_names_in_one_schema_fail_closed() {
         relation("public", "audit_log", Some("shared_idx")),
     ]);
 
-    assert!(
-        result.is_err(),
-        "pg_class requires schema-local relation names, including indexes, to be unique"
+    assert_eq!(
+        result.unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "schema_relation_namespace"
+        }
     );
 }
 
@@ -94,9 +102,11 @@ fn index_name_colliding_with_relation_name_in_one_schema_fails_closed() {
         relation("public", "audit_log", None),
     ]);
 
-    assert!(
-        result.is_err(),
-        "an index and another relation cannot share one pg_class name in the same schema"
+    assert_eq!(
+        result.unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "schema_relation_namespace"
+        }
     );
 }
 
@@ -104,9 +114,11 @@ fn index_name_colliding_with_relation_name_in_one_schema_fails_closed() {
 fn index_name_colliding_with_own_relation_name_in_one_schema_fails_closed() {
     let result = snapshot(vec![relation("public", "document", Some("document"))]);
 
-    assert!(
-        result.is_err(),
-        "an index cannot share its owning relation's pg_class name in the same schema"
+    assert_eq!(
+        result.unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "schema_relation_namespace"
+        }
     );
 }
 

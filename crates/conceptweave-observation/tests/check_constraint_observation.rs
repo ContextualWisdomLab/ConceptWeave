@@ -41,8 +41,14 @@ fn check_constraint_definition_must_be_observed_not_blank() {
 }
 
 #[test]
-fn check_constraint_name_must_be_observed_not_blank() {
-    assert!(CheckConstraintObservation::new(" ", "CHECK (true)", true, true, false).is_err());
+fn check_constraint_name_preserves_quoted_whitespace_identifier() {
+    let check = CheckConstraintObservation::new(" ", "CHECK (true)", true, true, false)
+        .expect("quoted whitespace is a valid PostgreSQL identifier");
+    assert_eq!(check.constraint_name(), " ");
+    assert!(CheckConstraintObservation::new("", "CHECK (true)", true, true, false).is_err());
+    assert!(
+        CheckConstraintObservation::new("bad\0name", "CHECK (true)", true, true, false).is_err()
+    );
 }
 
 #[test]
