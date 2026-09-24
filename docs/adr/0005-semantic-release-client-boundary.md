@@ -2,6 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-09-02
+- **Amended:** 2026-09-25
 - **Decision owners:** ConceptWeave Governance & Publication and Client Consumption bounded contexts
 - **Related:** Issue #3, PR #5, `docs/product-technical-gap-baseline.md`
 
@@ -17,7 +18,9 @@ This ADR remains **Proposed** while PR #5 is Draft and exact-head Product/securi
 
 Introduce **Client Consumption** as a Supporting Bounded Context and `conceptweave-client` as its Rust reference implementation.
 
-The versioned `semantic_release` contract carries stable release identity, explicit contract and ontology/model versions, truth/publication state, canonical declared artifact digest identity, provenance references, and unique stable concept identifiers. The v1 public JSON Schema is bound to `contract_version = 1.0.0`; unknown/future versions cannot validate as v1. `SemanticReleaseClient` admits authoritative use only when the release is explicitly compatible and both `Published` and `Authoritative`. Compatibility is never inferred from semantic-version ordering.
+The versioned `semantic_release` contract carries stable release identity, explicit contract and ontology/model versions, truth/publication state, canonical declared artifact digest identity, provenance references, and unique stable concept identifiers. The v1 public JSON Schema is bound to `contract_version = 1.0.0`; unknown/future versions cannot validate as v1. `SemanticReleaseClient` admits authoritative use only when the release is explicitly compatible, both `Published` and `Authoritative`, and its complete manifest matches an exact digest pinned independently through protected publication metadata. Compatibility is never inferred from semantic-version ordering. A client without trusted pins fails closed.
+
+The manifest digest is domain-separated from the artifact digest and binds release identity, versions, state, declared artifact digest, provenance, and concept IDs using the canonical v1 encoding in `contracts/semantic-release-manifest-digest-v1.md`. The release being checked cannot install its own trust pin. Protected Governance & Publication distribution remains responsible for issuing authentic pins; this offline check cannot establish steward identity on its own.
 
 `ReleaseDigest` accepts only canonical `sha256:<64 lowercase hex>`. `SemanticReleaseClient::verify_detached_artifact` separately hashes the caller-supplied detached immutable artifact bytes and requires an exact digest match after authoritative-use admission. Digest syntax and byte-integrity evidence remain distinct.
 
@@ -45,7 +48,7 @@ Consuming products retain tenant/purpose authorization, business-domain truth, a
 
 ### Costs and deferred work
 
-- signature/provenance-chain verification remains deferred until Governance & Publication defines a stable signing contract;
+- protected pin distribution and signature/provenance-chain verification remain deferred until Governance & Publication defines a stable issuance contract;
 - typed relation/mapping/dimension/measure resolution, match/align/explain and semantic query-plan operations remain Issue #3 work;
 - GRC-shaped reference-client fixtures remain required before buyer-facing integration readiness;
 - this ADR cannot advance to Accepted until the stacked implementation is integrated and current-head deterministic/security/review evidence is terminal.

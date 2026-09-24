@@ -1,5 +1,6 @@
 use conceptweave_client::{
     ReleaseContractError, ReleaseDigest, ReleaseMetadata, SemanticRelease, SemanticReleaseClient,
+    TrustedReleaseManifest,
 };
 use conceptweave_domain::{EvidenceReference, PublicationState, TruthStatus};
 
@@ -37,8 +38,13 @@ fn release(publication_state: PublicationState) -> SemanticRelease {
 
 #[test]
 fn exact_concept_resolution_is_deterministic_and_does_not_fuzzy_match() {
-    let client = SemanticReleaseClient::new("1.0.0").unwrap();
     let release = release(PublicationState::Published);
+    let client = SemanticReleaseClient::with_trusted_release_manifests(
+        "1.0.0",
+        vec![],
+        vec![TrustedReleaseManifest::new(release.release_id(), release.manifest_digest()).unwrap()],
+    )
+    .unwrap();
 
     assert_eq!(
         client.resolve_concept(&release, "control.internal_control"),

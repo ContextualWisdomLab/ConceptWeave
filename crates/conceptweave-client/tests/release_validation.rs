@@ -1,5 +1,6 @@
 use conceptweave_client::{
     ReleaseContractError, ReleaseDigest, ReleaseMetadata, SemanticRelease, SemanticReleaseClient,
+    TrustedReleaseManifest,
 };
 use conceptweave_domain::{EvidenceReference, PublicationState, TruthStatus};
 
@@ -44,12 +45,17 @@ fn release(
 
 #[test]
 fn authoritative_published_release_is_admitted_offline() {
-    let client = SemanticReleaseClient::new("1.0.0").unwrap();
     let release = release(
         "1.0.0",
         TruthStatus::Authoritative,
         PublicationState::Published,
     );
+    let client = SemanticReleaseClient::with_trusted_release_manifests(
+        "1.0.0",
+        vec![],
+        vec![TrustedReleaseManifest::new(release.release_id(), release.manifest_digest()).unwrap()],
+    )
+    .unwrap();
 
     assert_eq!(client.supported_contract_version(), "1.0.0");
     assert_eq!(release.release_id(), "semantic-release-grc-2026-09-01");
@@ -63,7 +69,119 @@ fn authoritative_published_release_is_admitted_offline() {
     );
     assert_eq!(release.provenance().len(), 1);
     assert_eq!(release.concept_ids(), ["control.evidence", "control.owner"]);
+    assert_eq!(
+        release.manifest_digest().as_str(),
+        "sha256:4abb03b6f9cf0f4d0d70b5deaf84f141cce4cba71c7178e577e1f883c4f6b974"
+    );
     assert_eq!(client.validate_for_authoritative_use(&release), Ok(()));
+}
+
+#[test]
+fn published_flags_without_a_trusted_manifest_are_not_authority() {
+    let client = SemanticReleaseClient::new("1.0.0").unwrap();
+    let release = release(
+        "1.0.0",
+        TruthStatus::Authoritative,
+        PublicationState::Published,
+    );
+
+    assert_eq!(
+        client.validate_for_authoritative_use(&release),
+        Err(ReleaseContractError::UntrustedRelease)
+    );
+}
+
+#[test]
+fn trusted_manifest_binds_provenance_and_concepts_independently_of_input_order() {
+    let original = release(
+        "1.0.0",
+        TruthStatus::Authoritative,
+        PublicationState::Published,
+    );
+    let other_evidence = EvidenceReference::new(
+        "snapshot:grc-schema-2026-09-01",
+        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "public.control_evidence.owner_identifier",
+    )
+    .unwrap();
+    let with_two_sources = SemanticRelease::new(
+        metadata("1.0.0"),
+        TruthStatus::Authoritative,
+        PublicationState::Published,
+        digest(),
+        vec![evidence(), other_evidence.clone()],
+        original.concept_ids().to_vec(),
+    )
+    .unwrap();
+    let reordered = SemanticRelease::new(
+        metadata("1.0.0"),
+        TruthStatus::Authoritative,
+        PublicationState::Published,
+        digest(),
+        vec![other_evidence, evidence()],
+        original.concept_ids().iter().rev().cloned().collect(),
+    )
+    .unwrap();
+    assert_eq!(
+        with_two_sources.manifest_digest(),
+        reordered.manifest_digest()
+    );
+    assert_ne!(
+        original.manifest_digest(),
+        with_two_sources.manifest_digest()
+    );
+
+    let client = SemanticReleaseClient::with_trusted_release_manifests(
+        "1.0.0",
+        vec![],
+        vec![
+            TrustedReleaseManifest::new(
+                with_two_sources.release_id(),
+                with_two_sources.manifest_digest(),
+            )
+            .unwrap(),
+        ],
+    )
+    .unwrap();
+    assert_eq!(client.validate_for_authoritative_use(&reordered), Ok(()));
+    assert_eq!(
+        client.validate_for_authoritative_use(&original),
+        Err(ReleaseContractError::UntrustedRelease)
+    );
+
+    let changed_concepts = SemanticRelease::new(
+        metadata("1.0.0"),
+        TruthStatus::Authoritative,
+        PublicationState::Published,
+        digest(),
+        with_two_sources.provenance().to_vec(),
+        vec!["control.evidence".to_owned(), "control.changed".to_owned()],
+    )
+    .unwrap();
+    assert_eq!(
+        client.validate_for_authoritative_use(&changed_concepts),
+        Err(ReleaseContractError::UntrustedRelease)
+    );
+}
+
+#[test]
+fn duplicate_trusted_release_identity_is_rejected() {
+    let release = release(
+        "1.0.0",
+        TruthStatus::Authoritative,
+        PublicationState::Published,
+    );
+    let pin = TrustedReleaseManifest::new(release.release_id(), release.manifest_digest()).unwrap();
+    assert_eq!(
+        SemanticReleaseClient::with_trusted_release_manifests(
+            "1.0.0",
+            vec![],
+            vec![pin.clone(), pin]
+        ),
+        Err(ReleaseContractError::DuplicateTrustedReleaseId(
+            release.release_id().to_owned()
+        ))
+    );
 }
 
 #[test]

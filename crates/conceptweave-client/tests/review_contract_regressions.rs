@@ -1,6 +1,6 @@
 use conceptweave_client::{
     ReleaseDigest, ReleaseMetadata, ReleaseSupersession, SemanticRelease, SemanticReleaseClient,
-    SemanticReleaseReference,
+    SemanticReleaseReference, TrustedReleaseManifest,
 };
 use conceptweave_domain::{EvidenceReference, PublicationState, TruthStatus};
 use std::{fs, path::PathBuf};
@@ -49,6 +49,21 @@ fn repository_root() -> PathBuf {
         .to_path_buf()
 }
 
+fn trusted_client(releases: &[&SemanticRelease]) -> SemanticReleaseClient {
+    SemanticReleaseClient::with_trusted_release_manifests(
+        "1.0.0",
+        vec![],
+        releases
+            .iter()
+            .map(|release| {
+                TrustedReleaseManifest::new(release.release_id(), release.manifest_digest())
+                    .unwrap()
+            })
+            .collect(),
+    )
+    .unwrap()
+}
+
 #[test]
 fn diff_fails_closed_when_one_release_id_names_conflicting_immutable_content() {
     let client = SemanticReleaseClient::new("1.0.0").expect("client policy must be valid");
@@ -75,7 +90,6 @@ fn diff_fails_closed_when_one_release_id_names_conflicting_immutable_content() {
 
 #[test]
 fn supersession_accepts_the_governed_superseded_predecessor_state() {
-    let client = SemanticReleaseClient::new("1.0.0").expect("client policy must be valid");
     let previous = release(
         "semantic_release_previous",
         'b',
@@ -90,6 +104,7 @@ fn supersession_accepts_the_governed_superseded_predecessor_state() {
         PublicationState::Published,
         &["control.evidence", "control.owner"],
     );
+    let client = trusted_client(&[&previous, &successor]);
     let declaration = ReleaseSupersession::new(
         SemanticReleaseReference::from_release(&previous),
         SemanticReleaseReference::from_release(&successor),
@@ -175,7 +190,6 @@ fn supersession_rejects_an_incompatible_governed_predecessor() {
 
 #[test]
 fn diff_accepts_reusing_the_same_release_object() {
-    let client = SemanticReleaseClient::new("1.0.0").expect("client policy must be valid");
     let release = release(
         "semantic_release_same_id",
         'b',
@@ -183,6 +197,7 @@ fn diff_accepts_reusing_the_same_release_object() {
         PublicationState::Published,
         &["control.evidence"],
     );
+    let client = trusted_client(&[&release]);
     assert!(client.diff(&release, &release).is_ok());
 }
 

@@ -10,7 +10,7 @@
 use conceptweave_domain::{EvidenceReference, PublicationState, TruthStatus};
 use core::fmt;
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// A validated content-digest identity carried by a semantic release.
 ///
@@ -180,6 +180,112 @@ impl SemanticRelease {
     pub fn concept_ids(&self) -> &[String] {
         &self.concept_ids
     }
+
+    /// Returns the domain-separated digest of the complete client-visible release manifest.
+    ///
+    /// The digest binds identity, versions, state, artifact identity, provenance, and concepts.
+    /// Ordering of provenance and concept IDs does not affect it. This calculation is not an
+    /// authority grant: clients must pin the expected digest from a protected publication path.
+    pub fn manifest_digest(&self) -> ReleaseDigest {
+        let mut hasher = Sha256::new();
+        encode_manifest_text(&mut hasher, "conceptweave.semantic_release_manifest.v1");
+        for value in [
+            self.release_id(),
+            self.contract_version(),
+            self.ontology_version(),
+            self.artifact_digest.as_str(),
+        ] {
+            encode_manifest_text(&mut hasher, value);
+        }
+        hasher.update([
+            truth_tag(self.truth_status),
+            publication_tag(self.publication_state),
+        ]);
+        let mut provenance = self.provenance.iter().collect::<Vec<_>>();
+        provenance.sort_by_key(|item| (item.source_id(), item.source_digest(), item.location()));
+        encode_manifest_len(&mut hasher, provenance.len());
+        for evidence in provenance {
+            for value in [
+                evidence.source_id(),
+                evidence.source_digest(),
+                evidence.location(),
+            ] {
+                encode_manifest_text(&mut hasher, value);
+            }
+        }
+        let mut concepts = self.concept_ids.iter().collect::<Vec<_>>();
+        concepts.sort();
+        encode_manifest_len(&mut hasher, concepts.len());
+        for concept in concepts {
+            encode_manifest_text(&mut hasher, concept);
+        }
+        ReleaseDigest(format!("sha256:{:x}", hasher.finalize()))
+    }
+}
+
+fn encode_manifest_len(hasher: &mut Sha256, len: usize) {
+    let len = u64::try_from(len).expect("Rust target usize must fit into canonical u64 length");
+    hasher.update(len.to_be_bytes());
+}
+
+fn encode_manifest_text(hasher: &mut Sha256, value: &str) {
+    encode_manifest_len(hasher, value.len());
+    hasher.update(value.as_bytes());
+}
+
+const fn truth_tag(value: TruthStatus) -> u8 {
+    match value {
+        TruthStatus::Observed => 0,
+        TruthStatus::Inferred => 1,
+        TruthStatus::Proposed => 2,
+        TruthStatus::Authoritative => 3,
+        TruthStatus::Superseded => 4,
+        TruthStatus::Rejected => 5,
+    }
+}
+
+const fn publication_tag(value: PublicationState) -> u8 {
+    match value {
+        PublicationState::Draft => 0,
+        PublicationState::Proposed => 1,
+        PublicationState::Validated => 2,
+        PublicationState::Reviewed => 3,
+        PublicationState::Published => 4,
+        PublicationState::Superseded => 5,
+        PublicationState::Rejected => 6,
+    }
+}
+
+/// One exact release-manifest digest supplied independently by a trusted publication channel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TrustedReleaseManifest {
+    release_id: String,
+    manifest_digest: ReleaseDigest,
+}
+
+impl TrustedReleaseManifest {
+    /// Creates a pinned release identity from protected distribution metadata.
+    pub fn new(
+        release_id: impl Into<String>,
+        manifest_digest: ReleaseDigest,
+    ) -> Result<Self, ReleaseContractError> {
+        let release_id = release_id.into();
+        require_non_blank(&release_id, "trusted_release_id")?;
+        Ok(Self {
+            release_id,
+            manifest_digest,
+        })
+    }
+
+    /// Returns the exact trusted release identity.
+    pub fn release_id(&self) -> &str {
+        &self.release_id
+    }
+
+    /// Returns the pinned digest of its complete manifest.
+    pub fn manifest_digest(&self) -> &ReleaseDigest {
+        &self.manifest_digest
+    }
 }
 
 /// Immutable reference to the exact bytes of one published semantic release.
@@ -318,28 +424,48 @@ pub enum ContractVersionCompatibility {
     Unsupported,
 }
 
-/// Offline admission policy for current and explicitly supported legacy contract versions.
+/// Offline admission policy with immutable release-manifest trust anchors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SemanticReleaseClient {
     supported_contract_version: String,
     supported_legacy_contract_versions: BTreeSet<String>,
+    trusted_release_manifests: BTreeMap<String, ReleaseDigest>,
 }
 
 impl SemanticReleaseClient {
-    /// Creates a client pinned to one explicit current semantic-release contract version.
+    /// Creates a client with one supported version and no trusted releases.
+    ///
+    /// This client can inspect compatibility but fails closed for authoritative use.
     pub fn new(
         supported_contract_version: impl Into<String>,
     ) -> Result<Self, ReleaseContractError> {
         Self::with_supported_legacy_contract_versions(supported_contract_version, Vec::new())
     }
 
-    /// Creates a client with an explicit current version and explicit supported legacy versions.
+    /// Creates a client with explicit versions and no trusted releases.
     ///
     /// Legacy support is opt-in rather than inferred from version ordering. Blank versions and the
     /// current version repeated as legacy are rejected so admission policy remains unambiguous.
     pub fn with_supported_legacy_contract_versions(
         supported_contract_version: impl Into<String>,
         supported_legacy_contract_versions: Vec<String>,
+    ) -> Result<Self, ReleaseContractError> {
+        Self::with_trusted_release_manifests(
+            supported_contract_version,
+            supported_legacy_contract_versions,
+            Vec::new(),
+        )
+    }
+
+    /// Creates an offline client with exact manifest digests from protected publication metadata.
+    ///
+    /// Release objects under inspection cannot add themselves to this immutable allow-set.
+    /// A client constructed without trusted manifests may inspect compatibility but cannot
+    /// authorize any release for consumption.
+    pub fn with_trusted_release_manifests(
+        supported_contract_version: impl Into<String>,
+        supported_legacy_contract_versions: Vec<String>,
+        trusted_release_manifests: Vec<TrustedReleaseManifest>,
     ) -> Result<Self, ReleaseContractError> {
         let supported_contract_version = supported_contract_version.into();
         require_non_blank(&supported_contract_version, "supported_contract_version")?;
@@ -355,9 +481,22 @@ impl SemanticReleaseClient {
             validated_legacy_versions.insert(legacy_version);
         }
 
+        let mut trusted = BTreeMap::new();
+        for manifest in trusted_release_manifests {
+            if trusted
+                .insert(manifest.release_id.clone(), manifest.manifest_digest)
+                .is_some()
+            {
+                return Err(ReleaseContractError::DuplicateTrustedReleaseId(
+                    manifest.release_id,
+                ));
+            }
+        }
+
         Ok(Self {
             supported_contract_version,
             supported_legacy_contract_versions: validated_legacy_versions,
+            trusted_release_manifests: trusted,
         })
     }
 
@@ -401,7 +540,19 @@ impl SemanticReleaseClient {
         Ok(())
     }
 
-    /// Fails closed unless a release is explicitly compatible, Published and Authoritative.
+    fn validate_trusted_manifest(
+        &self,
+        release: &SemanticRelease,
+    ) -> Result<(), ReleaseContractError> {
+        if self.trusted_release_manifests.get(release.release_id())
+            != Some(&release.manifest_digest())
+        {
+            return Err(ReleaseContractError::UntrustedRelease);
+        }
+        Ok(())
+    }
+
+    /// Fails closed unless a release is compatible, Published, Authoritative, and manifest-pinned.
     ///
     /// This check is deterministic and performs no network or model calls. It is
     /// suitable as an admission gate before a consuming product performs its own
@@ -421,7 +572,7 @@ impl SemanticReleaseClient {
                 actual: release.truth_status,
             });
         }
-        Ok(())
+        self.validate_trusted_manifest(release)
     }
 
     /// Resolves one exact concept identifier from an admitted semantic release.
@@ -494,6 +645,7 @@ impl SemanticReleaseClient {
             && superseded.truth_status() == TruthStatus::Superseded
         {
             self.validate_contract_compatibility(superseded)?;
+            self.validate_trusted_manifest(superseded)?;
         } else {
             self.validate_for_authoritative_use(superseded)?;
         }
@@ -576,6 +728,10 @@ pub enum ReleaseContractError {
     MissingProvenance,
     /// The release repeats one semantic concept identity.
     DuplicateConceptId(String),
+    /// The protected client configuration repeats one release identity.
+    DuplicateTrustedReleaseId(String),
+    /// The release manifest is absent from or differs from the protected client trust set.
+    UntrustedRelease,
     /// The configured current contract version was also supplied as a legacy version.
     CurrentContractVersionMarkedLegacy(String),
     /// A release attempted to supersede the same stable release identity.
@@ -624,6 +780,11 @@ impl fmt::Display for ReleaseContractError {
                 formatter,
                 "semantic release contains duplicate concept id `{concept_id}`"
             ),
+            Self::DuplicateTrustedReleaseId(release_id) => write!(
+                formatter,
+                "trusted release identity `{release_id}` was configured more than once"
+            ),
+            Self::UntrustedRelease => formatter.write_str("semantic release is not trusted"),
             Self::CurrentContractVersionMarkedLegacy(contract_version) => write!(
                 formatter,
                 "current semantic release contract version `{contract_version}` cannot also be marked legacy"

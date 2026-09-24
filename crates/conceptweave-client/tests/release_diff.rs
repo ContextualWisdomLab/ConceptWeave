@@ -1,5 +1,6 @@
 use conceptweave_client::{
     ReleaseContractError, ReleaseDigest, ReleaseMetadata, SemanticRelease, SemanticReleaseClient,
+    TrustedReleaseManifest,
 };
 use conceptweave_domain::{EvidenceReference, PublicationState, TruthStatus};
 
@@ -36,7 +37,6 @@ fn release(release_id: &str, concept_ids: &[&str], state: PublicationState) -> S
 
 #[test]
 fn release_diff_reports_deterministic_added_and_removed_concepts() {
-    let client = SemanticReleaseClient::new("1.0.0").unwrap();
     let previous = release(
         "semantic-release-grc-v1",
         &["control.evidence", "control.owner"],
@@ -47,6 +47,18 @@ fn release_diff_reports_deterministic_added_and_removed_concepts() {
         &["control.effectiveness", "control.evidence"],
         PublicationState::Published,
     );
+    let client = SemanticReleaseClient::with_trusted_release_manifests(
+        "1.0.0",
+        vec![],
+        [&previous, &current]
+            .into_iter()
+            .map(|release| {
+                TrustedReleaseManifest::new(release.release_id(), release.manifest_digest())
+                    .unwrap()
+            })
+            .collect(),
+    )
+    .unwrap();
 
     let diff = client.diff(&previous, &current).unwrap();
 
@@ -58,7 +70,6 @@ fn release_diff_reports_deterministic_added_and_removed_concepts() {
 
 #[test]
 fn release_diff_fails_closed_when_either_release_is_not_admissible() {
-    let client = SemanticReleaseClient::new("1.0.0").unwrap();
     let published = release(
         "semantic-release-grc-published",
         &["control.evidence"],
@@ -74,6 +85,15 @@ fn release_diff_fails_closed_when_either_release_is_not_admissible() {
         &["control.effectiveness"],
         PublicationState::Reviewed,
     );
+    let client = SemanticReleaseClient::with_trusted_release_manifests(
+        "1.0.0",
+        vec![],
+        vec![
+            TrustedReleaseManifest::new(published.release_id(), published.manifest_digest())
+                .unwrap(),
+        ],
+    )
+    .unwrap();
     let expected = Err(ReleaseContractError::ReleaseNotPublished {
         actual: PublicationState::Reviewed,
     });
