@@ -1,7 +1,7 @@
 //! PostgreSQL 18 catalog observation behind the Source Observation capability.
 //!
-//! This bounded path admits schema-scoped domains, enums, ordinary tables, local CHECK and
-//! ordinary UNIQUE constraints, and bounded indexes.
+//! This bounded path admits schema-scoped domains, enums, ordinary tables, local CHECK,
+//! NOT NULL, and ordinary key constraints, and bounded indexes.
 //! Unsupported relation metadata fails closed until it can be mapped without losing facts.
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
@@ -12,10 +12,10 @@ use conceptweave_observation::{
     CheckConstraintObservation, ColumnExpressionObservation, ColumnGenerationObservation,
     ColumnObservationV3, DomainCheckConstraintObservation, DomainObservation, EnumObservation,
     IndexAttributeKind, IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics,
-    IndexObservation, IndexStorageOption, IndexTablespace, OperatorClassOption,
-    PostgresSchemaSnapshotV3, QualifiedCollationName, QualifiedOperatorClassName,
-    QualifiedTypeName, RelationKind, RelationObservation, ReplicaIdentityMode,
-    TableConstraintObservation, UniqueConstraintObservation,
+    IndexObservation, IndexStorageOption, IndexTablespace, NotNullConstraintObservation,
+    OperatorClassOption, PostgresSchemaSnapshotV3, PrimaryKeyObservation, QualifiedCollationName,
+    QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
+    ReplicaIdentityMode, TableConstraintObservation, UniqueConstraintObservation,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, SourceObservationFailure,
@@ -456,8 +456,9 @@ async fn capture_catalog(
     let mut relations = Vec::new();
     let mut column_generations = Vec::new();
     let mut column_expressions = Vec::new();
+    let mut not_null_constraints = Vec::new();
     for relation in relation_rows {
-        let (observed, generations, expressions) = capture_relation(
+        let (observed, generations, expressions, not_null) = capture_relation(
             &transaction,
             request,
             cancellation,
@@ -469,6 +470,7 @@ async fn capture_catalog(
         relations.push(observed);
         column_generations.extend(generations);
         column_expressions.extend(expressions);
+        not_null_constraints.extend(not_null);
     }
     let observed_at_utc: String = field(
         &bounded(
@@ -483,9 +485,9 @@ async fn capture_catalog(
         0,
     )?;
     let extractor_revision = if relations.is_empty() {
-        "postgres18_type_only_adapter_v1"
+        "postgres18_type_only_adapter_v2"
     } else {
-        "postgres18_key_constraint_adapter_v1"
+        "postgres18_not_null_primary_adapter_v1"
     };
     let snapshot = if relations.is_empty() {
         PostgresSchemaSnapshotV3::new(
@@ -508,6 +510,8 @@ async fn capture_catalog(
             column_expressions,
         )
     }
+    .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
+    .with_observed_not_null_constraints(not_null_constraints)
     .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
     bounded(request, cancellation, transaction.commit()).await?;
     Ok(snapshot)
@@ -525,6 +529,7 @@ async fn capture_relation(
         RelationObservation,
         Vec<ColumnGenerationObservation>,
         Vec<ColumnExpressionObservation>,
+        Vec<NotNullConstraintObservation>,
     ),
     SourceObservationFailure,
 > {
@@ -691,12 +696,12 @@ async fn capture_relation(
         relation.oid,
     )
     .await?;
-    let constraints = capture_constraints(
+    let (constraints, not_null) = capture_constraints(
         transaction,
         request,
         cancellation,
         meter,
-        relation.oid,
+        &relation,
         expected_check_count,
         (&columns, &indexes),
     )
@@ -712,7 +717,7 @@ async fn capture_relation(
     if let Some(comment) = relation.comment {
         observed = observed.with_source_comment(comment);
     }
-    Ok((observed, generations, expressions))
+    Ok((observed, generations, expressions, not_null))
 }
 
 async fn capture_constraints(
@@ -720,10 +725,16 @@ async fn capture_constraints(
     request: &AuthorizedObservationRequest,
     cancellation: &dyn ObservationCancellation,
     meter: &mut CaptureMeter,
-    relation_oid: u32,
+    relation: &RelationRow,
     expected_count: i16,
     evidence: (&[ColumnObservationV3], &[IndexObservation]),
-) -> Result<Vec<TableConstraintObservation>, SourceObservationFailure> {
+) -> Result<
+    (
+        Vec<TableConstraintObservation>,
+        Vec<NotNullConstraintObservation>,
+    ),
+    SourceObservationFailure,
+> {
     let (columns, indexes) = evidence;
     let max_bytes = request.request().limits().max_bytes().min(i64::MAX as u64) as i64;
     let stream = bounded(
@@ -750,12 +761,13 @@ async fn capture_constraints(
              JOIN pg_catalog.pg_class t ON t.oid = c.conrelid \
              LEFT JOIN pg_catalog.pg_class backing ON backing.oid = c.conindid \
              WHERE c.conrelid = $1 ORDER BY c.conname, c.oid",
-            vec![&relation_oid as &(dyn ToSql + Sync), &max_bytes],
+            vec![&relation.oid as &(dyn ToSql + Sync), &max_bytes],
         ),
     )
     .await?;
     tokio::pin!(stream);
     let mut constraints = Vec::new();
+    let mut not_null = Vec::new();
     let mut check_count = 0;
     while let Some(row) = bounded(request, cancellation, stream.try_next()).await? {
         let name: String = field(&row, 0)?;
@@ -803,11 +815,42 @@ async fn capture_constraints(
                     .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
                 )
             }
-            "u" if !field::<bool>(&row, 12)?
+            "n" if field::<bool>(&row, 12)?
                 && !field::<bool>(&row, 16)?
-                && field::<bool>(&row, 4)?
                 && field::<bool>(&row, 5)?
-                && field::<bool>(&row, 6)? =>
+                && backing_name.is_none() =>
+            {
+                let key = key.ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
+                let [position] = key.as_slice() else {
+                    return Err(SourceObservationFailure::InvalidCapturedMetadata);
+                };
+                let column = columns
+                    .iter()
+                    .find(|column| column.ordinal_position() == *position as u32)
+                    .ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
+                not_null.push(
+                    NotNullConstraintObservation::new(
+                        &relation.schema,
+                        &relation.name,
+                        RelationKind::Table,
+                        name,
+                        column.column_name(),
+                        field(&row, 4)?,
+                        field(&row, 5)?,
+                        field(&row, 7)?,
+                        field::<i16>(&row, 8)? as u16,
+                        field(&row, 6)?,
+                    )
+                    .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+                );
+                continue;
+            }
+            "p" | "u"
+                if !field::<bool>(&row, 12)?
+                    && !field::<bool>(&row, 16)?
+                    && field::<bool>(&row, 4)?
+                    && field::<bool>(&row, 5)?
+                    && field::<bool>(&row, 6)? =>
             {
                 let key = key.ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
                 let names = key
@@ -827,8 +870,11 @@ async fn capture_constraints(
                     .iter()
                     .find(|index| index.index_name() == name)
                     .ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
+                let is_primary = kind == "p";
                 if !index.is_unique()
-                    || index.catalog_flags().is_none_or(|flags| flags.primary())
+                    || index
+                        .catalog_flags()
+                        .is_none_or(|flags| flags.primary() != is_primary)
                     || index.key_attributes().len() != names.len()
                     || index
                         .key_attributes()
@@ -841,18 +887,26 @@ async fn capture_constraints(
                     || index.ready() != Some(true)
                     || index.valid() != Some(true)
                     || index.live() != Some(true)
+                    || (is_primary && index.nulls_not_distinct() == Some(true))
                 {
                     return Err(SourceObservationFailure::InvalidCapturedMetadata);
                 }
-                TableConstraintObservation::Unique(
-                    UniqueConstraintObservation::new(name, names)
-                        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
-                        .with_nulls_not_distinct(
-                            index
-                                .nulls_not_distinct()
-                                .ok_or(SourceObservationFailure::InvalidCapturedMetadata)?,
-                        ),
-                )
+                if is_primary {
+                    TableConstraintObservation::PrimaryKey(
+                        PrimaryKeyObservation::new(name, names)
+                            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+                    )
+                } else {
+                    TableConstraintObservation::Unique(
+                        UniqueConstraintObservation::new(name, names)
+                            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
+                            .with_nulls_not_distinct(
+                                index
+                                    .nulls_not_distinct()
+                                    .ok_or(SourceObservationFailure::InvalidCapturedMetadata)?,
+                            ),
+                    )
+                }
             }
             _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
         };
@@ -861,7 +915,7 @@ async fn capture_constraints(
     if check_count != expected_count as usize {
         return Err(SourceObservationFailure::InvalidCapturedMetadata);
     }
-    Ok(constraints)
+    Ok((constraints, not_null))
 }
 
 async fn capture_indexes(

@@ -1029,6 +1029,26 @@ impl PostgresSchemaSnapshotV3 {
         &self,
         location: SchemaObjectLocation,
     ) -> Result<SuccessorSourceReceipt, ObservationError> {
+        if self.not_null_constraints_observed
+            && self.not_null_constraints.iter().any(|observation| {
+                SchemaObjectLocation::constraint(
+                    observation.schema_name(),
+                    observation.relation_name(),
+                    observation.relation_kind(),
+                    observation.constraint_name(),
+                )
+                .is_ok_and(|observed_location| observed_location == location)
+            })
+        {
+            return Ok(SuccessorSourceReceipt {
+                source_id: self.inner.source_connection_key().to_owned(),
+                connection_policy_binding: self.inner.connection_policy_binding().to_owned(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.inner.extractor_revision().to_owned(),
+                observed_at_utc: self.inner.observed_at_utc().to_owned(),
+                location,
+            });
+        }
         let verified = self.inner.source_receipt(location.clone())?;
         Ok(SuccessorSourceReceipt {
             source_id: verified.source_id().to_owned(),

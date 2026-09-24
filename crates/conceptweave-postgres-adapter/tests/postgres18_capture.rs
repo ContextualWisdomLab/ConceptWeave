@@ -347,17 +347,108 @@ async fn postgres18_catalog_is_observed_in_one_read_only_transaction() {
         );
         client
             .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".item ADD CONSTRAINT item_other_not_null \
+                 NOT NULL other NOT VALID"
+            ))
+            .await
+            .unwrap();
+        let with_not_null = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        assert!(with_not_null
+            .not_null_constraints()
+            .unwrap()
+            .iter()
+            .any(|constraint| {
+                constraint.relation_name() == "item"
+                    && constraint.constraint_name() == "item_other_not_null"
+                    && constraint.column_name() == "other"
+                    && !constraint.validated()
+            }));
+        with_not_null
+            .source_receipt(
+                SchemaObjectLocation::constraint(
+                    &schema,
+                    "item",
+                    RelationKind::Table,
+                    "item_other_not_null",
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        assert_ne!(after_drop.snapshot_digest(), with_not_null.snapshot_digest());
+        client
+            .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".item VALIDATE CONSTRAINT item_other_not_null"
+            ))
+            .await
+            .unwrap();
+        let validated_not_null = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        assert!(validated_not_null.not_null_constraints().unwrap()[0].validated());
+        assert_ne!(with_not_null.snapshot_digest(), validated_not_null.snapshot_digest());
+        client
+            .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".item DROP CONSTRAINT item_other_not_null"
+            ))
+            .await
+            .unwrap();
+        let restored = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        assert_eq!(after_drop.snapshot_digest(), restored.snapshot_digest());
+        assert!(restored
+            .source_receipt(
+                SchemaObjectLocation::constraint(
+                    &schema,
+                    "item",
+                    RelationKind::Table,
+                    "item_other_not_null",
+                )
+                .unwrap(),
+            )
+            .is_err());
+        client
+            .batch_execute(&format!(
                 "CREATE TABLE \"{schema}\".keyed (id integer PRIMARY KEY)"
             ))
             .await
             .unwrap();
-        assert_eq!(
-            adapter(config.clone())
-                .observe(authorized(&schema), &NotCancelled)
-                .await
-                .err(),
-            Some(SourceObservationFailure::InvalidCapturedMetadata)
-        );
+        let with_primary_key = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        let keyed = with_primary_key
+            .relations()
+            .iter()
+            .find(|relation| relation.relation_name() == "keyed")
+            .unwrap();
+        assert!(keyed.constraints().iter().any(|constraint| matches!(
+            constraint,
+            TableConstraintObservation::PrimaryKey(primary)
+                if primary.constraint_name() == "keyed_pkey"
+                    && primary.column_names() == ["id"]
+        )));
+        assert!(with_primary_key
+            .not_null_constraints()
+            .unwrap()
+            .iter()
+            .any(|constraint| {
+                constraint.relation_name() == "keyed"
+                    && constraint.constraint_name() == "keyed_id_not_null"
+                    && constraint.column_name() == "id"
+                    && constraint.validated()
+            }));
+        for name in ["keyed_pkey", "keyed_id_not_null"] {
+            let receipt = with_primary_key
+                .source_receipt(
+                    SchemaObjectLocation::constraint(&schema, "keyed", RelationKind::Table, name)
+                        .unwrap(),
+                )
+                .unwrap();
+            assert_eq!(receipt.source_digest(), with_primary_key.snapshot_digest());
+        }
+        assert_ne!(after_drop.snapshot_digest(), with_primary_key.snapshot_digest());
         client
             .batch_execute(&format!("DROP TABLE \"{schema}\".keyed"))
             .await
