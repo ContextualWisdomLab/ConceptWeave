@@ -332,6 +332,66 @@ async fn postgres18_catalog_is_observed_in_one_read_only_transaction() {
             ))
             .await
             .unwrap();
+        let with_index = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        let item = with_index
+            .relations()
+            .iter()
+            .find(|relation| relation.relation_name() == "item")
+            .unwrap();
+        assert_eq!(item.indexes().len(), 1);
+        assert_eq!(
+            item.indexes()[0].key_attributes()[0].attribute_name(),
+            Some("id")
+        );
+        assert_eq!(item.indexes()[0].key_semantics().unwrap().len(), 1);
+        with_index
+            .source_receipt(
+                SchemaObjectLocation::index(&schema, "item", RelationKind::Table, "item_id_idx")
+                    .unwrap(),
+            )
+            .unwrap();
+        client
+            .batch_execute(&format!(
+                "COMMENT ON INDEX \"{schema}\".item_id_idx IS 'lookup'"
+            ))
+            .await
+            .unwrap();
+        let changed_index = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        assert_ne!(
+            with_index.snapshot_digest(),
+            changed_index.snapshot_digest()
+        );
+        client
+            .batch_execute(&format!(
+                "CREATE UNIQUE INDEX item_id_unique_idx ON \"{schema}\".item (id) NULLS NOT DISTINCT"
+            ))
+            .await
+            .unwrap();
+        let with_unique = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        let item = with_unique
+            .relations()
+            .iter()
+            .find(|relation| relation.relation_name() == "item")
+            .unwrap();
+        assert_eq!(item.indexes().len(), 2);
+        assert!(item.indexes().iter().any(|index| {
+            index.index_name() == "item_id_unique_idx"
+                && index.is_unique()
+                && index.nulls_not_distinct() == Some(true)
+        }));
+        assert_ne!(changed_index.snapshot_digest(), with_unique.snapshot_digest());
+        client
+            .batch_execute(&format!(
+                "CREATE INDEX item_expr_idx ON \"{schema}\".item ((id + 1))"
+            ))
+            .await
+            .unwrap();
         assert_eq!(
             adapter(config.clone())
                 .observe(authorized(&schema), &NotCancelled)

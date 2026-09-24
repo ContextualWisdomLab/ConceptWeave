@@ -1,7 +1,7 @@
 //! PostgreSQL 18 catalog observation behind the Source Observation capability.
 //!
-//! This bounded path admits schema-scoped domains, enums, and simple ordinary tables. Unsupported
-//! relation metadata fails closed until its catalog families can be mapped without losing facts.
+//! This bounded path admits schema-scoped domains, enums, ordinary tables, and simple B-tree
+//! indexes. Unsupported relation metadata fails closed until it can be mapped without losing facts.
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
@@ -9,9 +9,10 @@ use std::{collections::BTreeMap, future::Future, time::Duration};
 
 use conceptweave_observation::{
     ColumnExpressionObservation, ColumnGenerationObservation, ColumnObservationV3,
-    DomainCheckConstraintObservation, DomainObservation, EnumObservation, PostgresSchemaSnapshotV3,
-    QualifiedCollationName, QualifiedTypeName, RelationKind, RelationObservation,
-    ReplicaIdentityMode,
+    DomainCheckConstraintObservation, DomainObservation, EnumObservation, IndexAttributeKind,
+    IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics, IndexObservation,
+    IndexTablespace, PostgresSchemaSnapshotV3, QualifiedCollationName, QualifiedOperatorClassName,
+    QualifiedTypeName, RelationKind, RelationObservation, ReplicaIdentityMode,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, SourceObservationFailure,
@@ -479,7 +480,7 @@ async fn capture_catalog(
     let extractor_revision = if relations.is_empty() {
         "postgres18_type_only_adapter_v1"
     } else {
-        "postgres18_column_expression_adapter_v1"
+        "postgres18_simple_index_adapter_v1"
     };
     let snapshot = if relations.is_empty() {
         PostgresSchemaSnapshotV3::new(
@@ -527,7 +528,6 @@ async fn capture_relation(
         cancellation,
         transaction.query_one(
             "SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid = $1), \
-             EXISTS(SELECT 1 FROM pg_catalog.pg_index WHERE indrelid = $1), \
              EXISTS(SELECT 1 FROM pg_catalog.pg_inherits WHERE inhrelid = $1 OR inhparent = $1), \
              EXISTS(SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid = $1), \
              EXISTS(SELECT 1 FROM pg_catalog.pg_rewrite WHERE ev_class = $1), \
@@ -538,8 +538,8 @@ async fn capture_relation(
         ),
     )
     .await?;
-    meter.add(request, 8)?;
-    if (0..8).any(|index| field::<bool>(&unsupported, index) != Ok(false)) {
+    meter.add(request, 7)?;
+    if (0..7).any(|index| field::<bool>(&unsupported, index) != Ok(false)) {
         return Err(SourceObservationFailure::InvalidCapturedMetadata);
     }
 
@@ -673,14 +673,228 @@ async fn capture_relation(
             .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
         );
     }
+    let indexes = capture_indexes(
+        transaction,
+        request,
+        cancellation,
+        meter,
+        max_bytes,
+        relation.oid,
+    )
+    .await?;
     let mut observed =
         RelationObservation::new(relation.schema, relation.name, RelationKind::Table, columns)
             .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
-            .with_replica_identity_mode(relation.replica_identity);
+            .with_replica_identity_mode(relation.replica_identity)
+            .with_indexes(indexes)
+            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
     if let Some(comment) = relation.comment {
         observed = observed.with_source_comment(comment);
     }
     Ok((observed, generations, expressions))
+}
+
+async fn capture_indexes(
+    transaction: &Transaction<'_>,
+    request: &AuthorizedObservationRequest,
+    cancellation: &dyn ObservationCancellation,
+    meter: &mut CaptureMeter,
+    max_bytes: i64,
+    relation_oid: u32,
+) -> Result<Vec<IndexObservation>, SourceObservationFailure> {
+    let stream = bounded(
+        request,
+        cancellation,
+        transaction.query_raw(
+            "SELECT c.oid, c.relname::text, c.relkind::text, c.relpersistence::text, \
+             c.relispartition, c.reloptions IS NOT NULL, c.relacl IS NOT NULL, \
+             am.amname::text, i.indnatts, i.indnkeyatts, i.indisunique, i.indnullsnotdistinct, \
+             i.indisprimary, i.indisexclusion, i.indimmediate, i.indisclustered, \
+             i.indcheckxmin, i.indisready, i.indisvalid, i.indislive, i.indisreplident, \
+             i.indexprs IS NOT NULL, i.indpred IS NOT NULL, ts.spcname::text, \
+             c.reltablespace = 0, \
+             CASE WHEN octet_length(pg_catalog.pg_get_indexdef(c.oid)) <= $2::bigint \
+               THEN pg_catalog.pg_get_indexdef(c.oid) END, \
+             CASE WHEN octet_length(pg_catalog.obj_description(c.oid, 'pg_class')) <= $2::bigint \
+               THEN pg_catalog.obj_description(c.oid, 'pg_class') END, \
+             COALESCE(octet_length(pg_catalog.pg_get_indexdef(c.oid)) > $2::bigint, false) \
+               OR COALESCE(octet_length(pg_catalog.obj_description(c.oid, 'pg_class')) > $2::bigint, false), \
+             c.relnamespace = t.relnamespace, \
+             EXISTS(SELECT 1 FROM pg_catalog.pg_seclabel WHERE classoid = 'pg_class'::regclass AND objoid = c.oid), \
+             EXISTS(SELECT 1 FROM pg_catalog.pg_depend WHERE classid = 'pg_class'::regclass AND objid = c.oid AND deptype = 'e'), \
+             EXISTS(SELECT 1 FROM pg_catalog.pg_description WHERE classoid = 'pg_class'::regclass AND objoid = c.oid AND objsubid > 0), \
+             EXISTS(SELECT 1 FROM pg_catalog.pg_attribute WHERE attrelid = c.oid AND attnum > 0 \
+               AND (attoptions IS NOT NULL OR attacl IS NOT NULL OR attisdropped)) \
+             FROM pg_catalog.pg_index i \
+             JOIN pg_catalog.pg_class c ON c.oid = i.indexrelid \
+             JOIN pg_catalog.pg_class t ON t.oid = i.indrelid \
+             LEFT JOIN pg_catalog.pg_am am ON am.oid = c.relam \
+             JOIN pg_catalog.pg_database db ON db.datname = pg_catalog.current_database() \
+             LEFT JOIN pg_catalog.pg_tablespace ts \
+               ON ts.oid = CASE WHEN c.reltablespace = 0 THEN db.dattablespace ELSE c.reltablespace END \
+             WHERE i.indrelid = $1 ORDER BY c.relname",
+            vec![&relation_oid as &(dyn ToSql + Sync), &max_bytes],
+        ),
+    )
+    .await?;
+    tokio::pin!(stream);
+    let mut indexes = Vec::new();
+    while let Some(row) = bounded(request, cancellation, stream.try_next()).await? {
+        let index_oid: u32 = field(&row, 0)?;
+        let name: String = field(&row, 1)?;
+        let kind: String = field(&row, 2)?;
+        let persistence: String = field(&row, 3)?;
+        let access_method: Option<String> = field(&row, 7)?;
+        let total: i16 = field(&row, 8)?;
+        let key_count: i16 = field(&row, 9)?;
+        let tablespace: Option<String> = field(&row, 23)?;
+        let definition: Option<String> = field(&row, 25)?;
+        let comment: Option<String> = field(&row, 26)?;
+        if field::<bool>(&row, 27)? {
+            return Err(SourceObservationFailure::ByteLimitExceeded {
+                max_bytes: request.request().limits().max_bytes(),
+            });
+        }
+        meter.add(
+            request,
+            40 + name.len()
+                + kind.len()
+                + persistence.len()
+                + access_method.as_ref().map_or(0, String::len)
+                + tablespace.as_ref().map_or(0, String::len)
+                + definition.as_ref().map_or(0, String::len)
+                + comment.as_ref().map_or(0, String::len),
+        )?;
+        if kind != "i"
+            || persistence != "p"
+            || access_method.as_deref() != Some("btree")
+            || total <= 0
+            || total != key_count
+            || definition.is_none()
+            || tablespace.is_none()
+            || [4, 5, 6, 21, 22, 29, 30, 31, 32]
+                .into_iter()
+                .any(|index| field::<bool>(&row, index) != Ok(false))
+            || !field::<bool>(&row, 28)?
+        {
+            return Err(SourceObservationFailure::InvalidCapturedMetadata);
+        }
+
+        let attributes = bounded(
+            request,
+            cancellation,
+            transaction.query_raw(
+                "SELECT s.position, i.indkey[s.position], a.attname::text, \
+                 ocn.nspname::text, oc.opcname::text, cn.nspname::text, coll.collname::text, \
+                 i.indoption[s.position] \
+                 FROM pg_catalog.pg_index i \
+                 CROSS JOIN LATERAL pg_catalog.generate_series(0, i.indnkeyatts - 1) s(position) \
+                 LEFT JOIN pg_catalog.pg_attribute a ON a.attrelid = i.indrelid \
+                   AND a.attnum = i.indkey[s.position] AND NOT a.attisdropped \
+                 LEFT JOIN pg_catalog.pg_opclass oc ON oc.oid = i.indclass[s.position] \
+                 LEFT JOIN pg_catalog.pg_namespace ocn ON ocn.oid = oc.opcnamespace \
+                 LEFT JOIN pg_catalog.pg_collation coll ON coll.oid = i.indcollation[s.position] \
+                 LEFT JOIN pg_catalog.pg_namespace cn ON cn.oid = coll.collnamespace \
+                 WHERE i.indexrelid = $1 ORDER BY s.position",
+                &[&index_oid],
+            ),
+        )
+        .await?;
+        tokio::pin!(attributes);
+        let mut keys = Vec::new();
+        let mut semantics = Vec::new();
+        while let Some(attribute) = bounded(request, cancellation, attributes.try_next()).await? {
+            let position: i32 = field(&attribute, 0)?;
+            let attnum: i16 = field(&attribute, 1)?;
+            let column: Option<String> = field(&attribute, 2)?;
+            let opclass_schema: Option<String> = field(&attribute, 3)?;
+            let opclass_name: Option<String> = field(&attribute, 4)?;
+            let collation_schema: Option<String> = field(&attribute, 5)?;
+            let collation_name: Option<String> = field(&attribute, 6)?;
+            let options: i16 = field(&attribute, 7)?;
+            meter.add(
+                request,
+                12 + column.as_ref().map_or(0, String::len)
+                    + opclass_schema.as_ref().map_or(0, String::len)
+                    + opclass_name.as_ref().map_or(0, String::len)
+                    + collation_schema.as_ref().map_or(0, String::len)
+                    + collation_name.as_ref().map_or(0, String::len),
+            )?;
+            let (Some(column), Some(opclass_schema), Some(opclass_name)) =
+                (column, opclass_schema, opclass_name)
+            else {
+                return Err(SourceObservationFailure::InvalidCapturedMetadata);
+            };
+            if attnum <= 0 || position < 0 || position as usize != keys.len() {
+                return Err(SourceObservationFailure::InvalidCapturedMetadata);
+            }
+            let position = position as u32 + 1;
+            let collation = match (collation_schema, collation_name) {
+                (Some(schema), Some(name)) => Some(
+                    QualifiedCollationName::new(schema, name)
+                        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+                ),
+                (None, None) => None,
+                _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
+            };
+            keys.push(
+                IndexAttributeObservation::column(position, IndexAttributeKind::Key, column)
+                    .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+            );
+            semantics.push(
+                IndexKeySemantics::new(
+                    position,
+                    collation,
+                    QualifiedOperatorClassName::new(opclass_schema, opclass_name)
+                        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+                    options as u16,
+                )
+                .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+            );
+        }
+        if keys.len() != key_count as usize {
+            return Err(SourceObservationFailure::InvalidCapturedMetadata);
+        }
+        let flags = IndexCatalogFlags::new(
+            field(&row, 12)?,
+            field(&row, 13)?,
+            field(&row, 14)?,
+            field(&row, 15)?,
+            field(&row, 16)?,
+            field(&row, 20)?,
+        );
+        let tablespace = if field::<bool>(&row, 24)? {
+            IndexTablespace::database_default(tablespace.unwrap())
+        } else {
+            IndexTablespace::named(tablespace.unwrap())
+        }
+        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+        let mut index = IndexObservation::new(
+            name,
+            field(&row, 10)?,
+            Some(field(&row, 11)?),
+            keys,
+            Vec::new(),
+        )
+        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
+        .with_access_method("btree")
+        .with_key_semantics(semantics)
+        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
+        .with_catalog_flags(flags)
+        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
+        .with_storage_options(Vec::new())
+        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
+        .with_tablespace(tablespace)
+        .with_ready(field(&row, 17)?)
+        .with_valid(field(&row, 18)?)
+        .with_live(field(&row, 19)?)
+        .with_index_definition(definition.unwrap());
+        if let Some(comment) = comment {
+            index = index.with_source_comment(comment);
+        }
+        indexes.push(index);
+    }
+    Ok(indexes)
 }
 
 fn field<T>(row: &Row, index: usize) -> Result<T, SourceObservationFailure>
