@@ -117,6 +117,7 @@ pub struct AlignedProposal {
     source_digest: String,
     candidates: Vec<AlignedCandidate>,
     relation_endpoints: BTreeMap<String, (String, String)>,
+    field_parents: BTreeMap<String, String>,
 }
 
 impl AlignedProposal {
@@ -171,6 +172,7 @@ pub struct ValidationSummary {
     source_bound_candidates: usize,
     unique_semantic_ids: usize,
     mapped_relations_with_endpoints: usize,
+    mapped_fields_with_concepts: usize,
 }
 
 impl ValidationSummary {
@@ -187,6 +189,11 @@ impl ValidationSummary {
     /// Number of mapped relations checked against both included endpoint concepts.
     pub const fn mapped_relations_with_endpoints(&self) -> usize {
         self.mapped_relations_with_endpoints
+    }
+
+    /// Number of mapped fields checked against included concept parents.
+    pub const fn mapped_fields_with_concepts(&self) -> usize {
+        self.mapped_fields_with_concepts
     }
 }
 
@@ -207,6 +214,8 @@ pub enum AlignmentError {
     DuplicateSemanticIdentity,
     /// A mapped relation refers to an excluded concept.
     ExcludedRelationEndpoint,
+    /// A mapped field belongs to an excluded concept.
+    ExcludedFieldParent,
     /// Candidate evidence disagrees with the exact proposal source.
     InvalidSourceBinding,
     /// A domain lifecycle transition failed.
@@ -223,6 +232,7 @@ impl fmt::Display for AlignmentError {
             Self::MissingDecision => "a candidate still needs an alignment decision",
             Self::DuplicateSemanticIdentity => "two candidates share a proposed semantic identity",
             Self::ExcludedRelationEndpoint => "a mapped relation needs both concepts included",
+            Self::ExcludedFieldParent => "a mapped field needs its concept included",
             Self::InvalidSourceBinding => "candidate source evidence does not match this proposal",
             Self::Contract(_) => "a candidate could not enter its validation state",
         };
@@ -273,10 +283,14 @@ pub fn align_relational_proposal(
 
     let mut candidates = Vec::new();
     let mut relation_endpoints = BTreeMap::new();
+    let mut field_parents = BTreeMap::new();
     let source_candidates = proposal
         .concepts()
         .iter()
-        .map(|concept| concept.candidate())
+        .flat_map(|concept| {
+            std::iter::once(concept.candidate())
+                .chain(concept.fields().iter().map(|field| field.candidate()))
+        })
         .chain(
             proposal
                 .relations()
@@ -315,6 +329,14 @@ pub fn align_relational_proposal(
             ),
         );
     }
+    for concept in proposal.concepts() {
+        for field in concept.fields() {
+            field_parents.insert(
+                field.candidate().candidate_id().to_owned(),
+                concept.candidate().candidate_id().to_owned(),
+            );
+        }
+    }
     candidates.sort_by(|left, right| {
         left.candidate
             .candidate_id()
@@ -326,6 +348,7 @@ pub fn align_relational_proposal(
         source_digest: proposal.source_digest().to_owned(),
         candidates,
         relation_endpoints,
+        field_parents,
     })
 }
 
@@ -354,6 +377,15 @@ pub fn validate_alignment(aligned: &AlignedProposal) -> Result<ValidatedAlignmen
                 return Err(AlignmentError::DuplicateSemanticIdentity);
             }
             mapped_candidates.insert(aligned_candidate.candidate.candidate_id());
+        }
+    }
+    let mut mapped_fields_with_concepts = 0;
+    for (field_id, concept_id) in &aligned.field_parents {
+        if mapped_candidates.contains(field_id.as_str()) {
+            if !mapped_candidates.contains(concept_id.as_str()) {
+                return Err(AlignmentError::ExcludedFieldParent);
+            }
+            mapped_fields_with_concepts += 1;
         }
     }
     let mut mapped_relations_with_endpoints = 0;
@@ -387,6 +419,7 @@ pub fn validate_alignment(aligned: &AlignedProposal) -> Result<ValidatedAlignmen
             source_bound_candidates: aligned.candidates.len(),
             unique_semantic_ids: semantic_ids.len(),
             mapped_relations_with_endpoints,
+            mapped_fields_with_concepts,
         },
     })
 }

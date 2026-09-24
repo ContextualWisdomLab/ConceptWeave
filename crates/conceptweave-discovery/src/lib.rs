@@ -17,19 +17,24 @@ use conceptweave_observation::{
 
 const REVISION: &str = "conceptweave.relational_proposal.v1";
 
-/// One source column carried into a proposed concept with its verified coordinate.
+/// One source column offered as a physical-to-semantic field mapping candidate.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProposedField {
+    candidate: SemanticCandidate,
     source_name: String,
     ordinal_position: u32,
     display_type: String,
     type_binding: QualifiedTypeName,
     nullable: bool,
     source_comment: Option<String>,
-    evidence: EvidenceReference,
 }
 
 impl ProposedField {
+    /// Returns the draft, inferred physical-mapping candidate.
+    pub const fn candidate(&self) -> &SemanticCandidate {
+        &self.candidate
+    }
+
     /// Returns the exact observed column name.
     pub fn source_name(&self) -> &str {
         &self.source_name
@@ -61,8 +66,8 @@ impl ProposedField {
     }
 
     /// Returns the verified column evidence.
-    pub const fn evidence(&self) -> &EvidenceReference {
-        &self.evidence
+    pub fn evidence(&self) -> &EvidenceReference {
+        &self.candidate.evidence()[0]
     }
 }
 
@@ -344,22 +349,24 @@ pub fn propose_relational_model(
             .columns()
             .iter()
             .map(|column| {
+                let location = SchemaObjectLocation::column(
+                    relation.schema_name(),
+                    relation.relation_name(),
+                    relation.kind(),
+                    column.column_name(),
+                )?;
                 Ok(ProposedField {
+                    candidate: SemanticCandidate::new(
+                        candidate_id(source_id, "field", &location),
+                        CandidateKind::PhysicalMapping,
+                        vec![evidence(snapshot, location)?],
+                    )?,
                     source_name: column.column_name().to_owned(),
                     ordinal_position: column.ordinal_position(),
                     display_type: column.data_type().to_owned(),
                     type_binding: column.type_binding().clone(),
                     nullable: column.nullable(),
                     source_comment: column.source_comment().map(str::to_owned),
-                    evidence: evidence(
-                        snapshot,
-                        SchemaObjectLocation::column(
-                            relation.schema_name(),
-                            relation.relation_name(),
-                            relation.kind(),
-                            column.column_name(),
-                        )?,
-                    )?,
                 })
             })
             .collect::<Result<Vec<_>, ProposalError>>()?;

@@ -1,4 +1,7 @@
-use std::{collections::BTreeMap, str::FromStr};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    str::FromStr,
+};
 
 use conceptweave_alignment::{
     AlignmentDecision, AlignmentError, align_relational_proposal, validate_alignment,
@@ -250,6 +253,7 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
     assert_eq!(validated.validation().source_bound_candidates(), 2);
     assert_eq!(validated.validation().unique_semantic_ids(), 1);
     assert_eq!(validated.validation().mapped_relations_with_endpoints(), 0);
+    assert_eq!(validated.validation().mapped_fields_with_concepts(), 0);
     assert_eq!(
         validated.candidates()[0].candidate().publication_state(),
         PublicationState::Validated
@@ -415,6 +419,12 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
         assert_eq!(proposal.concepts().len(), 4);
         assert_eq!(proposal.relations().len(), 4);
         assert_eq!(proposal.source_types().len(), 2);
+        let field_count = proposal
+            .concepts()
+            .iter()
+            .map(|concept| concept.fields().len())
+            .sum::<usize>();
+        assert_eq!(field_count, 13);
         let decisions = proposal
             .concepts()
             .iter()
@@ -428,6 +438,22 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
                 )
                 .unwrap()
             })
+            .chain(
+                proposal
+                    .concepts()
+                    .iter()
+                    .flat_map(|concept| concept.fields())
+                    .enumerate()
+                    .map(|(index, field)| {
+                        AlignmentDecision::map(
+                            field.candidate().candidate_id(),
+                            format!("fixture.field.{index}"),
+                            format!("Fixture field {index}"),
+                            "Explicit fixture property mapping",
+                        )
+                        .unwrap()
+                    }),
+            )
             .chain(
                 proposal
                     .relations()
@@ -472,21 +498,54 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             .unwrap()
         );
         let validated = validate_alignment(&aligned).unwrap();
-        assert_eq!(validated.candidates().len(), 10);
-        assert_eq!(validated.validation().source_bound_candidates(), 10);
-        assert_eq!(validated.validation().unique_semantic_ids(), 10);
+        assert_eq!(validated.candidates().len(), 10 + field_count);
+        assert_eq!(
+            validated.validation().source_bound_candidates(),
+            10 + field_count
+        );
+        assert_eq!(
+            validated.validation().unique_semantic_ids(),
+            10 + field_count
+        );
         assert_eq!(validated.validation().mapped_relations_with_endpoints(), 4);
+        assert_eq!(
+            validated.validation().mapped_fields_with_concepts(),
+            field_count
+        );
         assert!(validated.candidates().iter().all(|candidate| {
             candidate.candidate().publication_state() == PublicationState::Validated
                 && candidate.candidate().truth_status() == TruthStatus::Inferred
                 && candidate.candidate().evidence()[0].source_digest() == first.snapshot_digest()
         }));
         let excluded_concept_id = proposal.concepts()[0].candidate().candidate_id();
-        let excluded = decisions
+        let excluded_parent = decisions
+            .clone()
             .into_iter()
             .map(|decision| {
                 if decision.candidate_id() == excluded_concept_id {
                     AlignmentDecision::exclude(excluded_concept_id, "Fixture endpoint excluded")
+                        .unwrap()
+                } else {
+                    decision
+                }
+            })
+            .collect();
+        let invalid =
+            align_relational_proposal(&proposal, proposal.proposal_id(), excluded_parent).unwrap();
+        assert_eq!(
+            validate_alignment(&invalid).unwrap_err(),
+            AlignmentError::ExcludedFieldParent
+        );
+        let excluded = decisions
+            .into_iter()
+            .map(|decision| {
+                if decision.candidate_id() == excluded_concept_id
+                    || proposal.concepts()[0]
+                        .fields()
+                        .iter()
+                        .any(|field| field.candidate().candidate_id() == decision.candidate_id())
+                {
+                    AlignmentDecision::exclude(decision.candidate_id(), "Fixture parent excluded")
                         .unwrap()
                 } else {
                     decision
@@ -526,9 +585,23 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             );
             for field in concept.fields() {
                 assert_eq!(field.evidence().source_digest(), first.snapshot_digest());
+                assert_eq!(field.candidate().kind(), CandidateKind::PhysicalMapping);
+                assert_eq!(
+                    field.candidate().publication_state(),
+                    PublicationState::Draft
+                );
+                assert_eq!(field.candidate().evidence(), [field.evidence().clone()]);
             }
             assert!(concept.primary_key_columns().is_some());
         }
+        let tenant_id_candidates = proposal
+            .concepts()
+            .iter()
+            .flat_map(|concept| concept.fields())
+            .filter(|field| field.source_name() == "tenant_id")
+            .map(|field| field.candidate().candidate_id())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(tenant_id_candidates.len(), 4);
         let risk = proposal
             .concepts()
             .iter()
@@ -587,19 +660,29 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
         assert_ne!(first.snapshot_digest(), changed.snapshot_digest());
         let changed_proposal = propose_relational_model(&changed).unwrap();
         assert_ne!(proposal.proposal_id(), changed_proposal.proposal_id());
+        let changed_title = changed_proposal
+            .concepts()
+            .iter()
+            .find(|concept| concept.source_relation() == "risk_record")
+            .unwrap()
+            .fields()
+            .iter()
+            .find(|field| field.source_name() == "title")
+            .unwrap();
+        let original_title = risk
+            .fields()
+            .iter()
+            .find(|field| field.source_name() == "title")
+            .unwrap();
         assert_eq!(
-            changed_proposal
-                .concepts()
-                .iter()
-                .find(|concept| concept.source_relation() == "risk_record")
-                .unwrap()
-                .fields()
-                .iter()
-                .find(|field| field.source_name() == "title")
-                .unwrap()
-                .source_comment(),
-            Some("Revised review title")
+            original_title.candidate().candidate_id(),
+            changed_title.candidate().candidate_id()
         );
+        assert_ne!(
+            original_title.evidence().source_digest(),
+            changed_title.evidence().source_digest()
+        );
+        assert_eq!(changed_title.source_comment(), Some("Revised review title"));
         client
             .batch_execute(&format!(
                 "COMMENT ON COLUMN \"{schema}\".risk_record.title IS 'Reviewable risk title'"
