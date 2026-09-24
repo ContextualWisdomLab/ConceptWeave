@@ -1,6 +1,7 @@
 //! PostgreSQL 18 catalog observation behind the Source Observation capability.
 //!
-//! This bounded path admits schema-scoped domains, enums, ordinary tables, and bounded indexes.
+//! This bounded path admits schema-scoped domains, enums, ordinary tables, local CHECK and
+//! ordinary UNIQUE constraints, and bounded indexes.
 //! Unsupported relation metadata fails closed until it can be mapped without losing facts.
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
@@ -14,7 +15,7 @@ use conceptweave_observation::{
     IndexObservation, IndexStorageOption, IndexTablespace, OperatorClassOption,
     PostgresSchemaSnapshotV3, QualifiedCollationName, QualifiedOperatorClassName,
     QualifiedTypeName, RelationKind, RelationObservation, ReplicaIdentityMode,
-    TableConstraintObservation,
+    TableConstraintObservation, UniqueConstraintObservation,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, SourceObservationFailure,
@@ -241,9 +242,11 @@ async fn capture_catalog(
                     + replica.len()
                     + comment.as_ref().map_or(0, String::len),
             )?;
+            // relhasrules and relhastriggers are lazy hints; the catalog-row guards below
+            // decide whether any unsupported rule or trigger still exists.
             if kind != "r"
                 || persistence != "p"
-                || [4, 6, 7, 8, 9, 10, 11, 12]
+                || [4, 6, 7, 10, 11, 12]
                     .into_iter()
                     .any(|index| field::<bool>(&row, index) != Ok(false))
             {
@@ -482,7 +485,7 @@ async fn capture_catalog(
     let extractor_revision = if relations.is_empty() {
         "postgres18_type_only_adapter_v1"
     } else {
-        "postgres18_check_constraint_adapter_v1"
+        "postgres18_key_constraint_adapter_v1"
     };
     let snapshot = if relations.is_empty() {
         PostgresSchemaSnapshotV3::new(
@@ -679,16 +682,6 @@ async fn capture_relation(
             .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
         );
     }
-    let constraints = capture_checks(
-        transaction,
-        request,
-        cancellation,
-        meter,
-        max_bytes,
-        relation.oid,
-        expected_check_count,
-    )
-    .await?;
     let indexes = capture_indexes(
         transaction,
         request,
@@ -696,6 +689,16 @@ async fn capture_relation(
         meter,
         max_bytes,
         relation.oid,
+    )
+    .await?;
+    let constraints = capture_constraints(
+        transaction,
+        request,
+        cancellation,
+        meter,
+        relation.oid,
+        expected_check_count,
+        (&columns, &indexes),
     )
     .await?;
     let mut observed =
@@ -712,15 +715,17 @@ async fn capture_relation(
     Ok((observed, generations, expressions))
 }
 
-async fn capture_checks(
+async fn capture_constraints(
     transaction: &Transaction<'_>,
     request: &AuthorizedObservationRequest,
     cancellation: &dyn ObservationCancellation,
     meter: &mut CaptureMeter,
-    max_bytes: i64,
     relation_oid: u32,
     expected_count: i16,
+    evidence: (&[ColumnObservationV3], &[IndexObservation]),
 ) -> Result<Vec<TableConstraintObservation>, SourceObservationFailure> {
+    let (columns, indexes) = evidence;
+    let max_bytes = request.request().limits().max_bytes().min(i64::MAX as u64) as i64;
     let stream = bounded(
         request,
         cancellation,
@@ -736,20 +741,28 @@ async fn capture_checks(
              EXISTS(SELECT 1 FROM pg_catalog.pg_description \
                WHERE classoid = 'pg_constraint'::regclass AND objoid = c.oid), \
              EXISTS(SELECT 1 FROM pg_catalog.pg_seclabel \
-               WHERE classoid = 'pg_constraint'::regclass AND objoid = c.oid) \
+               WHERE classoid = 'pg_constraint'::regclass AND objoid = c.oid), \
+             c.conkey, backing.relname::text, c.conexclop IS NULL, c.confkey IS NULL, \
+             c.conpfeqop IS NULL, c.conppeqop IS NULL, c.conffeqop IS NULL, \
+             c.confdelsetcols IS NULL, c.confupdtype::text, c.confdeltype::text, \
+             c.confmatchtype::text \
              FROM pg_catalog.pg_constraint c \
              JOIN pg_catalog.pg_class t ON t.oid = c.conrelid \
+             LEFT JOIN pg_catalog.pg_class backing ON backing.oid = c.conindid \
              WHERE c.conrelid = $1 ORDER BY c.conname, c.oid",
             vec![&relation_oid as &(dyn ToSql + Sync), &max_bytes],
         ),
     )
     .await?;
     tokio::pin!(stream);
-    let mut checks = Vec::new();
+    let mut constraints = Vec::new();
+    let mut check_count = 0;
     while let Some(row) = bounded(request, cancellation, stream.try_next()).await? {
         let name: String = field(&row, 0)?;
         let kind: String = field(&row, 1)?;
         let definition: Option<String> = field(&row, 2)?;
+        let key: Option<Vec<i16>> = field(&row, 20)?;
+        let backing_name: Option<String> = field(&row, 21)?;
         if field::<bool>(&row, 3)? {
             return Err(SourceObservationFailure::ByteLimitExceeded {
                 max_bytes: request.request().limits().max_bytes(),
@@ -757,36 +770,98 @@ async fn capture_checks(
         }
         meter.add(
             request,
-            24 + name.len() + kind.len() + definition.as_ref().map_or(0, String::len),
+            32 + name.len()
+                + kind.len()
+                + definition.as_ref().map_or(0, String::len)
+                + key.as_ref().map_or(0, |values| values.len() * 2)
+                + backing_name.as_ref().map_or(0, String::len),
         )?;
-        if kind != "c"
-            || definition.is_none()
-            || field::<i16>(&row, 8)? != 0
-            || [9, 12, 13, 14, 16, 17]
+        if field::<i16>(&row, 8)? != 0
+            || [9, 13, 14, 17]
                 .into_iter()
                 .any(|index| field::<bool>(&row, index) != Ok(true))
             || [10, 11, 15, 18, 19]
                 .into_iter()
                 .any(|index| field::<bool>(&row, index) != Ok(false))
             || !field::<bool>(&row, 7)?
+            || !(22..=27).all(|index| field::<bool>(&row, index) == Ok(true))
+            || !(28..=30).all(|index| field::<String>(&row, index) == Ok(" ".to_owned()))
         {
             return Err(SourceObservationFailure::InvalidCapturedMetadata);
         }
-        checks.push(TableConstraintObservation::Check(
-            CheckConstraintObservation::new(
-                name,
-                definition.unwrap(),
-                field(&row, 4)?,
-                field(&row, 5)?,
-                field(&row, 6)?,
-            )
-            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
-        ));
+        let constraint = match kind.as_str() {
+            "c" if field::<bool>(&row, 12)? && field::<bool>(&row, 16)? => {
+                check_count += 1;
+                TableConstraintObservation::Check(
+                    CheckConstraintObservation::new(
+                        name,
+                        definition.ok_or(SourceObservationFailure::InvalidCapturedMetadata)?,
+                        field(&row, 4)?,
+                        field(&row, 5)?,
+                        field(&row, 6)?,
+                    )
+                    .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+                )
+            }
+            "u" if !field::<bool>(&row, 12)?
+                && !field::<bool>(&row, 16)?
+                && field::<bool>(&row, 4)?
+                && field::<bool>(&row, 5)?
+                && field::<bool>(&row, 6)? =>
+            {
+                let key = key.ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
+                let names = key
+                    .into_iter()
+                    .map(|position| {
+                        columns
+                            .iter()
+                            .find(|column| column.ordinal_position() == position as u32)
+                            .map(|column| column.column_name().to_owned())
+                            .ok_or(SourceObservationFailure::InvalidCapturedMetadata)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                if backing_name.as_deref() != Some(name.as_str()) {
+                    return Err(SourceObservationFailure::InvalidCapturedMetadata);
+                }
+                let index = indexes
+                    .iter()
+                    .find(|index| index.index_name() == name)
+                    .ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
+                if !index.is_unique()
+                    || index.catalog_flags().is_none_or(|flags| flags.primary())
+                    || index.key_attributes().len() != names.len()
+                    || index
+                        .key_attributes()
+                        .iter()
+                        .zip(&names)
+                        .any(|(attribute, column)| {
+                            attribute.attribute_name() != Some(column.as_str())
+                        })
+                    || index.predicate().is_some()
+                    || index.ready() != Some(true)
+                    || index.valid() != Some(true)
+                    || index.live() != Some(true)
+                {
+                    return Err(SourceObservationFailure::InvalidCapturedMetadata);
+                }
+                TableConstraintObservation::Unique(
+                    UniqueConstraintObservation::new(name, names)
+                        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
+                        .with_nulls_not_distinct(
+                            index
+                                .nulls_not_distinct()
+                                .ok_or(SourceObservationFailure::InvalidCapturedMetadata)?,
+                        ),
+                )
+            }
+            _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
+        };
+        constraints.push(constraint);
     }
-    if checks.len() != expected_count as usize {
+    if check_count != expected_count as usize {
         return Err(SourceObservationFailure::InvalidCapturedMetadata);
     }
-    Ok(checks)
+    Ok(constraints)
 }
 
 async fn capture_indexes(

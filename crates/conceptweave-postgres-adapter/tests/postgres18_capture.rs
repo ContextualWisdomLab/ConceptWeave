@@ -294,6 +294,35 @@ async fn postgres18_catalog_is_observed_in_one_read_only_transaction() {
             ))
             .await
             .unwrap();
+        let with_unique_constraint = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await
+            .expect("ordinary UNIQUE constraint capture");
+        let item = with_unique_constraint
+            .relations()
+            .iter()
+            .find(|relation| relation.relation_name() == "item")
+            .unwrap();
+        assert!(item.constraints().iter().any(|constraint| matches!(
+            constraint,
+            TableConstraintObservation::Unique(unique)
+                if unique.constraint_name() == "item_unique"
+                    && unique.column_names() == ["id"]
+                    && unique.nulls_not_distinct() == Some(false)
+        )));
+        with_unique_constraint
+            .source_receipt(
+                SchemaObjectLocation::constraint(&schema, "item", RelationKind::Table, "item_unique")
+                    .unwrap(),
+            )
+            .unwrap();
+        assert_ne!(validated.snapshot_digest(), with_unique_constraint.snapshot_digest());
+        client
+            .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".item ADD CONSTRAINT item_deferred UNIQUE (other) DEFERRABLE"
+            ))
+            .await
+            .unwrap();
         assert_eq!(
             adapter(config.clone())
                 .observe(authorized(&schema), &NotCancelled)
@@ -303,10 +332,61 @@ async fn postgres18_catalog_is_observed_in_one_read_only_transaction() {
         );
         client
             .batch_execute(&format!(
-                "ALTER TABLE \"{schema}\".item DROP CONSTRAINT item_unique"
+                "ALTER TABLE \"{schema}\".item DROP CONSTRAINT item_deferred; \
+                 ALTER TABLE \"{schema}\".item DROP CONSTRAINT item_unique"
             ))
             .await
             .unwrap();
+        let after_drop = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        assert_eq!(
+            after_drop.relations()[0].constraints().len(),
+            1,
+            "dropped internal triggers must not block the remaining CHECK"
+        );
+        client
+            .batch_execute(&format!(
+                "CREATE TABLE \"{schema}\".keyed (id integer PRIMARY KEY)"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            adapter(config.clone())
+                .observe(authorized(&schema), &NotCancelled)
+                .await
+                .err(),
+            Some(SourceObservationFailure::InvalidCapturedMetadata)
+        );
+        client
+            .batch_execute(&format!("DROP TABLE \"{schema}\".keyed"))
+            .await
+            .unwrap();
+        client
+            .batch_execute(&format!(
+                "CREATE FUNCTION \"{schema}\".keep_item() RETURNS trigger LANGUAGE plpgsql \
+                 AS $$ BEGIN RETURN NEW; END $$; \
+                 CREATE TRIGGER item_live_trigger BEFORE INSERT ON \"{schema}\".item \
+                 FOR EACH ROW EXECUTE FUNCTION \"{schema}\".keep_item()"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            adapter(config.clone())
+                .observe(authorized(&schema), &NotCancelled)
+                .await
+                .err(),
+            Some(SourceObservationFailure::InvalidCapturedMetadata)
+        );
+        client
+            .batch_execute(&format!(
+                "DROP TRIGGER item_live_trigger ON \"{schema}\".item"
+            ))
+            .await
+            .unwrap();
+        adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
 
         client
             .batch_execute(&format!("CREATE TABLE \"{schema}\".\" \" (\" \" integer)"))
