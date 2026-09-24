@@ -76,7 +76,7 @@ The live Local API replay remains acquisition/observation evidence only: 8,326 o
 | Area | Status | Evidence / next verification |
 | --- | --- | --- |
 | Product boundary | ACTIVE_PR | PRD/TRD/ADR/context map define ConceptWeave ownership and owner/consumer boundaries; foreign truth remains behind released/versioned ports and ACLs. |
-| Truth/publication lifecycle | SOURCE_REPAIRED_PENDING_PROTECTED_EVIDENCE | Publication-state/truth-status semantics and immutable/supersession direction are defined; no protected semantic release exists. |
+| Truth/publication lifecycle | SOURCE_REPAIRED_PENDING_PROTECTED_EVIDENCE | Publication-state/truth-status semantics and immutable/supersession direction are defined; Client read-only diff now admits a governed Superseded+Superseded predecessor while current-use admission remains Published+Authoritative. `verify_detached_artifact` checks caller-supplied exact bytes against the declared digest; no protected semantic release exists. |
 | Source Observation | ACTIVE_CHILD | Immutable source evidence and bounded observation contracts exist; concrete production PostgreSQL adapter remains a P0 gap. |
 | Research Intake / source resolution | LOCAL_GREEN_HOSTED_PENDING | #9 and #40 have current local source/coverage evidence within their stated scope; hosted checks and independent current-head review remain missing. |
 | Product CI | BLOCKED_OWNER | #35 leaf CodeQL failure waits on accepted central `.github#2051@70e8c1f...` and then a fresh #35 exact-head run. |

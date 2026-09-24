@@ -33,7 +33,10 @@ fn release(
         publication_state,
         digest(digest_hex),
         vec![evidence()],
-        concept_ids.iter().map(|value| (*value).to_owned()).collect(),
+        concept_ids
+            .iter()
+            .map(|value| (*value).to_owned())
+            .collect(),
     )
     .expect("release fixture must be structurally valid")
 }

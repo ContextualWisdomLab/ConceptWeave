@@ -424,6 +424,19 @@ impl SemanticReleaseClient {
         Ok(())
     }
 
+    fn validate_for_previous_release(
+        &self,
+        release: &SemanticRelease,
+    ) -> Result<(), ReleaseContractError> {
+        if release.publication_state() == PublicationState::Superseded
+            && release.truth_status() == TruthStatus::Superseded
+        {
+            self.validate_contract_compatibility(release)
+        } else {
+            self.validate_for_authoritative_use(release)
+        }
+    }
+
     /// Resolves one exact concept identifier from an admitted semantic release.
     ///
     /// Resolution is deliberately exact and deterministic: it performs no
@@ -490,13 +503,7 @@ impl SemanticReleaseClient {
         superseded: &SemanticRelease,
         successor: &SemanticRelease,
     ) -> Result<(), ReleaseContractError> {
-        if superseded.publication_state() == PublicationState::Superseded
-            && superseded.truth_status() == TruthStatus::Superseded
-        {
-            self.validate_contract_compatibility(superseded)?;
-        } else {
-            self.validate_for_authoritative_use(superseded)?;
-        }
+        self.validate_for_previous_release(superseded)?;
         self.validate_for_authoritative_use(successor)?;
 
         if declaration.superseded() != &SemanticReleaseReference::from_release(superseded) {
@@ -510,8 +517,10 @@ impl SemanticReleaseClient {
 
     /// Compares two admitted releases and reports deterministic concept changes.
     ///
-    /// Both releases pass the same authoritative-use admission gate before any
-    /// difference is exposed. Reusing one stable release identity for conflicting
+    /// The previous release may be governed Superseded+Superseded; the current
+    /// release must pass authoritative-use admission. A diff does not establish
+    /// a supersession relation or authorize use of the previous release.
+    /// Reusing one stable release identity for conflicting
     /// immutable content fails closed rather than being reported as ordinary
     /// evolution. Concept identifiers are sorted deterministically for replay.
     pub fn diff(
@@ -519,7 +528,7 @@ impl SemanticReleaseClient {
         previous: &SemanticRelease,
         current: &SemanticRelease,
     ) -> Result<SemanticReleaseDiff, ReleaseContractError> {
-        self.validate_for_authoritative_use(previous)?;
+        self.validate_for_previous_release(previous)?;
         self.validate_for_authoritative_use(current)?;
 
         if previous.release_id() == current.release_id() && previous != current {
