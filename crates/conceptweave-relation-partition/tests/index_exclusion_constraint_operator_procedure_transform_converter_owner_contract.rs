@@ -187,10 +187,9 @@ fn ordinary_exclude_transform_converter_owner_rejects_zero_owner_oid() {
 
 #[test]
 fn ordinary_exclude_transform_converter_owner_rejects_blank_owner_role_name() {
-    let error = IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity::new(
-        16_384, "   ",
-    )
-    .expect_err("owner OID resolution must retain a nonblank same-generation role name");
+    let error =
+        IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity::new(16_384, "")
+            .expect_err("owner OID resolution must retain a nonblank same-generation role name");
     assert_field(
         error,
         "index_exclusion_constraint_operator_procedure_transform_converter_owner_role_name",

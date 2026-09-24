@@ -1,12 +1,12 @@
 use conceptweave_observation::{QualifiedTypeName, RelationKind};
 use conceptweave_relation_partition::{
-    CollationCatalogIdentity, ColumnTypeModifierObservation, IndexConstraintParentageCoordinate,
-    IndexExclusionConstraintAccessMethodCapabilityObservation, IndexExclusionConstraintCoordinate,
-    IndexExclusionConstraintIndexNamespaceObservation,
+    CanonicalExpression, CollationCatalogIdentity, ColumnTypeModifierObservation,
+    IndexConstraintParentageCoordinate, IndexExclusionConstraintAccessMethodCapabilityObservation,
+    IndexExclusionConstraintCoordinate, IndexExclusionConstraintIndexNamespaceObservation,
     IndexExclusionConstraintNamespaceObservation,
     IndexExclusionConstraintOperatorProcedureExecuteGrant, IndexPartitionCoordinate,
-    PartitionParentRelationCoordinate, QualifiedOperatorSignature, QualifiedProcedureSignature,
-    RelationPartitionObservation,
+    PartitionParentRelationCoordinate, QualifiedFunctionSignature, QualifiedOperatorSignature,
+    QualifiedProcedureSignature, QualifiedUnaryOperatorSignature, RelationPartitionObservation,
 };
 
 #[test]
@@ -60,18 +60,33 @@ fn quoted_catalog_identifiers_survive_independent_partition_and_exclusion_coordi
     );
     let type_name = QualifiedTypeName::new("pg_catalog", "int4").unwrap();
     assert_eq!(
-        QualifiedOperatorSignature::new(" ", " ", type_name.clone(), type_name.clone())
+        QualifiedOperatorSignature::new(" ", "=", type_name.clone(), type_name.clone())
             .unwrap()
-            .operator_name(),
+            .schema_name(),
         " "
     );
     assert_eq!(
-        QualifiedProcedureSignature::new(" ", " ", vec![type_name])
+        QualifiedProcedureSignature::new(" ", " ", vec![type_name.clone()])
             .unwrap()
             .procedure_name(),
         " "
     );
     IndexExclusionConstraintOperatorProcedureExecuteGrant::role(" ", " ", false).unwrap();
+    assert_eq!(
+        QualifiedFunctionSignature::new(" ", " ", vec![], type_name.clone())
+            .unwrap()
+            .function_name(),
+        " "
+    );
+    assert_eq!(
+        QualifiedUnaryOperatorSignature::new(" ", "+", type_name.clone())
+            .unwrap()
+            .schema_name(),
+        " "
+    );
+    CanonicalExpression::column(" ").unwrap();
+    assert!(QualifiedUnaryOperatorSignature::new(" ", " ", type_name.clone()).is_err());
+    assert!(QualifiedOperatorSignature::new(" ", " ", type_name.clone(), type_name).is_err());
 }
 
 #[test]

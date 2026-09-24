@@ -283,13 +283,13 @@ fn ordinary_exclude_transform_converter_argument_modes_preserve_location_receipt
 
     for (schema, function, field) in [
         (
-            " ",
+            "",
             "payload_from_sql",
             "index_exclusion_constraint_operator_procedure_transform_converter_argument_modes_function_schema",
         ),
         (
             "public",
-            "\t",
+            "",
             "index_exclusion_constraint_operator_procedure_transform_converter_argument_modes_function_name",
         ),
     ] {

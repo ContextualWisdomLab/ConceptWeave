@@ -204,13 +204,13 @@ fn ordinary_exclude_transform_converter_argument_count_preserves_location_and_in
 
     for (schema, function, field) in [
         (
-            " ",
+            "",
             "payload_from_sql",
             "index_exclusion_constraint_operator_procedure_transform_converter_argument_count_function_schema",
         ),
         (
             "public",
-            "\t",
+            "",
             "index_exclusion_constraint_operator_procedure_transform_converter_argument_count_function_name",
         ),
     ] {

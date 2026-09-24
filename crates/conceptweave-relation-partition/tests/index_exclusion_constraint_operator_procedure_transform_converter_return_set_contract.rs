@@ -202,13 +202,13 @@ fn ordinary_exclude_transform_converter_return_set_keeps_collision_safe_location
 
     for (schema, function, field) in [
         (
-            " ",
+            "",
             "payload_from_sql",
             "index_exclusion_constraint_operator_procedure_transform_converter_return_set_function_schema",
         ),
         (
             "public",
-            "\t",
+            "",
             "index_exclusion_constraint_operator_procedure_transform_converter_return_set_function_name",
         ),
     ] {
