@@ -21,15 +21,15 @@ const POLICY_BINDING: &str = "fixture_policy_revision_a";
 struct Registry;
 impl SourceConnectionRegistry for Registry {
     fn contains_source_connection(&self, key: &str) -> bool {
-        key == "warehouse"
+        key == "warehouse_primary"
     }
 
     fn connection_policy_binding(&self, key: &str) -> Option<String> {
-        (key == "warehouse").then(|| POLICY_BINDING.to_owned())
+        (key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
 
     fn authorizes_schema_scope(&self, source: &ResolvedSourceConnection, schemas: &[String]) -> bool {
-        source.source_connection_key() == "warehouse"
+        source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && schemas == ["public"]
     }
@@ -39,7 +39,7 @@ impl SourceConnectionRegistry for Registry {
         source: &ResolvedSourceConnection,
         envelope: ObservationResourceEnvelope,
     ) -> bool {
-        source.source_connection_key() == "warehouse"
+        source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && envelope.request_budget().max_schema_count() <= 1
             && envelope.request_budget().max_schema_bytes() <= 256
@@ -53,7 +53,7 @@ impl SourceConnectionRegistry for Registry {
 
 fn authorized_source() -> AuthorizedObservationRequest {
     ObservationRequest::new(
-        "warehouse",
+        "warehouse_primary",
         vec!["public".to_owned()],
         ObservationRequestBudget::new(1, 256).unwrap(),
         ObservationLimits::new(1_000, 10, 1_024, 1).unwrap(),
@@ -118,7 +118,10 @@ fn relation(
     .unwrap()
 }
 
-fn base_snapshot(unique: bool, primary: bool) -> PostgresSchemaSnapshotV3 {
+fn base_snapshot(
+    unique: bool,
+    primary: bool,
+) -> Result<PostgresSchemaSnapshotV3, ObservationError> {
     PostgresSchemaSnapshotV3::new(
         &authorized_source(),
         "extractor-index-exclusion-constraint-index-role-v1",
@@ -142,7 +145,6 @@ fn base_snapshot(unique: bool, primary: bool) -> PostgresSchemaSnapshotV3 {
         vec![],
         vec![],
     )
-    .unwrap()
 }
 
 fn relation_partitions(base: &PostgresSchemaSnapshotV3) -> RelationPartitionSnapshot {
@@ -276,7 +278,7 @@ fn build_role(
     unique: bool,
     primary: bool,
 ) -> Result<IndexExclusionConstraintIndexRoleSnapshot, ObservationError> {
-    let base = base_snapshot(unique, primary);
+    let base = base_snapshot(unique, primary)?;
     let relations = relation_partitions(&base);
     let indexes = index_partitions(&base, &relations);
     let constraints = exclusion_constraints(&base, &relations, &indexes);
@@ -318,7 +320,7 @@ fn ordinary_exclusion_rejects_primary_backing_index() {
     assert_eq!(
         error,
         ObservationError::InvalidObservationField {
-            field: "index_exclusion_constraint_index_role_state",
+            field: "constraint_backing_index",
         }
     );
 }

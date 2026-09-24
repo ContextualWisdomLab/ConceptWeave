@@ -41,6 +41,11 @@ impl IndexExclusionConstraintOperatorProcedureObservation {
         if key_position == 0 {
             return Err(ObservationError::InvalidOrdinalPosition);
         }
+        if procedure.argument_types().len() != 2 {
+            return Err(ObservationError::InvalidObservationField {
+                field: "exclusion_procedure_argument_types",
+            });
+        }
         Ok(Self {
             coordinate,
             key_position,

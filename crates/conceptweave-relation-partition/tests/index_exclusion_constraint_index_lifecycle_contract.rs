@@ -23,15 +23,15 @@ const POLICY_BINDING: &str = "fixture_policy_revision_a";
 struct Registry;
 impl SourceConnectionRegistry for Registry {
     fn contains_source_connection(&self, key: &str) -> bool {
-        key == "warehouse"
+        key == "warehouse_primary"
     }
 
     fn connection_policy_binding(&self, key: &str) -> Option<String> {
-        (key == "warehouse").then(|| POLICY_BINDING.to_owned())
+        (key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
 
     fn authorizes_schema_scope(&self, source: &ResolvedSourceConnection, schemas: &[String]) -> bool {
-        source.source_connection_key() == "warehouse"
+        source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && schemas == ["public"]
     }
@@ -41,7 +41,7 @@ impl SourceConnectionRegistry for Registry {
         source: &ResolvedSourceConnection,
         envelope: ObservationResourceEnvelope,
     ) -> bool {
-        source.source_connection_key() == "warehouse"
+        source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && envelope.request_budget().max_schema_count() <= 1
             && envelope.request_budget().max_schema_bytes() <= 256
@@ -55,7 +55,7 @@ impl SourceConnectionRegistry for Registry {
 
 fn authorized_source() -> AuthorizedObservationRequest {
     ObservationRequest::new(
-        "warehouse",
+        "warehouse_primary",
         vec!["public".to_owned()],
         ObservationRequestBudget::new(1, 256).unwrap(),
         ObservationLimits::new(1_000, 10, 1_024, 1).unwrap(),
@@ -292,7 +292,7 @@ fn non_enforceable_backing_index_lifecycle_fails_closed() {
 }
 
 #[test]
-fn lifecycle_must_bind_the_exact_conindid_backing_index() {
+fn lifecycle_rejects_a_different_base_index_generation() {
     let stack = stack(Some(true), Some(true), Some(true));
     let unrelated = IndexObservation::new(
         "other_index",
@@ -301,6 +301,15 @@ fn lifecycle_must_bind_the_exact_conindid_backing_index() {
         vec![IndexAttributeObservation::new(1, IndexAttributeKind::Key, "id").unwrap()],
         vec![],
     )
+    .unwrap()
+    .with_access_method("btree")
+    .with_key_semantics(vec![IndexKeySemantics::new(
+        1,
+        None,
+        QualifiedOperatorClassName::new("pg_catalog", "int8_ops").unwrap(),
+        0,
+    )
+    .unwrap()])
     .unwrap()
     .with_ready(true)
     .with_valid(true)
@@ -315,7 +324,7 @@ fn lifecycle_must_bind_the_exact_conindid_backing_index() {
     assert_eq!(
         error,
         ObservationError::InvalidObservationField {
-            field: "index_exclusion_constraint_index_lifecycle_backing_index",
+            field: "index_exclusion_constraint_index_lifecycle_predecessor_binding",
         }
     );
 }

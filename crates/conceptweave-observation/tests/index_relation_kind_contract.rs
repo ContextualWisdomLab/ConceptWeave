@@ -36,7 +36,7 @@ fn complete_index() -> IndexObservation {
     .expect("complete key semantics are valid")
 }
 
-fn indexed_relation(kind: RelationKind) -> RelationObservation {
+fn indexed_relation(kind: RelationKind) -> Result<RelationObservation, ObservationError> {
     RelationObservation::new(
         "public",
         "document",
@@ -55,7 +55,6 @@ fn indexed_relation(kind: RelationKind) -> RelationObservation {
     )
     .expect("relation fixture is valid")
     .with_indexes(vec![complete_index()])
-    .expect("relation-local index structure is valid before snapshot admission")
 }
 
 fn snapshot(kind: RelationKind) -> Result<PostgresSchemaSnapshotV3, ObservationError> {
@@ -63,7 +62,7 @@ fn snapshot(kind: RelationKind) -> Result<PostgresSchemaSnapshotV3, ObservationE
         &support::authorized_source("warehouse_primary", &["public"]),
         "postgres_introspector_v3",
         "2026-09-11T12:46:00Z",
-        vec![indexed_relation(kind)],
+        vec![indexed_relation(kind)?],
         Vec::new(),
         Vec::new(),
     )
@@ -94,7 +93,7 @@ fn index_evidence_is_admitted_only_for_postgresql_indexable_relation_kinds() {
         assert_eq!(
             error,
             ObservationError::InvalidObservationField {
-                field: "index_relation_kind",
+                field: "indexes",
             },
             "unexpected admission result for {kind:?}"
         );

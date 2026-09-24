@@ -7,7 +7,7 @@ use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterExecuteGrant,
 };
 
-fn owner_snapshot() -> IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot {
+fn converter_owner_snapshot() -> IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot {
     let predecessor = converter_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot::new(
         &predecessor,
@@ -77,7 +77,7 @@ fn complete_access_control_observations(
 
 #[test]
 fn ordinary_exclude_transform_converter_acl_preserves_proacl_state_and_execute_grants() {
-    let predecessor = owner_snapshot();
+    let predecessor = converter_owner_snapshot();
     let snapshot = IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
         &predecessor,
         complete_access_control_observations(),
@@ -99,7 +99,7 @@ fn ordinary_exclude_transform_converter_acl_preserves_proacl_state_and_execute_g
 
 #[test]
 fn ordinary_exclude_transform_converter_acl_distinguishes_null_from_explicit_acl() {
-    let predecessor = owner_snapshot();
+    let predecessor = converter_owner_snapshot();
     let explicit = IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
         &predecessor,
         complete_access_control_observations(),
@@ -122,7 +122,7 @@ fn ordinary_exclude_transform_converter_acl_distinguishes_null_from_explicit_acl
 
 #[test]
 fn ordinary_exclude_transform_converter_acl_distinguishes_execute_grant_changes() {
-    let predecessor = owner_snapshot();
+    let predecessor = converter_owner_snapshot();
     let left = IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
         &predecessor,
         complete_access_control_observations(),
@@ -145,7 +145,7 @@ fn ordinary_exclude_transform_converter_acl_distinguishes_execute_grant_changes(
 
 #[test]
 fn ordinary_exclude_transform_converter_acl_rejects_missing_direction() {
-    let predecessor = owner_snapshot();
+    let predecessor = converter_owner_snapshot();
     let error = IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
         &predecessor,
         vec![access_control_observation(
@@ -164,7 +164,7 @@ fn ordinary_exclude_transform_converter_acl_rejects_missing_direction() {
 
 #[test]
 fn ordinary_exclude_transform_converter_acl_rejects_binding_drift() {
-    let predecessor = owner_snapshot();
+    let predecessor = converter_owner_snapshot();
     let mut observations = complete_access_control_observations();
     observations[0] = access_control_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,

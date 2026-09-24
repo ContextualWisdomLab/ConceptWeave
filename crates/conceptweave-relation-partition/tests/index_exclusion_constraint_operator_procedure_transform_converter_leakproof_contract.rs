@@ -5,9 +5,9 @@ use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofSnapshot,
 };
 
-fn security_definer_snapshot(
+fn converter_security_definer_snapshot(
 ) -> IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerSnapshot {
-    let predecessor = configuration_snapshot();
+    let predecessor = converter_configuration_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerSnapshot::new(
         &predecessor,
         complete_security_definer_observations(),
@@ -15,7 +15,7 @@ fn security_definer_snapshot(
     .unwrap()
 }
 
-fn leakproof_observation(
+fn converter_leakproof_observation(
     direction: IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
     function_name: &str,
     leakproof: bool,
@@ -35,12 +35,12 @@ fn leakproof_observation(
 fn complete_leakproof_observations(
 ) -> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofObservation> {
     vec![
-        leakproof_observation(
+        converter_leakproof_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
             "payload_from_sql",
             false,
         ),
-        leakproof_observation(
+        converter_leakproof_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::ToSql,
             "payload_to_sql",
             false,
@@ -50,7 +50,7 @@ fn complete_leakproof_observations(
 
 #[test]
 fn ordinary_exclude_transform_converter_leakproof_preserves_raw_proleakproof() {
-    let predecessor = security_definer_snapshot();
+    let predecessor = converter_security_definer_snapshot();
     let snapshot = IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofSnapshot::new(
         &predecessor,
         complete_leakproof_observations(),
@@ -110,7 +110,7 @@ fn ordinary_exclude_transform_converter_leakproof_location_is_collision_safe_for
 
 #[test]
 fn ordinary_exclude_transform_converter_leakproof_distinguishes_false_from_true() {
-    let predecessor = security_definer_snapshot();
+    let predecessor = converter_security_definer_snapshot();
     let nonleakproof =
         IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofSnapshot::new(
             &predecessor,
@@ -118,7 +118,7 @@ fn ordinary_exclude_transform_converter_leakproof_distinguishes_false_from_true(
         )
         .unwrap();
     let mut changed = complete_leakproof_observations();
-    changed[0] = leakproof_observation(
+    changed[0] = converter_leakproof_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "payload_from_sql",
         true,
@@ -134,10 +134,10 @@ fn ordinary_exclude_transform_converter_leakproof_distinguishes_false_from_true(
 
 #[test]
 fn ordinary_exclude_transform_converter_leakproof_rejects_missing_direction() {
-    let predecessor = security_definer_snapshot();
+    let predecessor = converter_security_definer_snapshot();
     let error = IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofSnapshot::new(
         &predecessor,
-        vec![leakproof_observation(
+        vec![converter_leakproof_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
             "payload_from_sql",
             false,
@@ -152,9 +152,9 @@ fn ordinary_exclude_transform_converter_leakproof_rejects_missing_direction() {
 
 #[test]
 fn ordinary_exclude_transform_converter_leakproof_rejects_binding_drift() {
-    let predecessor = security_definer_snapshot();
+    let predecessor = converter_security_definer_snapshot();
     let mut observations = complete_leakproof_observations();
-    observations[0] = leakproof_observation(
+    observations[0] = converter_leakproof_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "different_from_sql",
         false,
@@ -172,8 +172,8 @@ fn ordinary_exclude_transform_converter_leakproof_rejects_binding_drift() {
 
 #[test]
 fn ordinary_exclude_transform_converter_leakproof_rejects_duplicate_coordinate() {
-    let predecessor = security_definer_snapshot();
-    let observation = leakproof_observation(
+    let predecessor = converter_security_definer_snapshot();
+    let observation = converter_leakproof_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "payload_from_sql",
         false,
@@ -206,7 +206,7 @@ fn ordinary_exclude_transform_converter_leakproof_rejects_zero_position() {
 
 #[test]
 fn ordinary_exclude_transform_converter_leakproof_rejects_unknown_receipt_coordinate() {
-    let predecessor = security_definer_snapshot();
+    let predecessor = converter_security_definer_snapshot();
     let snapshot = IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofSnapshot::new(
         &predecessor,
         complete_leakproof_observations(),

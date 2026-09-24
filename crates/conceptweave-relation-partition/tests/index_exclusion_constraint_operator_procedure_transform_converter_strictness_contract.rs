@@ -5,8 +5,8 @@ use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessSnapshot,
 };
 
-fn leakproof_snapshot() -> IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofSnapshot {
-    let predecessor = security_definer_snapshot();
+fn converter_leakproof_snapshot() -> IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofSnapshot {
+    let predecessor = converter_security_definer_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterLeakproofSnapshot::new(
         &predecessor,
         complete_leakproof_observations(),
@@ -49,7 +49,7 @@ fn complete_converter_strictness_observations(
 
 #[test]
 fn ordinary_exclude_transform_converter_strictness_preserves_raw_proisstrict() {
-    let predecessor = leakproof_snapshot();
+    let predecessor = converter_leakproof_snapshot();
     let snapshot =
         IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessSnapshot::new(
             &predecessor,
@@ -110,7 +110,7 @@ fn ordinary_exclude_transform_converter_strictness_location_is_collision_safe_fo
 
 #[test]
 fn ordinary_exclude_transform_converter_strictness_distinguishes_strict_from_non_strict() {
-    let predecessor = leakproof_snapshot();
+    let predecessor = converter_leakproof_snapshot();
     let strict = IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessSnapshot::new(
         &predecessor,
         complete_converter_strictness_observations(),
@@ -134,7 +134,7 @@ fn ordinary_exclude_transform_converter_strictness_distinguishes_strict_from_non
 
 #[test]
 fn ordinary_exclude_transform_converter_strictness_rejects_missing_direction() {
-    let predecessor = leakproof_snapshot();
+    let predecessor = converter_leakproof_snapshot();
     let error = IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessSnapshot::new(
         &predecessor,
         vec![converter_strictness_observation(
@@ -152,7 +152,7 @@ fn ordinary_exclude_transform_converter_strictness_rejects_missing_direction() {
 
 #[test]
 fn ordinary_exclude_transform_converter_strictness_rejects_extra_coordinate() {
-    let predecessor = leakproof_snapshot();
+    let predecessor = converter_leakproof_snapshot();
     let mut observations = complete_converter_strictness_observations();
     observations.push(
         IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessObservation::new(
@@ -179,7 +179,7 @@ fn ordinary_exclude_transform_converter_strictness_rejects_extra_coordinate() {
 
 #[test]
 fn ordinary_exclude_transform_converter_strictness_rejects_binding_drift() {
-    let predecessor = leakproof_snapshot();
+    let predecessor = converter_leakproof_snapshot();
     let mut observations = complete_converter_strictness_observations();
     observations[0] = converter_strictness_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
@@ -199,7 +199,7 @@ fn ordinary_exclude_transform_converter_strictness_rejects_binding_drift() {
 
 #[test]
 fn ordinary_exclude_transform_converter_strictness_rejects_duplicate_coordinate() {
-    let predecessor = leakproof_snapshot();
+    let predecessor = converter_leakproof_snapshot();
     let observation = converter_strictness_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "payload_from_sql",
@@ -269,7 +269,7 @@ fn ordinary_exclude_transform_converter_strictness_rejects_zero_position() {
 
 #[test]
 fn ordinary_exclude_transform_converter_strictness_rejects_unknown_receipt_coordinate() {
-    let predecessor = leakproof_snapshot();
+    let predecessor = converter_leakproof_snapshot();
     let snapshot =
         IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessSnapshot::new(
             &predecessor,

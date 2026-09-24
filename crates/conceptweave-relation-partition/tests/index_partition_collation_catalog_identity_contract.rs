@@ -20,11 +20,11 @@ struct Registry;
 
 impl SourceConnectionRegistry for Registry {
     fn contains_source_connection(&self, source_connection_key: &str) -> bool {
-        source_connection_key == "warehouse"
+        source_connection_key == "warehouse_primary"
     }
 
     fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
-        (source_connection_key == "warehouse").then(|| POLICY_BINDING.to_owned())
+        (source_connection_key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
 
     fn authorizes_schema_scope(
@@ -32,7 +32,7 @@ impl SourceConnectionRegistry for Registry {
         source_connection: &ResolvedSourceConnection,
         allowed_schema_names: &[String],
     ) -> bool {
-        source_connection.source_connection_key() == "warehouse"
+        source_connection.source_connection_key() == "warehouse_primary"
             && source_connection.connection_policy_binding() == POLICY_BINDING
             && allowed_schema_names == ["public"]
     }
@@ -42,7 +42,7 @@ impl SourceConnectionRegistry for Registry {
         source_connection: &ResolvedSourceConnection,
         resource_envelope: ObservationResourceEnvelope,
     ) -> bool {
-        source_connection.source_connection_key() == "warehouse"
+        source_connection.source_connection_key() == "warehouse_primary"
             && source_connection.connection_policy_binding() == POLICY_BINDING
             && resource_envelope.request_budget().max_schema_count() <= 1
             && resource_envelope.request_budget().max_schema_bytes() <= 256
@@ -56,7 +56,7 @@ impl SourceConnectionRegistry for Registry {
 
 fn authorized_source() -> AuthorizedObservationRequest {
     ObservationRequest::new(
-        "warehouse",
+        "warehouse_primary",
         vec!["public".to_owned()],
         ObservationRequestBudget::new(1, 256).unwrap(),
         ObservationLimits::new(1_000, 10, 1_024, 1).unwrap(),
@@ -319,7 +319,7 @@ fn matching_catalog_row_identity_remains_admissible_and_receiptable() {
     )
     .expect("the same resolved pg_collation row must remain admissible");
 
-    assert_eq!(snapshot.source_connection_key(), "warehouse");
+    assert_eq!(snapshot.source_connection_key(), "warehouse_primary");
     assert_eq!(snapshot.connection_policy_binding(), POLICY_BINDING);
     assert_eq!(snapshot.predecessor_digest(), indexes.snapshot_digest());
     assert!(snapshot.snapshot_digest().starts_with("sha256:"));
@@ -330,7 +330,7 @@ fn matching_catalog_row_identity_remains_admissible_and_receiptable() {
     let receipt = snapshot
         .source_receipt(&child_index(), 1)
         .expect("an observed key must issue exact provenance");
-    assert_eq!(receipt.source_id(), "warehouse");
+    assert_eq!(receipt.source_id(), "warehouse_primary");
     assert_eq!(receipt.connection_policy_binding(), POLICY_BINDING);
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
     assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());

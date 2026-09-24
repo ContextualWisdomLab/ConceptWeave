@@ -6,9 +6,9 @@ use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationSnapshot,
 };
 
-fn access_control_snapshot(
+fn converter_access_control_snapshot(
 ) -> IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot {
-    let predecessor = owner_snapshot();
+    let predecessor = converter_owner_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSnapshot::new(
         &predecessor,
         complete_access_control_observations(),
@@ -16,7 +16,7 @@ fn access_control_snapshot(
     .unwrap()
 }
 
-fn configuration_observation(
+fn converter_configuration_observation(
     direction: IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
     function_name: &str,
     proconfig: Option<Vec<&str>>,
@@ -40,12 +40,12 @@ fn configuration_observation(
 fn complete_configuration_observations(
 ) -> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationObservation> {
     vec![
-        configuration_observation(
+        converter_configuration_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
             "payload_from_sql",
             Some(vec!["search_path=pg_catalog, pg_temp"]),
         ),
-        configuration_observation(
+        converter_configuration_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::ToSql,
             "payload_to_sql",
             None,
@@ -55,7 +55,7 @@ fn complete_configuration_observations(
 
 #[test]
 fn ordinary_exclude_transform_converter_configuration_preserves_exact_proconfig_identity() {
-    let predecessor = access_control_snapshot();
+    let predecessor = converter_access_control_snapshot();
     let snapshot =
         IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationSnapshot::new(
             &predecessor,
@@ -86,15 +86,15 @@ fn ordinary_exclude_transform_converter_configuration_preserves_exact_proconfig_
 
 #[test]
 fn ordinary_exclude_transform_converter_configuration_distinguishes_null_from_empty_array() {
-    let predecessor = access_control_snapshot();
+    let predecessor = converter_access_control_snapshot();
     let mut absent = complete_configuration_observations();
-    absent[0] = configuration_observation(
+    absent[0] = converter_configuration_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "payload_from_sql",
         None,
     );
     let mut empty = complete_configuration_observations();
-    empty[0] = configuration_observation(
+    empty[0] = converter_configuration_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "payload_from_sql",
         Some(vec![]),
@@ -117,7 +117,7 @@ fn ordinary_exclude_transform_converter_configuration_distinguishes_null_from_em
 
 #[test]
 fn ordinary_exclude_transform_converter_configuration_distinguishes_setting_changes() {
-    let predecessor = access_control_snapshot();
+    let predecessor = converter_access_control_snapshot();
     let first =
         IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationSnapshot::new(
             &predecessor,
@@ -125,7 +125,7 @@ fn ordinary_exclude_transform_converter_configuration_distinguishes_setting_chan
         )
         .unwrap();
     let mut changed = complete_configuration_observations();
-    changed[0] = configuration_observation(
+    changed[0] = converter_configuration_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "payload_from_sql",
         Some(vec!["search_path=public"]),
@@ -142,15 +142,15 @@ fn ordinary_exclude_transform_converter_configuration_distinguishes_setting_chan
 
 #[test]
 fn ordinary_exclude_transform_converter_configuration_preserves_catalog_array_order() {
-    let predecessor = access_control_snapshot();
+    let predecessor = converter_access_control_snapshot();
     let mut first_observations = complete_configuration_observations();
-    first_observations[0] = configuration_observation(
+    first_observations[0] = converter_configuration_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "payload_from_sql",
         Some(vec!["search_path=pg_catalog, pg_temp", "work_mem=4MB"]),
     );
     let mut second_observations = complete_configuration_observations();
-    second_observations[0] = configuration_observation(
+    second_observations[0] = converter_configuration_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "payload_from_sql",
         Some(vec!["work_mem=4MB", "search_path=pg_catalog, pg_temp"]),
@@ -173,11 +173,11 @@ fn ordinary_exclude_transform_converter_configuration_preserves_catalog_array_or
 
 #[test]
 fn ordinary_exclude_transform_converter_configuration_rejects_missing_direction() {
-    let predecessor = access_control_snapshot();
+    let predecessor = converter_access_control_snapshot();
     let error =
         IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationSnapshot::new(
             &predecessor,
-            vec![configuration_observation(
+            vec![converter_configuration_observation(
                 IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
                 "payload_from_sql",
                 None,
@@ -192,9 +192,9 @@ fn ordinary_exclude_transform_converter_configuration_rejects_missing_direction(
 
 #[test]
 fn ordinary_exclude_transform_converter_configuration_rejects_binding_drift() {
-    let predecessor = access_control_snapshot();
+    let predecessor = converter_access_control_snapshot();
     let mut observations = complete_configuration_observations();
-    observations[0] = configuration_observation(
+    observations[0] = converter_configuration_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "different_from_sql",
         None,
@@ -213,8 +213,8 @@ fn ordinary_exclude_transform_converter_configuration_rejects_binding_drift() {
 
 #[test]
 fn ordinary_exclude_transform_converter_configuration_rejects_duplicate_coordinate() {
-    let predecessor = access_control_snapshot();
-    let observation = configuration_observation(
+    let predecessor = converter_access_control_snapshot();
+    let observation = converter_configuration_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "payload_from_sql",
         None,
@@ -249,7 +249,7 @@ fn ordinary_exclude_transform_converter_configuration_rejects_zero_position() {
 
 #[test]
 fn ordinary_exclude_transform_converter_configuration_rejects_unknown_receipt_coordinate() {
-    let predecessor = access_control_snapshot();
+    let predecessor = converter_access_control_snapshot();
     let snapshot =
         IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationSnapshot::new(
             &predecessor,

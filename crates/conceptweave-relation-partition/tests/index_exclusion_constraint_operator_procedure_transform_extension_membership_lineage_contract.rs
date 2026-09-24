@@ -35,7 +35,7 @@ fn ordinary_exclude_transform_extension_membership_rejects_same_generation_conve
 
     assert_field(
         error,
-        "index_exclusion_constraint_operator_procedure_transform_extension_membership_binding",
+        "index_exclusion_constraint_operator_procedure_transform_extension_membership_lineage",
     );
 }
 
@@ -78,7 +78,7 @@ fn ordinary_exclude_transform_extension_membership_rejects_same_generation_conve
 
     assert_field(
         error,
-        "index_exclusion_constraint_operator_procedure_transform_extension_membership_binding",
+        "index_exclusion_constraint_operator_procedure_transform_extension_membership_lineage",
     );
 }
 

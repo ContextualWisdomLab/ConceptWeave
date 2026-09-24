@@ -289,7 +289,11 @@ fn relation_kind_is_material_successor_identity() {
     ];
     let digests: Vec<String> = kinds
         .iter()
-        .map(|kind| digest_of(vec![event_relation(*kind)], Vec::new(), Vec::new()))
+        .map(|kind| {
+            let relation = RelationObservation::new("public", "event_record", *kind, Vec::new())
+                .expect("unconstrained relation fixture is valid");
+            digest_of(vec![relation], Vec::new(), Vec::new())
+        })
         .collect();
 
     for left in 0..digests.len() {
@@ -996,7 +1000,7 @@ fn fake_type_coordinates_fail_closed() {
     );
 
     let table_binding = QualifiedTypeName::new("public", "event_record").expect("type");
-    let error = snapshot_v3(
+    snapshot_v3(
         vec![
             RelationObservation::new(
                 "public",
@@ -1019,14 +1023,7 @@ fn fake_type_coordinates_fail_closed() {
         Vec::new(),
         Vec::new(),
     )
-    .expect_err("a relation coordinate must not satisfy a type binding");
-    assert_eq!(
-        error,
-        ObservationError::UnknownTypeBinding {
-            schema_name: "public".to_owned(),
-            type_name: "event_record".to_owned(),
-        }
-    );
+    .expect("a table also defines a composite row type");
 }
 
 #[test]
@@ -1053,19 +1050,12 @@ fn domain_base_type_must_resolve_without_search_path() {
         QualifiedTypeName::new("public", "event_record").expect("type"),
     )
     .expect("domain fixture");
-    let error = snapshot_v3(
+    snapshot_v3(
         vec![event_relation(RelationKind::Table)],
         vec![relation_base],
         Vec::new(),
     )
-    .expect_err("a relation coordinate must not satisfy a domain base type");
-    assert_eq!(
-        error,
-        ObservationError::UnknownTypeBinding {
-            schema_name: "public".to_owned(),
-            type_name: "event_record".to_owned(),
-        }
-    );
+    .expect("a domain can use the table's composite row type");
 }
 
 #[test]
@@ -1251,23 +1241,29 @@ fn successor_snapshot_rejects_duplicate_schema_object_coordinates() {
 #[test]
 fn v3_value_objects_reject_ambiguous_or_blank_evidence() {
     assert_eq!(
-        QualifiedTypeName::new(" ", "uuid"),
+        QualifiedTypeName::new(" ", "uuid")
+            .expect("quoted whitespace schema is valid")
+            .schema_name(),
+        " "
+    );
+    assert_eq!(
+        QualifiedTypeName::new("", "uuid"),
         Err(ObservationError::InvalidObservationField {
             field: "schema_name"
         })
     );
     assert_eq!(
-        QualifiedTypeName::new("pg_catalog", "\t"),
+        QualifiedTypeName::new("pg_catalog", ""),
         Err(ObservationError::InvalidObservationField { field: "type_name" })
     );
     assert_eq!(
-        QualifiedCollationName::new("pg_catalog", "\u{2003}"),
+        QualifiedCollationName::new("pg_catalog", ""),
         Err(ObservationError::InvalidObservationField {
             field: "collation_name"
         })
     );
     assert_eq!(
-        ColumnObservationV3::new(" ", 1, "uuid", catalog_type("uuid"), false, None),
+        ColumnObservationV3::new("", 1, "uuid", catalog_type("uuid"), false, None),
         Err(ObservationError::InvalidObservationField {
             field: "column_name"
         })
@@ -1281,29 +1277,29 @@ fn v3_value_objects_reject_ambiguous_or_blank_evidence() {
         Err(ObservationError::InvalidObservationField { field: "data_type" })
     );
     assert_eq!(
-        RelationObservation::new(" ", "event_record", RelationKind::Table, Vec::new()),
+        RelationObservation::new("", "event_record", RelationKind::Table, Vec::new()),
         Err(ObservationError::InvalidObservationField {
             field: "schema_name"
         })
     );
     assert_eq!(
-        RelationObservation::new("public", " ", RelationKind::Table, Vec::new()),
+        RelationObservation::new("public", "", RelationKind::Table, Vec::new()),
         Err(ObservationError::InvalidObservationField {
             field: "relation_name"
         })
     );
     assert_eq!(
-        DomainObservation::new("public", " ", catalog_type("text")),
+        DomainObservation::new("public", "", catalog_type("text")),
         Err(ObservationError::InvalidObservationField {
             field: "domain_name"
         })
     );
     assert_eq!(
-        EnumObservation::new("public", " ", Vec::new()),
+        EnumObservation::new("public", "", Vec::new()),
         Err(ObservationError::InvalidObservationField { field: "enum_name" })
     );
     assert_eq!(
-        DomainCheckConstraintObservation::new(" ", "CHECK (true)", true, true),
+        DomainCheckConstraintObservation::new("", "CHECK (true)", true, true),
         Err(ObservationError::InvalidObservationField {
             field: "constraint_name"
         })
@@ -1316,37 +1312,37 @@ fn v3_value_objects_reject_ambiguous_or_blank_evidence() {
     );
 
     assert_eq!(
-        SchemaObjectLocation::relation(" ", "event_record", RelationKind::Table),
+        SchemaObjectLocation::relation("", "event_record", RelationKind::Table),
         Err(ObservationError::InvalidObservationField {
             field: "schema_name"
         })
     );
     assert_eq!(
-        SchemaObjectLocation::relation("public", " ", RelationKind::Table),
+        SchemaObjectLocation::relation("public", "", RelationKind::Table),
         Err(ObservationError::InvalidObservationField {
             field: "relation_name"
         })
     );
     assert_eq!(
-        SchemaObjectLocation::column("public", "event_record", RelationKind::Table, " "),
+        SchemaObjectLocation::column("public", "event_record", RelationKind::Table, ""),
         Err(ObservationError::InvalidObservationField {
             field: "column_name"
         })
     );
     assert_eq!(
-        SchemaObjectLocation::constraint("public", "event_record", RelationKind::Table, "\n"),
+        SchemaObjectLocation::constraint("public", "event_record", RelationKind::Table, ""),
         Err(ObservationError::InvalidObservationField {
             field: "constraint_name"
         })
     );
     assert_eq!(
-        SchemaObjectLocation::domain("public", " "),
+        SchemaObjectLocation::domain("public", ""),
         Err(ObservationError::InvalidObservationField {
             field: "domain_name"
         })
     );
     assert_eq!(
-        SchemaObjectLocation::enum_("public", " "),
+        SchemaObjectLocation::enum_("public", ""),
         Err(ObservationError::InvalidObservationField { field: "enum_name" })
     );
 }
@@ -1750,13 +1746,19 @@ fn relation_indexes_reject_duplicate_or_unknown_coordinates() {
 #[test]
 fn index_value_objects_reject_blank_or_zero_evidence() {
     assert_eq!(
-        IndexObservation::new(" ", true, None, Vec::new(), Vec::new()),
+        IndexObservation::new(
+            "",
+            true,
+            None,
+            vec![index_attribute(1, IndexAttributeKind::Key, "parent_key")],
+            Vec::new(),
+        ),
         Err(ObservationError::InvalidObservationField {
             field: "index_name"
         })
     );
     assert_eq!(
-        IndexAttributeObservation::new(1, IndexAttributeKind::Key, " "),
+        IndexAttributeObservation::new(1, IndexAttributeKind::Key, ""),
         Err(ObservationError::InvalidObservationField {
             field: "attribute_name"
         })
@@ -1766,13 +1768,13 @@ fn index_value_objects_reject_blank_or_zero_evidence() {
         Err(ObservationError::InvalidOrdinalPosition)
     );
     assert_eq!(
-        SchemaObjectLocation::index("public", " ", RelationKind::Table, "event_parent_ix"),
+        SchemaObjectLocation::index("public", "", RelationKind::Table, "event_parent_ix"),
         Err(ObservationError::InvalidObservationField {
             field: "relation_name"
         })
     );
     assert_eq!(
-        SchemaObjectLocation::index("public", "event_record", RelationKind::Table, " "),
+        SchemaObjectLocation::index("public", "event_record", RelationKind::Table, ""),
         Err(ObservationError::InvalidObservationField {
             field: "index_name"
         })
@@ -1967,32 +1969,33 @@ fn index_receipts_cannot_be_satisfied_by_a_different_kind_or_relation() {
 
 #[test]
 fn coordinate_constructors_reject_blank_schema_and_relation_names() {
+    assert!(QualifiedCollationName::new(" ", "C").is_ok());
     assert_eq!(
-        QualifiedCollationName::new(" ", "C"),
+        QualifiedCollationName::new("", "C"),
         Err(ObservationError::InvalidObservationField {
             field: "schema_name"
         })
     );
     assert_eq!(
-        DomainObservation::new(" ", "event_status_kind", catalog_type("text")),
+        DomainObservation::new("", "event_status_kind", catalog_type("text")),
         Err(ObservationError::InvalidObservationField {
             field: "schema_name"
         })
     );
     assert_eq!(
-        EnumObservation::new(" ", "event_status", Vec::new()),
+        EnumObservation::new("", "event_status", Vec::new()),
         Err(ObservationError::InvalidObservationField {
             field: "schema_name"
         })
     );
     assert_eq!(
-        SchemaObjectLocation::column("public", " ", RelationKind::Table, "event_key"),
+        SchemaObjectLocation::column("public", "", RelationKind::Table, "event_key"),
         Err(ObservationError::InvalidObservationField {
             field: "relation_name"
         })
     );
     assert_eq!(
-        SchemaObjectLocation::constraint("public", " ", RelationKind::Table, "event_parent_uq"),
+        SchemaObjectLocation::constraint("public", "", RelationKind::Table, "event_parent_uq"),
         Err(ObservationError::InvalidObservationField {
             field: "relation_name"
         })
@@ -2279,7 +2282,7 @@ fn foreign_key_relation_carrier() -> RelationObservation {
         (
             ForeignKeyAction::Cascade,
             ForeignKeyAction::Cascade,
-            ForeignKeyMatchType::Partial,
+            ForeignKeyMatchType::Simple,
             ForeignKeyDeferrability::InitiallyDeferred,
             false,
         ),

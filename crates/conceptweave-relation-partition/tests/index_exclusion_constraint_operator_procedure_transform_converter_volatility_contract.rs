@@ -7,7 +7,7 @@ use conceptweave_relation_partition::{
 
 fn converter_strictness_snapshot(
 ) -> IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessSnapshot {
-    let predecessor = leakproof_snapshot();
+    let predecessor = converter_leakproof_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterStrictnessSnapshot::new(
         &predecessor,
         complete_converter_strictness_observations(),

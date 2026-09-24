@@ -258,7 +258,7 @@ fn validate_schema_relation_namespace(
         .iter()
         .filter(|relation| relation.schema_name() == schema_name)
     {
-        for index in relation
+        for _index in relation
             .indexes()
             .iter()
             .filter(|index| index.index_name() == index_name)

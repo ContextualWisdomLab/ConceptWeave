@@ -5,9 +5,9 @@ use conceptweave_relation_partition::{
     IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerSnapshot,
 };
 
-fn configuration_snapshot(
+fn converter_configuration_snapshot(
 ) -> IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationSnapshot {
-    let predecessor = access_control_snapshot();
+    let predecessor = converter_access_control_snapshot();
     IndexExclusionConstraintOperatorProcedureTransformConverterConfigurationSnapshot::new(
         &predecessor,
         complete_configuration_observations(),
@@ -15,7 +15,7 @@ fn configuration_snapshot(
     .unwrap()
 }
 
-fn security_definer_observation(
+fn converter_security_definer_observation(
     direction: IndexExclusionConstraintOperatorProcedureTransformConverterDirection,
     function_name: &str,
     security_definer: bool,
@@ -35,12 +35,12 @@ fn security_definer_observation(
 fn complete_security_definer_observations(
 ) -> Vec<IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerObservation> {
     vec![
-        security_definer_observation(
+        converter_security_definer_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
             "payload_from_sql",
             false,
         ),
-        security_definer_observation(
+        converter_security_definer_observation(
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::ToSql,
             "payload_to_sql",
             false,
@@ -50,7 +50,7 @@ fn complete_security_definer_observations(
 
 #[test]
 fn ordinary_exclude_transform_converter_security_context_preserves_raw_prosecdef() {
-    let predecessor = configuration_snapshot();
+    let predecessor = converter_configuration_snapshot();
     let snapshot =
         IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerSnapshot::new(
             &predecessor,
@@ -79,7 +79,7 @@ fn ordinary_exclude_transform_converter_security_context_preserves_raw_prosecdef
 
 #[test]
 fn ordinary_exclude_transform_converter_security_context_distinguishes_invoker_from_definer() {
-    let predecessor = configuration_snapshot();
+    let predecessor = converter_configuration_snapshot();
     let invoker =
         IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerSnapshot::new(
             &predecessor,
@@ -87,7 +87,7 @@ fn ordinary_exclude_transform_converter_security_context_distinguishes_invoker_f
         )
         .unwrap();
     let mut changed = complete_security_definer_observations();
-    changed[0] = security_definer_observation(
+    changed[0] = converter_security_definer_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "payload_from_sql",
         true,
@@ -104,11 +104,11 @@ fn ordinary_exclude_transform_converter_security_context_distinguishes_invoker_f
 
 #[test]
 fn ordinary_exclude_transform_converter_security_context_rejects_missing_direction() {
-    let predecessor = configuration_snapshot();
+    let predecessor = converter_configuration_snapshot();
     let error =
         IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerSnapshot::new(
             &predecessor,
-            vec![security_definer_observation(
+            vec![converter_security_definer_observation(
                 IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
                 "payload_from_sql",
                 false,
@@ -123,9 +123,9 @@ fn ordinary_exclude_transform_converter_security_context_rejects_missing_directi
 
 #[test]
 fn ordinary_exclude_transform_converter_security_context_rejects_binding_drift() {
-    let predecessor = configuration_snapshot();
+    let predecessor = converter_configuration_snapshot();
     let mut observations = complete_security_definer_observations();
-    observations[0] = security_definer_observation(
+    observations[0] = converter_security_definer_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "different_from_sql",
         false,
@@ -144,8 +144,8 @@ fn ordinary_exclude_transform_converter_security_context_rejects_binding_drift()
 
 #[test]
 fn ordinary_exclude_transform_converter_security_context_rejects_duplicate_coordinate() {
-    let predecessor = configuration_snapshot();
-    let observation = security_definer_observation(
+    let predecessor = converter_configuration_snapshot();
+    let observation = converter_security_definer_observation(
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "payload_from_sql",
         false,
@@ -180,7 +180,7 @@ fn ordinary_exclude_transform_converter_security_context_rejects_zero_position()
 
 #[test]
 fn ordinary_exclude_transform_converter_security_context_rejects_unknown_receipt_coordinate() {
-    let predecessor = configuration_snapshot();
+    let predecessor = converter_configuration_snapshot();
     let snapshot =
         IndexExclusionConstraintOperatorProcedureTransformConverterSecurityDefinerSnapshot::new(
             &predecessor,

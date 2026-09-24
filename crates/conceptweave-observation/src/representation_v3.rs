@@ -2087,12 +2087,6 @@ impl SuccessorSourceReceipt {
         &self.connection_policy_binding
     }
 
-    /// Returns the immutable canonical successor snapshot digest.
-    #[must_use]
-    pub fn source_digest(&self) -> &str {
-        &self.source_digest
-    }
-
     /// Returns the exact extractor implementation/configuration revision.
     #[must_use]
     pub fn extractor_revision(&self) -> &str {
@@ -2105,11 +2099,6 @@ impl SuccessorSourceReceipt {
         &self.observed_at_utc
     }
 
-    /// Returns the verified exact successor source coordinate inside the snapshot.
-    #[must_use]
-    pub const fn location(&self) -> &SchemaObjectLocation {
-        &self.location
-    }
 }
 
 /// Immutable evidence that one bounded PostgreSQL schema snapshot was observed.

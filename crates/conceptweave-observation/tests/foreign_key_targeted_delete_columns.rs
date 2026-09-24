@@ -70,10 +70,10 @@ fn targeted_set_default_rejects_unknown_or_non_targetable_columns() {
 }
 
 #[test]
-fn targeted_delete_columns_reject_empty_blank_and_duplicate_coordinates() {
+fn targeted_delete_columns_reject_empty_names_and_duplicate_coordinates() {
     for target_columns in [
         Vec::new(),
-        vec![" ".to_owned()],
+        vec![String::new()],
         vec!["author_id".to_owned(), "author_id".to_owned()],
     ] {
         assert!(
@@ -87,6 +87,18 @@ fn targeted_delete_columns_reject_empty_blank_and_duplicate_coordinates() {
             .is_err()
         );
     }
+
+    assert!(
+        ForeignKeyReferenceBehavior::new(
+            ForeignKeyAction::NoAction,
+            ForeignKeyAction::SetNull,
+            ForeignKeyMatchType::Simple,
+            ForeignKeyDeferrability::NotDeferrable,
+        )
+        .with_delete_target_columns(vec![" ".to_owned()])
+        .is_ok(),
+        "quoted whitespace is a valid PostgreSQL column identifier"
+    );
 
     let behavior = ForeignKeyReferenceBehavior::new(
         ForeignKeyAction::NoAction,

@@ -21,15 +21,15 @@ const POLICY_BINDING: &str = "fixture_policy_revision_a";
 struct Registry;
 impl SourceConnectionRegistry for Registry {
     fn contains_source_connection(&self, key: &str) -> bool {
-        key == "warehouse"
+        key == "warehouse_primary"
     }
 
     fn connection_policy_binding(&self, key: &str) -> Option<String> {
-        (key == "warehouse").then(|| POLICY_BINDING.to_owned())
+        (key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
 
     fn authorizes_schema_scope(&self, source: &ResolvedSourceConnection, schemas: &[String]) -> bool {
-        source.source_connection_key() == "warehouse"
+        source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && schemas == ["public"]
     }
@@ -39,7 +39,7 @@ impl SourceConnectionRegistry for Registry {
         source: &ResolvedSourceConnection,
         envelope: ObservationResourceEnvelope,
     ) -> bool {
-        source.source_connection_key() == "warehouse"
+        source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && envelope.request_budget().max_schema_count() <= 1
             && envelope.request_budget().max_schema_bytes() <= 256
@@ -53,7 +53,7 @@ impl SourceConnectionRegistry for Registry {
 
 fn authorized_source() -> AuthorizedObservationRequest {
     ObservationRequest::new(
-        "warehouse",
+        "warehouse_primary",
         vec!["public".to_owned()],
         ObservationRequestBudget::new(1, 256).unwrap(),
         ObservationLimits::new(1_000, 10, 1_024, 1).unwrap(),
@@ -132,27 +132,6 @@ fn stack(specs: &[(&str, &str, &str)]) -> Stack {
     )
     .unwrap();
     stack_from_base(&base, specs)
-}
-
-fn stack_with_extra_relation(
-    relation_name: &str,
-    index_name: &str,
-    constraint_name: &str,
-    extra_relation_name: &str,
-) -> Stack {
-    let base = PostgresSchemaSnapshotV3::new(
-        &authorized_source(),
-        "extractor-index-exclusion-index-name-v1",
-        "2026-09-16T13:42:00Z",
-        vec![
-            relation(relation_name, vec![index(index_name, true)]),
-            relation(extra_relation_name, vec![]),
-        ],
-        vec![],
-        vec![],
-    )
-    .unwrap();
-    stack_from_base(&base, &[(relation_name, index_name, constraint_name)])
 }
 
 fn stack_from_base(base: &PostgresSchemaSnapshotV3, specs: &[(&str, &str, &str)]) -> Stack {
@@ -298,48 +277,46 @@ fn mismatched_constraint_and_backing_index_name_fails_closed() {
 
 #[test]
 fn same_schema_duplicate_backing_index_name_fails_closed() {
-    let stack = stack(&[
-        ("bookings", "shared_no_overlap", "shared_no_overlap"),
-        ("reservations", "shared_no_overlap", "shared_no_overlap"),
-    ]);
-    let error = IndexExclusionConstraintIndexNameSnapshot::new(
-        &stack.base,
-        &stack.relations,
-        &stack.indexes,
-        &stack.constraints,
-        &stack.shapes,
+    let error = PostgresSchemaSnapshotV3::new(
+        &authorized_source(),
+        "extractor-index-exclusion-index-name-v1",
+        "2026-09-16T13:42:00Z",
+        vec![
+            relation("bookings", vec![index("shared_no_overlap", true)]),
+            relation("reservations", vec![index("shared_no_overlap", true)]),
+        ],
+        vec![],
+        vec![],
     )
     .expect_err("pg_class relation names, including indexes, are schema-scoped");
 
     assert_eq!(
         error,
         ObservationError::InvalidObservationField {
-            field: "index_exclusion_constraint_index_name_namespace",
+            field: "schema_relation_namespace",
         }
     );
 }
 
 #[test]
 fn backing_index_name_colliding_with_relation_name_fails_closed() {
-    let stack = stack_with_extra_relation(
-        "bookings",
-        "shared_relation_name",
-        "shared_relation_name",
-        "shared_relation_name",
-    );
-    let error = IndexExclusionConstraintIndexNameSnapshot::new(
-        &stack.base,
-        &stack.relations,
-        &stack.indexes,
-        &stack.constraints,
-        &stack.shapes,
+    let error = PostgresSchemaSnapshotV3::new(
+        &authorized_source(),
+        "extractor-index-exclusion-index-name-v1",
+        "2026-09-16T13:42:00Z",
+        vec![
+            relation("bookings", vec![index("shared_relation_name", true)]),
+            relation("shared_relation_name", vec![]),
+        ],
+        vec![],
+        vec![],
     )
     .expect_err("an index cannot reuse a pg_class relation name in the same schema");
 
     assert_eq!(
         error,
         ObservationError::InvalidObservationField {
-            field: "index_exclusion_constraint_index_name_namespace",
+            field: "schema_relation_namespace",
         }
     );
 }

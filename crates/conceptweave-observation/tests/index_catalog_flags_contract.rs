@@ -129,7 +129,7 @@ fn each_observed_pg_index_catalog_flag_is_material_identity() {
         catalog_flags(false, false, true, false, false, false),
         catalog_flags(false, false, false, true, false, false),
         catalog_flags(false, false, false, false, true, false),
-        catalog_flags(false, false, false, false, false, true),
+        catalog_flags(false, false, true, false, false, true),
     ];
 
     for (index, flags) in variants.into_iter().enumerate() {

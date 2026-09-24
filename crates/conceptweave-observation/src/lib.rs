@@ -292,6 +292,7 @@ impl PostgresSchemaSnapshotV3 {
     }
 
     /// Creates a type-kind-aware v3 snapshot with explicit PRIMARY KEY/UNIQUE timing evidence.
+    #[expect(clippy::too_many_arguments, reason = "preserve public constructor compatibility")]
     pub fn new_with_type_kinds_and_constraint_timings(
         authorized_request: &AuthorizedObservationRequest,
         extractor_revision: impl Into<String>,
@@ -396,6 +397,7 @@ impl PostgresSchemaSnapshotV3 {
     /// family so generated/default expression kind can be checked against source-authoritative `attgenerated` state. The family is
     /// attached before identity, NOT NULL constraint, constraint timing, and PERIOD evidence; reverse-
     /// order attachment is rejected so optional-family order cannot become a semantic escape hatch.
+    #[expect(clippy::too_many_arguments, reason = "preserve public constructor compatibility")]
     pub fn new_with_column_expressions(
         authorized_request: &AuthorizedObservationRequest,
         extractor_revision: impl Into<String>,
@@ -567,6 +569,7 @@ impl PostgresSchemaSnapshotV3 {
     /// The array-aware digest is computed first; timing evidence then adds its own domain-separated
     /// layer. This keeps each observed catalog family explicit while supporting one immutable source
     /// snapshot containing both families.
+    #[expect(clippy::too_many_arguments, reason = "preserve public constructor compatibility")]
     pub fn new_with_array_types_and_constraint_timings(
         authorized_request: &AuthorizedObservationRequest,
         extractor_revision: impl Into<String>,
@@ -1321,16 +1324,14 @@ fn canonicalize_type_kind_observations(
         if let Some(domain) = domains.iter().find(|domain| {
             domain.schema_name() == coordinate.schema_name()
                 && domain.domain_name() == coordinate.type_name()
-        }) {
-            if type_kind.kind() != PostgresTypeKind::Domain
-                || !type_kind
-                    .domain_base_type()
-                    .is_some_and(|base| same_type_coordinate(base, domain.base_type()))
-            {
-                return Err(ObservationError::InvalidObservationField {
-                    field: "type_kind_domain_base",
-                });
-            }
+        }) && (type_kind.kind() != PostgresTypeKind::Domain
+            || !type_kind
+                .domain_base_type()
+                .is_some_and(|base| same_type_coordinate(base, domain.base_type())))
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "type_kind_domain_base",
+            });
         }
         if enums.iter().any(|observed_enum| {
             observed_enum.schema_name() == coordinate.schema_name()
@@ -1781,20 +1782,19 @@ fn canonicalize_constraint_timings(
     let expected_key_coordinates = relations
         .iter()
         .flat_map(|relation| {
-            relation.constraints().iter().filter_map(move |constraint| {
+            relation.constraints().iter().filter(|constraint| {
                 matches!(
                     constraint,
                     TableConstraintObservation::PrimaryKey(_)
                         | TableConstraintObservation::Unique(_)
                 )
-                .then(|| {
-                    (
+            }).map(move |constraint| {
+                (
                         relation.schema_name().to_owned(),
                         relation.relation_name().to_owned(),
                         relation.kind().token().to_owned(),
                         constraint.constraint_name().to_owned(),
-                    )
-                })
+                )
             })
         })
         .collect::<BTreeSet<_>>();
@@ -1916,21 +1916,20 @@ fn canonicalize_constraint_periods(
     let expected_period_coordinates = relations
         .iter()
         .flat_map(|relation| {
-            relation.constraints().iter().filter_map(move |constraint| {
+            relation.constraints().iter().filter(|constraint| {
                 matches!(
                     constraint,
                     TableConstraintObservation::PrimaryKey(_)
                         | TableConstraintObservation::Unique(_)
                         | TableConstraintObservation::ForeignKey(_)
                 )
-                .then(|| {
-                    (
+            }).map(move |constraint| {
+                (
                         relation.schema_name().to_owned(),
                         relation.relation_name().to_owned(),
                         relation.kind().token().to_owned(),
                         constraint.constraint_name().to_owned(),
-                    )
-                })
+                )
             })
         })
         .collect::<BTreeSet<_>>();

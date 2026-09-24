@@ -70,7 +70,7 @@ impl QualifiedOperatorSignature {
     }
 }
 
-/// Stable PostgreSQL procedure identity resolved from an exclusion operator's underlying function.
+/// Stable PostgreSQL procedure identity for an exclusion operator or planner-support function.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct QualifiedProcedureSignature {
     schema_name: String,
@@ -79,7 +79,7 @@ pub struct QualifiedProcedureSignature {
 }
 
 impl QualifiedProcedureSignature {
-    /// Creates one exact binary procedure signature.
+    /// Creates an exact operator or planner-support procedure signature.
     pub fn new(
         schema_name: impl Into<String>,
         procedure_name: impl Into<String>,
@@ -89,7 +89,7 @@ impl QualifiedProcedureSignature {
         let procedure_name = procedure_name.into();
         validate_nonblank(&schema_name, "exclusion_procedure_schema_name")?;
         validate_nonblank(&procedure_name, "exclusion_procedure_name")?;
-        if argument_types.len() != 2 {
+        if !(1..=2).contains(&argument_types.len()) {
             return Err(invalid("exclusion_procedure_argument_types"));
         }
         Ok(Self {

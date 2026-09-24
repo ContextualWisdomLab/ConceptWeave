@@ -28,15 +28,15 @@ const POLICY_BINDING: &str = "fixture_policy_revision_a";
 struct Registry;
 impl SourceConnectionRegistry for Registry {
     fn contains_source_connection(&self, key: &str) -> bool {
-        key == "warehouse"
+        key == "warehouse_primary"
     }
 
     fn connection_policy_binding(&self, key: &str) -> Option<String> {
-        (key == "warehouse").then(|| POLICY_BINDING.to_owned())
+        (key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
 
     fn authorizes_schema_scope(&self, source: &ResolvedSourceConnection, schemas: &[String]) -> bool {
-        source.source_connection_key() == "warehouse"
+        source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && schemas == ["public"]
     }
@@ -46,7 +46,7 @@ impl SourceConnectionRegistry for Registry {
         source: &ResolvedSourceConnection,
         envelope: ObservationResourceEnvelope,
     ) -> bool {
-        source.source_connection_key() == "warehouse"
+        source.source_connection_key() == "warehouse_primary"
             && source.connection_policy_binding() == POLICY_BINDING
             && envelope.request_budget().max_schema_count() <= 1
             && envelope.request_budget().max_schema_bytes() <= 256
@@ -60,7 +60,7 @@ impl SourceConnectionRegistry for Registry {
 
 fn authorized_source() -> AuthorizedObservationRequest {
     ObservationRequest::new(
-        "warehouse",
+        "warehouse_primary",
         vec!["public".to_owned()],
         ObservationRequestBudget::new(1, 256).unwrap(),
         ObservationLimits::new(1_000, 10, 1_024, 1).unwrap(),
@@ -154,7 +154,7 @@ fn operator_snapshot() -> IndexExclusionConstraintOperatorSnapshot {
     let base = PostgresSchemaSnapshotV3::new(
         &authorized_source(),
         "extractor-index-exclusion-result-v1",
-        "2026-09-17T04:20:00+09:00",
+        "2026-09-16T19:20:00Z",
         vec![relation],
         vec![],
         vec![],

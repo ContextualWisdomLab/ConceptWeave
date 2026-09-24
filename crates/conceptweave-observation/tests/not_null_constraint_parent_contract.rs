@@ -323,7 +323,11 @@ fn partition_parent_link_requires_exactly_one_inheritance_ancestor() {
         assert_eq!(
             error,
             ObservationError::InvalidObservationField {
-                field: "not_null_constraint_parent_inheritance_ancestor_count",
+                field: if inheritance_ancestor_count == 0 {
+                    "not_null_constraint_inheritance_origin"
+                } else {
+                    "not_null_constraint_parent_inheritance_ancestor_count"
+                },
             }
         );
     }
@@ -331,6 +335,15 @@ fn partition_parent_link_requires_exactly_one_inheritance_ancestor() {
 
 #[test]
 fn partition_parent_link_rejects_no_inherit_child_constraint() {
+    assert_eq!(
+        NotNullConstraintObservation::new(
+            "public", "metric_2026", RelationKind::Table, "metric_raw_value_not_null",
+            "raw_value", true, true, false, 1, true,
+        ),
+        Err(ObservationError::InvalidObservationField {
+            field: "not_null_constraint_no_inherit_origin",
+        })
+    );
     let child = NotNullConstraintObservation::new(
         "public",
         "metric_2026",
@@ -339,11 +352,11 @@ fn partition_parent_link_rejects_no_inherit_child_constraint() {
         "raw_value",
         true,
         true,
-        false,
-        1,
+        true,
+        0,
         true,
     )
-    .expect("ordinary-table NO INHERIT is valid before partition-parent linkage is attached");
+    .expect("a purely local ordinary-table NO INHERIT constraint is valid");
     let parent = ParentNotNullConstraintCoordinate::new(
         "public",
         "metric",
@@ -359,7 +372,7 @@ fn partition_parent_link_rejects_no_inherit_child_constraint() {
     assert_eq!(
         error,
         ObservationError::InvalidObservationField {
-            field: "not_null_constraint_parent_no_inherit",
+            field: "not_null_constraint_parent_locality",
         }
     );
 }

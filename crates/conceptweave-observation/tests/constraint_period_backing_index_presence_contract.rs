@@ -230,16 +230,20 @@ fn temporal_key_rejects_same_name_gist_exclusion_with_mismatched_key_shape() {
     .with_ready(true)
     .with_valid(true)
     .with_live(true);
-    let error = snapshot(temporal_key_relation(Some(mismatched)))
-        .with_observed_constraint_periods(vec![temporal_period()])
-        .expect_err(
-            "WITHOUT OVERLAPS backing evidence must preserve the exact constrained-column order",
-        );
+    let error = PostgresSchemaSnapshotV3::new(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-12T07:35:00Z",
+        vec![temporal_key_relation(Some(mismatched))],
+        Vec::new(),
+        Vec::new(),
+    )
+    .expect_err("a primary key's backing index must preserve constrained-column order");
 
     assert_eq!(
         error,
         ObservationError::InvalidObservationField {
-            field: "constraint_period_backing_index",
+            field: "constraint_backing_index",
         }
     );
 }

@@ -132,7 +132,7 @@ fn missing_per_key_semantics_fail_closed_before_snapshot_identity() {
 }
 
 #[test]
-fn blank_access_method_fails_closed_when_key_options_need_an_interpretation_context() {
+fn empty_access_method_fails_closed_when_key_options_need_an_interpretation_context() {
     let index = IndexObservation::new(
         "document_title_ix",
         false,
@@ -144,7 +144,7 @@ fn blank_access_method_fails_closed_when_key_options_need_an_interpretation_cont
         Vec::new(),
     )
     .expect("index layout is valid")
-    .with_access_method("   ")
+    .with_access_method("")
     .with_key_semantics(vec![key_semantics(Some("C"), "text_ops", 0)])
     .expect("key semantics match the structural key position");
 
@@ -159,7 +159,7 @@ fn blank_access_method_fails_closed_when_key_options_need_an_interpretation_cont
     )
     .expect("relation fixture is valid")
     .with_indexes(vec![index])
-    .expect_err("per-key option bits require a nonblank observed access method");
+    .expect_err("per-key option bits require an observed access method");
 
     assert_eq!(
         error,

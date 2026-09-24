@@ -43,6 +43,14 @@ impl IndexExclusionConstraintOperatorProcedurePlannerSupportObservation {
         if key_position == 0 {
             return Err(ObservationError::InvalidOrdinalPosition);
         }
+        if planner_support.as_ref().is_some_and(|support| {
+            !matches!(support.argument_types(), [argument]
+                if argument.schema_name() == "pg_catalog" && argument.type_name() == "internal")
+        }) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "exclusion_planner_support_signature",
+            });
+        }
         Ok(Self {
             coordinate,
             key_position,

@@ -17,11 +17,11 @@ struct Registry;
 
 impl SourceConnectionRegistry for Registry {
     fn contains_source_connection(&self, source_connection_key: &str) -> bool {
-        source_connection_key == "warehouse"
+        source_connection_key == "warehouse_primary"
     }
 
     fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
-        (source_connection_key == "warehouse").then(|| POLICY_BINDING.to_owned())
+        (source_connection_key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
     }
 
     fn authorizes_schema_scope(
@@ -29,7 +29,7 @@ impl SourceConnectionRegistry for Registry {
         source_connection: &ResolvedSourceConnection,
         allowed_schema_names: &[String],
     ) -> bool {
-        source_connection.source_connection_key() == "warehouse"
+        source_connection.source_connection_key() == "warehouse_primary"
             && source_connection.connection_policy_binding() == POLICY_BINDING
             && allowed_schema_names == ["public"]
     }
@@ -41,7 +41,7 @@ impl SourceConnectionRegistry for Registry {
     ) -> bool {
         let request_budget = resource_envelope.request_budget();
         let limits = resource_envelope.limits();
-        source_connection.source_connection_key() == "warehouse"
+        source_connection.source_connection_key() == "warehouse_primary"
             && source_connection.connection_policy_binding() == POLICY_BINDING
             && request_budget.max_schema_count() <= 1
             && request_budget.max_schema_bytes() <= 256
@@ -55,7 +55,7 @@ impl SourceConnectionRegistry for Registry {
 
 fn authorized_source() -> AuthorizedObservationRequest {
     ObservationRequest::new(
-        "warehouse",
+        "warehouse_primary",
         vec!["public".to_owned()],
         ObservationRequestBudget::new(1, 256).unwrap(),
         ObservationLimits::new(1_000, 10, 1_024, 1).unwrap(),
