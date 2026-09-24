@@ -270,14 +270,23 @@ fn ordinary_exclusion_rejects_backing_index_binding_drift() {
 }
 
 #[test]
-fn capability_observation_rejects_blank_access_method_name() {
-    let error = IndexExclusionConstraintAccessMethodCapabilityObservation::new(
+fn capability_observation_preserves_quoted_access_method_name() {
+    let observation = IndexExclusionConstraintAccessMethodCapabilityObservation::new(
         constraint_coordinate(),
         backing_index(),
         "  ",
         true,
     )
-    .expect_err("blank access-method identity cannot become governed evidence");
+    .unwrap();
+    assert_eq!(observation.access_method_name(), "  ");
+
+    let error = IndexExclusionConstraintAccessMethodCapabilityObservation::new(
+        constraint_coordinate(),
+        backing_index(),
+        "",
+        true,
+    )
+    .expect_err("empty access-method identity cannot become governed evidence");
     assert_eq!(
         error,
         ObservationError::InvalidObservationField {

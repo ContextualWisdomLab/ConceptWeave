@@ -33,9 +33,9 @@ impl QualifiedOperatorFamilyName {
         let access_method_name = access_method_name.into();
         let schema_name = schema_name.into();
         let operator_family_name = operator_family_name.into();
-        validate_nonblank(&access_method_name, "operator_family_access_method_name")?;
-        validate_nonblank(&schema_name, "operator_family_schema_name")?;
-        validate_nonblank(&operator_family_name, "operator_family_name")?;
+        validate_identifier(&access_method_name, "operator_family_access_method_name")?;
+        validate_identifier(&schema_name, "operator_family_schema_name")?;
+        validate_identifier(&operator_family_name, "operator_family_name")?;
         Ok(Self {
             access_method_name,
             schema_name,
@@ -449,8 +449,8 @@ fn compute_operator_family_digest(
     format!("{SHA256_DIGEST_PREFIX}{:x}", hasher.finalize())
 }
 
-fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
-    if value.trim().is_empty() {
+fn validate_identifier(value: &str, field: &'static str) -> Result<(), ObservationError> {
+    if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }
     Ok(())

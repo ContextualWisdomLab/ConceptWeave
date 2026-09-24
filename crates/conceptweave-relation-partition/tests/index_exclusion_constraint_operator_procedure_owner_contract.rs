@@ -148,20 +148,25 @@ fn ordinary_exclude_operator_procedure_owner_rejects_zero_proowner_oid() {
 }
 
 #[test]
-fn ordinary_exclude_operator_procedure_owner_rejects_blank_resolved_role_name() {
-    let error = IndexExclusionConstraintOperatorProcedureOwnerObservation::new(
-        coordinate(),
-        1,
-        operator("="),
-        procedure("int4eq"),
-        10,
-        "   ",
-    )
-    .expect_err("pg_proc.proowner must resolve to an exact nonblank pg_roles.rolname");
-    assert_field(
-        error,
-        "index_exclusion_constraint_operator_procedure_owner_role_name",
-    );
+fn ordinary_exclude_operator_procedure_owner_preserves_quoted_role_name() {
+    let observation = owner_observation(operator("="), procedure("int4eq"), 10, "   ");
+    assert_eq!(observation.owner_role_name(), "   ");
+
+    for name in ["", "bad\0name"] {
+        let error = IndexExclusionConstraintOperatorProcedureOwnerObservation::new(
+            coordinate(),
+            1,
+            operator("="),
+            procedure("int4eq"),
+            10,
+            name,
+        )
+        .expect_err("an empty or NUL-containing role name cannot come from PostgreSQL");
+        assert_field(
+            error,
+            "index_exclusion_constraint_operator_procedure_owner_role_name",
+        );
+    }
 }
 
 #[test]

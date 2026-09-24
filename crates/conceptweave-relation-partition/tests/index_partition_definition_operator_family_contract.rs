@@ -296,3 +296,53 @@ fn operator_family_evidence_must_be_complete_and_bound_to_the_observed_class() {
         }
     );
 }
+
+#[test]
+fn quoted_operator_family_identifiers_keep_exact_whitespace() {
+    for (access_method, schema, name) in [
+        (" ", "pg_catalog", "text_ops"),
+        ("btree", " ", "text_ops"),
+        ("btree", "pg_catalog", " "),
+    ] {
+        let family = QualifiedOperatorFamilyName::new(access_method, schema, name).unwrap();
+        assert_eq!(family.access_method_name(), access_method);
+        assert_eq!(family.schema_name(), schema);
+        assert_eq!(family.operator_family_name(), name);
+    }
+
+    for (access_method, schema, name) in [
+        ("", "pg_catalog", "text_ops"),
+        ("btree", "", "text_ops"),
+        ("btree", "pg_catalog", ""),
+        ("\0", "pg_catalog", "text_ops"),
+        ("btree", "\0", "text_ops"),
+        ("btree", "pg_catalog", "\0"),
+    ] {
+        assert!(QualifiedOperatorFamilyName::new(access_method, schema, name).is_err());
+    }
+
+    let (base, relations, indexes) = snapshots("text_ops", "varchar_ops");
+    let evidence = IndexOperatorFamilySnapshot::new(
+        &base,
+        &relations,
+        &indexes,
+        vec![
+            family(parent_index(), "text_ops", " "),
+            family(child_index(), "varchar_ops", " "),
+        ],
+    )
+    .unwrap();
+    assert_eq!(
+        evidence.observations()[0]
+            .operator_family()
+            .operator_family_name(),
+        " "
+    );
+    assert_eq!(
+        evidence
+            .source_receipt(&parent_index(), 1)
+            .unwrap()
+            .source_digest(),
+        evidence.snapshot_digest()
+    );
+}

@@ -234,13 +234,18 @@ fn ordinary_exclude_operator_procedure_access_control_rejects_duplicate_effectiv
 }
 
 #[test]
-fn ordinary_exclude_operator_procedure_access_control_rejects_blank_role_identity() {
-    let error = IndexExclusionConstraintOperatorProcedureExecuteGrant::role(" ", "postgres", false)
-        .expect_err("grantee role identity must be explicit");
-    assert_field(
-        error,
-        "index_exclusion_constraint_operator_procedure_access_control_grantee_role_name",
-    );
+fn ordinary_exclude_operator_procedure_access_control_preserves_quoted_role_identity() {
+    IndexExclusionConstraintOperatorProcedureExecuteGrant::role(" ", " ", false).unwrap();
+    IndexExclusionConstraintOperatorProcedureExecuteGrant::public(" ", false).unwrap();
+    for name in ["", "bad\0name"] {
+        let error =
+            IndexExclusionConstraintOperatorProcedureExecuteGrant::role(name, "postgres", false)
+                .expect_err("empty and NUL-containing role names cannot come from PostgreSQL");
+        assert_field(
+            error,
+            "index_exclusion_constraint_operator_procedure_access_control_grantee_role_name",
+        );
+    }
 }
 
 #[test]

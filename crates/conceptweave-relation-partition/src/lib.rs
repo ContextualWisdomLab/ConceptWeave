@@ -802,7 +802,7 @@ fn compute_relation_partition_digest(
 }
 
 fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
-    if value.trim().is_empty() {
+    if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }
     Ok(())
