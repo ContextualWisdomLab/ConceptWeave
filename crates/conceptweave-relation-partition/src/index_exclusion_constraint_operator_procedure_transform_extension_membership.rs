@@ -48,12 +48,12 @@ impl IndexExclusionConstraintOperatorProcedureTransformExtensionMembershipObserv
             return Err(ObservationError::InvalidOrdinalPosition);
         }
         let target_language_name = target_language_name.into();
-        validate_nonblank(
+        validate_postgresql_identifier(
             &target_language_name,
             "index_exclusion_constraint_operator_procedure_transform_extension_membership_language",
         )?;
         if let Some(extension_name) = extension_name.as_deref() {
-            validate_nonblank(
+            validate_postgresql_identifier(
                 extension_name,
                 "index_exclusion_constraint_operator_procedure_transform_extension_membership_extension_name",
             )?;
@@ -516,8 +516,8 @@ fn encode_str(hasher: &mut Sha256, value: &str) {
     hasher.update(value.as_bytes());
 }
 
-fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
-    if value.trim().is_empty() {
+fn validate_postgresql_identifier(value: &str, field: &'static str) -> Result<(), ObservationError> {
+    if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }
     Ok(())

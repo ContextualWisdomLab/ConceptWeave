@@ -201,16 +201,26 @@ fn ordinary_exclude_transform_extension_membership_rejects_completeness_binding_
 }
 
 #[test]
-fn ordinary_exclude_transform_extension_membership_rejects_blank_inputs_and_zero_position() {
+fn ordinary_exclude_transform_extension_membership_rejects_invalid_identifiers_and_zero_position() {
     for (language, extension, field) in [
         (
-            " ",
+            "",
             None,
             "index_exclusion_constraint_operator_procedure_transform_extension_membership_language",
         ),
         (
             "internal",
-            Some("\t"),
+            Some(""),
+            "index_exclusion_constraint_operator_procedure_transform_extension_membership_extension_name",
+        ),
+        (
+            "internal\0",
+            None,
+            "index_exclusion_constraint_operator_procedure_transform_extension_membership_language",
+        ),
+        (
+            "internal",
+            Some("extension\0"),
             "index_exclusion_constraint_operator_procedure_transform_extension_membership_extension_name",
         ),
     ] {
@@ -221,7 +231,7 @@ fn ordinary_exclude_transform_extension_membership_rejects_blank_inputs_and_zero
             language,
             extension.map(str::to_owned),
         )
-        .expect_err("transform identity and extension membership inputs are exact nonblank catalog values");
+        .expect_err("PostgreSQL catalog identifiers cannot be empty or contain NUL");
         assert_field(error, field);
     }
 
