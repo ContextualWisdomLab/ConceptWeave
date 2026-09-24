@@ -2,6 +2,7 @@
 members = [
     "crates/conceptweave-domain",
     "crates/conceptweave-client",
+    "crates/conceptweave-discovery",
     "crates/conceptweave-observation",
     "crates/conceptweave-postgres-adapter",
     "crates/conceptweave-relation-partition",

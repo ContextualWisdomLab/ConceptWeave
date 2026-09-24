@@ -1,8 +1,12 @@
 use std::{collections::BTreeMap, str::FromStr};
 
+use conceptweave_discovery::{ProposalError, ProposedSourceType, propose_relational_model};
+use conceptweave_domain::{CandidateKind, PublicationState, TruthStatus};
 use conceptweave_observation::{
-    CollationProvider, ConstraintDeferrability, ForeignKeyAction, ForeignKeyDeferrability,
-    ForeignKeyMatchType, RelationKind, SchemaObjectLocation, TableConstraintObservation,
+    CollationProvider, ColumnObservationV3, ConstraintDeferrability, EnumObservation,
+    ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType, ForeignKeyObservation,
+    PostgresSchemaSnapshotV3, QualifiedTypeName, RelationKind, RelationObservation,
+    SchemaObjectLocation, TableConstraintObservation,
 };
 use conceptweave_postgres_adapter::{PostgresTlsAdapter, PostgresUnixAdapter};
 use conceptweave_source_port::{
@@ -89,6 +93,134 @@ fn adapter(config: Config) -> PostgresUnixAdapter {
         "fixture_source".to_owned(),
         ("fixture_policy".to_owned(), config),
     )]))
+}
+
+#[test]
+fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
+    let authorized = || authorized_with_limits("public", 128, 16_384);
+    let view = RelationObservation::new("public", "summary", RelationKind::View, vec![]).unwrap();
+    let snapshot = PostgresSchemaSnapshotV3::new(
+        &authorized(),
+        "fixture",
+        "2026-09-25T00:00:00Z",
+        vec![view],
+        vec![],
+        vec![],
+    )
+    .unwrap();
+    assert!(matches!(
+        propose_relational_model(&snapshot),
+        Err(ProposalError::UnsupportedRelationKind)
+    ));
+
+    let column = |name: &str| {
+        ColumnObservationV3::new(
+            name,
+            1,
+            "integer",
+            QualifiedTypeName::new("pg_catalog", "int4").unwrap(),
+            true,
+            None,
+        )
+        .unwrap()
+    };
+    let child = RelationObservation::new(
+        "public",
+        "child",
+        RelationKind::Table,
+        vec![column("parent_id")],
+    )
+    .unwrap()
+    .with_constraints(vec![TableConstraintObservation::ForeignKey(
+        ForeignKeyObservation::new(
+            "child_parent_fk",
+            vec!["parent_id".to_owned()],
+            "public",
+            "parent",
+            vec!["id".to_owned()],
+        )
+        .unwrap(),
+    )])
+    .unwrap();
+    let missing_parent = PostgresSchemaSnapshotV3::new(
+        &authorized(),
+        "fixture",
+        "2026-09-25T00:00:00Z",
+        vec![child.clone()],
+        vec![],
+        vec![],
+    )
+    .unwrap();
+    assert!(matches!(
+        propose_relational_model(&missing_parent),
+        Err(ProposalError::MissingForeignKeyTarget)
+    ));
+
+    let parent =
+        RelationObservation::new("public", "parent", RelationKind::Table, vec![column("id")])
+            .unwrap();
+    let unknown_state = PostgresSchemaSnapshotV3::new(
+        &authorized(),
+        "fixture",
+        "2026-09-25T00:00:00Z",
+        vec![child, parent],
+        vec![],
+        vec![],
+    )
+    .unwrap();
+    assert!(matches!(
+        propose_relational_model(&unknown_state),
+        Err(ProposalError::UnobservedForeignKeyState)
+    ));
+
+    let partial = PostgresSchemaSnapshotV3::new(
+        &authorized(),
+        "fixture",
+        "2026-09-25T00:00:00Z",
+        vec![
+            RelationObservation::new("public", "plain", RelationKind::Table, vec![column("id")])
+                .unwrap(),
+        ],
+        vec![],
+        vec![],
+    )
+    .unwrap();
+    assert!(matches!(
+        propose_relational_model(&partial),
+        Err(ProposalError::IncompleteSourceObservation)
+    ));
+
+    let enums = vec![
+        EnumObservation::new("public", "stage", vec!["draft".to_owned()]).unwrap(),
+        EnumObservation::new("public", "severity", vec!["high".to_owned()]).unwrap(),
+    ];
+    let type_only = PostgresSchemaSnapshotV3::new(
+        &authorized(),
+        "fixture",
+        "2026-09-25T00:00:00Z",
+        vec![],
+        vec![],
+        enums.clone(),
+    )
+    .unwrap();
+    let reordered = PostgresSchemaSnapshotV3::new(
+        &authorized(),
+        "fixture",
+        "2026-09-25T01:00:00Z",
+        vec![],
+        vec![],
+        enums.into_iter().rev().collect(),
+    )
+    .unwrap();
+    let type_proposal = propose_relational_model(&type_only).unwrap();
+    assert_eq!(type_proposal, propose_relational_model(&reordered).unwrap());
+    assert!(type_proposal.concepts().is_empty());
+    assert!(type_proposal.relations().is_empty());
+    assert_eq!(type_proposal.source_types().len(), 2);
+    assert_eq!(
+        type_proposal.source_types()[0].candidate().evidence()[0].source_digest(),
+        type_only.snapshot_digest()
+    );
 }
 
 #[tokio::test]
@@ -188,6 +320,79 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
         assert_eq!(first.domains().len(), 1);
         assert_eq!(first.enums().len(), 1);
         assert_eq!(first.foreign_key_catalog().unwrap().len(), 4);
+        let proposal = propose_relational_model(&first).unwrap();
+        let replay_proposal = propose_relational_model(&replay).unwrap();
+        assert_eq!(proposal, replay_proposal);
+        assert_eq!(proposal.source_digest(), first.snapshot_digest());
+        assert_eq!(proposal.concepts().len(), 4);
+        assert_eq!(proposal.relations().len(), 4);
+        assert_eq!(proposal.source_types().len(), 2);
+        assert!(proposal.source_types().iter().any(|source_type| matches!(
+            source_type,
+            ProposedSourceType::Domain { candidate, observation }
+                if candidate.kind() == CandidateKind::Constraint
+                    && observation.domain_name() == "impact_score"
+                    && candidate.evidence()[0].source_digest() == first.snapshot_digest()
+        )));
+        assert!(proposal.source_types().iter().any(|source_type| matches!(
+            source_type,
+            ProposedSourceType::Enum { candidate, observation }
+                if candidate.kind() == CandidateKind::Dimension
+                    && observation.enum_name() == "risk_level"
+                    && observation.labels() == ["low", "moderate", "high"]
+                    && candidate.evidence()[0].source_digest() == first.snapshot_digest()
+        )));
+        for concept in proposal.concepts() {
+            assert_eq!(
+                concept.candidate().publication_state(),
+                PublicationState::Draft
+            );
+            assert_eq!(concept.candidate().truth_status(), TruthStatus::Inferred);
+            assert_eq!(
+                concept.candidate().evidence()[0].source_digest(),
+                first.snapshot_digest()
+            );
+            for field in concept.fields() {
+                assert_eq!(field.evidence().source_digest(), first.snapshot_digest());
+            }
+            assert!(concept.primary_key_columns().is_some());
+        }
+        let risk = proposal
+            .concepts()
+            .iter()
+            .find(|concept| concept.source_relation() == "risk_record")
+            .unwrap();
+        assert_eq!(risk.source_comment(), Some("Anonymized risk catalog shape"));
+        assert_eq!(
+            risk.fields()
+                .iter()
+                .find(|field| field.source_name() == "title")
+                .unwrap()
+                .source_comment(),
+            Some("Reviewable risk title")
+        );
+        for relationship in proposal.relations() {
+            assert!(proposal.concepts().iter().any(
+                |concept| concept.candidate().candidate_id() == relationship.from_concept_id()
+            ));
+            assert!(
+                proposal
+                    .concepts()
+                    .iter()
+                    .any(|concept| concept.candidate().candidate_id()
+                        == relationship.to_concept_id())
+            );
+            assert!(relationship.validated());
+            assert!(relationship.enforced());
+            assert_eq!(
+                relationship.reference_behavior().delete_action(),
+                ForeignKeyAction::NoAction
+            );
+            assert_eq!(
+                relationship.candidate().evidence()[0].source_digest(),
+                first.snapshot_digest()
+            );
+        }
         let receipt = first
             .source_receipt(
                 SchemaObjectLocation::constraint(
@@ -208,6 +413,21 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             .unwrap();
         let changed = observe().await?;
         assert_ne!(first.snapshot_digest(), changed.snapshot_digest());
+        let changed_proposal = propose_relational_model(&changed).unwrap();
+        assert_ne!(proposal.proposal_id(), changed_proposal.proposal_id());
+        assert_eq!(
+            changed_proposal
+                .concepts()
+                .iter()
+                .find(|concept| concept.source_relation() == "risk_record")
+                .unwrap()
+                .fields()
+                .iter()
+                .find(|field| field.source_name() == "title")
+                .unwrap()
+                .source_comment(),
+            Some("Revised review title")
+        );
         client
             .batch_execute(&format!(
                 "COMMENT ON COLUMN \"{schema}\".risk_record.title IS 'Reviewable risk title'"
@@ -216,6 +436,10 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             .unwrap();
         let restored = observe().await?;
         assert_eq!(first.snapshot_digest(), restored.snapshot_digest());
+        assert_eq!(
+            proposal.proposal_id(),
+            propose_relational_model(&restored).unwrap().proposal_id()
+        );
         Ok::<_, SourceObservationFailure>(())
     }
     .await;

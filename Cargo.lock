@@ -109,6 +109,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "conceptweave-discovery"
+version = "0.1.0"
+dependencies = [
+ "conceptweave-domain",
+ "conceptweave-observation",
+]
+
+[[package]]
 name = "conceptweave-domain"
 version = "0.1.0"
 
@@ -124,6 +132,8 @@ dependencies = [
 name = "conceptweave-postgres-adapter"
 version = "0.1.0"
 dependencies = [
+ "conceptweave-discovery",
+ "conceptweave-domain",
  "conceptweave-observation",
  "conceptweave-source-port",
  "futures-util",

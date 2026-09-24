@@ -17,4 +17,6 @@ tokio-postgres = "=0.7.18"
 tokio-postgres-rustls = { version = "=0.14.0", default-features = false, features = ["ring"] }
 
 [dev-dependencies]
+conceptweave-domain = { path = "../conceptweave-domain" }
+conceptweave-discovery = { path = "../conceptweave-discovery" }
 tokio = { version = "=1.53.1", features = ["macros", "rt-multi-thread", "time"] }
