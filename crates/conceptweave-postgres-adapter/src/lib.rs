@@ -6,13 +6,18 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
-use std::{collections::BTreeMap, future::Future, time::Duration};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    future::Future,
+    time::Duration,
+};
 
 use conceptweave_observation::{
     CheckConstraintObservation, ColumnCollationObservation, ColumnExpressionObservation,
-    ColumnGenerationObservation, ColumnObservationV3, DomainCheckConstraintObservation,
-    DomainObservation, EnumObservation, IndexAttributeKind, IndexAttributeObservation,
-    IndexCatalogFlags, IndexKeySemantics, IndexObservation, IndexStorageOption, IndexTablespace,
+    ColumnGenerationObservation, ColumnObservationV3, ConstraintDeferrability,
+    ConstraintTimingObservation, DomainCheckConstraintObservation, DomainObservation,
+    EnumObservation, IndexAttributeKind, IndexAttributeObservation, IndexCatalogFlags,
+    IndexKeySemantics, IndexObservation, IndexStorageOption, IndexTablespace,
     NotNullConstraintObservation, OperatorClassOption, PostgresSchemaSnapshotV3,
     PrimaryKeyObservation, QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName,
     RelationKind, RelationObservation, ReplicaIdentityMode, TableConstraintObservation,
@@ -528,8 +533,9 @@ async fn capture_catalog(
     let mut column_generations = Vec::new();
     let mut column_expressions = Vec::new();
     let mut not_null_constraints = Vec::new();
+    let mut constraint_timings = Vec::new();
     for relation in relation_rows {
-        let (observed, collations, generations, expressions, not_null) = capture_relation(
+        let (observed, collations, generations, expressions, not_null, timings) = capture_relation(
             &transaction,
             request,
             cancellation,
@@ -543,6 +549,7 @@ async fn capture_catalog(
         column_generations.extend(generations);
         column_expressions.extend(expressions);
         not_null_constraints.extend(not_null);
+        constraint_timings.extend(timings);
     }
     let observed_at_utc: String = field(
         &bounded(
@@ -556,12 +563,13 @@ async fn capture_catalog(
         .await?,
         0,
     )?;
-    let extractor_revision = if relations.is_empty() {
+    let has_relations = !relations.is_empty();
+    let extractor_revision = if !has_relations {
         "postgres18_type_only_adapter_v2"
     } else {
-        "postgres18_column_collation_adapter_v1"
+        "postgres18_constraint_timing_adapter_v1"
     };
-    let snapshot = if relations.is_empty() {
+    let snapshot = if !has_relations {
         PostgresSchemaSnapshotV3::new(
             request,
             extractor_revision,
@@ -586,6 +594,13 @@ async fn capture_catalog(
     .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
     .with_observed_not_null_constraints(not_null_constraints)
     .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+    let snapshot = if has_relations {
+        snapshot
+            .with_observed_constraint_timings(constraint_timings)
+            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
+    } else {
+        snapshot
+    };
     bounded(request, cancellation, transaction.commit()).await?;
     Ok(snapshot)
 }
@@ -604,6 +619,7 @@ async fn capture_relation(
         Vec<ColumnGenerationObservation>,
         Vec<ColumnExpressionObservation>,
         Vec<NotNullConstraintObservation>,
+        Vec<ConstraintTimingObservation>,
     ),
     SourceObservationFailure,
 > {
@@ -612,7 +628,7 @@ async fn capture_relation(
         cancellation,
         transaction.query_one(
             "SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_inherits WHERE inhrelid = $1 OR inhparent = $1), \
-             EXISTS(SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid = $1), \
+             EXISTS(SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid = $1 AND NOT tgisinternal), \
              EXISTS(SELECT 1 FROM pg_catalog.pg_rewrite WHERE ev_class = $1), \
              EXISTS(SELECT 1 FROM pg_catalog.pg_policy WHERE polrelid = $1), \
              EXISTS(SELECT 1 FROM pg_catalog.pg_seclabel WHERE classoid = 'pg_class'::regclass AND objoid = $1), \
@@ -805,7 +821,7 @@ async fn capture_relation(
         relation.oid,
     )
     .await?;
-    let (constraints, not_null) = capture_constraints(
+    let (constraints, not_null, timings) = capture_constraints(
         transaction,
         request,
         cancellation,
@@ -813,6 +829,15 @@ async fn capture_relation(
         &relation,
         expected_check_count,
         (&columns, &indexes),
+    )
+    .await?;
+    validate_constraint_triggers(
+        transaction,
+        request,
+        cancellation,
+        meter,
+        relation.oid,
+        &timings,
     )
     .await?;
     let mut observed =
@@ -826,7 +851,14 @@ async fn capture_relation(
     if let Some(comment) = relation.comment {
         observed = observed.with_source_comment(comment);
     }
-    Ok((observed, collations, generations, expressions, not_null))
+    Ok((
+        observed,
+        collations,
+        generations,
+        expressions,
+        not_null,
+        timings,
+    ))
 }
 
 async fn capture_constraints(
@@ -841,6 +873,7 @@ async fn capture_constraints(
     (
         Vec<TableConstraintObservation>,
         Vec<NotNullConstraintObservation>,
+        Vec<ConstraintTimingObservation>,
     ),
     SourceObservationFailure,
 > {
@@ -877,6 +910,7 @@ async fn capture_constraints(
     tokio::pin!(stream);
     let mut constraints = Vec::new();
     let mut not_null = Vec::new();
+    let mut timings = Vec::new();
     let mut check_count = 0;
     while let Some(row) = bounded(request, cancellation, stream.try_next()).await? {
         let name: String = field(&row, 0)?;
@@ -901,7 +935,7 @@ async fn capture_constraints(
             || [9, 13, 14, 17]
                 .into_iter()
                 .any(|index| field::<bool>(&row, index) != Ok(true))
-            || [10, 11, 15, 18, 19]
+            || [15, 18, 19]
                 .into_iter()
                 .any(|index| field::<bool>(&row, index) != Ok(false))
             || !field::<bool>(&row, 7)?
@@ -911,7 +945,11 @@ async fn capture_constraints(
             return Err(SourceObservationFailure::InvalidCapturedMetadata);
         }
         let constraint = match kind.as_str() {
-            "c" if field::<bool>(&row, 12)? && field::<bool>(&row, 16)? => {
+            "c" if field::<bool>(&row, 12)?
+                && field::<bool>(&row, 16)?
+                && !field::<bool>(&row, 10)?
+                && !field::<bool>(&row, 11)? =>
+            {
                 check_count += 1;
                 TableConstraintObservation::Check(
                     CheckConstraintObservation::new(
@@ -927,6 +965,8 @@ async fn capture_constraints(
             "n" if field::<bool>(&row, 12)?
                 && !field::<bool>(&row, 16)?
                 && field::<bool>(&row, 5)?
+                && !field::<bool>(&row, 10)?
+                && !field::<bool>(&row, 11)?
                 && backing_name.is_none() =>
             {
                 let key = key.ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
@@ -961,6 +1001,22 @@ async fn capture_constraints(
                     && field::<bool>(&row, 5)?
                     && field::<bool>(&row, 6)? =>
             {
+                let deferrability = match (field(&row, 10)?, field(&row, 11)?) {
+                    (false, false) => ConstraintDeferrability::NotDeferrable,
+                    (true, false) => ConstraintDeferrability::InitiallyImmediate,
+                    (true, true) => ConstraintDeferrability::InitiallyDeferred,
+                    (false, true) => return Err(SourceObservationFailure::InvalidCapturedMetadata),
+                };
+                timings.push(
+                    ConstraintTimingObservation::new(
+                        &relation.schema,
+                        &relation.name,
+                        RelationKind::Table,
+                        &name,
+                        deferrability,
+                    )
+                    .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+                );
                 let key = key.ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
                 let names = key
                     .into_iter()
@@ -1024,7 +1080,63 @@ async fn capture_constraints(
     if check_count != expected_count as usize {
         return Err(SourceObservationFailure::InvalidCapturedMetadata);
     }
-    Ok((constraints, not_null))
+    Ok((constraints, not_null, timings))
+}
+
+async fn validate_constraint_triggers(
+    transaction: &Transaction<'_>,
+    request: &AuthorizedObservationRequest,
+    cancellation: &dyn ObservationCancellation,
+    meter: &mut CaptureMeter,
+    relation_oid: u32,
+    timings: &[ConstraintTimingObservation],
+) -> Result<(), SourceObservationFailure> {
+    // PostgreSQL 18 uses tgtype 21 (ROW | INSERT | UPDATE, AFTER) for the one
+    // internal uniqueness recheck trigger of each deferrable key constraint.
+    let expected = timings
+        .iter()
+        .filter(|timing| timing.deferrability() != ConstraintDeferrability::NotDeferrable)
+        .map(|timing| timing.constraint_name().to_owned())
+        .collect::<BTreeSet<_>>();
+    let stream = bounded(
+        request,
+        cancellation,
+        transaction.query_raw(
+            "SELECT c.conname::text, COALESCE( \
+             t.tgisinternal AND c.conrelid = $1 AND c.contype IN ('p', 'u') \
+             AND c.condeferrable AND c.conindid <> 0 \
+             AND pn.nspname = 'pg_catalog' AND p.proname = 'unique_key_recheck' \
+             AND t.tgenabled = 'O' AND t.tgtype = 21 AND t.tgnargs = 0 \
+             AND octet_length(t.tgargs) = 0 \
+             AND t.tgattr::text = '' AND t.tgqual IS NULL \
+             AND t.tgoldtable IS NULL AND t.tgnewtable IS NULL \
+             AND t.tgparentid = 0 AND t.tgconstrrelid = 0 \
+             AND t.tgconstrindid = c.conindid \
+             AND t.tgdeferrable = c.condeferrable \
+             AND t.tginitdeferred = c.condeferred, false) \
+             FROM pg_catalog.pg_trigger t \
+             LEFT JOIN pg_catalog.pg_constraint c ON c.oid = t.tgconstraint \
+             LEFT JOIN pg_catalog.pg_proc p ON p.oid = t.tgfoid \
+             LEFT JOIN pg_catalog.pg_namespace pn ON pn.oid = p.pronamespace \
+             WHERE t.tgrelid = $1 ORDER BY t.tgname, t.oid",
+            vec![&relation_oid as &(dyn ToSql + Sync)],
+        ),
+    )
+    .await?;
+    tokio::pin!(stream);
+    let mut observed = BTreeSet::new();
+    while let Some(row) = bounded(request, cancellation, stream.try_next()).await? {
+        let name: Option<String> = field(&row, 0)?;
+        meter.add(request, 32 + name.as_ref().map_or(0, String::len))?;
+        let name = name.ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
+        if !field::<bool>(&row, 1)? || !expected.contains(&name) || !observed.insert(name) {
+            return Err(SourceObservationFailure::InvalidCapturedMetadata);
+        }
+    }
+    if observed != expected {
+        return Err(SourceObservationFailure::InvalidCapturedMetadata);
+    }
+    Ok(())
 }
 
 async fn capture_indexes(

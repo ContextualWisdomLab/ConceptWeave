@@ -1,6 +1,8 @@
 use std::{collections::BTreeMap, str::FromStr};
 
-use conceptweave_observation::{RelationKind, SchemaObjectLocation, TableConstraintObservation};
+use conceptweave_observation::{
+    ConstraintDeferrability, RelationKind, SchemaObjectLocation, TableConstraintObservation,
+};
 use conceptweave_postgres_adapter::{PostgresTlsAdapter, PostgresUnixAdapter};
 use conceptweave_source_port::{
     ObservationCancellation, ObservationLimits, ObservationRequest, ObservationRequestBudget,
@@ -473,12 +475,41 @@ async fn postgres18_catalog_is_observed_in_one_read_only_transaction() {
             ))
             .await
             .unwrap();
-        assert_eq!(
-            adapter(config.clone())
-                .observe(authorized(&schema), &NotCancelled)
-                .await
-                .err(),
-            Some(SourceObservationFailure::InvalidCapturedMetadata)
+        let initially_immediate = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        assert!(initially_immediate.constraint_timings().unwrap().iter().any(|timing| {
+            timing.constraint_name() == "item_deferred"
+                && timing.deferrability() == ConstraintDeferrability::InitiallyImmediate
+        }));
+        initially_immediate
+            .source_receipt(
+                SchemaObjectLocation::constraint(
+                    &schema,
+                    "item",
+                    RelationKind::Table,
+                    "item_deferred",
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        client
+            .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".item DROP CONSTRAINT item_deferred; \
+                 ALTER TABLE \"{schema}\".item ADD CONSTRAINT item_deferred UNIQUE (other) DEFERRABLE INITIALLY DEFERRED"
+            ))
+            .await
+            .unwrap();
+        let initially_deferred = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        assert!(initially_deferred.constraint_timings().unwrap().iter().any(|timing| {
+            timing.constraint_name() == "item_deferred"
+                && timing.deferrability() == ConstraintDeferrability::InitiallyDeferred
+        }));
+        assert_ne!(
+            initially_immediate.snapshot_digest(),
+            initially_deferred.snapshot_digest()
         );
         client
             .batch_execute(&format!(
@@ -561,7 +592,7 @@ async fn postgres18_catalog_is_observed_in_one_read_only_transaction() {
             .is_err());
         client
             .batch_execute(&format!(
-                "CREATE TABLE \"{schema}\".keyed (id integer PRIMARY KEY)"
+                "CREATE TABLE \"{schema}\".keyed (id integer PRIMARY KEY DEFERRABLE INITIALLY DEFERRED)"
             ))
             .await
             .unwrap();
@@ -579,6 +610,10 @@ async fn postgres18_catalog_is_observed_in_one_read_only_transaction() {
                 if primary.constraint_name() == "keyed_pkey"
                     && primary.column_names() == ["id"]
         )));
+        assert!(with_primary_key.constraint_timings().unwrap().iter().any(|timing| {
+            timing.constraint_name() == "keyed_pkey"
+                && timing.deferrability() == ConstraintDeferrability::InitiallyDeferred
+        }));
         assert!(with_primary_key
             .not_null_constraints()
             .unwrap()

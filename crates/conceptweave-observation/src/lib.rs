@@ -851,10 +851,17 @@ impl PostgresSchemaSnapshotV3 {
         Ok(self)
     }
 
-    fn with_observed_constraint_timings(
+    /// Adds complete PRIMARY KEY and UNIQUE deferrability evidence after column and NOT NULL
+    /// families. The backing index must agree with every observed timing state.
+    pub fn with_observed_constraint_timings(
         mut self,
         constraint_timings: Vec<ConstraintTimingObservation>,
     ) -> Result<Self, ObservationError> {
+        if self.constraint_timings_observed || self.constraint_periods_observed {
+            return Err(ObservationError::InvalidObservationField {
+                field: "constraint_timing_observation_order",
+            });
+        }
         let constraint_timings =
             canonicalize_constraint_timings(&self.relations, constraint_timings)?;
         self.snapshot_digest =
