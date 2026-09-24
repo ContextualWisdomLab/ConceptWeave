@@ -1,5 +1,8 @@
 use std::{collections::BTreeMap, str::FromStr};
 
+use conceptweave_alignment::{
+    AlignmentDecision, AlignmentError, align_relational_proposal, validate_alignment,
+};
 use conceptweave_discovery::{ProposalError, ProposedSourceType, propose_relational_model};
 use conceptweave_domain::{CandidateKind, PublicationState, TruthStatus};
 use conceptweave_observation::{
@@ -221,6 +224,91 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         type_proposal.source_types()[0].candidate().evidence()[0].source_digest(),
         type_only.snapshot_digest()
     );
+
+    let first_id = type_proposal.source_types()[0].candidate().candidate_id();
+    let second_id = type_proposal.source_types()[1].candidate().candidate_id();
+    let decisions = vec![
+        AlignmentDecision::map(first_id, "risk.severity", "Severity", "Fixture glossary").unwrap(),
+        AlignmentDecision::exclude(second_id, "Not part of this model").unwrap(),
+    ];
+    let aligned = align_relational_proposal(
+        &type_proposal,
+        type_proposal.proposal_id(),
+        decisions.clone(),
+    )
+    .unwrap();
+    let reversed = align_relational_proposal(
+        &type_proposal,
+        type_proposal.proposal_id(),
+        decisions.into_iter().rev().collect(),
+    )
+    .unwrap();
+    assert_eq!(aligned, reversed);
+    let validated = validate_alignment(&aligned).unwrap();
+    assert_eq!(validated.proposal_id(), type_proposal.proposal_id());
+    assert_eq!(validated.source_digest(), type_only.snapshot_digest());
+    assert_eq!(validated.validation().source_bound_candidates(), 2);
+    assert_eq!(validated.validation().unique_semantic_ids(), 1);
+    assert_eq!(validated.validation().mapped_relations_with_endpoints(), 0);
+    assert_eq!(
+        validated.candidates()[0].candidate().publication_state(),
+        PublicationState::Validated
+    );
+    assert_eq!(
+        validated.candidates()[1].candidate().publication_state(),
+        PublicationState::Rejected
+    );
+    assert!(matches!(
+        align_relational_proposal(&type_proposal, "stale", vec![]),
+        Err(AlignmentError::StaleProposal)
+    ));
+    assert!(matches!(
+        align_relational_proposal(
+            &type_proposal,
+            type_proposal.proposal_id(),
+            vec![AlignmentDecision::exclude(first_id, "Omit").unwrap()]
+        ),
+        Err(AlignmentError::MissingDecision)
+    ));
+    assert!(matches!(
+        align_relational_proposal(
+            &type_proposal,
+            type_proposal.proposal_id(),
+            vec![
+                AlignmentDecision::exclude(first_id, "Omit").unwrap(),
+                AlignmentDecision::exclude(second_id, "Omit").unwrap(),
+                AlignmentDecision::exclude("absent", "Omit").unwrap(),
+            ]
+        ),
+        Err(AlignmentError::UnknownCandidate)
+    ));
+    assert!(matches!(
+        align_relational_proposal(
+            &type_proposal,
+            type_proposal.proposal_id(),
+            vec![
+                AlignmentDecision::exclude(first_id, "Omit").unwrap(),
+                AlignmentDecision::exclude(first_id, "Omit again").unwrap(),
+            ]
+        ),
+        Err(AlignmentError::DuplicateDecision)
+    ));
+    assert_eq!(
+        AlignmentDecision::map(first_id, "\0", "Name", "Fixture").unwrap_err(),
+        AlignmentError::InvalidText("semantic_id")
+    );
+    assert!(matches!(
+        align_relational_proposal(
+            &type_proposal,
+            type_proposal.proposal_id(),
+            vec![
+                AlignmentDecision::map(first_id, "same", "First", "Fixture").unwrap(),
+                AlignmentDecision::map(second_id, "same", "Second", "Fixture").unwrap(),
+            ]
+        )
+        .and_then(|candidate| validate_alignment(&candidate)),
+        Err(AlignmentError::DuplicateSemanticIdentity)
+    ));
 }
 
 #[tokio::test]
@@ -327,6 +415,90 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
         assert_eq!(proposal.concepts().len(), 4);
         assert_eq!(proposal.relations().len(), 4);
         assert_eq!(proposal.source_types().len(), 2);
+        let decisions = proposal
+            .concepts()
+            .iter()
+            .enumerate()
+            .map(|(index, concept)| {
+                AlignmentDecision::map(
+                    concept.candidate().candidate_id(),
+                    format!("fixture.concept.{index}"),
+                    format!("Fixture concept {index}"),
+                    "Explicit fixture glossary mapping",
+                )
+                .unwrap()
+            })
+            .chain(
+                proposal
+                    .relations()
+                    .iter()
+                    .enumerate()
+                    .map(|(index, relation)| {
+                        AlignmentDecision::map(
+                            relation.candidate().candidate_id(),
+                            format!("fixture.relation.{index}"),
+                            format!("Fixture relation {index}"),
+                            "Explicit fixture relationship mapping",
+                        )
+                        .unwrap()
+                    }),
+            )
+            .chain(
+                proposal
+                    .source_types()
+                    .iter()
+                    .enumerate()
+                    .map(|(index, source_type)| {
+                        AlignmentDecision::map(
+                            source_type.candidate().candidate_id(),
+                            format!("fixture.type.{index}"),
+                            format!("Fixture type {index}"),
+                            "Explicit fixture type mapping",
+                        )
+                        .unwrap()
+                    }),
+            )
+            .collect::<Vec<_>>();
+        let aligned =
+            align_relational_proposal(&proposal, proposal.proposal_id(), decisions.clone())
+                .unwrap();
+        assert_eq!(
+            aligned,
+            align_relational_proposal(
+                &replay_proposal,
+                replay_proposal.proposal_id(),
+                decisions.clone(),
+            )
+            .unwrap()
+        );
+        let validated = validate_alignment(&aligned).unwrap();
+        assert_eq!(validated.candidates().len(), 10);
+        assert_eq!(validated.validation().source_bound_candidates(), 10);
+        assert_eq!(validated.validation().unique_semantic_ids(), 10);
+        assert_eq!(validated.validation().mapped_relations_with_endpoints(), 4);
+        assert!(validated.candidates().iter().all(|candidate| {
+            candidate.candidate().publication_state() == PublicationState::Validated
+                && candidate.candidate().truth_status() == TruthStatus::Inferred
+                && candidate.candidate().evidence()[0].source_digest() == first.snapshot_digest()
+        }));
+        let excluded_concept_id = proposal.concepts()[0].candidate().candidate_id();
+        let excluded = decisions
+            .into_iter()
+            .map(|decision| {
+                if decision.candidate_id() == excluded_concept_id {
+                    AlignmentDecision::exclude(excluded_concept_id, "Fixture endpoint excluded")
+                        .unwrap()
+                } else {
+                    decision
+                }
+            })
+            .collect();
+        let invalid =
+            align_relational_proposal(&proposal, proposal.proposal_id(), excluded).unwrap();
+        assert_eq!(
+            validate_alignment(&invalid).unwrap_err(),
+            AlignmentError::ExcludedRelationEndpoint
+        );
         assert!(proposal.source_types().iter().any(|source_type| matches!(
             source_type,
             ProposedSourceType::Domain { candidate, observation }
