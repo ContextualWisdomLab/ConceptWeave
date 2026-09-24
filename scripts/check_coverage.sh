@@ -16,7 +16,6 @@ jq -r '
   | select(
       .summary.lines.percent != 100
       or .summary.functions.percent != 100
-      or .summary.regions.percent != 100
     )
   | "COVERAGE_GAP file=\(.filename) lines=\(.summary.lines.percent) functions=\(.summary.functions.percent) regions=\(.summary.regions.percent)"
 ' coverage.json
@@ -109,9 +108,10 @@ jq -r '
 
 jq -e '
   .data[0].totals.lines.percent == 100 and
-  .data[0].totals.functions.percent == 100 and
-  .data[0].totals.regions.percent == 100
+  .data[0].totals.functions.percent == 100
 ' coverage.json >/dev/null
 
-jq -e 'all(.[]; .count > 0)' source-regions.json >/dev/null
+# LLVM's raw region summary can disagree across Rust generic instantiations.
+# Gate every distinct code and expansion source region collected above instead.
+jq -e 'length > 0 and all(.[]; .count > 0)' source-regions.json >/dev/null
 jq -e 'all(.[]; .true_count > 0 and .false_count > 0)' source-branches.json >/dev/null

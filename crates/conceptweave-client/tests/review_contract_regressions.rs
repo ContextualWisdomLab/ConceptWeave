@@ -126,7 +126,8 @@ fn public_contract_and_coverage_gates_encode_the_reviewed_fail_closed_rules() {
     );
     assert!(
         !coverage_gate.contains("select(.[6] == 0)")
-            && coverage_gate.contains(".data[0].totals.regions.percent == 100"),
-        "coverage must retain expansion regions and independently enforce LLVM total region coverage"
+            && coverage_gate.contains("select(.[7] == 0 or .[7] == 1)")
+            && coverage_gate.contains("length > 0 and all(.[]; .count > 0)"),
+        "coverage must retain and gate every distinct code and expansion source region"
     );
 }
