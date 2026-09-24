@@ -8,9 +8,10 @@
 use std::{collections::BTreeMap, future::Future, time::Duration};
 
 use conceptweave_observation::{
-    ColumnObservationV3, DomainCheckConstraintObservation, DomainObservation, EnumObservation,
-    PostgresSchemaSnapshotV3, QualifiedCollationName, QualifiedTypeName, RelationKind,
-    RelationObservation, ReplicaIdentityMode,
+    ColumnExpressionObservation, ColumnGenerationObservation, ColumnObservationV3,
+    DomainCheckConstraintObservation, DomainObservation, EnumObservation, PostgresSchemaSnapshotV3,
+    QualifiedCollationName, QualifiedTypeName, RelationKind, RelationObservation,
+    ReplicaIdentityMode,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, SourceObservationFailure,
@@ -447,18 +448,21 @@ async fn capture_catalog(
         }
     }
     let mut relations = Vec::new();
+    let mut column_generations = Vec::new();
+    let mut column_expressions = Vec::new();
     for relation in relation_rows {
-        relations.push(
-            capture_relation(
-                &transaction,
-                request,
-                cancellation,
-                &mut meter,
-                max_bytes,
-                relation,
-            )
-            .await?,
-        );
+        let (observed, generations, expressions) = capture_relation(
+            &transaction,
+            request,
+            cancellation,
+            &mut meter,
+            max_bytes,
+            relation,
+        )
+        .await?;
+        relations.push(observed);
+        column_generations.extend(generations);
+        column_expressions.extend(expressions);
     }
     let observed_at_utc: String = field(
         &bounded(
@@ -475,16 +479,29 @@ async fn capture_catalog(
     let extractor_revision = if relations.is_empty() {
         "postgres18_type_only_adapter_v1"
     } else {
-        "postgres18_simple_relation_adapter_v1"
+        "postgres18_column_expression_adapter_v1"
     };
-    let snapshot = PostgresSchemaSnapshotV3::new(
-        request,
-        extractor_revision,
-        observed_at_utc,
-        relations,
-        domains,
-        enums,
-    )
+    let snapshot = if relations.is_empty() {
+        PostgresSchemaSnapshotV3::new(
+            request,
+            extractor_revision,
+            observed_at_utc,
+            relations,
+            domains,
+            enums,
+        )
+    } else {
+        PostgresSchemaSnapshotV3::new_with_column_expressions(
+            request,
+            extractor_revision,
+            observed_at_utc,
+            relations,
+            domains,
+            enums,
+            column_generations,
+            column_expressions,
+        )
+    }
     .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
     bounded(request, cancellation, transaction.commit()).await?;
     Ok(snapshot)
@@ -497,7 +514,14 @@ async fn capture_relation(
     meter: &mut CaptureMeter,
     max_bytes: i64,
     relation: RelationRow,
-) -> Result<RelationObservation, SourceObservationFailure> {
+) -> Result<
+    (
+        RelationObservation,
+        Vec<ColumnGenerationObservation>,
+        Vec<ColumnExpressionObservation>,
+    ),
+    SourceObservationFailure,
+> {
     let unsupported = bounded(
         request,
         cancellation,
@@ -530,8 +554,13 @@ async fn capture_relation(
                THEN pg_catalog.col_description(a.attrelid, a.attnum) END, \
              a.atthasdef, a.attgenerated::text, a.attidentity::text, a.attisdropped, \
              a.attcollation <> 0, a.attacl IS NOT NULL, a.attoptions IS NOT NULL, \
-             COALESCE(octet_length(pg_catalog.col_description(a.attrelid, a.attnum)) > $2::bigint, false) \
+             COALESCE(octet_length(pg_catalog.col_description(a.attrelid, a.attnum)) > $2::bigint, false), \
+             CASE WHEN octet_length(pg_catalog.pg_get_expr(ad.adbin, ad.adrelid)) <= $2::bigint \
+               THEN pg_catalog.pg_get_expr(ad.adbin, ad.adrelid) END, \
+             COALESCE(octet_length(pg_catalog.pg_get_expr(ad.adbin, ad.adrelid)) > $2::bigint, false), \
+             a.atthasmissing \
              FROM pg_catalog.pg_attribute a \
+             LEFT JOIN pg_catalog.pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum \
              LEFT JOIN pg_catalog.pg_type t ON t.oid = a.atttypid \
              LEFT JOIN pg_catalog.pg_namespace tn ON tn.oid = t.typnamespace \
              WHERE a.attrelid = $1 AND a.attnum > 0 ORDER BY a.attnum",
@@ -541,6 +570,8 @@ async fn capture_relation(
     .await?;
     tokio::pin!(stream);
     let mut columns = Vec::new();
+    let mut generations = Vec::new();
+    let mut expressions = Vec::new();
     while let Some(row) = bounded(request, cancellation, stream.try_next()).await? {
         let name: String = field(&row, 0)?;
         let ordinal: i16 = field(&row, 1)?;
@@ -551,7 +582,8 @@ async fn capture_relation(
         let comment: Option<String> = field(&row, 6)?;
         let generated: String = field(&row, 8)?;
         let identity: String = field(&row, 9)?;
-        if field::<bool>(&row, 14)? {
+        let expression: Option<String> = field(&row, 15)?;
+        if field::<bool>(&row, 14)? || field::<bool>(&row, 16)? {
             return Err(SourceObservationFailure::ByteLimitExceeded {
                 max_bytes: request.request().limits().max_bytes(),
             });
@@ -562,12 +594,14 @@ async fn capture_relation(
                 + data_type.as_ref().map_or(0, String::len)
                 + type_schema.as_ref().map_or(0, String::len)
                 + type_name.as_ref().map_or(0, String::len)
-                + comment.as_ref().map_or(0, String::len),
+                + comment.as_ref().map_or(0, String::len)
+                + expression.as_ref().map_or(0, String::len),
         )?;
         if ordinal <= 0
-            || !generated.is_empty()
             || !identity.is_empty()
-            || [7, 10, 11, 12, 13]
+            || field::<bool>(&row, 7)? != expression.is_some()
+            || field::<bool>(&row, 17)?
+            || [10, 11, 12, 13]
                 .into_iter()
                 .any(|index| field::<bool>(&row, index) != Ok(false))
         {
@@ -578,6 +612,54 @@ async fn capture_relation(
         else {
             return Err(SourceObservationFailure::InvalidCapturedMetadata);
         };
+        let generation = match generated.as_str() {
+            "" => ColumnGenerationObservation::not_generated(
+                &relation.schema,
+                &relation.name,
+                RelationKind::Table,
+                &name,
+            ),
+            "s" => ColumnGenerationObservation::stored(
+                &relation.schema,
+                &relation.name,
+                RelationKind::Table,
+                &name,
+            ),
+            "v" => ColumnGenerationObservation::virtual_generated(
+                &relation.schema,
+                &relation.name,
+                RelationKind::Table,
+                &name,
+            ),
+            _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
+        }
+        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+        let observed_expression = match (generated.as_str(), expression) {
+            ("", None) => ColumnExpressionObservation::no_expression(
+                &relation.schema,
+                &relation.name,
+                RelationKind::Table,
+                &name,
+            ),
+            ("", Some(value)) => ColumnExpressionObservation::default_expression(
+                &relation.schema,
+                &relation.name,
+                RelationKind::Table,
+                &name,
+                value,
+            ),
+            ("s" | "v", Some(value)) => ColumnExpressionObservation::generation_expression(
+                &relation.schema,
+                &relation.name,
+                RelationKind::Table,
+                &name,
+                value,
+            ),
+            _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
+        }
+        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+        generations.push(generation);
+        expressions.push(observed_expression);
         columns.push(
             ColumnObservationV3::new(
                 name,
@@ -598,7 +680,7 @@ async fn capture_relation(
     if let Some(comment) = relation.comment {
         observed = observed.with_source_comment(comment);
     }
-    Ok(observed)
+    Ok((observed, generations, expressions))
 }
 
 fn field<T>(row: &Row, index: usize) -> Result<T, SourceObservationFailure>

@@ -282,16 +282,44 @@ async fn postgres18_catalog_is_observed_in_one_read_only_transaction() {
 
         client
             .batch_execute(&format!(
-                "CREATE TABLE \"{schema}\".defaulted (id integer DEFAULT 1)"
+                "CREATE TABLE \"{schema}\".defaulted (id integer DEFAULT 1, \
+                 doubled integer GENERATED ALWAYS AS (id * 2) STORED, \
+                 tripled integer GENERATED ALWAYS AS (id * 3) VIRTUAL)"
             ))
             .await
             .unwrap();
-        assert_eq!(
-            adapter(config.clone())
-                .observe(authorized(&schema), &NotCancelled)
-                .await
-                .err(),
-            Some(SourceObservationFailure::InvalidCapturedMetadata)
+        let with_expressions = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        let expressions = with_expressions.column_expressions().unwrap();
+        let generations = with_expressions.column_generations().unwrap();
+        assert!(
+            expressions
+                .iter()
+                .any(|value| { value.column_name() == "id" && value.is_default_expression() })
+        );
+        assert!(
+            expressions.iter().any(|value| {
+                value.column_name() == "doubled" && value.is_generation_expression()
+            })
+        );
+        assert!(
+            generations
+                .iter()
+                .any(|value| { value.column_name() == "tripled" && value.is_virtual_generated() })
+        );
+        client
+            .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".defaulted ALTER COLUMN id SET DEFAULT 2"
+            ))
+            .await
+            .unwrap();
+        let changed_default = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        assert_ne!(
+            with_expressions.snapshot_digest(),
+            changed_default.snapshot_digest()
         );
         client
             .batch_execute(&format!("DROP TABLE \"{schema}\".defaulted"))
