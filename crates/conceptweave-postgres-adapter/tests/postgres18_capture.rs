@@ -428,6 +428,45 @@ async fn postgres18_catalog_is_observed_in_one_read_only_transaction() {
             ))
             .await
             .unwrap();
+        let with_hash = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        let item = with_hash
+            .relations()
+            .iter()
+            .find(|relation| relation.relation_name() == "item")
+            .unwrap();
+        assert!(item.indexes().iter().any(|index| {
+            index.index_name() == "item_hash_idx" && index.access_method() == Some("hash")
+        }));
+        client
+            .batch_execute(&format!(
+                "ALTER INDEX \"{schema}\".item_id_idx SET (fillfactor = 80)"
+            ))
+            .await
+            .unwrap();
+        let with_storage_option = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        let item = with_storage_option
+            .relations()
+            .iter()
+            .find(|relation| relation.relation_name() == "item")
+            .unwrap();
+        let index = item
+            .indexes()
+            .iter()
+            .find(|index| index.index_name() == "item_id_idx")
+            .unwrap();
+        assert_eq!(index.storage_options().unwrap()[0].name(), "fillfactor");
+        assert_eq!(index.storage_options().unwrap()[0].value(), "80");
+        assert_ne!(with_hash.snapshot_digest(), with_storage_option.snapshot_digest());
+        client
+            .batch_execute(&format!(
+                "ALTER INDEX \"{schema}\".item_expr_idx ALTER COLUMN 2 SET STATISTICS 1000"
+            ))
+            .await
+            .unwrap();
         assert_eq!(
             adapter(config.clone())
                 .observe(authorized(&schema), &NotCancelled)
