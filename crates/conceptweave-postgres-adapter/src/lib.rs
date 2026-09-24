@@ -724,7 +724,10 @@ async fn capture_indexes(
              EXISTS(SELECT 1 FROM pg_catalog.pg_depend WHERE classid = 'pg_class'::regclass AND objid = c.oid AND deptype = 'e'), \
              EXISTS(SELECT 1 FROM pg_catalog.pg_description WHERE classoid = 'pg_class'::regclass AND objoid = c.oid AND objsubid > 0), \
              EXISTS(SELECT 1 FROM pg_catalog.pg_attribute WHERE attrelid = c.oid AND attnum > 0 \
-               AND (attoptions IS NOT NULL OR attacl IS NOT NULL OR attisdropped)) \
+               AND (attoptions IS NOT NULL OR attacl IS NOT NULL OR attisdropped)), \
+             CASE WHEN octet_length(pg_catalog.pg_get_expr(i.indpred, i.indrelid, false)) <= $2::bigint \
+               THEN pg_catalog.pg_get_expr(i.indpred, i.indrelid, false) END, \
+             COALESCE(octet_length(pg_catalog.pg_get_expr(i.indpred, i.indrelid, false)) > $2::bigint, false) \
              FROM pg_catalog.pg_index i \
              JOIN pg_catalog.pg_class c ON c.oid = i.indexrelid \
              JOIN pg_catalog.pg_class t ON t.oid = i.indrelid \
@@ -750,7 +753,8 @@ async fn capture_indexes(
         let tablespace: Option<String> = field(&row, 23)?;
         let definition: Option<String> = field(&row, 25)?;
         let comment: Option<String> = field(&row, 26)?;
-        if field::<bool>(&row, 27)? {
+        let predicate: Option<String> = field(&row, 33)?;
+        if field::<bool>(&row, 27)? || field::<bool>(&row, 34)? {
             return Err(SourceObservationFailure::ByteLimitExceeded {
                 max_bytes: request.request().limits().max_bytes(),
             });
@@ -763,16 +767,19 @@ async fn capture_indexes(
                 + access_method.as_ref().map_or(0, String::len)
                 + tablespace.as_ref().map_or(0, String::len)
                 + definition.as_ref().map_or(0, String::len)
-                + comment.as_ref().map_or(0, String::len),
+                + comment.as_ref().map_or(0, String::len)
+                + predicate.as_ref().map_or(0, String::len),
         )?;
         if kind != "i"
             || persistence != "p"
             || access_method.as_deref() != Some("btree")
             || total <= 0
-            || total != key_count
+            || key_count <= 0
+            || key_count > total
             || definition.is_none()
             || tablespace.is_none()
-            || [4, 5, 6, 21, 22, 29, 30, 31, 32]
+            || field::<bool>(&row, 22)? != predicate.is_some()
+            || [4, 5, 6, 29, 30, 31, 32]
                 .into_iter()
                 .any(|index| field::<bool>(&row, index) != Ok(false))
             || !field::<bool>(&row, 28)?
@@ -786,9 +793,14 @@ async fn capture_indexes(
             transaction.query_raw(
                 "SELECT s.position, i.indkey[s.position], a.attname::text, \
                  ocn.nspname::text, oc.opcname::text, cn.nspname::text, coll.collname::text, \
-                 i.indoption[s.position] \
+                 i.indoption[s.position], \
+                 CASE WHEN i.indkey[s.position] = 0 \
+                   AND octet_length(pg_catalog.pg_get_indexdef(i.indexrelid, s.position + 1, false)) <= $2::bigint \
+                   THEN pg_catalog.pg_get_indexdef(i.indexrelid, s.position + 1, false) END, \
+                 COALESCE(i.indkey[s.position] = 0 \
+                   AND octet_length(pg_catalog.pg_get_indexdef(i.indexrelid, s.position + 1, false)) > $2::bigint, false) \
                  FROM pg_catalog.pg_index i \
-                 CROSS JOIN LATERAL pg_catalog.generate_series(0, i.indnkeyatts - 1) s(position) \
+                 CROSS JOIN LATERAL pg_catalog.generate_series(0, i.indnatts - 1) s(position) \
                  LEFT JOIN pg_catalog.pg_attribute a ON a.attrelid = i.indrelid \
                    AND a.attnum = i.indkey[s.position] AND NOT a.attisdropped \
                  LEFT JOIN pg_catalog.pg_opclass oc ON oc.oid = i.indclass[s.position] \
@@ -796,13 +808,15 @@ async fn capture_indexes(
                  LEFT JOIN pg_catalog.pg_collation coll ON coll.oid = i.indcollation[s.position] \
                  LEFT JOIN pg_catalog.pg_namespace cn ON cn.oid = coll.collnamespace \
                  WHERE i.indexrelid = $1 ORDER BY s.position",
-                &[&index_oid],
+                vec![&index_oid as &(dyn ToSql + Sync), &max_bytes],
             ),
         )
         .await?;
         tokio::pin!(attributes);
         let mut keys = Vec::new();
+        let mut includes = Vec::new();
         let mut semantics = Vec::new();
+        let mut expression_count = 0;
         while let Some(attribute) = bounded(request, cancellation, attributes.try_next()).await? {
             let position: i32 = field(&attribute, 0)?;
             let attnum: i16 = field(&attribute, 1)?;
@@ -811,24 +825,52 @@ async fn capture_indexes(
             let opclass_name: Option<String> = field(&attribute, 4)?;
             let collation_schema: Option<String> = field(&attribute, 5)?;
             let collation_name: Option<String> = field(&attribute, 6)?;
-            let options: i16 = field(&attribute, 7)?;
+            let options: Option<i16> = field(&attribute, 7)?;
+            let expression: Option<String> = field(&attribute, 8)?;
+            if field::<bool>(&attribute, 9)? {
+                return Err(SourceObservationFailure::ByteLimitExceeded {
+                    max_bytes: request.request().limits().max_bytes(),
+                });
+            }
             meter.add(
                 request,
                 12 + column.as_ref().map_or(0, String::len)
                     + opclass_schema.as_ref().map_or(0, String::len)
                     + opclass_name.as_ref().map_or(0, String::len)
                     + collation_schema.as_ref().map_or(0, String::len)
-                    + collation_name.as_ref().map_or(0, String::len),
+                    + collation_name.as_ref().map_or(0, String::len)
+                    + expression.as_ref().map_or(0, String::len),
             )?;
-            let (Some(column), Some(opclass_schema), Some(opclass_name)) =
-                (column, opclass_schema, opclass_name)
-            else {
-                return Err(SourceObservationFailure::InvalidCapturedMetadata);
-            };
-            if attnum <= 0 || position < 0 || position as usize != keys.len() {
+            if position < 0 || position as usize != keys.len() + includes.len() {
                 return Err(SourceObservationFailure::InvalidCapturedMetadata);
             }
             let position = position as u32 + 1;
+            if position > key_count as u32 {
+                if attnum <= 0
+                    || expression.is_some()
+                    || opclass_schema.is_some()
+                    || opclass_name.is_some()
+                    || collation_schema.is_some()
+                    || collation_name.is_some()
+                    || options.is_some()
+                {
+                    return Err(SourceObservationFailure::InvalidCapturedMetadata);
+                }
+                includes.push(
+                    IndexAttributeObservation::column(
+                        position,
+                        IndexAttributeKind::Include,
+                        column.ok_or(SourceObservationFailure::InvalidCapturedMetadata)?,
+                    )
+                    .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+                );
+                continue;
+            }
+            let (Some(opclass_schema), Some(opclass_name), Some(options)) =
+                (opclass_schema, opclass_name, options)
+            else {
+                return Err(SourceObservationFailure::InvalidCapturedMetadata);
+            };
             let collation = match (collation_schema, collation_name) {
                 (Some(schema), Some(name)) => Some(
                     QualifiedCollationName::new(schema, name)
@@ -837,10 +879,17 @@ async fn capture_indexes(
                 (None, None) => None,
                 _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
             };
-            keys.push(
-                IndexAttributeObservation::column(position, IndexAttributeKind::Key, column)
-                    .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
-            );
+            let key = match (attnum, column, expression) {
+                (0, None, Some(value)) => {
+                    expression_count += 1;
+                    IndexAttributeObservation::expression(position, IndexAttributeKind::Key, value)
+                }
+                (number, Some(value), None) if number > 0 => {
+                    IndexAttributeObservation::column(position, IndexAttributeKind::Key, value)
+                }
+                _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
+            };
+            keys.push(key.map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?);
             semantics.push(
                 IndexKeySemantics::new(
                     position,
@@ -852,7 +901,10 @@ async fn capture_indexes(
                 .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
             );
         }
-        if keys.len() != key_count as usize {
+        if keys.len() != key_count as usize
+            || keys.len() + includes.len() != total as usize
+            || field::<bool>(&row, 21)? != (expression_count > 0)
+        {
             return Err(SourceObservationFailure::InvalidCapturedMetadata);
         }
         let flags = IndexCatalogFlags::new(
@@ -874,7 +926,7 @@ async fn capture_indexes(
             field(&row, 10)?,
             Some(field(&row, 11)?),
             keys,
-            Vec::new(),
+            includes,
         )
         .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
         .with_access_method("btree")
@@ -889,6 +941,9 @@ async fn capture_indexes(
         .with_valid(field(&row, 18)?)
         .with_live(field(&row, 19)?)
         .with_index_definition(definition.unwrap());
+        if let Some(predicate) = predicate {
+            index = index.with_predicate(predicate);
+        }
         if let Some(comment) = comment {
             index = index.with_source_comment(comment);
         }

@@ -203,7 +203,7 @@ async fn postgres18_catalog_is_observed_in_one_read_only_transaction() {
 
         client
             .batch_execute(&format!(
-                "CREATE TABLE \"{schema}\".item (id integer); \
+                "CREATE TABLE \"{schema}\".item (id integer, other integer); \
                  COMMENT ON TABLE \"{schema}\".item IS 'items'"
             ))
             .await
@@ -213,7 +213,7 @@ async fn postgres18_catalog_is_observed_in_one_read_only_transaction() {
             .await?;
         assert_eq!(with_table.relations().len(), 1);
         assert_eq!(with_table.relations()[0].source_comment(), Some("items"));
-        assert_eq!(with_table.relations()[0].columns().len(), 1);
+        assert_eq!(with_table.relations()[0].columns().len(), 2);
         assert_eq!(
             with_table.relations()[0].columns()[0]
                 .type_binding()
@@ -388,7 +388,43 @@ async fn postgres18_catalog_is_observed_in_one_read_only_transaction() {
         assert_ne!(changed_index.snapshot_digest(), with_unique.snapshot_digest());
         client
             .batch_execute(&format!(
-                "CREATE INDEX item_expr_idx ON \"{schema}\".item ((id + 1))"
+                "CREATE INDEX item_expr_idx ON \"{schema}\".item (id, (other + 1)) INCLUDE (other) WHERE id > 0"
+            ))
+            .await
+            .unwrap();
+        let with_expression_index = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        let item = with_expression_index
+            .relations()
+            .iter()
+            .find(|relation| relation.relation_name() == "item")
+            .unwrap();
+        let expression_index = item
+            .indexes()
+            .iter()
+            .find(|index| index.index_name() == "item_expr_idx")
+            .unwrap();
+        assert_eq!(expression_index.key_attributes()[0].attribute_name(), Some("id"));
+        assert!(expression_index.key_attributes()[1]
+            .expression_text()
+            .unwrap()
+            .contains("other"));
+        assert_eq!(
+            expression_index.include_attributes()[0].attribute_name(),
+            Some("other")
+        );
+        assert!(expression_index.predicate().unwrap().contains("id"));
+        with_expression_index
+            .source_receipt(
+                SchemaObjectLocation::index(&schema, "item", RelationKind::Table, "item_expr_idx")
+                    .unwrap(),
+            )
+            .unwrap();
+        assert_ne!(with_unique.snapshot_digest(), with_expression_index.snapshot_digest());
+        client
+            .batch_execute(&format!(
+                "CREATE INDEX item_hash_idx ON \"{schema}\".item USING hash (id)"
             ))
             .await
             .unwrap();
