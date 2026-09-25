@@ -648,7 +648,14 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             .query(
                 "SELECT t.relname::text, i.relname::text, am.amname::text, \
                  pg_catalog.pg_get_indexdef(i.oid), x.indisunique, x.indnullsnotdistinct, \
-                 x.indisready, x.indisvalid, x.indislive \
+                 x.indisready, x.indisvalid, x.indislive, \
+                 x.indnkeyatts, x.indnatts, pg_catalog.pg_get_expr(x.indpred, x.indrelid), \
+                 x.indisprimary, x.indisexclusion, x.indimmediate, x.indisclustered, \
+                 x.indcheckxmin, x.indisreplident, \
+                 ARRAY(SELECT a.attname::text \
+                   FROM generate_series(0, x.indnatts - 1) AS s(pos) \
+                   JOIN pg_catalog.pg_attribute a ON a.attrelid = t.oid \
+                     AND a.attnum = x.indkey[s.pos] ORDER BY s.pos) \
                  FROM pg_catalog.pg_index x \
                  JOIN pg_catalog.pg_class t ON t.oid = x.indrelid \
                  JOIN pg_catalog.pg_class i ON i.oid = x.indexrelid \
@@ -685,6 +692,26 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
                 assert_eq!(index.ready(), Some(row.get::<_, bool>(6)));
                 assert_eq!(index.valid(), Some(row.get::<_, bool>(7)));
                 assert_eq!(index.live(), Some(row.get::<_, bool>(8)));
+                let key_count = usize::try_from(row.get::<_, i16>(9)).unwrap();
+                let total_count = usize::try_from(row.get::<_, i16>(10)).unwrap();
+                assert_eq!(index.key_attributes().len(), key_count);
+                assert_eq!(index.include_attributes().len(), total_count - key_count);
+                assert_eq!(index.predicate(), row.get::<_, Option<String>>(11).as_deref());
+                let flags = index.catalog_flags().unwrap();
+                assert_eq!(flags.primary(), row.get::<_, bool>(12));
+                assert_eq!(flags.exclusion(), row.get::<_, bool>(13));
+                assert_eq!(flags.immediate(), row.get::<_, bool>(14));
+                assert_eq!(flags.clustered(), row.get::<_, bool>(15));
+                assert_eq!(flags.check_xmin(), row.get::<_, bool>(16));
+                assert_eq!(flags.replica_identity(), row.get::<_, bool>(17));
+                let catalog_key_names: Vec<String> = row.get(18);
+                let observed_key_names = index
+                    .key_attributes()
+                    .iter()
+                    .chain(index.include_attributes())
+                    .map(|attribute| attribute.attribute_name().unwrap().to_owned())
+                    .collect::<Vec<_>>();
+                assert_eq!(observed_key_names, catalog_key_names);
                 (relation_name, index_name)
             })
             .collect::<BTreeSet<_>>();

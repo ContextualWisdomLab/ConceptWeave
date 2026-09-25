@@ -36,5 +36,7 @@ CREATE TABLE "__SCHEMA__".risk_control_link (
         REFERENCES "__SCHEMA__".control_record (tenant_id, control_id)
 );
 CREATE INDEX risk_record_level_idx ON "__SCHEMA__".risk_record (level);
+CREATE INDEX risk_record_title_idx ON "__SCHEMA__".risk_record (title)
+    INCLUDE (level) WHERE title IS NOT NULL;
 COMMENT ON TABLE "__SCHEMA__".risk_record IS 'Anonymized risk catalog shape';
 COMMENT ON COLUMN "__SCHEMA__".risk_record.title IS 'Reviewable risk title';
