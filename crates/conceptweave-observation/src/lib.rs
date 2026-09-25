@@ -8,6 +8,7 @@
 
 mod array_type;
 mod collation_definition;
+mod column_array_dimensions;
 mod column_collation;
 mod column_expression;
 mod column_generation;
@@ -28,6 +29,7 @@ pub use collation_definition::{
     CollationDefinitionObservation, CollationLocaleFields, CollationProvider,
     DatabaseLocaleDefinition,
 };
+pub use column_array_dimensions::ColumnArrayDimensionsObservation;
 pub use column_collation::ColumnCollationObservation;
 pub use column_expression::ColumnExpressionObservation;
 pub use column_generation::ColumnGenerationObservation;
@@ -147,6 +149,8 @@ pub struct PostgresSchemaSnapshotV3 {
     type_kinds_observed: bool,
     type_owners: Vec<TypeOwnerObservation>,
     type_owners_observed: bool,
+    column_array_dimensions: Vec<ColumnArrayDimensionsObservation>,
+    column_array_dimensions_observed: bool,
     column_collations: Vec<ColumnCollationObservation>,
     column_collations_observed: bool,
     column_generations: Vec<ColumnGenerationObservation>,
@@ -214,6 +218,8 @@ impl PostgresSchemaSnapshotV3 {
             type_kinds_observed: false,
             type_owners: Vec::new(),
             type_owners_observed: false,
+            column_array_dimensions: Vec::new(),
+            column_array_dimensions_observed: false,
             column_collations: Vec::new(),
             column_collations_observed: false,
             column_generations: Vec::new(),
@@ -316,6 +322,8 @@ impl PostgresSchemaSnapshotV3 {
             type_kinds_observed: true,
             type_owners: Vec::new(),
             type_owners_observed: false,
+            column_array_dimensions: Vec::new(),
+            column_array_dimensions_observed: false,
             column_collations: Vec::new(),
             column_collations_observed: false,
             column_generations: Vec::new(),
@@ -608,6 +616,8 @@ impl PostgresSchemaSnapshotV3 {
             type_kinds_observed: false,
             type_owners: Vec::new(),
             type_owners_observed: false,
+            column_array_dimensions: Vec::new(),
+            column_array_dimensions_observed: false,
             column_collations: Vec::new(),
             column_collations_observed: false,
             column_generations: Vec::new(),
@@ -1308,6 +1318,32 @@ impl PostgresSchemaSnapshotV3 {
         Ok(self)
     }
 
+    /// Adds exact declared array dimensions for every bounded column after all earlier families.
+    /// The historical v3 and prior successor digests remain reproducible.
+    pub fn with_observed_column_array_dimensions(
+        mut self,
+        observations: Vec<ColumnArrayDimensionsObservation>,
+    ) -> Result<Self, ObservationError> {
+        if !self.collation_definitions_observed
+            || !self.array_types_observed
+            || self.column_array_dimensions_observed
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "column_array_dimensions_observation_order",
+            });
+        }
+        let observations = column_array_dimensions::canonicalize(
+            &self.relations,
+            &self.array_types,
+            observations,
+        )?;
+        self.snapshot_digest =
+            column_array_dimensions::digest(&self.snapshot_digest, &observations);
+        self.column_array_dimensions = observations;
+        self.column_array_dimensions_observed = true;
+        Ok(self)
+    }
+
     /// Returns the stable source-connection registry reference, never a credential.
     #[must_use]
     pub fn source_connection_key(&self) -> &str {
@@ -1377,6 +1413,13 @@ impl PostgresSchemaSnapshotV3 {
     pub fn type_owners(&self) -> Option<&[TypeOwnerObservation]> {
         self.type_owners_observed
             .then_some(self.type_owners.as_slice())
+    }
+
+    /// Returns complete declared column-array dimensions, or `None` when unobserved.
+    #[must_use]
+    pub fn column_array_dimensions(&self) -> Option<&[ColumnArrayDimensionsObservation]> {
+        self.column_array_dimensions_observed
+            .then_some(self.column_array_dimensions.as_slice())
     }
 
     /// Returns explicitly observed PostgreSQL column-collation evidence, or `None` when that catalog

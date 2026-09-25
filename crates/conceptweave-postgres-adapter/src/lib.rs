@@ -17,16 +17,17 @@ use std::{
 };
 
 use conceptweave_observation::{
-    ArrayTypeObservation, CheckConstraintObservation, ColumnCollationObservation,
-    ColumnExpressionObservation, ColumnGenerationObservation, ColumnIdentityObservation,
-    ColumnObservationV3, ConstraintDeferrability, ConstraintPeriodObservation,
-    ConstraintTimingObservation, DomainCheckConstraintObservation, DomainObservation,
-    EnumObservation, IdentitySequenceObservation, IndexAttributeKind, IndexAttributeObservation,
-    IndexCatalogFlags, IndexKeySemantics, IndexObservation, IndexStorageOption, IndexTablespace,
-    NotNullConstraintObservation, OperatorClassOption, PostgresSchemaSnapshotV3, PostgresTypeKind,
-    PrimaryKeyObservation, QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName,
-    RelationKind, RelationObservation, RelationOwnerObservation, RelationTablespaceObservation,
-    ReplicaIdentityMode, TableConstraintObservation, TypeKindObservation, TypeOwnerObservation,
+    ArrayTypeObservation, CheckConstraintObservation, ColumnArrayDimensionsObservation,
+    ColumnCollationObservation, ColumnExpressionObservation, ColumnGenerationObservation,
+    ColumnIdentityObservation, ColumnObservationV3, ConstraintDeferrability,
+    ConstraintPeriodObservation, ConstraintTimingObservation, DomainCheckConstraintObservation,
+    DomainObservation, EnumObservation, IdentitySequenceObservation, IndexAttributeKind,
+    IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics, IndexObservation,
+    IndexStorageOption, IndexTablespace, NotNullConstraintObservation, OperatorClassOption,
+    PostgresSchemaSnapshotV3, PostgresTypeKind, PrimaryKeyObservation, QualifiedCollationName,
+    QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
+    RelationOwnerObservation, RelationTablespaceObservation, ReplicaIdentityMode,
+    TableConstraintObservation, TypeKindObservation, TypeOwnerObservation,
     UniqueConstraintObservation,
 };
 use conceptweave_source_port::{
@@ -764,6 +765,7 @@ async fn capture_catalog(
     let mut relation_oids = Vec::new();
     let mut key_timings = Vec::new();
     let mut column_collations = Vec::new();
+    let mut column_array_dimensions = Vec::new();
     let mut column_generations = Vec::new();
     let mut column_expressions = Vec::new();
     let mut column_identities = Vec::new();
@@ -790,17 +792,26 @@ async fn capture_catalog(
             );
         }
         relation_oids.push(relation.oid);
-        let (observed, collations, generations, expressions, identities, not_null, timings) =
-            capture_relation(
-                &transaction,
-                request,
-                cancellation,
-                &mut meter,
-                max_bytes,
-                relation,
-            )
-            .await?;
+        let (
+            observed,
+            dimensions,
+            collations,
+            generations,
+            expressions,
+            identities,
+            not_null,
+            timings,
+        ) = capture_relation(
+            &transaction,
+            request,
+            cancellation,
+            &mut meter,
+            max_bytes,
+            relation,
+        )
+        .await?;
         relations.push(observed);
+        column_array_dimensions.extend(dimensions);
         column_collations.extend(collations);
         column_generations.extend(generations);
         column_expressions.extend(expressions);
@@ -1009,6 +1020,13 @@ async fn capture_catalog(
     let snapshot = snapshot
         .with_observed_collation_definitions(collation_definitions)
         .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+    let snapshot = if has_relations {
+        snapshot
+            .with_observed_column_array_dimensions(column_array_dimensions)
+            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
+    } else {
+        snapshot
+    };
     bounded(request, cancellation, transaction.commit()).await?;
     Ok(snapshot)
 }
@@ -1023,6 +1041,7 @@ async fn capture_relation(
 ) -> Result<
     (
         RelationObservation,
+        Vec<ColumnArrayDimensionsObservation>,
         Vec<ColumnCollationObservation>,
         Vec<ColumnGenerationObservation>,
         Vec<ColumnExpressionObservation>,
@@ -1073,7 +1092,7 @@ async fn capture_relation(
              COALESCE(octet_length(pg_catalog.pg_get_expr(ad.adbin, ad.adrelid)) > $2::bigint, false), \
              a.atthasmissing, cn.nspname::text, co.collname::text, co.collisdeterministic, \
              a.attstorage IS DISTINCT FROM t.typstorage \
-               OR a.attcompression::text <> '' OR a.attstattarget IS NOT NULL \
+               OR a.attcompression::text <> '' OR a.attstattarget IS NOT NULL, a.attndims \
              FROM pg_catalog.pg_attribute a \
              LEFT JOIN pg_catalog.pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum \
              LEFT JOIN pg_catalog.pg_type t ON t.oid = a.atttypid \
@@ -1087,6 +1106,7 @@ async fn capture_relation(
     .await?;
     tokio::pin!(stream);
     let mut columns = Vec::new();
+    let mut dimensions = Vec::new();
     let mut collations = Vec::new();
     let mut generations = Vec::new();
     let mut expressions = Vec::new();
@@ -1105,6 +1125,7 @@ async fn capture_relation(
         let collation_schema: Option<String> = field(&row, 18)?;
         let collation_name: Option<String> = field(&row, 19)?;
         let collation_deterministic: Option<bool> = field(&row, 20)?;
+        let array_dimensions: i16 = field(&row, 22)?;
         if field::<bool>(&row, 14)? || field::<bool>(&row, 16)? {
             return Err(SourceObservationFailure::ByteLimitExceeded {
                 max_bytes: request.request().limits().max_bytes(),
@@ -1122,6 +1143,7 @@ async fn capture_relation(
                 + collation_name.as_ref().map_or(0, String::len),
         )?;
         if ordinal <= 0
+            || array_dimensions < 0
             || field::<bool>(&row, 7)? != expression.is_some()
             || field::<bool>(&row, 17)?
             || field::<bool>(&row, 21)?
@@ -1141,6 +1163,16 @@ async fn capture_relation(
         else {
             return Err(SourceObservationFailure::InvalidCapturedMetadata);
         };
+        dimensions.push(
+            ColumnArrayDimensionsObservation::new(
+                &relation.schema,
+                &relation.name,
+                relation.kind,
+                &name,
+                array_dimensions as u16,
+            )
+            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+        );
         let collation = match (
             field::<bool>(&row, 11)?,
             collation_schema,
@@ -1387,6 +1419,7 @@ async fn capture_relation(
     }
     Ok((
         observed,
+        dimensions,
         collations,
         generations,
         expressions,

@@ -14,14 +14,14 @@ use conceptweave_governance::{
     StewardReviewAuthority, review, sign_published_manifest,
 };
 use conceptweave_observation::{
-    ArrayTypeObservation, CollationProvider, ColumnCollationObservation,
-    ColumnExpressionObservation, ColumnGenerationObservation, ColumnIdentityObservation,
-    ColumnObservationV3, ConstraintDeferrability, DomainObservation, EnumObservation,
-    ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType, ForeignKeyObservation,
-    IndexTablespace, PostgresSchemaSnapshotV3, PostgresTypeKind, QualifiedTypeName, RelationKind,
-    RelationObservation, RelationOwnerObservation, RelationTablespaceObservation,
-    ReplicaIdentityMode, SchemaObjectLocation, TableConstraintObservation, TypeKindObservation,
-    TypeOwnerObservation,
+    ArrayTypeObservation, CollationProvider, ColumnArrayDimensionsObservation,
+    ColumnCollationObservation, ColumnExpressionObservation, ColumnGenerationObservation,
+    ColumnIdentityObservation, ColumnObservationV3, ConstraintDeferrability, DomainObservation,
+    EnumObservation, ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType,
+    ForeignKeyObservation, IndexTablespace, PostgresSchemaSnapshotV3, PostgresTypeKind,
+    QualifiedTypeName, RelationKind, RelationObservation, RelationOwnerObservation,
+    RelationTablespaceObservation, ReplicaIdentityMode, SchemaObjectLocation,
+    TableConstraintObservation, TypeKindObservation, TypeOwnerObservation,
 };
 use conceptweave_postgres_adapter::{PostgresTlsAdapter, PostgresUnixAdapter};
 use conceptweave_source_port::{
@@ -645,6 +645,22 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         ])
         .unwrap();
     let complete = |snapshot: PostgresSchemaSnapshotV3, observe_periods: bool| {
+        let dimensions = snapshot
+            .relations()
+            .iter()
+            .flat_map(|relation| {
+                relation.columns().iter().map(|column| {
+                    ColumnArrayDimensionsObservation::new(
+                        relation.schema_name(),
+                        relation.relation_name(),
+                        relation.kind(),
+                        column.column_name(),
+                        0,
+                    )
+                    .unwrap()
+                })
+            })
+            .collect();
         let snapshot = snapshot
             .with_observed_not_null_constraints(vec![])
             .unwrap()
@@ -659,6 +675,8 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
             .with_observed_foreign_key_catalog(vec![])
             .unwrap()
             .with_observed_collation_definitions(vec![])
+            .unwrap()
+            .with_observed_column_array_dimensions(dimensions)
             .unwrap()
     };
     assert!(matches!(
@@ -3220,6 +3238,68 @@ async fn postgres18_nondefault_table_tablespace_changes_source_identity() {
     assert_eq!(moved.tablespace().name(), tablespace);
     assert!(!moved.tablespace().is_database_default());
     assert_ne!(before.snapshot_digest(), after.snapshot_digest());
+}
+
+#[tokio::test]
+async fn postgres18_declared_array_dimensions_change_source_identity() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_array_dimensions_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; CREATE TABLE \"{schema}\".record (payload integer[])"
+        ))
+        .await
+        .unwrap();
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await
+        .unwrap();
+    client
+        .batch_execute(&format!(
+            "ALTER TABLE \"{schema}\".record ALTER COLUMN payload TYPE integer[][]"
+        ))
+        .await
+        .unwrap();
+    let after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    let catalog_dimensions: i16 = client
+        .query_one(
+            "SELECT a.attndims FROM pg_catalog.pg_attribute a \
+             JOIN pg_catalog.pg_class c ON c.oid = a.attrelid \
+             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+             WHERE n.nspname = $1 AND c.relname = 'record' AND a.attname = 'payload'",
+            &[&schema],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    let after = after.unwrap();
+    assert_eq!(catalog_dimensions, 2);
+    assert_eq!(
+        before.relations()[0].columns()[0].data_type(),
+        after.relations()[0].columns()[0].data_type()
+    );
+    assert_eq!(before.column_array_dimensions().unwrap()[0].dimensions(), 1);
+    assert_eq!(after.column_array_dimensions().unwrap()[0].dimensions(), 2);
+    assert_ne!(before.snapshot_digest(), after.snapshot_digest());
+    let receipt = after
+        .source_receipt(
+            SchemaObjectLocation::column(&schema, "record", RelationKind::Table, "payload")
+                .unwrap(),
+        )
+        .unwrap();
+    assert_eq!(receipt.source_digest(), after.snapshot_digest());
 }
 
 #[tokio::test]
