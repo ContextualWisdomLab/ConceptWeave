@@ -1826,7 +1826,7 @@ async fn capture_indexes(
                  CASE WHEN COALESCE(octet_length(pg_catalog.array_to_string(ia.attoptions, ',', '<NULL>')), 0) <= $2::bigint \
                    THEN ia.attoptions END, \
                  COALESCE(octet_length(pg_catalog.array_to_string(ia.attoptions, ',', '<NULL>')) > $2::bigint, false), \
-                 ia.attnum \
+                 ia.attnum, oc.oid \
                  FROM pg_catalog.pg_index i \
                  CROSS JOIN LATERAL pg_catalog.generate_series(0, i.indnatts - 1) s(position) \
                  LEFT JOIN pg_catalog.pg_attribute a ON a.attrelid = i.indrelid \
@@ -1859,6 +1859,7 @@ async fn capture_indexes(
             let expression: Option<String> = field(&attribute, 8)?;
             let operator_options: Option<Vec<String>> = field(&attribute, 10)?;
             let index_attnum: Option<i16> = field(&attribute, 12)?;
+            let opclass_oid: Option<u32> = field(&attribute, 13)?;
             if field::<bool>(&attribute, 9)? || field::<bool>(&attribute, 11)? {
                 return Err(SourceObservationFailure::ByteLimitExceeded {
                     max_bytes: request.request().limits().max_bytes(),
@@ -1885,6 +1886,7 @@ async fn capture_indexes(
                     || expression.is_some()
                     || opclass_schema.is_some()
                     || opclass_name.is_some()
+                    || opclass_oid.is_some()
                     || collation_schema.is_some()
                     || collation_name.is_some()
                     || options.is_some()
@@ -1902,11 +1904,15 @@ async fn capture_indexes(
                 );
                 continue;
             }
-            let (Some(opclass_schema), Some(opclass_name), Some(options)) =
-                (opclass_schema, opclass_name, options)
+            let (Some(opclass_schema), Some(opclass_name), Some(opclass_oid), Some(options)) =
+                (opclass_schema, opclass_name, opclass_oid, options)
             else {
                 return Err(SourceObservationFailure::InvalidCapturedMetadata);
             };
+            // A class name does not bind its operator-family support procedures.
+            if opclass_schema != "pg_catalog" || opclass_oid >= 16384 {
+                return Err(SourceObservationFailure::InvalidCapturedMetadata);
+            }
             let collation = match (collation_schema, collation_name) {
                 (Some(schema), Some(name)) => Some(
                     QualifiedCollationName::new(schema, name)

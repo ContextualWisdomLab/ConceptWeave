@@ -3349,6 +3349,48 @@ async fn postgres18_user_operator_expression_dependencies_fail_closed() {
 }
 
 #[tokio::test]
+async fn postgres18_user_operator_class_fails_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_opclass_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA {schema}; \
+             CREATE FUNCTION {schema}.compare(integer, integer) RETURNS integer \
+               LANGUAGE sql IMMUTABLE STRICT AS 'SELECT pg_catalog.btint4cmp($1,$2)'; \
+             CREATE OPERATOR CLASS {schema}.int4_custom_ops FOR TYPE integer USING btree AS \
+               OPERATOR 1 < (integer, integer), OPERATOR 2 <= (integer, integer), \
+               OPERATOR 3 = (integer, integer), OPERATOR 4 >= (integer, integer), \
+               OPERATOR 5 > (integer, integer), \
+               FUNCTION 1 {schema}.compare(integer, integer); \
+             CREATE TABLE {schema}.record (id integer); \
+             CREATE INDEX record_id_idx ON {schema}.record \
+               (id {schema}.int4_custom_ops)"
+        ))
+        .await
+        .unwrap();
+    let observed = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA {schema} CASCADE"))
+        .await
+        .unwrap();
+    assert!(
+        matches!(
+            observed,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "user operator class support functions must not be omitted: {observed:?}"
+    );
+    connection_task.abort();
+}
+
+#[tokio::test]
 async fn postgres18_user_defined_base_type_fails_closed() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
