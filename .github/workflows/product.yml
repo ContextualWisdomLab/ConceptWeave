@@ -14,6 +14,43 @@ permissions:
   contents: read
 
 jobs:
+  dependency-evidence:
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'closed' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact source revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Install pinned dependency evidence tools
+        run: |
+          cargo install --locked cargo-deny --version 0.19.7
+          cargo install --locked cargo-cyclonedx --version 0.5.9
+
+      - name: Check advisories, licenses and sources
+        run: cargo deny check advisories licenses sources
+
+      - name: Generate and check CycloneDX SBOMs
+        run: |
+          SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
+          export SOURCE_DATE_EPOCH
+          cargo cyclonedx --all --all-features --target all --format json --spec-version 1.5
+          python3 scripts/check_sbom.py
+
+      - name: Preserve exact-head SBOMs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: conceptweave-sbom-${{ github.event.pull_request.head.sha || github.sha }}
+          path: crates/**/*.cdx.json
+          if-no-files-found: error
+
   rust-quality:
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'closed' }}
     runs-on: ubuntu-24.04
