@@ -533,6 +533,15 @@ pub fn propose_relational_model(
             .candidate_id()
             .cmp(right.candidate().candidate_id())
     });
+    if (!snapshot.relations().is_empty()
+        || !snapshot.domains().is_empty()
+        || !snapshot.enums().is_empty())
+        && (snapshot.array_types().is_none()
+            || snapshot.type_kinds().is_none()
+            || snapshot.collation_definitions().is_none())
+    {
+        return Err(ProposalError::IncompleteSourceObservation);
+    }
     if !snapshot.relations().is_empty()
         && (snapshot.column_collations().is_none()
             || snapshot.column_generations().is_none()
@@ -541,8 +550,7 @@ pub fn propose_relational_model(
             || snapshot.not_null_constraints().is_none()
             || snapshot.constraint_timings().is_none()
             || snapshot.constraint_periods().is_none()
-            || snapshot.foreign_key_catalog().is_none()
-            || snapshot.collation_definitions().is_none())
+            || snapshot.foreign_key_catalog().is_none())
     {
         return Err(ProposalError::IncompleteSourceObservation);
     }

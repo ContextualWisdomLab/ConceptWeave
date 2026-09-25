@@ -14,12 +14,12 @@ use conceptweave_governance::{
     StewardReviewAuthority, review, sign_published_manifest,
 };
 use conceptweave_observation::{
-    CollationProvider, ColumnCollationObservation, ColumnExpressionObservation,
-    ColumnGenerationObservation, ColumnIdentityObservation, ColumnObservationV3,
-    ConstraintDeferrability, EnumObservation, ForeignKeyAction, ForeignKeyDeferrability,
-    ForeignKeyMatchType, ForeignKeyObservation, PostgresSchemaSnapshotV3, PostgresTypeKind,
-    QualifiedTypeName, RelationKind, RelationObservation, ReplicaIdentityMode,
-    SchemaObjectLocation, TableConstraintObservation,
+    ArrayTypeObservation, CollationProvider, ColumnCollationObservation,
+    ColumnExpressionObservation, ColumnGenerationObservation, ColumnIdentityObservation,
+    ColumnObservationV3, ConstraintDeferrability, EnumObservation, ForeignKeyAction,
+    ForeignKeyDeferrability, ForeignKeyMatchType, ForeignKeyObservation, PostgresSchemaSnapshotV3,
+    PostgresTypeKind, QualifiedTypeName, RelationKind, RelationObservation, ReplicaIdentityMode,
+    SchemaObjectLocation, TableConstraintObservation, TypeKindObservation,
 };
 use conceptweave_postgres_adapter::{PostgresTlsAdapter, PostgresUnixAdapter};
 use conceptweave_source_port::{
@@ -412,7 +412,7 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         Err(ProposalError::IncompleteSourceObservation)
     ));
 
-    let identity_unobserved = PostgresSchemaSnapshotV3::new(
+    let identity_unobserved = PostgresSchemaSnapshotV3::new_with_array_types_and_type_kinds(
         &authorized(),
         "fixture",
         "2026-09-25T00:00:00Z",
@@ -420,6 +420,8 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
             RelationObservation::new("public", "plain", RelationKind::Table, vec![column("id")])
                 .unwrap(),
         ],
+        vec![],
+        vec![],
         vec![],
         vec![],
     )
@@ -477,7 +479,7 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         EnumObservation::new("public", "stage", vec!["draft".to_owned()]).unwrap(),
         EnumObservation::new("public", "severity", vec!["high".to_owned()]).unwrap(),
     ];
-    let type_only = PostgresSchemaSnapshotV3::new(
+    let incomplete_type_only = PostgresSchemaSnapshotV3::new(
         &authorized(),
         "fixture",
         "2026-09-25T00:00:00Z",
@@ -486,15 +488,95 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         enums.clone(),
     )
     .unwrap();
-    let reordered = PostgresSchemaSnapshotV3::new(
+    assert!(matches!(
+        propose_relational_model(&incomplete_type_only),
+        Err(ProposalError::IncompleteSourceObservation)
+    ));
+    let array_types = ["stage", "severity"]
+        .into_iter()
+        .map(|name| {
+            ArrayTypeObservation::new(
+                QualifiedTypeName::new("public", format!("_{name}")).unwrap(),
+                QualifiedTypeName::new("public", name).unwrap(),
+            )
+            .unwrap()
+        })
+        .collect::<Vec<_>>();
+    let type_kinds = ["stage", "severity"]
+        .into_iter()
+        .flat_map(|name| {
+            [
+                TypeKindObservation::plain(
+                    QualifiedTypeName::new("public", name).unwrap(),
+                    PostgresTypeKind::Enum,
+                )
+                .unwrap(),
+                TypeKindObservation::plain(
+                    QualifiedTypeName::new("public", format!("_{name}")).unwrap(),
+                    PostgresTypeKind::Base,
+                )
+                .unwrap(),
+            ]
+        })
+        .collect::<Vec<_>>();
+    let missing_arrays = PostgresSchemaSnapshotV3::new_with_type_kinds(
         &authorized(),
         "fixture",
-        "2026-09-25T01:00:00Z",
+        "2026-09-25T00:00:00Z",
         vec![],
         vec![],
-        enums.into_iter().rev().collect(),
+        enums.clone(),
+        type_kinds.clone(),
+    )
+    .unwrap()
+    .with_observed_collation_definitions(vec![])
+    .unwrap();
+    let missing_type_kinds = PostgresSchemaSnapshotV3::new_with_array_types(
+        &authorized(),
+        "fixture",
+        "2026-09-25T00:00:00Z",
+        vec![],
+        vec![],
+        enums.clone(),
+        array_types.clone(),
+    )
+    .unwrap()
+    .with_observed_collation_definitions(vec![])
+    .unwrap();
+    let missing_collations = PostgresSchemaSnapshotV3::new_with_array_types_and_type_kinds(
+        &authorized(),
+        "fixture",
+        "2026-09-25T00:00:00Z",
+        vec![],
+        vec![],
+        enums.clone(),
+        array_types.clone(),
+        type_kinds.clone(),
     )
     .unwrap();
+    for incomplete in [&missing_arrays, &missing_type_kinds, &missing_collations] {
+        assert!(matches!(
+            propose_relational_model(incomplete),
+            Err(ProposalError::IncompleteSourceObservation)
+        ));
+    }
+    let complete_type_only = |enums, observed_at| {
+        PostgresSchemaSnapshotV3::new_with_array_types_and_type_kinds(
+            &authorized(),
+            "fixture",
+            observed_at,
+            vec![],
+            vec![],
+            enums,
+            array_types.clone(),
+            type_kinds.clone(),
+        )
+        .unwrap()
+        .with_observed_collation_definitions(vec![])
+        .unwrap()
+    };
+    let type_only = complete_type_only(enums.clone(), "2026-09-25T00:00:00Z");
+    let reordered = complete_type_only(enums.into_iter().rev().collect(), "2026-09-25T01:00:00Z");
     let type_proposal = propose_relational_model(&type_only).unwrap();
     assert_eq!(type_proposal, propose_relational_model(&reordered).unwrap());
     assert!(type_proposal.concepts().is_empty());
