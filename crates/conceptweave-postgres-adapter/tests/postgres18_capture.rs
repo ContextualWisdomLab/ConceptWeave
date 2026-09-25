@@ -3304,6 +3304,51 @@ async fn postgres18_user_function_expression_dependencies_fail_closed() {
 }
 
 #[tokio::test]
+async fn postgres18_user_operator_expression_dependencies_fail_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    for (index, object_ddl) in [
+        "CREATE TABLE {schema}.record (id integer, CONSTRAINT positive CHECK ((id OPERATOR({schema}.##) 2) > 0))",
+        "CREATE TABLE {schema}.record (id integer DEFAULT (1 OPERATOR({schema}.##) 2))",
+        "CREATE TABLE {schema}.record (id integer); CREATE INDEX record_expr ON {schema}.record (((id OPERATOR({schema}.##) 2)))",
+        "CREATE DOMAIN {schema}.score AS integer CHECK ((VALUE OPERATOR({schema}.##) 2) > 0)",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let schema = format!("cw_operator_dep_fixture_{}_{}", std::process::id(), index);
+        let object_ddl = object_ddl.replace("{schema}", &schema);
+        client
+            .batch_execute(&format!(
+                "CREATE SCHEMA {schema}; \
+                 CREATE FUNCTION {schema}.multiply(integer, integer) RETURNS integer \
+                   LANGUAGE sql IMMUTABLE AS 'SELECT $1 * $2'; \
+                 CREATE OPERATOR {schema}.## \
+                   (LEFTARG=integer, RIGHTARG=integer, FUNCTION={schema}.multiply); \
+                 {object_ddl}"
+            ))
+            .await
+            .unwrap();
+        let observed = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await;
+        client
+            .batch_execute(&format!("DROP SCHEMA {schema} CASCADE"))
+            .await
+            .unwrap();
+        assert!(
+            matches!(observed, Err(SourceObservationFailure::InvalidCapturedMetadata)),
+            "user operator dependency in scenario {index} must fail closed: {observed:?}"
+        );
+    }
+    connection_task.abort();
+}
+
+#[tokio::test]
 async fn postgres18_user_defined_base_type_fails_closed() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;

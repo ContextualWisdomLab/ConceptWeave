@@ -294,16 +294,19 @@ async fn capture_catalog(
         meter.add(request, schema.len() + 4)?;
         let schema_oid: u32 = field(&schema_row, 0)?;
         // PostgreSQL assigns normal user objects OIDs from 16384 onward; even
-        // functions installed in pg_catalog need this check.
-        let function_dependency = bounded(
+        // functions and operators installed in pg_catalog need this check.
+        let expression_dependency = bounded(
             request,
             cancellation,
             transaction.query_one(
                 "SELECT EXISTS( \
                    SELECT 1 FROM pg_catalog.pg_depend d \
-                   JOIN pg_catalog.pg_proc p ON p.oid = d.refobjid \
-                   WHERE d.refclassid = 'pg_proc'::regclass \
-                     AND (p.pronamespace <> 'pg_catalog'::regnamespace OR p.oid >= 16384::oid) \
+                   LEFT JOIN pg_catalog.pg_proc p \
+                     ON d.refclassid = 'pg_proc'::regclass AND p.oid = d.refobjid \
+                   LEFT JOIN pg_catalog.pg_operator o \
+                     ON d.refclassid = 'pg_operator'::regclass AND o.oid = d.refobjid \
+                   WHERE ((p.pronamespace <> 'pg_catalog'::regnamespace OR p.oid >= 16384::oid) \
+                     OR (o.oprnamespace <> 'pg_catalog'::regnamespace OR o.oid >= 16384::oid)) \
                      AND ( \
                        (d.classid = 'pg_constraint'::regclass AND EXISTS( \
                          SELECT 1 FROM pg_catalog.pg_constraint c \
@@ -326,7 +329,7 @@ async fn capture_catalog(
         )
         .await?;
         meter.add(request, 1)?;
-        if field::<bool>(&function_dependency, 0)? {
+        if field::<bool>(&expression_dependency, 0)? {
             return Err(SourceObservationFailure::InvalidCapturedMetadata);
         }
         let relation_stream = bounded(
