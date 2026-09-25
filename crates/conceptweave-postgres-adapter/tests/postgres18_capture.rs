@@ -1833,8 +1833,9 @@ async fn postgres18_range_and_multirange_kinds_are_source_evidence() {
         .batch_execute(&format!(
             "CREATE SCHEMA \"{schema}\"; \
              CREATE TYPE \"{schema}\".span AS RANGE (subtype = integer); \
+             CREATE DOMAIN \"{schema}\".labels AS text[]; \
              CREATE TABLE \"{schema}\".record \
-               (id integer PRIMARY KEY, value \"{schema}\".span, values \"{schema}\".span_multirange, spans \"{schema}\".span[])"
+               (id integer PRIMARY KEY, value \"{schema}\".span, values \"{schema}\".span_multirange, spans \"{schema}\".span[], numbers integer[], legacy oidvector)"
         ))
         .await
         .unwrap();
@@ -1892,6 +1893,25 @@ async fn postgres18_range_and_multirange_kinds_are_source_evidence() {
             && array.array_type().type_name() == source_array
             && array.element_type().schema_name() == schema
             && array.element_type().type_name() == "span"
+    }));
+    assert!(snapshot.array_types().unwrap().iter().any(|array| {
+        array.array_type().schema_name() == "pg_catalog"
+            && array.array_type().type_name() == "_int4"
+            && array.element_type().schema_name() == "pg_catalog"
+            && array.element_type().type_name() == "int4"
+    }));
+    assert!(
+        !snapshot
+            .array_types()
+            .unwrap()
+            .iter()
+            .any(|array| array.array_type().type_name() == "oidvector")
+    );
+    assert!(snapshot.array_types().unwrap().iter().any(|array| {
+        array.array_type().schema_name() == "pg_catalog"
+            && array.array_type().type_name() == "_text"
+            && array.element_type().schema_name() == "pg_catalog"
+            && array.element_type().type_name() == "text"
     }));
     assert_eq!(
         shell_result,

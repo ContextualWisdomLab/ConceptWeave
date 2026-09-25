@@ -626,10 +626,11 @@ impl PostgresSchemaSnapshotV3 {
             array_types,
         )?;
         if array_types.iter().any(|array| {
-            !type_kinds.iter().any(|kind| {
-                same_type_coordinate(kind.type_name(), array.array_type())
-                    && kind.kind() == PostgresTypeKind::Base
-            })
+            array.array_type().schema_name() != POSTGRES_CATALOG_SCHEMA_NAME
+                && !type_kinds.iter().any(|kind| {
+                    same_type_coordinate(kind.type_name(), array.array_type())
+                        && kind.kind() == PostgresTypeKind::Base
+                })
         }) {
             return Err(ObservationError::InvalidObservationField {
                 field: "array_type_kind",
@@ -650,6 +651,27 @@ impl PostgresSchemaSnapshotV3 {
             .iter()
             .map(|domain| project_domain_array_binding(domain, &array_types))
             .collect::<Result<Vec<_>, _>>()?;
+        let projected_type_kinds = type_kinds
+            .iter()
+            .map(|kind| {
+                if kind.kind() != PostgresTypeKind::Domain {
+                    return Ok(kind.clone());
+                }
+                let domain = projected_domains
+                    .iter()
+                    .find(|domain| {
+                        domain.schema_name() == kind.type_name().schema_name()
+                            && domain.domain_name() == kind.type_name().type_name()
+                    })
+                    .ok_or(ObservationError::InvalidObservationField {
+                        field: "type_kind_coordinate",
+                    })?;
+                Ok(TypeKindObservation::domain(
+                    kind.type_name().clone(),
+                    domain.base_type().clone(),
+                ))
+            })
+            .collect::<Result<Vec<_>, ObservationError>>()?;
         let mut snapshot = Self::new_with_type_kinds(
             authorized_request,
             extractor_revision,
@@ -657,8 +679,9 @@ impl PostgresSchemaSnapshotV3 {
             projected_relations,
             projected_domains,
             enums,
-            type_kinds,
+            projected_type_kinds,
         )?;
+        snapshot.type_kinds = type_kinds;
         snapshot.relations = relations;
         snapshot.relations.sort_by(|left, right| {
             (left.schema_name(), left.relation_name())
@@ -2433,11 +2456,12 @@ fn canonicalize_array_type_observations(
             array_type.element_type().type_name().to_owned(),
         );
 
-        if !authorized_request
-            .request()
-            .allowed_schema_names()
-            .iter()
-            .any(|schema_name| schema_name == array_type.array_type().schema_name())
+        if array_type.array_type().schema_name() != POSTGRES_CATALOG_SCHEMA_NAME
+            && !authorized_request
+                .request()
+                .allowed_schema_names()
+                .iter()
+                .any(|schema_name| schema_name == array_type.array_type().schema_name())
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "unauthorized_schema_name",

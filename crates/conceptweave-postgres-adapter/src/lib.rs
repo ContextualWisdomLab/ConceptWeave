@@ -9,7 +9,11 @@
 mod collations;
 mod foreign_keys;
 
-use std::{collections::BTreeMap, future::Future, time::Duration};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    future::Future,
+    time::Duration,
+};
 
 use conceptweave_observation::{
     ArrayTypeObservation, CheckConstraintObservation, ColumnCollationObservation,
@@ -669,6 +673,83 @@ async fn capture_catalog(
         key_timings.push(timings.clone());
         constraint_timings.extend(timings);
     }
+    let builtin_type_names = domains
+        .iter()
+        .map(DomainObservation::base_type)
+        .chain(relations.iter().flat_map(|relation| {
+            relation
+                .columns()
+                .iter()
+                .map(ColumnObservationV3::type_binding)
+        }))
+        .filter(|binding| binding.schema_name() == "pg_catalog")
+        .map(|binding| binding.type_name().to_owned())
+        .collect::<BTreeSet<_>>();
+    if !builtin_type_names.is_empty() {
+        let names = builtin_type_names.iter().cloned().collect::<Vec<_>>();
+        let stream = bounded(
+            request,
+            cancellation,
+            transaction.query_raw(
+                "SELECT a.typname::text, a.typtype::text, a.typisdefined, \
+                 a.typsubscript = 'pg_catalog.array_subscript_handler'::regproc, \
+                 a.typinput = 'pg_catalog.array_in'::regproc, \
+                 en.nspname::text, e.typname::text, e.typarray = a.oid \
+                 FROM pg_catalog.pg_type a \
+                 LEFT JOIN pg_catalog.pg_type e ON e.oid = a.typelem \
+                 LEFT JOIN pg_catalog.pg_namespace en ON en.oid = e.typnamespace \
+                 WHERE a.typnamespace = 'pg_catalog'::regnamespace \
+                   AND a.typname::text = ANY($1::text[]) ORDER BY a.typname",
+                &[&names],
+            ),
+        )
+        .await?;
+        tokio::pin!(stream);
+        let mut seen = BTreeSet::new();
+        while let Some(row) = bounded(request, cancellation, stream.try_next()).await? {
+            let name: String = field(&row, 0)?;
+            let kind: String = field(&row, 1)?;
+            let defined: bool = field(&row, 2)?;
+            let array_handler: bool = field(&row, 3)?;
+            let array_input: bool = field(&row, 4)?;
+            let element_schema: Option<String> = field(&row, 5)?;
+            let element_name: Option<String> = field(&row, 6)?;
+            let reciprocal: Option<bool> = field(&row, 7)?;
+            meter.add(
+                request,
+                8 + name.len() + element_name.as_ref().map_or(0, String::len),
+            )?;
+            let true_array = reciprocal == Some(true);
+            if !seen.insert(name.clone())
+                || !defined
+                || (kind == "b" && array_input && !true_array)
+                || (true_array && !array_handler)
+            {
+                return Err(SourceObservationFailure::InvalidCapturedMetadata);
+            }
+            if true_array {
+                let (Some(element_schema), Some(element_name)) = (element_schema, element_name)
+                else {
+                    return Err(SourceObservationFailure::InvalidCapturedMetadata);
+                };
+                if kind != "b" || element_schema != "pg_catalog" {
+                    return Err(SourceObservationFailure::InvalidCapturedMetadata);
+                }
+                array_types.push(
+                    ArrayTypeObservation::new(
+                        QualifiedTypeName::new("pg_catalog", name)
+                            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+                        QualifiedTypeName::new(element_schema, element_name)
+                            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+                    )
+                    .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+                );
+            }
+        }
+        if seen != builtin_type_names {
+            return Err(SourceObservationFailure::InvalidCapturedMetadata);
+        }
+    }
     let (foreign_key_catalog, foreign_key_triggers) = foreign_keys::capture(
         &transaction,
         request,
@@ -713,7 +794,7 @@ async fn capture_catalog(
     let has_relations = !relations.is_empty();
     let snapshot = PostgresSchemaSnapshotV3::new_with_array_types_and_type_kinds(
         request,
-        "postgres18_array_type_kind_adapter_v1",
+        "postgres18_referenced_array_type_kind_adapter_v1",
         observed_at_utc,
         relations,
         domains,
