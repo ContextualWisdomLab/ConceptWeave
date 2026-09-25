@@ -141,6 +141,8 @@ pub struct ValidatedAlignment {
     proposal_id: String,
     source_digest: String,
     candidates: Vec<AlignedCandidate>,
+    relation_endpoints: BTreeMap<String, (String, String)>,
+    field_parents: BTreeMap<String, String>,
     validation: ValidationSummary,
 }
 
@@ -158,6 +160,16 @@ impl ValidatedAlignment {
     /// Returns mapped validated candidates and explicitly excluded candidates.
     pub fn candidates(&self) -> &[AlignedCandidate] {
         &self.candidates
+    }
+
+    /// Returns each proposed relation's exact source-backed endpoint candidate IDs.
+    pub const fn relation_endpoints(&self) -> &BTreeMap<String, (String, String)> {
+        &self.relation_endpoints
+    }
+
+    /// Returns each proposed field's exact source-backed parent concept candidate ID.
+    pub const fn field_parents(&self) -> &BTreeMap<String, String> {
+        &self.field_parents
     }
 
     /// Returns counts of the deterministic checks that passed for this exact alignment.
@@ -415,6 +427,8 @@ pub fn validate_alignment(aligned: &AlignedProposal) -> Result<ValidatedAlignmen
         proposal_id: aligned.proposal_id.clone(),
         source_digest: aligned.source_digest.clone(),
         candidates,
+        relation_endpoints: aligned.relation_endpoints.clone(),
+        field_parents: aligned.field_parents.clone(),
         validation: ValidationSummary {
             source_bound_candidates: aligned.candidates.len(),
             unique_semantic_ids: semantic_ids.len(),

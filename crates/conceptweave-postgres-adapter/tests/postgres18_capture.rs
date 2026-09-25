@@ -77,6 +77,23 @@ impl StewardReviewAuthority for FixtureSteward<'_> {
 
 struct DeniedSteward;
 
+fn take_u64(bytes: &mut &[u8]) -> usize {
+    let (number, remaining) = bytes.split_at(8);
+    *bytes = remaining;
+    usize::try_from(u64::from_be_bytes(number.try_into().unwrap())).unwrap()
+}
+
+fn take_blob<'a>(bytes: &mut &'a [u8]) -> &'a [u8] {
+    let len = take_u64(bytes);
+    let (blob, remaining) = bytes.split_at(len);
+    *bytes = remaining;
+    blob
+}
+
+fn take_text<'a>(bytes: &mut &'a [u8]) -> &'a str {
+    std::str::from_utf8(take_blob(bytes)).unwrap()
+}
+
 impl StewardReviewAuthority for DeniedSteward {
     fn authorize_review(&self, _: &ReviewRequest) -> Result<Option<String>, GovernanceError> {
         Ok(None)
@@ -598,6 +615,55 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
         );
         assert_eq!(published.release(), replay_published.release());
         assert_eq!(published.manifest_pin(), replay_published.manifest_pin());
+        let mut artifact = published.artifact_bytes();
+        assert_eq!(
+            take_text(&mut artifact),
+            "conceptweave.governed_semantic_artifact.v1"
+        );
+        for _ in 0..3 {
+            take_text(&mut artifact);
+        }
+        let mut encoded_alignment = take_blob(&mut artifact);
+        assert_eq!(
+            take_text(&mut encoded_alignment),
+            "conceptweave.validated_alignment.v1"
+        );
+        assert_eq!(take_text(&mut encoded_alignment), proposal.proposal_id());
+        assert_eq!(take_text(&mut encoded_alignment), first.snapshot_digest());
+        assert_eq!(take_u64(&mut encoded_alignment), 23);
+        for _ in 0..23 {
+            take_text(&mut encoded_alignment);
+            let decision = encoded_alignment[1];
+            encoded_alignment = &encoded_alignment[2..];
+            for _ in 0..if decision == 1 { 3 } else { 1 } {
+                take_text(&mut encoded_alignment);
+            }
+            let evidence_count = take_u64(&mut encoded_alignment);
+            for _ in 0..evidence_count * 3 {
+                take_text(&mut encoded_alignment);
+            }
+        }
+        for _ in 0..4 {
+            take_u64(&mut encoded_alignment);
+        }
+        let mut encoded_fields = BTreeMap::new();
+        for _ in 0..take_u64(&mut encoded_alignment) {
+            let field_id = take_text(&mut encoded_alignment).to_owned();
+            let concept_id = take_text(&mut encoded_alignment).to_owned();
+            encoded_fields.insert(field_id, concept_id);
+        }
+        assert_eq!(&encoded_fields, validated.field_parents());
+        assert_eq!(encoded_fields.len(), 13);
+        let mut encoded_relations = BTreeMap::new();
+        for _ in 0..take_u64(&mut encoded_alignment) {
+            let relation_id = take_text(&mut encoded_alignment).to_owned();
+            let from_id = take_text(&mut encoded_alignment).to_owned();
+            let to_id = take_text(&mut encoded_alignment).to_owned();
+            encoded_relations.insert(relation_id, (from_id, to_id));
+        }
+        assert_eq!(&encoded_relations, validated.relation_endpoints());
+        assert_eq!(encoded_relations.len(), 4);
+        assert!(encoded_alignment.is_empty());
         assert_eq!(published.release().concept_ids().len(), 4);
         assert_eq!(
             published.release().publication_state(),

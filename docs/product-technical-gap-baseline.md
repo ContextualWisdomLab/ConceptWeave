@@ -16,6 +16,8 @@ The offline Client now requires an exact, independently configured manifest dige
 
 The Governance successor now turns a validated alignment into a reviewed proposal only after an injected authority adapter authorizes the exact alignment digest and returns an audit receipt. Publication derives canonical artifact bytes, artifact digest, release, and independent-distribution manifest pin from that review. The PostgreSQL 18 GRC-shaped fixture checks deterministic replay, denial, unpinned rejection, pinned client admission, and tampered-artifact rejection. `contracts/governed-semantic-artifact-v1.md` records the byte format. The fixture authority is not a production steward-authentication service; durable immutable storage, protected pin distribution, and cross-language release contract remain unimplemented.
 
+The first publication encoding omitted the field-to-concept and relation-to-endpoint links after validation even though validation had checked them. The validated alignment now retains both maps, and the artifact serializes their complete candidate-ID topology in deterministic order. The PostgreSQL 18 fixture reads the detached bytes back and checks all thirteen field parents and four relation endpoint pairs against the validated model. This keeps the published relationship and physical mapping structure reviewable without reconstructing it from mutable source metadata.
+
 #46 `codex/pr6-v3-index-evidence` remains the Draft Source Observation single writer stacked on #45. #45 and #6 must not partially adopt or independently reimplement #46. Product bootstrap #35 and canonical reusable-workflow ownership in `ContextualWisdomLab/.github` remain separate prerequisites.
 
 ## Current Source Observation authority

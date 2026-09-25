@@ -318,6 +318,17 @@ fn encode_alignment(alignment: &ValidatedAlignment) -> Result<Vec<u8>, Governanc
     ] {
         put_len(&mut bytes, count)?;
     }
+    put_len(&mut bytes, alignment.field_parents().len())?;
+    for (field_id, concept_id) in alignment.field_parents() {
+        put_text(&mut bytes, field_id)?;
+        put_text(&mut bytes, concept_id)?;
+    }
+    put_len(&mut bytes, alignment.relation_endpoints().len())?;
+    for (relation_id, (from_id, to_id)) in alignment.relation_endpoints() {
+        put_text(&mut bytes, relation_id)?;
+        put_text(&mut bytes, from_id)?;
+        put_text(&mut bytes, to_id)?;
+    }
     Ok(bytes)
 }
 
