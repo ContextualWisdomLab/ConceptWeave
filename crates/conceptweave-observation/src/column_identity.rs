@@ -388,18 +388,17 @@ pub(crate) fn canonicalize_column_identities(
                 field: "column_identity_nullability",
             });
         }
-        if let Some(sequence) = observation.sequence() {
-            if sequence.sequence_type() != column.type_binding()
+        if let Some(sequence) = observation.sequence()
+            && (sequence.sequence_type() != column.type_binding()
                 || sequence.sequence_name().schema_name() != observation.schema_name()
                 || !observed_sequences.insert((
                     sequence.sequence_name().schema_name().to_owned(),
                     sequence.sequence_name().type_name().to_owned(),
-                ))
-            {
-                return Err(ObservationError::InvalidObservationField {
-                    field: "identity_sequence_binding",
-                });
-            }
+                )))
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "identity_sequence_binding",
+            });
         }
 
         observed_coordinates.insert((
