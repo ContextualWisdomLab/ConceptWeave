@@ -18,6 +18,8 @@ The adapter now captures standalone `CREATE TYPE AS` composite relations and the
 
 The bounded adapter now checks `pg_class.relam` against the built-in `heap` table access method and its handler before constructing an immutable snapshot. A PostgreSQL 18 fixture creates a separate table access method and confirms rejection; table access methods beyond `heap` still need a complete source-evidence representation before admission.
 
+The adapter also rejects a table assigned to a nondefault tablespace, since the current relation digest has no table-level tablespace coordinate. A PostgreSQL 18 fixture first admits the ordinary table, moves it to a separate tablespace, and verifies that the changed source is not admitted under the old identity. Capturing tablespace identity remains future representation work.
+
 Dropped `pg_attribute` rows remain physical tombstones but are not SQL-visible columns. The adapter excludes them from the observed column set without renumbering surviving `attnum` coordinates. A PostgreSQL 18 fixture verifies a retained ordinal gap, the surviving index key, and source receipts for live versus dropped columns.
 
 The existing aggregate validation rejects a replica-identity index flag on a nonunique index and rejects partial, deferred, expression-key, or nullable-key shapes before immutable snapshot construction. The independent relation-level replica-identity mode remains source evidence even when its selected index has been dropped. The contract keeps nullable INCLUDE payloads outside the NOT NULL key requirement, while the GRC-shaped live fixture checks a selected replica-identity index and exact relation mode.

@@ -2582,6 +2582,75 @@ async fn postgres18_identity_sequence_settings_change_source_identity() {
 }
 
 #[tokio::test]
+async fn postgres18_nondefault_table_tablespace_fails_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let can_create_tablespace: bool = client
+        .query_one(
+            "SELECT rolsuper FROM pg_catalog.pg_roles WHERE rolname = current_user",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    if !can_create_tablespace {
+        eprintln!("skipping tablespace fixture: setup requires a superuser");
+        connection_task.abort();
+        return;
+    }
+    let suffix = std::process::id();
+    let schema = format!("cw_table_space_fixture_{suffix}");
+    let tablespace = format!("cw_table_space_{suffix}");
+    let directory = std::env::temp_dir().join(&tablespace);
+    std::fs::create_dir(&directory).unwrap();
+    client
+        .batch_execute(&format!(
+            "CREATE TABLESPACE \"{tablespace}\" LOCATION '{}'",
+            directory.display()
+        ))
+        .await
+        .unwrap();
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; CREATE TABLE \"{schema}\".record (id integer)"
+        ))
+        .await
+        .unwrap();
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await
+        .unwrap();
+    assert_eq!(before.relations().len(), 1);
+    client
+        .batch_execute(&format!(
+            "ALTER TABLE \"{schema}\".record SET TABLESPACE \"{tablespace}\""
+        ))
+        .await
+        .unwrap();
+    let observed = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    client
+        .batch_execute(&format!("DROP TABLESPACE \"{tablespace}\""))
+        .await
+        .unwrap();
+    std::fs::remove_dir(&directory).unwrap();
+    connection_task.abort();
+    assert!(matches!(
+        observed,
+        Err(SourceObservationFailure::InvalidCapturedMetadata)
+    ));
+}
+
+#[tokio::test]
 async fn postgres18_custom_table_access_method_fails_closed() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;

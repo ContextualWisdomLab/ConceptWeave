@@ -318,7 +318,8 @@ async fn capture_catalog(
                    AND NOT EXISTS(SELECT 1 FROM pg_catalog.pg_depend d \
                      WHERE d.classid = 'pg_type'::regclass AND d.objid = t.oid \
                        AND d.deptype = 'e')), \
-                 c.relam = 0 AND c.reltablespace = 0 AND c.reltoastrelid = 0 \
+                 c.relam = 0 AND c.reltablespace = 0 AND c.reltoastrelid = 0, \
+                 c.reltablespace = 0 \
                  FROM pg_catalog.pg_class c WHERE c.relnamespace = $1 \
                    AND c.relkind IN ('r','p','v','m','f','S','c') ORDER BY c.relname",
                 vec![&schema_oid as &(dyn ToSql + Sync), &max_bytes],
@@ -351,6 +352,7 @@ async fn capture_catalog(
             }
             // relhasrules and relhastriggers are lazy hints; the catalog-row guards below
             // decide whether any unsupported rule or trigger still exists.
+            // A nondefault table tablespace is not represented in the source digest.
             // Row-type pg_type metadata is separate from pg_class for both tables and
             // standalone composites; unmodeled changes must not retain the same digest.
             let relation_kind = match kind.as_str() {
@@ -359,6 +361,7 @@ async fn capture_catalog(
                 _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
             };
             if persistence != "p"
+                || !field::<bool>(&row, 19)?
                 || [4, 6, 7, 10, 11, 12]
                     .into_iter()
                     .any(|index| field::<bool>(&row, index) != Ok(false))
