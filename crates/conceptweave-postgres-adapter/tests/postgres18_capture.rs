@@ -94,6 +94,39 @@ fn take_text<'a>(bytes: &mut &'a [u8]) -> &'a str {
     std::str::from_utf8(take_blob(bytes)).unwrap()
 }
 
+fn take_byte(bytes: &mut &[u8]) -> u8 {
+    let value = bytes[0];
+    *bytes = &bytes[1..];
+    value
+}
+
+fn take_optional_text<'a>(bytes: &mut &'a [u8]) -> Option<&'a str> {
+    (take_byte(bytes) == 1).then(|| take_text(bytes))
+}
+
+fn take_optional_strings<'a>(bytes: &mut &'a [u8]) -> Option<Vec<&'a str>> {
+    (take_byte(bytes) == 1).then(|| {
+        let count = take_u64(bytes);
+        (0..count).map(|_| take_text(bytes)).collect()
+    })
+}
+
+fn take_optional_i32(bytes: &mut &[u8]) -> Option<i32> {
+    (take_byte(bytes) == 1).then(|| {
+        let (value, remaining) = bytes.split_at(4);
+        *bytes = remaining;
+        i32::from_be_bytes(value.try_into().unwrap())
+    })
+}
+
+fn take_optional_u32(bytes: &mut &[u8]) -> Option<u32> {
+    (take_byte(bytes) == 1).then(|| {
+        let (value, remaining) = bytes.split_at(4);
+        *bytes = remaining;
+        u32::from_be_bytes(value.try_into().unwrap())
+    })
+}
+
 impl StewardReviewAuthority for DeniedSteward {
     fn authorize_review(&self, _: &ReviewRequest) -> Result<Option<String>, GovernanceError> {
         Ok(None)
@@ -618,7 +651,7 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
         let mut artifact = published.artifact_bytes();
         assert_eq!(
             take_text(&mut artifact),
-            "conceptweave.governed_semantic_artifact.v1"
+            "conceptweave.governed_semantic_artifact.v2"
         );
         for _ in 0..3 {
             take_text(&mut artifact);
@@ -626,7 +659,7 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
         let mut encoded_alignment = take_blob(&mut artifact);
         assert_eq!(
             take_text(&mut encoded_alignment),
-            "conceptweave.validated_alignment.v1"
+            "conceptweave.validated_alignment.v2"
         );
         assert_eq!(take_text(&mut encoded_alignment), proposal.proposal_id());
         assert_eq!(take_text(&mut encoded_alignment), first.snapshot_digest());
@@ -663,6 +696,179 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
         }
         assert_eq!(&encoded_relations, validated.relation_endpoints());
         assert_eq!(encoded_relations.len(), 4);
+        assert_eq!(validated.proposal(), &proposal);
+        assert_eq!(
+            take_text(&mut encoded_alignment),
+            "conceptweave.relational_source_details.v1"
+        );
+        let mut concepts = proposal.concepts().iter().collect::<Vec<_>>();
+        concepts.sort_by_key(|concept| concept.candidate().candidate_id());
+        assert_eq!(take_u64(&mut encoded_alignment), concepts.len());
+        for concept in concepts {
+            assert_eq!(
+                take_text(&mut encoded_alignment),
+                concept.candidate().candidate_id()
+            );
+            assert_eq!(take_text(&mut encoded_alignment), concept.source_schema());
+            assert_eq!(take_text(&mut encoded_alignment), concept.source_relation());
+            assert_eq!(
+                take_optional_text(&mut encoded_alignment),
+                concept.source_comment()
+            );
+            assert_eq!(
+                take_optional_strings(&mut encoded_alignment),
+                concept
+                    .primary_key_columns()
+                    .map(|values| values.iter().map(String::as_str).collect())
+            );
+            assert_eq!(take_u64(&mut encoded_alignment), concept.fields().len());
+            for field in concept.fields() {
+                assert_eq!(
+                    take_text(&mut encoded_alignment),
+                    field.candidate().candidate_id()
+                );
+                assert_eq!(take_text(&mut encoded_alignment), field.source_name());
+                assert_eq!(take_text(&mut encoded_alignment), field.display_type());
+                assert_eq!(
+                    take_text(&mut encoded_alignment),
+                    field.type_binding().schema_name()
+                );
+                assert_eq!(
+                    take_text(&mut encoded_alignment),
+                    field.type_binding().type_name()
+                );
+                assert_eq!(
+                    take_u64(&mut encoded_alignment),
+                    field.ordinal_position() as usize
+                );
+                assert_eq!(
+                    take_byte(&mut encoded_alignment),
+                    u8::from(field.nullable())
+                );
+                assert_eq!(
+                    take_optional_text(&mut encoded_alignment),
+                    field.source_comment()
+                );
+            }
+        }
+        let mut relations = proposal.relations().iter().collect::<Vec<_>>();
+        relations.sort_by_key(|relation| relation.candidate().candidate_id());
+        assert_eq!(take_u64(&mut encoded_alignment), relations.len());
+        for relation in relations {
+            assert_eq!(
+                take_text(&mut encoded_alignment),
+                relation.candidate().candidate_id()
+            );
+            assert_eq!(
+                take_text(&mut encoded_alignment),
+                relation.from_concept_id()
+            );
+            assert_eq!(take_text(&mut encoded_alignment), relation.to_concept_id());
+            assert_eq!(
+                take_text(&mut encoded_alignment),
+                relation.source_constraint()
+            );
+            assert_eq!(
+                take_u64(&mut encoded_alignment),
+                relation.column_pairs().len()
+            );
+            for (local, referenced) in relation.column_pairs() {
+                assert_eq!(take_text(&mut encoded_alignment), local);
+                assert_eq!(take_text(&mut encoded_alignment), referenced);
+            }
+            let mut behavior = [0u8; 6];
+            for item in &mut behavior {
+                *item = take_byte(&mut encoded_alignment);
+            }
+            assert_eq!(behavior, [0, 0, 0, 0, 1, 1]);
+            assert_eq!(take_optional_strings(&mut encoded_alignment), None);
+        }
+        let mut source_types = proposal.source_types().iter().collect::<Vec<_>>();
+        source_types.sort_by_key(|item| item.candidate().candidate_id());
+        assert_eq!(take_u64(&mut encoded_alignment), source_types.len());
+        for source_type in source_types {
+            match source_type {
+                ProposedSourceType::Domain {
+                    candidate,
+                    observation,
+                } => {
+                    assert_eq!(take_byte(&mut encoded_alignment), 0);
+                    assert_eq!(take_text(&mut encoded_alignment), candidate.candidate_id());
+                    assert_eq!(take_text(&mut encoded_alignment), observation.schema_name());
+                    assert_eq!(take_text(&mut encoded_alignment), observation.domain_name());
+                    assert_eq!(
+                        take_text(&mut encoded_alignment),
+                        observation.base_type().schema_name()
+                    );
+                    assert_eq!(
+                        take_text(&mut encoded_alignment),
+                        observation.base_type().type_name()
+                    );
+                    assert_eq!(
+                        take_optional_i32(&mut encoded_alignment),
+                        observation.type_modifier()
+                    );
+                    assert_eq!(
+                        take_optional_u32(&mut encoded_alignment),
+                        observation.array_dimensions()
+                    );
+                    if let Some(collation) = observation.collation() {
+                        assert_eq!(take_byte(&mut encoded_alignment), 1);
+                        assert_eq!(take_text(&mut encoded_alignment), collation.schema_name());
+                        assert_eq!(
+                            take_text(&mut encoded_alignment),
+                            collation.collation_name()
+                        );
+                    } else {
+                        assert_eq!(take_byte(&mut encoded_alignment), 0);
+                    }
+                    let not_null = (take_byte(&mut encoded_alignment) == 1)
+                        .then(|| take_byte(&mut encoded_alignment) == 1);
+                    assert_eq!(not_null, observation.not_null());
+                    assert_eq!(
+                        take_optional_text(&mut encoded_alignment),
+                        observation.default_expression()
+                    );
+                    assert_eq!(
+                        take_u64(&mut encoded_alignment),
+                        observation.check_constraints().len()
+                    );
+                    for check in observation.check_constraints() {
+                        assert_eq!(take_text(&mut encoded_alignment), check.constraint_name());
+                        assert_eq!(take_text(&mut encoded_alignment), check.check_definition());
+                        assert_eq!(
+                            take_byte(&mut encoded_alignment),
+                            u8::from(check.validated())
+                        );
+                        assert_eq!(
+                            take_byte(&mut encoded_alignment),
+                            u8::from(check.enforced())
+                        );
+                    }
+                    assert_eq!(
+                        take_optional_text(&mut encoded_alignment),
+                        observation.source_comment()
+                    );
+                }
+                ProposedSourceType::Enum {
+                    candidate,
+                    observation,
+                } => {
+                    assert_eq!(take_byte(&mut encoded_alignment), 1);
+                    assert_eq!(take_text(&mut encoded_alignment), candidate.candidate_id());
+                    assert_eq!(take_text(&mut encoded_alignment), observation.schema_name());
+                    assert_eq!(take_text(&mut encoded_alignment), observation.enum_name());
+                    assert_eq!(take_u64(&mut encoded_alignment), observation.labels().len());
+                    for label in observation.labels() {
+                        assert_eq!(take_text(&mut encoded_alignment), label);
+                    }
+                    assert_eq!(
+                        take_optional_text(&mut encoded_alignment),
+                        observation.source_comment()
+                    );
+                }
+            }
+        }
         assert!(encoded_alignment.is_empty());
         assert_eq!(published.release().concept_ids().len(), 4);
         assert_eq!(

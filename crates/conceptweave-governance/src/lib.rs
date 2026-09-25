@@ -13,7 +13,9 @@ use conceptweave_alignment::{AlignedCandidate, AlignmentDisposition, ValidatedAl
 use conceptweave_client::{
     ReleaseContractError, ReleaseDigest, ReleaseMetadata, SemanticRelease, TrustedReleaseManifest,
 };
+use conceptweave_discovery::{ProposedSourceType, RelationalProposal};
 use conceptweave_domain::{CandidateKind, PublicationState, TruthStatus};
+use conceptweave_observation::{ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType};
 use sha2::{Digest, Sha256};
 
 const MAX_ARTIFACT_BYTES: usize = 16 * 1024 * 1024;
@@ -248,7 +250,7 @@ pub fn publish(
         valid_text(value)?;
     }
     let mut artifact = Vec::new();
-    put_text(&mut artifact, "conceptweave.governed_semantic_artifact.v1")?;
+    put_text(&mut artifact, "conceptweave.governed_semantic_artifact.v2")?;
     put_text(&mut artifact, metadata.release_id())?;
     put_text(&mut artifact, metadata.contract_version())?;
     put_text(&mut artifact, metadata.ontology_version())?;
@@ -300,7 +302,7 @@ pub fn publish(
 
 fn encode_alignment(alignment: &ValidatedAlignment) -> Result<Vec<u8>, GovernanceError> {
     let mut bytes = Vec::new();
-    put_text(&mut bytes, "conceptweave.validated_alignment.v1")?;
+    put_text(&mut bytes, "conceptweave.validated_alignment.v2")?;
     put_text(&mut bytes, alignment.proposal_id())?;
     put_text(&mut bytes, alignment.source_digest())?;
     let mut candidates = alignment.candidates().iter().collect::<Vec<_>>();
@@ -329,6 +331,7 @@ fn encode_alignment(alignment: &ValidatedAlignment) -> Result<Vec<u8>, Governanc
         put_text(&mut bytes, from_id)?;
         put_text(&mut bytes, to_id)?;
     }
+    encode_source_details(&mut bytes, alignment.proposal())?;
     Ok(bytes)
 }
 
@@ -364,6 +367,212 @@ fn encode_candidate(
         }
     }
     Ok(())
+}
+
+fn encode_source_details(
+    bytes: &mut Vec<u8>,
+    proposal: &RelationalProposal,
+) -> Result<(), GovernanceError> {
+    put_text(bytes, "conceptweave.relational_source_details.v1")?;
+    let mut concepts = proposal.concepts().iter().collect::<Vec<_>>();
+    concepts.sort_by_key(|concept| concept.candidate().candidate_id());
+    put_len(bytes, concepts.len())?;
+    for concept in concepts {
+        for value in [
+            concept.candidate().candidate_id(),
+            concept.source_schema(),
+            concept.source_relation(),
+        ] {
+            put_text(bytes, value)?;
+        }
+        put_optional_text(bytes, concept.source_comment())?;
+        put_optional_strings(bytes, concept.primary_key_columns())?;
+        put_len(bytes, concept.fields().len())?;
+        for field in concept.fields() {
+            for value in [
+                field.candidate().candidate_id(),
+                field.source_name(),
+                field.display_type(),
+                field.type_binding().schema_name(),
+                field.type_binding().type_name(),
+            ] {
+                put_text(bytes, value)?;
+            }
+            put_len(bytes, field.ordinal_position() as usize)?;
+            put_raw(bytes, &[u8::from(field.nullable())])?;
+            put_optional_text(bytes, field.source_comment())?;
+        }
+    }
+    let mut relations = proposal.relations().iter().collect::<Vec<_>>();
+    relations.sort_by_key(|relation| relation.candidate().candidate_id());
+    put_len(bytes, relations.len())?;
+    for relation in relations {
+        for value in [
+            relation.candidate().candidate_id(),
+            relation.from_concept_id(),
+            relation.to_concept_id(),
+            relation.source_constraint(),
+        ] {
+            put_text(bytes, value)?;
+        }
+        put_len(bytes, relation.column_pairs().len())?;
+        for (local, referenced) in relation.column_pairs() {
+            put_text(bytes, local)?;
+            put_text(bytes, referenced)?;
+        }
+        let behavior = relation.reference_behavior();
+        put_raw(
+            bytes,
+            &[
+                action_tag(behavior.update_action()),
+                action_tag(behavior.delete_action()),
+                match_tag(behavior.match_type()),
+                deferrability_tag(behavior.deferrability()),
+                u8::from(relation.validated()),
+                u8::from(relation.enforced()),
+            ],
+        )?;
+        put_optional_strings(bytes, behavior.delete_target_columns())?;
+    }
+    let mut source_types = proposal.source_types().iter().collect::<Vec<_>>();
+    source_types.sort_by_key(|source_type| source_type.candidate().candidate_id());
+    put_len(bytes, source_types.len())?;
+    for source_type in source_types {
+        match source_type {
+            ProposedSourceType::Domain {
+                candidate,
+                observation,
+            } => {
+                put_raw(bytes, &[0])?;
+                for value in [
+                    candidate.candidate_id(),
+                    observation.schema_name(),
+                    observation.domain_name(),
+                    observation.base_type().schema_name(),
+                    observation.base_type().type_name(),
+                ] {
+                    put_text(bytes, value)?;
+                }
+                put_optional_i32(bytes, observation.type_modifier())?;
+                put_optional_u32(bytes, observation.array_dimensions())?;
+                match observation.collation() {
+                    Some(collation) => {
+                        put_raw(bytes, &[1])?;
+                        put_text(bytes, collation.schema_name())?;
+                        put_text(bytes, collation.collation_name())?;
+                    }
+                    None => put_raw(bytes, &[0])?,
+                }
+                match observation.not_null() {
+                    Some(value) => put_raw(bytes, &[1, u8::from(value)])?,
+                    None => put_raw(bytes, &[0])?,
+                }
+                put_optional_text(bytes, observation.default_expression())?;
+                put_len(bytes, observation.check_constraints().len())?;
+                for check in observation.check_constraints() {
+                    put_text(bytes, check.constraint_name())?;
+                    put_text(bytes, check.check_definition())?;
+                    put_raw(
+                        bytes,
+                        &[u8::from(check.validated()), u8::from(check.enforced())],
+                    )?;
+                }
+                put_optional_text(bytes, observation.source_comment())?;
+            }
+            ProposedSourceType::Enum {
+                candidate,
+                observation,
+            } => {
+                put_raw(bytes, &[1])?;
+                for value in [
+                    candidate.candidate_id(),
+                    observation.schema_name(),
+                    observation.enum_name(),
+                ] {
+                    put_text(bytes, value)?;
+                }
+                put_len(bytes, observation.labels().len())?;
+                for label in observation.labels() {
+                    put_text(bytes, label)?;
+                }
+                put_optional_text(bytes, observation.source_comment())?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn put_optional_text(bytes: &mut Vec<u8>, value: Option<&str>) -> Result<(), GovernanceError> {
+    match value {
+        Some(value) => {
+            put_raw(bytes, &[1])?;
+            put_text(bytes, value)
+        }
+        None => put_raw(bytes, &[0]),
+    }
+}
+
+fn put_optional_strings(
+    bytes: &mut Vec<u8>,
+    values: Option<&[String]>,
+) -> Result<(), GovernanceError> {
+    match values {
+        Some(values) => {
+            put_raw(bytes, &[1])?;
+            put_len(bytes, values.len())?;
+            for value in values {
+                put_text(bytes, value)?;
+            }
+            Ok(())
+        }
+        None => put_raw(bytes, &[0]),
+    }
+}
+
+fn put_optional_i32(bytes: &mut Vec<u8>, value: Option<i32>) -> Result<(), GovernanceError> {
+    match value {
+        Some(value) => {
+            put_raw(bytes, &[1])?;
+            put_raw(bytes, &value.to_be_bytes())
+        }
+        None => put_raw(bytes, &[0]),
+    }
+}
+
+fn put_optional_u32(bytes: &mut Vec<u8>, value: Option<u32>) -> Result<(), GovernanceError> {
+    match value {
+        Some(value) => {
+            put_raw(bytes, &[1])?;
+            put_raw(bytes, &value.to_be_bytes())
+        }
+        None => put_raw(bytes, &[0]),
+    }
+}
+
+const fn action_tag(value: ForeignKeyAction) -> u8 {
+    match value {
+        ForeignKeyAction::NoAction => 0,
+        ForeignKeyAction::Restrict => 1,
+        ForeignKeyAction::Cascade => 2,
+        ForeignKeyAction::SetNull => 3,
+        ForeignKeyAction::SetDefault => 4,
+    }
+}
+
+const fn match_tag(value: ForeignKeyMatchType) -> u8 {
+    match value {
+        ForeignKeyMatchType::Simple => 0,
+        ForeignKeyMatchType::Full => 1,
+        ForeignKeyMatchType::Partial => 2,
+    }
+}
+
+const fn deferrability_tag(value: ForeignKeyDeferrability) -> u8 {
+    match value {
+        ForeignKeyDeferrability::NotDeferrable => 0,
+        ForeignKeyDeferrability::InitiallyImmediate => 1,
+        ForeignKeyDeferrability::InitiallyDeferred => 2,
+    }
 }
 
 const fn kind_tag(kind: CandidateKind) -> u8 {

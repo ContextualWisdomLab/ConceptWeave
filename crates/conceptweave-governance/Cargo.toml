@@ -14,4 +14,6 @@ path = "src/lib.rs"
 conceptweave-alignment = { path = "../conceptweave-alignment" }
 conceptweave-client = { path = "../conceptweave-client" }
 conceptweave-domain = { path = "../conceptweave-domain" }
+conceptweave-discovery = { path = "../conceptweave-discovery" }
+conceptweave-observation = { path = "../conceptweave-observation" }
 sha2 = "0.10.9"

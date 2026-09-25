@@ -112,6 +112,7 @@ impl AlignedCandidate {
 /// Complete decisions for one exact proposal, awaiting deterministic validation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AlignedProposal {
+    proposal: RelationalProposal,
     proposal_id: String,
     source_id: String,
     source_digest: String,
@@ -138,6 +139,7 @@ impl AlignedProposal {
 /// review, publication, or client consumption.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ValidatedAlignment {
+    proposal: RelationalProposal,
     proposal_id: String,
     source_digest: String,
     candidates: Vec<AlignedCandidate>,
@@ -147,6 +149,11 @@ pub struct ValidatedAlignment {
 }
 
 impl ValidatedAlignment {
+    /// Returns the complete immutable source facts offered for this exact alignment.
+    pub const fn proposal(&self) -> &RelationalProposal {
+        &self.proposal
+    }
+
     /// Returns the exact discovery proposal identity used for validation.
     pub fn proposal_id(&self) -> &str {
         &self.proposal_id
@@ -355,6 +362,7 @@ pub fn align_relational_proposal(
             .cmp(right.candidate.candidate_id())
     });
     Ok(AlignedProposal {
+        proposal: proposal.clone(),
         proposal_id: proposal.proposal_id().to_owned(),
         source_id: proposal.source_id().to_owned(),
         source_digest: proposal.source_digest().to_owned(),
@@ -424,6 +432,7 @@ pub fn validate_alignment(aligned: &AlignedProposal) -> Result<ValidatedAlignmen
         }
     }
     Ok(ValidatedAlignment {
+        proposal: aligned.proposal.clone(),
         proposal_id: aligned.proposal_id.clone(),
         source_digest: aligned.source_digest.clone(),
         candidates,

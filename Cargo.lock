@@ -134,7 +134,9 @@ version = "0.1.0"
 dependencies = [
  "conceptweave-alignment",
  "conceptweave-client",
+ "conceptweave-discovery",
  "conceptweave-domain",
+ "conceptweave-observation",
  "sha2 0.10.9",
 ]
 
