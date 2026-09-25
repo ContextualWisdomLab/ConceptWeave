@@ -178,16 +178,23 @@ impl FilePublicationStore {
         client
             .validate_for_authoritative_use(release)
             .map_err(|_| PublicationStoreError::ReleaseNotAdmitted)?;
-        let mut file = match File::open(self.release_path(release.release_id())) {
-            Ok(file) => file,
+        let path = self.release_path(release.release_id());
+        let entry = match fs::symlink_metadata(&path) {
+            Ok(entry) => entry,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(error.into()),
         };
-        if file.metadata()?.len() > MAX_RECORD_BYTES as u64 {
+        if !entry.file_type().is_file() {
+            return Err(PublicationStoreError::InvalidRecord);
+        }
+        let file = File::open(path)?;
+        let metadata = file.metadata()?;
+        if !metadata.is_file() || metadata.len() > MAX_RECORD_BYTES as u64 {
             return Err(PublicationStoreError::InvalidRecord);
         }
         let mut record = Vec::new();
-        file.read_to_end(&mut record)?;
+        file.take(MAX_RECORD_BYTES as u64 + 1)
+            .read_to_end(&mut record)?;
         if record.len() < 8 || record.len() > MAX_RECORD_BYTES {
             return Err(PublicationStoreError::InvalidRecord);
         }
@@ -353,6 +360,12 @@ mod tests {
         )
         .unwrap();
         fs::write(store.release_path(release.release_id()), corrupt).unwrap();
+        assert!(matches!(
+            store.read_verified(&pinned, &release),
+            Err(PublicationStoreError::InvalidRecord)
+        ));
+        fs::remove_file(store.release_path(release.release_id())).unwrap();
+        std::os::unix::fs::symlink("/dev/zero", store.release_path(release.release_id())).unwrap();
         assert!(matches!(
             store.read_verified(&pinned, &release),
             Err(PublicationStoreError::InvalidRecord)
