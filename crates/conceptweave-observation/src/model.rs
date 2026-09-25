@@ -12,12 +12,14 @@ use std::fmt::{Display, Formatter};
 
 use conceptweave_source_port::ResolvedSourceConnection;
 
+use crate::column_identity::validate_postgresql_identifier;
+
 const SHA256_DIGEST_PREFIX: &str = "sha256:";
 
 /// Fail-closed validation errors for immutable schema observations.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ObservationError {
-    /// A required observation field contained only Unicode whitespace.
+    /// A required observation field failed its field-specific admission rule.
     InvalidObservationField {
         /// Stable field name for caller diagnostics.
         field: &'static str,
@@ -148,6 +150,26 @@ pub enum ObservationError {
         /// Exact source type identifier of the unresolved type coordinate.
         type_name: String,
     },
+    /// The same exact relation-scoped index name appeared more than once.
+    DuplicateIndexObservation {
+        /// Exact source schema identifier.
+        schema_name: String,
+        /// Exact owning relation identifier.
+        relation_name: String,
+        /// Exact duplicated source index identifier.
+        index_name: String,
+    },
+    /// An index attribute did not resolve to a key or INCLUDE coordinate on the owning relation.
+    UnknownIndexAttribute {
+        /// Exact source schema identifier.
+        schema_name: String,
+        /// Exact owning relation identifier.
+        relation_name: String,
+        /// Exact source index identifier.
+        index_name: String,
+        /// Exact attribute identifier that could not be resolved.
+        attribute_name: String,
+    },
 }
 
 impl Display for ObservationError {
@@ -271,6 +293,23 @@ impl Display for ObservationError {
                 formatter,
                 "unresolved qualified type binding: {schema_name}.{type_name}"
             ),
+            Self::DuplicateIndexObservation {
+                schema_name,
+                relation_name,
+                index_name,
+            } => write!(
+                formatter,
+                "duplicate index observation on {schema_name}.{relation_name}: {index_name}"
+            ),
+            Self::UnknownIndexAttribute {
+                schema_name,
+                relation_name,
+                index_name,
+                attribute_name,
+            } => write!(
+                formatter,
+                "unknown index attribute on {schema_name}.{relation_name}: {index_name} refers to {attribute_name}"
+            ),
         }
     }
 }
@@ -298,7 +337,7 @@ impl ColumnObservation {
     ) -> Result<Self, ObservationError> {
         let column_name = column_name.into();
         let data_type = data_type.into();
-        validate_nonblank(&column_name, "column_name")?;
+        validate_postgresql_identifier(&column_name, "column_name")?;
         if ordinal_position == 0 {
             return Err(ObservationError::InvalidOrdinalPosition);
         }
@@ -357,7 +396,7 @@ impl PrimaryKeyObservation {
         column_names: Vec<String>,
     ) -> Result<Self, ObservationError> {
         let constraint_name = constraint_name.into();
-        validate_nonblank(&constraint_name, "constraint_name")?;
+        validate_postgresql_identifier(&constraint_name, "constraint_name")?;
         validate_constraint_columns(&constraint_name, &column_names, "constraint_column_name")?;
         Ok(Self {
             constraint_name,
@@ -393,7 +432,7 @@ impl UniqueConstraintObservation {
         column_names: Vec<String>,
     ) -> Result<Self, ObservationError> {
         let constraint_name = constraint_name.into();
-        validate_nonblank(&constraint_name, "constraint_name")?;
+        validate_postgresql_identifier(&constraint_name, "constraint_name")?;
         validate_constraint_columns(&constraint_name, &column_names, "constraint_column_name")?;
         Ok(Self {
             constraint_name,
@@ -452,7 +491,7 @@ impl CheckConstraintObservation {
     ) -> Result<Self, ObservationError> {
         let constraint_name = constraint_name.into();
         let definition = definition.into();
-        validate_nonblank(&constraint_name, "constraint_name")?;
+        validate_postgresql_identifier(&constraint_name, "constraint_name")?;
         validate_nonblank(&definition, "check_definition")?;
         Ok(Self {
             constraint_name,
@@ -575,7 +614,7 @@ impl ForeignKeyReferenceBehavior {
         }
         let mut seen_columns = BTreeSet::new();
         for column_name in &delete_target_columns {
-            validate_nonblank(column_name, "delete_target_column_name")?;
+            validate_postgresql_identifier(column_name, "delete_target_column_name")?;
             if !seen_columns.insert(column_name.as_str()) {
                 return Err(ObservationError::DuplicateConstraintColumn {
                     constraint_name: "delete_target_columns".to_owned(),
@@ -680,9 +719,9 @@ impl ForeignKeyObservation {
         let constraint_name = constraint_name.into();
         let referenced_schema_name = referenced_schema_name.into();
         let referenced_table_name = referenced_table_name.into();
-        validate_nonblank(&constraint_name, "constraint_name")?;
-        validate_nonblank(&referenced_schema_name, "referenced_schema_name")?;
-        validate_nonblank(&referenced_table_name, "referenced_table_name")?;
+        validate_postgresql_identifier(&constraint_name, "constraint_name")?;
+        validate_postgresql_identifier(&referenced_schema_name, "referenced_schema_name")?;
+        validate_postgresql_identifier(&referenced_table_name, "referenced_table_name")?;
         validate_constraint_columns(&constraint_name, &column_names, "constraint_column_name")?;
         validate_constraint_columns(
             &constraint_name,
@@ -852,8 +891,8 @@ impl TableObservation {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let table_name = table_name.into();
-        validate_nonblank(&schema_name, "schema_name")?;
-        validate_nonblank(&table_name, "table_name")?;
+        validate_postgresql_identifier(&schema_name, "schema_name")?;
+        validate_postgresql_identifier(&table_name, "table_name")?;
 
         let mut column_names = BTreeSet::new();
         let mut ordinal_positions = BTreeSet::new();
@@ -981,7 +1020,7 @@ impl ObservationLocation {
         column_name: impl Into<String>,
     ) -> Result<Self, ObservationError> {
         let column_name = column_name.into();
-        validate_nonblank(&column_name, "column_name")?;
+        validate_postgresql_identifier(&column_name, "column_name")?;
         Self::new(
             schema_name,
             table_name,
@@ -996,7 +1035,7 @@ impl ObservationLocation {
         constraint_name: impl Into<String>,
     ) -> Result<Self, ObservationError> {
         let constraint_name = constraint_name.into();
-        validate_nonblank(&constraint_name, "constraint_name")?;
+        validate_postgresql_identifier(&constraint_name, "constraint_name")?;
         Self::new(
             schema_name,
             table_name,
@@ -1011,8 +1050,8 @@ impl ObservationLocation {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let table_name = table_name.into();
-        validate_nonblank(&schema_name, "schema_name")?;
-        validate_nonblank(&table_name, "table_name")?;
+        validate_postgresql_identifier(&schema_name, "schema_name")?;
+        validate_postgresql_identifier(&table_name, "table_name")?;
         Ok(Self {
             schema_name,
             table_name,
@@ -1271,7 +1310,7 @@ fn validate_constraint_columns(
     }
     let mut seen_columns = BTreeSet::new();
     for column_name in column_names {
-        validate_nonblank(column_name, field)?;
+        validate_postgresql_identifier(column_name, field)?;
         if !seen_columns.insert(column_name.as_str()) {
             return Err(ObservationError::DuplicateConstraintColumn {
                 constraint_name: constraint_name.to_owned(),

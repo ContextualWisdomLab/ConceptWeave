@@ -173,30 +173,24 @@ fn constraint_constructors_reject_empty_duplicate_and_mismatched_column_sets() {
 }
 
 #[test]
-fn constraint_identifiers_reject_blank_source_metadata() {
-    let error = ForeignKeyObservation::new(
+fn constraint_identifiers_preserve_quoted_whitespace_and_reject_impossible_names() {
+    let foreign_key = ForeignKeyObservation::new(
         "event_account_fk",
         vec!["account_key".to_owned()],
         "\u{2003}",
         "account_record",
         vec!["account_key".to_owned()],
     )
-    .expect_err("referenced schema identity must be present");
-
-    assert_eq!(
-        error,
-        ObservationError::InvalidObservationField {
-            field: "referenced_schema_name"
-        }
-    );
+    .expect("quoted whitespace is a valid PostgreSQL schema identifier");
+    assert_eq!(foreign_key.referenced_schema_name(), "\u{2003}");
 
     for result in [
-        PrimaryKeyObservation::new(" ", vec!["event_key".to_owned()]).map(|_| ()),
-        UniqueConstraintObservation::new("\n", vec!["event_key".to_owned()]).map(|_| ()),
+        PrimaryKeyObservation::new("", vec!["event_key".to_owned()]).map(|_| ()),
+        UniqueConstraintObservation::new("bad\0name", vec!["event_key".to_owned()]).map(|_| ()),
         ForeignKeyObservation::new(
-            "\t",
+            "event_parent_fk",
             vec!["event_key".to_owned()],
-            "public",
+            "",
             "event_record",
             vec!["event_key".to_owned()],
         )
@@ -205,24 +199,8 @@ fn constraint_identifiers_reject_blank_source_metadata() {
             "event_parent_fk",
             vec!["event_key".to_owned()],
             "public",
-            " ",
+            "bad\0name",
             vec!["event_key".to_owned()],
-        )
-        .map(|_| ()),
-        ForeignKeyObservation::new(
-            "event_parent_fk",
-            vec![" ".to_owned()],
-            "public",
-            "event_record",
-            vec!["event_key".to_owned()],
-        )
-        .map(|_| ()),
-        ForeignKeyObservation::new(
-            "event_parent_fk",
-            vec!["event_key".to_owned()],
-            "public",
-            "event_record",
-            vec!["event_key".to_owned(), "event_key".to_owned()],
         )
         .map(|_| ()),
     ] {

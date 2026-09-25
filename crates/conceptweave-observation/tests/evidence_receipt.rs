@@ -158,24 +158,26 @@ fn snapshot_receipts_existing_constraint_coordinates() {
 }
 
 #[test]
-fn evidence_location_rejects_blank_exact_identifiers() {
+fn evidence_location_preserves_quoted_whitespace_and_rejects_impossible_identifiers() {
     assert_eq!(
-        ObservationLocation::table("\u{2003}", "event_record"),
-        Err(ObservationError::InvalidObservationField {
-            field: "schema_name"
-        })
+        ObservationLocation::table("\u{2003}", "event_record")
+            .expect("quoted whitespace schema is valid")
+            .schema_name(),
+        "\u{2003}"
     );
     assert_eq!(
-        ObservationLocation::column("public", "event_record", " "),
-        Err(ObservationError::InvalidObservationField {
-            field: "column_name"
-        })
+        ObservationLocation::column("public", "event_record", " ")
+            .expect("quoted whitespace column is valid")
+            .column_name(),
+        Some(" ")
     );
     assert_eq!(
-        ObservationLocation::constraint("public", "event_record", "\n\t"),
-        Err(ObservationError::InvalidObservationField {
-            field: "constraint_name"
-        })
+        ObservationLocation::constraint("public", "event_record", "\n\t")
+            .expect("quoted whitespace constraint is valid")
+            .constraint_name(),
+        Some("\n\t")
     );
-    assert!(ObservationLocation::table("public", " ").is_err());
+    assert!(ObservationLocation::table("public", " ").is_ok());
+    assert!(ObservationLocation::table("", "event_record").is_err());
+    assert!(ObservationLocation::table("public", "bad\0name").is_err());
 }

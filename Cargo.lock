@@ -38,6 +38,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "conceptweave-relation-partition"
+version = "0.1.0"
+dependencies = [
+ "conceptweave-observation",
+ "conceptweave-source-port",
+ "sha2",
+]
+
+[[package]]
 name = "conceptweave-source-port"
 version = "0.1.0"
 

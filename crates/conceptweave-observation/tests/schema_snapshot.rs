@@ -142,9 +142,12 @@ fn table_rejects_duplicate_column_name_or_ordinal() {
 }
 
 #[test]
-fn source_identifiers_and_evidence_reject_unicode_whitespace_only_values() {
-    let column_error = ColumnObservation::new("\t\n", 1, "text", false, None)
-        .expect_err("blank column names must fail closed");
+fn source_identifiers_preserve_quoted_whitespace_while_evidence_rejects_blank_text() {
+    let column = ColumnObservation::new("\t\n", 1, "text", false, None)
+        .expect("quoted whitespace column is valid");
+    assert_eq!(column.column_name(), "\t\n");
+    let column_error = ColumnObservation::new("", 1, "text", false, None)
+        .expect_err("empty column names must fail closed");
     assert_eq!(
         column_error,
         ObservationError::InvalidObservationField {
@@ -163,23 +166,10 @@ fn source_identifiers_and_evidence_reject_unicode_whitespace_only_values() {
         ObservationError::InvalidObservationField { field: "data_type" }
     );
 
-    let schema_error = TableObservation::new(" ", "events", Vec::new())
-        .expect_err("blank schema names must fail closed");
-    assert_eq!(
-        schema_error,
-        ObservationError::InvalidObservationField {
-            field: "schema_name"
-        }
-    );
-
-    let table_error = TableObservation::new("public", "\n", Vec::new())
-        .expect_err("blank table names must fail closed");
-    assert_eq!(
-        table_error,
-        ObservationError::InvalidObservationField {
-            field: "table_name"
-        }
-    );
+    assert!(TableObservation::new(" ", "events", Vec::new()).is_ok());
+    assert!(TableObservation::new("public", "\n", Vec::new()).is_ok());
+    assert!(TableObservation::new("", "events", Vec::new()).is_err());
+    assert!(TableObservation::new("public", "bad\0name", Vec::new()).is_err());
 
     for (extractor_revision, observed_at_utc, field) in [
         ("\n", "time", "extractor_revision"),
