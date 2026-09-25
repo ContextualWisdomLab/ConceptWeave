@@ -521,6 +521,30 @@ fn encode_source_details(
                 }
                 put_optional_text(bytes, observation.source_comment())?;
             }
+            ProposedSourceType::Composite {
+                candidate,
+                observation,
+            } => {
+                put_raw(bytes, &[2])?;
+                for value in [
+                    candidate.candidate_id(),
+                    observation.schema_name(),
+                    observation.relation_name(),
+                ] {
+                    put_text(bytes, value)?;
+                }
+                put_optional_text(bytes, observation.source_comment())?;
+                put_len(bytes, observation.columns().len())?;
+                for column in observation.columns() {
+                    put_text(bytes, column.column_name())?;
+                    put_len(bytes, column.ordinal_position() as usize)?;
+                    put_text(bytes, column.data_type())?;
+                    put_text(bytes, column.type_binding().schema_name())?;
+                    put_text(bytes, column.type_binding().type_name())?;
+                    put_raw(bytes, &[u8::from(column.nullable())])?;
+                    put_optional_text(bytes, column.source_comment())?;
+                }
+            }
         }
     }
     Ok(())

@@ -1612,6 +1612,9 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
                         observation.source_comment()
                     );
                 }
+                ProposedSourceType::Composite { .. } => {
+                    panic!("this fixture has no composite source type")
+                }
             }
         }
         assert!(encoded_alignment.is_empty());
@@ -2701,6 +2704,67 @@ async fn postgres18_standalone_composite_type_retains_column_receipts() {
             )
             .unwrap();
         assert_eq!(receipt.source_digest(), first.snapshot_digest());
+        let proposal = propose_relational_model(&first).unwrap();
+        assert!(proposal.concepts().is_empty());
+        assert!(proposal.relations().is_empty());
+        let [
+            ProposedSourceType::Composite {
+                candidate,
+                observation,
+            },
+        ] = proposal.source_types()
+        else {
+            panic!("composite source type must have one review candidate");
+        };
+        assert_eq!(
+            candidate.evidence()[0].source_digest(),
+            first.snapshot_digest()
+        );
+        let type_receipt = first
+            .source_receipt(
+                SchemaObjectLocation::relation(&schema, "assessment", RelationKind::CompositeType)
+                    .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(
+            candidate.evidence()[0].location(),
+            type_receipt.location().canonical_location()
+        );
+        assert_eq!(observation.columns().len(), 2);
+        let aligned = align_relational_proposal(
+            &proposal,
+            proposal.proposal_id(),
+            vec![
+                AlignmentDecision::exclude(candidate.candidate_id(), "Source-only fixture")
+                    .unwrap(),
+            ],
+        )
+        .unwrap();
+        assert_eq!(validate_alignment(&aligned).unwrap().candidates().len(), 1);
+        let mapped = align_relational_proposal(
+            &proposal,
+            proposal.proposal_id(),
+            vec![
+                AlignmentDecision::map(
+                    candidate.candidate_id(),
+                    "risk.assessment",
+                    "Assessment",
+                    "Explicit fixture concept mapping",
+                )
+                .unwrap(),
+            ],
+        )
+        .unwrap();
+        let reviewed = review(
+            &validate_alignment(&mapped).unwrap(),
+            "fixture-steward",
+            "Review composite type mapping",
+            &FixtureSteward {
+                proposal_id: proposal.proposal_id(),
+                source_digest: first.snapshot_digest(),
+            },
+        )
+        .unwrap();
         let replay = adapter(config.clone())
             .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
             .await?;
@@ -2764,6 +2828,60 @@ async fn postgres18_standalone_composite_type_retains_column_receipts() {
             .await?;
         assert_ne!(mixed.snapshot_digest(), first.snapshot_digest());
         assert_ne!(changed.snapshot_digest(), mixed.snapshot_digest());
+        let changed_proposal = propose_relational_model(&changed).unwrap();
+        assert_ne!(changed_proposal.proposal_id(), proposal.proposal_id());
+        assert_eq!(changed_proposal.source_types().len(), 1);
+        let changed_candidate = changed_proposal.source_types()[0].candidate();
+        let changed_mapped = align_relational_proposal(
+            &changed_proposal,
+            changed_proposal.proposal_id(),
+            vec![
+                AlignmentDecision::map(
+                    changed_candidate.candidate_id(),
+                    "risk.assessment",
+                    "Assessment",
+                    "Explicit fixture concept mapping",
+                )
+                .unwrap(),
+                AlignmentDecision::exclude(
+                    changed_proposal.concepts()[0].candidate().candidate_id(),
+                    "Exclude fixture table",
+                )
+                .unwrap(),
+                AlignmentDecision::exclude(
+                    changed_proposal.concepts()[0].fields()[0]
+                        .candidate()
+                        .candidate_id(),
+                    "Exclude fixture field",
+                )
+                .unwrap(),
+                AlignmentDecision::exclude(
+                    changed_proposal.concepts()[0].fields()[1]
+                        .candidate()
+                        .candidate_id(),
+                    "Exclude fixture field",
+                )
+                .unwrap(),
+            ],
+        );
+        let changed_reviewed = review(
+            &validate_alignment(&changed_mapped.unwrap()).unwrap(),
+            "fixture-steward",
+            "Review composite type mapping",
+            &FixtureSteward {
+                proposal_id: changed_proposal.proposal_id(),
+                source_digest: changed.snapshot_digest(),
+            },
+        )
+        .unwrap();
+        assert_ne!(
+            reviewed.request().source_digest(),
+            changed_proposal.source_digest()
+        );
+        assert_ne!(
+            reviewed.request().alignment_digest(),
+            changed_reviewed.request().alignment_digest()
+        );
         client
             .batch_execute(&format!(
                 "GRANT USAGE ON TYPE \"{schema}\".assessment TO PUBLIC"

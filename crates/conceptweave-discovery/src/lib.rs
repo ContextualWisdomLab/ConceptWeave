@@ -11,8 +11,8 @@ use std::fmt;
 use conceptweave_domain::{CandidateKind, ContractError, EvidenceReference, SemanticCandidate};
 use conceptweave_observation::{
     DomainObservation, EnumObservation, ForeignKeyReferenceBehavior, ObservationError,
-    PostgresSchemaSnapshotV3, QualifiedTypeName, RelationKind, SchemaObjectLocation,
-    TableConstraintObservation,
+    PostgresSchemaSnapshotV3, QualifiedTypeName, RelationKind, RelationObservation,
+    SchemaObjectLocation, TableConstraintObservation,
 };
 
 const REVISION: &str = "conceptweave.relational_proposal.v1";
@@ -186,13 +186,22 @@ pub enum ProposedSourceType {
         /// Exact source enum observation.
         observation: EnumObservation,
     },
+    /// A standalone composite type may suggest a structured concept; its attributes remain source evidence.
+    Composite {
+        /// Draft candidate bound to the exact composite relation receipt.
+        candidate: SemanticCandidate,
+        /// Exact source composite type observation.
+        observation: RelationObservation,
+    },
 }
 
 impl ProposedSourceType {
     /// Returns the draft, inferred domain candidate.
     pub const fn candidate(&self) -> &SemanticCandidate {
         match self {
-            Self::Domain { candidate, .. } | Self::Enum { candidate, .. } => candidate,
+            Self::Domain { candidate, .. }
+            | Self::Enum { candidate, .. }
+            | Self::Composite { candidate, .. } => candidate,
         }
     }
 }
@@ -234,7 +243,7 @@ impl RelationalProposal {
         &self.relations
     }
 
-    /// Returns schema-scoped domain and enum proposals in deterministic coordinate order.
+    /// Returns schema-scoped source type proposals in deterministic coordinate order.
     pub fn source_types(&self) -> &[ProposedSourceType] {
         &self.source_types
     }
@@ -247,7 +256,7 @@ pub enum ProposalError {
     Observation(ObservationError),
     /// Domain candidate or evidence construction failed.
     Contract(ContractError),
-    /// This proposal path only admits ordinary tables.
+    /// This proposal path cannot represent this relation kind.
     UnsupportedRelationKind,
     /// The referenced table or column is outside the complete proposal.
     MissingForeignKeyTarget,
@@ -320,7 +329,7 @@ fn candidate_id(source_id: &str, kind: &str, location: &SchemaObjectLocation) ->
     )
 }
 
-/// Builds a deterministic draft from exact table, column, and foreign-key receipts.
+/// Builds a deterministic draft from exact relation, column, and foreign-key receipts.
 ///
 /// Unknown relation kinds, out-of-scope targets, and unobserved foreign-key state fail closed.
 /// No source comment or table name is promoted to authoritative business truth.
@@ -331,6 +340,9 @@ pub fn propose_relational_model(
     let mut concept_ids = BTreeMap::new();
     let mut concepts = Vec::with_capacity(snapshot.relations().len());
     for relation in snapshot.relations() {
+        if relation.kind() == RelationKind::CompositeType {
+            continue;
+        }
         if relation.kind() != RelationKind::Table {
             return Err(ProposalError::UnsupportedRelationKind);
         }
@@ -453,7 +465,27 @@ pub fn propose_relational_model(
             });
         }
     }
-    let mut source_types = Vec::with_capacity(snapshot.domains().len() + snapshot.enums().len());
+    let mut source_types = Vec::with_capacity(
+        snapshot.domains().len() + snapshot.enums().len() + snapshot.relations().len(),
+    );
+    for relation in snapshot.relations() {
+        if relation.kind() != RelationKind::CompositeType {
+            continue;
+        }
+        let location = SchemaObjectLocation::relation(
+            relation.schema_name(),
+            relation.relation_name(),
+            relation.kind(),
+        )?;
+        source_types.push(ProposedSourceType::Composite {
+            candidate: SemanticCandidate::new(
+                candidate_id(source_id, "composite", &location),
+                CandidateKind::Concept,
+                vec![evidence(snapshot, location)?],
+            )?,
+            observation: relation.clone(),
+        });
+    }
     for domain in snapshot.domains() {
         let location = SchemaObjectLocation::domain(domain.schema_name(), domain.domain_name())?;
         source_types.push(ProposedSourceType::Domain {
