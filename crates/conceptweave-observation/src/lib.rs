@@ -28,7 +28,7 @@ pub use collation_definition::{
 pub use column_collation::ColumnCollationObservation;
 pub use column_expression::ColumnExpressionObservation;
 pub use column_generation::ColumnGenerationObservation;
-pub use column_identity::ColumnIdentityObservation;
+pub use column_identity::{ColumnIdentityObservation, IdentitySequenceObservation};
 pub use constraint_period::ConstraintPeriodObservation;
 pub use constraint_timing::{ConstraintDeferrability, ConstraintTimingObservation};
 pub use foreign_key_catalog::{ForeignKeyCatalogObservation, ForeignKeyOperatorObservation};

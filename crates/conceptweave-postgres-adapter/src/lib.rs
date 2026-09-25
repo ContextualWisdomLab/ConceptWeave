@@ -17,10 +17,11 @@ use std::{
 
 use conceptweave_observation::{
     ArrayTypeObservation, CheckConstraintObservation, ColumnCollationObservation,
-    ColumnExpressionObservation, ColumnGenerationObservation, ColumnObservationV3,
-    ConstraintDeferrability, ConstraintTimingObservation, DomainCheckConstraintObservation,
-    DomainObservation, EnumObservation, IndexAttributeKind, IndexAttributeObservation,
-    IndexCatalogFlags, IndexKeySemantics, IndexObservation, IndexStorageOption, IndexTablespace,
+    ColumnExpressionObservation, ColumnGenerationObservation, ColumnIdentityObservation,
+    ColumnObservationV3, ConstraintDeferrability, ConstraintTimingObservation,
+    DomainCheckConstraintObservation, DomainObservation, EnumObservation,
+    IdentitySequenceObservation, IndexAttributeKind, IndexAttributeObservation, IndexCatalogFlags,
+    IndexKeySemantics, IndexObservation, IndexStorageOption, IndexTablespace,
     NotNullConstraintObservation, OperatorClassOption, PostgresSchemaSnapshotV3, PostgresTypeKind,
     PrimaryKeyObservation, QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName,
     RelationKind, RelationObservation, ReplicaIdentityMode, TableConstraintObservation,
@@ -294,7 +295,14 @@ async fn capture_catalog(
                  c.reloftype <> 0, \
                  CASE WHEN octet_length(pg_catalog.obj_description(c.oid, 'pg_class')) <= $2::bigint \
                    THEN pg_catalog.obj_description(c.oid, 'pg_class') END, \
-                 COALESCE(octet_length(pg_catalog.obj_description(c.oid, 'pg_class')) > $2::bigint, false) \
+                 COALESCE(octet_length(pg_catalog.obj_description(c.oid, 'pg_class')) > $2::bigint, false), \
+                 EXISTS(SELECT 1 FROM pg_catalog.pg_depend d \
+                   JOIN pg_catalog.pg_class owner_table ON owner_table.oid = d.refobjid \
+                   JOIN pg_catalog.pg_attribute a ON a.attrelid = d.refobjid \
+                     AND a.attnum = d.refobjsubid AND a.attidentity <> '' \
+                   WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid \
+                     AND d.objsubid = 0 AND d.refclassid = 'pg_class'::regclass \
+                     AND d.deptype = 'i' AND owner_table.relnamespace = c.relnamespace) \
                  FROM pg_catalog.pg_class c WHERE c.relnamespace = $1 \
                    AND c.relkind IN ('r','p','v','m','f','S','c') ORDER BY c.relname",
                 vec![&schema_oid as &(dyn ToSql + Sync), &max_bytes],
@@ -322,6 +330,9 @@ async fn capture_catalog(
                     + replica.len()
                     + comment.as_ref().map_or(0, String::len),
             )?;
+            if kind == "S" && field::<bool>(&row, 15)? {
+                continue;
+            }
             // relhasrules and relhastriggers are lazy hints; the catalog-row guards below
             // decide whether any unsupported rule or trigger still exists.
             if kind != "r"
@@ -652,23 +663,26 @@ async fn capture_catalog(
     let mut column_collations = Vec::new();
     let mut column_generations = Vec::new();
     let mut column_expressions = Vec::new();
+    let mut column_identities = Vec::new();
     let mut not_null_constraints = Vec::new();
     let mut constraint_timings = Vec::new();
     for relation in relation_rows {
         relation_oids.push(relation.oid);
-        let (observed, collations, generations, expressions, not_null, timings) = capture_relation(
-            &transaction,
-            request,
-            cancellation,
-            &mut meter,
-            max_bytes,
-            relation,
-        )
-        .await?;
+        let (observed, collations, generations, expressions, identities, not_null, timings) =
+            capture_relation(
+                &transaction,
+                request,
+                cancellation,
+                &mut meter,
+                max_bytes,
+                relation,
+            )
+            .await?;
         relations.push(observed);
         column_collations.extend(collations);
         column_generations.extend(generations);
         column_expressions.extend(expressions);
+        column_identities.extend(identities);
         not_null_constraints.extend(not_null);
         key_timings.push(timings.clone());
         constraint_timings.extend(timings);
@@ -794,7 +808,7 @@ async fn capture_catalog(
     let has_relations = !relations.is_empty();
     let snapshot = PostgresSchemaSnapshotV3::new_with_array_types_and_type_kinds(
         request,
-        "postgres18_referenced_array_type_kind_adapter_v1",
+        "postgres18_identity_sequence_adapter_v1",
         observed_at_utc,
         relations,
         domains,
@@ -808,6 +822,7 @@ async fn capture_catalog(
                 .with_observed_column_collations(column_collations)
                 .and_then(|snapshot| snapshot.with_observed_column_generations(column_generations))
                 .and_then(|snapshot| snapshot.with_observed_column_expressions(column_expressions))
+                .and_then(|snapshot| snapshot.with_observed_column_identities(column_identities))
         } else {
             Ok(snapshot)
         }
@@ -844,6 +859,7 @@ async fn capture_relation(
         Vec<ColumnCollationObservation>,
         Vec<ColumnGenerationObservation>,
         Vec<ColumnExpressionObservation>,
+        Vec<ColumnIdentityObservation>,
         Vec<NotNullConstraintObservation>,
         Vec<ConstraintTimingObservation>,
     ),
@@ -905,6 +921,7 @@ async fn capture_relation(
     let mut collations = Vec::new();
     let mut generations = Vec::new();
     let mut expressions = Vec::new();
+    let mut identities = Vec::new();
     while let Some(row) = bounded(request, cancellation, stream.try_next()).await? {
         let name: String = field(&row, 0)?;
         let ordinal: i16 = field(&row, 1)?;
@@ -936,7 +953,6 @@ async fn capture_relation(
                 + collation_name.as_ref().map_or(0, String::len),
         )?;
         if ordinal <= 0
-            || !identity.is_empty()
             || field::<bool>(&row, 7)? != expression.is_some()
             || field::<bool>(&row, 17)?
             || [10, 12, 13]
@@ -1025,6 +1041,29 @@ async fn capture_relation(
         .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
         generations.push(generation);
         expressions.push(observed_expression);
+        let observed_identity = match identity.as_str() {
+            "" => ColumnIdentityObservation::not_identity(
+                &relation.schema,
+                &relation.name,
+                RelationKind::Table,
+                &name,
+            ),
+            "a" => ColumnIdentityObservation::generated_always(
+                &relation.schema,
+                &relation.name,
+                RelationKind::Table,
+                &name,
+            ),
+            "d" => ColumnIdentityObservation::generated_by_default(
+                &relation.schema,
+                &relation.name,
+                RelationKind::Table,
+                &name,
+            ),
+            _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
+        }
+        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+        identities.push(observed_identity);
         columns.push(
             ColumnObservationV3::new(
                 name,
@@ -1037,6 +1076,106 @@ async fn capture_relation(
             )
             .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
         );
+    }
+    let identity_stream = bounded(
+        request,
+        cancellation,
+        transaction.query_raw(
+            "SELECT a.attname::text, sn.nspname::text, s.relname::text, \
+             tn.nspname::text, st.typname::text, ps.seqstart, ps.seqincrement, \
+             ps.seqmin, ps.seqmax, ps.seqcache, ps.seqcycle, \
+             s.relkind::text, s.relpersistence::text, s.relacl IS NOT NULL, \
+             s.reloptions IS NOT NULL, s.relowner = t.relowner, ps.seqtypid = a.atttypid, \
+             CASE WHEN octet_length(pg_catalog.obj_description(s.oid, 'pg_class')) <= $2::bigint \
+               THEN pg_catalog.obj_description(s.oid, 'pg_class') END, \
+             COALESCE(octet_length(pg_catalog.obj_description(s.oid, 'pg_class')) > $2::bigint, false), \
+             EXISTS(SELECT 1 FROM pg_catalog.pg_seclabel l \
+               WHERE l.classoid = 'pg_class'::regclass AND l.objoid = s.oid), \
+             EXISTS(SELECT 1 FROM pg_catalog.pg_depend e \
+               WHERE e.classid = 'pg_class'::regclass AND e.objid = s.oid AND e.deptype = 'e') \
+             FROM pg_catalog.pg_attribute a \
+             JOIN pg_catalog.pg_class t ON t.oid = a.attrelid \
+             LEFT JOIN pg_catalog.pg_depend d ON d.classid = 'pg_class'::regclass \
+               AND d.refclassid = 'pg_class'::regclass AND d.refobjid = a.attrelid \
+               AND d.refobjsubid = a.attnum AND d.objsubid = 0 AND d.deptype = 'i' \
+             LEFT JOIN pg_catalog.pg_class s ON s.oid = d.objid \
+             LEFT JOIN pg_catalog.pg_namespace sn ON sn.oid = s.relnamespace \
+             LEFT JOIN pg_catalog.pg_sequence ps ON ps.seqrelid = s.oid \
+             LEFT JOIN pg_catalog.pg_type st ON st.oid = ps.seqtypid \
+             LEFT JOIN pg_catalog.pg_namespace tn ON tn.oid = st.typnamespace \
+             WHERE a.attrelid = $1 AND a.attnum > 0 AND a.attidentity <> '' \
+             ORDER BY a.attnum, s.oid",
+            vec![&relation.oid as &(dyn ToSql + Sync), &max_bytes],
+        ),
+    )
+    .await?;
+    tokio::pin!(identity_stream);
+    while let Some(row) = bounded(request, cancellation, identity_stream.try_next()).await? {
+        let column_name: String = field(&row, 0)?;
+        let sequence_schema: Option<String> = field(&row, 1)?;
+        let sequence_name: Option<String> = field(&row, 2)?;
+        let type_schema: Option<String> = field(&row, 3)?;
+        let type_name: Option<String> = field(&row, 4)?;
+        let comment: Option<String> = field(&row, 17)?;
+        if field::<bool>(&row, 18)? {
+            return Err(SourceObservationFailure::ByteLimitExceeded {
+                max_bytes: request.request().limits().max_bytes(),
+            });
+        }
+        meter.add(
+            request,
+            64 + column_name.len()
+                + sequence_schema.as_ref().map_or(0, String::len)
+                + sequence_name.as_ref().map_or(0, String::len)
+                + type_schema.as_ref().map_or(0, String::len)
+                + type_name.as_ref().map_or(0, String::len)
+                + comment.as_ref().map_or(0, String::len),
+        )?;
+        let (Some(sequence_schema), Some(sequence_name), Some(type_schema), Some(type_name)) =
+            (sequence_schema, sequence_name, type_schema, type_name)
+        else {
+            return Err(SourceObservationFailure::InvalidCapturedMetadata);
+        };
+        if sequence_schema != relation.schema
+            || field::<String>(&row, 11)? != "S"
+            || field::<String>(&row, 12)? != "p"
+            || [13, 14, 19, 20]
+                .into_iter()
+                .any(|index| field::<bool>(&row, index) != Ok(false))
+            || [15, 16]
+                .into_iter()
+                .any(|index| field::<bool>(&row, index) != Ok(true))
+        {
+            return Err(SourceObservationFailure::InvalidCapturedMetadata);
+        }
+        let sequence = IdentitySequenceObservation::new(
+            QualifiedTypeName::new(sequence_schema, sequence_name)
+                .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+            QualifiedTypeName::new(type_schema, type_name)
+                .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+            field(&row, 5)?,
+            field(&row, 6)?,
+            field(&row, 7)?,
+            field(&row, 8)?,
+            field(&row, 9)?,
+            field(&row, 10)?,
+            comment,
+        )
+        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+        let identity = identities
+            .iter_mut()
+            .find(|identity| identity.column_name() == column_name && !identity.is_not_identity())
+            .ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
+        *identity = identity
+            .clone()
+            .with_sequence(sequence)
+            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+    }
+    if identities
+        .iter()
+        .any(|identity| !identity.is_not_identity() && identity.sequence().is_none())
+    {
+        return Err(SourceObservationFailure::InvalidCapturedMetadata);
     }
     let indexes = capture_indexes(
         transaction,
@@ -1073,6 +1212,7 @@ async fn capture_relation(
         collations,
         generations,
         expressions,
+        identities,
         not_null,
         timings,
     ))
