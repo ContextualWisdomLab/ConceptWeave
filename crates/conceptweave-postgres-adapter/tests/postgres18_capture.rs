@@ -504,6 +504,188 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
         assert_eq!(first.domains().len(), 1);
         assert_eq!(first.enums().len(), 1);
         assert_eq!(first.foreign_key_catalog().unwrap().len(), 4);
+        let catalog_relations = client
+            .query(
+                "SELECT c.relname::text FROM pg_catalog.pg_class c \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+                 WHERE n.nspname = $1 AND c.relkind = 'r'",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| row.get::<_, String>(0))
+            .collect::<BTreeSet<_>>();
+        let observed_relations = first
+            .relations()
+            .iter()
+            .map(|relation| relation.relation_name().to_owned())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(observed_relations, catalog_relations);
+
+        let catalog_columns = client
+            .query(
+                "SELECT c.relname::text, a.attname::text, a.attnum, \
+                 pg_catalog.format_type(a.atttypid, a.atttypmod), tn.nspname::text, \
+                 ty.typname::text, a.attnotnull, pg_catalog.col_description(a.attrelid, a.attnum) \
+                 FROM pg_catalog.pg_attribute a \
+                 JOIN pg_catalog.pg_class c ON c.oid = a.attrelid \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+                 JOIN pg_catalog.pg_type ty ON ty.oid = a.atttypid \
+                 JOIN pg_catalog.pg_namespace tn ON tn.oid = ty.typnamespace \
+                 WHERE n.nspname = $1 AND c.relkind = 'r' AND a.attnum > 0 AND NOT a.attisdropped",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| {
+                let relation_name: String = row.get(0);
+                let column_name: String = row.get(1);
+                let column = first
+                    .relations()
+                    .iter()
+                    .find(|relation| relation.relation_name() == relation_name)
+                    .unwrap()
+                    .columns()
+                    .iter()
+                    .find(|column| column.column_name() == column_name)
+                    .unwrap();
+                assert_eq!(column.ordinal_position(), row.get::<_, i16>(2) as u32);
+                assert_eq!(column.data_type(), row.get::<_, String>(3));
+                assert_eq!(column.type_binding().schema_name(), row.get::<_, String>(4));
+                assert_eq!(column.type_binding().type_name(), row.get::<_, String>(5));
+                assert_eq!(column.nullable(), !row.get::<_, bool>(6));
+                assert_eq!(
+                    column.source_comment(),
+                    row.get::<_, Option<String>>(7).as_deref()
+                );
+                (relation_name, column_name)
+            })
+            .collect::<BTreeSet<_>>();
+        let observed_columns = first
+            .relations()
+            .iter()
+            .flat_map(|relation| {
+                relation.columns().iter().map(|column| {
+                    (
+                        relation.relation_name().to_owned(),
+                        column.column_name().to_owned(),
+                    )
+                })
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(observed_columns, catalog_columns);
+
+        let catalog_indexes = client
+            .query(
+                "SELECT t.relname::text, i.relname::text, am.amname::text, \
+                 pg_catalog.pg_get_indexdef(i.oid), x.indisunique, x.indnullsnotdistinct, \
+                 x.indisready, x.indisvalid, x.indislive \
+                 FROM pg_catalog.pg_index x \
+                 JOIN pg_catalog.pg_class t ON t.oid = x.indrelid \
+                 JOIN pg_catalog.pg_class i ON i.oid = x.indexrelid \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace \
+                 JOIN pg_catalog.pg_am am ON am.oid = i.relam \
+                 WHERE n.nspname = $1 AND t.relkind = 'r'",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| {
+                let relation_name: String = row.get(0);
+                let index_name: String = row.get(1);
+                let index = first
+                    .relations()
+                    .iter()
+                    .find(|relation| relation.relation_name() == relation_name)
+                    .unwrap()
+                    .indexes()
+                    .iter()
+                    .find(|index| index.index_name() == index_name)
+                    .unwrap();
+                assert_eq!(
+                    index.access_method(),
+                    Some(row.get::<_, String>(2).as_str())
+                );
+                assert_eq!(
+                    index.index_definition(),
+                    Some(row.get::<_, String>(3).as_str())
+                );
+                assert_eq!(index.is_unique(), row.get::<_, bool>(4));
+                assert_eq!(index.nulls_not_distinct(), Some(row.get::<_, bool>(5)));
+                assert_eq!(index.ready(), Some(row.get::<_, bool>(6)));
+                assert_eq!(index.valid(), Some(row.get::<_, bool>(7)));
+                assert_eq!(index.live(), Some(row.get::<_, bool>(8)));
+                (relation_name, index_name)
+            })
+            .collect::<BTreeSet<_>>();
+        let observed_indexes = first
+            .relations()
+            .iter()
+            .flat_map(|relation| {
+                relation.indexes().iter().map(|index| {
+                    (
+                        relation.relation_name().to_owned(),
+                        index.index_name().to_owned(),
+                    )
+                })
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(observed_indexes, catalog_indexes);
+
+        let catalog_constraints = client
+            .query(
+                "SELECT t.relname::text, con.conname::text FROM pg_catalog.pg_constraint con \
+                 JOIN pg_catalog.pg_class t ON t.oid = con.conrelid \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace \
+                 WHERE n.nspname = $1 AND t.relkind = 'r' AND con.contype IN ('p','u','f','c')",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| (row.get::<_, String>(0), row.get::<_, String>(1)))
+            .collect::<BTreeSet<_>>();
+        let observed_constraints = first
+            .relations()
+            .iter()
+            .flat_map(|relation| {
+                relation.constraints().iter().map(|constraint| {
+                    (
+                        relation.relation_name().to_owned(),
+                        constraint.constraint_name().to_owned(),
+                    )
+                })
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(observed_constraints, catalog_constraints);
+
+        let catalog_types = client
+            .query(
+                "SELECT t.typtype::text, t.typname::text FROM pg_catalog.pg_type t \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace \
+                 WHERE n.nspname = $1 AND t.typtype IN ('d','e')",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| (row.get::<_, String>(0), row.get::<_, String>(1)))
+            .collect::<BTreeSet<_>>();
+        let observed_types = first
+            .domains()
+            .iter()
+            .map(|domain| ("d".to_owned(), domain.domain_name().to_owned()))
+            .chain(
+                first
+                    .enums()
+                    .iter()
+                    .map(|enumeration| ("e".to_owned(), enumeration.enum_name().to_owned())),
+            )
+            .collect::<BTreeSet<_>>();
+        assert_eq!(observed_types, catalog_types);
         let proposal = propose_relational_model(&first).unwrap();
         let replay_proposal = propose_relational_model(&replay).unwrap();
         assert_eq!(proposal, replay_proposal);
