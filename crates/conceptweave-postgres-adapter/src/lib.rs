@@ -620,11 +620,25 @@ async fn capture_catalog(
                     cancellation,
                     transaction.query_raw(
                         "SELECT conname::text, contype::text, \
-                         CASE WHEN octet_length(pg_catalog.pg_get_constraintdef(oid, false)) <= $2::bigint \
-                           THEN pg_catalog.pg_get_constraintdef(oid, false) END, \
+                         CASE WHEN octet_length(pg_catalog.pg_get_constraintdef(c.oid, false)) <= $2::bigint \
+                           THEN pg_catalog.pg_get_constraintdef(c.oid, false) END, \
                          convalidated, conenforced, \
-                         octet_length(pg_catalog.pg_get_constraintdef(oid, false)) > $2::bigint \
-                         FROM pg_catalog.pg_constraint WHERE contypid = $1 ORDER BY conname, oid",
+                         octet_length(pg_catalog.pg_get_constraintdef(c.oid, false)) > $2::bigint, \
+                         c.connamespace <> t.typnamespace OR c.conrelid <> 0 OR \
+                           c.conparentid <> 0 OR NOT c.conislocal OR c.coninhcount <> 0 OR \
+                           c.connoinherit OR c.condeferrable OR c.condeferred OR \
+                           c.conindid <> 0 OR c.confrelid <> 0 OR c.conkey IS NOT NULL OR \
+                           c.conbin IS NULL OR \
+                           EXISTS(SELECT 1 FROM pg_catalog.pg_description d \
+                             WHERE d.classoid = 'pg_constraint'::regclass AND d.objoid = c.oid) OR \
+                           EXISTS(SELECT 1 FROM pg_catalog.pg_seclabel l \
+                             WHERE l.classoid = 'pg_constraint'::regclass AND l.objoid = c.oid) OR \
+                           EXISTS(SELECT 1 FROM pg_catalog.pg_depend d \
+                             WHERE d.classid = 'pg_constraint'::regclass AND d.objid = c.oid \
+                               AND d.deptype = 'e') \
+                         FROM pg_catalog.pg_constraint c \
+                         JOIN pg_catalog.pg_type t ON t.oid = c.contypid \
+                         WHERE c.contypid = $1 ORDER BY c.conname, c.oid",
                         vec![&observed.oid as &(dyn ToSql + Sync), &max_bytes],
                     ),
                 )
@@ -646,7 +660,7 @@ async fn capture_catalog(
                     let definition =
                         definition.ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
                     meter.add(request, name.len() + kind.len() + definition.len() + 2)?;
-                    if kind != "c" {
+                    if kind != "c" || field::<bool>(&row, 6)? {
                         return Err(SourceObservationFailure::InvalidCapturedMetadata);
                     }
                     checks.push(

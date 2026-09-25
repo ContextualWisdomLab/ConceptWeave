@@ -2642,6 +2642,52 @@ async fn postgres18_custom_table_access_method_fails_closed() {
 }
 
 #[tokio::test]
+async fn postgres18_domain_constraint_comment_fails_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_domain_comment_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; \
+             CREATE DOMAIN \"{schema}\".score AS integer \
+               CONSTRAINT nonnegative CHECK (VALUE >= 0)"
+        ))
+        .await
+        .unwrap();
+    let result: Result<(), SourceObservationFailure> = async {
+        let original = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await?;
+        assert_eq!(original.domains()[0].check_constraints().len(), 1);
+        client
+            .batch_execute(&format!(
+                "COMMENT ON CONSTRAINT nonnegative ON DOMAIN \"{schema}\".score \
+                 IS 'reviewed restriction'"
+            ))
+            .await
+            .unwrap();
+        assert!(matches!(
+            adapter(config)
+                .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+                .await,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ));
+        Ok(())
+    }
+    .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    result.unwrap();
+}
+
+#[tokio::test]
 async fn postgres18_domain_and_enum_acl_changes_fail_closed() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
