@@ -293,6 +293,42 @@ async fn capture_catalog(
         .ok_or(SourceObservationFailure::SourceUnavailable)?;
         meter.add(request, schema.len() + 4)?;
         let schema_oid: u32 = field(&schema_row, 0)?;
+        // PostgreSQL assigns normal user objects OIDs from 16384 onward; even
+        // functions installed in pg_catalog need this check.
+        let function_dependency = bounded(
+            request,
+            cancellation,
+            transaction.query_one(
+                "SELECT EXISTS( \
+                   SELECT 1 FROM pg_catalog.pg_depend d \
+                   JOIN pg_catalog.pg_proc p ON p.oid = d.refobjid \
+                   WHERE d.refclassid = 'pg_proc'::regclass \
+                     AND (p.pronamespace <> 'pg_catalog'::regnamespace OR p.oid >= 16384::oid) \
+                     AND ( \
+                       (d.classid = 'pg_constraint'::regclass AND EXISTS( \
+                         SELECT 1 FROM pg_catalog.pg_constraint c \
+                         WHERE c.oid = d.objid AND c.connamespace = $1)) OR \
+                       (d.classid = 'pg_attrdef'::regclass AND EXISTS( \
+                         SELECT 1 FROM pg_catalog.pg_attrdef ad \
+                         JOIN pg_catalog.pg_class c ON c.oid = ad.adrelid \
+                         WHERE ad.oid = d.objid AND c.relnamespace = $1)) OR \
+                       (d.classid = 'pg_class'::regclass AND EXISTS( \
+                         SELECT 1 FROM pg_catalog.pg_class c \
+                         WHERE c.oid = d.objid AND c.relnamespace = $1 \
+                           AND c.relkind IN ('i','I'))) OR \
+                       (d.classid = 'pg_type'::regclass AND EXISTS( \
+                         SELECT 1 FROM pg_catalog.pg_type t \
+                         WHERE t.oid = d.objid AND t.typnamespace = $1 \
+                           AND t.typtype = 'd')) \
+                     ))",
+                &[&schema_oid],
+            ),
+        )
+        .await?;
+        meter.add(request, 1)?;
+        if field::<bool>(&function_dependency, 0)? {
+            return Err(SourceObservationFailure::InvalidCapturedMetadata);
+        }
         let relation_stream = bounded(
             request,
             cancellation,
