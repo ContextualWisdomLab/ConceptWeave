@@ -17,7 +17,7 @@ use conceptweave_observation::{
     CollationProvider, ColumnObservationV3, ConstraintDeferrability, EnumObservation,
     ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType, ForeignKeyObservation,
     PostgresSchemaSnapshotV3, PostgresTypeKind, QualifiedTypeName, RelationKind,
-    RelationObservation, SchemaObjectLocation, TableConstraintObservation,
+    RelationObservation, ReplicaIdentityMode, SchemaObjectLocation, TableConstraintObservation,
 };
 use conceptweave_postgres_adapter::{PostgresTlsAdapter, PostgresUnixAdapter};
 use conceptweave_source_port::{
@@ -589,6 +589,26 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             .map(|relation| relation.relation_name().to_owned())
             .collect::<BTreeSet<_>>();
         assert_eq!(observed_relations, catalog_relations);
+        let replica_mode: String = client
+            .query_one(
+                "SELECT c.relreplident::text FROM pg_catalog.pg_class c \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+                 WHERE n.nspname = $1 AND c.relname = 'risk_record'",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+            .get(0);
+        assert_eq!(replica_mode, "i");
+        assert_eq!(
+            first
+                .relations()
+                .iter()
+                .find(|relation| relation.relation_name() == "risk_record")
+                .unwrap()
+                .replica_identity_mode(),
+            Some(ReplicaIdentityMode::Index)
+        );
 
         let catalog_columns = client
             .query(
@@ -704,6 +724,9 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
                 assert_eq!(flags.clustered(), row.get::<_, bool>(15));
                 assert_eq!(flags.check_xmin(), row.get::<_, bool>(16));
                 assert_eq!(flags.replica_identity(), row.get::<_, bool>(17));
+                if relation_name == "risk_record" && index_name == "risk_record_key" {
+                    assert!(flags.replica_identity());
+                }
                 let catalog_key_names: Vec<String> = row.get(18);
                 let observed_key_names = index
                     .key_attributes()
