@@ -22,6 +22,7 @@ mod range_catalog;
 mod relation_owner;
 mod relation_tablespace;
 mod representation_v3;
+mod schema_owner;
 mod type_kind;
 
 pub use array_type::{ArrayTypeLocation, ArrayTypeObservation, ArrayTypeSourceReceipt};
@@ -56,6 +57,7 @@ pub use representation_v3::{
     QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
     RelationObservation, ReplicaIdentityMode, SchemaObjectLocation, SchemaObjectLocationKind,
 };
+pub use schema_owner::SchemaOwnerObservation;
 pub use type_kind::TypeOwnerObservation;
 pub use type_kind::{PostgresTypeKind, TypeKindObservation};
 
@@ -140,6 +142,7 @@ impl SuccessorSourceReceipt {
 pub struct PostgresSchemaSnapshotV3 {
     inner: representation_v3::PostgresSchemaSnapshotV3,
     snapshot_digest: String,
+    authorized_schema_names: Vec<String>,
     relations: Vec<RelationObservation>,
     domains: Vec<DomainObservation>,
     enums: Vec<EnumObservation>,
@@ -149,6 +152,8 @@ pub struct PostgresSchemaSnapshotV3 {
     type_kinds_observed: bool,
     type_owners: Vec<TypeOwnerObservation>,
     type_owners_observed: bool,
+    schema_owners: Vec<SchemaOwnerObservation>,
+    schema_owners_observed: bool,
     column_array_dimensions: Vec<ColumnArrayDimensionsObservation>,
     column_array_dimensions_observed: bool,
     column_collations: Vec<ColumnCollationObservation>,
@@ -209,6 +214,7 @@ impl PostgresSchemaSnapshotV3 {
         Ok(Self {
             inner,
             snapshot_digest,
+            authorized_schema_names: authorized_request.request().allowed_schema_names().to_vec(),
             relations,
             domains,
             enums,
@@ -218,6 +224,8 @@ impl PostgresSchemaSnapshotV3 {
             type_kinds_observed: false,
             type_owners: Vec::new(),
             type_owners_observed: false,
+            schema_owners: Vec::new(),
+            schema_owners_observed: false,
             column_array_dimensions: Vec::new(),
             column_array_dimensions_observed: false,
             column_collations: Vec::new(),
@@ -313,6 +321,7 @@ impl PostgresSchemaSnapshotV3 {
         Ok(Self {
             inner,
             snapshot_digest,
+            authorized_schema_names: authorized_request.request().allowed_schema_names().to_vec(),
             relations,
             domains,
             enums,
@@ -322,6 +331,8 @@ impl PostgresSchemaSnapshotV3 {
             type_kinds_observed: true,
             type_owners: Vec::new(),
             type_owners_observed: false,
+            schema_owners: Vec::new(),
+            schema_owners_observed: false,
             column_array_dimensions: Vec::new(),
             column_array_dimensions_observed: false,
             column_collations: Vec::new(),
@@ -607,6 +618,7 @@ impl PostgresSchemaSnapshotV3 {
         Ok(Self {
             inner,
             snapshot_digest,
+            authorized_schema_names: authorized_request.request().allowed_schema_names().to_vec(),
             relations,
             domains,
             enums,
@@ -616,6 +628,8 @@ impl PostgresSchemaSnapshotV3 {
             type_kinds_observed: false,
             type_owners: Vec::new(),
             type_owners_observed: false,
+            schema_owners: Vec::new(),
+            schema_owners_observed: false,
             column_array_dimensions: Vec::new(),
             column_array_dimensions_observed: false,
             column_collations: Vec::new(),
@@ -1236,6 +1250,36 @@ impl PostgresSchemaSnapshotV3 {
         Ok(self)
     }
 
+    /// Adds exact same-generation owner identities for every observed source schema.
+    /// Earlier v3 and type-owner digests remain reproducible.
+    pub fn with_observed_schema_owners(
+        mut self,
+        observations: Vec<SchemaOwnerObservation>,
+    ) -> Result<Self, ObservationError> {
+        if !self.type_owners_observed
+            || self.schema_owners_observed
+            || self.range_catalog_observed
+            || self.column_collations_observed
+            || self.column_generations_observed
+            || self.column_expressions_observed
+            || self.column_identities_observed
+            || self.not_null_constraints_observed
+            || self.constraint_timings_observed
+            || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "schema_owner_observation_order",
+            });
+        }
+        let observations = schema_owner::canonicalize(&self.authorized_schema_names, observations)?;
+        self.snapshot_digest = schema_owner::digest(&self.snapshot_digest, &observations);
+        self.schema_owners = observations;
+        self.schema_owners_observed = true;
+        Ok(self)
+    }
+
     /// Adds complete `pg_range` subtype, ordering, collation, and function coordinates.
     /// This successor digest leaves historical type-kind identities unchanged.
     pub fn with_observed_range_catalog(
@@ -1413,6 +1457,13 @@ impl PostgresSchemaSnapshotV3 {
     pub fn type_owners(&self) -> Option<&[TypeOwnerObservation]> {
         self.type_owners_observed
             .then_some(self.type_owners.as_slice())
+    }
+
+    /// Returns complete observed schema-owner evidence, or `None` when unobserved.
+    #[must_use]
+    pub fn schema_owners(&self) -> Option<&[SchemaOwnerObservation]> {
+        self.schema_owners_observed
+            .then_some(self.schema_owners.as_slice())
     }
 
     /// Returns complete declared column-array dimensions, or `None` when unobserved.

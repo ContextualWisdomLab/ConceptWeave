@@ -21,7 +21,7 @@ use conceptweave_observation::{
     ForeignKeyObservation, IndexTablespace, PostgresSchemaSnapshotV3, PostgresTypeKind,
     QualifiedTypeName, RelationKind, RelationObservation, RelationOwnerObservation,
     RelationTablespaceObservation, ReplicaIdentityMode, SchemaObjectLocation,
-    TableConstraintObservation, TypeKindObservation, TypeOwnerObservation,
+    SchemaOwnerObservation, TableConstraintObservation, TypeKindObservation, TypeOwnerObservation,
 };
 use conceptweave_postgres_adapter::{PostgresTlsAdapter, PostgresUnixAdapter};
 use conceptweave_source_port::{
@@ -622,6 +622,10 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         .unwrap(),
     ])
     .unwrap()
+    .with_observed_schema_owners(vec![
+        SchemaOwnerObservation::new("public", 42, "fixture_owner").unwrap(),
+    ])
+    .unwrap()
     .with_observed_column_collations(vec![
         ColumnCollationObservation::uncollatable("public", "plain", RelationKind::Table, "id")
             .unwrap(),
@@ -863,6 +867,10 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
                 })
                 .collect(),
         )
+        .unwrap()
+        .with_observed_schema_owners(vec![
+            SchemaOwnerObservation::new("public", 42, "fixture_owner").unwrap(),
+        ])
         .unwrap()
         .with_observed_collation_definitions(vec![])
         .unwrap()
@@ -2869,7 +2877,7 @@ async fn postgres18_tcp_requires_valid_ca_and_host_name() {
 
     let adapter = connection(config.clone(), ca.clone()).unwrap();
     let snapshot = adapter
-        .observe(authorized("public"), &NotCancelled)
+        .observe(authorized("conceptweave_tls_fixture"), &NotCancelled)
         .await
         .unwrap();
     assert!(snapshot.relations().is_empty());
@@ -3697,6 +3705,99 @@ async fn postgres18_table_owner_changes_source_identity() {
     assert_eq!(after.relation_owners().unwrap()[0].owner_oid(), owner_oid);
     assert_eq!(after.relation_owners().unwrap()[0].owner_role_name(), owner);
     assert_ne!(before.snapshot_digest(), after.snapshot_digest());
+}
+
+#[tokio::test]
+async fn postgres18_schema_owner_changes_source_identity() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let can_create_role: bool = client
+        .query_one(
+            "SELECT rolsuper FROM pg_catalog.pg_roles WHERE rolname = current_user",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    if !can_create_role {
+        eprintln!("skipping schema-owner fixture: setup requires a superuser");
+        connection_task.abort();
+        return;
+    }
+    let suffix = std::process::id();
+    let schema = format!("cw_schema_owner_fixture_{suffix}");
+    let owner = format!("cw_schema_owner_{suffix}");
+    client
+        .batch_execute(&format!(
+            "CREATE ROLE \"{owner}\" NOLOGIN; CREATE SCHEMA \"{schema}\"; \
+             CREATE TABLE \"{schema}\".record (id integer)"
+        ))
+        .await
+        .unwrap();
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await
+        .unwrap();
+    client
+        .batch_execute(&format!("ALTER SCHEMA \"{schema}\" OWNER TO \"{owner}\""))
+        .await
+        .unwrap();
+    let after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    let owner_row = client
+        .query_one(
+            "SELECT n.nspowner, r.rolname::text FROM pg_catalog.pg_namespace n \
+             JOIN pg_catalog.pg_roles r ON r.oid = n.nspowner WHERE n.nspname = $1",
+            &[&schema],
+        )
+        .await
+        .unwrap();
+    let after = after.unwrap();
+    assert_eq!(
+        after.schema_owners().unwrap()[0].owner_oid(),
+        owner_row.get::<_, u32>(0)
+    );
+    assert_eq!(after.schema_owners().unwrap()[0].owner_role_name(), owner);
+    assert_eq!(
+        after.schema_owners().unwrap()[0].owner_role_name(),
+        owner_row.get::<_, String>(1)
+    );
+    assert_ne!(before.snapshot_digest(), after.snapshot_digest());
+    client
+        .batch_execute(&format!("COMMENT ON SCHEMA \"{schema}\" IS 'unmodeled'"))
+        .await
+        .unwrap();
+    assert!(matches!(
+        adapter(Config::from_str(&dsn).unwrap())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await,
+        Err(SourceObservationFailure::InvalidCapturedMetadata)
+    ));
+    client
+        .batch_execute(&format!(
+            "COMMENT ON SCHEMA \"{schema}\" IS NULL; \
+             GRANT USAGE ON SCHEMA \"{schema}\" TO PUBLIC"
+        ))
+        .await
+        .unwrap();
+    assert!(matches!(
+        adapter(Config::from_str(&dsn).unwrap())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await,
+        Err(SourceObservationFailure::InvalidCapturedMetadata)
+    ));
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA \"{schema}\" CASCADE; DROP ROLE \"{owner}\""
+        ))
+        .await
+        .unwrap();
+    connection_task.abort();
 }
 
 #[tokio::test]

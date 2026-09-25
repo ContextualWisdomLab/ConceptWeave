@@ -576,6 +576,9 @@ pub fn propose_relational_model(
     {
         return Err(ProposalError::IncompleteSourceObservation);
     }
+    if snapshot.schema_owners().is_none() {
+        return Err(ProposalError::IncompleteSourceObservation);
+    }
     if snapshot
         .relations()
         .iter()

@@ -27,7 +27,7 @@ use conceptweave_observation::{
     PostgresSchemaSnapshotV3, PostgresTypeKind, PrimaryKeyObservation, QualifiedCollationName,
     QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
     RelationOwnerObservation, RelationTablespaceObservation, ReplicaIdentityMode,
-    TableConstraintObservation, TypeKindObservation, TypeOwnerObservation,
+    SchemaOwnerObservation, TableConstraintObservation, TypeKindObservation, TypeOwnerObservation,
     UniqueConstraintObservation,
 };
 use conceptweave_source_port::{
@@ -278,6 +278,7 @@ async fn capture_catalog(
     let mut types = Vec::new();
     let mut type_kinds = Vec::new();
     let mut type_owners = Vec::new();
+    let mut schema_owners = Vec::new();
     let mut array_types = Vec::new();
     let mut relation_rows = Vec::new();
     for schema in request.request().allowed_schema_names() {
@@ -285,14 +286,34 @@ async fn capture_catalog(
             request,
             cancellation,
             transaction.query_opt(
-                "SELECT oid FROM pg_catalog.pg_namespace WHERE nspname = $1",
+                "SELECT n.oid, n.nspowner, r.rolname::text, \
+                 n.nspacl IS NOT NULL \
+                   OR pg_catalog.obj_description(n.oid, 'pg_namespace') IS NOT NULL \
+                   OR EXISTS(SELECT 1 FROM pg_catalog.pg_seclabel l \
+                     WHERE l.classoid = 'pg_namespace'::regclass AND l.objoid = n.oid) \
+                   OR EXISTS(SELECT 1 FROM pg_catalog.pg_depend d \
+                     WHERE d.classid = 'pg_namespace'::regclass AND d.objid = n.oid \
+                       AND d.deptype = 'e') \
+                 FROM pg_catalog.pg_namespace n \
+                 LEFT JOIN pg_catalog.pg_roles r ON r.oid = n.nspowner \
+                 WHERE n.nspname = $1",
                 &[schema],
             ),
         )
         .await?
         .ok_or(SourceObservationFailure::SourceUnavailable)?;
-        meter.add(request, schema.len() + 4)?;
+        let owner_oid: u32 = field(&schema_row, 1)?;
+        let owner_name: String = field::<Option<String>>(&schema_row, 2)?
+            .ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
+        if field::<bool>(&schema_row, 3)? {
+            return Err(SourceObservationFailure::InvalidCapturedMetadata);
+        }
+        meter.add(request, schema.len() + owner_name.len() + 8)?;
         let schema_oid: u32 = field(&schema_row, 0)?;
+        schema_owners.push(
+            SchemaOwnerObservation::new(schema, owner_oid, owner_name)
+                .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+        );
         // PostgreSQL assigns normal user objects OIDs from 16384 onward; even
         // functions and operators installed in pg_catalog need this check.
         let expression_dependency = bounded(
@@ -1049,6 +1070,7 @@ async fn capture_catalog(
         }
     })
     .and_then(|snapshot| snapshot.with_observed_type_owners(type_owners))
+    .and_then(|snapshot| snapshot.with_observed_schema_owners(schema_owners))
     .and_then(|snapshot| snapshot.with_observed_range_catalog(range_catalog))
     .and_then(|snapshot| {
         if has_relations {
