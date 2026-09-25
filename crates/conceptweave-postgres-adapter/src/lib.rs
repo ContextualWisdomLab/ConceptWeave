@@ -871,15 +871,14 @@ async fn capture_catalog(
         .collect::<Result<Vec<_>, _>>()
         .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
     let range_catalog = ranges::capture(&transaction, request, cancellation, &mut meter).await?;
+    let collation_references =
+        collations::references(&domains, &relations, &column_collations, &range_catalog);
     let collation_definitions = collations::capture(
         &transaction,
         request,
         cancellation,
         &mut meter,
-        &domains,
-        &relations,
-        &column_collations,
-        &range_catalog,
+        collation_references,
     )
     .await?;
     let observed_at_utc: String = field(

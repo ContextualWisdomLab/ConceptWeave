@@ -91,7 +91,7 @@ fn locale_bytes(fields: &CollationLocaleFields) -> usize {
     .sum()
 }
 
-fn references(
+pub(super) fn references(
     domains: &[DomainObservation],
     relations: &[RelationObservation],
     column_collations: &[ColumnCollationObservation],
@@ -138,12 +138,8 @@ pub(super) async fn capture(
     request: &AuthorizedObservationRequest,
     cancellation: &dyn ObservationCancellation,
     meter: &mut CaptureMeter,
-    domains: &[DomainObservation],
-    relations: &[RelationObservation],
-    column_collations: &[ColumnCollationObservation],
-    range_catalog: &[RangeCatalogObservation],
+    references: BTreeSet<(String, String)>,
 ) -> Result<Vec<CollationDefinitionObservation>, SourceObservationFailure> {
-    let references = references(domains, relations, column_collations, range_catalog);
     if references.is_empty() {
         return Ok(Vec::new());
     }

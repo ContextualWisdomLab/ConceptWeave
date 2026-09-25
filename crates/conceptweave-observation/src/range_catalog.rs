@@ -301,7 +301,7 @@ mod tests {
             None,
             None,
         );
-        let original = digest("sha256:prior", &[base.clone()]);
+        let original = digest("sha256:prior", std::slice::from_ref(&base));
         let mut changed = base.clone();
         changed.subtype = QualifiedTypeName::new("pg_catalog", "int8").unwrap();
         assert_ne!(original, digest("sha256:prior", &[changed]));
