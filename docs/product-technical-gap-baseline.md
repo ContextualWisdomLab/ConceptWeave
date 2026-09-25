@@ -26,6 +26,8 @@ The bounded adapter now checks `pg_class.relam` against the built-in `heap` tabl
 
 The adapter now captures every admitted ordinary table's resolved tablespace name and the exact database-default marker in a separate successor digest. Missing, duplicate, or out-of-scope table storage evidence fails closed before Discovery promotion. A PostgreSQL 18 fixture moves a table to a separate tablespace, checks both storage coordinates, and verifies changed source identity. Historical v3 digests remain reproducible.
 
+The adapter now also binds each admitted table or standalone composite to its same-generation owner role OID and resolved name in a later successor digest. A PostgreSQL 18 RED/GREEN fixture reproduced an unchanged digest after `ALTER TABLE ... OWNER TO` and now verifies a changed digest plus exact catalog owner identity. Missing or duplicate owner observations cannot become a Discovery proposal; role OIDs are source-local evidence rather than portable semantic identifiers.
+
 Dropped `pg_attribute` rows remain physical tombstones but are not SQL-visible columns. The adapter excludes them from the observed column set without renumbering surviving `attnum` coordinates. A PostgreSQL 18 fixture verifies a retained ordinal gap, the surviving index key, and source receipts for live versus dropped columns.
 
 A PostgreSQL 18 fixture now captures quoted identifiers with leading/trailing whitespace and embedded `/` and `~` across schema, table, columns, primary-key index/constraint, domain, and enum. It resolves exact receipts for each and verifies that literal pointer-like column text cannot collide with JSON Pointer-escaped coordinates. This is bounded identifier/receipt evidence, not the complete same-generation catalog differential.

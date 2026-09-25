@@ -19,8 +19,8 @@ use conceptweave_observation::{
     ColumnObservationV3, ConstraintDeferrability, DomainObservation, EnumObservation,
     ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType, ForeignKeyObservation,
     IndexTablespace, PostgresSchemaSnapshotV3, PostgresTypeKind, QualifiedTypeName, RelationKind,
-    RelationObservation, RelationTablespaceObservation, ReplicaIdentityMode, SchemaObjectLocation,
-    TableConstraintObservation, TypeKindObservation,
+    RelationObservation, RelationOwnerObservation, RelationTablespaceObservation,
+    ReplicaIdentityMode, SchemaObjectLocation, TableConstraintObservation, TypeKindObservation,
 };
 use conceptweave_postgres_adapter::{PostgresTlsAdapter, PostgresUnixAdapter};
 use conceptweave_source_port::{
@@ -606,6 +606,10 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
             IndexTablespace::database_default("pg_default").unwrap(),
         )
         .unwrap(),
+    ])
+    .unwrap()
+    .with_observed_relation_owners(vec![
+        RelationOwnerObservation::new("public", "plain", 42, "fixture_owner").unwrap(),
     ])
     .unwrap()
     .with_observed_column_collations(vec![
@@ -3195,6 +3199,73 @@ async fn postgres18_nondefault_table_tablespace_changes_source_identity() {
     assert!(original.tablespace().is_database_default());
     assert_eq!(moved.tablespace().name(), tablespace);
     assert!(!moved.tablespace().is_database_default());
+    assert_ne!(before.snapshot_digest(), after.snapshot_digest());
+}
+
+#[tokio::test]
+async fn postgres18_table_owner_changes_source_identity() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let can_create_role: bool = client
+        .query_one(
+            "SELECT rolsuper FROM pg_catalog.pg_roles WHERE rolname = current_user",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    if !can_create_role {
+        eprintln!("skipping table-owner fixture: setup requires a superuser");
+        connection_task.abort();
+        return;
+    }
+    let suffix = std::process::id();
+    let schema = format!("cw_owner_fixture_{suffix}");
+    let owner = format!("cw_owner_{suffix}");
+    client
+        .batch_execute(&format!(
+            "CREATE ROLE \"{owner}\" NOLOGIN; CREATE SCHEMA \"{schema}\"; \
+             CREATE TABLE \"{schema}\".record (id integer)"
+        ))
+        .await
+        .unwrap();
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await
+        .unwrap();
+    client
+        .batch_execute(&format!(
+            "ALTER TABLE \"{schema}\".record OWNER TO \"{owner}\""
+        ))
+        .await
+        .unwrap();
+    let after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    let owner_oid: u32 = client
+        .query_one(
+            "SELECT c.relowner FROM pg_catalog.pg_class c \
+             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+             WHERE n.nspname = $1 AND c.relname = 'record'",
+            &[&schema],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA \"{schema}\" CASCADE; DROP ROLE \"{owner}\""
+        ))
+        .await
+        .unwrap();
+    connection_task.abort();
+    let after = after.unwrap();
+    assert_eq!(after.relation_owners().unwrap()[0].owner_oid(), owner_oid);
+    assert_eq!(after.relation_owners().unwrap()[0].owner_role_name(), owner);
     assert_ne!(before.snapshot_digest(), after.snapshot_digest());
 }
 

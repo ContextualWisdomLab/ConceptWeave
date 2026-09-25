@@ -25,8 +25,9 @@ use conceptweave_observation::{
     IndexCatalogFlags, IndexKeySemantics, IndexObservation, IndexStorageOption, IndexTablespace,
     NotNullConstraintObservation, OperatorClassOption, PostgresSchemaSnapshotV3, PostgresTypeKind,
     PrimaryKeyObservation, QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName,
-    RelationKind, RelationObservation, RelationTablespaceObservation, ReplicaIdentityMode,
-    TableConstraintObservation, TypeKindObservation, UniqueConstraintObservation,
+    RelationKind, RelationObservation, RelationOwnerObservation, RelationTablespaceObservation,
+    ReplicaIdentityMode, TableConstraintObservation, TypeKindObservation,
+    UniqueConstraintObservation,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, SourceObservationFailure,
@@ -206,6 +207,8 @@ struct RelationRow {
     kind: RelationKind,
     replica_identity: ReplicaIdentityMode,
     tablespace: Option<IndexTablespace>,
+    owner_oid: u32,
+    owner_name: String,
     comment: Option<String>,
 }
 
@@ -321,11 +324,12 @@ async fn capture_catalog(
                      WHERE d.classid = 'pg_type'::regclass AND d.objid = t.oid \
                        AND d.deptype = 'e')), \
                  c.relam = 0 AND c.reltablespace = 0 AND c.reltoastrelid = 0, \
-                 ts.spcname::text, c.reltablespace = 0 \
+                 ts.spcname::text, c.reltablespace = 0, c.relowner, owner_role.rolname::text \
                  FROM pg_catalog.pg_class c \
                  JOIN pg_catalog.pg_database db ON db.datname = pg_catalog.current_database() \
                  LEFT JOIN pg_catalog.pg_tablespace ts \
                    ON ts.oid = CASE WHEN c.reltablespace = 0 THEN db.dattablespace ELSE c.reltablespace END \
+                 LEFT JOIN pg_catalog.pg_roles owner_role ON owner_role.oid = c.relowner \
                  WHERE c.relnamespace = $1 \
                    AND c.relkind IN ('r','p','v','m','f','S','c') ORDER BY c.relname",
                 vec![&schema_oid as &(dyn ToSql + Sync), &max_bytes],
@@ -341,6 +345,9 @@ async fn capture_catalog(
             let replica: String = field(&row, 5)?;
             let comment: Option<String> = field(&row, 13)?;
             let tablespace_name: Option<String> = field(&row, 19)?;
+            let owner_oid: u32 = field(&row, 21)?;
+            let owner_name: String = field::<Option<String>>(&row, 22)?
+                .ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
             if field::<bool>(&row, 14)? {
                 return Err(SourceObservationFailure::ByteLimitExceeded {
                     max_bytes: limits.max_bytes(),
@@ -353,6 +360,7 @@ async fn capture_catalog(
                     + persistence.len()
                     + replica.len()
                     + tablespace_name.as_ref().map_or(0, String::len)
+                    + owner_name.len()
                     + comment.as_ref().map_or(0, String::len),
             )?;
             if kind == "S" && field::<bool>(&row, 15)? {
@@ -412,6 +420,8 @@ async fn capture_catalog(
                 kind: relation_kind,
                 replica_identity,
                 tablespace,
+                owner_oid,
+                owner_name,
                 comment,
             });
         }
@@ -740,6 +750,7 @@ async fn capture_catalog(
     }
     let mut relations = Vec::new();
     let mut relation_tablespaces = Vec::new();
+    let mut relation_owners = Vec::new();
     let mut relation_oids = Vec::new();
     let mut key_timings = Vec::new();
     let mut column_collations = Vec::new();
@@ -749,6 +760,15 @@ async fn capture_catalog(
     let mut not_null_constraints = Vec::new();
     let mut constraint_timings = Vec::new();
     for relation in relation_rows {
+        relation_owners.push(
+            RelationOwnerObservation::new(
+                relation.schema.clone(),
+                relation.name.clone(),
+                relation.owner_oid,
+                relation.owner_name.clone(),
+            )
+            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+        );
         if let Some(tablespace) = &relation.tablespace {
             relation_tablespaces.push(
                 RelationTablespaceObservation::new(
@@ -940,6 +960,13 @@ async fn capture_catalog(
             Ok(snapshot)
         } else {
             snapshot.with_observed_relation_tablespaces(relation_tablespaces)
+        }
+    })
+    .and_then(|snapshot| {
+        if relation_owners.is_empty() {
+            Ok(snapshot)
+        } else {
+            snapshot.with_observed_relation_owners(relation_owners)
         }
     })
     .and_then(|snapshot| snapshot.with_observed_range_catalog(range_catalog))

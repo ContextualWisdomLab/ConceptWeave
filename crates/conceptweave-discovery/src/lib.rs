@@ -568,6 +568,9 @@ pub fn propose_relational_model(
     {
         return Err(ProposalError::IncompleteSourceObservation);
     }
+    if !snapshot.relations().is_empty() && snapshot.relation_owners().is_none() {
+        return Err(ProposalError::IncompleteSourceObservation);
+    }
     let has_type_kind = |schema: &str, name: &str, kind: PostgresTypeKind| {
         observed_type_kinds.get(&(schema, name)) == Some(&kind)
     };

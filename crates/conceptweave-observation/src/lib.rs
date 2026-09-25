@@ -18,6 +18,7 @@ mod foreign_key_catalog;
 mod model;
 mod not_null_constraint;
 mod range_catalog;
+mod relation_owner;
 mod relation_tablespace;
 mod representation_v3;
 mod type_kind;
@@ -44,6 +45,7 @@ pub use not_null_constraint::{NotNullConstraintObservation, ParentNotNullConstra
 pub use range_catalog::{
     QualifiedRangeProcedure, RangeCatalogObservation, RangeCatalogSourceReceipt,
 };
+pub use relation_owner::RelationOwnerObservation;
 pub use relation_tablespace::RelationTablespaceObservation;
 pub use representation_v3::{
     ColumnObservationV3, DomainCheckConstraintObservation, DomainObservation, EnumObservation,
@@ -162,6 +164,8 @@ pub struct PostgresSchemaSnapshotV3 {
     range_catalog_observed: bool,
     relation_tablespaces: Vec<RelationTablespaceObservation>,
     relation_tablespaces_observed: bool,
+    relation_owners: Vec<RelationOwnerObservation>,
+    relation_owners_observed: bool,
     collation_definitions: Vec<CollationDefinitionObservation>,
     collation_definitions_observed: bool,
 }
@@ -225,6 +229,8 @@ impl PostgresSchemaSnapshotV3 {
             range_catalog_observed: false,
             relation_tablespaces: Vec::new(),
             relation_tablespaces_observed: false,
+            relation_owners: Vec::new(),
+            relation_owners_observed: false,
             collation_definitions: Vec::new(),
             collation_definitions_observed: false,
         })
@@ -323,6 +329,8 @@ impl PostgresSchemaSnapshotV3 {
             range_catalog_observed: false,
             relation_tablespaces: Vec::new(),
             relation_tablespaces_observed: false,
+            relation_owners: Vec::new(),
+            relation_owners_observed: false,
             collation_definitions: Vec::new(),
             collation_definitions_observed: false,
         })
@@ -611,6 +619,8 @@ impl PostgresSchemaSnapshotV3 {
             range_catalog_observed: false,
             relation_tablespaces: Vec::new(),
             relation_tablespaces_observed: false,
+            relation_owners: Vec::new(),
+            relation_owners_observed: false,
             collation_definitions: Vec::new(),
             collation_definitions_observed: false,
         })
@@ -1118,6 +1128,7 @@ impl PostgresSchemaSnapshotV3 {
     ) -> Result<Self, ObservationError> {
         if !self.type_kinds_observed
             || self.relation_tablespaces_observed
+            || self.relation_owners_observed
             || self.range_catalog_observed
             || self.column_collations_observed
             || self.column_generations_observed
@@ -1137,6 +1148,41 @@ impl PostgresSchemaSnapshotV3 {
         self.snapshot_digest = relation_tablespace::digest(&self.snapshot_digest, &observations);
         self.relation_tablespaces = observations;
         self.relation_tablespaces_observed = true;
+        Ok(self)
+    }
+
+    /// Adds exact same-generation relation owner OIDs and resolved role names.
+    /// This successor leaves historical v3 and table-storage digests reproducible.
+    pub fn with_observed_relation_owners(
+        mut self,
+        observations: Vec<RelationOwnerObservation>,
+    ) -> Result<Self, ObservationError> {
+        if !self.type_kinds_observed
+            || (self
+                .relations
+                .iter()
+                .any(|relation| relation.kind() == RelationKind::Table)
+                && !self.relation_tablespaces_observed)
+            || self.relation_owners_observed
+            || self.range_catalog_observed
+            || self.column_collations_observed
+            || self.column_generations_observed
+            || self.column_expressions_observed
+            || self.column_identities_observed
+            || self.not_null_constraints_observed
+            || self.constraint_timings_observed
+            || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "relation_owner_observation_order",
+            });
+        }
+        let observations = relation_owner::canonicalize(&self.relations, observations)?;
+        self.snapshot_digest = relation_owner::digest(&self.snapshot_digest, &observations);
+        self.relation_owners = observations;
+        self.relation_owners_observed = true;
         Ok(self)
     }
 
@@ -1361,6 +1407,13 @@ impl PostgresSchemaSnapshotV3 {
     pub fn relation_tablespaces(&self) -> Option<&[RelationTablespaceObservation]> {
         self.relation_tablespaces_observed
             .then_some(self.relation_tablespaces.as_slice())
+    }
+
+    /// Returns complete relation-owner evidence, or `None` when unobserved.
+    #[must_use]
+    pub fn relation_owners(&self) -> Option<&[RelationOwnerObservation]> {
+        self.relation_owners_observed
+            .then_some(self.relation_owners.as_slice())
     }
 
     /// Issues provenance only for an exact observed range catalog coordinate.

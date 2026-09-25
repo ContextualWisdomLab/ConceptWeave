@@ -22,6 +22,8 @@ This path does not admit general relation-bearing schemas. Discovery maps ordina
 
 Every admitted ordinary table now carries a separate successor storage observation with the resolved `pg_tablespace.spcname` and exact `pg_class.reltablespace = 0` database-default marker. The adapter resolves the default from `pg_database.dattablespace` inside the same read-only transaction; missing or duplicate table storage evidence fails closed. A live PostgreSQL 18 fixture moves an admitted table to a separate tablespace and verifies the changed source digest and marker without rewriting historical v3 identities.
 
+Every admitted table and standalone composite also binds its same-generation `pg_class.relowner` OID and resolved role name in a later successor digest. Missing or duplicate owner evidence fails closed before Discovery promotion. A PostgreSQL 18 fixture changes a table owner without changing its schema or columns, checks the resolved owner against a fresh catalog read, and verifies changed source identity. Role OIDs remain source-local catalog identity, not portable business identity.
+
 The live quoted-identifier fixture preserves whitespace, slash, and tilde in observed schema/relation/column/constraint/index/domain/enum names, and verifies distinct receipt coordinates for text that resembles an escaped pointer token.
 
 The column-collation fixture compares the captured database-default collation against PostgreSQL 18's actual provider-`d`, encoding-`-1` catalog row and the current database locale/version fields.
