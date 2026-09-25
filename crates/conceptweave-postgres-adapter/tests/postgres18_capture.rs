@@ -6,8 +6,12 @@ use std::{
 use conceptweave_alignment::{
     AlignmentDecision, AlignmentError, align_relational_proposal, validate_alignment,
 };
+use conceptweave_client::{ReleaseMetadata, SemanticReleaseClient};
 use conceptweave_discovery::{ProposalError, ProposedSourceType, propose_relational_model};
 use conceptweave_domain::{CandidateKind, PublicationState, TruthStatus};
+use conceptweave_governance::{
+    GovernanceError, ReviewRequest, StewardReviewAuthority, publish, review,
+};
 use conceptweave_observation::{
     CollationProvider, ColumnObservationV3, ConstraintDeferrability, EnumObservation,
     ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType, ForeignKeyObservation,
@@ -55,6 +59,29 @@ impl ObservationCancellation for NotCancelled {
 }
 
 struct Cancelled;
+
+struct FixtureSteward<'a> {
+    proposal_id: &'a str,
+    source_digest: &'a str,
+}
+
+impl StewardReviewAuthority for FixtureSteward<'_> {
+    fn authorize_review(&self, request: &ReviewRequest) -> Result<Option<String>, GovernanceError> {
+        assert_eq!(request.proposal_id(), self.proposal_id);
+        assert_eq!(request.source_digest(), self.source_digest);
+        assert_eq!(request.steward_id(), "fixture-steward");
+        assert!(request.alignment_digest().starts_with("sha256:"));
+        Ok(Some("fixture-audit-receipt".to_owned()))
+    }
+}
+
+struct DeniedSteward;
+
+impl StewardReviewAuthority for DeniedSteward {
+    fn authorize_review(&self, _: &ReviewRequest) -> Result<Option<String>, GovernanceError> {
+        Ok(None)
+    }
+}
 
 impl ObservationCancellation for Cancelled {
     fn is_cancelled(&self) -> bool {
@@ -249,6 +276,16 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
     assert_eq!(aligned, reversed);
     let validated = validate_alignment(&aligned).unwrap();
     assert_eq!(validated.proposal_id(), type_proposal.proposal_id());
+    assert_eq!(
+        review(
+            &validated,
+            "fixture-steward",
+            "Type-only proposal",
+            &DeniedSteward
+        )
+        .unwrap_err(),
+        GovernanceError::NoSemanticConcept
+    );
     assert_eq!(validated.source_digest(), type_only.snapshot_digest());
     assert_eq!(validated.validation().source_bound_candidates(), 2);
     assert_eq!(validated.validation().unique_semantic_ids(), 1);
@@ -517,6 +554,97 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
                 && candidate.candidate().truth_status() == TruthStatus::Inferred
                 && candidate.candidate().evidence()[0].source_digest() == first.snapshot_digest()
         }));
+        assert_eq!(
+            review(
+                &validated,
+                "fixture-steward",
+                "Review GRC mapping",
+                &DeniedSteward
+            )
+            .unwrap_err(),
+            GovernanceError::ReviewDenied
+        );
+        let authority = FixtureSteward {
+            proposal_id: proposal.proposal_id(),
+            source_digest: first.snapshot_digest(),
+        };
+        let reviewed = review(
+            &validated,
+            "fixture-steward",
+            "Review GRC mapping",
+            &authority,
+        )
+        .unwrap();
+        let replay_aligned = align_relational_proposal(
+            &replay_proposal,
+            replay_proposal.proposal_id(),
+            decisions.clone(),
+        )
+        .unwrap();
+        let replay_reviewed = review(
+            &validate_alignment(&replay_aligned).unwrap(),
+            "fixture-steward",
+            "Review GRC mapping",
+            &authority,
+        )
+        .unwrap();
+        let metadata =
+            || ReleaseMetadata::new("fixture-release", "1.0.0", "fixture-ontology").unwrap();
+        let published = publish(&reviewed, metadata()).unwrap();
+        let replay_published = publish(&replay_reviewed, metadata()).unwrap();
+        assert_eq!(
+            published.artifact_bytes(),
+            replay_published.artifact_bytes()
+        );
+        assert_eq!(published.release(), replay_published.release());
+        assert_eq!(published.manifest_pin(), replay_published.manifest_pin());
+        assert_eq!(published.release().concept_ids().len(), 4);
+        assert_eq!(
+            published.release().publication_state(),
+            PublicationState::Published
+        );
+        assert_eq!(
+            published.release().truth_status(),
+            TruthStatus::Authoritative
+        );
+        assert!(
+            published
+                .release()
+                .provenance()
+                .iter()
+                .all(|item| item.source_digest() == first.snapshot_digest())
+        );
+        let unpinned = SemanticReleaseClient::new("1.0.0").unwrap();
+        assert!(
+            unpinned
+                .validate_for_authoritative_use(published.release())
+                .is_err()
+        );
+        let pinned = SemanticReleaseClient::with_trusted_release_manifests(
+            "1.0.0",
+            vec![],
+            vec![published.manifest_pin().clone()],
+        )
+        .unwrap();
+        pinned
+            .validate_for_authoritative_use(published.release())
+            .unwrap();
+        pinned
+            .verify_detached_artifact(published.release(), published.artifact_bytes())
+            .unwrap();
+        assert_eq!(
+            pinned
+                .resolve_concept(published.release(), "fixture.concept.0")
+                .unwrap(),
+            Some("fixture.concept.0")
+        );
+        let mut tampered = published.artifact_bytes().to_vec();
+        tampered.push(0);
+        assert!(
+            pinned
+                .verify_detached_artifact(published.release(), &tampered)
+                .is_err()
+        );
         let excluded_concept_id = proposal.concepts()[0].candidate().candidate_id();
         let excluded_parent = decisions
             .clone()

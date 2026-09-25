@@ -1,0 +1,17 @@
+[package]
+name = "conceptweave-governance"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "Steward-gated immutable semantic publication for ConceptWeave"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+conceptweave-alignment = { path = "../conceptweave-alignment" }
+conceptweave-client = { path = "../conceptweave-client" }
+conceptweave-domain = { path = "../conceptweave-domain" }
+sha2 = "0.10.9"

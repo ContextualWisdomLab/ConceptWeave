@@ -20,4 +20,6 @@ tokio-postgres-rustls = { version = "=0.14.0", default-features = false, feature
 conceptweave-alignment = { path = "../conceptweave-alignment" }
 conceptweave-domain = { path = "../conceptweave-domain" }
 conceptweave-discovery = { path = "../conceptweave-discovery" }
+conceptweave-governance = { path = "../conceptweave-governance" }
+conceptweave-client = { path = "../conceptweave-client" }
 tokio = { version = "=1.53.1", features = ["macros", "rt-multi-thread", "time"] }

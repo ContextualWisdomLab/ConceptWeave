@@ -129,6 +129,16 @@ name = "conceptweave-domain"
 version = "0.1.0"
 
 [[package]]
+name = "conceptweave-governance"
+version = "0.1.0"
+dependencies = [
+ "conceptweave-alignment",
+ "conceptweave-client",
+ "conceptweave-domain",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "conceptweave-observation"
 version = "0.1.0"
 dependencies = [
@@ -141,8 +151,10 @@ name = "conceptweave-postgres-adapter"
 version = "0.1.0"
 dependencies = [
  "conceptweave-alignment",
+ "conceptweave-client",
  "conceptweave-discovery",
  "conceptweave-domain",
+ "conceptweave-governance",
  "conceptweave-observation",
  "conceptweave-source-port",
  "futures-util",
