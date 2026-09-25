@@ -316,12 +316,10 @@ pub fn align_relational_proposal(
                 .iter()
                 .map(|relation| relation.candidate()),
         )
-        .chain(
-            proposal
-                .source_types()
-                .iter()
-                .map(|source_type| source_type.candidate()),
-        );
+        .chain(proposal.source_types().iter().flat_map(|source_type| {
+            std::iter::once(source_type.candidate())
+                .chain(source_type.fields().iter().map(|field| field.candidate()))
+        }));
     for source_candidate in source_candidates {
         let mut candidate = source_candidate.clone();
         let disposition = pending
@@ -353,6 +351,14 @@ pub fn align_relational_proposal(
             field_parents.insert(
                 field.candidate().candidate_id().to_owned(),
                 concept.candidate().candidate_id().to_owned(),
+            );
+        }
+    }
+    for source_type in proposal.source_types() {
+        for field in source_type.fields() {
+            field_parents.insert(
+                field.candidate().candidate_id().to_owned(),
+                source_type.candidate().candidate_id().to_owned(),
             );
         }
     }

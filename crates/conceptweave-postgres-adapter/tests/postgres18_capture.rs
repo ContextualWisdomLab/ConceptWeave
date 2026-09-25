@@ -2809,6 +2809,7 @@ async fn postgres18_standalone_composite_type_retains_column_receipts() {
             ProposedSourceType::Composite {
                 candidate,
                 observation,
+                fields,
             },
         ] = proposal.source_types()
         else {
@@ -2829,20 +2830,61 @@ async fn postgres18_standalone_composite_type_retains_column_receipts() {
             type_receipt.location().canonical_location()
         );
         assert_eq!(observation.columns().len(), 2);
-        let aligned = align_relational_proposal(
+        assert_eq!(fields.len(), 2);
+        assert_eq!(fields[0].source_name(), "risk_id");
+        assert_eq!(fields[1].source_name(), "label");
+        assert_eq!(
+            fields[1].evidence().location(),
+            receipt.location().canonical_location()
+        );
+        assert!(matches!(
+            align_relational_proposal(
+                &proposal,
+                proposal.proposal_id(),
+                vec![AlignmentDecision::exclude(candidate.candidate_id(), "Omit type").unwrap()],
+            ),
+            Err(AlignmentError::MissingDecision)
+        ));
+        let orphan = align_relational_proposal(
             &proposal,
             proposal.proposal_id(),
             vec![
-                AlignmentDecision::exclude(candidate.candidate_id(), "Source-only fixture")
+                AlignmentDecision::exclude(candidate.candidate_id(), "Omit type").unwrap(),
+                AlignmentDecision::map(
+                    fields[0].candidate().candidate_id(),
+                    "risk.orphan",
+                    "Orphan",
+                    "Invalid fixture mapping",
+                )
+                .unwrap(),
+                AlignmentDecision::exclude(fields[1].candidate().candidate_id(), "Omit field")
                     .unwrap(),
             ],
         )
         .unwrap();
-        assert_eq!(validate_alignment(&aligned).unwrap().candidates().len(), 1);
+        assert_eq!(
+            validate_alignment(&orphan).unwrap_err(),
+            AlignmentError::ExcludedFieldParent
+        );
+        let aligned = align_relational_proposal(
+            &proposal,
+            proposal.proposal_id(),
+            std::iter::once(
+                AlignmentDecision::exclude(candidate.candidate_id(), "Source-only fixture")
+                    .unwrap(),
+            )
+            .chain(fields.iter().map(|field| {
+                AlignmentDecision::exclude(field.candidate().candidate_id(), "Source-only field")
+                    .unwrap()
+            }))
+            .collect(),
+        )
+        .unwrap();
+        assert_eq!(validate_alignment(&aligned).unwrap().candidates().len(), 3);
         let mapped = align_relational_proposal(
             &proposal,
             proposal.proposal_id(),
-            vec![
+            std::iter::once(
                 AlignmentDecision::map(
                     candidate.candidate_id(),
                     "risk.assessment",
@@ -2850,11 +2892,29 @@ async fn postgres18_standalone_composite_type_retains_column_receipts() {
                     "Explicit fixture concept mapping",
                 )
                 .unwrap(),
-            ],
+            )
+            .chain(fields.iter().enumerate().map(|(index, field)| {
+                AlignmentDecision::map(
+                    field.candidate().candidate_id(),
+                    format!("risk.assessment.field.{index}"),
+                    field.source_name(),
+                    "Explicit fixture attribute mapping",
+                )
+                .unwrap()
+            }))
+            .collect(),
         )
         .unwrap();
+        let validated = validate_alignment(&mapped).unwrap();
+        assert_eq!(validated.validation().mapped_fields_with_concepts(), 2);
+        assert_eq!(
+            validated
+                .field_parents()
+                .get(fields[1].candidate().candidate_id()),
+            Some(&candidate.candidate_id().to_owned())
+        );
         let reviewed = review(
-            &validate_alignment(&mapped).unwrap(),
+            &validated,
             "fixture-steward",
             "Review composite type mapping",
             &FixtureSteward {
@@ -2930,10 +2990,12 @@ async fn postgres18_standalone_composite_type_retains_column_receipts() {
         assert_ne!(changed_proposal.proposal_id(), proposal.proposal_id());
         assert_eq!(changed_proposal.source_types().len(), 1);
         let changed_candidate = changed_proposal.source_types()[0].candidate();
+        let changed_fields = changed_proposal.source_types()[0].fields();
+        assert_eq!(changed_fields.len(), 3);
         let changed_mapped = align_relational_proposal(
             &changed_proposal,
             changed_proposal.proposal_id(),
-            vec![
+            std::iter::once(
                 AlignmentDecision::map(
                     changed_candidate.candidate_id(),
                     "risk.assessment",
@@ -2941,26 +3003,33 @@ async fn postgres18_standalone_composite_type_retains_column_receipts() {
                     "Explicit fixture concept mapping",
                 )
                 .unwrap(),
-                AlignmentDecision::exclude(
-                    changed_proposal.concepts()[0].candidate().candidate_id(),
-                    "Exclude fixture table",
+            )
+            .chain(changed_fields.iter().enumerate().map(|(index, field)| {
+                AlignmentDecision::map(
+                    field.candidate().candidate_id(),
+                    format!("risk.assessment.field.{index}"),
+                    field.source_name(),
+                    "Explicit fixture attribute mapping",
                 )
-                .unwrap(),
-                AlignmentDecision::exclude(
-                    changed_proposal.concepts()[0].fields()[0]
-                        .candidate()
-                        .candidate_id(),
-                    "Exclude fixture field",
+                .unwrap()
+            }))
+            .chain(changed_proposal.concepts().iter().flat_map(|concept| {
+                std::iter::once(
+                    AlignmentDecision::exclude(
+                        concept.candidate().candidate_id(),
+                        "Exclude fixture table",
+                    )
+                    .unwrap(),
                 )
-                .unwrap(),
-                AlignmentDecision::exclude(
-                    changed_proposal.concepts()[0].fields()[1]
-                        .candidate()
-                        .candidate_id(),
-                    "Exclude fixture field",
-                )
-                .unwrap(),
-            ],
+                .chain(concept.fields().iter().map(|field| {
+                    AlignmentDecision::exclude(
+                        field.candidate().candidate_id(),
+                        "Exclude fixture field",
+                    )
+                    .unwrap()
+                }))
+            }))
+            .collect(),
         );
         let changed_reviewed = review(
             &validate_alignment(&changed_mapped.unwrap()).unwrap(),

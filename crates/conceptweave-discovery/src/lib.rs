@@ -192,6 +192,8 @@ pub enum ProposedSourceType {
         candidate: SemanticCandidate,
         /// Exact source composite type observation.
         observation: RelationObservation,
+        /// Attribute mappings with exact composite-column receipts.
+        fields: Vec<ProposedField>,
     },
 }
 
@@ -202,6 +204,14 @@ impl ProposedSourceType {
             Self::Domain { candidate, .. }
             | Self::Enum { candidate, .. }
             | Self::Composite { candidate, .. } => candidate,
+        }
+    }
+
+    /// Returns reviewable attributes when this source type is composite.
+    pub fn fields(&self) -> &[ProposedField] {
+        match self {
+            Self::Composite { fields, .. } => fields,
+            Self::Domain { .. } | Self::Enum { .. } => &[],
         }
     }
 }
@@ -329,6 +339,38 @@ fn candidate_id(source_id: &str, kind: &str, location: &SchemaObjectLocation) ->
     )
 }
 
+fn propose_fields(
+    snapshot: &PostgresSchemaSnapshotV3,
+    relation: &RelationObservation,
+) -> Result<Vec<ProposedField>, ProposalError> {
+    let source_id = snapshot.source_connection_key();
+    relation
+        .columns()
+        .iter()
+        .map(|column| {
+            let location = SchemaObjectLocation::column(
+                relation.schema_name(),
+                relation.relation_name(),
+                relation.kind(),
+                column.column_name(),
+            )?;
+            Ok(ProposedField {
+                candidate: SemanticCandidate::new(
+                    candidate_id(source_id, "field", &location),
+                    CandidateKind::PhysicalMapping,
+                    vec![evidence(snapshot, location)?],
+                )?,
+                source_name: column.column_name().to_owned(),
+                ordinal_position: column.ordinal_position(),
+                display_type: column.data_type().to_owned(),
+                type_binding: column.type_binding().clone(),
+                nullable: column.nullable(),
+                source_comment: column.source_comment().map(str::to_owned),
+            })
+        })
+        .collect()
+}
+
 /// Builds a deterministic draft from exact relation, column, and foreign-key receipts.
 ///
 /// Unknown relation kinds, out-of-scope targets, and unobserved foreign-key state fail closed.
@@ -357,31 +399,7 @@ pub fn propose_relational_model(
             CandidateKind::Concept,
             vec![evidence(snapshot, location)?],
         )?;
-        let fields = relation
-            .columns()
-            .iter()
-            .map(|column| {
-                let location = SchemaObjectLocation::column(
-                    relation.schema_name(),
-                    relation.relation_name(),
-                    relation.kind(),
-                    column.column_name(),
-                )?;
-                Ok(ProposedField {
-                    candidate: SemanticCandidate::new(
-                        candidate_id(source_id, "field", &location),
-                        CandidateKind::PhysicalMapping,
-                        vec![evidence(snapshot, location)?],
-                    )?,
-                    source_name: column.column_name().to_owned(),
-                    ordinal_position: column.ordinal_position(),
-                    display_type: column.data_type().to_owned(),
-                    type_binding: column.type_binding().clone(),
-                    nullable: column.nullable(),
-                    source_comment: column.source_comment().map(str::to_owned),
-                })
-            })
-            .collect::<Result<Vec<_>, ProposalError>>()?;
+        let fields = propose_fields(snapshot, relation)?;
         concept_ids.insert((relation.schema_name(), relation.relation_name()), id);
         concepts.push(ProposedConcept {
             candidate,
@@ -484,6 +502,7 @@ pub fn propose_relational_model(
                 vec![evidence(snapshot, location)?],
             )?,
             observation: relation.clone(),
+            fields: propose_fields(snapshot, relation)?,
         });
     }
     for domain in snapshot.domains() {
