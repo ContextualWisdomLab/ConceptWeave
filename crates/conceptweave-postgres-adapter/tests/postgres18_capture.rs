@@ -14,10 +14,12 @@ use conceptweave_governance::{
     StewardReviewAuthority, review, sign_published_manifest,
 };
 use conceptweave_observation::{
-    CollationProvider, ColumnObservationV3, ConstraintDeferrability, EnumObservation,
-    ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType, ForeignKeyObservation,
-    PostgresSchemaSnapshotV3, PostgresTypeKind, QualifiedTypeName, RelationKind,
-    RelationObservation, ReplicaIdentityMode, SchemaObjectLocation, TableConstraintObservation,
+    CollationProvider, ColumnCollationObservation, ColumnExpressionObservation,
+    ColumnGenerationObservation, ColumnIdentityObservation, ColumnObservationV3,
+    ConstraintDeferrability, EnumObservation, ForeignKeyAction, ForeignKeyDeferrability,
+    ForeignKeyMatchType, ForeignKeyObservation, PostgresSchemaSnapshotV3, PostgresTypeKind,
+    QualifiedTypeName, RelationKind, RelationObservation, ReplicaIdentityMode,
+    SchemaObjectLocation, TableConstraintObservation,
 };
 use conceptweave_postgres_adapter::{PostgresTlsAdapter, PostgresUnixAdapter};
 use conceptweave_source_port::{
@@ -409,6 +411,57 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         propose_relational_model(&partial),
         Err(ProposalError::IncompleteSourceObservation)
     ));
+
+    let identity_unobserved = PostgresSchemaSnapshotV3::new(
+        &authorized(),
+        "fixture",
+        "2026-09-25T00:00:00Z",
+        vec![
+            RelationObservation::new("public", "plain", RelationKind::Table, vec![column("id")])
+                .unwrap(),
+        ],
+        vec![],
+        vec![],
+    )
+    .unwrap()
+    .with_observed_column_collations(vec![
+        ColumnCollationObservation::uncollatable("public", "plain", RelationKind::Table, "id")
+            .unwrap(),
+    ])
+    .unwrap()
+    .with_observed_column_generations(vec![
+        ColumnGenerationObservation::not_generated("public", "plain", RelationKind::Table, "id")
+            .unwrap(),
+    ])
+    .unwrap()
+    .with_observed_column_expressions(vec![
+        ColumnExpressionObservation::no_expression("public", "plain", RelationKind::Table, "id")
+            .unwrap(),
+    ])
+    .unwrap();
+    let identity_observed = identity_unobserved
+        .clone()
+        .with_observed_column_identities(vec![
+            ColumnIdentityObservation::not_identity("public", "plain", RelationKind::Table, "id")
+                .unwrap(),
+        ])
+        .unwrap();
+    let complete = |snapshot: PostgresSchemaSnapshotV3| {
+        snapshot
+            .with_observed_not_null_constraints(vec![])
+            .unwrap()
+            .with_observed_constraint_timings(vec![])
+            .unwrap()
+            .with_observed_foreign_key_catalog(vec![])
+            .unwrap()
+            .with_observed_collation_definitions(vec![])
+            .unwrap()
+    };
+    assert!(matches!(
+        propose_relational_model(&complete(identity_unobserved)),
+        Err(ProposalError::IncompleteSourceObservation)
+    ));
+    assert!(propose_relational_model(&complete(identity_observed)).is_ok());
 
     let enums = vec![
         EnumObservation::new("public", "stage", vec!["draft".to_owned()]).unwrap(),
