@@ -18,6 +18,10 @@ use conceptweave_domain::{CandidateKind, PublicationState, TruthStatus};
 use conceptweave_observation::{ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType};
 use sha2::{Digest, Sha256};
 
+mod file_store;
+
+pub use file_store::{FilePublicationStore, PublicationStoreError};
+
 const MAX_ARTIFACT_BYTES: usize = 16 * 1024 * 1024;
 
 /// Exact review request presented to a trusted steward-authorization adapter.
@@ -234,11 +238,8 @@ pub fn review(
     })
 }
 
-/// Publishes canonical bytes and release metadata from an authorized review.
-///
-/// This operation produces a pin for protected distribution. It does not install that pin in a
-/// client or implement the external steward-authorization adapter.
-pub fn publish(
+/// Builds canonical bytes for an authorized review before durable issuance.
+fn build_published(
     reviewed: &ReviewedAlignment,
     metadata: ReleaseMetadata,
 ) -> Result<PublishedModel, GovernanceError> {

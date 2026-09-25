@@ -10,7 +10,8 @@ use conceptweave_client::{ReleaseMetadata, SemanticReleaseClient};
 use conceptweave_discovery::{ProposalError, ProposedSourceType, propose_relational_model};
 use conceptweave_domain::{CandidateKind, PublicationState, TruthStatus};
 use conceptweave_governance::{
-    GovernanceError, ReviewRequest, StewardReviewAuthority, publish, review,
+    FilePublicationStore, GovernanceError, PublicationStoreError, ReviewRequest,
+    StewardReviewAuthority, review,
 };
 use conceptweave_observation::{
     CollationProvider, ColumnObservationV3, ConstraintDeferrability, EnumObservation,
@@ -640,8 +641,75 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
         .unwrap();
         let metadata =
             || ReleaseMetadata::new("fixture-release", "1.0.0", "fixture-ontology").unwrap();
-        let published = publish(&reviewed, metadata()).unwrap();
-        let replay_published = publish(&replay_reviewed, metadata()).unwrap();
+        let publication_root = std::env::temp_dir().join(format!(
+            "cw-publish-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&publication_root).unwrap();
+        let replay_root = publication_root.join("replay");
+        std::fs::create_dir(&replay_root).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&publication_root, std::fs::Permissions::from_mode(0o755))
+                .unwrap();
+            assert!(matches!(
+                FilePublicationStore::new(&publication_root),
+                Err(PublicationStoreError::InvalidRoot)
+            ));
+        }
+        #[cfg(unix)]
+        for root in [&publication_root, &replay_root] {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(root, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        let store = FilePublicationStore::new(&publication_root).unwrap();
+        let replay_store = FilePublicationStore::new(&replay_root).unwrap();
+        let published = store.publish(&reviewed, metadata()).unwrap();
+        let replay_published = replay_store.publish(&replay_reviewed, metadata()).unwrap();
+        assert!(matches!(
+            store.publish(&reviewed, metadata()),
+            Err(PublicationStoreError::DuplicateReleaseId)
+        ));
+        let conflicting_review = review(
+            &validated,
+            "fixture-steward",
+            "Different review reason",
+            &authority,
+        )
+        .unwrap();
+        assert!(matches!(
+            store.publish(&conflicting_review, metadata()),
+            Err(PublicationStoreError::DuplicateReleaseId)
+        ));
+        let race_root = publication_root.join("race");
+        std::fs::create_dir(&race_root).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&race_root, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        let race_store = FilePublicationStore::new(&race_root).unwrap();
+        let race_results = std::thread::scope(|scope| {
+            let first = scope.spawn(|| race_store.publish(&reviewed, metadata()));
+            let second = scope.spawn(|| race_store.publish(&conflicting_review, metadata()));
+            [first.join().unwrap(), second.join().unwrap()]
+        });
+        assert_eq!(
+            race_results.iter().filter(|result| result.is_ok()).count(),
+            1
+        );
+        assert_eq!(
+            race_results
+                .iter()
+                .filter(|result| matches!(result, Err(PublicationStoreError::DuplicateReleaseId)))
+                .count(),
+            1
+        );
         assert_eq!(
             published.artifact_bytes(),
             replay_published.artifact_bytes()
@@ -905,6 +973,17 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             .verify_detached_artifact(published.release(), published.artifact_bytes())
             .unwrap();
         assert_eq!(
+            store
+                .read_verified(&pinned, published.release())
+                .unwrap()
+                .unwrap(),
+            published.artifact_bytes()
+        );
+        assert!(matches!(
+            store.read_verified(&unpinned, published.release()),
+            Err(PublicationStoreError::ReleaseNotAdmitted)
+        ));
+        assert_eq!(
             pinned
                 .resolve_concept(published.release(), "fixture.concept.0")
                 .unwrap(),
@@ -917,6 +996,27 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
                 .verify_detached_artifact(published.release(), &tampered)
                 .is_err()
         );
+        let record_path = std::fs::read_dir(&publication_root)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .find(|path| {
+                path.extension()
+                    .is_some_and(|extension| extension == "release")
+            })
+            .unwrap();
+        let mut record = std::fs::read(&record_path).unwrap();
+        *record.last_mut().unwrap() ^= 1;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&record_path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        }
+        std::fs::write(&record_path, record).unwrap();
+        assert!(matches!(
+            store.read_verified(&pinned, published.release()),
+            Err(PublicationStoreError::InvalidRecord)
+        ));
+        std::fs::remove_dir_all(&publication_root).unwrap();
         let excluded_concept_id = proposal.concepts()[0].candidate().candidate_id();
         let excluded_parent = decisions
             .clone()
