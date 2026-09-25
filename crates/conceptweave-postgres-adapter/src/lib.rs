@@ -17,10 +17,10 @@ use conceptweave_observation::{
     ConstraintTimingObservation, DomainCheckConstraintObservation, DomainObservation,
     EnumObservation, IndexAttributeKind, IndexAttributeObservation, IndexCatalogFlags,
     IndexKeySemantics, IndexObservation, IndexStorageOption, IndexTablespace,
-    NotNullConstraintObservation, OperatorClassOption, PostgresSchemaSnapshotV3,
+    NotNullConstraintObservation, OperatorClassOption, PostgresSchemaSnapshotV3, PostgresTypeKind,
     PrimaryKeyObservation, QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName,
     RelationKind, RelationObservation, ReplicaIdentityMode, TableConstraintObservation,
-    UniqueConstraintObservation,
+    TypeKindObservation, UniqueConstraintObservation,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, SourceObservationFailure,
@@ -264,6 +264,7 @@ async fn capture_catalog(
     let mut meter = CaptureMeter::default();
     let max_bytes = limits.max_bytes().min(i64::MAX as u64) as i64;
     let mut types = Vec::new();
+    let mut type_kinds = Vec::new();
     let mut relation_rows = Vec::new();
     for schema in request.request().allowed_schema_names() {
         let schema_row = bounded(
@@ -398,6 +399,85 @@ async fn capture_catalog(
                 + observed.comment.as_ref().map_or(0, String::len);
             meter.add(request, bytes)?;
             types.push((schema.clone(), observed));
+        }
+
+        let kind_stream = bounded(
+            request,
+            cancellation,
+            transaction.query_raw(
+                "SELECT t.typname::text, t.typtype::text, t.typisdefined, \
+                 bn.nspname::text, bt.typname::text, cn.nspname::text, ct.typname::text \
+                 FROM pg_catalog.pg_type t \
+                 LEFT JOIN pg_catalog.pg_type bt ON bt.oid = t.typbasetype \
+                 LEFT JOIN pg_catalog.pg_namespace bn ON bn.oid = bt.typnamespace \
+                 LEFT JOIN pg_catalog.pg_range r ON r.rngtypid = t.oid \
+                 LEFT JOIN pg_catalog.pg_range mr ON mr.rngmultitypid = t.oid \
+                 LEFT JOIN pg_catalog.pg_type ct ON ct.oid = COALESCE(r.rngmultitypid, mr.rngtypid) \
+                 LEFT JOIN pg_catalog.pg_namespace cn ON cn.oid = ct.typnamespace \
+                 WHERE t.typnamespace = $1 ORDER BY t.typname",
+                &[&schema_oid],
+            ),
+        )
+        .await?;
+        tokio::pin!(kind_stream);
+        while let Some(row) = bounded(request, cancellation, kind_stream.try_next()).await? {
+            let name: String = field(&row, 0)?;
+            let kind: String = field(&row, 1)?;
+            let defined: bool = field(&row, 2)?;
+            let base_schema: Option<String> = field(&row, 3)?;
+            let base_name: Option<String> = field(&row, 4)?;
+            let counterpart_schema: Option<String> = field(&row, 5)?;
+            let counterpart_name: Option<String> = field(&row, 6)?;
+            meter.add(
+                request,
+                8 + name.len()
+                    + kind.len()
+                    + base_schema.as_ref().map_or(0, String::len)
+                    + base_name.as_ref().map_or(0, String::len)
+                    + counterpart_schema.as_ref().map_or(0, String::len)
+                    + counterpart_name.as_ref().map_or(0, String::len),
+            )?;
+            if !defined {
+                return Err(SourceObservationFailure::InvalidCapturedMetadata);
+            }
+            let coordinate = QualifiedTypeName::new(schema, name)
+                .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+            let base = match (base_schema, base_name) {
+                (Some(schema), Some(name)) => Some(
+                    QualifiedTypeName::new(schema, name)
+                        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+                ),
+                (None, None) => None,
+                _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
+            };
+            let counterpart = match (counterpart_schema, counterpart_name) {
+                (Some(schema), Some(name)) => Some(
+                    QualifiedTypeName::new(schema, name)
+                        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+                ),
+                (None, None) => None,
+                _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
+            };
+            let observation = match (kind.as_str(), base, counterpart) {
+                ("b", None, None) => TypeKindObservation::plain(coordinate, PostgresTypeKind::Base),
+                ("c", None, None) => {
+                    TypeKindObservation::plain(coordinate, PostgresTypeKind::Composite)
+                }
+                ("e", None, None) => TypeKindObservation::plain(coordinate, PostgresTypeKind::Enum),
+                ("p", None, None) => {
+                    TypeKindObservation::plain(coordinate, PostgresTypeKind::Pseudo)
+                }
+                ("d", Some(base), None) => Ok(TypeKindObservation::domain(coordinate, base)),
+                ("r", None, Some(counterpart)) => {
+                    Ok(TypeKindObservation::range(coordinate, counterpart))
+                }
+                ("m", None, Some(counterpart)) => {
+                    Ok(TypeKindObservation::multirange(coordinate, counterpart))
+                }
+                _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
+            }
+            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+            type_kinds.push(observation);
         }
     }
 
@@ -596,33 +676,25 @@ async fn capture_catalog(
         0,
     )?;
     let has_relations = !relations.is_empty();
-    let extractor_revision = if !has_relations {
-        "postgres18_type_only_adapter_v3"
-    } else {
-        "postgres18_collation_definition_adapter_v1"
-    };
-    let snapshot = if !has_relations {
-        PostgresSchemaSnapshotV3::new(
-            request,
-            extractor_revision,
-            observed_at_utc,
-            relations,
-            domains,
-            enums,
-        )
-    } else {
-        PostgresSchemaSnapshotV3::new(
-            request,
-            extractor_revision,
-            observed_at_utc,
-            relations,
-            domains,
-            enums,
-        )
-        .and_then(|snapshot| snapshot.with_observed_column_collations(column_collations))
-        .and_then(|snapshot| snapshot.with_observed_column_generations(column_generations))
-        .and_then(|snapshot| snapshot.with_observed_column_expressions(column_expressions))
-    }
+    let snapshot = PostgresSchemaSnapshotV3::new_with_type_kinds(
+        request,
+        "postgres18_type_kind_adapter_v1",
+        observed_at_utc,
+        relations,
+        domains,
+        enums,
+        type_kinds,
+    )
+    .and_then(|snapshot| {
+        if has_relations {
+            snapshot
+                .with_observed_column_collations(column_collations)
+                .and_then(|snapshot| snapshot.with_observed_column_generations(column_generations))
+                .and_then(|snapshot| snapshot.with_observed_column_expressions(column_expressions))
+        } else {
+            Ok(snapshot)
+        }
+    })
     .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
     .with_observed_not_null_constraints(not_null_constraints)
     .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;

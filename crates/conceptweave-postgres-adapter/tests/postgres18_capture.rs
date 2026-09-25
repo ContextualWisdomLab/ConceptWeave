@@ -16,8 +16,8 @@ use conceptweave_governance::{
 use conceptweave_observation::{
     CollationProvider, ColumnObservationV3, ConstraintDeferrability, EnumObservation,
     ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType, ForeignKeyObservation,
-    PostgresSchemaSnapshotV3, QualifiedTypeName, RelationKind, RelationObservation,
-    SchemaObjectLocation, TableConstraintObservation,
+    PostgresSchemaSnapshotV3, PostgresTypeKind, QualifiedTypeName, RelationKind,
+    RelationObservation, SchemaObjectLocation, TableConstraintObservation,
 };
 use conceptweave_postgres_adapter::{PostgresTlsAdapter, PostgresUnixAdapter};
 use conceptweave_source_port::{
@@ -686,6 +686,35 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             )
             .collect::<BTreeSet<_>>();
         assert_eq!(observed_types, catalog_types);
+        let catalog_type_kinds = client
+            .query(
+                "SELECT t.typname::text, t.typtype::text FROM pg_catalog.pg_type t \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = $1",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| (row.get::<_, String>(0), row.get::<_, String>(1)))
+            .collect::<BTreeSet<_>>();
+        let observed_type_kinds = first
+            .type_kinds()
+            .unwrap()
+            .iter()
+            .map(|observed| {
+                let kind = match observed.kind() {
+                    PostgresTypeKind::Base => "b",
+                    PostgresTypeKind::Composite => "c",
+                    PostgresTypeKind::Domain => "d",
+                    PostgresTypeKind::Enum => "e",
+                    PostgresTypeKind::Pseudo => "p",
+                    PostgresTypeKind::Range => "r",
+                    PostgresTypeKind::Multirange => "m",
+                };
+                (observed.type_name().type_name().to_owned(), kind.to_owned())
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(observed_type_kinds, catalog_type_kinds);
         let proposal = propose_relational_model(&first).unwrap();
         let replay_proposal = propose_relational_model(&replay).unwrap();
         assert_eq!(proposal, replay_proposal);
@@ -1764,6 +1793,108 @@ async fn postgres18_column_collation_is_exact_source_evidence() {
         .unwrap();
     connection_task.abort();
     result.unwrap();
+}
+
+#[tokio::test]
+async fn postgres18_range_and_multirange_kinds_are_source_evidence() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_type_kind_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; \
+             CREATE TYPE \"{schema}\".span AS RANGE (subtype = integer); \
+             CREATE TABLE \"{schema}\".record \
+               (id integer PRIMARY KEY, value \"{schema}\".span, values \"{schema}\".span_multirange)"
+        ))
+        .await
+        .unwrap();
+    let result = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    let pair = client
+        .query_one(
+            "SELECT rn.nspname::text, rt.typname::text, mn.nspname::text, mt.typname::text \
+             FROM pg_catalog.pg_range r \
+             JOIN pg_catalog.pg_type rt ON rt.oid = r.rngtypid \
+             JOIN pg_catalog.pg_namespace rn ON rn.oid = rt.typnamespace \
+             JOIN pg_catalog.pg_type mt ON mt.oid = r.rngmultitypid \
+             JOIN pg_catalog.pg_namespace mn ON mn.oid = mt.typnamespace \
+             WHERE rn.nspname = $1 AND rt.typname = 'span'",
+            &[&schema],
+        )
+        .await
+        .unwrap();
+    let source_range = (pair.get::<_, String>(0), pair.get::<_, String>(1));
+    let source_multirange = (pair.get::<_, String>(2), pair.get::<_, String>(3));
+    let shell_result = if result.is_ok() {
+        client
+            .batch_execute(&format!("CREATE TYPE \"{schema}\".unresolved"))
+            .await
+            .unwrap();
+        Some(
+            adapter(config)
+                .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+                .await
+                .err(),
+        )
+    } else {
+        None
+    };
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    let snapshot = result.unwrap();
+    assert_eq!(
+        shell_result,
+        Some(Some(SourceObservationFailure::InvalidCapturedMetadata))
+    );
+    let kinds = snapshot.type_kinds().expect("type kinds must be observed");
+    let range = kinds
+        .iter()
+        .find(|kind| {
+            kind.type_name().schema_name() == schema && kind.type_name().type_name() == "span"
+        })
+        .unwrap();
+    let multirange = kinds
+        .iter()
+        .find(|kind| {
+            kind.type_name().schema_name() == schema
+                && kind.type_name().type_name() == "span_multirange"
+        })
+        .unwrap();
+    assert_eq!(range.kind(), PostgresTypeKind::Range);
+    assert_eq!(multirange.kind(), PostgresTypeKind::Multirange);
+    assert_eq!(
+        (
+            range.type_name().schema_name(),
+            range.type_name().type_name()
+        ),
+        (source_range.0.as_str(), source_range.1.as_str())
+    );
+    assert_eq!(
+        (
+            multirange.type_name().schema_name(),
+            multirange.type_name().type_name()
+        ),
+        (source_multirange.0.as_str(), source_multirange.1.as_str())
+    );
+    assert_eq!(range.range_counterpart(), Some(multirange.type_name()));
+    assert_eq!(multirange.range_counterpart(), Some(range.type_name()));
+    assert_eq!(
+        snapshot.relations()[0].columns()[1].type_binding(),
+        range.type_name()
+    );
+    assert_eq!(
+        snapshot.relations()[0].columns()[2].type_binding(),
+        multirange.type_name()
+    );
 }
 
 #[tokio::test]
