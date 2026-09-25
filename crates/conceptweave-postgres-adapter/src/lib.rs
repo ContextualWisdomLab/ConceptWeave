@@ -202,6 +202,7 @@ struct RelationRow {
     schema: String,
     oid: u32,
     name: String,
+    kind: RelationKind,
     replica_identity: ReplicaIdentityMode,
     comment: Option<String>,
 }
@@ -305,7 +306,19 @@ async fn capture_catalog(
                      AND d.deptype = 'i' AND owner_table.relnamespace = c.relnamespace), \
                  EXISTS(SELECT 1 FROM pg_catalog.pg_am am WHERE am.oid = c.relam \
                    AND am.amname = 'heap' AND am.amtype = 't' \
-                   AND am.amhandler = 'pg_catalog.heap_tableam_handler'::regproc) \
+                   AND am.amhandler = 'pg_catalog.heap_tableam_handler'::regproc), \
+                 EXISTS(SELECT 1 FROM pg_catalog.pg_type t WHERE t.oid = c.reltype \
+                   AND t.typtype = 'c' AND t.typisdefined AND t.typrelid = c.oid \
+                   AND t.typnamespace = c.relnamespace AND t.typname = c.relname \
+                   AND t.typowner = c.relowner AND t.typacl IS NULL \
+                   AND NOT EXISTS(SELECT 1 FROM pg_catalog.pg_description d \
+                     WHERE d.classoid = 'pg_type'::regclass AND d.objoid = t.oid) \
+                   AND NOT EXISTS(SELECT 1 FROM pg_catalog.pg_seclabel l \
+                     WHERE l.classoid = 'pg_type'::regclass AND l.objoid = t.oid) \
+                   AND NOT EXISTS(SELECT 1 FROM pg_catalog.pg_depend d \
+                     WHERE d.classid = 'pg_type'::regclass AND d.objid = t.oid \
+                       AND d.deptype = 'e')), \
+                 c.relam = 0 AND c.reltablespace = 0 AND c.reltoastrelid = 0 \
                  FROM pg_catalog.pg_class c WHERE c.relnamespace = $1 \
                    AND c.relkind IN ('r','p','v','m','f','S','c') ORDER BY c.relname",
                 vec![&schema_oid as &(dyn ToSql + Sync), &max_bytes],
@@ -338,12 +351,27 @@ async fn capture_catalog(
             }
             // relhasrules and relhastriggers are lazy hints; the catalog-row guards below
             // decide whether any unsupported rule or trigger still exists.
-            if kind != "r"
-                || persistence != "p"
+            // A standalone composite has no table storage; its separate pg_type metadata
+            // must be absent until that family has an immutable representation.
+            let relation_kind = match kind.as_str() {
+                "r" => RelationKind::Table,
+                "c" => RelationKind::CompositeType,
+                _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
+            };
+            if persistence != "p"
                 || [4, 6, 7, 10, 11, 12]
                     .into_iter()
                     .any(|index| field::<bool>(&row, index) != Ok(false))
-                || !field::<bool>(&row, 16)?
+                || match relation_kind {
+                    RelationKind::Table => !field::<bool>(&row, 16)?,
+                    RelationKind::CompositeType => {
+                        field::<bool>(&row, 16)?
+                            || !field::<bool>(&row, 17)?
+                            || !field::<bool>(&row, 18)?
+                            || replica != "n"
+                    }
+                    _ => unreachable!(),
+                }
             {
                 return Err(SourceObservationFailure::InvalidCapturedMetadata);
             }
@@ -358,6 +386,7 @@ async fn capture_catalog(
                 schema: schema.clone(),
                 oid,
                 name,
+                kind: relation_kind,
                 replica_identity,
                 comment,
             });
@@ -959,6 +988,11 @@ async fn capture_relation(
         if ordinal <= 0
             || field::<bool>(&row, 7)? != expression.is_some()
             || field::<bool>(&row, 17)?
+            || (relation.kind == RelationKind::CompositeType
+                && (not_null
+                    || expression.is_some()
+                    || !generated.is_empty()
+                    || !identity.is_empty()))
             || [10, 12, 13]
                 .into_iter()
                 .any(|index| field::<bool>(&row, index) != Ok(false))
@@ -979,14 +1013,14 @@ async fn capture_relation(
             (false, None, None, None) => ColumnCollationObservation::uncollatable(
                 &relation.schema,
                 &relation.name,
-                RelationKind::Table,
+                relation.kind,
                 &name,
             ),
             (true, Some(schema), Some(collation), Some(deterministic)) => {
                 ColumnCollationObservation::collatable(
                     &relation.schema,
                     &relation.name,
-                    RelationKind::Table,
+                    relation.kind,
                     &name,
                     QualifiedCollationName::new(schema, collation)
                         .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
@@ -1001,19 +1035,19 @@ async fn capture_relation(
             "" => ColumnGenerationObservation::not_generated(
                 &relation.schema,
                 &relation.name,
-                RelationKind::Table,
+                relation.kind,
                 &name,
             ),
             "s" => ColumnGenerationObservation::stored(
                 &relation.schema,
                 &relation.name,
-                RelationKind::Table,
+                relation.kind,
                 &name,
             ),
             "v" => ColumnGenerationObservation::virtual_generated(
                 &relation.schema,
                 &relation.name,
-                RelationKind::Table,
+                relation.kind,
                 &name,
             ),
             _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
@@ -1023,20 +1057,20 @@ async fn capture_relation(
             ("", None) => ColumnExpressionObservation::no_expression(
                 &relation.schema,
                 &relation.name,
-                RelationKind::Table,
+                relation.kind,
                 &name,
             ),
             ("", Some(value)) => ColumnExpressionObservation::default_expression(
                 &relation.schema,
                 &relation.name,
-                RelationKind::Table,
+                relation.kind,
                 &name,
                 value,
             ),
             ("s" | "v", Some(value)) => ColumnExpressionObservation::generation_expression(
                 &relation.schema,
                 &relation.name,
-                RelationKind::Table,
+                relation.kind,
                 &name,
                 value,
             ),
@@ -1049,19 +1083,19 @@ async fn capture_relation(
             "" => ColumnIdentityObservation::not_identity(
                 &relation.schema,
                 &relation.name,
-                RelationKind::Table,
+                relation.kind,
                 &name,
             ),
             "a" => ColumnIdentityObservation::generated_always(
                 &relation.schema,
                 &relation.name,
-                RelationKind::Table,
+                relation.kind,
                 &name,
             ),
             "d" => ColumnIdentityObservation::generated_by_default(
                 &relation.schema,
                 &relation.name,
-                RelationKind::Table,
+                relation.kind,
                 &name,
             ),
             _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
@@ -1201,13 +1235,16 @@ async fn capture_relation(
     )
     .await?;
     let mut observed =
-        RelationObservation::new(relation.schema, relation.name, RelationKind::Table, columns)
-            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
-            .with_replica_identity_mode(relation.replica_identity)
-            .with_constraints(constraints)
-            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
-            .with_indexes(indexes)
+        RelationObservation::new(relation.schema, relation.name, relation.kind, columns)
             .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+    if relation.kind == RelationKind::Table {
+        observed = observed.with_replica_identity_mode(relation.replica_identity);
+    }
+    observed = observed
+        .with_constraints(constraints)
+        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
+        .with_indexes(indexes)
+        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
     if let Some(comment) = relation.comment {
         observed = observed.with_source_comment(comment);
     }

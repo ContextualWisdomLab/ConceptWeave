@@ -2639,6 +2639,142 @@ async fn postgres18_custom_table_access_method_fails_closed() {
 }
 
 #[tokio::test]
+async fn postgres18_standalone_composite_type_retains_column_receipts() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_composite_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; \
+             CREATE TYPE \"{schema}\".assessment AS (risk_id uuid, label text)"
+        ))
+        .await
+        .unwrap();
+    let result: Result<(), SourceObservationFailure> = async {
+        let first = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await?;
+        let [relation] = first.relations() else {
+            panic!("standalone composite type must be the sole relation");
+        };
+        assert_eq!(relation.kind(), RelationKind::CompositeType);
+        assert_eq!(relation.relation_name(), "assessment");
+        assert!(first.type_kinds().unwrap().iter().any(|kind| {
+            kind.type_name().schema_name() == schema
+                && kind.type_name().type_name() == "assessment"
+                && kind.kind() == PostgresTypeKind::Composite
+        }));
+        let linked: bool = client
+            .query_one(
+                "SELECT t.typtype = 'c' AND t.typrelid = c.oid \
+                 FROM pg_catalog.pg_class c \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+                 JOIN pg_catalog.pg_type t ON t.oid = c.reltype \
+                 WHERE n.nspname = $1 AND c.relname = 'assessment'",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+            .get(0);
+        assert!(linked);
+        assert_eq!(
+            relation
+                .columns()
+                .iter()
+                .map(|column| (column.ordinal_position(), column.column_name()))
+                .collect::<Vec<_>>(),
+            vec![(1, "risk_id"), (2, "label")]
+        );
+        let receipt = first
+            .source_receipt(
+                SchemaObjectLocation::column(
+                    &schema,
+                    "assessment",
+                    RelationKind::CompositeType,
+                    "label",
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(receipt.source_digest(), first.snapshot_digest());
+        let replay = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await?;
+        assert_eq!(replay.snapshot_digest(), first.snapshot_digest());
+        client
+            .batch_execute(&format!(
+                "COMMENT ON TYPE \"{schema}\".assessment IS 'type-only comment'"
+            ))
+            .await
+            .unwrap();
+        assert!(matches!(
+            adapter(config.clone())
+                .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+                .await,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ));
+        client
+            .batch_execute(&format!(
+                "COMMENT ON TYPE \"{schema}\".assessment IS NULL; \
+                 CREATE TABLE \"{schema}\".assessment_record \
+                   (id integer PRIMARY KEY, payload \"{schema}\".assessment)"
+            ))
+            .await
+            .unwrap();
+        let mixed = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await?;
+        assert_eq!(mixed.relations().len(), 2);
+        let payload = mixed
+            .relations()
+            .iter()
+            .find(|relation| relation.relation_name() == "assessment_record")
+            .unwrap()
+            .columns()
+            .iter()
+            .find(|column| column.column_name() == "payload")
+            .unwrap();
+        assert_eq!(payload.type_binding().schema_name(), schema);
+        assert_eq!(payload.type_binding().type_name(), "assessment");
+        client
+            .batch_execute(&format!(
+                "ALTER TYPE \"{schema}\".assessment ADD ATTRIBUTE priority integer"
+            ))
+            .await
+            .unwrap();
+        let changed = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await?;
+        assert_ne!(mixed.snapshot_digest(), first.snapshot_digest());
+        assert_ne!(changed.snapshot_digest(), mixed.snapshot_digest());
+        client
+            .batch_execute(&format!(
+                "GRANT USAGE ON TYPE \"{schema}\".assessment TO PUBLIC"
+            ))
+            .await
+            .unwrap();
+        assert!(matches!(
+            adapter(config)
+                .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+                .await,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ));
+        Ok(())
+    }
+    .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    result.unwrap();
+}
+
+#[tokio::test]
 async fn postgres18_range_and_multirange_kinds_are_source_evidence() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
