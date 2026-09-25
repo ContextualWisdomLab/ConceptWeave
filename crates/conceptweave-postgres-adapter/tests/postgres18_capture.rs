@@ -715,6 +715,31 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             })
             .collect::<BTreeSet<_>>();
         assert_eq!(observed_type_kinds, catalog_type_kinds);
+        let catalog_array_types = client
+            .query(
+                "SELECT a.typname::text, e.typname::text FROM pg_catalog.pg_type e \
+                 JOIN pg_catalog.pg_type a ON a.oid = e.typarray \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = e.typnamespace \
+                 WHERE n.nspname = $1 AND e.typarray <> 0 AND a.typelem = e.oid",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| (row.get::<_, String>(0), row.get::<_, String>(1)))
+            .collect::<BTreeSet<_>>();
+        let observed_array_types = first
+            .array_types()
+            .unwrap()
+            .iter()
+            .map(|pair| {
+                (
+                    pair.array_type().type_name().to_owned(),
+                    pair.element_type().type_name().to_owned(),
+                )
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(observed_array_types, catalog_array_types);
         let proposal = propose_relational_model(&first).unwrap();
         let replay_proposal = propose_relational_model(&replay).unwrap();
         assert_eq!(proposal, replay_proposal);
@@ -1809,7 +1834,7 @@ async fn postgres18_range_and_multirange_kinds_are_source_evidence() {
             "CREATE SCHEMA \"{schema}\"; \
              CREATE TYPE \"{schema}\".span AS RANGE (subtype = integer); \
              CREATE TABLE \"{schema}\".record \
-               (id integer PRIMARY KEY, value \"{schema}\".span, values \"{schema}\".span_multirange)"
+               (id integer PRIMARY KEY, value \"{schema}\".span, values \"{schema}\".span_multirange, spans \"{schema}\".span[])"
         ))
         .await
         .unwrap();
@@ -1831,6 +1856,17 @@ async fn postgres18_range_and_multirange_kinds_are_source_evidence() {
         .unwrap();
     let source_range = (pair.get::<_, String>(0), pair.get::<_, String>(1));
     let source_multirange = (pair.get::<_, String>(2), pair.get::<_, String>(3));
+    let source_array: String = client
+        .query_one(
+            "SELECT a.typname::text FROM pg_catalog.pg_type e \
+             JOIN pg_catalog.pg_type a ON a.oid = e.typarray \
+             JOIN pg_catalog.pg_namespace n ON n.oid = e.typnamespace \
+             WHERE n.nspname = $1 AND e.typname = 'span' AND a.typelem = e.oid",
+            &[&schema],
+        )
+        .await
+        .unwrap()
+        .get(0);
     let shell_result = if result.is_ok() {
         client
             .batch_execute(&format!("CREATE TYPE \"{schema}\".unresolved"))
@@ -1851,6 +1887,12 @@ async fn postgres18_range_and_multirange_kinds_are_source_evidence() {
         .unwrap();
     connection_task.abort();
     let snapshot = result.unwrap();
+    assert!(snapshot.array_types().unwrap().iter().any(|array| {
+        array.array_type().schema_name() == schema
+            && array.array_type().type_name() == source_array
+            && array.element_type().schema_name() == schema
+            && array.element_type().type_name() == "span"
+    }));
     assert_eq!(
         shell_result,
         Some(Some(SourceObservationFailure::InvalidCapturedMetadata))

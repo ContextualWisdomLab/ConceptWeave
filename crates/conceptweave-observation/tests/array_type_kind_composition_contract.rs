@@ -110,10 +110,53 @@ fn observed_type_kinds_preserve_an_already_observed_custom_true_array_binding() 
     let composed = snapshot
         .with_observed_type_kinds(status_type_kinds())
         .expect("independent array and type-kind catalog families must compose");
+    let direct = PostgresSchemaSnapshotV3::new_with_array_types_and_type_kinds(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-12T05:10:00Z",
+        vec![ticket_with_status_array_binding()],
+        Vec::new(),
+        vec![status_enum()],
+        vec![
+            ArrayTypeObservation::new(
+                type_name("public", "_status"),
+                type_name("public", "status"),
+            )
+            .unwrap(),
+        ],
+        status_type_kinds(),
+    )
+    .expect("the combined source constructor must preserve both catalog families");
 
     assert!(composed.array_types().is_some());
     assert!(composed.type_kinds().is_some());
     assert_ne!(array_aware_digest, composed.snapshot_digest());
+    assert_eq!(direct.snapshot_digest(), composed.snapshot_digest());
+    assert_eq!(
+        PostgresSchemaSnapshotV3::new_with_array_types_and_type_kinds(
+            &support::authorized_source("warehouse_primary", &["public"]),
+            "postgres_introspector_v3",
+            "2026-09-12T05:10:00Z",
+            vec![ticket_with_status_array_binding()],
+            Vec::new(),
+            vec![status_enum()],
+            vec![
+                ArrayTypeObservation::new(
+                    type_name("public", "_status"),
+                    type_name("public", "status"),
+                )
+                .unwrap()
+            ],
+            status_type_kinds()
+                .into_iter()
+                .filter(|kind| kind.type_name().type_name() != "_status")
+                .collect(),
+        )
+        .unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "array_type_kind"
+        }
+    );
 }
 
 #[test]

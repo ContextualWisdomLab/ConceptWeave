@@ -520,6 +520,7 @@ impl PostgresSchemaSnapshotV3 {
             &relations,
             &domains,
             &enums,
+            &[],
             array_types,
         )?;
         validate_type_bindings_with_arrays(&relations, &domains, &enums, &array_types)?;
@@ -591,6 +592,97 @@ impl PostgresSchemaSnapshotV3 {
             collation_definitions: Vec::new(),
             collation_definitions_observed: false,
         })
+    }
+
+    /// Captures exact true-array pairs alongside all schema-local PostgreSQL type kinds.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "preserve source evidence constructor"
+    )]
+    pub fn new_with_array_types_and_type_kinds(
+        authorized_request: &AuthorizedObservationRequest,
+        extractor_revision: impl Into<String>,
+        observed_at_utc: impl Into<String>,
+        relations: Vec<RelationObservation>,
+        domains: Vec<DomainObservation>,
+        enums: Vec<EnumObservation>,
+        array_types: Vec<ArrayTypeObservation>,
+        type_kinds: Vec<TypeKindObservation>,
+    ) -> Result<Self, ObservationError> {
+        validate_schema_relation_invariants(&relations)?;
+        let type_kinds = canonicalize_type_kind_observations(
+            Some(authorized_request.request().allowed_schema_names()),
+            &relations,
+            &domains,
+            &enums,
+            type_kinds,
+        )?;
+        let array_types = canonicalize_array_type_observations(
+            authorized_request,
+            &relations,
+            &domains,
+            &enums,
+            &type_kinds,
+            array_types,
+        )?;
+        if array_types.iter().any(|array| {
+            !type_kinds.iter().any(|kind| {
+                same_type_coordinate(kind.type_name(), array.array_type())
+                    && kind.kind() == PostgresTypeKind::Base
+            })
+        }) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "array_type_kind",
+            });
+        }
+        validate_type_bindings_with_type_kinds_and_arrays(
+            &relations,
+            &domains,
+            &enums,
+            &array_types,
+            &type_kinds,
+        )?;
+        let projected_relations = relations
+            .iter()
+            .map(|relation| project_relation_array_bindings(relation, &array_types))
+            .collect::<Result<Vec<_>, _>>()?;
+        let projected_domains = domains
+            .iter()
+            .map(|domain| project_domain_array_binding(domain, &array_types))
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut snapshot = Self::new_with_type_kinds(
+            authorized_request,
+            extractor_revision,
+            observed_at_utc,
+            projected_relations,
+            projected_domains,
+            enums,
+            type_kinds,
+        )?;
+        snapshot.relations = relations;
+        snapshot.relations.sort_by(|left, right| {
+            (left.schema_name(), left.relation_name())
+                .cmp(&(right.schema_name(), right.relation_name()))
+        });
+        snapshot.domains = domains;
+        snapshot.domains.sort_by(|left, right| {
+            (left.schema_name(), left.domain_name())
+                .cmp(&(right.schema_name(), right.domain_name()))
+        });
+        snapshot.snapshot_digest = compute_type_kind_aware_snapshot_digest(
+            &compute_array_aware_snapshot_digest(
+                snapshot.inner.snapshot_digest(),
+                &snapshot.relations,
+                &snapshot.domains,
+                &array_types,
+            ),
+            &snapshot.relations,
+            &snapshot.domains,
+            &snapshot.type_kinds,
+        );
+        snapshot.array_types = array_types;
+        snapshot.array_types_observed = true;
+        Ok(snapshot)
     }
 
     /// Creates a deterministic v3 snapshot with both true-array identity and key-constraint timing.
@@ -2272,6 +2364,7 @@ fn canonicalize_array_type_observations(
     relations: &[RelationObservation],
     domains: &[DomainObservation],
     enums: &[EnumObservation],
+    type_kinds: &[TypeKindObservation],
     mut array_types: Vec<ArrayTypeObservation>,
 ) -> Result<Vec<ArrayTypeObservation>, ObservationError> {
     let mut scalar_type_names = BTreeSet::new();
@@ -2367,6 +2460,10 @@ fn canonicalize_array_type_observations(
         }
         if array_type.element_type().schema_name() != POSTGRES_CATALOG_SCHEMA_NAME
             && !scalar_type_names.contains(&element_coordinate)
+            && !type_kinds.iter().any(|kind| {
+                same_type_coordinate(kind.type_name(), array_type.element_type())
+                    && !array_type_names.contains(&element_coordinate)
+            })
         {
             return Err(ObservationError::UnknownTypeBinding {
                 schema_name: element_coordinate.0,

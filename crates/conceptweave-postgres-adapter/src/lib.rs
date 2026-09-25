@@ -12,11 +12,11 @@ mod foreign_keys;
 use std::{collections::BTreeMap, future::Future, time::Duration};
 
 use conceptweave_observation::{
-    CheckConstraintObservation, ColumnCollationObservation, ColumnExpressionObservation,
-    ColumnGenerationObservation, ColumnObservationV3, ConstraintDeferrability,
-    ConstraintTimingObservation, DomainCheckConstraintObservation, DomainObservation,
-    EnumObservation, IndexAttributeKind, IndexAttributeObservation, IndexCatalogFlags,
-    IndexKeySemantics, IndexObservation, IndexStorageOption, IndexTablespace,
+    ArrayTypeObservation, CheckConstraintObservation, ColumnCollationObservation,
+    ColumnExpressionObservation, ColumnGenerationObservation, ColumnObservationV3,
+    ConstraintDeferrability, ConstraintTimingObservation, DomainCheckConstraintObservation,
+    DomainObservation, EnumObservation, IndexAttributeKind, IndexAttributeObservation,
+    IndexCatalogFlags, IndexKeySemantics, IndexObservation, IndexStorageOption, IndexTablespace,
     NotNullConstraintObservation, OperatorClassOption, PostgresSchemaSnapshotV3, PostgresTypeKind,
     PrimaryKeyObservation, QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName,
     RelationKind, RelationObservation, ReplicaIdentityMode, TableConstraintObservation,
@@ -265,6 +265,7 @@ async fn capture_catalog(
     let max_bytes = limits.max_bytes().min(i64::MAX as u64) as i64;
     let mut types = Vec::new();
     let mut type_kinds = Vec::new();
+    let mut array_types = Vec::new();
     let mut relation_rows = Vec::new();
     for schema in request.request().allowed_schema_names() {
         let schema_row = bounded(
@@ -479,6 +480,40 @@ async fn capture_catalog(
             .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
             type_kinds.push(observation);
         }
+
+        let array_stream = bounded(
+            request,
+            cancellation,
+            transaction.query_raw(
+                "SELECT e.typname::text, a.typname::text, a.typnamespace = e.typnamespace, \
+                 a.typelem = e.oid FROM pg_catalog.pg_type e \
+                 LEFT JOIN pg_catalog.pg_type a ON a.oid = e.typarray \
+                 WHERE e.typnamespace = $1 AND e.typarray <> 0 ORDER BY e.typname",
+                &[&schema_oid],
+            ),
+        )
+        .await?;
+        tokio::pin!(array_stream);
+        while let Some(row) = bounded(request, cancellation, array_stream.try_next()).await? {
+            let element_name: String = field(&row, 0)?;
+            let array_name: Option<String> = field(&row, 1)?;
+            let same_schema: Option<bool> = field(&row, 2)?;
+            let reciprocal: Option<bool> = field(&row, 3)?;
+            let array_name = array_name.ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
+            meter.add(request, 16 + element_name.len() + array_name.len())?;
+            if same_schema != Some(true) || reciprocal != Some(true) {
+                return Err(SourceObservationFailure::InvalidCapturedMetadata);
+            }
+            array_types.push(
+                ArrayTypeObservation::new(
+                    QualifiedTypeName::new(schema, array_name)
+                        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+                    QualifiedTypeName::new(schema, element_name)
+                        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+                )
+                .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+            );
+        }
     }
 
     let mut domains = Vec::new();
@@ -676,13 +711,14 @@ async fn capture_catalog(
         0,
     )?;
     let has_relations = !relations.is_empty();
-    let snapshot = PostgresSchemaSnapshotV3::new_with_type_kinds(
+    let snapshot = PostgresSchemaSnapshotV3::new_with_array_types_and_type_kinds(
         request,
-        "postgres18_type_kind_adapter_v1",
+        "postgres18_array_type_kind_adapter_v1",
         observed_at_utc,
         relations,
         domains,
         enums,
+        array_types,
         type_kinds,
     )
     .and_then(|snapshot| {
