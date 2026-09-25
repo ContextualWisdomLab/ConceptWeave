@@ -619,6 +619,25 @@ async fn capture_catalog(
         }
     }
 
+    // Base-type input/output and storage behavior is not represented by the bounded snapshot.
+    // The only admitted schema-local base types are generated true arrays with reciprocal pairs.
+    let true_array_names = array_types
+        .iter()
+        .map(|array| {
+            (
+                array.array_type().schema_name(),
+                array.array_type().type_name(),
+            )
+        })
+        .collect::<BTreeSet<_>>();
+    if type_kinds.iter().any(|item| {
+        item.kind() == PostgresTypeKind::Base
+            && !true_array_names
+                .contains(&(item.type_name().schema_name(), item.type_name().type_name()))
+    }) {
+        return Err(SourceObservationFailure::InvalidCapturedMetadata);
+    }
+
     let mut domains = Vec::new();
     let mut enums = Vec::new();
     for (schema, observed) in types {

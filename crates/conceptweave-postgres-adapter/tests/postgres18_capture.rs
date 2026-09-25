@@ -3241,6 +3241,56 @@ async fn postgres18_nondefault_table_tablespace_changes_source_identity() {
 }
 
 #[tokio::test]
+async fn postgres18_user_defined_base_type_fails_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let can_create_internal_function: bool = client
+        .query_one(
+            "SELECT rolsuper FROM pg_catalog.pg_roles WHERE rolname = current_user",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    if !can_create_internal_function {
+        eprintln!("skipping custom-base fixture: setup requires a superuser");
+        connection_task.abort();
+        return;
+    }
+    let schema = format!("cw_custom_base_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; CREATE TYPE \"{schema}\".custom; \
+             CREATE FUNCTION \"{schema}\".custom_in(cstring) RETURNS \"{schema}\".custom \
+               AS 'int4in' LANGUAGE internal IMMUTABLE STRICT; \
+             CREATE FUNCTION \"{schema}\".custom_out(\"{schema}\".custom) RETURNS cstring \
+               AS 'int4out' LANGUAGE internal IMMUTABLE STRICT; \
+             CREATE TYPE \"{schema}\".custom \
+               (INPUT = \"{schema}\".custom_in, OUTPUT = \"{schema}\".custom_out, \
+                INTERNALLENGTH = 4, PASSEDBYVALUE); \
+             CREATE TABLE \"{schema}\".record (payload \"{schema}\".custom)"
+        ))
+        .await
+        .unwrap();
+    let observed = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    assert!(matches!(
+        observed,
+        Err(SourceObservationFailure::InvalidCapturedMetadata)
+    ));
+}
+
+#[tokio::test]
 async fn postgres18_declared_array_dimensions_change_source_identity() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
