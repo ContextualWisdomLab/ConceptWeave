@@ -18,6 +18,7 @@ mod foreign_key_catalog;
 mod model;
 mod not_null_constraint;
 mod range_catalog;
+mod relation_tablespace;
 mod representation_v3;
 mod type_kind;
 
@@ -43,6 +44,7 @@ pub use not_null_constraint::{NotNullConstraintObservation, ParentNotNullConstra
 pub use range_catalog::{
     QualifiedRangeProcedure, RangeCatalogObservation, RangeCatalogSourceReceipt,
 };
+pub use relation_tablespace::RelationTablespaceObservation;
 pub use representation_v3::{
     ColumnObservationV3, DomainCheckConstraintObservation, DomainObservation, EnumObservation,
     IndexAttributeKind, IndexAttributeObservation, IndexAttributeSource, IndexCatalogFlags,
@@ -158,6 +160,8 @@ pub struct PostgresSchemaSnapshotV3 {
     foreign_key_catalog_observed: bool,
     range_catalog: Vec<RangeCatalogObservation>,
     range_catalog_observed: bool,
+    relation_tablespaces: Vec<RelationTablespaceObservation>,
+    relation_tablespaces_observed: bool,
     collation_definitions: Vec<CollationDefinitionObservation>,
     collation_definitions_observed: bool,
 }
@@ -219,6 +223,8 @@ impl PostgresSchemaSnapshotV3 {
             foreign_key_catalog_observed: false,
             range_catalog: Vec::new(),
             range_catalog_observed: false,
+            relation_tablespaces: Vec::new(),
+            relation_tablespaces_observed: false,
             collation_definitions: Vec::new(),
             collation_definitions_observed: false,
         })
@@ -315,6 +321,8 @@ impl PostgresSchemaSnapshotV3 {
             foreign_key_catalog_observed: false,
             range_catalog: Vec::new(),
             range_catalog_observed: false,
+            relation_tablespaces: Vec::new(),
+            relation_tablespaces_observed: false,
             collation_definitions: Vec::new(),
             collation_definitions_observed: false,
         })
@@ -601,6 +609,8 @@ impl PostgresSchemaSnapshotV3 {
             foreign_key_catalog_observed: false,
             range_catalog: Vec::new(),
             range_catalog_observed: false,
+            relation_tablespaces: Vec::new(),
+            relation_tablespaces_observed: false,
             collation_definitions: Vec::new(),
             collation_definitions_observed: false,
         })
@@ -1100,6 +1110,36 @@ impl PostgresSchemaSnapshotV3 {
         Ok(self)
     }
 
+    /// Adds complete resolved storage coordinates for every observed ordinary table.
+    /// The predecessor v3 digest remains reproducible; this is an explicit successor family.
+    pub fn with_observed_relation_tablespaces(
+        mut self,
+        observations: Vec<RelationTablespaceObservation>,
+    ) -> Result<Self, ObservationError> {
+        if !self.type_kinds_observed
+            || self.relation_tablespaces_observed
+            || self.range_catalog_observed
+            || self.column_collations_observed
+            || self.column_generations_observed
+            || self.column_expressions_observed
+            || self.column_identities_observed
+            || self.not_null_constraints_observed
+            || self.constraint_timings_observed
+            || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "relation_tablespace_observation_order",
+            });
+        }
+        let observations = relation_tablespace::canonicalize(&self.relations, observations)?;
+        self.snapshot_digest = relation_tablespace::digest(&self.snapshot_digest, &observations);
+        self.relation_tablespaces = observations;
+        self.relation_tablespaces_observed = true;
+        Ok(self)
+    }
+
     /// Adds complete `pg_range` subtype, ordering, collation, and function coordinates.
     /// This successor digest leaves historical type-kind identities unchanged.
     pub fn with_observed_range_catalog(
@@ -1314,6 +1354,13 @@ impl PostgresSchemaSnapshotV3 {
     pub fn range_catalog(&self) -> Option<&[RangeCatalogObservation]> {
         self.range_catalog_observed
             .then_some(self.range_catalog.as_slice())
+    }
+
+    /// Returns the complete ordinary-table storage family, or `None` when unobserved.
+    #[must_use]
+    pub fn relation_tablespaces(&self) -> Option<&[RelationTablespaceObservation]> {
+        self.relation_tablespaces_observed
+            .then_some(self.relation_tablespaces.as_slice())
     }
 
     /// Issues provenance only for an exact observed range catalog coordinate.

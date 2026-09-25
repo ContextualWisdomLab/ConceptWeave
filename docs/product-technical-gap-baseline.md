@@ -24,7 +24,7 @@ The live column-collation fixture now compares the captured `pg_catalog.default`
 
 The bounded adapter now checks `pg_class.relam` against the built-in `heap` table access method and its handler before constructing an immutable snapshot. A PostgreSQL 18 fixture creates a separate table access method and confirms rejection; table access methods beyond `heap` still need a complete source-evidence representation before admission.
 
-The adapter also rejects a table assigned to a nondefault tablespace, since the current relation digest has no table-level tablespace coordinate. A PostgreSQL 18 fixture first admits the ordinary table, moves it to a separate tablespace, and verifies that the changed source is not admitted under the old identity. Capturing tablespace identity remains future representation work.
+The adapter now captures every admitted ordinary table's resolved tablespace name and the exact database-default marker in a separate successor digest. Missing, duplicate, or out-of-scope table storage evidence fails closed before Discovery promotion. A PostgreSQL 18 fixture moves a table to a separate tablespace, checks both storage coordinates, and verifies changed source identity. Historical v3 digests remain reproducible.
 
 Dropped `pg_attribute` rows remain physical tombstones but are not SQL-visible columns. The adapter excludes them from the observed column set without renumbering surviving `attnum` coordinates. A PostgreSQL 18 fixture verifies a retained ordinal gap, the surviving index key, and source receipts for live versus dropped columns.
 

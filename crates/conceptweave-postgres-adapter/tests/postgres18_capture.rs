@@ -18,9 +18,9 @@ use conceptweave_observation::{
     ColumnExpressionObservation, ColumnGenerationObservation, ColumnIdentityObservation,
     ColumnObservationV3, ConstraintDeferrability, DomainObservation, EnumObservation,
     ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType, ForeignKeyObservation,
-    PostgresSchemaSnapshotV3, PostgresTypeKind, QualifiedTypeName, RelationKind,
-    RelationObservation, ReplicaIdentityMode, SchemaObjectLocation, TableConstraintObservation,
-    TypeKindObservation,
+    IndexTablespace, PostgresSchemaSnapshotV3, PostgresTypeKind, QualifiedTypeName, RelationKind,
+    RelationObservation, RelationTablespaceObservation, ReplicaIdentityMode, SchemaObjectLocation,
+    TableConstraintObservation, TypeKindObservation,
 };
 use conceptweave_postgres_adapter::{PostgresTlsAdapter, PostgresUnixAdapter};
 use conceptweave_source_port::{
@@ -598,6 +598,15 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
             .unwrap(),
         ],
     )
+    .unwrap()
+    .with_observed_relation_tablespaces(vec![
+        RelationTablespaceObservation::new(
+            "public",
+            "plain",
+            IndexTablespace::database_default("pg_default").unwrap(),
+        )
+        .unwrap(),
+    ])
     .unwrap()
     .with_observed_column_collations(vec![
         ColumnCollationObservation::uncollatable("public", "plain", RelationKind::Table, "id")
@@ -3114,7 +3123,7 @@ async fn postgres18_identity_sequence_settings_change_source_identity() {
 }
 
 #[tokio::test]
-async fn postgres18_nondefault_table_tablespace_fails_closed() {
+async fn postgres18_nondefault_table_tablespace_changes_source_identity() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
     };
@@ -3176,10 +3185,17 @@ async fn postgres18_nondefault_table_tablespace_fails_closed() {
         .unwrap();
     std::fs::remove_dir(&directory).unwrap();
     connection_task.abort();
-    assert!(matches!(
-        observed,
-        Err(SourceObservationFailure::InvalidCapturedMetadata)
-    ));
+    let after = observed.unwrap();
+    let [original] = before.relation_tablespaces().unwrap() else {
+        panic!("one table tablespace expected");
+    };
+    let [moved] = after.relation_tablespaces().unwrap() else {
+        panic!("one table tablespace expected");
+    };
+    assert!(original.tablespace().is_database_default());
+    assert_eq!(moved.tablespace().name(), tablespace);
+    assert!(!moved.tablespace().is_database_default());
+    assert_ne!(before.snapshot_digest(), after.snapshot_digest());
 }
 
 #[tokio::test]

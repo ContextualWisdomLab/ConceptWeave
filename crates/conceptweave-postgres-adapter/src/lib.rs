@@ -25,8 +25,8 @@ use conceptweave_observation::{
     IndexCatalogFlags, IndexKeySemantics, IndexObservation, IndexStorageOption, IndexTablespace,
     NotNullConstraintObservation, OperatorClassOption, PostgresSchemaSnapshotV3, PostgresTypeKind,
     PrimaryKeyObservation, QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName,
-    RelationKind, RelationObservation, ReplicaIdentityMode, TableConstraintObservation,
-    TypeKindObservation, UniqueConstraintObservation,
+    RelationKind, RelationObservation, RelationTablespaceObservation, ReplicaIdentityMode,
+    TableConstraintObservation, TypeKindObservation, UniqueConstraintObservation,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, SourceObservationFailure,
@@ -205,6 +205,7 @@ struct RelationRow {
     name: String,
     kind: RelationKind,
     replica_identity: ReplicaIdentityMode,
+    tablespace: Option<IndexTablespace>,
     comment: Option<String>,
 }
 
@@ -320,8 +321,12 @@ async fn capture_catalog(
                      WHERE d.classid = 'pg_type'::regclass AND d.objid = t.oid \
                        AND d.deptype = 'e')), \
                  c.relam = 0 AND c.reltablespace = 0 AND c.reltoastrelid = 0, \
-                 c.reltablespace = 0 \
-                 FROM pg_catalog.pg_class c WHERE c.relnamespace = $1 \
+                 ts.spcname::text, c.reltablespace = 0 \
+                 FROM pg_catalog.pg_class c \
+                 JOIN pg_catalog.pg_database db ON db.datname = pg_catalog.current_database() \
+                 LEFT JOIN pg_catalog.pg_tablespace ts \
+                   ON ts.oid = CASE WHEN c.reltablespace = 0 THEN db.dattablespace ELSE c.reltablespace END \
+                 WHERE c.relnamespace = $1 \
                    AND c.relkind IN ('r','p','v','m','f','S','c') ORDER BY c.relname",
                 vec![&schema_oid as &(dyn ToSql + Sync), &max_bytes],
             ),
@@ -335,6 +340,7 @@ async fn capture_catalog(
             let persistence: String = field(&row, 3)?;
             let replica: String = field(&row, 5)?;
             let comment: Option<String> = field(&row, 13)?;
+            let tablespace_name: Option<String> = field(&row, 19)?;
             if field::<bool>(&row, 14)? {
                 return Err(SourceObservationFailure::ByteLimitExceeded {
                     max_bytes: limits.max_bytes(),
@@ -346,6 +352,7 @@ async fn capture_catalog(
                     + kind.len()
                     + persistence.len()
                     + replica.len()
+                    + tablespace_name.as_ref().map_or(0, String::len)
                     + comment.as_ref().map_or(0, String::len),
             )?;
             if kind == "S" && field::<bool>(&row, 15)? {
@@ -353,7 +360,6 @@ async fn capture_catalog(
             }
             // relhasrules and relhastriggers are lazy hints; the catalog-row guards below
             // decide whether any unsupported rule or trigger still exists.
-            // A nondefault table tablespace is not represented in the source digest.
             // Row-type pg_type metadata is separate from pg_class for both tables and
             // standalone composites; unmodeled changes must not retain the same digest.
             let relation_kind = match kind.as_str() {
@@ -362,7 +368,6 @@ async fn capture_catalog(
                 _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
             };
             if persistence != "p"
-                || !field::<bool>(&row, 19)?
                 || [4, 6, 7, 10, 11, 12]
                     .into_iter()
                     .any(|index| field::<bool>(&row, index) != Ok(false))
@@ -386,12 +391,27 @@ async fn capture_catalog(
                 "i" => ReplicaIdentityMode::Index,
                 _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
             };
+            let tablespace = if relation_kind == RelationKind::Table {
+                let name =
+                    tablespace_name.ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
+                Some(
+                    if field::<bool>(&row, 20)? {
+                        IndexTablespace::database_default(name)
+                    } else {
+                        IndexTablespace::named(name)
+                    }
+                    .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+                )
+            } else {
+                None
+            };
             relation_rows.push(RelationRow {
                 schema: schema.clone(),
                 oid,
                 name,
                 kind: relation_kind,
                 replica_identity,
+                tablespace,
                 comment,
             });
         }
@@ -719,6 +739,7 @@ async fn capture_catalog(
         }
     }
     let mut relations = Vec::new();
+    let mut relation_tablespaces = Vec::new();
     let mut relation_oids = Vec::new();
     let mut key_timings = Vec::new();
     let mut column_collations = Vec::new();
@@ -728,6 +749,16 @@ async fn capture_catalog(
     let mut not_null_constraints = Vec::new();
     let mut constraint_timings = Vec::new();
     for relation in relation_rows {
+        if let Some(tablespace) = &relation.tablespace {
+            relation_tablespaces.push(
+                RelationTablespaceObservation::new(
+                    relation.schema.clone(),
+                    relation.name.clone(),
+                    tablespace.clone(),
+                )
+                .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+            );
+        }
         relation_oids.push(relation.oid);
         let (observed, collations, generations, expressions, identities, not_null, timings) =
             capture_relation(
@@ -904,6 +935,13 @@ async fn capture_catalog(
         array_types,
         type_kinds,
     )
+    .and_then(|snapshot| {
+        if relation_tablespaces.is_empty() {
+            Ok(snapshot)
+        } else {
+            snapshot.with_observed_relation_tablespaces(relation_tablespaces)
+        }
+    })
     .and_then(|snapshot| snapshot.with_observed_range_catalog(range_catalog))
     .and_then(|snapshot| {
         if has_relations {
