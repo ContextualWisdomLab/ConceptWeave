@@ -455,7 +455,16 @@ async fn capture_catalog(
             cancellation,
             transaction.query_raw(
                 "SELECT t.typname::text, t.typtype::text, t.typisdefined, \
-                 bn.nspname::text, bt.typname::text, cn.nspname::text, ct.typname::text \
+                 bn.nspname::text, bt.typname::text, cn.nspname::text, ct.typname::text, \
+                 t.typacl IS NOT NULL OR \
+                   EXISTS(SELECT 1 FROM pg_catalog.pg_seclabel l \
+                     WHERE l.classoid = 'pg_type'::regclass AND l.objoid = t.oid) OR \
+                   EXISTS(SELECT 1 FROM pg_catalog.pg_depend d \
+                     WHERE d.classid = 'pg_type'::regclass AND d.objid = t.oid \
+                       AND d.deptype = 'e') OR \
+                   (t.typtype NOT IN ('d','e') AND \
+                     EXISTS(SELECT 1 FROM pg_catalog.pg_description d \
+                       WHERE d.classoid = 'pg_type'::regclass AND d.objoid = t.oid)) \
                  FROM pg_catalog.pg_type t \
                  LEFT JOIN pg_catalog.pg_type bt ON bt.oid = t.typbasetype \
                  LEFT JOIN pg_catalog.pg_namespace bn ON bn.oid = bt.typnamespace \
@@ -477,6 +486,7 @@ async fn capture_catalog(
             let base_name: Option<String> = field(&row, 4)?;
             let counterpart_schema: Option<String> = field(&row, 5)?;
             let counterpart_name: Option<String> = field(&row, 6)?;
+            let unmodeled_metadata: bool = field(&row, 7)?;
             meter.add(
                 request,
                 8 + name.len()
@@ -486,7 +496,7 @@ async fn capture_catalog(
                     + counterpart_schema.as_ref().map_or(0, String::len)
                     + counterpart_name.as_ref().map_or(0, String::len),
             )?;
-            if !defined {
+            if !defined || unmodeled_metadata {
                 return Err(SourceObservationFailure::InvalidCapturedMetadata);
             }
             let coordinate = QualifiedTypeName::new(schema, name)

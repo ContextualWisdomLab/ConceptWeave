@@ -2642,6 +2642,58 @@ async fn postgres18_custom_table_access_method_fails_closed() {
 }
 
 #[tokio::test]
+async fn postgres18_domain_and_enum_acl_changes_fail_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_type_acl_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; \
+             CREATE TYPE \"{schema}\".stage AS ENUM ('open', 'closed'); \
+             CREATE DOMAIN \"{schema}\".score AS integer CHECK (VALUE >= 0)"
+        ))
+        .await
+        .unwrap();
+    let result: Result<(), SourceObservationFailure> = async {
+        let original = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await?;
+        assert_eq!(original.enums().len(), 1);
+        assert_eq!(original.domains().len(), 1);
+        for type_name in ["stage", "score"] {
+            client
+                .batch_execute(&format!(
+                    "REVOKE USAGE ON TYPE \"{schema}\".{type_name} FROM PUBLIC"
+                ))
+                .await
+                .unwrap();
+            assert!(matches!(
+                adapter(config.clone())
+                    .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+                    .await,
+                Err(SourceObservationFailure::InvalidCapturedMetadata)
+            ));
+            client
+                .batch_execute(&format!("DROP TYPE \"{schema}\".{type_name}"))
+                .await
+                .unwrap();
+        }
+        Ok(())
+    }
+    .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    result.unwrap();
+}
+
+#[tokio::test]
 async fn postgres18_standalone_composite_type_retains_column_receipts() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
