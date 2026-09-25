@@ -34,6 +34,118 @@ use ring::{
 };
 use tokio_postgres::{Config, NoTls};
 
+#[tokio::test]
+async fn postgres18_range_subtype_changes_source_identity() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_range_subtype_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA {schema}; CREATE TYPE {schema}.span AS RANGE (subtype = int4)"
+        ))
+        .await
+        .unwrap();
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await
+        .unwrap();
+    client
+        .batch_execute(&format!(
+            "DROP TYPE {schema}.span CASCADE; CREATE TYPE {schema}.span AS RANGE (subtype = int8)"
+        ))
+        .await
+        .unwrap();
+    let after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await
+        .unwrap();
+    client
+        .batch_execute(&format!("DROP SCHEMA {schema} CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    let [original] = before.range_catalog().unwrap() else {
+        panic!("one range definition expected");
+    };
+    let [changed] = after.range_catalog().unwrap() else {
+        panic!("one range definition expected");
+    };
+    assert_eq!(original.subtype().type_name(), "int4");
+    assert_eq!(changed.subtype().type_name(), "int8");
+    assert_eq!(
+        original.subtype_operator_class().operator_class_name(),
+        "int4_ops"
+    );
+    assert_eq!(
+        changed.subtype_operator_class().operator_class_name(),
+        "int8_ops"
+    );
+    let receipt = after
+        .range_catalog_source_receipt(QualifiedTypeName::new(&schema, "span").unwrap())
+        .unwrap();
+    assert_eq!(receipt.source_digest(), after.snapshot_digest());
+    assert_eq!(
+        receipt.canonical_location(),
+        format!("/schemas/{schema}/ranges/span/catalog")
+    );
+    assert!(
+        after
+            .range_catalog_source_receipt(QualifiedTypeName::new(&schema, "unknown").unwrap())
+            .is_err()
+    );
+    assert_ne!(before.snapshot_digest(), after.snapshot_digest());
+}
+
+#[tokio::test]
+async fn postgres18_range_collation_and_difference_function_are_bound() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_range_collation_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA {schema}; \
+             CREATE FUNCTION {schema}.text_diff(text, text) RETURNS float8 \
+               LANGUAGE SQL IMMUTABLE STRICT AS $$ SELECT (length($1)-length($2))::float8 $$; \
+             CREATE TYPE {schema}.span AS RANGE \
+               (subtype=text, collation=\"C\", subtype_diff={schema}.text_diff)"
+        ))
+        .await
+        .unwrap();
+    let result = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA {schema} CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    let snapshot = result.unwrap();
+    let [range] = snapshot.range_catalog().unwrap() else {
+        panic!("one range definition expected");
+    };
+    assert_eq!(range.subtype().type_name(), "text");
+    assert_eq!(range.collation().unwrap().collation_name(), "C");
+    assert_eq!(
+        range.subtype_difference().unwrap().procedure_name(),
+        "text_diff"
+    );
+    assert!(
+        snapshot
+            .collation_definitions()
+            .unwrap()
+            .iter()
+            .any(|definition| { definition.collation().collation_name() == "C" })
+    );
+}
+
 struct Registry;
 
 impl SourceConnectionRegistry for Registry {

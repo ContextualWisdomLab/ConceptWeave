@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use conceptweave_observation::{
     CollationDefinitionObservation, CollationLocaleFields, CollationProvider,
     ColumnCollationObservation, DatabaseLocaleDefinition, DomainObservation,
-    QualifiedCollationName, RelationObservation,
+    QualifiedCollationName, RangeCatalogObservation, RelationObservation,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, SourceObservationFailure,
@@ -95,6 +95,7 @@ fn references(
     domains: &[DomainObservation],
     relations: &[RelationObservation],
     column_collations: &[ColumnCollationObservation],
+    range_catalog: &[RangeCatalogObservation],
 ) -> BTreeSet<(String, String)> {
     let mut references = BTreeSet::new();
     let mut add = |collation: &QualifiedCollationName| {
@@ -124,6 +125,11 @@ fn references(
             add(collation);
         }
     }
+    for range in range_catalog {
+        if let Some(collation) = range.collation() {
+            add(collation);
+        }
+    }
     references
 }
 
@@ -135,8 +141,9 @@ pub(super) async fn capture(
     domains: &[DomainObservation],
     relations: &[RelationObservation],
     column_collations: &[ColumnCollationObservation],
+    range_catalog: &[RangeCatalogObservation],
 ) -> Result<Vec<CollationDefinitionObservation>, SourceObservationFailure> {
-    let references = references(domains, relations, column_collations);
+    let references = references(domains, relations, column_collations, range_catalog);
     if references.is_empty() {
         return Ok(Vec::new());
     }

@@ -553,6 +553,13 @@ pub fn propose_relational_model(
             )
         })
         .collect::<BTreeMap<_, _>>();
+    if observed_type_kinds
+        .values()
+        .any(|kind| *kind == PostgresTypeKind::Range)
+        && snapshot.range_catalog().is_none()
+    {
+        return Err(ProposalError::IncompleteSourceObservation);
+    }
     let has_type_kind = |schema: &str, name: &str, kind: PostgresTypeKind| {
         observed_type_kinds.get(&(schema, name)) == Some(&kind)
     };

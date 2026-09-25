@@ -17,6 +17,7 @@ mod constraint_timing;
 mod foreign_key_catalog;
 mod model;
 mod not_null_constraint;
+mod range_catalog;
 mod representation_v3;
 mod type_kind;
 
@@ -39,6 +40,9 @@ pub use model::{
     TableConstraintObservation, TableObservation, UniqueConstraintObservation,
 };
 pub use not_null_constraint::{NotNullConstraintObservation, ParentNotNullConstraintCoordinate};
+pub use range_catalog::{
+    QualifiedRangeProcedure, RangeCatalogObservation, RangeCatalogSourceReceipt,
+};
 pub use representation_v3::{
     ColumnObservationV3, DomainCheckConstraintObservation, DomainObservation, EnumObservation,
     IndexAttributeKind, IndexAttributeObservation, IndexAttributeSource, IndexCatalogFlags,
@@ -152,6 +156,8 @@ pub struct PostgresSchemaSnapshotV3 {
     constraint_periods_observed: bool,
     foreign_key_catalog: Vec<ForeignKeyCatalogObservation>,
     foreign_key_catalog_observed: bool,
+    range_catalog: Vec<RangeCatalogObservation>,
+    range_catalog_observed: bool,
     collation_definitions: Vec<CollationDefinitionObservation>,
     collation_definitions_observed: bool,
 }
@@ -211,6 +217,8 @@ impl PostgresSchemaSnapshotV3 {
             constraint_periods_observed: false,
             foreign_key_catalog: Vec::new(),
             foreign_key_catalog_observed: false,
+            range_catalog: Vec::new(),
+            range_catalog_observed: false,
             collation_definitions: Vec::new(),
             collation_definitions_observed: false,
         })
@@ -305,6 +313,8 @@ impl PostgresSchemaSnapshotV3 {
             constraint_periods_observed: false,
             foreign_key_catalog: Vec::new(),
             foreign_key_catalog_observed: false,
+            range_catalog: Vec::new(),
+            range_catalog_observed: false,
             collation_definitions: Vec::new(),
             collation_definitions_observed: false,
         })
@@ -589,6 +599,8 @@ impl PostgresSchemaSnapshotV3 {
             constraint_periods_observed: false,
             foreign_key_catalog: Vec::new(),
             foreign_key_catalog_observed: false,
+            range_catalog: Vec::new(),
+            range_catalog_observed: false,
             collation_definitions: Vec::new(),
             collation_definitions_observed: false,
         })
@@ -1088,8 +1100,52 @@ impl PostgresSchemaSnapshotV3 {
         Ok(self)
     }
 
-    /// Adds the complete definitions of collations referenced by observed columns, domains, and
-    /// index keys. This final successor family binds stored and actual provider versions, and the
+    /// Adds complete `pg_range` subtype, ordering, collation, and function coordinates.
+    /// This successor digest leaves historical type-kind identities unchanged.
+    pub fn with_observed_range_catalog(
+        mut self,
+        observations: Vec<RangeCatalogObservation>,
+    ) -> Result<Self, ObservationError> {
+        if !self.type_kinds_observed
+            || self.range_catalog_observed
+            || self.column_collations_observed
+            || self.column_generations_observed
+            || self.column_expressions_observed
+            || self.column_identities_observed
+            || self.not_null_constraints_observed
+            || self.constraint_timings_observed
+            || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "range_catalog_observation_order",
+            });
+        }
+        let observations = range_catalog::canonicalize(&self.type_kinds, observations)?;
+        for observation in &observations {
+            if !type_binding_is_resolvable_with_type_kinds_and_arrays(
+                observation.subtype(),
+                &self.relations,
+                &self.domains,
+                &self.enums,
+                &self.array_types,
+                &self.type_kinds,
+            ) {
+                return Err(ObservationError::UnknownTypeBinding {
+                    schema_name: observation.subtype().schema_name().to_owned(),
+                    type_name: observation.subtype().type_name().to_owned(),
+                });
+            }
+        }
+        self.snapshot_digest = range_catalog::digest(&self.snapshot_digest, &observations);
+        self.range_catalog = observations;
+        self.range_catalog_observed = true;
+        Ok(self)
+    }
+
+    /// Adds the complete definitions of collations referenced by observed columns, domains, index
+    /// keys, and range types. This final successor family binds stored and actual provider versions, and the
     /// effective database locale when PostgreSQL's default collation is referenced.
     pub fn with_observed_collation_definitions(
         mut self,
@@ -1109,6 +1165,8 @@ impl PostgresSchemaSnapshotV3 {
             &self.relations,
             &self.domains,
             columns,
+            self.range_catalog_observed
+                .then_some(self.range_catalog.as_slice()),
             definitions,
         )?;
         self.snapshot_digest = collation_definition::digest(&self.snapshot_digest, &definitions);
@@ -1242,6 +1300,39 @@ impl PostgresSchemaSnapshotV3 {
     pub fn foreign_key_catalog(&self) -> Option<&[ForeignKeyCatalogObservation]> {
         self.foreign_key_catalog_observed
             .then_some(self.foreign_key_catalog.as_slice())
+    }
+
+    /// Returns complete range catalog evidence, or `None` when that family was unobserved.
+    #[must_use]
+    pub fn range_catalog(&self) -> Option<&[RangeCatalogObservation]> {
+        self.range_catalog_observed
+            .then_some(self.range_catalog.as_slice())
+    }
+
+    /// Issues provenance only for an exact observed range catalog coordinate.
+    pub fn range_catalog_source_receipt(
+        &self,
+        range_type: QualifiedTypeName,
+    ) -> Result<RangeCatalogSourceReceipt, ObservationError> {
+        if !self.range_catalog_observed
+            || !self
+                .range_catalog
+                .iter()
+                .any(|item| item.range_type() == &range_type)
+        {
+            return Err(ObservationError::UnknownTypeBinding {
+                schema_name: range_type.schema_name().to_owned(),
+                type_name: range_type.type_name().to_owned(),
+            });
+        }
+        Ok(RangeCatalogSourceReceipt::new(
+            self.source_connection_key().to_owned(),
+            self.connection_policy_binding().to_owned(),
+            self.snapshot_digest.clone(),
+            self.extractor_revision().to_owned(),
+            self.observed_at_utc().to_owned(),
+            range_type,
+        ))
     }
 
     /// Returns exact definitions for every collation referenced by the observed schema evidence.

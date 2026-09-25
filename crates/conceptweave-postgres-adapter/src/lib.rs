@@ -8,6 +8,7 @@
 
 mod collations;
 mod foreign_keys;
+mod ranges;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -869,6 +870,7 @@ async fn capture_catalog(
         })
         .collect::<Result<Vec<_>, _>>()
         .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+    let range_catalog = ranges::capture(&transaction, request, cancellation, &mut meter).await?;
     let collation_definitions = collations::capture(
         &transaction,
         request,
@@ -877,6 +879,7 @@ async fn capture_catalog(
         &domains,
         &relations,
         &column_collations,
+        &range_catalog,
     )
     .await?;
     let observed_at_utc: String = field(
@@ -902,6 +905,7 @@ async fn capture_catalog(
         array_types,
         type_kinds,
     )
+    .and_then(|snapshot| snapshot.with_observed_range_catalog(range_catalog))
     .and_then(|snapshot| {
         if has_relations {
             snapshot

@@ -306,6 +306,7 @@ pub(crate) fn canonicalize(
     relations: &[RelationObservation],
     domains: &[DomainObservation],
     column_collations: Option<&[ColumnCollationObservation]>,
+    range_catalog: Option<&[crate::RangeCatalogObservation]>,
     mut definitions: Vec<CollationDefinitionObservation>,
 ) -> Result<Vec<CollationDefinitionObservation>, ObservationError> {
     let mut expected = BTreeSet::new();
@@ -334,6 +335,16 @@ pub(crate) fn canonicalize(
     if let Some(columns) = column_collations {
         for column in columns {
             if let Some(collation) = column.collation() {
+                expected.insert((
+                    collation.schema_name().to_owned(),
+                    collation.collation_name().to_owned(),
+                ));
+            }
+        }
+    }
+    if let Some(ranges) = range_catalog {
+        for range in ranges {
+            if let Some(collation) = range.collation() {
                 expected.insert((
                     collation.schema_name().to_owned(),
                     collation.collation_name().to_owned(),
