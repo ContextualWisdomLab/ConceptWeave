@@ -446,22 +446,32 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
                 .unwrap(),
         ])
         .unwrap();
-    let complete = |snapshot: PostgresSchemaSnapshotV3| {
-        snapshot
+    let complete = |snapshot: PostgresSchemaSnapshotV3, observe_periods: bool| {
+        let snapshot = snapshot
             .with_observed_not_null_constraints(vec![])
             .unwrap()
             .with_observed_constraint_timings(vec![])
-            .unwrap()
+            .unwrap();
+        let snapshot = if observe_periods {
+            snapshot.with_observed_constraint_periods(vec![]).unwrap()
+        } else {
+            snapshot
+        };
+        snapshot
             .with_observed_foreign_key_catalog(vec![])
             .unwrap()
             .with_observed_collation_definitions(vec![])
             .unwrap()
     };
     assert!(matches!(
-        propose_relational_model(&complete(identity_unobserved)),
+        propose_relational_model(&complete(identity_unobserved, true)),
         Err(ProposalError::IncompleteSourceObservation)
     ));
-    assert!(propose_relational_model(&complete(identity_observed)).is_ok());
+    assert!(matches!(
+        propose_relational_model(&complete(identity_observed.clone(), false)),
+        Err(ProposalError::IncompleteSourceObservation)
+    ));
+    assert!(propose_relational_model(&complete(identity_observed, true)).is_ok());
 
     let enums = vec![
         EnumObservation::new("public", "stage", vec!["draft".to_owned()]).unwrap(),
@@ -689,6 +699,39 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
         assert_eq!(first.domains().len(), 1);
         assert_eq!(first.enums().len(), 1);
         assert_eq!(first.foreign_key_catalog().unwrap().len(), 4);
+        let catalog_periods = client
+            .query(
+                "SELECT t.relname::text, con.conname::text, con.conperiod \
+                 FROM pg_catalog.pg_constraint con \
+                 JOIN pg_catalog.pg_class t ON t.oid = con.conrelid \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace \
+                 WHERE n.nspname = $1 AND con.contype IN ('p', 'u', 'f')",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| {
+                (
+                    row.get::<_, String>(0),
+                    row.get::<_, String>(1),
+                    row.get::<_, bool>(2),
+                )
+            })
+            .collect::<BTreeSet<_>>();
+        let observed_periods = first
+            .constraint_periods()
+            .unwrap()
+            .iter()
+            .map(|period| {
+                (
+                    period.relation_name().to_owned(),
+                    period.constraint_name().to_owned(),
+                    period.has_period_semantics(),
+                )
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(observed_periods, catalog_periods);
         let catalog_relations = client
             .query(
                 "SELECT c.relname::text FROM pg_catalog.pg_class c \

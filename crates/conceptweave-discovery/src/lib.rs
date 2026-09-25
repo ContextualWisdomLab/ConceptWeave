@@ -540,6 +540,7 @@ pub fn propose_relational_model(
             || snapshot.column_identities().is_none()
             || snapshot.not_null_constraints().is_none()
             || snapshot.constraint_timings().is_none()
+            || snapshot.constraint_periods().is_none()
             || snapshot.foreign_key_catalog().is_none()
             || snapshot.collation_definitions().is_none())
     {

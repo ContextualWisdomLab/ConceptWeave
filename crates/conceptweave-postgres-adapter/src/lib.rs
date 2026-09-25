@@ -18,10 +18,10 @@ use std::{
 use conceptweave_observation::{
     ArrayTypeObservation, CheckConstraintObservation, ColumnCollationObservation,
     ColumnExpressionObservation, ColumnGenerationObservation, ColumnIdentityObservation,
-    ColumnObservationV3, ConstraintDeferrability, ConstraintTimingObservation,
-    DomainCheckConstraintObservation, DomainObservation, EnumObservation,
-    IdentitySequenceObservation, IndexAttributeKind, IndexAttributeObservation, IndexCatalogFlags,
-    IndexKeySemantics, IndexObservation, IndexStorageOption, IndexTablespace,
+    ColumnObservationV3, ConstraintDeferrability, ConstraintPeriodObservation,
+    ConstraintTimingObservation, DomainCheckConstraintObservation, DomainObservation,
+    EnumObservation, IdentitySequenceObservation, IndexAttributeKind, IndexAttributeObservation,
+    IndexCatalogFlags, IndexKeySemantics, IndexObservation, IndexStorageOption, IndexTablespace,
     NotNullConstraintObservation, OperatorClassOption, PostgresSchemaSnapshotV3, PostgresTypeKind,
     PrimaryKeyObservation, QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName,
     RelationKind, RelationObservation, ReplicaIdentityMode, TableConstraintObservation,
@@ -843,6 +843,32 @@ async fn capture_catalog(
         &foreign_key_triggers,
     )
     .await?;
+    let constraint_periods = relations
+        .iter()
+        .flat_map(|relation| {
+            relation
+                .constraints()
+                .iter()
+                .filter(|constraint| {
+                    matches!(
+                        constraint,
+                        TableConstraintObservation::PrimaryKey(_)
+                            | TableConstraintObservation::Unique(_)
+                            | TableConstraintObservation::ForeignKey(_)
+                    )
+                })
+                .map(|constraint| {
+                    ConstraintPeriodObservation::new(
+                        relation.schema_name(),
+                        relation.relation_name(),
+                        relation.kind(),
+                        constraint.constraint_name(),
+                        false,
+                    )
+                })
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
     let collation_definitions = collations::capture(
         &transaction,
         request,
@@ -893,6 +919,8 @@ async fn capture_catalog(
     let snapshot = if has_relations {
         snapshot
             .with_observed_constraint_timings(constraint_timings)
+            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
+            .with_observed_constraint_periods(constraint_periods)
             .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
             .with_observed_foreign_key_catalog(foreign_key_catalog)
             .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?
