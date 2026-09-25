@@ -2742,7 +2742,20 @@ async fn postgres18_standalone_composite_type_retains_column_receipts() {
         assert_eq!(payload.type_binding().type_name(), "assessment");
         client
             .batch_execute(&format!(
-                "ALTER TYPE \"{schema}\".assessment ADD ATTRIBUTE priority integer"
+                "COMMENT ON TYPE \"{schema}\".assessment_record IS 'table row type comment'"
+            ))
+            .await
+            .unwrap();
+        assert!(matches!(
+            adapter(config.clone())
+                .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+                .await,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ));
+        client
+            .batch_execute(&format!(
+                "COMMENT ON TYPE \"{schema}\".assessment_record IS NULL; \
+                 ALTER TYPE \"{schema}\".assessment ADD ATTRIBUTE priority integer"
             ))
             .await
             .unwrap();

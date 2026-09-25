@@ -351,8 +351,8 @@ async fn capture_catalog(
             }
             // relhasrules and relhastriggers are lazy hints; the catalog-row guards below
             // decide whether any unsupported rule or trigger still exists.
-            // A standalone composite has no table storage; its separate pg_type metadata
-            // must be absent until that family has an immutable representation.
+            // Row-type pg_type metadata is separate from pg_class for both tables and
+            // standalone composites; unmodeled changes must not retain the same digest.
             let relation_kind = match kind.as_str() {
                 "r" => RelationKind::Table,
                 "c" => RelationKind::CompositeType,
@@ -363,7 +363,7 @@ async fn capture_catalog(
                     .into_iter()
                     .any(|index| field::<bool>(&row, index) != Ok(false))
                 || match relation_kind {
-                    RelationKind::Table => !field::<bool>(&row, 16)?,
+                    RelationKind::Table => !field::<bool>(&row, 16)? || !field::<bool>(&row, 17)?,
                     RelationKind::CompositeType => {
                         field::<bool>(&row, 16)?
                             || !field::<bool>(&row, 17)?
