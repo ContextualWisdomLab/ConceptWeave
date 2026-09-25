@@ -26,7 +26,7 @@ use conceptweave_observation::{
     NotNullConstraintObservation, OperatorClassOption, PostgresSchemaSnapshotV3, PostgresTypeKind,
     PrimaryKeyObservation, QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName,
     RelationKind, RelationObservation, RelationOwnerObservation, RelationTablespaceObservation,
-    ReplicaIdentityMode, TableConstraintObservation, TypeKindObservation,
+    ReplicaIdentityMode, TableConstraintObservation, TypeKindObservation, TypeOwnerObservation,
     UniqueConstraintObservation,
 };
 use conceptweave_source_port::{
@@ -276,6 +276,7 @@ async fn capture_catalog(
     let max_bytes = limits.max_bytes().min(i64::MAX as u64) as i64;
     let mut types = Vec::new();
     let mut type_kinds = Vec::new();
+    let mut type_owners = Vec::new();
     let mut array_types = Vec::new();
     let mut relation_rows = Vec::new();
     for schema in request.request().allowed_schema_names() {
@@ -490,6 +491,7 @@ async fn capture_catalog(
             transaction.query_raw(
                 "SELECT t.typname::text, t.typtype::text, t.typisdefined, \
                  bn.nspname::text, bt.typname::text, cn.nspname::text, ct.typname::text, \
+                 t.typowner, owner.rolname::text, \
                  t.typacl IS NOT NULL OR \
                    EXISTS(SELECT 1 FROM pg_catalog.pg_seclabel l \
                      WHERE l.classoid = 'pg_type'::regclass AND l.objoid = t.oid) OR \
@@ -500,6 +502,7 @@ async fn capture_catalog(
                      EXISTS(SELECT 1 FROM pg_catalog.pg_description d \
                        WHERE d.classoid = 'pg_type'::regclass AND d.objoid = t.oid)) \
                  FROM pg_catalog.pg_type t \
+                 JOIN pg_catalog.pg_roles owner ON owner.oid = t.typowner \
                  LEFT JOIN pg_catalog.pg_type bt ON bt.oid = t.typbasetype \
                  LEFT JOIN pg_catalog.pg_namespace bn ON bn.oid = bt.typnamespace \
                  LEFT JOIN pg_catalog.pg_range r ON r.rngtypid = t.oid \
@@ -520,7 +523,9 @@ async fn capture_catalog(
             let base_name: Option<String> = field(&row, 4)?;
             let counterpart_schema: Option<String> = field(&row, 5)?;
             let counterpart_name: Option<String> = field(&row, 6)?;
-            let unmodeled_metadata: bool = field(&row, 7)?;
+            let owner_oid: u32 = field(&row, 7)?;
+            let owner_name: String = field(&row, 8)?;
+            let unmodeled_metadata: bool = field(&row, 9)?;
             meter.add(
                 request,
                 8 + name.len()
@@ -528,13 +533,18 @@ async fn capture_catalog(
                     + base_schema.as_ref().map_or(0, String::len)
                     + base_name.as_ref().map_or(0, String::len)
                     + counterpart_schema.as_ref().map_or(0, String::len)
-                    + counterpart_name.as_ref().map_or(0, String::len),
+                    + counterpart_name.as_ref().map_or(0, String::len)
+                    + owner_name.len(),
             )?;
             if !defined || unmodeled_metadata {
                 return Err(SourceObservationFailure::InvalidCapturedMetadata);
             }
             let coordinate = QualifiedTypeName::new(schema, name)
                 .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+            type_owners.push(
+                TypeOwnerObservation::new(coordinate.clone(), owner_oid, owner_name)
+                    .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+            );
             let base = match (base_schema, base_name) {
                 (Some(schema), Some(name)) => Some(
                     QualifiedTypeName::new(schema, name)
@@ -969,6 +979,7 @@ async fn capture_catalog(
             snapshot.with_observed_relation_owners(relation_owners)
         }
     })
+    .and_then(|snapshot| snapshot.with_observed_type_owners(type_owners))
     .and_then(|snapshot| snapshot.with_observed_range_catalog(range_catalog))
     .and_then(|snapshot| {
         if has_relations {

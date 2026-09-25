@@ -1,4 +1,99 @@
-use crate::{ObservationError, QualifiedTypeName};
+use std::collections::BTreeSet;
+
+use sha2::{Digest, Sha256};
+
+use crate::column_identity::validate_postgresql_identifier;
+use crate::{
+    ObservationError, QualifiedTypeName, encode_bytes, encode_len, encode_sha256, encode_str,
+};
+
+const OWNER_DIGEST_DOMAIN: &[u8] = b"conceptweave.postgres_schema_snapshot.v3.type_owner.v1";
+
+/// Exact same-generation owner role for one schema-local PostgreSQL type.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TypeOwnerObservation {
+    type_name: QualifiedTypeName,
+    owner_oid: u32,
+    owner_role_name: String,
+}
+
+impl TypeOwnerObservation {
+    /// Records the catalog role OID and resolved role name for an exact type coordinate.
+    pub fn new(
+        type_name: QualifiedTypeName,
+        owner_oid: u32,
+        owner_role_name: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        let owner_role_name = owner_role_name.into();
+        validate_postgresql_identifier(&owner_role_name, "type_owner_role_name")?;
+        if owner_oid == 0 {
+            return Err(ObservationError::InvalidObservationField {
+                field: "type_owner_oid",
+            });
+        }
+        Ok(Self {
+            type_name,
+            owner_oid,
+            owner_role_name,
+        })
+    }
+
+    /// Returns the exact type coordinate.
+    #[must_use]
+    pub const fn type_name(&self) -> &QualifiedTypeName {
+        &self.type_name
+    }
+
+    /// Returns the catalog role OID.
+    #[must_use]
+    pub const fn owner_oid(&self) -> u32 {
+        self.owner_oid
+    }
+
+    /// Returns the resolved role name.
+    #[must_use]
+    pub fn owner_role_name(&self) -> &str {
+        &self.owner_role_name
+    }
+}
+
+pub(crate) fn canonicalize_owners(
+    type_kinds: &[TypeKindObservation],
+    mut owners: Vec<TypeOwnerObservation>,
+) -> Result<Vec<TypeOwnerObservation>, ObservationError> {
+    owners.sort_by(|left, right| {
+        (left.type_name.schema_name(), left.type_name.type_name())
+            .cmp(&(right.type_name.schema_name(), right.type_name.type_name()))
+    });
+    let expected = type_kinds
+        .iter()
+        .map(|item| (item.type_name().schema_name(), item.type_name().type_name()))
+        .collect::<BTreeSet<_>>();
+    let actual = owners
+        .iter()
+        .map(|item| (item.type_name.schema_name(), item.type_name.type_name()))
+        .collect::<BTreeSet<_>>();
+    if expected != actual || owners.len() != expected.len() {
+        return Err(ObservationError::InvalidObservationField {
+            field: "type_owner_coverage",
+        });
+    }
+    Ok(owners)
+}
+
+pub(crate) fn owner_digest(base: &str, owners: &[TypeOwnerObservation]) -> String {
+    let mut hasher = Sha256::new();
+    encode_bytes(&mut hasher, OWNER_DIGEST_DOMAIN);
+    encode_str(&mut hasher, base);
+    encode_len(&mut hasher, owners.len());
+    for item in owners {
+        encode_str(&mut hasher, item.type_name.schema_name());
+        encode_str(&mut hasher, item.type_name.type_name());
+        hasher.update(item.owner_oid.to_be_bytes());
+        encode_str(&mut hasher, &item.owner_role_name);
+    }
+    encode_sha256(hasher)
+}
 
 /// Source-authoritative PostgreSQL `pg_type.typtype` classification.
 ///
@@ -124,5 +219,35 @@ impl TypeKindObservation {
     #[must_use]
     pub fn range_counterpart(&self) -> Option<&QualifiedTypeName> {
         self.range_counterpart.as_ref()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn type_owner_requires_complete_coverage_and_binds_role_identity() {
+        let coordinate = QualifiedTypeName::new("source", "stage").unwrap();
+        let kinds =
+            [TypeKindObservation::plain(coordinate.clone(), PostgresTypeKind::Enum).unwrap()];
+        let owner = TypeOwnerObservation::new(coordinate.clone(), 42, "owner").unwrap();
+        assert!(canonicalize_owners(&kinds, vec![]).is_err());
+        assert!(canonicalize_owners(&kinds, vec![owner.clone(), owner.clone()]).is_err());
+        assert!(TypeOwnerObservation::new(coordinate.clone(), 0, "owner").is_err());
+        assert_ne!(
+            owner_digest("sha256:prior", std::slice::from_ref(&owner)),
+            owner_digest(
+                "sha256:prior",
+                &[TypeOwnerObservation::new(coordinate.clone(), 43, "owner").unwrap()]
+            )
+        );
+        assert_ne!(
+            owner_digest("sha256:prior", std::slice::from_ref(&owner)),
+            owner_digest(
+                "sha256:prior",
+                &[TypeOwnerObservation::new(coordinate, 42, "other").unwrap()]
+            )
+        );
     }
 }

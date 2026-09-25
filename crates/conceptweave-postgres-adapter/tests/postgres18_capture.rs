@@ -21,6 +21,7 @@ use conceptweave_observation::{
     IndexTablespace, PostgresSchemaSnapshotV3, PostgresTypeKind, QualifiedTypeName, RelationKind,
     RelationObservation, RelationOwnerObservation, RelationTablespaceObservation,
     ReplicaIdentityMode, SchemaObjectLocation, TableConstraintObservation, TypeKindObservation,
+    TypeOwnerObservation,
 };
 use conceptweave_postgres_adapter::{PostgresTlsAdapter, PostgresUnixAdapter};
 use conceptweave_source_port::{
@@ -612,6 +613,15 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         RelationOwnerObservation::new("public", "plain", 42, "fixture_owner").unwrap(),
     ])
     .unwrap()
+    .with_observed_type_owners(vec![
+        TypeOwnerObservation::new(
+            QualifiedTypeName::new("public", "plain").unwrap(),
+            42,
+            "fixture_owner",
+        )
+        .unwrap(),
+    ])
+    .unwrap()
     .with_observed_column_collations(vec![
         ColumnCollationObservation::uncollatable("public", "plain", RelationKind::Table, "id")
             .unwrap(),
@@ -824,6 +834,16 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
             enums,
             array_types.clone(),
             type_kinds.clone(),
+        )
+        .unwrap()
+        .with_observed_type_owners(
+            type_kinds
+                .iter()
+                .map(|kind| {
+                    TypeOwnerObservation::new(kind.type_name().clone(), 42, "fixture_owner")
+                        .unwrap()
+                })
+                .collect(),
         )
         .unwrap()
         .with_observed_collation_definitions(vec![])
@@ -3200,6 +3220,85 @@ async fn postgres18_nondefault_table_tablespace_changes_source_identity() {
     assert_eq!(moved.tablespace().name(), tablespace);
     assert!(!moved.tablespace().is_database_default());
     assert_ne!(before.snapshot_digest(), after.snapshot_digest());
+}
+
+#[tokio::test]
+async fn postgres18_type_owner_changes_source_identity() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let can_create_role: bool = client
+        .query_one(
+            "SELECT rolsuper FROM pg_catalog.pg_roles WHERE rolname = current_user",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    if !can_create_role {
+        eprintln!("skipping type-owner fixture: setup requires a superuser");
+        connection_task.abort();
+        return;
+    }
+    let suffix = std::process::id();
+    let schema = format!("cw_type_owner_fixture_{suffix}");
+    let owner = format!("cw_type_owner_{suffix}");
+    client
+        .batch_execute(&format!(
+            "CREATE ROLE \"{owner}\" NOLOGIN; CREATE SCHEMA \"{schema}\"; \
+             CREATE DOMAIN \"{schema}\".score AS integer; \
+             CREATE TYPE \"{schema}\".stage AS ENUM ('new', 'done')"
+        ))
+        .await
+        .unwrap();
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await
+        .unwrap();
+    client
+        .batch_execute(&format!(
+            "ALTER DOMAIN \"{schema}\".score OWNER TO \"{owner}\""
+        ))
+        .await
+        .unwrap();
+    let domain_changed = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await
+        .unwrap();
+    client
+        .batch_execute(&format!(
+            "ALTER TYPE \"{schema}\".stage OWNER TO \"{owner}\""
+        ))
+        .await
+        .unwrap();
+    let after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA \"{schema}\" CASCADE; DROP ROLE \"{owner}\""
+        ))
+        .await
+        .unwrap();
+    connection_task.abort();
+    let after = after.unwrap();
+    assert_ne!(before.snapshot_digest(), domain_changed.snapshot_digest());
+    assert_ne!(domain_changed.snapshot_digest(), after.snapshot_digest());
+    let owners = after.type_owners().unwrap();
+    assert_eq!(owners.len(), after.type_kinds().unwrap().len());
+    assert!(
+        owners
+            .iter()
+            .filter(|item| {
+                matches!(item.type_name().type_name(), "score" | "stage")
+                    && item.owner_role_name() == owner
+            })
+            .count()
+            == 2
+    );
 }
 
 #[tokio::test]

@@ -54,6 +54,7 @@ pub use representation_v3::{
     QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
     RelationObservation, ReplicaIdentityMode, SchemaObjectLocation, SchemaObjectLocationKind,
 };
+pub use type_kind::TypeOwnerObservation;
 pub use type_kind::{PostgresTypeKind, TypeKindObservation};
 
 use std::collections::BTreeSet;
@@ -144,6 +145,8 @@ pub struct PostgresSchemaSnapshotV3 {
     array_types_observed: bool,
     type_kinds: Vec<TypeKindObservation>,
     type_kinds_observed: bool,
+    type_owners: Vec<TypeOwnerObservation>,
+    type_owners_observed: bool,
     column_collations: Vec<ColumnCollationObservation>,
     column_collations_observed: bool,
     column_generations: Vec<ColumnGenerationObservation>,
@@ -209,6 +212,8 @@ impl PostgresSchemaSnapshotV3 {
             array_types_observed: false,
             type_kinds: Vec::new(),
             type_kinds_observed: false,
+            type_owners: Vec::new(),
+            type_owners_observed: false,
             column_collations: Vec::new(),
             column_collations_observed: false,
             column_generations: Vec::new(),
@@ -309,6 +314,8 @@ impl PostgresSchemaSnapshotV3 {
             array_types_observed: false,
             type_kinds,
             type_kinds_observed: true,
+            type_owners: Vec::new(),
+            type_owners_observed: false,
             column_collations: Vec::new(),
             column_collations_observed: false,
             column_generations: Vec::new(),
@@ -599,6 +606,8 @@ impl PostgresSchemaSnapshotV3 {
             array_types_observed: true,
             type_kinds: Vec::new(),
             type_kinds_observed: false,
+            type_owners: Vec::new(),
+            type_owners_observed: false,
             column_collations: Vec::new(),
             column_collations_observed: false,
             column_generations: Vec::new(),
@@ -1186,6 +1195,37 @@ impl PostgresSchemaSnapshotV3 {
         Ok(self)
     }
 
+    /// Adds a complete same-generation owner role for every schema-local type.
+    /// Historical type-kind and relation-owner digests remain reproducible.
+    pub fn with_observed_type_owners(
+        mut self,
+        observations: Vec<TypeOwnerObservation>,
+    ) -> Result<Self, ObservationError> {
+        if !self.type_kinds_observed
+            || (!self.relations.is_empty() && !self.relation_owners_observed)
+            || self.type_owners_observed
+            || self.range_catalog_observed
+            || self.column_collations_observed
+            || self.column_generations_observed
+            || self.column_expressions_observed
+            || self.column_identities_observed
+            || self.not_null_constraints_observed
+            || self.constraint_timings_observed
+            || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "type_owner_observation_order",
+            });
+        }
+        let observations = type_kind::canonicalize_owners(&self.type_kinds, observations)?;
+        self.snapshot_digest = type_kind::owner_digest(&self.snapshot_digest, &observations);
+        self.type_owners = observations;
+        self.type_owners_observed = true;
+        Ok(self)
+    }
+
     /// Adds complete `pg_range` subtype, ordering, collation, and function coordinates.
     /// This successor digest leaves historical type-kind identities unchanged.
     pub fn with_observed_range_catalog(
@@ -1330,6 +1370,13 @@ impl PostgresSchemaSnapshotV3 {
     pub fn type_kinds(&self) -> Option<&[TypeKindObservation]> {
         self.type_kinds_observed
             .then_some(self.type_kinds.as_slice())
+    }
+
+    /// Returns complete type-owner evidence, or `None` when unobserved.
+    #[must_use]
+    pub fn type_owners(&self) -> Option<&[TypeOwnerObservation]> {
+        self.type_owners_observed
+            .then_some(self.type_owners.as_slice())
     }
 
     /// Returns explicitly observed PostgreSQL column-collation evidence, or `None` when that catalog
