@@ -19,6 +19,7 @@ pub(super) struct ForeignKeyTrigger {
     pub(super) local_oid: u32,
     pub(super) referenced_oid: u32,
     pub(super) index_oid: u32,
+    pub(super) enforced: bool,
     pub(super) update_action: ForeignKeyAction,
     pub(super) delete_action: ForeignKeyAction,
     pub(super) deferrable: bool,
@@ -194,7 +195,6 @@ pub(super) async fn capture(
                 || primary_foreign_operators.len() != local_key.len()
                 || primary_primary_operators.len() != local_key.len()
                 || foreign_foreign_operators.len() != local_key.len()
-                || !field::<bool>(&row, 10)?
                 || (field::<bool>(&row, 12)? && !field::<bool>(&row, 11)?)
             {
                 return Err(SourceObservationFailure::InvalidCapturedMetadata);
@@ -334,6 +334,7 @@ pub(super) async fn capture(
             local_oid: key.local_oid,
             referenced_oid: key.referenced_oid,
             index_oid: key.index_oid,
+            enforced: key.enforced,
             update_action: key.update_action,
             delete_action: key.delete_action,
             deferrable: key.deferrable,
@@ -370,6 +371,9 @@ pub(super) async fn validate_triggers(
             .collect::<BTreeSet<_>>();
         let mut expected_fk = BTreeSet::new();
         for key in foreign_keys {
+            if !key.enforced {
+                continue;
+            }
             if key.local_oid == *relation_oid {
                 expected_fk.insert((key.oid, "RI_FKey_check_ins".to_owned()));
                 expected_fk.insert((key.oid, "RI_FKey_check_upd".to_owned()));

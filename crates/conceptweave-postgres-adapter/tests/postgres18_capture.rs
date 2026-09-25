@@ -2002,6 +2002,108 @@ async fn missing_binding_and_tcp_transport_fail_before_source_io() {
 }
 
 #[tokio::test]
+async fn postgres18_unenforced_foreign_key_retains_false_state_without_ri_triggers() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_unenforced_fk_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; \
+             CREATE TABLE \"{schema}\".parent (id integer PRIMARY KEY); \
+             CREATE TABLE \"{schema}\".child (guarded_id integer, advisory_id integer, \
+               CONSTRAINT guarded_fk FOREIGN KEY (guarded_id) REFERENCES \"{schema}\".parent(id), \
+               CONSTRAINT advisory_fk FOREIGN KEY (advisory_id) REFERENCES \"{schema}\".parent(id) NOT ENFORCED)"
+        ))
+        .await
+        .unwrap();
+
+    let result = async {
+        let observed = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await?;
+        let child = observed
+            .relations()
+            .iter()
+            .find(|relation| relation.relation_name() == "child")
+            .unwrap();
+        let foreign_key = |name| {
+            let TableConstraintObservation::ForeignKey(key) = child
+                .constraints()
+                .iter()
+                .find(|constraint| constraint.constraint_name() == name)
+                .unwrap()
+            else {
+                panic!("observed constraint must be a foreign key");
+            };
+            key
+        };
+        assert_eq!(foreign_key("advisory_fk").validated(), Some(false));
+        assert_eq!(foreign_key("advisory_fk").enforced(), Some(false));
+        assert_eq!(foreign_key("guarded_fk").validated(), Some(true));
+        assert_eq!(foreign_key("guarded_fk").enforced(), Some(true));
+        observed
+            .source_receipt(
+                SchemaObjectLocation::constraint(
+                    &schema,
+                    "child",
+                    RelationKind::Table,
+                    "advisory_fk",
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let proposal = propose_relational_model(&observed).unwrap();
+        let advisory = proposal
+            .relations()
+            .iter()
+            .find(|relation| relation.source_constraint() == "advisory_fk")
+            .unwrap();
+        assert!(!advisory.validated());
+        assert!(!advisory.enforced());
+        assert_eq!(advisory.candidate().truth_status(), TruthStatus::Inferred);
+        assert_eq!(
+            advisory.candidate().publication_state(),
+            PublicationState::Draft
+        );
+        let trigger_count: i64 = client
+            .query_one(
+                "SELECT count(*) FROM pg_catalog.pg_trigger t \
+                 JOIN pg_catalog.pg_constraint c ON c.oid = t.tgconstraint \
+                 WHERE c.conname = 'advisory_fk' AND c.connamespace = to_regnamespace($1)",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+            .get(0);
+        assert_eq!(trigger_count, 0);
+        client
+            .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".child DROP CONSTRAINT advisory_fk; \
+                 ALTER TABLE \"{schema}\".child ADD CONSTRAINT advisory_fk \
+                 FOREIGN KEY (advisory_id) REFERENCES \"{schema}\".parent(id)"
+            ))
+            .await
+            .unwrap();
+        let enforced = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await?;
+        assert_ne!(observed.snapshot_digest(), enforced.snapshot_digest());
+        Ok::<_, SourceObservationFailure>(())
+    }
+    .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    result.unwrap();
+}
+
+#[tokio::test]
 async fn postgres18_tcp_requires_valid_ca_and_host_name() {
     let (Ok(dsn), Ok(ca_path), Ok(wrong_ca_path), Ok(plaintext_dsn)) = (
         std::env::var("CONCEPTWEAVE_PG18_TLS_TEST_DSN"),
