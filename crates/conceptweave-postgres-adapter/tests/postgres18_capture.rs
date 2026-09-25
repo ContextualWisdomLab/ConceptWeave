@@ -56,6 +56,71 @@ impl SourceConnectionRegistry for Registry {
 }
 
 #[tokio::test]
+async fn postgres18_quoted_identifiers_keep_exact_source_coordinates() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!(" cw/~ quoted {} ", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; \
+             CREATE DOMAIN \"{schema}\".\" domain/~ \" AS integer \
+               CONSTRAINT \" domain check \" CHECK (VALUE >= 0); \
+             CREATE TYPE \"{schema}\".\" enum/~ \" AS ENUM ('first'); \
+             CREATE TABLE \"{schema}\".\" table/~ \" \
+               (\" /~ \" \"{schema}\".\" domain/~ \" NOT NULL, \
+                \" ~1~0 \" text, \
+                state \"{schema}\".\" enum/~ \", \
+                CONSTRAINT \" pk/~ \" PRIMARY KEY (\" /~ \"))"
+        ))
+        .await
+        .unwrap();
+    let result = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+
+    let snapshot = result.unwrap();
+    let relation = &snapshot.relations()[0];
+    assert_eq!(relation.schema_name(), schema);
+    assert_eq!(relation.relation_name(), " table/~ ");
+    assert_eq!(relation.columns()[0].column_name(), " /~ ");
+    assert_eq!(relation.columns()[1].column_name(), " ~1~0 ");
+    assert_eq!(relation.constraints()[0].constraint_name(), " pk/~ ");
+    assert_eq!(relation.indexes()[0].index_name(), " pk/~ ");
+    assert_eq!(snapshot.domains()[0].domain_name(), " domain/~ ");
+    assert_eq!(snapshot.enums()[0].enum_name(), " enum/~ ");
+    let slash_column =
+        SchemaObjectLocation::column(&schema, " table/~ ", RelationKind::Table, " /~ ").unwrap();
+    let literal_column =
+        SchemaObjectLocation::column(&schema, " table/~ ", RelationKind::Table, " ~1~0 ").unwrap();
+    assert_ne!(
+        slash_column.canonical_location(),
+        literal_column.canonical_location()
+    );
+    for coordinate in [
+        SchemaObjectLocation::relation(&schema, " table/~ ", RelationKind::Table).unwrap(),
+        slash_column,
+        literal_column,
+        SchemaObjectLocation::constraint(&schema, " table/~ ", RelationKind::Table, " pk/~ ")
+            .unwrap(),
+        SchemaObjectLocation::index(&schema, " table/~ ", RelationKind::Table, " pk/~ ").unwrap(),
+        SchemaObjectLocation::domain(&schema, " domain/~ ").unwrap(),
+        SchemaObjectLocation::enum_(&schema, " enum/~ ").unwrap(),
+    ] {
+        assert!(coordinate.canonical_location().contains("~1~0"));
+        assert!(snapshot.source_receipt(coordinate).is_ok());
+    }
+}
+
+#[tokio::test]
 async fn postgres18_dropped_column_tombstone_does_not_hide_live_columns() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
