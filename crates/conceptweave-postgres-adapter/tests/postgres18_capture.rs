@@ -55,6 +55,73 @@ impl SourceConnectionRegistry for Registry {
     }
 }
 
+#[tokio::test]
+async fn postgres18_dropped_column_tombstone_does_not_hide_live_columns() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_dropped_column_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; \
+             CREATE TABLE \"{schema}\".item (first_id integer, retired text, last_id integer); \
+             ALTER TABLE \"{schema}\".item DROP COLUMN retired; \
+             CREATE INDEX item_last_idx ON \"{schema}\".item (last_id)"
+        ))
+        .await
+        .unwrap();
+    let dropped_ordinal: i16 = client
+        .query_one(
+            "SELECT attnum FROM pg_catalog.pg_attribute \
+             WHERE attrelid = to_regclass($1) AND attisdropped",
+            &[&format!("\"{schema}\".item")],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(dropped_ordinal, 2);
+
+    let result = adapter(config)
+        .observe(authorized_with_limits(&schema, 64, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+
+    let snapshot = result.unwrap();
+    let columns = snapshot.relations()[0]
+        .columns()
+        .iter()
+        .map(|column| (column.column_name(), column.ordinal_position()))
+        .collect::<Vec<_>>();
+    assert_eq!(columns, [("first_id", 1), ("last_id", 3)]);
+    assert_eq!(
+        snapshot.relations()[0].indexes()[0].key_attributes()[0].attribute_name(),
+        Some("last_id")
+    );
+    assert!(
+        snapshot
+            .source_receipt(
+                SchemaObjectLocation::column(&schema, "item", RelationKind::Table, "retired")
+                    .unwrap(),
+            )
+            .is_err()
+    );
+    assert!(
+        snapshot
+            .source_receipt(
+                SchemaObjectLocation::column(&schema, "item", RelationKind::Table, "last_id")
+                    .unwrap(),
+            )
+            .is_ok()
+    );
+}
+
 struct NotCancelled;
 
 impl ObservationCancellation for NotCancelled {

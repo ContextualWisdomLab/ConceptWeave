@@ -915,7 +915,7 @@ async fn capture_relation(
              LEFT JOIN pg_catalog.pg_namespace tn ON tn.oid = t.typnamespace \
              LEFT JOIN pg_catalog.pg_collation co ON co.oid = a.attcollation \
              LEFT JOIN pg_catalog.pg_namespace cn ON cn.oid = co.collnamespace \
-             WHERE a.attrelid = $1 AND a.attnum > 0 ORDER BY a.attnum",
+             WHERE a.attrelid = $1 AND a.attnum > 0 AND NOT a.attisdropped ORDER BY a.attnum",
             vec![&relation.oid as &(dyn ToSql + Sync), &max_bytes],
         ),
     )
