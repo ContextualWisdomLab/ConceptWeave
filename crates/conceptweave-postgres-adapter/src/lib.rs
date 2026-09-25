@@ -302,7 +302,10 @@ async fn capture_catalog(
                      AND a.attnum = d.refobjsubid AND a.attidentity <> '' \
                    WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid \
                      AND d.objsubid = 0 AND d.refclassid = 'pg_class'::regclass \
-                     AND d.deptype = 'i' AND owner_table.relnamespace = c.relnamespace) \
+                     AND d.deptype = 'i' AND owner_table.relnamespace = c.relnamespace), \
+                 EXISTS(SELECT 1 FROM pg_catalog.pg_am am WHERE am.oid = c.relam \
+                   AND am.amname = 'heap' AND am.amtype = 't' \
+                   AND am.amhandler = 'pg_catalog.heap_tableam_handler'::regproc) \
                  FROM pg_catalog.pg_class c WHERE c.relnamespace = $1 \
                    AND c.relkind IN ('r','p','v','m','f','S','c') ORDER BY c.relname",
                 vec![&schema_oid as &(dyn ToSql + Sync), &max_bytes],
@@ -340,6 +343,7 @@ async fn capture_catalog(
                 || [4, 6, 7, 10, 11, 12]
                     .into_iter()
                     .any(|index| field::<bool>(&row, index) != Ok(false))
+                || !field::<bool>(&row, 16)?
             {
                 return Err(SourceObservationFailure::InvalidCapturedMetadata);
             }

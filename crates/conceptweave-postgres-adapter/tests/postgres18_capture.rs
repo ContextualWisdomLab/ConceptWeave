@@ -1966,6 +1966,66 @@ async fn postgres18_identity_sequence_settings_change_source_identity() {
 }
 
 #[tokio::test]
+async fn postgres18_custom_table_access_method_fails_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let can_create_access_method: bool = client
+        .query_one(
+            "SELECT r.rolsuper FROM pg_catalog.pg_roles r WHERE r.rolname = current_user",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    if !can_create_access_method {
+        eprintln!("skipping custom table access method fixture: setup requires a superuser");
+        connection_task.abort();
+        return;
+    }
+    let suffix = std::process::id();
+    let schema = format!("cw_table_am_fixture_{suffix}");
+    let method = format!("cw_table_am_{suffix}");
+    client
+        .batch_execute(&format!(
+            "CREATE ACCESS METHOD \"{method}\" TYPE TABLE HANDLER pg_catalog.heap_tableam_handler; \
+             CREATE SCHEMA \"{schema}\"; \
+             CREATE TABLE \"{schema}\".record (id integer) USING \"{method}\""
+        ))
+        .await
+        .unwrap();
+    let observed_method: String = client
+        .query_one(
+            "SELECT am.amname::text FROM pg_catalog.pg_class c \
+             JOIN pg_catalog.pg_am am ON am.oid = c.relam \
+             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+             WHERE n.nspname = $1 AND c.relname = 'record'",
+            &[&schema],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    let observed = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA \"{schema}\" CASCADE; DROP ACCESS METHOD \"{method}\""
+        ))
+        .await
+        .unwrap();
+    connection_task.abort();
+    assert_eq!(observed_method, method);
+    assert!(matches!(
+        observed,
+        Err(SourceObservationFailure::InvalidCapturedMetadata)
+    ));
+}
+
+#[tokio::test]
 async fn postgres18_range_and_multirange_kinds_are_source_evidence() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
