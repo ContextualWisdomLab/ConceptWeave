@@ -28,7 +28,7 @@
 - PostgreSQL observation value objects preserve exact identifiers, ordering, FK action/match/deferrability/validation/enforcement evidence, CHECK reconstruction/status, strict UTC provenance and owner-computed deterministic digest identity.
 - Unique-constraint unknown, observed distinct and observed not-distinct states remain pairwise unequal in values, snapshot digests and bound receipts; a v2 golden frame also covers an empty snapshot. These are contract fixtures, not live PostgreSQL extraction evidence.
 - Exact cumulative UTF-8 schema-byte ceilings admit the boundary and reject one byte over it. Missing/unsafe policy bindings fail execution authorization; an expired final resource-policy decision returns timeout whether it allows or denies; a capability that expires after authorization cannot restart its budget or access the source.
-- Report raw LLVM lines/regions/branches separately from the existing source-coordinate-normalized coverage gate. Passing the latter is not a claim of 100% raw compiler coverage.
+- Run the coverage gate with all workspace features. Its function, normalized region, and branch acceptance includes only this workspace’s `crates/*/src` files; external macro expansion and test files remain diagnostic. Report raw LLVM totals separately. Passing the owned-source gate is not a claim of 100% raw compiler coverage.
 
 These contract fixtures are not runtime GREEN by existence alone. A concrete adapter and the first release candidate require one unchanged exact head to pass Rust 1.98 tests, fmt, strict Clippy, warnings-denied rustdoc, release build, owned 100% coverage, applicable security/dependency gates, and independent review.
 
