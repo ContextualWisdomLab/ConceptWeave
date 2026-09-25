@@ -23,3 +23,5 @@ This path does not admit general relation-bearing schemas. Discovery maps ordina
 Tables assigned to a nondefault tablespace fail capture until the relation identity can retain the exact table-level tablespace coordinate. The live PostgreSQL 18 fixture verifies this after moving an otherwise admitted table.
 
 The live quoted-identifier fixture preserves whitespace, slash, and tilde in observed schema/relation/column/constraint/index/domain/enum names, and verifies distinct receipt coordinates for text that resembles an escaped pointer token.
+
+The column-collation fixture compares the captured database-default collation against PostgreSQL 18's actual provider-`d`, encoding-`-1` catalog row and the current database locale/version fields.

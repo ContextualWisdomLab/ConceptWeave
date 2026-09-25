@@ -2446,6 +2446,54 @@ async fn postgres18_column_collation_is_exact_source_evidence() {
         assert_eq!(title.collation().unwrap().schema_name(), "pg_catalog");
         assert_eq!(title.collation().unwrap().collation_name(), "default");
         assert_eq!(title.deterministic(), Some(true));
+        let catalog_rows = client
+            .query(
+                "SELECT c.collencoding, c.collprovider::text, c.collisdeterministic, \
+                 d.encoding, d.datlocprovider::text, d.datcollate, d.datctype, \
+                 d.datlocale, d.daticurules, d.datcollversion, \
+                 pg_catalog.pg_database_collation_actual_version(d.oid) \
+                 FROM pg_catalog.pg_collation c \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = c.collnamespace \
+                 JOIN pg_catalog.pg_database d ON d.datname = current_database() \
+                 WHERE n.nspname = 'pg_catalog' AND c.collname = 'default'",
+                &[],
+            )
+            .await
+            .unwrap();
+        let [catalog] = catalog_rows.as_slice() else {
+            panic!("expected one pg_catalog.default collation row");
+        };
+        let definition = before
+            .collation_definitions()
+            .unwrap()
+            .iter()
+            .find(|item| {
+                item.collation().schema_name() == "pg_catalog"
+                    && item.collation().collation_name() == "default"
+            })
+            .unwrap();
+        assert_eq!(definition.encoding(), catalog.get::<_, i32>(0));
+        assert_eq!(definition.encoding(), -1);
+        assert_eq!(definition.provider(), CollationProvider::DatabaseDefault);
+        assert_eq!(catalog.get::<_, String>(1), "d");
+        assert_eq!(definition.deterministic(), catalog.get::<_, bool>(2));
+        assert_eq!(definition.database_encoding(), catalog.get::<_, i32>(3));
+        let database_default = definition.database_default().unwrap();
+        assert_eq!(
+            database_default.provider(),
+            CollationProvider::try_from(catalog.get::<_, String>(4).as_str()).unwrap()
+        );
+        let fields = database_default.fields();
+        for (observed, index) in [
+            (fields.lc_collate(), 5),
+            (fields.lc_ctype(), 6),
+            (fields.locale(), 7),
+            (fields.icu_rules(), 8),
+            (fields.recorded_version(), 9),
+            (fields.actual_version(), 10),
+        ] {
+            assert_eq!(observed, catalog.get::<_, Option<String>>(index).as_deref());
+        }
         let alias = before
             .column_collations()
             .unwrap()
