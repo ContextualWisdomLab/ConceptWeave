@@ -3223,6 +3223,57 @@ async fn postgres18_nondefault_table_tablespace_changes_source_identity() {
 }
 
 #[tokio::test]
+async fn postgres18_nondefault_column_storage_settings_fail_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    for (index, setting) in [
+        "SET STORAGE EXTERNAL",
+        "SET COMPRESSION pglz",
+        "SET STATISTICS 500",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let schema = format!("cw_column_storage_fixture_{}_{}", std::process::id(), index);
+        client
+            .batch_execute(&format!(
+                "CREATE SCHEMA \"{schema}\"; CREATE TABLE \"{schema}\".record (payload text)"
+            ))
+            .await
+            .unwrap();
+        let before = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await;
+        client
+            .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".record ALTER COLUMN payload {setting}"
+            ))
+            .await
+            .unwrap();
+        let after = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await;
+        client
+            .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+            .await
+            .unwrap();
+        assert!(before.is_ok(), "baseline for {setting}: {before:?}");
+        assert!(
+            matches!(
+                after,
+                Err(SourceObservationFailure::InvalidCapturedMetadata)
+            ),
+            "nondefault {setting} must fail closed: {after:?}"
+        );
+    }
+    connection_task.abort();
+}
+
+#[tokio::test]
 async fn postgres18_type_owner_changes_source_identity() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;

@@ -1071,7 +1071,9 @@ async fn capture_relation(
              CASE WHEN octet_length(pg_catalog.pg_get_expr(ad.adbin, ad.adrelid)) <= $2::bigint \
                THEN pg_catalog.pg_get_expr(ad.adbin, ad.adrelid) END, \
              COALESCE(octet_length(pg_catalog.pg_get_expr(ad.adbin, ad.adrelid)) > $2::bigint, false), \
-             a.atthasmissing, cn.nspname::text, co.collname::text, co.collisdeterministic \
+             a.atthasmissing, cn.nspname::text, co.collname::text, co.collisdeterministic, \
+             a.attstorage IS DISTINCT FROM t.typstorage \
+               OR a.attcompression::text <> '' OR a.attstattarget IS NOT NULL \
              FROM pg_catalog.pg_attribute a \
              LEFT JOIN pg_catalog.pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum \
              LEFT JOIN pg_catalog.pg_type t ON t.oid = a.atttypid \
@@ -1122,6 +1124,7 @@ async fn capture_relation(
         if ordinal <= 0
             || field::<bool>(&row, 7)? != expression.is_some()
             || field::<bool>(&row, 17)?
+            || field::<bool>(&row, 21)?
             || (relation.kind == RelationKind::CompositeType
                 && (not_null
                     || expression.is_some()
