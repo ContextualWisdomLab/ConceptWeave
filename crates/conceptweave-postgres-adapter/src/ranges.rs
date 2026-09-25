@@ -13,12 +13,16 @@ use super::{CaptureMeter, bounded, field};
 fn optional_procedure(
     schema: Option<String>,
     name: Option<String>,
+    definition: Option<String>,
+    owner: Option<String>,
 ) -> Result<Option<QualifiedRangeProcedure>, SourceObservationFailure> {
-    match (schema, name) {
-        (None, None) => Ok(None),
-        (Some(schema), Some(name)) => QualifiedRangeProcedure::new(schema, name)
-            .map(Some)
-            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata),
+    match (schema, name, definition, owner) {
+        (None, None, None, None) => Ok(None),
+        (Some(schema), Some(name), Some(definition), Some(owner)) => {
+            QualifiedRangeProcedure::new(schema, name, &definition, &owner)
+                .map(Some)
+                .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)
+        }
         _ => Err(SourceObservationFailure::InvalidCapturedMetadata),
     }
 }
@@ -30,6 +34,7 @@ pub(super) async fn capture(
     meter: &mut CaptureMeter,
 ) -> Result<Vec<RangeCatalogObservation>, SourceObservationFailure> {
     let mut observations = Vec::new();
+    let max_bytes = request.request().limits().max_bytes().min(i64::MAX as u64) as i64;
     for schema in request.request().allowed_schema_names() {
         let stream = bounded(
             request,
@@ -45,7 +50,26 @@ pub(super) async fn capture(
                    AND cp.prorettype = t.oid), \
                  r.rngsubdiff = 0 OR (dp.pronargs = 2 AND dp.proargtypes[0] = s.oid \
                    AND dp.proargtypes[1] = s.oid \
-                   AND dp.prorettype = 'pg_catalog.float8'::regtype) \
+                   AND dp.prorettype = 'pg_catalog.float8'::regtype), \
+                 CASE WHEN octet_length(pg_catalog.pg_get_functiondef(cp.oid)) <= $2::bigint \
+                   THEN pg_catalog.pg_get_functiondef(cp.oid) END, \
+                 CASE WHEN octet_length(pg_catalog.pg_get_functiondef(dp.oid)) <= $2::bigint \
+                   THEN pg_catalog.pg_get_functiondef(dp.oid) END, \
+                 cowner.rolname::text, downer.rolname::text, \
+                 COALESCE(octet_length(pg_catalog.pg_get_functiondef(cp.oid)) > $2::bigint, false), \
+                 COALESCE(octet_length(pg_catalog.pg_get_functiondef(dp.oid)) > $2::bigint, false), \
+                 cp.oid IS NOT NULL AND (cp.proacl IS NOT NULL OR \
+                   pg_catalog.obj_description(cp.oid, 'pg_proc') IS NOT NULL OR \
+                   EXISTS(SELECT 1 FROM pg_catalog.pg_seclabel l \
+                     WHERE l.classoid = 'pg_proc'::regclass AND l.objoid = cp.oid) OR \
+                   EXISTS(SELECT 1 FROM pg_catalog.pg_depend d \
+                     WHERE d.classid = 'pg_proc'::regclass AND d.objid = cp.oid AND d.deptype = 'e')), \
+                 dp.oid IS NOT NULL AND (dp.proacl IS NOT NULL OR \
+                   pg_catalog.obj_description(dp.oid, 'pg_proc') IS NOT NULL OR \
+                   EXISTS(SELECT 1 FROM pg_catalog.pg_seclabel l \
+                     WHERE l.classoid = 'pg_proc'::regclass AND l.objoid = dp.oid) OR \
+                   EXISTS(SELECT 1 FROM pg_catalog.pg_depend d \
+                     WHERE d.classid = 'pg_proc'::regclass AND d.objid = dp.oid AND d.deptype = 'e')) \
                  FROM pg_catalog.pg_range r \
                  JOIN pg_catalog.pg_type t ON t.oid = r.rngtypid \
                  JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace \
@@ -58,10 +82,12 @@ pub(super) async fn capture(
                  LEFT JOIN pg_catalog.pg_namespace cn ON cn.oid = coll.collnamespace \
                  LEFT JOIN pg_catalog.pg_proc cp ON cp.oid = r.rngcanonical \
                  LEFT JOIN pg_catalog.pg_namespace cpn ON cpn.oid = cp.pronamespace \
+                 LEFT JOIN pg_catalog.pg_roles cowner ON cowner.oid = cp.proowner \
                  LEFT JOIN pg_catalog.pg_proc dp ON dp.oid = r.rngsubdiff \
                  LEFT JOIN pg_catalog.pg_namespace dpn ON dpn.oid = dp.pronamespace \
+                 LEFT JOIN pg_catalog.pg_roles downer ON downer.oid = dp.proowner \
                  WHERE n.nspname = $1 ORDER BY t.typname",
-                vec![schema as &(dyn ToSql + Sync)],
+                vec![schema as &(dyn ToSql + Sync), &max_bytes],
             ),
         )
         .await?;
@@ -80,6 +106,10 @@ pub(super) async fn capture(
             let canonical_name: Option<String> = field(&row, 10)?;
             let diff_schema: Option<String> = field(&row, 11)?;
             let diff_name: Option<String> = field(&row, 12)?;
+            let canonical_definition: Option<String> = field(&row, 16)?;
+            let diff_definition: Option<String> = field(&row, 17)?;
+            let canonical_owner: Option<String> = field(&row, 18)?;
+            let diff_owner: Option<String> = field(&row, 19)?;
             let bytes = 24
                 + [
                     &range_schema,
@@ -100,6 +130,10 @@ pub(super) async fn capture(
                     &canonical_name,
                     &diff_schema,
                     &diff_name,
+                    &canonical_definition,
+                    &diff_definition,
+                    &canonical_owner,
+                    &diff_owner,
                 ]
                 .into_iter()
                 .flatten()
@@ -108,6 +142,7 @@ pub(super) async fn capture(
             meter.add(request, bytes)?;
             if access_method != "btree"
                 || !(13..=15).all(|index| field::<bool>(&row, index) == Ok(true))
+                || (20..=23).any(|index| field::<bool>(&row, index) != Ok(false))
             {
                 return Err(SourceObservationFailure::InvalidCapturedMetadata);
             }
@@ -127,8 +162,13 @@ pub(super) async fn capture(
                 QualifiedOperatorClassName::new(opclass_schema, opclass_name)
                     .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
                 collation,
-                optional_procedure(canonical_schema, canonical_name)?,
-                optional_procedure(diff_schema, diff_name)?,
+                optional_procedure(
+                    canonical_schema,
+                    canonical_name,
+                    canonical_definition,
+                    canonical_owner,
+                )?,
+                optional_procedure(diff_schema, diff_name, diff_definition, diff_owner)?,
             ));
         }
     }

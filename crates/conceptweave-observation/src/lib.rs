@@ -1139,6 +1139,13 @@ impl PostgresSchemaSnapshotV3 {
             }
         }
         self.snapshot_digest = range_catalog::digest(&self.snapshot_digest, &observations);
+        if observations
+            .iter()
+            .any(|item| item.canonical().is_some() || item.subtype_difference().is_some())
+        {
+            self.snapshot_digest =
+                range_catalog::procedure_definition_digest(&self.snapshot_digest, &observations);
+        }
         self.range_catalog = observations;
         self.range_catalog_observed = true;
         Ok(self)

@@ -146,6 +146,60 @@ async fn postgres18_range_collation_and_difference_function_are_bound() {
     );
 }
 
+#[tokio::test]
+async fn postgres18_range_difference_function_body_changes_source_identity() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_range_function_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA {schema}; \
+             CREATE FUNCTION {schema}.text_diff(text, text) RETURNS float8 \
+               LANGUAGE SQL IMMUTABLE STRICT AS $$ SELECT (length($1)-length($2))::float8 $$; \
+             CREATE TYPE {schema}.span AS RANGE (subtype=text, subtype_diff={schema}.text_diff)"
+        ))
+        .await
+        .unwrap();
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await
+        .unwrap();
+    client
+        .batch_execute(&format!(
+            "CREATE OR REPLACE FUNCTION {schema}.text_diff(text, text) RETURNS float8 \
+             LANGUAGE SQL IMMUTABLE STRICT AS $$ SELECT (length($1)+length($2))::float8 $$"
+        ))
+        .await
+        .unwrap();
+    let after = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "COMMENT ON FUNCTION {schema}.text_diff(text, text) IS 'unmodeled'"
+        ))
+        .await
+        .unwrap();
+    let commented = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA {schema} CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    let after = after.unwrap();
+    assert_ne!(before.snapshot_digest(), after.snapshot_digest());
+    assert!(matches!(
+        commented,
+        Err(SourceObservationFailure::InvalidCapturedMetadata)
+    ));
+}
+
 struct Registry;
 
 impl SourceConnectionRegistry for Registry {

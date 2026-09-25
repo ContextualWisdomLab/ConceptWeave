@@ -11,29 +11,48 @@ use crate::{
 };
 
 const DIGEST_DOMAIN: &[u8] = b"conceptweave.postgres_schema_snapshot.v3.range_catalog.v1";
+const PROCEDURE_DEFINITION_DIGEST_DOMAIN: &[u8] =
+    b"conceptweave.postgres_schema_snapshot.v3.range_procedure_definitions.v1";
 
-/// Exact qualified procedure coordinate. PostgreSQL fixes the argument signature for each range
-/// function role: the canonical function takes the range; the difference function takes two subtype
-/// values. Catalog OIDs are only join coordinates.
+/// Exact qualified procedure coordinate and privacy-preserving definition evidence. PostgreSQL
+/// fixes the argument signature for each range function role. Catalog OIDs are only join coordinates.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct QualifiedRangeProcedure {
     schema_name: String,
     procedure_name: String,
+    definition_digest: String,
 }
 
 impl QualifiedRangeProcedure {
-    /// Preserves exact PostgreSQL identifier text without `search_path` inference.
+    /// Preserves exact identifiers and binds reconstructed definition and owner without retaining
+    /// function source text in the snapshot.
     pub fn new(
         schema_name: impl Into<String>,
         procedure_name: impl Into<String>,
+        definition: &str,
+        owner_name: &str,
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let procedure_name = procedure_name.into();
         validate_postgresql_identifier(&schema_name, "range_procedure_schema_name")?;
         validate_postgresql_identifier(&procedure_name, "range_procedure_name")?;
+        validate_postgresql_identifier(owner_name, "range_procedure_owner_name")?;
+        if definition.is_empty() || definition.contains('\0') {
+            return Err(ObservationError::InvalidObservationField {
+                field: "range_procedure_definition",
+            });
+        }
+        let mut hasher = Sha256::new();
+        encode_bytes(
+            &mut hasher,
+            b"conceptweave.postgres_schema_snapshot.v3.range_procedure_definition.v1",
+        );
+        encode_str(&mut hasher, definition);
+        encode_str(&mut hasher, owner_name);
         Ok(Self {
             schema_name,
             procedure_name,
+            definition_digest: encode_sha256(hasher),
         })
     }
 
@@ -47,6 +66,12 @@ impl QualifiedRangeProcedure {
     #[must_use]
     pub fn procedure_name(&self) -> &str {
         &self.procedure_name
+    }
+
+    /// Returns a content digest without retaining the function body in the snapshot.
+    #[must_use]
+    pub fn definition_digest(&self) -> &str {
+        &self.definition_digest
     }
 }
 
@@ -263,6 +288,26 @@ pub(crate) fn digest(base: &str, observations: &[RangeCatalogObservation]) -> St
     encode_sha256(hasher)
 }
 
+pub(crate) fn procedure_definition_digest(
+    base: &str,
+    observations: &[RangeCatalogObservation],
+) -> String {
+    let mut hasher = Sha256::new();
+    encode_bytes(&mut hasher, PROCEDURE_DEFINITION_DIGEST_DOMAIN);
+    encode_str(&mut hasher, base);
+    for item in observations {
+        for procedure in [&item.canonical, &item.subtype_difference]
+            .into_iter()
+            .flatten()
+        {
+            encode_str(&mut hasher, item.range_type.schema_name());
+            encode_str(&mut hasher, item.range_type.type_name());
+            encode_str(&mut hasher, procedure.definition_digest());
+        }
+    }
+    encode_sha256(hasher)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -313,11 +358,45 @@ mod tests {
         changed.collation = Some(QualifiedCollationName::new("pg_catalog", "C").unwrap());
         assert_ne!(original, digest("sha256:prior", &[changed]));
         let mut changed = base.clone();
-        changed.canonical = Some(QualifiedRangeProcedure::new("source", "canonical").unwrap());
+        changed.canonical =
+            Some(QualifiedRangeProcedure::new("source", "canonical", "body", "owner").unwrap());
         assert_ne!(original, digest("sha256:prior", &[changed]));
         let mut changed = base;
         changed.subtype_difference =
-            Some(QualifiedRangeProcedure::new("source", "difference").unwrap());
+            Some(QualifiedRangeProcedure::new("source", "difference", "body", "owner").unwrap());
         assert_ne!(original, digest("sha256:prior", &[changed]));
+        let mut changed = RangeCatalogObservation::new(
+            QualifiedTypeName::new("source", "span").unwrap(),
+            QualifiedTypeName::new("pg_catalog", "int4").unwrap(),
+            QualifiedOperatorClassName::new("pg_catalog", "int4_ops").unwrap(),
+            None,
+            None,
+            Some(QualifiedRangeProcedure::new("source", "difference", "body", "owner").unwrap()),
+        );
+        let with_original_body =
+            procedure_definition_digest("sha256:prior", std::slice::from_ref(&changed));
+        let coordinate_digest = digest("sha256:prior", std::slice::from_ref(&changed));
+        changed.subtype_difference = Some(
+            QualifiedRangeProcedure::new("source", "difference", "changed body", "owner").unwrap(),
+        );
+        assert_eq!(
+            coordinate_digest,
+            digest("sha256:prior", std::slice::from_ref(&changed))
+        );
+        assert_ne!(
+            with_original_body,
+            procedure_definition_digest("sha256:prior", std::slice::from_ref(&changed))
+        );
+        let changed_body =
+            procedure_definition_digest("sha256:prior", std::slice::from_ref(&changed));
+        changed.subtype_difference = Some(
+            QualifiedRangeProcedure::new("source", "difference", "changed body", "other_owner")
+                .unwrap(),
+        );
+        assert_ne!(
+            changed_body,
+            procedure_definition_digest("sha256:prior", &[changed])
+        );
+        assert!(QualifiedRangeProcedure::new("source", "difference", "", "owner").is_err());
     }
 }
