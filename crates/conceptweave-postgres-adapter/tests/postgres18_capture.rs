@@ -662,6 +662,68 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             .collect::<BTreeSet<_>>();
         assert_eq!(observed_constraints, catalog_constraints);
 
+        let mut catalog_not_null = BTreeMap::new();
+        for row in client
+            .query(
+                "SELECT t.relname::text, con.conname::text, a.attname::text, \
+                 con.conkey, con.convalidated, con.conenforced, con.conislocal, \
+                 con.coninhcount, con.connoinherit \
+                 FROM pg_catalog.pg_constraint con \
+                 JOIN pg_catalog.pg_class t ON t.oid = con.conrelid \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace \
+                 LEFT JOIN pg_catalog.pg_attribute a ON a.attrelid = t.oid \
+                   AND a.attnum = con.conkey[1] \
+                 WHERE n.nspname = $1 AND t.relkind = 'r' AND con.contype = 'n'",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+        {
+            let key = (row.get::<_, String>(0), row.get::<_, String>(1));
+            let column_positions: Vec<i16> = row.get(3);
+            assert_eq!(column_positions.len(), 1);
+            let value = (
+                row.get::<_, Option<String>>(2).unwrap(),
+                row.get::<_, bool>(4),
+                row.get::<_, bool>(5),
+                row.get::<_, bool>(6),
+                u16::try_from(row.get::<_, i16>(7)).unwrap(),
+                row.get::<_, bool>(8),
+            );
+            assert!(catalog_not_null.insert(key, value).is_none());
+        }
+        let mut observed_not_null = BTreeMap::new();
+        for constraint in first.not_null_constraints().unwrap() {
+            let key = (
+                constraint.relation_name().to_owned(),
+                constraint.constraint_name().to_owned(),
+            );
+            let value = (
+                constraint.column_name().to_owned(),
+                constraint.validated(),
+                constraint.enforced(),
+                constraint.is_local(),
+                constraint.inheritance_ancestor_count(),
+                constraint.no_inherit(),
+            );
+            assert!(observed_not_null.insert(key, value).is_none());
+        }
+        assert_eq!(observed_not_null, catalog_not_null);
+        for relation_and_constraint in observed_not_null.keys() {
+            let receipt = first
+                .source_receipt(
+                    SchemaObjectLocation::constraint(
+                        &schema,
+                        &relation_and_constraint.0,
+                        RelationKind::Table,
+                        &relation_and_constraint.1,
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+            assert_eq!(receipt.source_digest(), first.snapshot_digest());
+        }
+
         let catalog_types = client
             .query(
                 "SELECT t.typtype::text, t.typname::text FROM pg_catalog.pg_type t \
@@ -686,6 +748,122 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             )
             .collect::<BTreeSet<_>>();
         assert_eq!(observed_types, catalog_types);
+        for row in client
+            .query(
+                "SELECT t.typname::text, bn.nspname::text, b.typname::text, \
+                 t.typtypmod, t.typndims, t.typnotnull, t.typdefault, \
+                 cn.nspname::text, c.collname::text, \
+                 pg_catalog.obj_description(t.oid, 'pg_type') \
+                 FROM pg_catalog.pg_type t \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace \
+                 JOIN pg_catalog.pg_type b ON b.oid = t.typbasetype \
+                 JOIN pg_catalog.pg_namespace bn ON bn.oid = b.typnamespace \
+                 LEFT JOIN pg_catalog.pg_collation c ON c.oid = t.typcollation \
+                 LEFT JOIN pg_catalog.pg_namespace cn ON cn.oid = c.collnamespace \
+                 WHERE n.nspname = $1 AND t.typtype = 'd'",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+        {
+            let name: String = row.get(0);
+            let domain = first
+                .domains()
+                .iter()
+                .find(|domain| domain.domain_name() == name)
+                .unwrap();
+            assert_eq!(domain.base_type().schema_name(), row.get::<_, String>(1));
+            assert_eq!(domain.base_type().type_name(), row.get::<_, String>(2));
+            assert_eq!(domain.type_modifier(), Some(row.get::<_, i32>(3)));
+            assert_eq!(
+                domain.array_dimensions(),
+                Some(u32::try_from(row.get::<_, i32>(4)).unwrap())
+            );
+            assert_eq!(domain.not_null(), Some(row.get::<_, bool>(5)));
+            assert_eq!(
+                domain.default_expression(),
+                row.get::<_, Option<String>>(6).as_deref()
+            );
+            assert_eq!(
+                domain.collation().map(|collation| (
+                    collation.schema_name().to_owned(),
+                    collation.collation_name().to_owned(),
+                )),
+                row.get::<_, Option<String>>(7)
+                    .zip(row.get::<_, Option<String>>(8))
+            );
+            assert_eq!(
+                domain.source_comment(),
+                row.get::<_, Option<String>>(9).as_deref()
+            );
+        }
+        let mut catalog_domain_checks = BTreeMap::new();
+        for row in client
+            .query(
+                "SELECT d.typname::text, con.conname::text, \
+                 pg_catalog.pg_get_constraintdef(con.oid, false), \
+                 con.convalidated, con.conenforced \
+                 FROM pg_catalog.pg_constraint con \
+                 JOIN pg_catalog.pg_type d ON d.oid = con.contypid \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = d.typnamespace \
+                 WHERE n.nspname = $1 AND d.typtype = 'd' AND con.contype = 'c'",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+        {
+            let key = (row.get::<_, String>(0), row.get::<_, String>(1));
+            let value = (
+                row.get::<_, String>(2),
+                row.get::<_, bool>(3),
+                row.get::<_, bool>(4),
+            );
+            assert!(catalog_domain_checks.insert(key, value).is_none());
+        }
+        let mut observed_domain_checks = BTreeMap::new();
+        for domain in first.domains() {
+            for check in domain.check_constraints() {
+                let key = (
+                    domain.domain_name().to_owned(),
+                    check.constraint_name().to_owned(),
+                );
+                let value = (
+                    check.check_definition().to_owned(),
+                    check.validated(),
+                    check.enforced(),
+                );
+                assert!(observed_domain_checks.insert(key, value).is_none());
+            }
+        }
+        assert_eq!(observed_domain_checks, catalog_domain_checks);
+        let mut catalog_enum_labels = BTreeMap::<String, Vec<String>>::new();
+        for row in client
+            .query(
+                "SELECT t.typname::text, e.enumlabel::text FROM pg_catalog.pg_enum e \
+                 JOIN pg_catalog.pg_type t ON t.oid = e.enumtypid \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace \
+                 WHERE n.nspname = $1 ORDER BY t.typname, e.enumsortorder, e.oid",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+        {
+            catalog_enum_labels
+                .entry(row.get(0))
+                .or_default()
+                .push(row.get(1));
+        }
+        let observed_enum_labels = first
+            .enums()
+            .iter()
+            .map(|enumeration| {
+                (
+                    enumeration.enum_name().to_owned(),
+                    enumeration.labels().to_vec(),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+        assert_eq!(observed_enum_labels, catalog_enum_labels);
         let catalog_type_kinds = client
             .query(
                 "SELECT t.typname::text, t.typtype::text FROM pg_catalog.pg_type t \
