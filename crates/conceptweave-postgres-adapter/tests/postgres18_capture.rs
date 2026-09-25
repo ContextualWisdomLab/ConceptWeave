@@ -6,12 +6,12 @@ use std::{
 use conceptweave_alignment::{
     AlignmentDecision, AlignmentError, align_relational_proposal, validate_alignment,
 };
-use conceptweave_client::{ReleaseMetadata, SemanticReleaseClient};
+use conceptweave_client::{ReleaseMetadata, SemanticReleaseClient, TrustedPublisherKey};
 use conceptweave_discovery::{ProposalError, ProposedSourceType, propose_relational_model};
 use conceptweave_domain::{CandidateKind, PublicationState, TruthStatus};
 use conceptweave_governance::{
     FilePublicationStore, GovernanceError, PublicationStoreError, ReviewRequest,
-    StewardReviewAuthority, review,
+    StewardReviewAuthority, review, sign_published_manifest,
 };
 use conceptweave_observation::{
     CollationProvider, ColumnObservationV3, ConstraintDeferrability, EnumObservation,
@@ -24,6 +24,10 @@ use conceptweave_source_port::{
     ObservationCancellation, ObservationLimits, ObservationRequest, ObservationRequestBudget,
     ObservationResourceEnvelope, ResolvedSourceConnection, SourceConnectionRegistry,
     SourceObservationFailure, SourceObservationPort,
+};
+use ring::{
+    rand::SystemRandom,
+    signature::{Ed25519KeyPair, KeyPair},
 };
 use tokio_postgres::{Config, NoTls};
 
@@ -960,10 +964,18 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
                 .validate_for_authoritative_use(published.release())
                 .is_err()
         );
-        let pinned = SemanticReleaseClient::with_trusted_release_manifests(
+        let rng = SystemRandom::new();
+        let pkcs8 = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
+        let signing_key = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
+        let key = TrustedPublisherKey::new("fixture-publisher", signing_key.public_key().as_ref())
+            .unwrap();
+        let signed =
+            sign_published_manifest(&published, "fixture-publisher", &signing_key).unwrap();
+        let pinned = SemanticReleaseClient::with_signed_release_manifests(
             "1.0.0",
             vec![],
-            vec![published.manifest_pin().clone()],
+            &[key],
+            &[signed],
         )
         .unwrap();
         pinned

@@ -22,4 +22,5 @@ conceptweave-domain = { path = "../conceptweave-domain" }
 conceptweave-discovery = { path = "../conceptweave-discovery" }
 conceptweave-governance = { path = "../conceptweave-governance" }
 conceptweave-client = { path = "../conceptweave-client" }
+ring = "=0.17.14"
 tokio = { version = "=1.53.1", features = ["macros", "rt-multi-thread", "time"] }

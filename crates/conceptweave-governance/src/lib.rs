@@ -11,11 +11,13 @@ use std::fmt;
 
 use conceptweave_alignment::{AlignedCandidate, AlignmentDisposition, ValidatedAlignment};
 use conceptweave_client::{
-    ReleaseContractError, ReleaseDigest, ReleaseMetadata, SemanticRelease, TrustedReleaseManifest,
+    ReleaseContractError, ReleaseDigest, ReleaseMetadata, SemanticRelease, SignedReleaseManifest,
+    TrustedReleaseManifest,
 };
 use conceptweave_discovery::{ProposedSourceType, RelationalProposal};
 use conceptweave_domain::{CandidateKind, PublicationState, TruthStatus};
 use conceptweave_observation::{ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType};
+use ring::signature::Ed25519KeyPair;
 use sha2::{Digest, Sha256};
 
 mod file_store;
@@ -126,6 +128,27 @@ impl PublishedModel {
     pub const fn review(&self) -> &ReviewedAlignment {
         &self.review
     }
+}
+
+/// Signs the exact pin of a durably issued model with a caller-managed publisher key.
+///
+/// The signing key and client trust anchors must be provisioned outside this crate.
+pub fn sign_published_manifest(
+    published: &PublishedModel,
+    key_id: &str,
+    signing_key: &Ed25519KeyPair,
+) -> Result<SignedReleaseManifest, GovernanceError> {
+    let pin = published.manifest_pin();
+    let message =
+        SignedReleaseManifest::signing_message(key_id, pin.release_id(), pin.manifest_digest())
+            .map_err(GovernanceError::Release)?;
+    SignedReleaseManifest::new(
+        key_id,
+        pin.release_id(),
+        pin.manifest_digest().clone(),
+        signing_key.sign(&message).as_ref(),
+    )
+    .map_err(GovernanceError::Release)
 }
 
 /// A review or publication request could not cross its trust boundary.

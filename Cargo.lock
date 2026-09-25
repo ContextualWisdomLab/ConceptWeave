@@ -113,6 +113,7 @@ name = "conceptweave-client"
 version = "0.1.0"
 dependencies = [
  "conceptweave-domain",
+ "ring",
  "sha2 0.10.9",
 ]
 
@@ -137,6 +138,7 @@ dependencies = [
  "conceptweave-discovery",
  "conceptweave-domain",
  "conceptweave-observation",
+ "ring",
  "sha2 0.10.9",
 ]
 
@@ -160,6 +162,7 @@ dependencies = [
  "conceptweave-observation",
  "conceptweave-source-port",
  "futures-util",
+ "ring",
  "rustls",
  "tokio",
  "tokio-postgres",

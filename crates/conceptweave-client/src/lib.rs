@@ -12,6 +12,9 @@ use core::fmt;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
+mod signed_manifest;
+pub use signed_manifest::{SignedReleaseManifest, TrustedPublisherKey};
+
 /// A validated content-digest identity carried by a semantic release.
 ///
 /// The current contract accepts only the canonical `sha256:<64 lowercase hex>`
@@ -500,6 +503,32 @@ impl SemanticReleaseClient {
         })
     }
 
+    /// Verifies publisher signatures against independently configured keys before trusting pins.
+    pub fn with_signed_release_manifests(
+        supported_contract_version: impl Into<String>,
+        supported_legacy_contract_versions: Vec<String>,
+        publisher_keys: &[TrustedPublisherKey],
+        signed_manifests: &[SignedReleaseManifest],
+    ) -> Result<Self, ReleaseContractError> {
+        let mut key_ids = BTreeSet::new();
+        for key in publisher_keys {
+            if !key_ids.insert(key.key_id()) {
+                return Err(ReleaseContractError::DuplicatePublisherKeyId(
+                    key.key_id().to_owned(),
+                ));
+            }
+        }
+        let pins = signed_manifests
+            .iter()
+            .map(|manifest| manifest.verify(publisher_keys))
+            .collect::<Result<Vec<_>, _>>()?;
+        Self::with_trusted_release_manifests(
+            supported_contract_version,
+            supported_legacy_contract_versions,
+            pins,
+        )
+    }
+
     /// Returns the exact current semantic-release contract version this client accepts.
     pub fn supported_contract_version(&self) -> &str {
         &self.supported_contract_version
@@ -730,6 +759,14 @@ pub enum ReleaseContractError {
     DuplicateConceptId(String),
     /// The protected client configuration repeats one release identity.
     DuplicateTrustedReleaseId(String),
+    /// A configured publisher key ID appears more than once.
+    DuplicatePublisherKeyId(String),
+    /// A publisher key, signed manifest field, or signature length is invalid.
+    InvalidSignedManifest,
+    /// The signed manifest names no independently configured publisher key.
+    UnknownPublisherKey,
+    /// The configured publisher did not sign this exact release manifest pin.
+    InvalidPublisherSignature,
     /// The release manifest is absent from or differs from the protected client trust set.
     UntrustedRelease,
     /// The configured current contract version was also supplied as a legacy version.
@@ -784,6 +821,19 @@ impl fmt::Display for ReleaseContractError {
                 formatter,
                 "trusted release identity `{release_id}` was configured more than once"
             ),
+            Self::DuplicatePublisherKeyId(key_id) => write!(
+                formatter,
+                "publisher key `{key_id}` was configured more than once"
+            ),
+            Self::InvalidSignedManifest => {
+                formatter.write_str("signed release manifest is invalid")
+            }
+            Self::UnknownPublisherKey => {
+                formatter.write_str("release publisher key is not trusted")
+            }
+            Self::InvalidPublisherSignature => {
+                formatter.write_str("release publisher signature is invalid")
+            }
             Self::UntrustedRelease => formatter.write_str("semantic release is not trusted"),
             Self::CurrentContractVersionMarkedLegacy(contract_version) => write!(
                 formatter,

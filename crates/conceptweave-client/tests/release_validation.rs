@@ -1,8 +1,12 @@
 use conceptweave_client::{
     ReleaseContractError, ReleaseDigest, ReleaseMetadata, SemanticRelease, SemanticReleaseClient,
-    TrustedReleaseManifest,
+    SignedReleaseManifest, TrustedPublisherKey, TrustedReleaseManifest,
 };
 use conceptweave_domain::{EvidenceReference, PublicationState, TruthStatus};
+use ring::{
+    rand::SystemRandom,
+    signature::{Ed25519KeyPair, KeyPair},
+};
 
 fn evidence() -> EvidenceReference {
     EvidenceReference::new(
@@ -41,6 +45,78 @@ fn release(
         vec!["control.evidence".to_string(), "control.owner".to_string()],
     )
     .unwrap()
+}
+
+#[test]
+fn signed_manifest_requires_an_independent_exact_publisher_key() {
+    let release = release(
+        "1.0.0",
+        TruthStatus::Authoritative,
+        PublicationState::Published,
+    );
+    let rng = SystemRandom::new();
+    let pkcs8 = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
+    let key = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
+    let trusted = TrustedPublisherKey::new("publisher-1", key.public_key().as_ref()).unwrap();
+    let digest = release.manifest_digest();
+    let message =
+        SignedReleaseManifest::signing_message("publisher-1", release.release_id(), &digest)
+            .unwrap();
+    let signature = key.sign(&message);
+    let signed = SignedReleaseManifest::new(
+        "publisher-1",
+        release.release_id(),
+        digest.clone(),
+        signature.as_ref(),
+    )
+    .unwrap();
+    let client = SemanticReleaseClient::with_signed_release_manifests(
+        "1.0.0",
+        vec![],
+        std::slice::from_ref(&trusted),
+        std::slice::from_ref(&signed),
+    )
+    .unwrap();
+    assert_eq!(client.validate_for_authoritative_use(&release), Ok(()));
+    assert_eq!(
+        SemanticReleaseClient::new("1.0.0")
+            .unwrap()
+            .validate_for_authoritative_use(&release),
+        Err(ReleaseContractError::UntrustedRelease)
+    );
+    assert_eq!(
+        SemanticReleaseClient::with_signed_release_manifests(
+            "1.0.0",
+            vec![],
+            &[],
+            std::slice::from_ref(&signed)
+        )
+        .unwrap_err(),
+        ReleaseContractError::UnknownPublisherKey
+    );
+    assert_eq!(
+        SemanticReleaseClient::with_signed_release_manifests(
+            "1.0.0",
+            vec![],
+            &[trusted.clone(), trusted.clone()],
+            std::slice::from_ref(&signed)
+        )
+        .unwrap_err(),
+        ReleaseContractError::DuplicatePublisherKeyId("publisher-1".into())
+    );
+    let tampered =
+        SignedReleaseManifest::new("publisher-1", "other-release", digest, signature.as_ref())
+            .unwrap();
+    assert_eq!(
+        SemanticReleaseClient::with_signed_release_manifests(
+            "1.0.0",
+            vec![],
+            &[trusted],
+            &[tampered]
+        )
+        .unwrap_err(),
+        ReleaseContractError::InvalidPublisherSignature
+    );
 }
 
 #[test]
