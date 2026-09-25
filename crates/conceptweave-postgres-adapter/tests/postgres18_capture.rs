@@ -815,6 +815,62 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             .collect::<BTreeSet<_>>();
         assert_eq!(observed_foreign_keys, catalog_foreign_keys);
 
+        for row in client
+            .query(
+                "SELECT t.relname::text, con.conname::text, con.conpfeqop, \
+                 con.conppeqop, con.conffeqop FROM pg_catalog.pg_constraint con \
+                 JOIN pg_catalog.pg_class t ON t.oid = con.conrelid \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace \
+                 WHERE n.nspname = $1 AND con.contype = 'f'",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+        {
+            let relation_name: String = row.get(0);
+            let constraint_name: String = row.get(1);
+            let observed = first
+                .foreign_key_catalog()
+                .unwrap()
+                .iter()
+                .find(|entry| {
+                    entry.relation_name() == relation_name
+                        && entry.constraint_name() == constraint_name
+                })
+                .unwrap();
+            for (oids, operators) in [
+                (row.get::<_, Vec<u32>>(2), observed.primary_foreign_operators()),
+                (row.get::<_, Vec<u32>>(3), observed.primary_primary_operators()),
+                (row.get::<_, Vec<u32>>(4), observed.foreign_foreign_operators()),
+            ] {
+                assert_eq!(oids.len(), operators.len());
+                for (oid, operator) in oids.iter().zip(operators) {
+                    let signature = client
+                        .query_one(
+                            "SELECT ns.nspname::text, op.oprname::text, \
+                             ln.nspname::text, lt.typname::text, \
+                             rn.nspname::text, rt.typname::text \
+                             FROM pg_catalog.pg_operator op \
+                             JOIN pg_catalog.pg_namespace ns ON ns.oid = op.oprnamespace \
+                             JOIN pg_catalog.pg_type lt ON lt.oid = op.oprleft \
+                             JOIN pg_catalog.pg_namespace ln ON ln.oid = lt.typnamespace \
+                             JOIN pg_catalog.pg_type rt ON rt.oid = op.oprright \
+                             JOIN pg_catalog.pg_namespace rn ON rn.oid = rt.typnamespace \
+                             WHERE op.oid = $1",
+                            &[oid],
+                        )
+                        .await
+                        .unwrap();
+                    assert_eq!(operator.schema_name(), signature.get::<_, String>(0));
+                    assert_eq!(operator.operator_name(), signature.get::<_, String>(1));
+                    assert_eq!(operator.left_type().schema_name(), signature.get::<_, String>(2));
+                    assert_eq!(operator.left_type().type_name(), signature.get::<_, String>(3));
+                    assert_eq!(operator.right_type().schema_name(), signature.get::<_, String>(4));
+                    assert_eq!(operator.right_type().type_name(), signature.get::<_, String>(5));
+                }
+            }
+        }
+
         let mut catalog_not_null = BTreeMap::new();
         for row in client
             .query(
