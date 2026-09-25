@@ -11,8 +11,8 @@ use std::fmt;
 use conceptweave_domain::{CandidateKind, ContractError, EvidenceReference, SemanticCandidate};
 use conceptweave_observation::{
     DomainObservation, EnumObservation, ForeignKeyReferenceBehavior, ObservationError,
-    PostgresSchemaSnapshotV3, QualifiedTypeName, RelationKind, RelationObservation,
-    SchemaObjectLocation, TableConstraintObservation,
+    PostgresSchemaSnapshotV3, PostgresTypeKind, QualifiedTypeName, RelationKind,
+    RelationObservation, SchemaObjectLocation, TableConstraintObservation,
 };
 
 const REVISION: &str = "conceptweave.relational_proposal.v1";
@@ -540,6 +540,41 @@ pub fn propose_relational_model(
             || snapshot.type_kinds().is_none()
             || snapshot.collation_definitions().is_none())
     {
+        return Err(ProposalError::IncompleteSourceObservation);
+    }
+    let observed_type_kinds = snapshot
+        .type_kinds()
+        .unwrap_or(&[])
+        .iter()
+        .map(|kind| {
+            (
+                (kind.type_name().schema_name(), kind.type_name().type_name()),
+                kind.kind(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let has_type_kind = |schema: &str, name: &str, kind: PostgresTypeKind| {
+        observed_type_kinds.get(&(schema, name)) == Some(&kind)
+    };
+    if snapshot.domains().iter().any(|domain| {
+        !has_type_kind(
+            domain.schema_name(),
+            domain.domain_name(),
+            PostgresTypeKind::Domain,
+        )
+    }) || snapshot.enums().iter().any(|observed_enum| {
+        !has_type_kind(
+            observed_enum.schema_name(),
+            observed_enum.enum_name(),
+            PostgresTypeKind::Enum,
+        )
+    }) || snapshot.relations().iter().any(|relation| {
+        !has_type_kind(
+            relation.schema_name(),
+            relation.relation_name(),
+            PostgresTypeKind::Composite,
+        )
+    }) {
         return Err(ProposalError::IncompleteSourceObservation);
     }
     if !snapshot.relations().is_empty()
