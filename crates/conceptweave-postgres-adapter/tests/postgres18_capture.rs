@@ -662,6 +662,92 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             .collect::<BTreeSet<_>>();
         assert_eq!(observed_constraints, catalog_constraints);
 
+        let catalog_foreign_keys = client
+            .query(
+                "SELECT t.relname::text, con.conname::text, rn.nspname::text, \
+                 rt.relname::text, ix.relname::text, con.convalidated, con.conenforced, \
+                 con.confupdtype::text, con.confdeltype::text, con.confmatchtype::text, \
+                 con.condeferrable, con.condeferred, \
+                 ARRAY(SELECT a.attname::text FROM unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord) \
+                   JOIN pg_catalog.pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum \
+                   ORDER BY k.ord), \
+                 ARRAY(SELECT a.attname::text FROM unnest(con.confkey) WITH ORDINALITY AS k(attnum, ord) \
+                   JOIN pg_catalog.pg_attribute a ON a.attrelid = con.confrelid AND a.attnum = k.attnum \
+                   ORDER BY k.ord) \
+                 FROM pg_catalog.pg_constraint con \
+                 JOIN pg_catalog.pg_class t ON t.oid = con.conrelid \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace \
+                 JOIN pg_catalog.pg_class rt ON rt.oid = con.confrelid \
+                 JOIN pg_catalog.pg_namespace rn ON rn.oid = rt.relnamespace \
+                 JOIN pg_catalog.pg_class ix ON ix.oid = con.conindid \
+                 WHERE n.nspname = $1 AND con.contype = 'f'",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| {
+                let relation_name: String = row.get(0);
+                let constraint_name: String = row.get(1);
+                let relation = first
+                    .relations()
+                    .iter()
+                    .find(|relation| relation.relation_name() == relation_name)
+                    .unwrap();
+                let TableConstraintObservation::ForeignKey(key) = relation
+                    .constraints()
+                    .iter()
+                    .find(|constraint| constraint.constraint_name() == constraint_name)
+                    .unwrap()
+                else {
+                    panic!("catalog foreign key must remain a foreign key");
+                };
+                assert_eq!(key.referenced_schema_name(), row.get::<_, String>(2));
+                assert_eq!(key.referenced_table_name(), row.get::<_, String>(3));
+                assert_eq!(key.validated(), Some(row.get::<_, bool>(5)));
+                assert_eq!(key.enforced(), Some(row.get::<_, bool>(6)));
+                assert_eq!(key.column_names(), row.get::<_, Vec<String>>(12));
+                assert_eq!(key.referenced_column_names(), row.get::<_, Vec<String>>(13));
+                let behavior = key.reference_behavior().unwrap();
+                assert_eq!(row.get::<_, String>(7), "a");
+                assert_eq!(behavior.update_action(), ForeignKeyAction::NoAction);
+                assert_eq!(row.get::<_, String>(8), "a");
+                assert_eq!(behavior.delete_action(), ForeignKeyAction::NoAction);
+                assert_eq!(row.get::<_, String>(9), "s");
+                assert_eq!(behavior.match_type(), ForeignKeyMatchType::Simple);
+                assert!(!row.get::<_, bool>(10));
+                assert!(!row.get::<_, bool>(11));
+                assert_eq!(behavior.deferrability(), ForeignKeyDeferrability::NotDeferrable);
+                let catalog = first
+                    .foreign_key_catalog()
+                    .unwrap()
+                    .iter()
+                    .find(|entry| entry.relation_name() == relation_name && entry.constraint_name() == constraint_name)
+                    .unwrap();
+                assert_eq!(catalog.referenced_index_name(), row.get::<_, String>(4));
+                let receipt = first
+                    .source_receipt(
+                        SchemaObjectLocation::constraint(
+                            &schema,
+                            &relation_name,
+                            RelationKind::Table,
+                            &constraint_name,
+                        )
+                        .unwrap(),
+                    )
+                    .unwrap();
+                assert_eq!(receipt.source_digest(), first.snapshot_digest());
+                (relation_name, constraint_name)
+            })
+            .collect::<BTreeSet<_>>();
+        let observed_foreign_keys = first
+            .foreign_key_catalog()
+            .unwrap()
+            .iter()
+            .map(|entry| (entry.relation_name().to_owned(), entry.constraint_name().to_owned()))
+            .collect::<BTreeSet<_>>();
+        assert_eq!(observed_foreign_keys, catalog_foreign_keys);
+
         let mut catalog_not_null = BTreeMap::new();
         for row in client
             .query(
