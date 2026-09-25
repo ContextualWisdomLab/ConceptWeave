@@ -2923,6 +2923,58 @@ async fn postgres18_standalone_composite_type_retains_column_receipts() {
             },
         )
         .unwrap();
+        let publication_root = std::env::temp_dir().join(format!(
+            "cw-composite-release-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&publication_root).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&publication_root, std::fs::Permissions::from_mode(0o700))
+                .unwrap();
+        }
+        let store = FilePublicationStore::new(&publication_root).unwrap();
+        let published = store
+            .publish(
+                &reviewed,
+                ReleaseMetadata::new("composite-fixture", "1.0.0", "fixture-ontology").unwrap(),
+            )
+            .unwrap();
+        assert_eq!(published.release().concept_ids(), &["risk.assessment"]);
+        assert_eq!(published.release().provenance().len(), 3);
+        let rng = SystemRandom::new();
+        let pkcs8 = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
+        let signing_key = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
+        let key = TrustedPublisherKey::new("fixture-publisher", signing_key.public_key().as_ref())
+            .unwrap();
+        let signed =
+            sign_published_manifest(&published, "fixture-publisher", &signing_key).unwrap();
+        let pinned = SemanticReleaseClient::with_signed_release_manifests(
+            "1.0.0",
+            vec![],
+            &[key],
+            &[signed],
+        )
+        .unwrap();
+        assert_eq!(
+            pinned
+                .resolve_concept(published.release(), "risk.assessment")
+                .unwrap(),
+            Some("risk.assessment")
+        );
+        assert_eq!(
+            store
+                .read_verified(&pinned, published.release())
+                .unwrap()
+                .unwrap(),
+            published.artifact_bytes()
+        );
+        std::fs::remove_dir_all(&publication_root).unwrap();
         let replay = adapter(config.clone())
             .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
             .await?;
