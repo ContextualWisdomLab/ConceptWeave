@@ -2104,6 +2104,80 @@ async fn postgres18_unenforced_foreign_key_retains_false_state_without_ri_trigge
 }
 
 #[tokio::test]
+async fn postgres18_unenforced_check_preserves_catalog_state_and_receipt() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_unenforced_check_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; \
+             CREATE TABLE \"{schema}\".item (score integer, \
+               CONSTRAINT score_positive CHECK (score > 0) NOT ENFORCED)"
+        ))
+        .await
+        .unwrap();
+
+    let result = async {
+        let observed = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 64, 65_536), &NotCancelled)
+            .await?;
+        let catalog = client
+            .query_one(
+                "SELECT c.convalidated, c.conenforced, pg_catalog.pg_get_constraintdef(c.oid) \
+                 FROM pg_catalog.pg_constraint c \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = c.connamespace \
+                 WHERE n.nspname = $1 AND c.conname = 'score_positive'",
+                &[&schema],
+            )
+            .await
+            .unwrap();
+        let TableConstraintObservation::Check(check) = &observed.relations()[0].constraints()[0]
+        else {
+            panic!("observed constraint must be CHECK");
+        };
+        assert_eq!(check.validated(), catalog.get::<_, bool>(0));
+        assert_eq!(check.enforced(), catalog.get::<_, bool>(1));
+        assert!(!check.validated());
+        assert!(!check.enforced());
+        assert_eq!(check.definition(), catalog.get::<_, String>(2));
+        observed
+            .source_receipt(
+                SchemaObjectLocation::constraint(
+                    &schema,
+                    "item",
+                    RelationKind::Table,
+                    "score_positive",
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        client
+            .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".item DROP CONSTRAINT score_positive; \
+                 ALTER TABLE \"{schema}\".item ADD CONSTRAINT score_positive CHECK (score > 0)"
+            ))
+            .await
+            .unwrap();
+        let enforced = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 64, 65_536), &NotCancelled)
+            .await?;
+        assert_ne!(observed.snapshot_digest(), enforced.snapshot_digest());
+        Ok::<_, SourceObservationFailure>(())
+    }
+    .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    result.unwrap();
+}
+
+#[tokio::test]
 async fn postgres18_tcp_requires_valid_ca_and_host_name() {
     let (Ok(dsn), Ok(ca_path), Ok(wrong_ca_path), Ok(plaintext_dsn)) = (
         std::env::var("CONCEPTWEAVE_PG18_TLS_TEST_DSN"),
