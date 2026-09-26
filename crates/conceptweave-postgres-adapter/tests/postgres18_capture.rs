@@ -1759,6 +1759,55 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             .collect::<BTreeSet<_>>();
         assert_eq!(observed_constraints, catalog_constraints);
 
+        let mut catalog_checks = BTreeMap::new();
+        for row in client
+            .query(
+                "SELECT t.relname::text, con.conname::text, \
+                 pg_catalog.pg_get_constraintdef(con.oid, false), \
+                 con.convalidated, con.conenforced, con.connoinherit \
+                 FROM pg_catalog.pg_constraint con \
+                 JOIN pg_catalog.pg_class t ON t.oid = con.conrelid \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace \
+                 WHERE n.nspname = $1 AND t.relkind = 'r' AND con.contype = 'c'",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+        {
+            let key = (row.get::<_, String>(0), row.get::<_, String>(1));
+            let value = (
+                row.get::<_, String>(2),
+                row.get::<_, bool>(3),
+                row.get::<_, bool>(4),
+                row.get::<_, bool>(5),
+            );
+            assert!(catalog_checks.insert(key, value).is_none());
+        }
+        let observed_checks = first
+            .relations()
+            .iter()
+            .flat_map(|relation| {
+                relation.constraints().iter().filter_map(|constraint| {
+                    let TableConstraintObservation::Check(check) = constraint else {
+                        return None;
+                    };
+                    Some((
+                        (
+                            relation.relation_name().to_owned(),
+                            check.constraint_name().to_owned(),
+                        ),
+                        (
+                            check.definition().to_owned(),
+                            check.validated(),
+                            check.enforced(),
+                            check.no_inherit(),
+                        ),
+                    ))
+                })
+            })
+            .collect::<BTreeMap<_, _>>();
+        assert_eq!(observed_checks, catalog_checks);
+
         let catalog_key_constraints = client
             .query(
                 "SELECT t.relname::text, con.conname::text, con.contype::text, \
