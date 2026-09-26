@@ -90,11 +90,11 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelObs
         }
         let converter_schema_name = converter_schema_name.into();
         let converter_function_name = converter_function_name.into();
-        validate_nonblank(
+        validate_identifier(
             &converter_schema_name,
             "index_exclusion_constraint_operator_procedure_transform_converter_security_label_function_schema",
         )?;
-        validate_nonblank(
+        validate_identifier(
             &converter_function_name,
             "index_exclusion_constraint_operator_procedure_transform_converter_security_label_function_name",
         )?;
@@ -547,6 +547,13 @@ fn encode_str(hasher: &mut Sha256, value: &str) {
 
 fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
     if value.trim().is_empty() {
+        return Err(invalid(field));
+    }
+    Ok(())
+}
+
+fn validate_identifier(value: &str, field: &'static str) -> Result<(), ObservationError> {
+    if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }
     Ok(())

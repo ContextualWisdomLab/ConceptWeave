@@ -140,7 +140,7 @@ fn ordinary_exclude_converter_auto_extension_dependency_rejects_blank_and_duplic
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "public",
         "payload_from_sql",
-        vec![" \t".to_owned()],
+        vec!["".to_owned()],
     )
     .expect_err("auto-extension dependency names are exact nonblank pg_extension names");
     assert_field(

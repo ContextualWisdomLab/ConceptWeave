@@ -1,6 +1,6 @@
 use conceptweave_observation::{
-    ArrayTypeObservation, ColumnObservationV3, EnumObservation, ObservationError,
-    PostgresSchemaSnapshotV3, PostgresTypeKind, QualifiedTypeName, RelationKind,
+    ArrayTypeObservation, ColumnObservationV3, DomainObservation, EnumObservation,
+    ObservationError, PostgresSchemaSnapshotV3, PostgresTypeKind, QualifiedTypeName, RelationKind,
     RelationObservation, TypeKindObservation,
 };
 
@@ -110,10 +110,145 @@ fn observed_type_kinds_preserve_an_already_observed_custom_true_array_binding() 
     let composed = snapshot
         .with_observed_type_kinds(status_type_kinds())
         .expect("independent array and type-kind catalog families must compose");
+    let direct = PostgresSchemaSnapshotV3::new_with_array_types_and_type_kinds(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-12T05:10:00Z",
+        vec![ticket_with_status_array_binding()],
+        Vec::new(),
+        vec![status_enum()],
+        vec![
+            ArrayTypeObservation::new(
+                type_name("public", "_status"),
+                type_name("public", "status"),
+            )
+            .unwrap(),
+        ],
+        status_type_kinds(),
+    )
+    .expect("the combined source constructor must preserve both catalog families");
 
     assert!(composed.array_types().is_some());
     assert!(composed.type_kinds().is_some());
     assert_ne!(array_aware_digest, composed.snapshot_digest());
+    assert_eq!(direct.snapshot_digest(), composed.snapshot_digest());
+    assert_eq!(
+        PostgresSchemaSnapshotV3::new_with_array_types_and_type_kinds(
+            &support::authorized_source("warehouse_primary", &["public"]),
+            "postgres_introspector_v3",
+            "2026-09-12T05:10:00Z",
+            vec![ticket_with_status_array_binding()],
+            Vec::new(),
+            vec![status_enum()],
+            vec![
+                ArrayTypeObservation::new(
+                    type_name("public", "_status"),
+                    type_name("public", "status"),
+                )
+                .unwrap()
+            ],
+            status_type_kinds()
+                .into_iter()
+                .filter(|kind| kind.type_name().type_name() != "_status")
+                .collect(),
+        )
+        .unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "array_type_kind"
+        }
+    );
+}
+
+#[test]
+fn referenced_catalog_array_pair_is_source_evidence_without_catalog_schema_authorization() {
+    let relation = RelationObservation::new(
+        "public",
+        "numbers",
+        RelationKind::Table,
+        vec![
+            ColumnObservationV3::new(
+                "values",
+                1,
+                "integer[]",
+                type_name("pg_catalog", "_int4"),
+                true,
+                None,
+            )
+            .unwrap(),
+        ],
+    )
+    .unwrap();
+    let authorized = support::authorized_source("warehouse_primary", &["public"]);
+    let pair = ArrayTypeObservation::new(
+        type_name("pg_catalog", "_int4"),
+        type_name("pg_catalog", "int4"),
+    )
+    .unwrap();
+    let observed = PostgresSchemaSnapshotV3::new_with_array_types_and_type_kinds(
+        &authorized,
+        "postgres_introspector_v3",
+        "2026-09-12T05:10:00Z",
+        vec![relation.clone()],
+        Vec::new(),
+        Vec::new(),
+        vec![pair],
+        Vec::new(),
+    )
+    .unwrap();
+    let unpaired = PostgresSchemaSnapshotV3::new_with_array_types_and_type_kinds(
+        &authorized,
+        "postgres_introspector_v3",
+        "2026-09-12T05:10:00Z",
+        vec![relation],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    )
+    .unwrap();
+    assert_eq!(observed.array_types().unwrap().len(), 1);
+    assert_ne!(observed.snapshot_digest(), unpaired.snapshot_digest());
+}
+
+#[test]
+fn domain_over_catalog_array_keeps_original_base_and_canonical_digest() {
+    let authorized = support::authorized_source("warehouse_primary", &["public"]);
+    let domain =
+        DomainObservation::new("public", "labels", type_name("pg_catalog", "_text")).unwrap();
+    let pair = ArrayTypeObservation::new(
+        type_name("pg_catalog", "_text"),
+        type_name("pg_catalog", "text"),
+    )
+    .unwrap();
+    let kind = TypeKindObservation::domain(
+        type_name("public", "labels"),
+        type_name("pg_catalog", "_text"),
+    );
+    let composed = PostgresSchemaSnapshotV3::new_with_array_types(
+        &authorized,
+        "postgres_introspector_v3",
+        "2026-09-12T05:10:00Z",
+        Vec::new(),
+        vec![domain.clone()],
+        Vec::new(),
+        vec![pair.clone()],
+    )
+    .unwrap()
+    .with_observed_type_kinds(vec![kind.clone()])
+    .unwrap();
+    let direct = PostgresSchemaSnapshotV3::new_with_array_types_and_type_kinds(
+        &authorized,
+        "postgres_introspector_v3",
+        "2026-09-12T05:10:00Z",
+        Vec::new(),
+        vec![domain],
+        Vec::new(),
+        vec![pair],
+        vec![kind],
+    )
+    .unwrap();
+    assert_eq!(direct.domains()[0].base_type().type_name(), "_text");
+    assert_eq!(direct.snapshot_digest(), composed.snapshot_digest());
 }
 
 #[test]

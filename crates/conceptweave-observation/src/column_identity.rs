@@ -11,10 +11,130 @@ use std::collections::BTreeSet;
 
 use sha2::{Digest, Sha256};
 
-use crate::{ObservationError, RelationKind, RelationObservation};
+use crate::{ObservationError, QualifiedTypeName, RelationKind, RelationObservation};
 
 const SNAPSHOT_DIGEST_DOMAIN_V3_COLUMN_IDENTITY_V1: &[u8] =
     b"conceptweave.postgres_schema_snapshot.v3.column_identity.v1";
+const SNAPSHOT_DIGEST_DOMAIN_V3_IDENTITY_SEQUENCE_V1: &[u8] =
+    b"conceptweave.postgres_schema_snapshot.v3.identity_sequence.v1";
+
+/// Exact declaration metadata for the sequence internally owned by one identity column.
+/// Runtime sequence state is not source schema evidence.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IdentitySequenceObservation {
+    sequence_name: QualifiedTypeName,
+    sequence_type: QualifiedTypeName,
+    start: i64,
+    increment: i64,
+    minimum: i64,
+    maximum: i64,
+    cache: i64,
+    cycle: bool,
+    source_comment: Option<String>,
+}
+
+impl IdentitySequenceObservation {
+    /// Records the exact `pg_class` coordinate and `pg_sequence` settings.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "catalog sequence settings are indivisible"
+    )]
+    pub fn new(
+        sequence_name: QualifiedTypeName,
+        sequence_type: QualifiedTypeName,
+        start: i64,
+        increment: i64,
+        minimum: i64,
+        maximum: i64,
+        cache: i64,
+        cycle: bool,
+        source_comment: Option<String>,
+    ) -> Result<Self, ObservationError> {
+        let type_bounds = match sequence_type.type_name() {
+            "int2" => Some((i64::from(i16::MIN), i64::from(i16::MAX))),
+            "int4" => Some((i64::from(i32::MIN), i64::from(i32::MAX))),
+            "int8" => Some((i64::MIN, i64::MAX)),
+            _ => None,
+        };
+        if sequence_type.schema_name() != "pg_catalog"
+            || type_bounds.is_none_or(|(lower, upper)| minimum < lower || maximum > upper)
+            || increment == 0
+            || cache <= 0
+            || minimum > maximum
+            || start < minimum
+            || start > maximum
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "identity_sequence_settings",
+            });
+        }
+        Ok(Self {
+            sequence_name,
+            sequence_type,
+            start,
+            increment,
+            minimum,
+            maximum,
+            cache,
+            cycle,
+            source_comment,
+        })
+    }
+
+    /// Returns the exact qualified sequence name.
+    #[must_use]
+    pub fn sequence_name(&self) -> &QualifiedTypeName {
+        &self.sequence_name
+    }
+
+    /// Returns the exact qualified sequence data type.
+    #[must_use]
+    pub fn sequence_type(&self) -> &QualifiedTypeName {
+        &self.sequence_type
+    }
+
+    /// Returns the PostgreSQL sequence start value.
+    #[must_use]
+    pub const fn start(&self) -> i64 {
+        self.start
+    }
+
+    /// Returns the PostgreSQL sequence increment.
+    #[must_use]
+    pub const fn increment(&self) -> i64 {
+        self.increment
+    }
+
+    /// Returns the PostgreSQL sequence minimum.
+    #[must_use]
+    pub const fn minimum(&self) -> i64 {
+        self.minimum
+    }
+
+    /// Returns the PostgreSQL sequence maximum.
+    #[must_use]
+    pub const fn maximum(&self) -> i64 {
+        self.maximum
+    }
+
+    /// Returns the PostgreSQL sequence cache size.
+    #[must_use]
+    pub const fn cache(&self) -> i64 {
+        self.cache
+    }
+
+    /// Returns whether the sequence cycles.
+    #[must_use]
+    pub const fn cycle(&self) -> bool {
+        self.cycle
+    }
+
+    /// Returns the source catalog comment, if present.
+    #[must_use]
+    pub fn source_comment(&self) -> Option<&str> {
+        self.source_comment.as_deref()
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ColumnIdentityMode {
@@ -45,6 +165,7 @@ pub struct ColumnIdentityObservation {
     relation_kind: RelationKind,
     column_name: String,
     mode: ColumnIdentityMode,
+    sequence: Option<IdentitySequenceObservation>,
 }
 
 impl ColumnIdentityObservation {
@@ -115,7 +236,28 @@ impl ColumnIdentityObservation {
             relation_kind,
             column_name,
             mode,
+            sequence: None,
         })
+    }
+
+    /// Attaches the internally owned sequence's exact catalog settings to an identity column.
+    pub fn with_sequence(
+        mut self,
+        sequence: IdentitySequenceObservation,
+    ) -> Result<Self, ObservationError> {
+        if self.is_not_identity() || self.sequence.is_some() {
+            return Err(ObservationError::InvalidObservationField {
+                field: "identity_sequence_binding",
+            });
+        }
+        self.sequence = Some(sequence);
+        Ok(self)
+    }
+
+    /// Returns complete identity-sequence settings when they were observed.
+    #[must_use]
+    pub fn sequence(&self) -> Option<&IdentitySequenceObservation> {
+        self.sequence.as_ref()
     }
 
     /// Returns the exact source schema identifier.
@@ -214,6 +356,7 @@ pub(crate) fn canonicalize_column_identities(
         .collect::<BTreeSet<_>>();
     let mut observed_coordinates = BTreeSet::new();
 
+    let mut observed_sequences = BTreeSet::new();
     for observation in &column_identities {
         let Some(relation) = relations.iter().find(|relation| {
             relation.schema_name() == observation.schema_name()
@@ -245,6 +388,18 @@ pub(crate) fn canonicalize_column_identities(
                 field: "column_identity_nullability",
             });
         }
+        if let Some(sequence) = observation.sequence()
+            && (sequence.sequence_type() != column.type_binding()
+                || sequence.sequence_name().schema_name() != observation.schema_name()
+                || !observed_sequences.insert((
+                    sequence.sequence_name().schema_name().to_owned(),
+                    sequence.sequence_name().type_name().to_owned(),
+                )))
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "identity_sequence_binding",
+            });
+        }
 
         observed_coordinates.insert((
             observation.schema_name().to_owned(),
@@ -257,6 +412,17 @@ pub(crate) fn canonicalize_column_identities(
     if observed_coordinates != expected_coordinates {
         return Err(ObservationError::InvalidObservationField {
             field: "column_identity_completeness",
+        });
+    }
+    if column_identities
+        .iter()
+        .any(|observation| observation.sequence.is_some())
+        && column_identities
+            .iter()
+            .any(|observation| !observation.is_not_identity() && observation.sequence.is_none())
+    {
+        return Err(ObservationError::InvalidObservationField {
+            field: "identity_sequence_completeness",
         });
     }
 
@@ -294,6 +460,48 @@ pub(crate) fn compute_column_identity_digest(
         encode_str(&mut hasher, observation.relation_kind().token());
         encode_str(&mut hasher, observation.column_name());
         hasher.update([observation.mode.tag()]);
+    }
+    let declaration_digest = encode_sha256(hasher);
+    if column_identities
+        .iter()
+        .all(|observation| observation.sequence.is_none())
+    {
+        return declaration_digest;
+    }
+    let mut hasher = Sha256::new();
+    encode_bytes(&mut hasher, SNAPSHOT_DIGEST_DOMAIN_V3_IDENTITY_SEQUENCE_V1);
+    encode_str(&mut hasher, &declaration_digest);
+    encode_len(&mut hasher, column_identities.len());
+    for observation in column_identities {
+        encode_str(&mut hasher, observation.schema_name());
+        encode_str(&mut hasher, observation.relation_name());
+        encode_str(&mut hasher, observation.column_name());
+        if let Some(sequence) = observation.sequence() {
+            hasher.update([1]);
+            encode_str(&mut hasher, sequence.sequence_name().schema_name());
+            encode_str(&mut hasher, sequence.sequence_name().type_name());
+            encode_str(&mut hasher, sequence.sequence_type().schema_name());
+            encode_str(&mut hasher, sequence.sequence_type().type_name());
+            for value in [
+                sequence.start(),
+                sequence.increment(),
+                sequence.minimum(),
+                sequence.maximum(),
+                sequence.cache(),
+            ] {
+                hasher.update(value.to_be_bytes());
+            }
+            hasher.update([u8::from(sequence.cycle())]);
+            match sequence.source_comment() {
+                Some(comment) => {
+                    hasher.update([1]);
+                    encode_str(&mut hasher, comment);
+                }
+                None => hasher.update([0]),
+            }
+        } else {
+            hasher.update([0]);
+        }
     }
     encode_sha256(hasher)
 }

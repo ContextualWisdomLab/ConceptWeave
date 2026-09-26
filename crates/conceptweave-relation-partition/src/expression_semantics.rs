@@ -40,8 +40,8 @@ impl QualifiedFunctionSignature {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let function_name = function_name.into();
-        validate_nonblank(&schema_name, "expression_function_schema_name")?;
-        validate_nonblank(&function_name, "expression_function_name")?;
+        validate_identifier(&schema_name, "expression_function_schema_name")?;
+        validate_identifier(&function_name, "expression_function_name")?;
         Ok(Self {
             schema_name,
             function_name,
@@ -96,7 +96,7 @@ impl QualifiedUnaryOperatorSignature {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let operator_name = operator_name.into();
-        validate_nonblank(&schema_name, "expression_unary_operator_schema_name")?;
+        validate_identifier(&schema_name, "expression_unary_operator_schema_name")?;
         validate_nonblank(&operator_name, "expression_unary_operator_name")?;
         Ok(Self {
             schema_name,
@@ -225,7 +225,7 @@ impl CanonicalExpression {
     /// Creates a relation-local column reference without retaining its physical attribute number.
     pub fn column(column_name: impl Into<String>) -> Result<Self, ObservationError> {
         let column_name = column_name.into();
-        validate_nonblank(&column_name, "canonical_expression_column_name")?;
+        validate_identifier(&column_name, "canonical_expression_column_name")?;
         Ok(Self::Column(column_name))
     }
 
@@ -962,6 +962,13 @@ fn encode_type(hasher: &mut Sha256, value: &QualifiedTypeName) {
 
 fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
     if value.trim().is_empty() {
+        return Err(invalid(field));
+    }
+    Ok(())
+}
+
+fn validate_identifier(value: &str, field: &'static str) -> Result<(), ObservationError> {
+    if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }
     Ok(())

@@ -1,6 +1,6 @@
 use conceptweave_client::{
     ReleaseContractError, ReleaseDigest, ReleaseMetadata, ReleaseSupersession, SemanticRelease,
-    SemanticReleaseClient, SemanticReleaseReference,
+    SemanticReleaseClient, SemanticReleaseReference, TrustedReleaseManifest,
 };
 use conceptweave_domain::{EvidenceReference, PublicationState, TruthStatus};
 
@@ -33,6 +33,21 @@ fn release(
         vec!["control.evidence".to_owned()],
     )
     .expect("release fixture is valid")
+}
+
+fn trusted_client(releases: &[&SemanticRelease]) -> SemanticReleaseClient {
+    SemanticReleaseClient::with_trusted_release_manifests(
+        "2.0.0",
+        vec![],
+        releases
+            .iter()
+            .map(|release| {
+                TrustedReleaseManifest::new(release.release_id(), release.manifest_digest())
+                    .unwrap()
+            })
+            .collect(),
+    )
+    .unwrap()
 }
 
 #[test]
@@ -100,9 +115,9 @@ fn supersession_rejects_blank_reference_fields_blank_rationale_and_self_superses
 
 #[test]
 fn client_accepts_only_an_explicit_supersession_bound_to_both_exact_release_identities() {
-    let client = SemanticReleaseClient::new("2.0.0").expect("client policy is valid");
     let previous = release("semantic_release_2026_09", 'b', PublicationState::Published);
     let successor = release("semantic_release_2026_10", 'c', PublicationState::Published);
+    let client = trusted_client(&[&previous, &successor]);
     let declaration = ReleaseSupersession::new(
         SemanticReleaseReference::from_release(&previous),
         SemanticReleaseReference::from_release(&successor),
@@ -119,24 +134,24 @@ fn client_accepts_only_an_explicit_supersession_bound_to_both_exact_release_iden
         release("semantic_release_2026_09", 'd', PublicationState::Published);
     assert_eq!(
         client.validate_supersession(&declaration, &wrong_previous_digest, &successor),
-        Err(ReleaseContractError::SupersededReleaseReferenceMismatch)
+        Err(ReleaseContractError::UntrustedRelease)
     );
 
     let wrong_successor_digest =
         release("semantic_release_2026_10", 'e', PublicationState::Published);
     assert_eq!(
         client.validate_supersession(&declaration, &previous, &wrong_successor_digest),
-        Err(ReleaseContractError::SuccessorReleaseReferenceMismatch)
+        Err(ReleaseContractError::UntrustedRelease)
     );
 }
 
 #[test]
 fn supersession_never_bypasses_either_authoritative_release_admission_gate() {
-    let client = SemanticReleaseClient::new("2.0.0").expect("client policy is valid");
     let reviewed_previous = release("semantic_release_2026_09", 'b', PublicationState::Reviewed);
     let published_previous = release("semantic_release_2026_09", 'b', PublicationState::Published);
     let published_successor = release("semantic_release_2026_10", 'c', PublicationState::Published);
     let reviewed_successor = release("semantic_release_2026_10", 'c', PublicationState::Reviewed);
+    let client = trusted_client(&[&published_previous, &published_successor]);
     let declaration = ReleaseSupersession::new(
         SemanticReleaseReference::from_release(&published_previous),
         SemanticReleaseReference::from_release(&published_successor),
@@ -155,5 +170,31 @@ fn supersession_never_bypasses_either_authoritative_release_admission_gate() {
         Err(ReleaseContractError::ReleaseNotPublished {
             actual: PublicationState::Reviewed,
         })
+    );
+}
+
+#[test]
+fn superseded_predecessor_still_requires_its_exact_trusted_manifest() {
+    let previous = SemanticRelease::new(
+        ReleaseMetadata::new("semantic_release_2026_09", "2.0.0", "ontology_previous").unwrap(),
+        TruthStatus::Superseded,
+        PublicationState::Superseded,
+        digest('b'),
+        vec![evidence()],
+        vec!["control.evidence".to_owned()],
+    )
+    .unwrap();
+    let successor = release("semantic_release_2026_10", 'c', PublicationState::Published);
+    let client = trusted_client(&[&successor]);
+    let declaration = ReleaseSupersession::new(
+        SemanticReleaseReference::from_release(&previous),
+        SemanticReleaseReference::from_release(&successor),
+        "steward-approved correction",
+    )
+    .unwrap();
+
+    assert_eq!(
+        client.validate_supersession(&declaration, &previous, &successor),
+        Err(ReleaseContractError::UntrustedRelease)
     );
 }

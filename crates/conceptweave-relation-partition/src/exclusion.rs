@@ -31,7 +31,7 @@ impl QualifiedOperatorSignature {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let operator_name = operator_name.into();
-        validate_nonblank(&schema_name, "exclusion_operator_schema_name")?;
+        validate_identifier(&schema_name, "exclusion_operator_schema_name")?;
         validate_nonblank(&operator_name, "exclusion_operator_name")?;
         Ok(Self {
             schema_name,
@@ -83,8 +83,8 @@ impl QualifiedProcedureSignature {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let procedure_name = procedure_name.into();
-        validate_nonblank(&schema_name, "exclusion_procedure_schema_name")?;
-        validate_nonblank(&procedure_name, "exclusion_procedure_name")?;
+        validate_identifier(&schema_name, "exclusion_procedure_schema_name")?;
+        validate_identifier(&procedure_name, "exclusion_procedure_name")?;
         if !(1..=2).contains(&argument_types.len()) {
             return Err(invalid("exclusion_procedure_argument_types"));
         }
@@ -543,7 +543,14 @@ fn encode_type(hasher: &mut Sha256, qualified_type: &QualifiedTypeName) {
 }
 
 fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
-    if value.trim().is_empty() {
+    if value.trim().is_empty() || value.contains('\0') {
+        return Err(invalid(field));
+    }
+    Ok(())
+}
+
+fn validate_identifier(value: &str, field: &'static str) -> Result<(), ObservationError> {
+    if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }
     Ok(())

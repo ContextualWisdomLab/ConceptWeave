@@ -134,6 +134,43 @@ fn assert_backing_index_error(result: Result<PostgresSchemaSnapshotV3, Observati
 }
 
 #[test]
+fn timing_family_can_be_attached_once_after_snapshot_construction() {
+    let observed_relation = relation(
+        unique_key(),
+        vec![usable_backing_index("document_id_key", false, false).unwrap()],
+    );
+    let observed_timing = timing(
+        "document_id_key",
+        ConstraintDeferrability::InitiallyDeferred,
+    );
+    let attached = PostgresSchemaSnapshotV3::new(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-11T16:38:00Z",
+        vec![observed_relation.clone()],
+        Vec::new(),
+        Vec::new(),
+    )
+    .unwrap()
+    .with_observed_constraint_timings(vec![observed_timing.clone()])
+    .unwrap();
+    assert_eq!(
+        attached.snapshot_digest(),
+        snapshot(observed_relation, observed_timing.clone())
+            .unwrap()
+            .snapshot_digest()
+    );
+    assert_eq!(
+        attached
+            .with_observed_constraint_timings(vec![observed_timing])
+            .unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "constraint_timing_observation_order"
+        }
+    );
+}
+
+#[test]
 fn observed_primary_key_requires_same_name_primary_unique_backing_index() {
     assert_backing_index_error(snapshot(
         relation(primary_key(), Vec::new()),

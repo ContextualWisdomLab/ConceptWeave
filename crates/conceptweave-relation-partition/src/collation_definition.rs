@@ -480,7 +480,11 @@ fn validate_provider_shape(
         }
     };
 
-    if valid {
+    if valid
+        && !(identity.schema_name() == "pg_catalog"
+            && identity.collation_name() == "default"
+            && provider != PostgresCollationProvider::DatabaseDefault)
+    {
         Ok(())
     } else {
         Err(invalid("index_collation_definition_provider_shape"))

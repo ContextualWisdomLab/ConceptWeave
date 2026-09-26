@@ -1585,6 +1585,8 @@ pub enum SchemaObjectLocationKind {
     Domain,
     /// A schema-scoped enum observation.
     Enum,
+    /// A schema-scoped collation definition observation.
+    Collation,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1610,6 +1612,7 @@ enum SchemaObjectElement {
     },
     Domain(String),
     Enum(String),
+    Collation(String),
 }
 
 /// Exact structured location inside an immutable successor schema snapshot.
@@ -1617,8 +1620,8 @@ enum SchemaObjectElement {
 /// Relation-level coordinates use the successor vocabulary
 /// `/schemas/{schema}/relations/{kind}/{name}` so the exact `pg_class.relkind` is carried in the
 /// coordinate. Relation children append `/columns/{name}`, `/constraints/{name}`, or
-/// `/indexes/{name}` under that kind-aware relation segment. Domain and enum coordinates use the
-/// schema-scoped vocabulary `/schemas/{schema}/domains/{name}` and `/schemas/{schema}/enums/{name}`.
+/// `/indexes/{name}` under that kind-aware relation segment. Domain, enum, and collation
+/// coordinates use `/schemas/{schema}/{domains|enums|collations}/{name}`.
 /// Every identifier token applies RFC 6901 escaping (`~` -> `~0`, `/` -> `~1`) without case or
 /// Unicode normalization. Frozen v2 `/schemas/{schema}/tables/{table}` meaning is unchanged.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1731,6 +1734,16 @@ impl SchemaObjectLocation {
         Self::new(schema_name, SchemaObjectElement::Enum(enum_name))
     }
 
+    /// Creates a location for an exact schema-scoped PostgreSQL collation.
+    pub fn collation(
+        schema_name: impl Into<String>,
+        collation_name: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        let collation_name = collation_name.into();
+        validate_postgresql_identifier(&collation_name, "collation_name")?;
+        Self::new(schema_name, SchemaObjectElement::Collation(collation_name))
+    }
+
     fn new(
         schema_name: impl Into<String>,
         element: SchemaObjectElement,
@@ -1753,6 +1766,7 @@ impl SchemaObjectLocation {
             SchemaObjectElement::Index { .. } => SchemaObjectLocationKind::Index,
             SchemaObjectElement::Domain(_) => SchemaObjectLocationKind::Domain,
             SchemaObjectElement::Enum(_) => SchemaObjectLocationKind::Enum,
+            SchemaObjectElement::Collation(_) => SchemaObjectLocationKind::Collation,
         }
     }
 
@@ -1773,7 +1787,9 @@ impl SchemaObjectLocation {
             | SchemaObjectElement::Column { kind, .. }
             | SchemaObjectElement::Constraint { kind, .. }
             | SchemaObjectElement::Index { kind, .. } => Some(*kind),
-            SchemaObjectElement::Domain(_) | SchemaObjectElement::Enum(_) => None,
+            SchemaObjectElement::Domain(_)
+            | SchemaObjectElement::Enum(_)
+            | SchemaObjectElement::Collation(_) => None,
         }
     }
 
@@ -1785,7 +1801,9 @@ impl SchemaObjectLocation {
             SchemaObjectElement::Column { relation_name, .. }
             | SchemaObjectElement::Constraint { relation_name, .. }
             | SchemaObjectElement::Index { relation_name, .. } => Some(relation_name),
-            SchemaObjectElement::Domain(_) | SchemaObjectElement::Enum(_) => None,
+            SchemaObjectElement::Domain(_)
+            | SchemaObjectElement::Enum(_)
+            | SchemaObjectElement::Collation(_) => None,
         }
     }
 
@@ -1798,7 +1816,8 @@ impl SchemaObjectLocation {
             | SchemaObjectElement::Constraint { .. }
             | SchemaObjectElement::Index { .. }
             | SchemaObjectElement::Domain(_)
-            | SchemaObjectElement::Enum(_) => None,
+            | SchemaObjectElement::Enum(_)
+            | SchemaObjectElement::Collation(_) => None,
         }
     }
 
@@ -1813,7 +1832,8 @@ impl SchemaObjectLocation {
             | SchemaObjectElement::Column { .. }
             | SchemaObjectElement::Index { .. }
             | SchemaObjectElement::Domain(_)
-            | SchemaObjectElement::Enum(_) => None,
+            | SchemaObjectElement::Enum(_)
+            | SchemaObjectElement::Collation(_) => None,
         }
     }
 
@@ -1826,7 +1846,8 @@ impl SchemaObjectLocation {
             | SchemaObjectElement::Column { .. }
             | SchemaObjectElement::Constraint { .. }
             | SchemaObjectElement::Domain(_)
-            | SchemaObjectElement::Enum(_) => None,
+            | SchemaObjectElement::Enum(_)
+            | SchemaObjectElement::Collation(_) => None,
         }
     }
 
@@ -1839,7 +1860,8 @@ impl SchemaObjectLocation {
             | SchemaObjectElement::Column { .. }
             | SchemaObjectElement::Constraint { .. }
             | SchemaObjectElement::Index { .. }
-            | SchemaObjectElement::Enum(_) => None,
+            | SchemaObjectElement::Enum(_)
+            | SchemaObjectElement::Collation(_) => None,
         }
     }
 
@@ -1852,7 +1874,17 @@ impl SchemaObjectLocation {
             | SchemaObjectElement::Column { .. }
             | SchemaObjectElement::Constraint { .. }
             | SchemaObjectElement::Index { .. }
-            | SchemaObjectElement::Domain(_) => None,
+            | SchemaObjectElement::Domain(_)
+            | SchemaObjectElement::Collation(_) => None,
+        }
+    }
+
+    /// Returns the exact source collation identifier for a collation coordinate.
+    #[must_use]
+    pub fn collation_name(&self) -> Option<&str> {
+        match &self.element {
+            SchemaObjectElement::Collation(collation_name) => Some(collation_name),
+            _ => None,
         }
     }
 
@@ -1915,6 +1947,11 @@ impl SchemaObjectLocation {
                 "/schemas/{}/enums/{}",
                 escape_json_pointer_token(&self.schema_name),
                 escape_json_pointer_token(enum_name)
+            ),
+            SchemaObjectElement::Collation(collation_name) => format!(
+                "/schemas/{}/collations/{}",
+                escape_json_pointer_token(&self.schema_name),
+                escape_json_pointer_token(collation_name)
             ),
         }
     }
@@ -2316,6 +2353,7 @@ impl PostgresSchemaSnapshotV3 {
                 observed_enum.schema_name == location.schema_name
                     && observed_enum.enum_name == *enum_name
             }),
+            SchemaObjectElement::Collation(_) => false,
         }
     }
 }

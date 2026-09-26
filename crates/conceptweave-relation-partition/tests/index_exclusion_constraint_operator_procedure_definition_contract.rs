@@ -232,15 +232,20 @@ fn ordinary_exclude_operator_procedure_definition_distinguishes_language_changes
 }
 
 #[test]
-fn ordinary_exclude_operator_procedure_definition_rejects_blank_language() {
-    let error = IndexExclusionConstraintOperatorProcedureDefinitionMaterial::new(
-        "   ", "int4eq", None, None,
-    )
-    .expect_err("resolved pg_language identity must not be blank");
-    assert_field(
-        error,
-        "index_exclusion_constraint_operator_procedure_definition_language",
-    );
+fn ordinary_exclude_operator_procedure_definition_preserves_quoted_language_name() {
+    let material = definition_material("   ", "int4eq", None, None);
+    assert_eq!(material.language_name(), "   ");
+
+    for name in ["", "bad\0name"] {
+        let error = IndexExclusionConstraintOperatorProcedureDefinitionMaterial::new(
+            name, "int4eq", None, None,
+        )
+        .expect_err("an empty or NUL-containing language name cannot come from PostgreSQL");
+        assert_field(
+            error,
+            "index_exclusion_constraint_operator_procedure_definition_language",
+        );
+    }
 }
 
 #[test]

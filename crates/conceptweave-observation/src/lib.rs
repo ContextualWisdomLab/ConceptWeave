@@ -7,24 +7,37 @@
 #![deny(missing_docs)]
 
 mod array_type;
+mod collation_definition;
+mod column_array_dimensions;
 mod column_collation;
 mod column_expression;
 mod column_generation;
 mod column_identity;
 mod constraint_period;
 mod constraint_timing;
+mod foreign_key_catalog;
 mod model;
 mod not_null_constraint;
+mod range_catalog;
+mod relation_owner;
+mod relation_tablespace;
 mod representation_v3;
+mod schema_owner;
 mod type_kind;
 
 pub use array_type::{ArrayTypeLocation, ArrayTypeObservation, ArrayTypeSourceReceipt};
+pub use collation_definition::{
+    CollationDefinitionObservation, CollationLocaleFields, CollationProvider,
+    DatabaseLocaleDefinition,
+};
+pub use column_array_dimensions::ColumnArrayDimensionsObservation;
 pub use column_collation::ColumnCollationObservation;
 pub use column_expression::ColumnExpressionObservation;
 pub use column_generation::ColumnGenerationObservation;
-pub use column_identity::ColumnIdentityObservation;
+pub use column_identity::{ColumnIdentityObservation, IdentitySequenceObservation};
 pub use constraint_period::ConstraintPeriodObservation;
 pub use constraint_timing::{ConstraintDeferrability, ConstraintTimingObservation};
+pub use foreign_key_catalog::{ForeignKeyCatalogObservation, ForeignKeyOperatorObservation};
 pub use model::{
     CheckConstraintObservation, ColumnObservation, ForeignKeyAction, ForeignKeyDeferrability,
     ForeignKeyMatchType, ForeignKeyObservation, ForeignKeyReferenceBehavior, ObservationError,
@@ -32,6 +45,11 @@ pub use model::{
     TableConstraintObservation, TableObservation, UniqueConstraintObservation,
 };
 pub use not_null_constraint::{NotNullConstraintObservation, ParentNotNullConstraintCoordinate};
+pub use range_catalog::{
+    QualifiedRangeProcedure, RangeCatalogObservation, RangeCatalogSourceReceipt,
+};
+pub use relation_owner::RelationOwnerObservation;
+pub use relation_tablespace::RelationTablespaceObservation;
 pub use representation_v3::{
     ColumnObservationV3, DomainCheckConstraintObservation, DomainObservation, EnumObservation,
     IndexAttributeKind, IndexAttributeObservation, IndexAttributeSource, IndexCatalogFlags,
@@ -39,7 +57,9 @@ pub use representation_v3::{
     QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
     RelationObservation, ReplicaIdentityMode, SchemaObjectLocation, SchemaObjectLocationKind,
 };
-pub use type_kind::{PostgresTypeKind, TypeKindObservation};
+pub use schema_owner::{SchemaOwnerLocation, SchemaOwnerObservation, SchemaOwnerSourceReceipt};
+pub use type_kind::TypeOwnerObservation;
+pub use type_kind::{PostgresTypeKind, TypeKindObservation, TypeSourceReceipt};
 
 use std::collections::BTreeSet;
 
@@ -122,6 +142,7 @@ impl SuccessorSourceReceipt {
 pub struct PostgresSchemaSnapshotV3 {
     inner: representation_v3::PostgresSchemaSnapshotV3,
     snapshot_digest: String,
+    authorized_schema_names: Vec<String>,
     relations: Vec<RelationObservation>,
     domains: Vec<DomainObservation>,
     enums: Vec<EnumObservation>,
@@ -129,6 +150,12 @@ pub struct PostgresSchemaSnapshotV3 {
     array_types_observed: bool,
     type_kinds: Vec<TypeKindObservation>,
     type_kinds_observed: bool,
+    type_owners: Vec<TypeOwnerObservation>,
+    type_owners_observed: bool,
+    schema_owners: Vec<SchemaOwnerObservation>,
+    schema_owners_observed: bool,
+    column_array_dimensions: Vec<ColumnArrayDimensionsObservation>,
+    column_array_dimensions_observed: bool,
     column_collations: Vec<ColumnCollationObservation>,
     column_collations_observed: bool,
     column_generations: Vec<ColumnGenerationObservation>,
@@ -143,6 +170,16 @@ pub struct PostgresSchemaSnapshotV3 {
     constraint_timings_observed: bool,
     constraint_periods: Vec<ConstraintPeriodObservation>,
     constraint_periods_observed: bool,
+    foreign_key_catalog: Vec<ForeignKeyCatalogObservation>,
+    foreign_key_catalog_observed: bool,
+    range_catalog: Vec<RangeCatalogObservation>,
+    range_catalog_observed: bool,
+    relation_tablespaces: Vec<RelationTablespaceObservation>,
+    relation_tablespaces_observed: bool,
+    relation_owners: Vec<RelationOwnerObservation>,
+    relation_owners_observed: bool,
+    collation_definitions: Vec<CollationDefinitionObservation>,
+    collation_definitions_observed: bool,
 }
 
 impl PostgresSchemaSnapshotV3 {
@@ -177,6 +214,7 @@ impl PostgresSchemaSnapshotV3 {
         Ok(Self {
             inner,
             snapshot_digest,
+            authorized_schema_names: authorized_request.request().allowed_schema_names().to_vec(),
             relations,
             domains,
             enums,
@@ -184,6 +222,12 @@ impl PostgresSchemaSnapshotV3 {
             array_types_observed: false,
             type_kinds: Vec::new(),
             type_kinds_observed: false,
+            type_owners: Vec::new(),
+            type_owners_observed: false,
+            schema_owners: Vec::new(),
+            schema_owners_observed: false,
+            column_array_dimensions: Vec::new(),
+            column_array_dimensions_observed: false,
             column_collations: Vec::new(),
             column_collations_observed: false,
             column_generations: Vec::new(),
@@ -198,6 +242,16 @@ impl PostgresSchemaSnapshotV3 {
             constraint_timings_observed: false,
             constraint_periods: Vec::new(),
             constraint_periods_observed: false,
+            foreign_key_catalog: Vec::new(),
+            foreign_key_catalog_observed: false,
+            range_catalog: Vec::new(),
+            range_catalog_observed: false,
+            relation_tablespaces: Vec::new(),
+            relation_tablespaces_observed: false,
+            relation_owners: Vec::new(),
+            relation_owners_observed: false,
+            collation_definitions: Vec::new(),
+            collation_definitions_observed: false,
         })
     }
 
@@ -267,6 +321,7 @@ impl PostgresSchemaSnapshotV3 {
         Ok(Self {
             inner,
             snapshot_digest,
+            authorized_schema_names: authorized_request.request().allowed_schema_names().to_vec(),
             relations,
             domains,
             enums,
@@ -274,6 +329,12 @@ impl PostgresSchemaSnapshotV3 {
             array_types_observed: false,
             type_kinds,
             type_kinds_observed: true,
+            type_owners: Vec::new(),
+            type_owners_observed: false,
+            schema_owners: Vec::new(),
+            schema_owners_observed: false,
+            column_array_dimensions: Vec::new(),
+            column_array_dimensions_observed: false,
             column_collations: Vec::new(),
             column_collations_observed: false,
             column_generations: Vec::new(),
@@ -288,6 +349,16 @@ impl PostgresSchemaSnapshotV3 {
             constraint_timings_observed: false,
             constraint_periods: Vec::new(),
             constraint_periods_observed: false,
+            foreign_key_catalog: Vec::new(),
+            foreign_key_catalog_observed: false,
+            range_catalog: Vec::new(),
+            range_catalog_observed: false,
+            relation_tablespaces: Vec::new(),
+            relation_tablespaces_observed: false,
+            relation_owners: Vec::new(),
+            relation_owners_observed: false,
+            collation_definitions: Vec::new(),
+            collation_definitions_observed: false,
         })
     }
 
@@ -501,6 +572,7 @@ impl PostgresSchemaSnapshotV3 {
             &relations,
             &domains,
             &enums,
+            &[],
             array_types,
         )?;
         validate_type_bindings_with_arrays(&relations, &domains, &enums, &array_types)?;
@@ -546,6 +618,7 @@ impl PostgresSchemaSnapshotV3 {
         Ok(Self {
             inner,
             snapshot_digest,
+            authorized_schema_names: authorized_request.request().allowed_schema_names().to_vec(),
             relations,
             domains,
             enums,
@@ -553,6 +626,12 @@ impl PostgresSchemaSnapshotV3 {
             array_types_observed: true,
             type_kinds: Vec::new(),
             type_kinds_observed: false,
+            type_owners: Vec::new(),
+            type_owners_observed: false,
+            schema_owners: Vec::new(),
+            schema_owners_observed: false,
+            column_array_dimensions: Vec::new(),
+            column_array_dimensions_observed: false,
             column_collations: Vec::new(),
             column_collations_observed: false,
             column_generations: Vec::new(),
@@ -567,7 +646,131 @@ impl PostgresSchemaSnapshotV3 {
             constraint_timings_observed: false,
             constraint_periods: Vec::new(),
             constraint_periods_observed: false,
+            foreign_key_catalog: Vec::new(),
+            foreign_key_catalog_observed: false,
+            range_catalog: Vec::new(),
+            range_catalog_observed: false,
+            relation_tablespaces: Vec::new(),
+            relation_tablespaces_observed: false,
+            relation_owners: Vec::new(),
+            relation_owners_observed: false,
+            collation_definitions: Vec::new(),
+            collation_definitions_observed: false,
         })
+    }
+
+    /// Captures exact true-array pairs alongside all schema-local PostgreSQL type kinds.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "preserve source evidence constructor"
+    )]
+    pub fn new_with_array_types_and_type_kinds(
+        authorized_request: &AuthorizedObservationRequest,
+        extractor_revision: impl Into<String>,
+        observed_at_utc: impl Into<String>,
+        relations: Vec<RelationObservation>,
+        domains: Vec<DomainObservation>,
+        enums: Vec<EnumObservation>,
+        array_types: Vec<ArrayTypeObservation>,
+        type_kinds: Vec<TypeKindObservation>,
+    ) -> Result<Self, ObservationError> {
+        validate_schema_relation_invariants(&relations)?;
+        let type_kinds = canonicalize_type_kind_observations(
+            Some(authorized_request.request().allowed_schema_names()),
+            &relations,
+            &domains,
+            &enums,
+            type_kinds,
+        )?;
+        let array_types = canonicalize_array_type_observations(
+            authorized_request,
+            &relations,
+            &domains,
+            &enums,
+            &type_kinds,
+            array_types,
+        )?;
+        if array_types.iter().any(|array| {
+            array.array_type().schema_name() != POSTGRES_CATALOG_SCHEMA_NAME
+                && !type_kinds.iter().any(|kind| {
+                    same_type_coordinate(kind.type_name(), array.array_type())
+                        && kind.kind() == PostgresTypeKind::Base
+                })
+        }) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "array_type_kind",
+            });
+        }
+        validate_type_bindings_with_type_kinds_and_arrays(
+            &relations,
+            &domains,
+            &enums,
+            &array_types,
+            &type_kinds,
+        )?;
+        let projected_relations = relations
+            .iter()
+            .map(|relation| project_relation_array_bindings(relation, &array_types))
+            .collect::<Result<Vec<_>, _>>()?;
+        let projected_domains = domains
+            .iter()
+            .map(|domain| project_domain_array_binding(domain, &array_types))
+            .collect::<Result<Vec<_>, _>>()?;
+        let projected_type_kinds = type_kinds
+            .iter()
+            .map(|kind| {
+                if kind.kind() != PostgresTypeKind::Domain {
+                    return Ok(kind.clone());
+                }
+                let domain = projected_domains
+                    .iter()
+                    .find(|domain| {
+                        domain.schema_name() == kind.type_name().schema_name()
+                            && domain.domain_name() == kind.type_name().type_name()
+                    })
+                    .ok_or(ObservationError::InvalidObservationField {
+                        field: "type_kind_coordinate",
+                    })?;
+                Ok(TypeKindObservation::domain(
+                    kind.type_name().clone(),
+                    domain.base_type().clone(),
+                ))
+            })
+            .collect::<Result<Vec<_>, ObservationError>>()?;
+        let mut snapshot = Self::new_with_type_kinds(
+            authorized_request,
+            extractor_revision,
+            observed_at_utc,
+            projected_relations,
+            projected_domains,
+            enums,
+            projected_type_kinds,
+        )?;
+        snapshot.type_kinds = type_kinds;
+        snapshot.relations = relations;
+        snapshot.relations.sort_by(|left, right| {
+            (left.schema_name(), left.relation_name())
+                .cmp(&(right.schema_name(), right.relation_name()))
+        });
+        snapshot.domains = domains;
+        snapshot.domains.sort_by(|left, right| {
+            (left.schema_name(), left.domain_name())
+                .cmp(&(right.schema_name(), right.domain_name()))
+        });
+        snapshot.snapshot_digest = compute_type_kind_aware_snapshot_digest(
+            &compute_array_aware_snapshot_digest(
+                snapshot.inner.snapshot_digest(),
+                &snapshot.relations,
+                &snapshot.domains,
+                &array_types,
+            ),
+            &snapshot.relations,
+            &snapshot.domains,
+            &snapshot.type_kinds,
+        );
+        snapshot.array_types = array_types;
+        snapshot.array_types_observed = true;
+        Ok(snapshot)
     }
 
     /// Creates a deterministic v3 snapshot with both true-array identity and key-constraint timing.
@@ -624,6 +827,8 @@ impl PostgresSchemaSnapshotV3 {
             || self.not_null_constraints_observed
             || self.constraint_timings_observed
             || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "type_kind_observation_order",
@@ -676,6 +881,8 @@ impl PostgresSchemaSnapshotV3 {
             || self.not_null_constraints_observed
             || self.constraint_timings_observed
             || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "column_collation_observation_order",
@@ -712,6 +919,8 @@ impl PostgresSchemaSnapshotV3 {
             || self.not_null_constraints_observed
             || self.constraint_timings_observed
             || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "column_generation_observation_order",
@@ -754,6 +963,8 @@ impl PostgresSchemaSnapshotV3 {
             || self.not_null_constraints_observed
             || self.constraint_timings_observed
             || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "column_expression_observation_order",
@@ -792,6 +1003,8 @@ impl PostgresSchemaSnapshotV3 {
         if self.not_null_constraints_observed
             || self.constraint_timings_observed
             || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "column_identity_observation_order",
@@ -833,7 +1046,11 @@ impl PostgresSchemaSnapshotV3 {
                 field: "not_null_constraint_already_observed",
             });
         }
-        if self.constraint_timings_observed || self.constraint_periods_observed {
+        if self.constraint_timings_observed
+            || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
+        {
             return Err(ObservationError::InvalidObservationField {
                 field: "not_null_constraint_observation_order",
             });
@@ -851,10 +1068,21 @@ impl PostgresSchemaSnapshotV3 {
         Ok(self)
     }
 
-    fn with_observed_constraint_timings(
+    /// Adds complete PRIMARY KEY and UNIQUE deferrability evidence after column and NOT NULL
+    /// families. The backing index must agree with every observed timing state.
+    pub fn with_observed_constraint_timings(
         mut self,
         constraint_timings: Vec<ConstraintTimingObservation>,
     ) -> Result<Self, ObservationError> {
+        if self.constraint_timings_observed
+            || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "constraint_timing_observation_order",
+            });
+        }
         let constraint_timings =
             canonicalize_constraint_timings(&self.relations, constraint_timings)?;
         self.snapshot_digest =
@@ -880,7 +1108,10 @@ impl PostgresSchemaSnapshotV3 {
         mut self,
         constraint_periods: Vec<ConstraintPeriodObservation>,
     ) -> Result<Self, ObservationError> {
-        if self.constraint_periods_observed {
+        if self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
+        {
             return Err(ObservationError::InvalidObservationField {
                 field: "constraint_period_already_observed",
             });
@@ -901,6 +1132,259 @@ impl PostgresSchemaSnapshotV3 {
             compute_constraint_period_digest(&self.snapshot_digest, &constraint_periods);
         self.constraint_periods = constraint_periods;
         self.constraint_periods_observed = true;
+        Ok(self)
+    }
+
+    /// Adds a complete foreign-key catalog family after all other observed families.
+    /// The referenced relation and selected unique index must be in this bounded snapshot.
+    pub fn with_observed_foreign_key_catalog(
+        mut self,
+        observations: Vec<ForeignKeyCatalogObservation>,
+    ) -> Result<Self, ObservationError> {
+        if self.foreign_key_catalog_observed || self.collation_definitions_observed {
+            return Err(ObservationError::InvalidObservationField {
+                field: "foreign_key_catalog_already_observed",
+            });
+        }
+        let observations = foreign_key_catalog::canonicalize(&self.relations, observations)?;
+        self.snapshot_digest = foreign_key_catalog::digest(&self.snapshot_digest, &observations);
+        self.foreign_key_catalog = observations;
+        self.foreign_key_catalog_observed = true;
+        Ok(self)
+    }
+
+    /// Adds complete resolved storage coordinates for every observed ordinary table.
+    /// The predecessor v3 digest remains reproducible; this is an explicit successor family.
+    pub fn with_observed_relation_tablespaces(
+        mut self,
+        observations: Vec<RelationTablespaceObservation>,
+    ) -> Result<Self, ObservationError> {
+        if !self.type_kinds_observed
+            || self.relation_tablespaces_observed
+            || self.relation_owners_observed
+            || self.range_catalog_observed
+            || self.column_collations_observed
+            || self.column_generations_observed
+            || self.column_expressions_observed
+            || self.column_identities_observed
+            || self.not_null_constraints_observed
+            || self.constraint_timings_observed
+            || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "relation_tablespace_observation_order",
+            });
+        }
+        let observations = relation_tablespace::canonicalize(&self.relations, observations)?;
+        self.snapshot_digest = relation_tablespace::digest(&self.snapshot_digest, &observations);
+        self.relation_tablespaces = observations;
+        self.relation_tablespaces_observed = true;
+        Ok(self)
+    }
+
+    /// Adds exact same-generation relation owner OIDs and resolved role names.
+    /// This successor leaves historical v3 and table-storage digests reproducible.
+    pub fn with_observed_relation_owners(
+        mut self,
+        observations: Vec<RelationOwnerObservation>,
+    ) -> Result<Self, ObservationError> {
+        if !self.type_kinds_observed
+            || (self
+                .relations
+                .iter()
+                .any(|relation| relation.kind() == RelationKind::Table)
+                && !self.relation_tablespaces_observed)
+            || self.relation_owners_observed
+            || self.range_catalog_observed
+            || self.column_collations_observed
+            || self.column_generations_observed
+            || self.column_expressions_observed
+            || self.column_identities_observed
+            || self.not_null_constraints_observed
+            || self.constraint_timings_observed
+            || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "relation_owner_observation_order",
+            });
+        }
+        let observations = relation_owner::canonicalize(&self.relations, observations)?;
+        self.snapshot_digest = relation_owner::digest(&self.snapshot_digest, &observations);
+        self.relation_owners = observations;
+        self.relation_owners_observed = true;
+        Ok(self)
+    }
+
+    /// Adds a complete same-generation owner role for every schema-local type.
+    /// Historical type-kind and relation-owner digests remain reproducible.
+    pub fn with_observed_type_owners(
+        mut self,
+        observations: Vec<TypeOwnerObservation>,
+    ) -> Result<Self, ObservationError> {
+        if !self.type_kinds_observed
+            || (!self.relations.is_empty() && !self.relation_owners_observed)
+            || self.type_owners_observed
+            || self.range_catalog_observed
+            || self.column_collations_observed
+            || self.column_generations_observed
+            || self.column_expressions_observed
+            || self.column_identities_observed
+            || self.not_null_constraints_observed
+            || self.constraint_timings_observed
+            || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "type_owner_observation_order",
+            });
+        }
+        let observations = type_kind::canonicalize_owners(&self.type_kinds, observations)?;
+        self.snapshot_digest = type_kind::owner_digest(&self.snapshot_digest, &observations);
+        self.type_owners = observations;
+        self.type_owners_observed = true;
+        Ok(self)
+    }
+
+    /// Adds exact same-generation owner identities for every observed source schema.
+    /// Earlier v3 and type-owner digests remain reproducible.
+    pub fn with_observed_schema_owners(
+        mut self,
+        observations: Vec<SchemaOwnerObservation>,
+    ) -> Result<Self, ObservationError> {
+        if !self.type_owners_observed
+            || self.schema_owners_observed
+            || self.range_catalog_observed
+            || self.column_collations_observed
+            || self.column_generations_observed
+            || self.column_expressions_observed
+            || self.column_identities_observed
+            || self.not_null_constraints_observed
+            || self.constraint_timings_observed
+            || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "schema_owner_observation_order",
+            });
+        }
+        let observations = schema_owner::canonicalize(&self.authorized_schema_names, observations)?;
+        self.snapshot_digest = schema_owner::digest(&self.snapshot_digest, &observations);
+        self.schema_owners = observations;
+        self.schema_owners_observed = true;
+        Ok(self)
+    }
+
+    /// Adds complete `pg_range` subtype, ordering, collation, and function coordinates.
+    /// This successor digest leaves historical type-kind identities unchanged.
+    pub fn with_observed_range_catalog(
+        mut self,
+        observations: Vec<RangeCatalogObservation>,
+    ) -> Result<Self, ObservationError> {
+        if !self.type_kinds_observed
+            || self.range_catalog_observed
+            || self.column_collations_observed
+            || self.column_generations_observed
+            || self.column_expressions_observed
+            || self.column_identities_observed
+            || self.not_null_constraints_observed
+            || self.constraint_timings_observed
+            || self.constraint_periods_observed
+            || self.foreign_key_catalog_observed
+            || self.collation_definitions_observed
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "range_catalog_observation_order",
+            });
+        }
+        let observations = range_catalog::canonicalize(&self.type_kinds, observations)?;
+        for observation in &observations {
+            if !type_binding_is_resolvable_with_type_kinds_and_arrays(
+                observation.subtype(),
+                &self.relations,
+                &self.domains,
+                &self.enums,
+                &self.array_types,
+                &self.type_kinds,
+            ) {
+                return Err(ObservationError::UnknownTypeBinding {
+                    schema_name: observation.subtype().schema_name().to_owned(),
+                    type_name: observation.subtype().type_name().to_owned(),
+                });
+            }
+        }
+        self.snapshot_digest = range_catalog::digest(&self.snapshot_digest, &observations);
+        if observations
+            .iter()
+            .any(|item| item.canonical().is_some() || item.subtype_difference().is_some())
+        {
+            self.snapshot_digest =
+                range_catalog::procedure_definition_digest(&self.snapshot_digest, &observations);
+        }
+        self.range_catalog = observations;
+        self.range_catalog_observed = true;
+        Ok(self)
+    }
+
+    /// Adds the complete definitions of collations referenced by observed columns, domains, index
+    /// keys, and range types. This final successor family binds stored and actual provider versions, and the
+    /// effective database locale when PostgreSQL's default collation is referenced.
+    pub fn with_observed_collation_definitions(
+        mut self,
+        definitions: Vec<CollationDefinitionObservation>,
+    ) -> Result<Self, ObservationError> {
+        if self.collation_definitions_observed
+            || (!self.relations.is_empty() && !self.column_collations_observed)
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "collation_definition_observation_order",
+            });
+        }
+        let columns = self
+            .column_collations_observed
+            .then_some(self.column_collations.as_slice());
+        let definitions = collation_definition::canonicalize(
+            &self.relations,
+            &self.domains,
+            columns,
+            self.range_catalog_observed
+                .then_some(self.range_catalog.as_slice()),
+            definitions,
+        )?;
+        self.snapshot_digest = collation_definition::digest(&self.snapshot_digest, &definitions);
+        self.collation_definitions = definitions;
+        self.collation_definitions_observed = true;
+        Ok(self)
+    }
+
+    /// Adds exact declared array dimensions for every bounded column after all earlier families.
+    /// The historical v3 and prior successor digests remain reproducible.
+    pub fn with_observed_column_array_dimensions(
+        mut self,
+        observations: Vec<ColumnArrayDimensionsObservation>,
+    ) -> Result<Self, ObservationError> {
+        if !self.collation_definitions_observed
+            || !self.array_types_observed
+            || self.column_array_dimensions_observed
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "column_array_dimensions_observation_order",
+            });
+        }
+        let observations = column_array_dimensions::canonicalize(
+            &self.relations,
+            &self.array_types,
+            observations,
+        )?;
+        self.snapshot_digest =
+            column_array_dimensions::digest(&self.snapshot_digest, &observations);
+        self.column_array_dimensions = observations;
+        self.column_array_dimensions_observed = true;
         Ok(self)
     }
 
@@ -968,6 +1452,27 @@ impl PostgresSchemaSnapshotV3 {
             .then_some(self.type_kinds.as_slice())
     }
 
+    /// Returns complete type-owner evidence, or `None` when unobserved.
+    #[must_use]
+    pub fn type_owners(&self) -> Option<&[TypeOwnerObservation]> {
+        self.type_owners_observed
+            .then_some(self.type_owners.as_slice())
+    }
+
+    /// Returns complete observed schema-owner evidence, or `None` when unobserved.
+    #[must_use]
+    pub fn schema_owners(&self) -> Option<&[SchemaOwnerObservation]> {
+        self.schema_owners_observed
+            .then_some(self.schema_owners.as_slice())
+    }
+
+    /// Returns complete declared column-array dimensions, or `None` when unobserved.
+    #[must_use]
+    pub fn column_array_dimensions(&self) -> Option<&[ColumnArrayDimensionsObservation]> {
+        self.column_array_dimensions_observed
+            .then_some(self.column_array_dimensions.as_slice())
+    }
+
     /// Returns explicitly observed PostgreSQL column-collation evidence, or `None` when that catalog
     /// family was not observed.
     #[must_use]
@@ -1024,11 +1529,100 @@ impl PostgresSchemaSnapshotV3 {
             .then_some(self.constraint_periods.as_slice())
     }
 
+    /// Returns the complete observed foreign-key comparison and backing-index catalog family.
+    #[must_use]
+    pub fn foreign_key_catalog(&self) -> Option<&[ForeignKeyCatalogObservation]> {
+        self.foreign_key_catalog_observed
+            .then_some(self.foreign_key_catalog.as_slice())
+    }
+
+    /// Returns complete range catalog evidence, or `None` when that family was unobserved.
+    #[must_use]
+    pub fn range_catalog(&self) -> Option<&[RangeCatalogObservation]> {
+        self.range_catalog_observed
+            .then_some(self.range_catalog.as_slice())
+    }
+
+    /// Returns the complete ordinary-table storage family, or `None` when unobserved.
+    #[must_use]
+    pub fn relation_tablespaces(&self) -> Option<&[RelationTablespaceObservation]> {
+        self.relation_tablespaces_observed
+            .then_some(self.relation_tablespaces.as_slice())
+    }
+
+    /// Returns complete relation-owner evidence, or `None` when unobserved.
+    #[must_use]
+    pub fn relation_owners(&self) -> Option<&[RelationOwnerObservation]> {
+        self.relation_owners_observed
+            .then_some(self.relation_owners.as_slice())
+    }
+
+    /// Issues provenance only for an exact observed range catalog coordinate.
+    pub fn range_catalog_source_receipt(
+        &self,
+        range_type: QualifiedTypeName,
+    ) -> Result<RangeCatalogSourceReceipt, ObservationError> {
+        if !self.range_catalog_observed
+            || !self
+                .range_catalog
+                .iter()
+                .any(|item| item.range_type() == &range_type)
+        {
+            return Err(ObservationError::UnknownTypeBinding {
+                schema_name: range_type.schema_name().to_owned(),
+                type_name: range_type.type_name().to_owned(),
+            });
+        }
+        Ok(RangeCatalogSourceReceipt::new(
+            self.source_connection_key().to_owned(),
+            self.connection_policy_binding().to_owned(),
+            self.snapshot_digest.clone(),
+            self.extractor_revision().to_owned(),
+            self.observed_at_utc().to_owned(),
+            range_type,
+        ))
+    }
+
+    /// Returns exact definitions for every collation referenced by the observed schema evidence.
+    #[must_use]
+    pub fn collation_definitions(&self) -> Option<&[CollationDefinitionObservation]> {
+        self.collation_definitions_observed
+            .then_some(self.collation_definitions.as_slice())
+    }
+
     /// Issues provenance for an exact successor coordinate only when it exists in this snapshot.
     pub fn source_receipt(
         &self,
         location: SchemaObjectLocation,
     ) -> Result<SuccessorSourceReceipt, ObservationError> {
+        let observed_not_null = self.not_null_constraints_observed
+            && self.not_null_constraints.iter().any(|observation| {
+                SchemaObjectLocation::constraint(
+                    observation.schema_name(),
+                    observation.relation_name(),
+                    observation.relation_kind(),
+                    observation.constraint_name(),
+                )
+                .is_ok_and(|observed_location| observed_location == location)
+            });
+        let observed_collation = self.collation_definitions_observed
+            && self.collation_definitions.iter().any(|definition| {
+                SchemaObjectLocation::collation(
+                    definition.collation().schema_name(),
+                    definition.collation().collation_name(),
+                )
+                .is_ok_and(|observed_location| observed_location == location)
+            });
+        if observed_not_null || observed_collation {
+            return Ok(SuccessorSourceReceipt {
+                source_id: self.inner.source_connection_key().to_owned(),
+                connection_policy_binding: self.inner.connection_policy_binding().to_owned(),
+                source_digest: self.snapshot_digest.clone(),
+                extractor_revision: self.inner.extractor_revision().to_owned(),
+                observed_at_utc: self.inner.observed_at_utc().to_owned(),
+                location,
+            });
+        }
         let verified = self.inner.source_receipt(location.clone())?;
         Ok(SuccessorSourceReceipt {
             source_id: verified.source_id().to_owned(),
@@ -1066,6 +1660,61 @@ impl PostgresSchemaSnapshotV3 {
             self.extractor_revision().to_owned(),
             self.observed_at_utc().to_owned(),
             location,
+        ))
+    }
+
+    /// Issues provenance for an exact observed source-schema owner, including an empty schema.
+    ///
+    /// The dedicated coordinate preserves the existing [`SchemaObjectLocation`] vocabulary.
+    pub fn schema_owner_source_receipt(
+        &self,
+        location: SchemaOwnerLocation,
+    ) -> Result<SchemaOwnerSourceReceipt, ObservationError> {
+        let exists = self.schema_owners_observed
+            && self
+                .schema_owners
+                .iter()
+                .any(|owner| owner.schema_name() == location.schema_name());
+        if !exists {
+            return Err(ObservationError::UnknownObservationLocation {
+                location: location.canonical_location(),
+            });
+        }
+        Ok(SchemaOwnerSourceReceipt::new(
+            self.source_connection_key().to_owned(),
+            self.connection_policy_binding().to_owned(),
+            self.snapshot_digest.clone(),
+            self.extractor_revision().to_owned(),
+            self.observed_at_utc().to_owned(),
+            location,
+        ))
+    }
+
+    /// Issues provenance only for an exact PostgreSQL type in the observed type-kind inventory.
+    ///
+    /// This tagged successor path covers type kinds without changing existing domain, enum, or
+    /// array receipt meanings. The final digest includes type-owner evidence when it was observed.
+    pub fn type_source_receipt(
+        &self,
+        type_name: QualifiedTypeName,
+    ) -> Result<TypeSourceReceipt, ObservationError> {
+        let exists = self.type_kinds_observed
+            && self
+                .type_kinds
+                .iter()
+                .any(|observed| same_type_coordinate(observed.type_name(), &type_name));
+        if !exists {
+            return Err(ObservationError::UnknownObservationLocation {
+                location: type_kind::canonical_type_location(&type_name),
+            });
+        }
+        Ok(TypeSourceReceipt::new(
+            self.source_connection_key().to_owned(),
+            self.connection_policy_binding().to_owned(),
+            self.snapshot_digest.clone(),
+            self.extractor_revision().to_owned(),
+            self.observed_at_utc().to_owned(),
+            type_name,
         ))
     }
 }
@@ -2132,6 +2781,7 @@ fn canonicalize_array_type_observations(
     relations: &[RelationObservation],
     domains: &[DomainObservation],
     enums: &[EnumObservation],
+    type_kinds: &[TypeKindObservation],
     mut array_types: Vec<ArrayTypeObservation>,
 ) -> Result<Vec<ArrayTypeObservation>, ObservationError> {
     let mut scalar_type_names = BTreeSet::new();
@@ -2200,11 +2850,12 @@ fn canonicalize_array_type_observations(
             array_type.element_type().type_name().to_owned(),
         );
 
-        if !authorized_request
-            .request()
-            .allowed_schema_names()
-            .iter()
-            .any(|schema_name| schema_name == array_type.array_type().schema_name())
+        if array_type.array_type().schema_name() != POSTGRES_CATALOG_SCHEMA_NAME
+            && !authorized_request
+                .request()
+                .allowed_schema_names()
+                .iter()
+                .any(|schema_name| schema_name == array_type.array_type().schema_name())
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "unauthorized_schema_name",
@@ -2227,6 +2878,10 @@ fn canonicalize_array_type_observations(
         }
         if array_type.element_type().schema_name() != POSTGRES_CATALOG_SCHEMA_NAME
             && !scalar_type_names.contains(&element_coordinate)
+            && !type_kinds.iter().any(|kind| {
+                same_type_coordinate(kind.type_name(), array_type.element_type())
+                    && !array_type_names.contains(&element_coordinate)
+            })
         {
             return Err(ObservationError::UnknownTypeBinding {
                 schema_name: element_coordinate.0,

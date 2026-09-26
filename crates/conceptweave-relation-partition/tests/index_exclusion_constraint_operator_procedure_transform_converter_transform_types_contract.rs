@@ -250,13 +250,13 @@ fn ordinary_exclude_converter_transform_types_preserve_location_receipt_and_inpu
 
     for (schema, function, field) in [
         (
-            " ",
+            "",
             "payload_from_sql",
             "index_exclusion_constraint_operator_procedure_transform_converter_transform_types_function_schema",
         ),
         (
             "public",
-            "\t",
+            "",
             "index_exclusion_constraint_operator_procedure_transform_converter_transform_types_function_name",
         ),
     ] {

@@ -1,0 +1,7 @@
+# Signed release manifest pin v1
+
+Governance may sign the exact manifest pin returned after durable publication. The signed pin contains a publisher key ID, release ID, canonical `sha256:<64 lowercase hex>` manifest digest, and 64 raw Ed25519 signature bytes. It contains no public key. A consumer installs publisher public keys through a protected channel independent of both the signed pin and the release artifact. Key generation, custody, rotation, revocation, and distribution are deployment responsibilities.
+
+The signature covers four `text(x)` fields in order: `conceptweave.signed_release_manifest.v1`, publisher key ID, release ID, and manifest digest. `text(x)` is an unsigned 64-bit big-endian UTF-8 byte length followed by exact bytes. IDs must be nonblank, at most 4096 UTF-8 bytes, and contain no NUL. There is no trimming, case folding, JSON serialization, or timestamp. Each key ID is unique in a consumer's configured trust set.
+
+The client verifies Ed25519 against the independently installed key with that ID before adding the release ID and manifest digest to its exact trusted-manifest set. Unknown keys, duplicate configured key IDs, changed fields, and invalid signatures fail closed. Existing release-policy, complete manifest, and detached artifact digest checks still apply. A signature does not authorize a steward review, grant a source-system permission, or prove a hosted deployment.

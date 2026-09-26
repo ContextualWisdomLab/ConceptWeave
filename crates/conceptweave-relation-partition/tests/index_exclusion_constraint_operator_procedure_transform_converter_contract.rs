@@ -150,6 +150,73 @@ fn ordinary_exclude_operator_procedure_transform_converter_preserves_pg_transfor
 }
 
 #[test]
+fn quoted_converter_function_identifiers_reach_the_source_receipt() {
+    let transform_types = selected_transform_types_predecessor();
+    let definition = definition_snapshot();
+    let snapshot_for = |name: &str| {
+        let material =
+            IndexExclusionConstraintOperatorProcedureTransformConverterFunctionDefinition::new(
+                " ",
+                "payload_from_sql",
+                None,
+                None,
+            )
+            .unwrap();
+        let function = IndexExclusionConstraintOperatorProcedureTransformConverterFunction::new(
+            " ",
+            name,
+            internal_type(),
+            internal_type(),
+            material,
+        )
+        .unwrap();
+        IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot::new(
+            &transform_types,
+            &definition,
+            vec![converter_observation(
+                operator("="),
+                procedure("int4eq"),
+                "internal",
+                vec![converter_binding(Some(function), None)],
+            )],
+        )
+        .unwrap()
+    };
+
+    let quoted = snapshot_for(" ");
+    let receipt = quoted.source_receipt(coordinate(), 1).unwrap();
+    let function = receipt.location().converters()[0].from_sql().unwrap();
+    assert_eq!(function.schema_name(), " ");
+    assert_eq!(function.function_name(), " ");
+    assert_eq!(function.implementation_language_name(), " ");
+    assert_ne!(
+        quoted.snapshot_digest(),
+        snapshot_for("  ").snapshot_digest()
+    );
+
+    for name in ["", "bad\0name"] {
+        let error = IndexExclusionConstraintOperatorProcedureTransformConverterFunction::new(
+            "public",
+            name,
+            internal_type(),
+            internal_type(),
+            converter_definition("body"),
+        )
+        .expect_err("empty and NUL-containing function names cannot come from PostgreSQL");
+        assert_field(
+            error,
+            "index_exclusion_constraint_operator_procedure_transform_converter_function_name",
+        );
+        assert!(
+            IndexExclusionConstraintOperatorProcedureTransformConverterFunctionDefinition::new(
+                name, "body", None, None,
+            )
+            .is_err()
+        );
+    }
+}
+
+#[test]
 fn ordinary_exclude_operator_procedure_transform_converter_distinguishes_converter_replacement() {
     let transform_types = selected_transform_types_predecessor();
     let definition = definition_snapshot();

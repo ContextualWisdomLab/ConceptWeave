@@ -100,7 +100,7 @@ fn ordinary_exclude_converter_extension_membership_rejects_blank_member_name() {
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "public",
         "payload_from_sql",
-        Some(" \t".to_owned()),
+        Some("".to_owned()),
     )
     .expect_err("an extension membership edge needs an exact nonblank pg_extension name");
     assert_field(
@@ -229,13 +229,13 @@ fn ordinary_exclude_converter_extension_membership_preserves_location_receipt_an
 
     for (schema, function, field) in [
         (
-            " ",
+            "",
             "payload_from_sql",
             "index_exclusion_constraint_operator_procedure_transform_converter_extension_membership_function_schema",
         ),
         (
             "public",
-            "\t",
+            "",
             "index_exclusion_constraint_operator_procedure_transform_converter_extension_membership_function_name",
         ),
     ] {

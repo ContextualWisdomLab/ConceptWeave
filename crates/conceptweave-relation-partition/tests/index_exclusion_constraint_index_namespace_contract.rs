@@ -254,11 +254,11 @@ fn mismatched_backing_index_namespace_fails_closed() {
 }
 
 #[test]
-fn blank_backing_index_namespace_fails_closed() {
+fn empty_backing_index_namespace_fails_closed() {
     let error = IndexExclusionConstraintIndexNamespaceObservation::new(
         coordinate(),
         index_coordinate(),
-        "   ",
+        "",
     )
     .expect_err("resolved pg_class.relnamespace must be present");
     assert_eq!(

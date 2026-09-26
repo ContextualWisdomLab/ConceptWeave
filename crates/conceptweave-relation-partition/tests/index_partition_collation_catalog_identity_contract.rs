@@ -208,8 +208,10 @@ fn catalog_identity_preserves_the_unique_pg_collation_coordinate() {
     assert_eq!(identity.collation_name(), "C");
     assert_eq!(identity.encoding(), 6);
 
-    let blank_schema = CollationCatalogIdentity::new(" ", "C", 6)
-        .expect_err("collation namespace must be a real catalog coordinate");
+    let quoted_schema = CollationCatalogIdentity::new(" ", "C", 6).unwrap();
+    assert_eq!(quoted_schema.schema_name(), " ");
+    let blank_schema = CollationCatalogIdentity::new("", "C", 6)
+        .expect_err("collation namespace must be a nonempty catalog coordinate");
     assert_eq!(
         blank_schema,
         ObservationError::InvalidObservationField {

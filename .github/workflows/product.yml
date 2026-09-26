@@ -14,11 +14,64 @@ permissions:
   contents: read
 
 jobs:
+  dependency-evidence:
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'closed' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact source revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Install pinned dependency evidence tools
+        run: |
+          cargo install --locked cargo-deny --version 0.19.7
+          cargo install --locked cargo-cyclonedx --version 0.5.9
+
+      - name: Check advisories, licenses and sources
+        run: cargo deny check advisories licenses sources
+
+      - name: Generate and check CycloneDX SBOMs
+        run: |
+          SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
+          export SOURCE_DATE_EPOCH
+          cargo cyclonedx --all --all-features --target all --format json --spec-version 1.5
+          python3 scripts/check_sbom.py
+
+      - name: Preserve exact-head SBOMs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: conceptweave-sbom-${{ github.event.pull_request.head.sha || github.sha }}
+          path: crates/**/*.cdx.json
+          if-no-files-found: error
+
   rust-quality:
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'closed' }}
     runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:18.4@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
+        env:
+          POSTGRES_PASSWORD: conceptweave_test_only
+          POSTGRES_DB: conceptweave_test
+        volumes:
+          - /tmp/conceptweave-pg18:/var/run/postgresql
+          - /tmp/conceptweave-pg18-tablespaces:/tmp/conceptweave-pg18-tablespaces
+        options: >-
+          --health-cmd "pg_isready -U postgres -d conceptweave_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       COVERAGE_TOOLCHAIN: nightly-2026-08-20
+      CONCEPTWEAVE_PG18_TEST_DSN: host=/tmp/conceptweave-pg18 user=postgres dbname=conceptweave_test
+      CONCEPTWEAVE_PG18_TEST_TABLESPACE_DIR: /tmp/conceptweave-pg18-tablespaces/fixture
     steps:
       - name: Checkout exact source revision
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -32,6 +85,11 @@ jobs:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
 
+      - name: Prepare isolated tablespace fixture directory
+        env:
+          POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: docker exec --user root "$POSTGRES_CONTAINER_ID" install -d -m 0700 -o postgres -g postgres /tmp/conceptweave-pg18-tablespaces/fixture
+
       - name: Validate Product CI contract
         run: python3 scripts/check_ci_contract.py
 
@@ -42,15 +100,15 @@ jobs:
         run: cargo fmt --all --check
 
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
       - name: Test
-        run: cargo test --workspace
+        run: cargo test --workspace --all-features --locked -- --test-threads=1
 
       - name: Public documentation
         env:
           RUSTDOCFLAGS: -D warnings
-        run: cargo doc --workspace --no-deps
+        run: cargo doc --workspace --all-features --no-deps --locked
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@1ed6d7be6168f6c9046541087ff549b6bc581fdf # v2.87.2
@@ -142,9 +200,9 @@ jobs:
             exit 1
           fi
 
-      - name: Lockfile freshness
+      - name: Lockfile consistency
         run: |
-          cargo generate-lockfile --locked
+          cargo metadata --locked --format-version 1 > /dev/null
           git ls-files --error-unmatch Cargo.lock >/dev/null
           if ! test -z "$(git status --porcelain=v1 --untracked-files=all -- Cargo.lock)"; then
             echo "::error::Cargo.lock changed while validating the declared dependency graph"

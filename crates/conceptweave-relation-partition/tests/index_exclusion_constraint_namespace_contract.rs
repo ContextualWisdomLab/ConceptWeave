@@ -272,8 +272,8 @@ fn mismatched_constraint_namespace_fails_closed() {
 }
 
 #[test]
-fn blank_constraint_namespace_fails_closed() {
-    let error = IndexExclusionConstraintNamespaceObservation::new(parent_constraint(), "   ")
+fn empty_constraint_namespace_fails_closed() {
+    let error = IndexExclusionConstraintNamespaceObservation::new(parent_constraint(), "")
         .expect_err("resolved constraint namespace must be present");
     assert_eq!(
         error,

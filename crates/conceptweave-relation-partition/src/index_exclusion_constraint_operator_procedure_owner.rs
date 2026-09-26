@@ -53,7 +53,7 @@ impl IndexExclusionConstraintOperatorProcedureOwnerObservation {
             ));
         }
         let owner_role_name = owner_role_name.into();
-        if owner_role_name.trim().is_empty() {
+        if owner_role_name.is_empty() || owner_role_name.contains('\0') {
             return Err(invalid(
                 "index_exclusion_constraint_operator_procedure_owner_role_name",
             ));

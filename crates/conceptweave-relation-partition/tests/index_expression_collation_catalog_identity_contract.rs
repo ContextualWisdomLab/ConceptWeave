@@ -6,7 +6,8 @@ use conceptweave_observation::{
 };
 use conceptweave_relation_partition::{
     CanonicalExpression, CanonicalExpressionField, CanonicalExpressionValue,
-    CollationCatalogIdentity, ColumnTypeModifierObservation, IndexExclusionSemanticsSnapshot,
+    CollationCatalogIdentity, ColumnTypeModifierObservation,
+    IndexCollationDatabaseEncodingSnapshot, IndexExclusionSemanticsSnapshot,
     IndexExpressionCollationIdentityLocation, IndexExpressionCollationIdentityObservation,
     IndexExpressionCollationIdentitySnapshot, IndexExpressionNodeSchemaSnapshot,
     IndexExpressionRelationVarLocation, IndexExpressionRelationVarNodeSchemaSnapshot,
@@ -16,9 +17,9 @@ use conceptweave_relation_partition::{
     IndexOperatorFamilySnapshot, IndexPartitionCollationIdentitySnapshot, IndexPartitionCoordinate,
     IndexPartitionObservation, IndexPartitionSnapshot, IndexRelationKind,
     IndexRelationVarCollationIdentityObservation, PartitionParentRelationCoordinate,
-    QualifiedFunctionSignature, QualifiedOperatorFamilyName, RelationPartitionObservation,
-    RelationPartitionSnapshot, RelationPartitionTypeModifierSnapshot, RelationVarRelationRole,
-    RelationVarReturningType,
+    PostgresDatabaseEncodingObservation, QualifiedFunctionSignature, QualifiedOperatorFamilyName,
+    RelationPartitionObservation, RelationPartitionSnapshot, RelationPartitionTypeModifierSnapshot,
+    RelationVarRelationRole, RelationVarReturningType,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationLimits, ObservationRequest, ObservationRequestBudget,
@@ -220,6 +221,10 @@ struct Stack {
 }
 
 fn stack() -> Stack {
+    stack_with_collation_encoding(ENCODING_UTF8)
+}
+
+fn stack_with_collation_encoding(catalog_encoding: i32) -> Stack {
     let base = PostgresSchemaSnapshotV3::new(
         &authorized_source(),
         "extractor-expression-collation-identity-v1",
@@ -428,13 +433,13 @@ fn stack() -> Stack {
             IndexKeyCollationIdentityObservation::new(
                 parent_index(),
                 1,
-                Some(catalog_default_collation(ENCODING_UTF8)),
+                Some(catalog_default_collation(catalog_encoding)),
             )
             .unwrap(),
             IndexKeyCollationIdentityObservation::new(
                 child_index(),
                 1,
-                Some(catalog_default_collation(ENCODING_UTF8)),
+                Some(catalog_default_collation(catalog_encoding)),
             )
             .unwrap(),
         ],
@@ -561,4 +566,75 @@ fn matching_catalog_identities_compose_with_the_existing_whole_tree_and_key_proo
     assert!(snapshot.snapshot_digest().starts_with("sha256:"));
     assert_eq!(snapshot.expression_observations().len(), 4);
     assert_eq!(snapshot.relation_var_observations().len(), 2);
+}
+
+#[test]
+fn database_encoding_binds_the_complete_collation_stack_and_receipt() {
+    let stack = stack();
+    let expressions = compose(
+        &stack,
+        ENCODING_UTF8,
+        ENCODING_UTF8,
+        ENCODING_UTF8,
+        ENCODING_UTF8,
+    )
+    .unwrap();
+    let encoding = PostgresDatabaseEncodingObservation::new(ENCODING_UTF8).unwrap();
+    let snapshot =
+        IndexCollationDatabaseEncodingSnapshot::new(encoding, &stack.key_collations, &expressions)
+            .expect("every observed collation belongs to this source database");
+    let receipt = snapshot.source_receipt();
+
+    assert_eq!(
+        snapshot.key_collation_predecessor_digest(),
+        stack.key_collations.snapshot_digest()
+    );
+    assert_eq!(
+        snapshot.expression_collation_predecessor_digest(),
+        expressions.snapshot_digest()
+    );
+    assert_eq!(receipt.source_id(), "warehouse_primary");
+    assert_eq!(receipt.connection_policy_binding(), POLICY_BINDING);
+    assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(receipt.observed_at_utc(), stack.base.observed_at_utc());
+    assert_eq!(receipt.database_encoding(), encoding);
+
+    assert_eq!(
+        IndexCollationDatabaseEncodingSnapshot::new(
+            PostgresDatabaseEncodingObservation::new(8).unwrap(),
+            &stack.key_collations,
+            &expressions,
+        ),
+        Err(ObservationError::InvalidObservationField {
+            field: "index_collation_database_encoding_binding",
+        })
+    );
+}
+
+#[test]
+fn encoding_independent_collations_keep_database_encoding_in_snapshot_identity() {
+    let stack = stack_with_collation_encoding(-1);
+    let expressions = compose(&stack, -1, -1, -1, -1).unwrap();
+    let utf8 = IndexCollationDatabaseEncodingSnapshot::new(
+        PostgresDatabaseEncodingObservation::new(ENCODING_UTF8).unwrap(),
+        &stack.key_collations,
+        &expressions,
+    )
+    .unwrap();
+    let latin1 = IndexCollationDatabaseEncodingSnapshot::new(
+        PostgresDatabaseEncodingObservation::new(8).unwrap(),
+        &stack.key_collations,
+        &expressions,
+    )
+    .unwrap();
+
+    assert_ne!(utf8.snapshot_digest(), latin1.snapshot_digest());
+    assert_eq!(
+        utf8.key_collation_predecessor_digest(),
+        latin1.key_collation_predecessor_digest()
+    );
+    assert_eq!(
+        utf8.expression_collation_predecessor_digest(),
+        latin1.expression_collation_predecessor_digest()
+    );
 }

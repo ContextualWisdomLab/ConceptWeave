@@ -50,7 +50,7 @@ impl IndexExclusionConstraintOperatorProcedureDefinitionMaterial {
         prosqlbody: Option<String>,
     ) -> Result<Self, ObservationError> {
         let language_name = language_name.into();
-        if language_name.trim().is_empty() {
+        if language_name.is_empty() || language_name.contains('\0') {
             return Err(invalid(
                 "index_exclusion_constraint_operator_procedure_definition_language",
             ));
