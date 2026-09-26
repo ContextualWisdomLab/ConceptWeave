@@ -3110,6 +3110,95 @@ async fn postgres18_column_collation_is_exact_source_evidence() {
 }
 
 #[tokio::test]
+async fn postgres18_external_collation_outside_authorized_schema_fails_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let suffix = std::process::id();
+    let schema = format!("cw_collation_scope_{suffix}");
+    let external_schema = format!("cw_external_collation_{suffix}");
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; CREATE SCHEMA \"{external_schema}\"; \
+             CREATE COLLATION \"{external_schema}\".casefold (provider = icu, locale = 'und-u-ks-level1'); \
+             CREATE TABLE \"{schema}\".records (title text COLLATE \"{external_schema}\".casefold)"
+        ))
+        .await
+        .unwrap();
+    let observed = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA \"{schema}\" CASCADE; DROP SCHEMA \"{external_schema}\" CASCADE"
+        ))
+        .await
+        .unwrap();
+    connection_task.abort();
+    assert!(
+        matches!(
+            observed,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "collation outside authorized schemas must fail closed: {observed:?}"
+    );
+}
+
+#[tokio::test]
+async fn postgres18_user_collation_in_pg_catalog_fails_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let is_superuser: bool = client
+        .query_one(
+            "SELECT rolsuper FROM pg_catalog.pg_roles WHERE rolname = current_user",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    if !is_superuser {
+        eprintln!("skipping pg_catalog user-collation fixture: setup requires a superuser");
+        connection_task.abort();
+        return;
+    }
+    let suffix = std::process::id();
+    let schema = format!("cw_catalog_collation_fixture_{suffix}");
+    let name = format!("cw_catalog_collation_{suffix}");
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; \
+             CREATE COLLATION pg_catalog.\"{name}\" (provider = icu, locale = 'und-u-ks-level1'); \
+             CREATE TABLE \"{schema}\".records (title text COLLATE pg_catalog.\"{name}\")"
+        ))
+        .await
+        .unwrap();
+    let observed = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA \"{schema}\" CASCADE; DROP COLLATION pg_catalog.\"{name}\""
+        ))
+        .await
+        .unwrap();
+    connection_task.abort();
+    assert!(
+        matches!(
+            observed,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "user collation in pg_catalog must fail closed: {observed:?}"
+    );
+}
+
+#[tokio::test]
 async fn postgres18_identity_sequence_settings_change_source_identity() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;

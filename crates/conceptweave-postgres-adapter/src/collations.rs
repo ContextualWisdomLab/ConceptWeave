@@ -43,6 +43,7 @@ const COLLATION_QUERY: &str = "WITH raw AS MATERIALIZED ( \
     FROM pg_catalog.pg_collation c \
     JOIN pg_catalog.pg_namespace n ON n.oid = c.collnamespace \
     WHERE n.nspname = $1 AND c.collname = $2 AND c.collencoding IN (-1, $3) \
+      AND (n.nspname <> 'pg_catalog' OR c.oid < 16384::oid) \
 ), sized AS MATERIALIZED ( \
     SELECT raw.*, COALESCE(octet_length(collcollate)::bigint, 0) \
       + COALESCE(octet_length(collctype)::bigint, 0) \
@@ -142,6 +143,11 @@ pub(super) async fn capture(
 ) -> Result<Vec<CollationDefinitionObservation>, SourceObservationFailure> {
     if references.is_empty() {
         return Ok(Vec::new());
+    }
+    if references.iter().any(|(schema, _)| {
+        schema != "pg_catalog" && !request.request().allowed_schema_names().contains(schema)
+    }) {
+        return Err(SourceObservationFailure::InvalidCapturedMetadata);
     }
     let max_bytes = request.request().limits().max_bytes().min(i64::MAX as u64) as i64;
     let default_referenced = references.contains(&("pg_catalog".to_owned(), "default".to_owned()));
