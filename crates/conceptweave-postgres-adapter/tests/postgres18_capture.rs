@@ -1328,6 +1328,73 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
         assert_eq!(first.domains().len(), 1);
         assert_eq!(first.enums().len(), 1);
         assert_eq!(first.foreign_key_catalog().unwrap().len(), 4);
+        let catalog_owners = client
+            .query(
+                "SELECT 'schema'::text, n.nspname::text, n.nspowner, r.rolname::text \
+                 FROM pg_catalog.pg_namespace n \
+                 JOIN pg_catalog.pg_roles r ON r.oid = n.nspowner \
+                 WHERE n.nspname = $1 \
+                 UNION ALL \
+                 SELECT 'relation'::text, c.relname::text, c.relowner, r.rolname::text \
+                 FROM pg_catalog.pg_class c \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+                 JOIN pg_catalog.pg_roles r ON r.oid = c.relowner \
+                 WHERE n.nspname = $1 AND c.relkind IN ('r','p','v','m','f','S','c') \
+                 UNION ALL \
+                 SELECT 'type'::text, t.typname::text, t.typowner, r.rolname::text \
+                 FROM pg_catalog.pg_type t \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace \
+                 JOIN pg_catalog.pg_roles r ON r.oid = t.typowner \
+                 WHERE n.nspname = $1",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| {
+                (
+                    row.get::<_, String>(0),
+                    row.get::<_, String>(1),
+                    row.get::<_, u32>(2),
+                    row.get::<_, String>(3),
+                )
+            })
+            .collect::<BTreeSet<_>>();
+        let observed_owners = first
+            .schema_owners()
+            .unwrap()
+            .iter()
+            .map(|owner| {
+                (
+                    "schema".to_owned(),
+                    owner.schema_name().to_owned(),
+                    owner.owner_oid(),
+                    owner.owner_role_name().to_owned(),
+                )
+            })
+            .chain(first.relation_owners().unwrap().iter().map(|owner| {
+                (
+                    "relation".to_owned(),
+                    owner.relation_name().to_owned(),
+                    owner.owner_oid(),
+                    owner.owner_role_name().to_owned(),
+                )
+            }))
+            .chain(first.type_owners().unwrap().iter().map(|owner| {
+                (
+                    "type".to_owned(),
+                    owner.type_name().type_name().to_owned(),
+                    owner.owner_oid(),
+                    owner.owner_role_name().to_owned(),
+                )
+            }))
+            .collect::<BTreeSet<_>>();
+        assert_eq!(observed_owners, catalog_owners);
+        let owner_receipt = first
+            .schema_owner_source_receipt(SchemaOwnerLocation::new(&schema).unwrap())
+            .unwrap();
+        assert_eq!(owner_receipt.location().schema_name(), schema);
+        assert_eq!(owner_receipt.source_digest(), first.snapshot_digest());
         let catalog_periods = client
             .query(
                 "SELECT t.relname::text, con.conname::text, con.conperiod \
