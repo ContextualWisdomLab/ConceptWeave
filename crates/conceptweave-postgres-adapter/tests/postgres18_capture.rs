@@ -1430,7 +1430,9 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
         assert_eq!(observed_periods, catalog_periods);
         let catalog_relations = client
             .query(
-                "SELECT c.relname::text FROM pg_catalog.pg_class c \
+                "SELECT c.relname::text, c.relreplident::text, \
+                 pg_catalog.obj_description(c.oid, 'pg_class') \
+                 FROM pg_catalog.pg_class c \
                  JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
                  WHERE n.nspname = $1 AND c.relkind = 'r'",
                 &[&schema],
@@ -1438,7 +1440,35 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             .await
             .unwrap()
             .into_iter()
-            .map(|row| row.get::<_, String>(0))
+            .map(|row| {
+                let relation_name: String = row.get(0);
+                let relation = first
+                    .relations()
+                    .iter()
+                    .find(|relation| relation.relation_name() == relation_name)
+                    .unwrap();
+                assert_eq!(relation.kind(), RelationKind::Table);
+                let replica_identity = match row.get::<_, String>(1).as_str() {
+                    "d" => ReplicaIdentityMode::Default,
+                    "n" => ReplicaIdentityMode::Nothing,
+                    "f" => ReplicaIdentityMode::Full,
+                    "i" => ReplicaIdentityMode::Index,
+                    other => panic!("unexpected PostgreSQL replica identity: {other}"),
+                };
+                if relation_name == "risk_record" {
+                    assert_eq!(replica_identity, ReplicaIdentityMode::Index);
+                }
+                assert_eq!(relation.replica_identity_mode(), Some(replica_identity));
+                assert_eq!(relation.source_comment(), row.get::<_, Option<String>>(2).as_deref());
+                let receipt = first
+                    .source_receipt(
+                        SchemaObjectLocation::relation(&schema, &relation_name, RelationKind::Table)
+                            .unwrap(),
+                    )
+                    .unwrap();
+                assert_eq!(receipt.source_digest(), first.snapshot_digest());
+                relation_name
+            })
             .collect::<BTreeSet<_>>();
         let observed_relations = first
             .relations()
@@ -1446,26 +1476,6 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             .map(|relation| relation.relation_name().to_owned())
             .collect::<BTreeSet<_>>();
         assert_eq!(observed_relations, catalog_relations);
-        let replica_mode: String = client
-            .query_one(
-                "SELECT c.relreplident::text FROM pg_catalog.pg_class c \
-                 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
-                 WHERE n.nspname = $1 AND c.relname = 'risk_record'",
-                &[&schema],
-            )
-            .await
-            .unwrap()
-            .get(0);
-        assert_eq!(replica_mode, "i");
-        assert_eq!(
-            first
-                .relations()
-                .iter()
-                .find(|relation| relation.relation_name() == "risk_record")
-                .unwrap()
-                .replica_identity_mode(),
-            Some(ReplicaIdentityMode::Index)
-        );
 
         let catalog_columns = client
             .query(
