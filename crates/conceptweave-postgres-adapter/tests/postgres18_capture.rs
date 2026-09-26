@@ -1500,12 +1500,15 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             .query(
                 "SELECT c.relname::text, a.attname::text, a.attnum, \
                  pg_catalog.format_type(a.atttypid, a.atttypmod), tn.nspname::text, \
-                 ty.typname::text, a.attnotnull, pg_catalog.col_description(a.attrelid, a.attnum) \
+                 ty.typname::text, a.attnotnull, pg_catalog.col_description(a.attrelid, a.attnum), \
+                 cn.nspname::text, coll.collname::text, coll.collisdeterministic \
                  FROM pg_catalog.pg_attribute a \
                  JOIN pg_catalog.pg_class c ON c.oid = a.attrelid \
                  JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
                  JOIN pg_catalog.pg_type ty ON ty.oid = a.atttypid \
                  JOIN pg_catalog.pg_namespace tn ON tn.oid = ty.typnamespace \
+                 LEFT JOIN pg_catalog.pg_collation coll ON coll.oid = a.attcollation \
+                 LEFT JOIN pg_catalog.pg_namespace cn ON cn.oid = coll.collnamespace \
                  WHERE n.nspname = $1 AND c.relkind = 'r' AND a.attnum > 0 AND NOT a.attisdropped",
                 &[&schema],
             )
@@ -1533,6 +1536,24 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
                     column.source_comment(),
                     row.get::<_, Option<String>>(7).as_deref()
                 );
+                let collation = first
+                    .column_collations()
+                    .unwrap()
+                    .iter()
+                    .find(|observed| {
+                        observed.relation_name() == relation_name
+                            && observed.column_name() == column_name
+                    })
+                    .unwrap();
+                assert_eq!(
+                    collation.collation().map(|name| (
+                        name.schema_name().to_owned(),
+                        name.collation_name().to_owned(),
+                    )),
+                    row.get::<_, Option<String>>(8)
+                        .zip(row.get::<_, Option<String>>(9))
+                );
+                assert_eq!(collation.deterministic(), row.get::<_, Option<bool>>(10));
                 (relation_name, column_name)
             })
             .collect::<BTreeSet<_>>();
