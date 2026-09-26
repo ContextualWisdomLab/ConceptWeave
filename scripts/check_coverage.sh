@@ -10,7 +10,8 @@ cargo "+${coverage_toolchain}" llvm-cov \
   --all-features \
   --branch \
   --json \
-  --output-path coverage.json
+  --output-path coverage.json \
+  -- --test-threads=1
 
 jq '.data[0].totals' coverage.json
 jq -r '

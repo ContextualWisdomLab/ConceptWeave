@@ -103,7 +103,7 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
       - name: Test
-        run: cargo test --workspace --all-features --locked
+        run: cargo test --workspace --all-features --locked -- --test-threads=1
 
       - name: Public documentation
         env:

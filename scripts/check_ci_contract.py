@@ -27,7 +27,7 @@ def main() -> int:
         "CONCEPTWEAVE_PG18_TEST_TABLESPACE_DIR: /tmp/conceptweave-pg18-tablespaces/fixture",
         'docker exec --user root "$POSTGRES_CONTAINER_ID" install -d -m 0700 -o postgres -g postgres /tmp/conceptweave-pg18-tablespaces/fixture',
         "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings",
-        "cargo test --workspace --all-features --locked",
+        "cargo test --workspace --all-features --locked -- --test-threads=1",
         "cargo doc --workspace --all-features --no-deps --locked",
         'rustup toolchain install "$COVERAGE_TOOLCHAIN" --profile minimal --component llvm-tools-preview',
         "cargo metadata --locked --format-version 1 > /dev/null",
@@ -37,6 +37,9 @@ def main() -> int:
         raise SystemExit(
             "Product CI contract missing required fragment(s): " + ", ".join(missing)
         )
+
+    if "-- --test-threads=1" not in Path("scripts/check_coverage.sh").read_text(encoding="utf-8"):
+        raise SystemExit("Product coverage must serialize shared PostgreSQL fixtures")
 
     if "runs-on: ubuntu-latest" in workflow:
         raise SystemExit(
