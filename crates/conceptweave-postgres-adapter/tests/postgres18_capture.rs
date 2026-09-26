@@ -3602,8 +3602,7 @@ async fn postgres18_type_owner_changes_source_identity() {
         .unwrap();
     let before = adapter(config.clone())
         .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
-        .await
-        .unwrap();
+        .await;
     client
         .batch_execute(&format!(
             "ALTER DOMAIN \"{schema}\".score OWNER TO \"{owner}\""
@@ -3612,8 +3611,7 @@ async fn postgres18_type_owner_changes_source_identity() {
         .unwrap();
     let domain_changed = adapter(config.clone())
         .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
-        .await
-        .unwrap();
+        .await;
     client
         .batch_execute(&format!(
             "ALTER TYPE \"{schema}\".stage OWNER TO \"{owner}\""
@@ -3630,6 +3628,8 @@ async fn postgres18_type_owner_changes_source_identity() {
         .await
         .unwrap();
     connection_task.abort();
+    let before = before.unwrap();
+    let domain_changed = domain_changed.unwrap();
     let after = after.unwrap();
     assert_ne!(before.snapshot_digest(), domain_changed.snapshot_digest());
     assert_ne!(domain_changed.snapshot_digest(), after.snapshot_digest());
@@ -3644,6 +3644,24 @@ async fn postgres18_type_owner_changes_source_identity() {
             })
             .count()
             == 2
+    );
+    let enum_receipt = after
+        .type_source_receipt(QualifiedTypeName::new(&schema, "stage").unwrap())
+        .unwrap();
+    let array_type = after
+        .array_types()
+        .unwrap()
+        .iter()
+        .find(|item| item.element_type().type_name() == "stage")
+        .unwrap()
+        .array_type()
+        .clone();
+    let array_receipt = after.type_source_receipt(array_type).unwrap();
+    assert_eq!(enum_receipt.source_digest(), after.snapshot_digest());
+    assert_eq!(array_receipt.source_digest(), after.snapshot_digest());
+    assert_ne!(
+        enum_receipt.canonical_location(),
+        array_receipt.canonical_location()
     );
 }
 

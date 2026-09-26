@@ -59,7 +59,7 @@ pub use representation_v3::{
 };
 pub use schema_owner::{SchemaOwnerLocation, SchemaOwnerObservation, SchemaOwnerSourceReceipt};
 pub use type_kind::TypeOwnerObservation;
-pub use type_kind::{PostgresTypeKind, TypeKindObservation};
+pub use type_kind::{PostgresTypeKind, TypeKindObservation, TypeSourceReceipt};
 
 use std::collections::BTreeSet;
 
@@ -1687,6 +1687,34 @@ impl PostgresSchemaSnapshotV3 {
             self.extractor_revision().to_owned(),
             self.observed_at_utc().to_owned(),
             location,
+        ))
+    }
+
+    /// Issues provenance only for an exact PostgreSQL type in the observed type-kind inventory.
+    ///
+    /// This tagged successor path covers type kinds without changing existing domain, enum, or
+    /// array receipt meanings. The final digest includes type-owner evidence when it was observed.
+    pub fn type_source_receipt(
+        &self,
+        type_name: QualifiedTypeName,
+    ) -> Result<TypeSourceReceipt, ObservationError> {
+        let exists = self.type_kinds_observed
+            && self
+                .type_kinds
+                .iter()
+                .any(|observed| same_type_coordinate(observed.type_name(), &type_name));
+        if !exists {
+            return Err(ObservationError::UnknownObservationLocation {
+                location: type_kind::canonical_type_location(&type_name),
+            });
+        }
+        Ok(TypeSourceReceipt::new(
+            self.source_connection_key().to_owned(),
+            self.connection_policy_binding().to_owned(),
+            self.snapshot_digest.clone(),
+            self.extractor_revision().to_owned(),
+            self.observed_at_utc().to_owned(),
+            type_name,
         ))
     }
 }

@@ -17,6 +17,93 @@ pub struct TypeOwnerObservation {
     owner_role_name: String,
 }
 
+/// Immutable provenance for one exact observed PostgreSQL type coordinate.
+///
+/// The receipt applies to every observed type kind and carries the final snapshot digest, which
+/// also binds the type owner when that successor family has been observed.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TypeSourceReceipt {
+    source_id: String,
+    connection_policy_binding: String,
+    source_digest: String,
+    extractor_revision: String,
+    observed_at_utc: String,
+    type_name: QualifiedTypeName,
+}
+
+impl TypeSourceReceipt {
+    pub(crate) fn new(
+        source_id: String,
+        connection_policy_binding: String,
+        source_digest: String,
+        extractor_revision: String,
+        observed_at_utc: String,
+        type_name: QualifiedTypeName,
+    ) -> Self {
+        Self {
+            source_id,
+            connection_policy_binding,
+            source_digest,
+            extractor_revision,
+            observed_at_utc,
+            type_name,
+        }
+    }
+
+    /// Returns the stable source registry reference.
+    #[must_use]
+    pub fn source_id(&self) -> &str {
+        &self.source_id
+    }
+
+    /// Returns the immutable connection-policy revision.
+    #[must_use]
+    pub fn connection_policy_binding(&self) -> &str {
+        &self.connection_policy_binding
+    }
+
+    /// Returns the governed source digest for this snapshot.
+    #[must_use]
+    pub fn source_digest(&self) -> &str {
+        &self.source_digest
+    }
+
+    /// Returns the exact extractor revision.
+    #[must_use]
+    pub fn extractor_revision(&self) -> &str {
+        &self.extractor_revision
+    }
+
+    /// Returns the exact UTC observation time supplied by the adapter.
+    #[must_use]
+    pub fn observed_at_utc(&self) -> &str {
+        &self.observed_at_utc
+    }
+
+    /// Returns the verified schema-qualified type coordinate.
+    #[must_use]
+    pub const fn type_name(&self) -> &QualifiedTypeName {
+        &self.type_name
+    }
+
+    /// Returns the collision-safe receipt path with RFC 6901 identifier escaping.
+    #[must_use]
+    pub fn canonical_location(&self) -> String {
+        canonical_type_location(&self.type_name)
+    }
+}
+
+pub(crate) fn canonical_type_location(type_name: &QualifiedTypeName) -> String {
+    format!(
+        "/schemas/{}/types/{}",
+        type_name
+            .schema_name()
+            .replace('~', "~0")
+            .replace('/', "~1"),
+        type_name.type_name().replace('~', "~0").replace('/', "~1")
+    )
+}
+
 impl TypeOwnerObservation {
     /// Records the catalog role OID and resolved role name for an exact type coordinate.
     pub fn new(
