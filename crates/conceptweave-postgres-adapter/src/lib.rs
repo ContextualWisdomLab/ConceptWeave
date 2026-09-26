@@ -326,8 +326,25 @@ async fn capture_catalog(
                      ON d.refclassid = 'pg_proc'::regclass AND p.oid = d.refobjid \
                    LEFT JOIN pg_catalog.pg_operator o \
                      ON d.refclassid = 'pg_operator'::regclass AND o.oid = d.refobjid \
+                   LEFT JOIN pg_catalog.pg_class referenced_relation \
+                     ON d.refclassid = 'pg_class'::regclass \
+                       AND referenced_relation.oid = d.refobjid \
                    WHERE ((p.pronamespace <> 'pg_catalog'::regnamespace OR p.oid >= 16384::oid) \
-                     OR (o.oprnamespace <> 'pg_catalog'::regnamespace OR o.oid >= 16384::oid)) \
+                     OR (o.oprnamespace <> 'pg_catalog'::regnamespace OR o.oid >= 16384::oid) \
+                     OR (referenced_relation.oid >= 16384::oid AND d.deptype = 'n' \
+                       AND (d.classid <> 'pg_constraint'::regclass OR EXISTS( \
+                         SELECT 1 FROM pg_catalog.pg_constraint expression_constraint \
+                         WHERE expression_constraint.oid = d.objid \
+                           AND expression_constraint.contype = 'c')) \
+                       AND NOT (d.refobjsubid > 0 AND ( \
+                         EXISTS(SELECT 1 FROM pg_catalog.pg_constraint own_constraint \
+                           WHERE d.classid = 'pg_constraint'::regclass \
+                             AND own_constraint.oid = d.objid \
+                             AND own_constraint.conrelid = d.refobjid) OR \
+                         EXISTS(SELECT 1 FROM pg_catalog.pg_attrdef own_default \
+                           WHERE d.classid = 'pg_attrdef'::regclass \
+                             AND own_default.oid = d.objid \
+                             AND own_default.adrelid = d.refobjid))))) \
                      AND ( \
                        (d.classid = 'pg_constraint'::regclass AND EXISTS( \
                          SELECT 1 FROM pg_catalog.pg_constraint c \

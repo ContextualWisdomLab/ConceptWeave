@@ -3331,6 +3331,54 @@ async fn postgres18_nondefault_table_tablespace_changes_source_identity() {
 }
 
 #[tokio::test]
+async fn postgres18_cross_schema_sequence_default_fails_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_sequence_default_{}", std::process::id());
+    let external = format!("cw_sequence_source_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA {schema}; CREATE SCHEMA {external}; \
+             CREATE SEQUENCE {external}.counter; \
+             CREATE TABLE {schema}.record \
+               (id bigint DEFAULT nextval('{external}.counter'::regclass))"
+        ))
+        .await
+        .unwrap();
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("ALTER SEQUENCE {external}.counter INCREMENT BY 7"))
+        .await
+        .unwrap();
+    let after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA {schema} CASCADE; DROP SCHEMA {external} CASCADE"
+        ))
+        .await
+        .unwrap();
+    connection_task.abort();
+    assert!(
+        matches!(
+            before,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ) && matches!(
+            after,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "external sequence settings cannot be omitted from an immutable default: before={before:?}, after={after:?}"
+    );
+}
+
+#[tokio::test]
 async fn postgres18_user_function_expression_dependencies_fail_closed() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
