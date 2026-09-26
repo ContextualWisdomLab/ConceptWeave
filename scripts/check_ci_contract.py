@@ -21,6 +21,7 @@ def main() -> int:
         "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
         "COVERAGE_TOOLCHAIN: nightly-2026-08-20",
         'rustup toolchain install "$COVERAGE_TOOLCHAIN" --profile minimal --component llvm-tools-preview',
+        "cargo metadata --locked --format-version 1 > /dev/null",
     )
     missing = [fragment for fragment in required_fragments if fragment not in workflow]
     if missing:

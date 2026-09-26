@@ -179,9 +179,9 @@ jobs:
             exit 1
           fi
 
-      - name: Lockfile freshness
+      - name: Lockfile consistency
         run: |
-          cargo generate-lockfile --locked
+          cargo metadata --locked --format-version 1 > /dev/null
           git ls-files --error-unmatch Cargo.lock >/dev/null
           if ! test -z "$(git status --porcelain=v1 --untracked-files=all -- Cargo.lock)"; then
             echo "::error::Cargo.lock changed while validating the declared dependency graph"
