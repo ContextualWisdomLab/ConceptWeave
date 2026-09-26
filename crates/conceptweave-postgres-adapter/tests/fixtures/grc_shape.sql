@@ -37,7 +37,8 @@ CREATE TABLE "__SCHEMA__".risk_control_link (
 );
 CREATE INDEX risk_record_level_idx ON "__SCHEMA__".risk_record (level DESC NULLS LAST);
 CREATE INDEX risk_record_title_idx ON "__SCHEMA__".risk_record (title)
-    INCLUDE (level) WHERE title IS NOT NULL;
+    INCLUDE (level) WITH (fillfactor = 80) WHERE title IS NOT NULL;
+COMMENT ON INDEX "__SCHEMA__".risk_record_title_idx IS 'Review index layout';
 ALTER TABLE "__SCHEMA__".risk_record REPLICA IDENTITY USING INDEX risk_record_key;
 ALTER TABLE "__SCHEMA__".tenant REPLICA IDENTITY FULL;
 ALTER TABLE "__SCHEMA__".control_record REPLICA IDENTITY NOTHING;

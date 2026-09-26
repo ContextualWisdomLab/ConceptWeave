@@ -1445,9 +1445,13 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
         let catalog_relations = client
             .query(
                 "SELECT c.relname::text, c.relreplident::text, \
-                 pg_catalog.obj_description(c.oid, 'pg_class') \
+                 pg_catalog.obj_description(c.oid, 'pg_class'), \
+                 c.reltablespace = 0, ts.spcname::text \
                  FROM pg_catalog.pg_class c \
                  JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+                 JOIN pg_catalog.pg_database d ON d.datname = pg_catalog.current_database() \
+                 JOIN pg_catalog.pg_tablespace ts ON ts.oid = CASE \
+                   WHEN c.reltablespace = 0 THEN d.dattablespace ELSE c.reltablespace END \
                  WHERE n.nspname = $1 AND c.relkind = 'r'",
                 &[&schema],
             )
@@ -1479,6 +1483,15 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
                 assert_eq!(replica_identity, expected_replica_identity);
                 assert_eq!(relation.replica_identity_mode(), Some(replica_identity));
                 assert_eq!(relation.source_comment(), row.get::<_, Option<String>>(2).as_deref());
+                let tablespace = first
+                    .relation_tablespaces()
+                    .unwrap()
+                    .iter()
+                    .find(|observed| observed.relation_name() == relation_name)
+                    .unwrap()
+                    .tablespace();
+                assert_eq!(tablespace.is_database_default(), row.get::<_, bool>(3));
+                assert_eq!(tablespace.name(), row.get::<_, String>(4));
                 let receipt = first
                     .source_receipt(
                         SchemaObjectLocation::relation(&schema, &relation_name, RelationKind::Table)
@@ -1582,12 +1595,17 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
                  ARRAY(SELECT a.attname::text \
                    FROM generate_series(0, x.indnatts - 1) AS s(pos) \
                    JOIN pg_catalog.pg_attribute a ON a.attrelid = t.oid \
-                     AND a.attnum = x.indkey[s.pos] ORDER BY s.pos) \
+                     AND a.attnum = x.indkey[s.pos] ORDER BY s.pos), \
+                 i.reloptions, i.reltablespace = 0, ts.spcname::text, \
+                 pg_catalog.obj_description(i.oid, 'pg_class') \
                  FROM pg_catalog.pg_index x \
                  JOIN pg_catalog.pg_class t ON t.oid = x.indrelid \
                  JOIN pg_catalog.pg_class i ON i.oid = x.indexrelid \
                  JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace \
                  JOIN pg_catalog.pg_am am ON am.oid = i.relam \
+                 JOIN pg_catalog.pg_database d ON d.datname = pg_catalog.current_database() \
+                 JOIN pg_catalog.pg_tablespace ts ON ts.oid = CASE \
+                   WHEN i.reltablespace = 0 THEN d.dattablespace ELSE i.reltablespace END \
                  WHERE n.nspname = $1 AND t.relkind = 'r'",
                 &[&schema],
             )
@@ -1642,6 +1660,20 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
                     .map(|attribute| attribute.attribute_name().unwrap().to_owned())
                     .collect::<Vec<_>>();
                 assert_eq!(observed_key_names, catalog_key_names);
+                let mut catalog_options = row.get::<_, Option<Vec<String>>>(19).unwrap_or_default();
+                catalog_options.sort();
+                let mut observed_options = index
+                    .storage_options()
+                    .unwrap()
+                    .iter()
+                    .map(|option| format!("{}={}", option.name(), option.value()))
+                    .collect::<Vec<_>>();
+                observed_options.sort();
+                assert_eq!(observed_options, catalog_options);
+                let tablespace = index.tablespace().unwrap();
+                assert_eq!(tablespace.is_database_default(), row.get::<_, bool>(20));
+                assert_eq!(tablespace.name(), row.get::<_, String>(21));
+                assert_eq!(index.source_comment(), row.get::<_, Option<String>>(22).as_deref());
                 (relation_name, index_name)
             })
             .collect::<BTreeSet<_>>();
