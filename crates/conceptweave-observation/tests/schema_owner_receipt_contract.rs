@@ -37,9 +37,18 @@ fn empty_schema_owner_has_an_exact_receipt_only_after_observation() {
     assert_eq!(receipt.location(), &location);
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
     assert_eq!(receipt.source_id(), "warehouse_primary");
-    assert!(matches!(
-        snapshot.schema_owner_source_receipt(SchemaOwnerLocation::new("other").unwrap()),
-        Err(ObservationError::UnknownObservationLocation { .. })
-    ));
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        snapshot.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
+    assert_eq!(
+        snapshot.schema_owner_source_receipt(SchemaOwnerLocation::new("other/~schema").unwrap()),
+        Err(ObservationError::UnknownObservationLocation {
+            location: "/schemas/other~1~0schema".to_owned()
+        })
+    );
+    assert!(SchemaOwnerLocation::new("").is_err());
     assert!(SchemaOwnerLocation::new("bad\0schema").is_err());
 }
