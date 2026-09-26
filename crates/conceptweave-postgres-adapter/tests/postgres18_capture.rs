@@ -3367,8 +3367,14 @@ async fn postgres18_nondefault_table_tablespace_changes_source_identity() {
     let suffix = std::process::id();
     let schema = format!("cw_table_space_fixture_{suffix}");
     let tablespace = format!("cw_table_space_{suffix}");
-    let directory = std::env::temp_dir().join(&tablespace);
-    std::fs::create_dir(&directory).unwrap();
+    let shared_directory = std::env::var_os("CONCEPTWEAVE_PG18_TEST_TABLESPACE_DIR");
+    let directory = shared_directory.clone().map_or_else(
+        || std::env::temp_dir().join(&tablespace),
+        std::path::PathBuf::from,
+    );
+    if shared_directory.is_none() {
+        std::fs::create_dir(&directory).unwrap();
+    }
     client
         .batch_execute(&format!(
             "CREATE TABLESPACE \"{tablespace}\" LOCATION '{}'",
@@ -3404,7 +3410,9 @@ async fn postgres18_nondefault_table_tablespace_changes_source_identity() {
         .batch_execute(&format!("DROP TABLESPACE \"{tablespace}\""))
         .await
         .unwrap();
-    std::fs::remove_dir(&directory).unwrap();
+    if shared_directory.is_none() {
+        std::fs::remove_dir(&directory).unwrap();
+    }
     connection_task.abort();
     let after = observed.unwrap();
     let [original] = before.relation_tablespaces().unwrap() else {
