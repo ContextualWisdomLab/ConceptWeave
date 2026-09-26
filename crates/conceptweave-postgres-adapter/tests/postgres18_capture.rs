@@ -114,7 +114,7 @@ async fn postgres18_range_collation_and_difference_function_are_bound() {
         .batch_execute(&format!(
             "CREATE SCHEMA {schema}; \
              CREATE FUNCTION {schema}.text_diff(text, text) RETURNS float8 \
-               LANGUAGE SQL IMMUTABLE STRICT AS $$ SELECT (length($1)-length($2))::float8 $$; \
+               LANGUAGE SQL IMMUTABLE STRICT RETURN (length($1)-length($2))::float8; \
              CREATE TYPE {schema}.span AS RANGE \
                (subtype=text, collation=\"C\", subtype_diff={schema}.text_diff)"
         ))
@@ -160,7 +160,7 @@ async fn postgres18_range_difference_function_body_changes_source_identity() {
         .batch_execute(&format!(
             "CREATE SCHEMA {schema}; \
              CREATE FUNCTION {schema}.text_diff(text, text) RETURNS float8 \
-               LANGUAGE SQL IMMUTABLE STRICT AS $$ SELECT (length($1)-length($2))::float8 $$; \
+               LANGUAGE SQL IMMUTABLE STRICT RETURN (length($1)-length($2))::float8; \
              CREATE TYPE {schema}.span AS RANGE (subtype=text, subtype_diff={schema}.text_diff)"
         ))
         .await
@@ -172,7 +172,7 @@ async fn postgres18_range_difference_function_body_changes_source_identity() {
     client
         .batch_execute(&format!(
             "CREATE OR REPLACE FUNCTION {schema}.text_diff(text, text) RETURNS float8 \
-             LANGUAGE SQL IMMUTABLE STRICT AS $$ SELECT (length($1)+length($2))::float8 $$"
+             LANGUAGE SQL IMMUTABLE STRICT RETURN (length($1)+length($2))::float8"
         ))
         .await
         .unwrap();
@@ -197,6 +197,88 @@ async fn postgres18_range_difference_function_body_changes_source_identity() {
     assert_ne!(before.snapshot_digest(), after.snapshot_digest());
     assert!(matches!(
         commented,
+        Err(SourceObservationFailure::InvalidCapturedMetadata)
+    ));
+}
+
+#[tokio::test]
+async fn postgres18_range_indirect_function_dependency_cannot_reuse_source_identity() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_range_dependency_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA {schema}; \
+             CREATE FUNCTION {schema}.helper(text, text) RETURNS float8 \
+               LANGUAGE SQL IMMUTABLE STRICT AS $$ SELECT (length($1)-length($2))::float8 $$; \
+             CREATE FUNCTION {schema}.text_diff(text, text) RETURNS float8 \
+               LANGUAGE SQL IMMUTABLE STRICT AS $$ SELECT {schema}.helper($1,$2) $$; \
+             CREATE TYPE {schema}.span AS RANGE (subtype=text, subtype_diff={schema}.text_diff)"
+        ))
+        .await
+        .unwrap();
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "CREATE OR REPLACE FUNCTION {schema}.helper(text, text) RETURNS float8 \
+             LANGUAGE SQL IMMUTABLE STRICT AS $$ SELECT (length($1)+length($2))::float8 $$"
+        ))
+        .await
+        .unwrap();
+    let after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA {schema} CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    match (before, after) {
+        (
+            Err(SourceObservationFailure::InvalidCapturedMetadata),
+            Err(SourceObservationFailure::InvalidCapturedMetadata),
+        ) => {}
+        (Ok(before), Ok(after)) => assert_ne!(before.snapshot_digest(), after.snapshot_digest()),
+        unexpected => panic!("indirect function dependency must change or reject: {unexpected:?}"),
+    }
+}
+
+#[tokio::test]
+async fn postgres18_range_parsed_body_custom_dependency_fails_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_range_parsed_dependency_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA {schema}; \
+             CREATE FUNCTION {schema}.helper(text, text) RETURNS float8 \
+               LANGUAGE SQL IMMUTABLE STRICT RETURN (length($1)-length($2))::float8; \
+             CREATE FUNCTION {schema}.text_diff(text, text) RETURNS float8 \
+               LANGUAGE SQL IMMUTABLE STRICT RETURN {schema}.helper($1,$2); \
+             CREATE TYPE {schema}.span AS RANGE (subtype=text, subtype_diff={schema}.text_diff)"
+        ))
+        .await
+        .unwrap();
+    let result = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA {schema} CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    assert!(matches!(
+        result,
         Err(SourceObservationFailure::InvalidCapturedMetadata)
     ));
 }

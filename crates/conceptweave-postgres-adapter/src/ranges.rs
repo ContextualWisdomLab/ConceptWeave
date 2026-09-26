@@ -36,6 +36,7 @@ pub(super) async fn capture(
     let mut observations = Vec::new();
     let max_bytes = request.request().limits().max_bytes().min(i64::MAX as u64) as i64;
     for schema in request.request().allowed_schema_names() {
+        // Only parsed SQL bodies expose their dependencies; opaque user bodies cannot prove closure.
         let stream = bounded(
             request,
             cancellation,
@@ -69,7 +70,22 @@ pub(super) async fn capture(
                    EXISTS(SELECT 1 FROM pg_catalog.pg_seclabel l \
                      WHERE l.classoid = 'pg_proc'::regclass AND l.objoid = dp.oid) OR \
                    EXISTS(SELECT 1 FROM pg_catalog.pg_depend d \
-                     WHERE d.classid = 'pg_proc'::regclass AND d.objid = dp.oid AND d.deptype = 'e')) \
+                     WHERE d.classid = 'pg_proc'::regclass AND d.objid = dp.oid AND d.deptype = 'e')), \
+                 EXISTS(SELECT 1 FROM (VALUES \
+                   (cp.oid, cp.pronamespace, cp.prosqlbody IS NULL, cp.prorettype, cp.proargtypes), \
+                   (dp.oid, dp.pronamespace, dp.prosqlbody IS NULL, dp.prorettype, dp.proargtypes) \
+                 ) AS p(proc_oid, proc_namespace, opaque_body, return_type, argument_types) \
+                 WHERE p.proc_oid IS NOT NULL \
+                   AND (p.proc_namespace <> 'pg_catalog'::regnamespace OR p.proc_oid >= 16384::oid) \
+                   AND (p.opaque_body OR EXISTS( \
+                     SELECT 1 FROM pg_catalog.pg_depend d \
+                     WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.proc_oid \
+                       AND d.refobjid >= 16384::oid \
+                       AND NOT (d.refclassid = 'pg_namespace'::regclass \
+                         AND d.refobjid = p.proc_namespace) \
+                       AND NOT (d.refclassid = 'pg_type'::regclass \
+                         AND (d.refobjid = p.return_type \
+                           OR d.refobjid = ANY(p.argument_types::oid[])))))) \
                  FROM pg_catalog.pg_range r \
                  JOIN pg_catalog.pg_type t ON t.oid = r.rngtypid \
                  JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace \
@@ -110,7 +126,7 @@ pub(super) async fn capture(
             let diff_definition: Option<String> = field(&row, 17)?;
             let canonical_owner: Option<String> = field(&row, 18)?;
             let diff_owner: Option<String> = field(&row, 19)?;
-            let bytes = 24
+            let bytes = 25
                 + [
                     &range_schema,
                     &range_name,
@@ -142,7 +158,7 @@ pub(super) async fn capture(
             meter.add(request, bytes)?;
             if access_method != "btree"
                 || !(13..=15).all(|index| field::<bool>(&row, index) == Ok(true))
-                || (20..=23).any(|index| field::<bool>(&row, index) != Ok(false))
+                || (20..=24).any(|index| field::<bool>(&row, index) != Ok(false))
             {
                 return Err(SourceObservationFailure::InvalidCapturedMetadata);
             }
