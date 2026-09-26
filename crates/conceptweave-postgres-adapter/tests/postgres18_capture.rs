@@ -6015,6 +6015,42 @@ async fn postgres18_catalog_is_observed_in_one_read_only_transaction() {
             .await?;
         let expressions = with_expressions.column_expressions().unwrap();
         let generations = with_expressions.column_generations().unwrap();
+        let catalog_declarations = client
+            .query(
+                "SELECT a.attname::text, a.attgenerated::text, \
+                 pg_catalog.pg_get_expr(d.adbin, d.adrelid) \
+                 FROM pg_catalog.pg_attribute a \
+                 JOIN pg_catalog.pg_class c ON c.oid = a.attrelid \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+                 LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum \
+                 WHERE n.nspname = $1 AND c.relname = 'defaulted' \
+                   AND a.attnum > 0 AND NOT a.attisdropped",
+                &[&schema],
+            )
+            .await
+            .unwrap();
+        assert_eq!(catalog_declarations.len(), 3);
+        for row in catalog_declarations {
+            let name: String = row.get(0);
+            let generation = generations
+                .iter()
+                .find(|value| value.relation_name() == "defaulted" && value.column_name() == name)
+                .unwrap();
+            let expression = expressions
+                .iter()
+                .find(|value| value.relation_name() == "defaulted" && value.column_name() == name)
+                .unwrap();
+            let catalog_expression: Option<String> = row.get(2);
+            assert_eq!(expression.expression(), catalog_expression.as_deref());
+            match row.get::<_, String>(1).as_str() {
+                "" => assert!(generation.is_not_generated()),
+                "s" => assert!(generation.is_stored()),
+                "v" => assert!(generation.is_virtual_generated()),
+                other => panic!("unexpected PostgreSQL generation mode: {other}"),
+            }
+            assert_eq!(expression.is_generation_expression(), !generation.is_not_generated());
+            assert_eq!(expression.is_no_expression(), catalog_expression.is_none());
+        }
         assert!(
             expressions
                 .iter()
