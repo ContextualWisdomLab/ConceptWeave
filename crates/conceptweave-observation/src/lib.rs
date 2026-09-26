@@ -57,7 +57,7 @@ pub use representation_v3::{
     QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
     RelationObservation, ReplicaIdentityMode, SchemaObjectLocation, SchemaObjectLocationKind,
 };
-pub use schema_owner::SchemaOwnerObservation;
+pub use schema_owner::{SchemaOwnerLocation, SchemaOwnerObservation, SchemaOwnerSourceReceipt};
 pub use type_kind::TypeOwnerObservation;
 pub use type_kind::{PostgresTypeKind, TypeKindObservation};
 
@@ -1654,6 +1654,33 @@ impl PostgresSchemaSnapshotV3 {
             });
         }
         Ok(ArrayTypeSourceReceipt::new(
+            self.source_connection_key().to_owned(),
+            self.connection_policy_binding().to_owned(),
+            self.snapshot_digest.clone(),
+            self.extractor_revision().to_owned(),
+            self.observed_at_utc().to_owned(),
+            location,
+        ))
+    }
+
+    /// Issues provenance for an exact observed source-schema owner, including an empty schema.
+    ///
+    /// The dedicated coordinate preserves the existing [`SchemaObjectLocation`] vocabulary.
+    pub fn schema_owner_source_receipt(
+        &self,
+        location: SchemaOwnerLocation,
+    ) -> Result<SchemaOwnerSourceReceipt, ObservationError> {
+        let exists = self.schema_owners_observed
+            && self
+                .schema_owners
+                .iter()
+                .any(|owner| owner.schema_name() == location.schema_name());
+        if !exists {
+            return Err(ObservationError::UnknownObservationLocation {
+                location: location.canonical_location(),
+            });
+        }
+        Ok(SchemaOwnerSourceReceipt::new(
             self.source_connection_key().to_owned(),
             self.connection_policy_binding().to_owned(),
             self.snapshot_digest.clone(),

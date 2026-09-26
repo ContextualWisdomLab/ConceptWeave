@@ -20,7 +20,7 @@ use conceptweave_observation::{
     EnumObservation, ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType,
     ForeignKeyObservation, IndexTablespace, PostgresSchemaSnapshotV3, PostgresTypeKind,
     QualifiedTypeName, RelationKind, RelationObservation, RelationOwnerObservation,
-    RelationTablespaceObservation, ReplicaIdentityMode, SchemaObjectLocation,
+    RelationTablespaceObservation, ReplicaIdentityMode, SchemaObjectLocation, SchemaOwnerLocation,
     SchemaOwnerObservation, TableConstraintObservation, TypeKindObservation, TypeOwnerObservation,
 };
 use conceptweave_postgres_adapter::{PostgresTlsAdapter, PostgresUnixAdapter};
@@ -3731,6 +3731,7 @@ async fn postgres18_schema_owner_changes_source_identity() {
     let suffix = std::process::id();
     let schema = format!("cw_schema_owner_fixture_{suffix}");
     let owner = format!("cw_schema_owner_{suffix}");
+    let renamed_owner = format!("cw_schema_owner_renamed_{suffix}");
     client
         .batch_execute(&format!(
             "CREATE ROLE \"{owner}\" NOLOGIN; CREATE SCHEMA \"{schema}\"; \
@@ -3746,7 +3747,7 @@ async fn postgres18_schema_owner_changes_source_identity() {
         .batch_execute(&format!("ALTER SCHEMA \"{schema}\" OWNER TO \"{owner}\""))
         .await
         .unwrap();
-    let after = adapter(config)
+    let after = adapter(config.clone())
         .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
         .await;
     let owner_row = client
@@ -3768,6 +3769,33 @@ async fn postgres18_schema_owner_changes_source_identity() {
         owner_row.get::<_, String>(1)
     );
     assert_ne!(before.snapshot_digest(), after.snapshot_digest());
+    client
+        .batch_execute(&format!(
+            "ALTER ROLE \"{owner}\" RENAME TO \"{renamed_owner}\""
+        ))
+        .await
+        .unwrap();
+    let renamed = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await
+        .unwrap();
+    assert_eq!(
+        renamed.schema_owners().unwrap()[0].owner_oid(),
+        after.schema_owners().unwrap()[0].owner_oid()
+    );
+    assert_eq!(
+        renamed.schema_owners().unwrap()[0].owner_role_name(),
+        renamed_owner
+    );
+    assert_ne!(after.snapshot_digest(), renamed.snapshot_digest());
+    let schema_receipt = renamed
+        .schema_owner_source_receipt(SchemaOwnerLocation::new(&schema).unwrap())
+        .unwrap();
+    assert_eq!(
+        schema_receipt.location().canonical_location(),
+        format!("/schemas/{schema}")
+    );
+    assert_eq!(schema_receipt.source_digest(), renamed.snapshot_digest());
     client
         .batch_execute(&format!("COMMENT ON SCHEMA \"{schema}\" IS 'unmodeled'"))
         .await
@@ -3793,7 +3821,7 @@ async fn postgres18_schema_owner_changes_source_identity() {
     ));
     client
         .batch_execute(&format!(
-            "DROP SCHEMA \"{schema}\" CASCADE; DROP ROLE \"{owner}\""
+            "DROP SCHEMA \"{schema}\" CASCADE; DROP ROLE \"{renamed_owner}\""
         ))
         .await
         .unwrap();

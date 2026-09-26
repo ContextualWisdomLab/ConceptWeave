@@ -17,6 +17,103 @@ pub struct SchemaOwnerObservation {
     owner_role_name: String,
 }
 
+/// Exact receipt coordinate for an observed source schema and its owner.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SchemaOwnerLocation {
+    schema_name: String,
+}
+
+impl SchemaOwnerLocation {
+    /// Creates an exact schema-owner coordinate without changing source identifier text.
+    pub fn new(schema_name: impl Into<String>) -> Result<Self, ObservationError> {
+        let schema_name = schema_name.into();
+        validate_postgresql_identifier(&schema_name, "schema_owner_schema_name")?;
+        Ok(Self { schema_name })
+    }
+
+    /// Returns the exact source schema identifier.
+    #[must_use]
+    pub fn schema_name(&self) -> &str {
+        &self.schema_name
+    }
+
+    /// Returns the collision-safe receipt path with RFC 6901 escaping.
+    #[must_use]
+    pub fn canonical_location(&self) -> String {
+        format!(
+            "/schemas/{}",
+            self.schema_name.replace('~', "~0").replace('/', "~1")
+        )
+    }
+}
+
+/// Immutable provenance receipt for one verified source-schema owner.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SchemaOwnerSourceReceipt {
+    source_id: String,
+    connection_policy_binding: String,
+    source_digest: String,
+    extractor_revision: String,
+    observed_at_utc: String,
+    location: SchemaOwnerLocation,
+}
+
+impl SchemaOwnerSourceReceipt {
+    pub(crate) fn new(
+        source_id: String,
+        connection_policy_binding: String,
+        source_digest: String,
+        extractor_revision: String,
+        observed_at_utc: String,
+        location: SchemaOwnerLocation,
+    ) -> Self {
+        Self {
+            source_id,
+            connection_policy_binding,
+            source_digest,
+            extractor_revision,
+            observed_at_utc,
+            location,
+        }
+    }
+
+    /// Returns the stable source registry reference.
+    #[must_use]
+    pub fn source_id(&self) -> &str {
+        &self.source_id
+    }
+
+    /// Returns the immutable connection-policy revision.
+    #[must_use]
+    pub fn connection_policy_binding(&self) -> &str {
+        &self.connection_policy_binding
+    }
+
+    /// Returns the schema-owner-aware governed source digest.
+    #[must_use]
+    pub fn source_digest(&self) -> &str {
+        &self.source_digest
+    }
+
+    /// Returns the exact extractor revision.
+    #[must_use]
+    pub fn extractor_revision(&self) -> &str {
+        &self.extractor_revision
+    }
+
+    /// Returns the exact UTC observation time supplied by the adapter.
+    #[must_use]
+    pub fn observed_at_utc(&self) -> &str {
+        &self.observed_at_utc
+    }
+
+    /// Returns the verified source-schema owner coordinate.
+    #[must_use]
+    pub const fn location(&self) -> &SchemaOwnerLocation {
+        &self.location
+    }
+}
+
 impl SchemaOwnerObservation {
     /// Records exact catalog role identity without inferring it from a connection user.
     pub fn new(
