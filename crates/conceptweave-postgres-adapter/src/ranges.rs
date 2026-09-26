@@ -86,7 +86,8 @@ pub(super) async fn capture(
                        AND NOT (d.refclassid = 'pg_type'::regclass \
                          AND (d.refobjid = p.return_type \
                            OR d.refobjid = ANY(p.argument_types::oid[])))))), \
-                 onsp.nspname = 'pg_catalog' AND opc.oid < 16384::oid \
+                 onsp.nspname = 'pg_catalog' AND opc.oid < 16384::oid, \
+                 sn.nspname <> 'pg_catalog' OR s.oid < 16384::oid \
                  FROM pg_catalog.pg_range r \
                  JOIN pg_catalog.pg_type t ON t.oid = r.rngtypid \
                  JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace \
@@ -161,6 +162,7 @@ pub(super) async fn capture(
                 || !(13..=15).all(|index| field::<bool>(&row, index) == Ok(true))
                 || (20..=24).any(|index| field::<bool>(&row, index) != Ok(false))
                 || field::<bool>(&row, 25) != Ok(true)
+                || field::<bool>(&row, 26) != Ok(true)
             {
                 return Err(SourceObservationFailure::InvalidCapturedMetadata);
             }

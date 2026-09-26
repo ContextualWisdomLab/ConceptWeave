@@ -161,6 +161,53 @@ async fn postgres18_user_defined_range_operator_class_fails_closed() {
 }
 
 #[tokio::test]
+async fn postgres18_user_type_in_pg_catalog_range_subtype_fails_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_range_catalog_subtype_fixture_{}", std::process::id());
+    let subtype = format!("cw_range_enum_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA {schema}; \
+             CREATE TYPE pg_catalog.{subtype} AS ENUM ('low', 'high'); \
+             CREATE TYPE {schema}.span AS RANGE (subtype = pg_catalog.{subtype})"
+        ))
+        .await
+        .unwrap();
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "ALTER TYPE pg_catalog.{subtype} ADD VALUE 'middle'"
+        ))
+        .await
+        .unwrap();
+    let after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA {schema} CASCADE; DROP TYPE pg_catalog.{subtype}"
+        ))
+        .await
+        .unwrap();
+    connection_task.abort();
+    assert!(matches!(
+        before,
+        Err(SourceObservationFailure::InvalidCapturedMetadata)
+    ));
+    assert!(matches!(
+        after,
+        Err(SourceObservationFailure::InvalidCapturedMetadata)
+    ));
+}
+
+#[tokio::test]
 async fn postgres18_range_collation_and_difference_function_are_bound() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
