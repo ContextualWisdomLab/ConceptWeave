@@ -2894,6 +2894,66 @@ async fn postgres18_foreign_key_preserves_comparison_and_referential_evidence() 
         assert_ne!(not_valid.snapshot_digest(), valid.snapshot_digest());
         client
             .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".child DROP CONSTRAINT child_parent_fk; \
+                 ALTER TABLE \"{schema}\".child ADD CONSTRAINT child_parent_fk \
+                 FOREIGN KEY (x, y) REFERENCES \"{schema}\".parent (b, a) \
+                 ON UPDATE RESTRICT ON DELETE SET DEFAULT (y)"
+            ))
+            .await
+            .unwrap();
+        let set_default = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await?;
+        assert_ne!(valid.snapshot_digest(), set_default.snapshot_digest());
+        let child = set_default
+            .relations()
+            .iter()
+            .find(|relation| relation.relation_name() == "child")
+            .unwrap();
+        let TableConstraintObservation::ForeignKey(key) = child
+            .constraints()
+            .iter()
+            .find(|constraint| constraint.constraint_name() == "child_parent_fk")
+            .unwrap()
+        else {
+            panic!("captured constraint must be a foreign key");
+        };
+        let catalog = client
+            .query_one(
+                "SELECT confupdtype::text, confdeltype::text, confdelsetcols \
+                 FROM pg_catalog.pg_constraint WHERE conrelid = $1::text::regclass \
+                   AND conname = 'child_parent_fk'",
+                &[&format!("\"{schema}\".child")],
+            )
+            .await
+            .unwrap();
+        assert_eq!(catalog.get::<_, String>(0), "r");
+        assert_eq!(catalog.get::<_, String>(1), "d");
+        assert_eq!(catalog.get::<_, Option<Vec<i16>>>(2), Some(vec![2]));
+        let behavior = key.reference_behavior().unwrap();
+        assert_eq!(behavior.update_action(), ForeignKeyAction::Restrict);
+        assert_eq!(behavior.delete_action(), ForeignKeyAction::SetDefault);
+        assert_eq!(
+            behavior.delete_target_columns(),
+            Some(["y".to_owned()].as_slice())
+        );
+        assert_eq!(
+            set_default
+                .source_receipt(
+                    SchemaObjectLocation::constraint(
+                        &schema,
+                        "child",
+                        RelationKind::Table,
+                        "child_parent_fk",
+                    )
+                    .unwrap(),
+                )
+                .unwrap()
+                .source_digest(),
+            set_default.snapshot_digest()
+        );
+        client
+            .batch_execute(&format!(
                 "CREATE SCHEMA \"{external_schema}\"; \
              CREATE TABLE \"{external_schema}\".other_parent (id integer PRIMARY KEY); \
              ALTER TABLE \"{schema}\".child ADD COLUMN outside_id integer; \
