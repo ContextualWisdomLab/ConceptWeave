@@ -3813,6 +3813,73 @@ async fn postgres18_nondefault_column_storage_settings_fail_closed() {
 }
 
 #[tokio::test]
+async fn postgres18_user_type_in_pg_catalog_fails_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let is_superuser: bool = client
+        .query_one(
+            "SELECT rolsuper FROM pg_catalog.pg_roles WHERE rolname = current_user",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    if !is_superuser {
+        eprintln!("skipping pg_catalog user-type fixture: setup requires a superuser");
+        connection_task.abort();
+        return;
+    }
+    let suffix = std::process::id();
+    let schema = format!("cw_catalog_type_fixture_{suffix}");
+    let type_name = format!("cw_catalog_enum_{suffix}");
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; \
+             CREATE TYPE pg_catalog.\"{type_name}\" AS ENUM ('new'); \
+             CREATE TABLE \"{schema}\".record (stage pg_catalog.\"{type_name}\")"
+        ))
+        .await
+        .unwrap();
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "ALTER TYPE pg_catalog.\"{type_name}\" ADD VALUE 'done'"
+        ))
+        .await
+        .unwrap();
+    let after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA \"{schema}\" CASCADE; DROP TYPE pg_catalog.\"{type_name}\" CASCADE"
+        ))
+        .await
+        .unwrap();
+    connection_task.abort();
+    assert!(
+        matches!(
+            before,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "user type in pg_catalog must fail closed before mutation: {before:?}"
+    );
+    assert!(
+        matches!(
+            after,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "user type in pg_catalog must fail closed after mutation: {after:?}"
+    );
+}
+
+#[tokio::test]
 async fn postgres18_type_owner_changes_source_identity() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;

@@ -970,6 +970,7 @@ async fn capture_catalog(
                  LEFT JOIN pg_catalog.pg_type e ON e.oid = a.typelem \
                  LEFT JOIN pg_catalog.pg_namespace en ON en.oid = e.typnamespace \
                  WHERE a.typnamespace = 'pg_catalog'::regnamespace \
+                   AND a.oid < 16384::oid \
                    AND a.typname::text = ANY($1::text[]) ORDER BY a.typname",
                 &[&names],
             ),
