@@ -35,6 +35,7 @@ pub(super) async fn capture(
 ) -> Result<Vec<RangeCatalogObservation>, SourceObservationFailure> {
     let mut observations = Vec::new();
     let max_bytes = request.request().limits().max_bytes().min(i64::MAX as u64) as i64;
+    let allowed_schemas = request.request().allowed_schema_names().to_vec();
     for schema in request.request().allowed_schema_names() {
         // Only parsed SQL bodies expose their dependencies; opaque user bodies cannot prove closure.
         let stream = bounded(
@@ -99,13 +100,19 @@ pub(super) async fn capture(
                  LEFT JOIN pg_catalog.pg_collation coll ON coll.oid = r.rngcollation \
                  LEFT JOIN pg_catalog.pg_namespace cn ON cn.oid = coll.collnamespace \
                  LEFT JOIN pg_catalog.pg_proc cp ON cp.oid = r.rngcanonical \
+                   AND (cp.pronamespace = 'pg_catalog'::regnamespace AND cp.oid < 16384::oid \
+                     OR cp.pronamespace IN (SELECT oid FROM pg_catalog.pg_namespace \
+                       WHERE nspname = ANY($3::text[]))) \
                  LEFT JOIN pg_catalog.pg_namespace cpn ON cpn.oid = cp.pronamespace \
                  LEFT JOIN pg_catalog.pg_roles cowner ON cowner.oid = cp.proowner \
                  LEFT JOIN pg_catalog.pg_proc dp ON dp.oid = r.rngsubdiff \
+                   AND (dp.pronamespace = 'pg_catalog'::regnamespace AND dp.oid < 16384::oid \
+                     OR dp.pronamespace IN (SELECT oid FROM pg_catalog.pg_namespace \
+                       WHERE nspname = ANY($3::text[]))) \
                  LEFT JOIN pg_catalog.pg_namespace dpn ON dpn.oid = dp.pronamespace \
                  LEFT JOIN pg_catalog.pg_roles downer ON downer.oid = dp.proowner \
                  WHERE n.nspname = $1 ORDER BY t.typname",
-                vec![schema as &(dyn ToSql + Sync), &max_bytes],
+                vec![schema as &(dyn ToSql + Sync), &max_bytes, &allowed_schemas],
             ),
         )
         .await?;

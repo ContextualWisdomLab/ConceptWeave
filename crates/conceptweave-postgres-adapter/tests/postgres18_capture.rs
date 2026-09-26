@@ -254,6 +254,65 @@ async fn postgres18_range_collation_and_difference_function_are_bound() {
 }
 
 #[tokio::test]
+async fn postgres18_range_procedure_requires_authorized_schema() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let source = format!("cw_range_procedure_source_{}", std::process::id());
+    let dependency = format!("cw_range_procedure_dependency_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA {source}; CREATE SCHEMA {dependency}; \
+             CREATE FUNCTION {dependency}.int4_diff(int4, int4) RETURNS float8 \
+               LANGUAGE SQL IMMUTABLE STRICT RETURN ($1 - $2)::float8; \
+             CREATE TYPE {source}.span AS RANGE \
+               (subtype=int4, subtype_diff={dependency}.int4_diff)"
+        ))
+        .await
+        .unwrap();
+    let outside_scope = adapter(config.clone())
+        .observe(authorized_with_limits(&source, 256, 65_536), &NotCancelled)
+        .await;
+    let inside_scope = adapter(config.clone())
+        .observe(authorized_two([&source, &dependency]), &NotCancelled)
+        .await;
+    let catalog_function = format!("cw_range_diff_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "DROP TYPE {source}.span CASCADE; \
+             CREATE FUNCTION pg_catalog.{catalog_function}(int4, int4) RETURNS float8 \
+               LANGUAGE SQL IMMUTABLE STRICT RETURN ($1 - $2)::float8; \
+             CREATE TYPE {source}.span AS RANGE \
+               (subtype=int4, subtype_diff=pg_catalog.{catalog_function})"
+        ))
+        .await
+        .unwrap();
+    let catalog_outside_scope = adapter(config)
+        .observe(authorized_with_limits(&source, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA {source} CASCADE; DROP SCHEMA {dependency} CASCADE; \
+             DROP FUNCTION pg_catalog.{catalog_function}(int4, int4)"
+        ))
+        .await
+        .unwrap();
+    connection_task.abort();
+    assert!(matches!(
+        outside_scope,
+        Err(SourceObservationFailure::InvalidCapturedMetadata)
+    ));
+    assert!(inside_scope.is_ok());
+    assert!(matches!(
+        catalog_outside_scope,
+        Err(SourceObservationFailure::InvalidCapturedMetadata)
+    ));
+}
+
+#[tokio::test]
 async fn postgres18_range_difference_function_body_changes_source_identity() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
