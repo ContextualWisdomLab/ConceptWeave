@@ -938,7 +938,19 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         propose_relational_model(&complete(identity_observed.clone(), false)),
         Err(ProposalError::IncompleteSourceObservation)
     ));
-    assert!(propose_relational_model(&complete(identity_observed, true)).is_ok());
+    let missing_collation_owners = complete(identity_observed, true);
+    assert!(matches!(
+        propose_relational_model(&missing_collation_owners),
+        Err(ProposalError::IncompleteSourceObservation)
+    ));
+    assert!(
+        propose_relational_model(
+            &missing_collation_owners
+                .with_observed_collation_owners(vec![])
+                .unwrap()
+        )
+        .is_ok()
+    );
     let missing_row_kind = PostgresSchemaSnapshotV3::new_with_array_types_and_type_kinds(
         &authorized(),
         "fixture",
@@ -1120,6 +1132,8 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         ])
         .unwrap()
         .with_observed_collation_definitions(vec![])
+        .unwrap()
+        .with_observed_collation_owners(vec![])
         .unwrap()
     };
     let type_only = complete_type_only(enums.clone(), "2026-09-25T00:00:00Z");
