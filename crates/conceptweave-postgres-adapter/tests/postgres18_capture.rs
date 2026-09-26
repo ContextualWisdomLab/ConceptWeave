@@ -3262,6 +3262,13 @@ async fn postgres18_user_function_expression_dependencies_fail_closed() {
         "CREATE TABLE \"{schema}\".record (id integer); CREATE INDEX record_expr ON \"{schema}\".record ((\"{schema}\".double_it(id)))",
         "CREATE DOMAIN \"{schema}\".score AS integer CHECK (\"{schema}\".double_it(VALUE) > 0)",
         "CREATE DOMAIN \"{schema}\".score AS integer DEFAULT \"{schema}\".double_it(1)",
+        "CREATE TYPE \"{schema}\".status AS ENUM ('a'); \
+         CREATE FUNCTION \"{schema}\".status_to_int(\"{schema}\".status) RETURNS integer \
+           LANGUAGE sql IMMUTABLE AS 'SELECT 1'; \
+         CREATE CAST (\"{schema}\".status AS integer) WITH FUNCTION \
+           \"{schema}\".status_to_int(\"{schema}\".status); \
+         CREATE TABLE \"{schema}\".record (id integer, status \"{schema}\".status, \
+           CONSTRAINT positive CHECK ((status::integer) > 0))",
     ]
     .into_iter()
     .enumerate()
