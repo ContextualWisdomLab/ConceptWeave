@@ -1759,6 +1759,99 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             .collect::<BTreeSet<_>>();
         assert_eq!(observed_constraints, catalog_constraints);
 
+        let catalog_key_constraints = client
+            .query(
+                "SELECT t.relname::text, con.conname::text, con.contype::text, \
+                 ARRAY(SELECT a.attname::text FROM unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord) \
+                   JOIN pg_catalog.pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum \
+                   ORDER BY k.ord), con.condeferrable, con.condeferred, ix.indnullsnotdistinct \
+                 FROM pg_catalog.pg_constraint con \
+                 JOIN pg_catalog.pg_class t ON t.oid = con.conrelid \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace \
+                 LEFT JOIN pg_catalog.pg_index ix ON ix.indexrelid = con.conindid \
+                 WHERE n.nspname = $1 AND t.relkind = 'r' AND con.contype IN ('p','u')",
+                &[&schema],
+            )
+            .await
+            .unwrap();
+        let mut catalog_key_names = BTreeSet::new();
+        for row in catalog_key_constraints {
+            let relation_name: String = row.get(0);
+            let constraint_name: String = row.get(1);
+            let constraint = first
+                .relations()
+                .iter()
+                .find(|relation| relation.relation_name() == relation_name)
+                .unwrap()
+                .constraints()
+                .iter()
+                .find(|constraint| constraint.constraint_name() == constraint_name)
+                .unwrap();
+            assert_eq!(constraint.column_names(), row.get::<_, Vec<String>>(3));
+            let nulls_not_distinct: bool = row.get::<_, Option<bool>>(6).unwrap();
+            match (row.get::<_, String>(2).as_str(), constraint) {
+                ("p", TableConstraintObservation::PrimaryKey(_)) => {
+                    assert!(!nulls_not_distinct);
+                }
+                ("u", TableConstraintObservation::Unique(unique)) => {
+                    assert_eq!(unique.nulls_not_distinct(), Some(nulls_not_distinct));
+                }
+                other => panic!("key constraint kind mismatch: {other:?}"),
+            }
+            let timing = first
+                .constraint_timings()
+                .unwrap()
+                .iter()
+                .find(|timing| {
+                    timing.relation_name() == relation_name
+                        && timing.constraint_name() == constraint_name
+                })
+                .unwrap();
+            let catalog_timing = match (row.get::<_, bool>(4), row.get::<_, bool>(5)) {
+                (false, false) => ConstraintDeferrability::NotDeferrable,
+                (true, false) => ConstraintDeferrability::InitiallyImmediate,
+                (true, true) => ConstraintDeferrability::InitiallyDeferred,
+                (false, true) => panic!("PostgreSQL reported deferred without deferrable"),
+            };
+            assert_eq!(timing.deferrability(), catalog_timing);
+            let receipt = first
+                .source_receipt(
+                    SchemaObjectLocation::constraint(
+                        &schema,
+                        &relation_name,
+                        RelationKind::Table,
+                        &constraint_name,
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+            assert_eq!(receipt.source_digest(), first.snapshot_digest());
+            assert!(catalog_key_names.insert((relation_name, constraint_name)));
+        }
+        let observed_key_names = first
+            .relations()
+            .iter()
+            .flat_map(|relation| {
+                relation
+                    .constraints()
+                    .iter()
+                    .filter(|constraint| {
+                        matches!(
+                            constraint,
+                            TableConstraintObservation::PrimaryKey(_)
+                                | TableConstraintObservation::Unique(_)
+                        )
+                    })
+                    .map(|constraint| {
+                        (
+                            relation.relation_name().to_owned(),
+                            constraint.constraint_name().to_owned(),
+                        )
+                    })
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(observed_key_names, catalog_key_names);
+
         let catalog_foreign_keys = client
             .query(
                 "SELECT t.relname::text, con.conname::text, rn.nspname::text, \
