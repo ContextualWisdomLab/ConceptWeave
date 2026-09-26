@@ -3420,6 +3420,79 @@ async fn postgres18_cross_schema_sequence_default_fails_closed() {
 }
 
 #[tokio::test]
+async fn postgres18_late_bound_relation_lookup_fails_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_lookup_owner_{}", std::process::id());
+    let external = format!("cw_lookup_source_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA {schema}; CREATE SCHEMA {external}; \
+             CREATE TABLE {external}.target (id integer); \
+             CREATE TABLE {schema}.record \
+               (target_oid oid DEFAULT to_regclass('{external}.target'))"
+        ))
+        .await
+        .unwrap();
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("ALTER TABLE {external}.target RENAME TO moved"))
+        .await
+        .unwrap();
+    let after = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "ALTER TABLE {schema}.record ALTER COLUMN target_oid \
+             SET DEFAULT ('{external}.moved'::text)::regclass"
+        ))
+        .await
+        .unwrap();
+    let cast_before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "ALTER TABLE {external}.moved RENAME TO final_name"
+        ))
+        .await
+        .unwrap();
+    let cast_after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA {schema} CASCADE; DROP SCHEMA {external} CASCADE"
+        ))
+        .await
+        .unwrap();
+    connection_task.abort();
+    assert!(
+        matches!(
+            before,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ) && matches!(
+            after,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ) && matches!(
+            cast_before,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ) && matches!(
+            cast_after,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "late-bound relation lookup must not reuse source identity: before={before:?}, after={after:?}, cast_before={cast_before:?}, cast_after={cast_after:?}"
+    );
+}
+
+#[tokio::test]
 async fn postgres18_user_function_expression_dependencies_fail_closed() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;

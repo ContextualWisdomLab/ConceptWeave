@@ -316,7 +316,7 @@ async fn capture_catalog(
         );
         // PostgreSQL assigns normal user objects OIDs from 16384 onward; even
         // functions and operators installed in pg_catalog need this check.
-        // Late-bound text sequence references lack pg_depend rows, so inspect
+        // Late-bound object lookups lack pg_depend rows, so inspect
         // server-reconstructed expressions before admitting the snapshot.
         let expression_dependency = bounded(
             request,
@@ -387,7 +387,8 @@ async fn capture_catalog(
                              AND c.oid = scoped.objid \
                          WHERE c.contype = 'c' AND c.conbin IS NOT NULL \
                        ) captured_expression \
-                       WHERE rendered ~* '(^|[^[:alnum:]_])(nextval|currval|setval|lastval)[[:space:]]*[(]' \
+                       WHERE rendered ~* '(^|[^[:alnum:]_])(nextval|currval|setval|lastval|to_reg[[:alnum:]_]*)[[:space:]]*[(]' \
+                         OR rendered ~* '::[[:space:]]*reg[[:alnum:]_]*([^[:alnum:]_]|$)' \
                      )",
                 &[&schema_oid],
             ),
