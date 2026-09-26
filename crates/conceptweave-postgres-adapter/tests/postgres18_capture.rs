@@ -1455,9 +1455,14 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
                     "i" => ReplicaIdentityMode::Index,
                     other => panic!("unexpected PostgreSQL replica identity: {other}"),
                 };
-                if relation_name == "risk_record" {
-                    assert_eq!(replica_identity, ReplicaIdentityMode::Index);
-                }
+                let expected_replica_identity = match relation_name.as_str() {
+                    "tenant" => ReplicaIdentityMode::Full,
+                    "risk_record" => ReplicaIdentityMode::Index,
+                    "control_record" => ReplicaIdentityMode::Nothing,
+                    "risk_control_link" => ReplicaIdentityMode::Default,
+                    other => panic!("unexpected relation in governance fixture: {other}"),
+                };
+                assert_eq!(replica_identity, expected_replica_identity);
                 assert_eq!(relation.replica_identity_mode(), Some(replica_identity));
                 assert_eq!(relation.source_comment(), row.get::<_, Option<String>>(2).as_deref());
                 let receipt = first
@@ -2823,6 +2828,25 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             proposal.proposal_id(),
             propose_relational_model(&restored).unwrap().proposal_id()
         );
+        client
+            .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".tenant REPLICA IDENTITY DEFAULT"
+            ))
+            .await
+            .unwrap();
+        let default_replica = observe().await?;
+        assert_ne!(first.snapshot_digest(), default_replica.snapshot_digest());
+        assert_ne!(
+            proposal.proposal_id(),
+            propose_relational_model(&default_replica).unwrap().proposal_id()
+        );
+        client
+            .batch_execute(&format!(
+                "ALTER TABLE \"{schema}\".tenant REPLICA IDENTITY FULL"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(first.snapshot_digest(), observe().await?.snapshot_digest());
         Ok::<_, SourceObservationFailure>(())
     }
     .await;
