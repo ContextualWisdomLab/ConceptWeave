@@ -120,6 +120,48 @@ fn signed_manifest_requires_an_independent_exact_publisher_key() {
 }
 
 #[test]
+fn signed_manifest_rejects_invalid_external_identifiers_and_key_material() {
+    let key = [1_u8; 32];
+    let signature = [0_u8; 64];
+    let digest = digest();
+    for invalid in [" ", "publisher\0forged"] {
+        assert_eq!(
+            TrustedPublisherKey::new(invalid, &key),
+            Err(ReleaseContractError::InvalidSignedManifest)
+        );
+        assert_eq!(
+            SignedReleaseManifest::signing_message(invalid, "release", &digest),
+            Err(ReleaseContractError::InvalidSignedManifest)
+        );
+        assert_eq!(
+            SignedReleaseManifest::new(invalid, "release", digest.clone(), &signature),
+            Err(ReleaseContractError::InvalidSignedManifest)
+        );
+        assert_eq!(
+            SignedReleaseManifest::new("publisher", invalid, digest.clone(), &signature),
+            Err(ReleaseContractError::InvalidSignedManifest)
+        );
+    }
+    let oversized = "x".repeat(4_097);
+    assert_eq!(
+        TrustedPublisherKey::new(&oversized, &key),
+        Err(ReleaseContractError::InvalidSignedManifest)
+    );
+    assert_eq!(
+        SignedReleaseManifest::new("publisher", &oversized, digest.clone(), &signature),
+        Err(ReleaseContractError::InvalidSignedManifest)
+    );
+    assert_eq!(
+        TrustedPublisherKey::new("publisher", &key[..31]),
+        Err(ReleaseContractError::InvalidSignedManifest)
+    );
+    assert_eq!(
+        SignedReleaseManifest::new("publisher", "release", digest, &signature[..63]),
+        Err(ReleaseContractError::InvalidSignedManifest)
+    );
+}
+
+#[test]
 fn authoritative_published_release_is_admitted_offline() {
     let release = release(
         "1.0.0",
