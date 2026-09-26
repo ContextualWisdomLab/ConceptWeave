@@ -1096,7 +1096,7 @@ async fn capture_catalog(
     let range_catalog = ranges::capture(&transaction, request, cancellation, &mut meter).await?;
     let collation_references =
         collations::references(&domains, &relations, &column_collations, &range_catalog);
-    let collation_definitions = collations::capture(
+    let (collation_definitions, collation_owners) = collations::capture(
         &transaction,
         request,
         cancellation,
@@ -1179,6 +1179,9 @@ async fn capture_catalog(
     } else {
         snapshot
     };
+    let snapshot = snapshot
+        .with_observed_collation_owners(collation_owners)
+        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
     bounded(request, cancellation, transaction.commit()).await?;
     Ok(snapshot)
 }

@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use sha2::{Digest, Sha256};
 
+use crate::column_identity::validate_postgresql_identifier;
 use crate::{
     ColumnCollationObservation, DomainObservation, ObservationError, QualifiedCollationName,
     RelationObservation,
@@ -185,6 +186,111 @@ pub struct CollationDefinitionObservation {
     fields: CollationLocaleFields,
     database_default: Option<DatabaseLocaleDefinition>,
     comment: Option<String>,
+}
+
+/// Exact catalog owner of one referenced PostgreSQL collation.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CollationOwnerObservation {
+    collation: QualifiedCollationName,
+    owner_oid: u32,
+    owner_role_name: String,
+}
+
+impl CollationOwnerObservation {
+    /// Records the owner OID and its resolved role name for one collation.
+    pub fn new(
+        collation: QualifiedCollationName,
+        owner_oid: u32,
+        owner_role_name: impl Into<String>,
+    ) -> Result<Self, ObservationError> {
+        let owner_role_name = owner_role_name.into();
+        validate_postgresql_identifier(&owner_role_name, "collation_owner_role_name")?;
+        if owner_oid == 0 {
+            return Err(ObservationError::InvalidObservationField {
+                field: "collation_owner_oid",
+            });
+        }
+        Ok(Self {
+            collation,
+            owner_oid,
+            owner_role_name,
+        })
+    }
+
+    /// Returns the exact qualified collation coordinate.
+    #[must_use]
+    pub const fn collation(&self) -> &QualifiedCollationName {
+        &self.collation
+    }
+
+    /// Returns the catalog role OID.
+    #[must_use]
+    pub const fn owner_oid(&self) -> u32 {
+        self.owner_oid
+    }
+
+    /// Returns the resolved role name.
+    #[must_use]
+    pub fn owner_role_name(&self) -> &str {
+        &self.owner_role_name
+    }
+}
+
+pub(crate) fn canonicalize_owners(
+    definitions: &[CollationDefinitionObservation],
+    mut owners: Vec<CollationOwnerObservation>,
+) -> Result<Vec<CollationOwnerObservation>, ObservationError> {
+    owners.sort_by(|left, right| {
+        (
+            left.collation.schema_name(),
+            left.collation.collation_name(),
+        )
+            .cmp(&(
+                right.collation.schema_name(),
+                right.collation.collation_name(),
+            ))
+    });
+    let expected = definitions
+        .iter()
+        .map(|item| {
+            (
+                item.collation().schema_name(),
+                item.collation().collation_name(),
+            )
+        })
+        .collect::<BTreeSet<_>>();
+    let actual = owners
+        .iter()
+        .map(|item| {
+            (
+                item.collation.schema_name(),
+                item.collation.collation_name(),
+            )
+        })
+        .collect::<BTreeSet<_>>();
+    if expected != actual || owners.len() != expected.len() {
+        return Err(ObservationError::InvalidObservationField {
+            field: "collation_owner_coverage",
+        });
+    }
+    Ok(owners)
+}
+
+pub(crate) fn owner_digest(base: &str, owners: &[CollationOwnerObservation]) -> String {
+    let mut hasher = Sha256::new();
+    super::encode_bytes(
+        &mut hasher,
+        b"conceptweave.postgres_schema_snapshot.v3.collation_owner.v1",
+    );
+    super::encode_str(&mut hasher, base);
+    super::encode_len(&mut hasher, owners.len());
+    for owner in owners {
+        super::encode_str(&mut hasher, owner.collation.schema_name());
+        super::encode_str(&mut hasher, owner.collation.collation_name());
+        hasher.update(owner.owner_oid.to_be_bytes());
+        super::encode_str(&mut hasher, &owner.owner_role_name);
+    }
+    super::encode_sha256(hasher)
 }
 
 impl CollationDefinitionObservation {
@@ -473,6 +579,43 @@ mod tests {
         let baseline = digest("base", &[definition("153.120", "153.120")]);
         assert_ne!(baseline, digest("base", &[definition("0", "153.120")]));
         assert_ne!(baseline, digest("base", &[definition("153.120", "154.1")]));
+    }
+
+    #[test]
+    fn collation_owner_digest_requires_complete_exact_coverage() {
+        let definitions = vec![definition("153.120", "153.120")];
+        let coordinate = definitions[0].collation().clone();
+        let original = CollationOwnerObservation::new(coordinate.clone(), 10, "postgres").unwrap();
+        let renamed = CollationOwnerObservation::new(coordinate.clone(), 10, "steward").unwrap();
+        let changed = CollationOwnerObservation::new(coordinate, 11, "steward").unwrap();
+        assert_ne!(
+            owner_digest("base", std::slice::from_ref(&original)),
+            owner_digest("base", std::slice::from_ref(&changed))
+        );
+        assert_ne!(
+            owner_digest("base", std::slice::from_ref(&original)),
+            owner_digest("base", std::slice::from_ref(&renamed))
+        );
+        assert!(canonicalize_owners(&definitions, vec![]).is_err());
+        assert!(canonicalize_owners(&definitions, vec![original.clone(), original]).is_err());
+        assert!(canonicalize_owners(&definitions, vec![changed]).is_ok());
+
+        let mut second = definitions[0].clone();
+        second.collation = QualifiedCollationName::new("public", "other").unwrap();
+        let first_owner =
+            CollationOwnerObservation::new(definitions[0].collation().clone(), 10, "postgres")
+                .unwrap();
+        let second_owner =
+            CollationOwnerObservation::new(second.collation().clone(), 11, "steward").unwrap();
+        let complete = [definitions[0].clone(), second];
+        let forward =
+            canonicalize_owners(&complete, vec![first_owner.clone(), second_owner.clone()])
+                .unwrap();
+        let reverse = canonicalize_owners(&complete, vec![second_owner, first_owner]).unwrap();
+        assert_eq!(
+            owner_digest("base", &forward),
+            owner_digest("base", &reverse)
+        );
     }
 
     #[test]

@@ -27,8 +27,8 @@ mod type_kind;
 
 pub use array_type::{ArrayTypeLocation, ArrayTypeObservation, ArrayTypeSourceReceipt};
 pub use collation_definition::{
-    CollationDefinitionObservation, CollationLocaleFields, CollationProvider,
-    DatabaseLocaleDefinition,
+    CollationDefinitionObservation, CollationLocaleFields, CollationOwnerObservation,
+    CollationProvider, DatabaseLocaleDefinition,
 };
 pub use column_array_dimensions::ColumnArrayDimensionsObservation;
 pub use column_collation::ColumnCollationObservation;
@@ -180,6 +180,8 @@ pub struct PostgresSchemaSnapshotV3 {
     relation_owners_observed: bool,
     collation_definitions: Vec<CollationDefinitionObservation>,
     collation_definitions_observed: bool,
+    collation_owners: Vec<CollationOwnerObservation>,
+    collation_owners_observed: bool,
 }
 
 impl PostgresSchemaSnapshotV3 {
@@ -252,6 +254,8 @@ impl PostgresSchemaSnapshotV3 {
             relation_owners_observed: false,
             collation_definitions: Vec::new(),
             collation_definitions_observed: false,
+            collation_owners: Vec::new(),
+            collation_owners_observed: false,
         })
     }
 
@@ -359,6 +363,8 @@ impl PostgresSchemaSnapshotV3 {
             relation_owners_observed: false,
             collation_definitions: Vec::new(),
             collation_definitions_observed: false,
+            collation_owners: Vec::new(),
+            collation_owners_observed: false,
         })
     }
 
@@ -656,6 +662,8 @@ impl PostgresSchemaSnapshotV3 {
             relation_owners_observed: false,
             collation_definitions: Vec::new(),
             collation_definitions_observed: false,
+            collation_owners: Vec::new(),
+            collation_owners_observed: false,
         })
     }
 
@@ -1371,6 +1379,7 @@ impl PostgresSchemaSnapshotV3 {
         if !self.collation_definitions_observed
             || !self.array_types_observed
             || self.column_array_dimensions_observed
+            || self.collation_owners_observed
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "column_array_dimensions_observation_order",
@@ -1385,6 +1394,28 @@ impl PostgresSchemaSnapshotV3 {
             column_array_dimensions::digest(&self.snapshot_digest, &observations);
         self.column_array_dimensions = observations;
         self.column_array_dimensions_observed = true;
+        Ok(self)
+    }
+
+    /// Binds the complete owner identity of every referenced collation in a new successor digest.
+    /// Earlier collation-definition and column-dimension digests remain reproducible.
+    pub fn with_observed_collation_owners(
+        mut self,
+        owners: Vec<CollationOwnerObservation>,
+    ) -> Result<Self, ObservationError> {
+        if !self.collation_definitions_observed
+            || (!self.relations.is_empty() && !self.column_array_dimensions_observed)
+            || self.collation_owners_observed
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "collation_owner_observation_order",
+            });
+        }
+        let owners =
+            collation_definition::canonicalize_owners(&self.collation_definitions, owners)?;
+        self.snapshot_digest = collation_definition::owner_digest(&self.snapshot_digest, &owners);
+        self.collation_owners = owners;
+        self.collation_owners_observed = true;
         Ok(self)
     }
 
@@ -1588,6 +1619,13 @@ impl PostgresSchemaSnapshotV3 {
     pub fn collation_definitions(&self) -> Option<&[CollationDefinitionObservation]> {
         self.collation_definitions_observed
             .then_some(self.collation_definitions.as_slice())
+    }
+
+    /// Returns complete owner identities for the referenced collation definitions, when observed.
+    #[must_use]
+    pub fn collation_owners(&self) -> Option<&[CollationOwnerObservation]> {
+        self.collation_owners_observed
+            .then_some(self.collation_owners.as_slice())
     }
 
     /// Issues provenance for an exact successor coordinate only when it exists in this snapshot.

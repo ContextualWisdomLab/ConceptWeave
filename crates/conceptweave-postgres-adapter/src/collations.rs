@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use conceptweave_observation::{
-    CollationDefinitionObservation, CollationLocaleFields, CollationProvider,
-    ColumnCollationObservation, DatabaseLocaleDefinition, DomainObservation,
+    CollationDefinitionObservation, CollationLocaleFields, CollationOwnerObservation,
+    CollationProvider, ColumnCollationObservation, DatabaseLocaleDefinition, DomainObservation,
     QualifiedCollationName, RangeCatalogObservation, RelationObservation,
 };
 use conceptweave_source_port::{
@@ -39,9 +39,11 @@ const COLLATION_QUERY: &str = "WITH raw AS MATERIALIZED ( \
     EXISTS(SELECT 1 FROM pg_catalog.pg_seclabel \
       WHERE classoid = 'pg_collation'::regclass AND objoid = c.oid) AS security_label, \
     EXISTS(SELECT 1 FROM pg_catalog.pg_depend \
-      WHERE classid = 'pg_collation'::regclass AND objid = c.oid AND deptype = 'e') AS extension_owned \
+      WHERE classid = 'pg_collation'::regclass AND objid = c.oid AND deptype = 'e') AS extension_owned, \
+    c.collowner, owner_role.rolname::text AS owner_name \
     FROM pg_catalog.pg_collation c \
     JOIN pg_catalog.pg_namespace n ON n.oid = c.collnamespace \
+    LEFT JOIN pg_catalog.pg_roles owner_role ON owner_role.oid = c.collowner \
     WHERE n.nspname = $1 AND c.collname = $2 AND c.collencoding IN (-1, $3) \
       AND (n.nspname <> 'pg_catalog' OR c.oid < 16384::oid) \
 ), sized AS MATERIALIZED ( \
@@ -59,7 +61,8 @@ const COLLATION_QUERY: &str = "WITH raw AS MATERIALIZED ( \
     CASE WHEN bytes <= $4 THEN collicurules END, \
     CASE WHEN bytes <= $4 THEN collversion END, \
     CASE WHEN bytes <= $4 THEN actual END, \
-    CASE WHEN bytes <= $4 THEN comment END, bytes > $4, security_label, extension_owned \
+    CASE WHEN bytes <= $4 THEN comment END, bytes > $4, security_label, extension_owned, \
+    collowner, owner_name \
     FROM sized";
 
 fn locale_fields(
@@ -140,9 +143,15 @@ pub(super) async fn capture(
     cancellation: &dyn ObservationCancellation,
     meter: &mut CaptureMeter,
     references: BTreeSet<(String, String)>,
-) -> Result<Vec<CollationDefinitionObservation>, SourceObservationFailure> {
+) -> Result<
+    (
+        Vec<CollationDefinitionObservation>,
+        Vec<CollationOwnerObservation>,
+    ),
+    SourceObservationFailure,
+> {
     if references.is_empty() {
-        return Ok(Vec::new());
+        return Ok((Vec::new(), Vec::new()));
     }
     if references.iter().any(|(schema, _)| {
         schema != "pg_catalog" && !request.request().allowed_schema_names().contains(schema)
@@ -190,6 +199,7 @@ pub(super) async fn capture(
         None
     };
     let mut definitions = Vec::with_capacity(references.len());
+    let mut owners = Vec::with_capacity(references.len());
     for (schema, name) in references {
         let rows = bounded(
             request,
@@ -216,17 +226,22 @@ pub(super) async fn capture(
             .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
         let fields = locale_fields(row, 3)?;
         let comment: Option<String> = field(row, 9)?;
+        let owner_oid: u32 = field(row, 13)?;
+        let owner_name: String = field::<Option<String>>(row, 14)?
+            .ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
         meter.add(
             request,
-            16 + schema.len()
+            20 + schema.len()
                 + name.len()
                 + locale_bytes(&fields)
-                + comment.as_ref().map_or(0, String::len),
+                + comment.as_ref().map_or(0, String::len)
+                + owner_name.len(),
         )?;
+        let collation = QualifiedCollationName::new(schema, name)
+            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
         definitions.push(
             CollationDefinitionObservation::new(
-                QualifiedCollationName::new(schema, name)
-                    .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+                collation.clone(),
                 field(row, 0)?,
                 database_encoding,
                 provider,
@@ -239,6 +254,10 @@ pub(super) async fn capture(
             )
             .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
         );
+        owners.push(
+            CollationOwnerObservation::new(collation, owner_oid, owner_name)
+                .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
+        );
     }
-    Ok(definitions)
+    Ok((definitions, owners))
 }

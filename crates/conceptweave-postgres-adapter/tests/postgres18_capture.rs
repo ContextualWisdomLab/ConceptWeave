@@ -3208,6 +3208,92 @@ async fn postgres18_tcp_requires_valid_ca_and_host_name() {
 }
 
 #[tokio::test]
+async fn postgres18_collation_owner_changes_source_identity() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let can_create_role: bool = client
+        .query_one(
+            "SELECT rolsuper FROM pg_catalog.pg_roles WHERE rolname = current_user",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    if !can_create_role {
+        eprintln!("skipping collation-owner fixture: setup requires a superuser");
+        connection_task.abort();
+        return;
+    }
+    let suffix = std::process::id();
+    let schema = format!("cw_collation_owner_fixture_{suffix}");
+    let owner = format!("cw_collation_owner_{suffix}");
+    client
+        .batch_execute(&format!(
+            "CREATE ROLE \"{owner}\" NOLOGIN; CREATE SCHEMA \"{schema}\"; \
+             CREATE COLLATION \"{schema}\".casefold \
+               (provider = icu, locale = 'und-u-ks-level1', deterministic = false); \
+             CREATE TABLE \"{schema}\".record (value text COLLATE \"{schema}\".casefold)"
+        ))
+        .await
+        .unwrap();
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "ALTER COLLATION \"{schema}\".casefold OWNER TO \"{owner}\""
+        ))
+        .await
+        .unwrap();
+    let after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    let catalog_owner = client
+        .query_one(
+            "SELECT c.collowner, r.rolname::text FROM pg_catalog.pg_collation c \
+             JOIN pg_catalog.pg_namespace n ON n.oid = c.collnamespace \
+             JOIN pg_catalog.pg_roles r ON r.oid = c.collowner \
+             WHERE n.nspname = $1 AND c.collname = 'casefold'",
+            &[&schema],
+        )
+        .await
+        .unwrap();
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA \"{schema}\" CASCADE; DROP ROLE \"{owner}\""
+        ))
+        .await
+        .unwrap();
+    connection_task.abort();
+    let before = before.unwrap();
+    let after = after.unwrap();
+    assert_ne!(before.snapshot_digest(), after.snapshot_digest());
+    assert_eq!(
+        after.collation_owners().unwrap().len(),
+        after.collation_definitions().unwrap().len()
+    );
+    let observed_owner = after
+        .collation_owners()
+        .unwrap()
+        .iter()
+        .find(|item| item.collation().schema_name() == schema)
+        .unwrap();
+    assert_eq!(observed_owner.owner_oid(), catalog_owner.get::<_, u32>(0));
+    assert_eq!(
+        observed_owner.owner_role_name(),
+        catalog_owner.get::<_, String>(1)
+    );
+    let receipt = after
+        .source_receipt(SchemaObjectLocation::collation(&schema, "casefold").unwrap())
+        .unwrap();
+    assert_eq!(receipt.source_digest(), after.snapshot_digest());
+}
+
+#[tokio::test]
 async fn postgres18_column_collation_is_exact_source_evidence() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
