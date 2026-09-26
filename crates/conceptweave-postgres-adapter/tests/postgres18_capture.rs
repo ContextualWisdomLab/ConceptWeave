@@ -1609,6 +1609,79 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             .collect::<BTreeSet<_>>();
         assert_eq!(observed_indexes, catalog_indexes);
 
+        let catalog_key_rows = client
+            .query(
+                "SELECT t.relname::text, c.relname::text, key.position + 1, \
+                 op_namespace.nspname::text, op.opcname::text, \
+                 coll_namespace.nspname::text, coll.collname::text, \
+                 x.indoption[key.position] \
+                 FROM pg_catalog.pg_index x \
+                 JOIN pg_catalog.pg_class t ON t.oid = x.indrelid \
+                 JOIN pg_catalog.pg_class c ON c.oid = x.indexrelid \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace \
+                 CROSS JOIN LATERAL pg_catalog.generate_series(0, x.indnkeyatts - 1) key(position) \
+                 JOIN pg_catalog.pg_opclass op ON op.oid = x.indclass[key.position] \
+                 JOIN pg_catalog.pg_namespace op_namespace ON op_namespace.oid = op.opcnamespace \
+                 LEFT JOIN pg_catalog.pg_collation coll ON coll.oid = x.indcollation[key.position] \
+                 LEFT JOIN pg_catalog.pg_namespace coll_namespace ON coll_namespace.oid = coll.collnamespace \
+                 WHERE n.nspname = $1 AND t.relkind = 'r'",
+                &[&schema],
+            )
+            .await
+            .unwrap();
+        let mut catalog_keys = BTreeSet::new();
+        let mut saw_nondefault_options = false;
+        for row in catalog_key_rows {
+            let relation_name: String = row.get(0);
+            let index_name: String = row.get(1);
+            let position = u32::try_from(row.get::<_, i32>(2)).unwrap();
+            let key = first
+                .relations()
+                .iter()
+                .find(|relation| relation.relation_name() == relation_name)
+                .unwrap()
+                .indexes()
+                .iter()
+                .find(|index| index.index_name() == index_name)
+                .unwrap()
+                .key_semantics()
+                .unwrap()
+                .iter()
+                .find(|key| key.position() == position)
+                .unwrap();
+            assert_eq!(key.operator_class().schema_name(), row.get::<_, String>(3));
+            assert_eq!(key.operator_class().operator_class_name(), row.get::<_, String>(4));
+            assert_eq!(
+                key.collation().map(|collation| (
+                    collation.schema_name().to_owned(),
+                    collation.collation_name().to_owned(),
+                )),
+                row.get::<_, Option<String>>(5)
+                    .zip(row.get::<_, Option<String>>(6))
+            );
+            let options = row.get::<_, i16>(7) as u16;
+            assert_eq!(key.access_method_options(), options);
+            saw_nondefault_options |= options != 0;
+            assert!(catalog_keys.insert((relation_name, index_name, position)));
+        }
+        assert!(saw_nondefault_options);
+        let observed_keys = first
+            .relations()
+            .iter()
+            .flat_map(|relation| {
+                relation.indexes().iter().flat_map(|index| {
+                    index.key_semantics().unwrap().iter().map(|key| {
+                        (
+                            relation.relation_name().to_owned(),
+                            index.index_name().to_owned(),
+                            key.position(),
+                        )
+                    })
+                })
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(observed_keys, catalog_keys);
+
         let catalog_constraints = client
             .query(
                 "SELECT t.relname::text, con.conname::text FROM pg_catalog.pg_constraint con \
