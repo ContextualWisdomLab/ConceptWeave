@@ -294,6 +294,32 @@ async fn capture_catalog(
                    OR EXISTS(SELECT 1 FROM pg_catalog.pg_depend d \
                      WHERE d.classid = 'pg_namespace'::regclass AND d.objid = n.oid \
                        AND d.deptype = 'e') \
+                   OR EXISTS(SELECT 1 FROM pg_catalog.pg_cast ca \
+                     JOIN pg_catalog.pg_type source_type ON source_type.oid = ca.castsource \
+                     JOIN pg_catalog.pg_type target_type ON target_type.oid = ca.casttarget \
+                     WHERE (source_type.typnamespace = n.oid OR target_type.typnamespace = n.oid) \
+                       AND NOT (source_type.typtype = 'r' AND target_type.typtype = 'm' \
+                         AND ca.castmethod = 'f' AND ca.castcontext = 'e' \
+                         AND EXISTS(SELECT 1 FROM pg_catalog.pg_range rg \
+                           WHERE rg.rngtypid = source_type.oid \
+                             AND rg.rngmultitypid = target_type.oid) \
+                         AND EXISTS(SELECT 1 FROM pg_catalog.pg_depend d \
+                           WHERE d.classid = 'pg_cast'::regclass AND d.objid = ca.oid \
+                             AND d.refclassid = 'pg_type'::regclass \
+                             AND d.refobjid = source_type.oid AND d.deptype = 'i') \
+                         AND EXISTS(SELECT 1 FROM pg_catalog.pg_proc p \
+                           JOIN pg_catalog.pg_language l ON l.oid = p.prolang \
+                           WHERE p.oid = ca.castfunc AND p.pronamespace = n.oid \
+                             AND p.proname = target_type.typname \
+                             AND p.proowner = source_type.typowner \
+                             AND p.pronargs = 1 AND p.proargtypes[0] = source_type.oid \
+                             AND p.prorettype = target_type.oid \
+                             AND l.lanname = 'internal' \
+                             AND p.prosrc = 'multirange_constructor1' \
+                             AND p.provolatile = 'i' AND p.proparallel = 's' \
+                             AND p.proisstrict AND NOT p.prosecdef AND NOT p.proleakproof \
+                             AND p.proconfig IS NULL AND p.proacl IS NULL \
+                             AND pg_catalog.obj_description(p.oid, 'pg_proc') IS NULL))) \
                  FROM pg_catalog.pg_namespace n \
                  LEFT JOIN pg_catalog.pg_roles r ON r.oid = n.nspowner \
                  WHERE n.nspname = $1",

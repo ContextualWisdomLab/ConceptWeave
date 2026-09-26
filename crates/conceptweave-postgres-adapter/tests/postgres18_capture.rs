@@ -3822,6 +3822,130 @@ async fn postgres18_late_bound_relation_lookup_fails_closed() {
 }
 
 #[tokio::test]
+async fn postgres18_renamed_range_cast_constructor_fails_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_range_cast_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; \
+             CREATE TYPE \"{schema}\".span AS RANGE (subtype = integer)"
+        ))
+        .await
+        .unwrap();
+    let source = adapter(config);
+    let before = source
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "ALTER FUNCTION \"{schema}\".span_multirange(\"{schema}\".span) \
+             RENAME TO renamed_constructor"
+        ))
+        .await
+        .unwrap();
+    let after = source
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    assert!(
+        before.is_ok(),
+        "ordinary range must be observed: {before:?}"
+    );
+    assert!(
+        matches!(
+            after,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "renamed cast constructor cannot retain range source identity: {after:?}"
+    );
+}
+
+#[tokio::test]
+async fn postgres18_unmodeled_cast_on_observed_type_fails_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_cast_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; \
+             CREATE TYPE \"{schema}\".status AS ENUM ('1'); \
+             CREATE TABLE \"{schema}\".record (status \"{schema}\".status); \
+             CREATE FUNCTION \"{schema}\".status_to_int(\"{schema}\".status) RETURNS integer \
+               LANGUAGE sql IMMUTABLE AS 'SELECT 1'"
+        ))
+        .await
+        .unwrap();
+    let source = adapter(config.clone());
+    let before = source
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "CREATE CAST (\"{schema}\".status AS integer) WITH FUNCTION \
+             \"{schema}\".status_to_int(\"{schema}\".status) AS IMPLICIT"
+        ))
+        .await
+        .unwrap();
+    let after = source
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("DROP CAST (\"{schema}\".status AS integer)"))
+        .await
+        .unwrap();
+    let restored = source
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "CREATE CAST (integer AS \"{schema}\".status) WITH INOUT AS ASSIGNMENT"
+        ))
+        .await
+        .unwrap();
+    let target_cast = source
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    assert!(before.is_ok(), "baseline type must be observed: {before:?}");
+    assert_eq!(
+        before.as_ref().unwrap().snapshot_digest(),
+        restored.as_ref().unwrap().snapshot_digest(),
+        "dropping the cast must restore the original source identity"
+    );
+    assert!(
+        matches!(
+            after,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "a cast from the observed type cannot be omitted: {after:?}"
+    );
+    assert!(
+        matches!(
+            target_cast,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "a cast to the observed type cannot be omitted: {target_cast:?}"
+    );
+}
+
+#[tokio::test]
 async fn postgres18_user_function_expression_dependencies_fail_closed() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
