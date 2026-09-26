@@ -2117,7 +2117,7 @@ where
     let remaining = request
         .remaining_operation_budget()
         .ok_or(SourceObservationFailure::OperationTimeout)?;
-    tokio::select! {
+    let result = tokio::select! {
         result = tokio::time::timeout(remaining, future) => match result {
             Ok(Ok(value)) => Ok(value),
             Ok(Err(error)) if error.code() == Some(&SqlState::QUERY_CANCELED) => {
@@ -2127,6 +2127,13 @@ where
             Err(_) => Err(SourceObservationFailure::OperationTimeout),
         },
         () = wait_for_cancellation(cancellation) => Err(SourceObservationFailure::Cancelled),
+    };
+    if cancellation.is_cancelled() {
+        Err(SourceObservationFailure::Cancelled)
+    } else if request.remaining_operation_budget().is_none() {
+        Err(SourceObservationFailure::OperationTimeout)
+    } else {
+        result
     }
 }
 
@@ -2136,5 +2143,88 @@ async fn wait_for_cancellation(cancellation: &dyn ObservationCancellation) {
             return;
         }
         tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use conceptweave_source_port::{
+        ObservationLimits, ObservationRequest, ObservationRequestBudget,
+        ObservationResourceEnvelope, ResolvedSourceConnection, SourceConnectionRegistry,
+    };
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    struct Registry;
+
+    impl SourceConnectionRegistry for Registry {
+        fn contains_source_connection(&self, _: &str) -> bool {
+            true
+        }
+
+        fn connection_policy_binding(&self, _: &str) -> Option<String> {
+            Some("fixture_policy".to_owned())
+        }
+
+        fn authorizes_schema_scope(&self, _: &ResolvedSourceConnection, _: &[String]) -> bool {
+            true
+        }
+
+        fn authorizes_resource_envelope(
+            &self,
+            _: &ResolvedSourceConnection,
+            _: ObservationResourceEnvelope,
+        ) -> bool {
+            true
+        }
+    }
+
+    struct NotCancelled;
+
+    impl ObservationCancellation for NotCancelled {
+        fn is_cancelled(&self) -> bool {
+            false
+        }
+    }
+
+    fn request() -> AuthorizedObservationRequest {
+        ObservationRequest::new(
+            "fixture_source",
+            vec!["public".to_owned()],
+            ObservationRequestBudget::new(1, 128).unwrap(),
+            ObservationLimits::with_timeouts(100, 100, 64, 8_192, 1).unwrap(),
+        )
+        .unwrap()
+        .authorize(&Registry)
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn completed_future_cannot_exceed_the_authorized_operation_budget() {
+        let result = bounded(&request(), &NotCancelled, async {
+            // A non-yielding future can complete after Tokio's timeout without an error.
+            std::thread::sleep(Duration::from_millis(125));
+            Ok::<_, tokio_postgres::Error>(())
+        })
+        .await;
+        assert_eq!(result, Err(SourceObservationFailure::OperationTimeout));
+    }
+
+    #[tokio::test]
+    async fn completed_future_cannot_override_cancellation() {
+        struct Cancellation(AtomicBool);
+        impl ObservationCancellation for Cancellation {
+            fn is_cancelled(&self) -> bool {
+                self.0.load(Ordering::SeqCst)
+            }
+        }
+
+        let cancellation = Cancellation(AtomicBool::new(false));
+        let result = bounded(&request(), &cancellation, async {
+            cancellation.0.store(true, Ordering::SeqCst);
+            Ok::<_, tokio_postgres::Error>(())
+        })
+        .await;
+        assert_eq!(result, Err(SourceObservationFailure::Cancelled));
     }
 }
