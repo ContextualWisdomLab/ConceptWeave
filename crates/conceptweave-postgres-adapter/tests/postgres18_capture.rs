@@ -5731,3 +5731,66 @@ async fn postgres18_catalog_is_observed_in_one_read_only_transaction() {
     connection_task.abort();
     result.unwrap();
 }
+
+#[tokio::test]
+async fn postgres18_catalog_capture_needs_no_application_table_read_privilege() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (admin, admin_connection) = config.connect(NoTls).await.unwrap();
+    let admin_task = tokio::spawn(admin_connection);
+    let schema = format!("cw_catalog_only_{}", std::process::id());
+    let role = format!("cw_catalog_reader_{}", std::process::id());
+    admin
+        .batch_execute(&format!(
+            "CREATE ROLE \"{role}\" LOGIN; \
+             CREATE SCHEMA \"{schema}\"; \
+             CREATE TABLE \"{schema}\".record (id integer PRIMARY KEY, title text)"
+        ))
+        .await
+        .unwrap();
+
+    let result = async {
+        let mut reader_config = config.clone();
+        reader_config.user(&role);
+        let (reader, reader_connection) = reader_config.connect(NoTls).await.unwrap();
+        let reader_task = tokio::spawn(reader_connection);
+        let has_table_select: bool = reader
+            .query_one(
+                "SELECT pg_catalog.has_table_privilege(current_user, c.oid, 'SELECT') \
+                 FROM pg_catalog.pg_class c \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+                 WHERE n.nspname = $1 AND c.relname = 'record'",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+            .get(0);
+        assert!(!has_table_select);
+        let table_read = reader
+            .query(&format!("SELECT id FROM \"{schema}\".record"), &[])
+            .await
+            .unwrap_err();
+        assert_eq!(
+            table_read.code(),
+            Some(&tokio_postgres::error::SqlState::INSUFFICIENT_PRIVILEGE)
+        );
+        let snapshot = adapter(reader_config)
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        assert_eq!(snapshot.relations().len(), 1);
+        assert_eq!(snapshot.relations()[0].relation_name(), "record");
+        reader_task.abort();
+        Ok::<_, SourceObservationFailure>(())
+    }
+    .await;
+    admin
+        .batch_execute(&format!(
+            "DROP SCHEMA \"{schema}\" CASCADE; DROP ROLE \"{role}\""
+        ))
+        .await
+        .unwrap();
+    admin_task.abort();
+    result.unwrap();
+}
