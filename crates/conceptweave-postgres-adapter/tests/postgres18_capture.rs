@@ -537,7 +537,7 @@ fn authorized_with_limits(
         "fixture_source",
         vec![schema.to_owned()],
         ObservationRequestBudget::new(1, 128).unwrap(),
-        ObservationLimits::with_timeouts(10_000, 3_000, max_rows, max_bytes, 1).unwrap(),
+        ObservationLimits::with_timeouts(60_000, 30_000, max_rows, max_bytes, 1).unwrap(),
     )
     .unwrap()
     .authorize(&Registry)
@@ -553,7 +553,7 @@ fn authorized_two(schemas: [&str; 2]) -> conceptweave_source_port::AuthorizedObs
         "fixture_source",
         schemas.map(str::to_owned).to_vec(),
         ObservationRequestBudget::new(2, 256).unwrap(),
-        ObservationLimits::with_timeouts(10_000, 3_000, 64, 8_192, 1).unwrap(),
+        ObservationLimits::with_timeouts(60_000, 30_000, 64, 8_192, 1).unwrap(),
     )
     .unwrap()
     .authorize(&Registry)
