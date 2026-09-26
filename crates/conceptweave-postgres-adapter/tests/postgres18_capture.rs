@@ -4349,6 +4349,90 @@ async fn postgres18_user_operator_expression_dependencies_fail_closed() {
 }
 
 #[tokio::test]
+async fn postgres18_builtin_gist_operator_class_options_change_source_identity() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_gist_options_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA {schema}; CREATE TABLE {schema}.record (terms tsvector); \
+             CREATE INDEX record_terms_idx ON {schema}.record USING gist \
+               (terms tsvector_ops(siglen=32))"
+        ))
+        .await
+        .unwrap();
+    let result = async {
+        let before = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await?;
+        let catalog_options: Vec<String> = client
+            .query_one(
+                "SELECT a.attoptions FROM pg_catalog.pg_attribute a \
+                 JOIN pg_catalog.pg_class i ON i.oid = a.attrelid \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = i.relnamespace \
+                 WHERE n.nspname = $1 AND i.relname = 'record_terms_idx' AND a.attnum = 1",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+            .get(0);
+        assert_eq!(catalog_options, ["siglen=32"]);
+        let first_index = &before.relations()[0].indexes()[0];
+        assert_eq!(first_index.access_method(), Some("gist"));
+        let first_options = first_index.key_semantics().unwrap()[0].operator_class_options();
+        assert_eq!(first_options.len(), 1);
+        assert_eq!(
+            (first_options[0].name(), first_options[0].value()),
+            ("siglen", "32")
+        );
+
+        client
+            .batch_execute(&format!(
+                "DROP INDEX {schema}.record_terms_idx; \
+                 CREATE INDEX record_terms_idx ON {schema}.record USING gist \
+                   (terms tsvector_ops(siglen=64))"
+            ))
+            .await
+            .unwrap();
+        let after = adapter(config)
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await?;
+        assert_ne!(before.snapshot_digest(), after.snapshot_digest());
+        let changed_options =
+            after.relations()[0].indexes()[0].key_semantics().unwrap()[0].operator_class_options();
+        assert_eq!(changed_options.len(), 1);
+        assert_eq!(
+            (changed_options[0].name(), changed_options[0].value()),
+            ("siglen", "64")
+        );
+        let receipt = after
+            .source_receipt(
+                SchemaObjectLocation::index(
+                    &schema,
+                    "record",
+                    RelationKind::Table,
+                    "record_terms_idx",
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(receipt.source_digest(), after.snapshot_digest());
+        Ok::<_, SourceObservationFailure>(())
+    }
+    .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA {schema} CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    result.unwrap();
+}
+
+#[tokio::test]
 async fn postgres18_user_operator_class_fails_closed() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
