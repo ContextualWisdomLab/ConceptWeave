@@ -6,20 +6,23 @@ use conceptweave_observation::{
 };
 use conceptweave_relation_partition::{
     CanonicalExpression, CanonicalExpressionField, CanonicalExpressionValue,
-    CollationCatalogIdentity, ColumnTypeModifierObservation,
-    IndexCollationDatabaseEncodingSnapshot, IndexExclusionSemanticsSnapshot,
-    IndexExpressionCollationIdentityLocation, IndexExpressionCollationIdentityObservation,
-    IndexExpressionCollationIdentitySnapshot, IndexExpressionNodeSchemaSnapshot,
-    IndexExpressionRelationVarLocation, IndexExpressionRelationVarNodeSchemaSnapshot,
-    IndexExpressionRelationVarObservation, IndexExpressionRelationVarSnapshot,
-    IndexExpressionSemanticsObservation, IndexExpressionSemanticsSnapshot,
-    IndexKeyCollationIdentityObservation, IndexKeyOperatorFamilyObservation,
-    IndexOperatorFamilySnapshot, IndexPartitionCollationIdentitySnapshot, IndexPartitionCoordinate,
-    IndexPartitionObservation, IndexPartitionSnapshot, IndexRelationKind,
-    IndexRelationVarCollationIdentityObservation, PartitionParentRelationCoordinate,
-    PostgresDatabaseEncodingObservation, QualifiedFunctionSignature, QualifiedOperatorFamilyName,
-    RelationPartitionObservation, RelationPartitionSnapshot, RelationPartitionTypeModifierSnapshot,
-    RelationVarRelationRole, RelationVarReturningType,
+    CollationCatalogIdentity, CollationDefinitionObservation, ColumnTypeModifierObservation,
+    DatabaseDefaultCollationDefinitionObservation, IndexCollationDatabaseEncodingSnapshot,
+    IndexCollationDefinitionSnapshot, IndexEffectiveCollationDefinitionSnapshot,
+    IndexExclusionSemanticsSnapshot, IndexExpressionCollationIdentityLocation,
+    IndexExpressionCollationIdentityObservation, IndexExpressionCollationIdentitySnapshot,
+    IndexExpressionNodeSchemaSnapshot, IndexExpressionRelationVarLocation,
+    IndexExpressionRelationVarNodeSchemaSnapshot, IndexExpressionRelationVarObservation,
+    IndexExpressionRelationVarSnapshot, IndexExpressionSemanticsObservation,
+    IndexExpressionSemanticsSnapshot, IndexKeyCollationIdentityObservation,
+    IndexKeyOperatorFamilyObservation, IndexOperatorFamilySnapshot,
+    IndexPartitionCollationIdentitySnapshot, IndexPartitionCoordinate, IndexPartitionObservation,
+    IndexPartitionSnapshot, IndexRelationKind, IndexRelationVarCollationIdentityObservation,
+    PartitionParentRelationCoordinate, PostgresCollationProvider,
+    PostgresDatabaseEncodingObservation, PostgresDatabaseLocaleProvider,
+    QualifiedFunctionSignature, QualifiedOperatorFamilyName, RelationPartitionObservation,
+    RelationPartitionSnapshot, RelationPartitionTypeModifierSnapshot, RelationVarRelationRole,
+    RelationVarReturningType,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationLimits, ObservationRequest, ObservationRequestBudget,
@@ -636,5 +639,85 @@ fn encoding_independent_collations_keep_database_encoding_in_snapshot_identity()
     assert_eq!(
         utf8.expression_collation_predecessor_digest(),
         latin1.expression_collation_predecessor_digest()
+    );
+}
+
+#[test]
+fn database_default_effective_definition_binds_material_evidence_and_receipt() {
+    let stack = stack_with_collation_encoding(-1);
+    let expressions = compose(&stack, -1, -1, -1, -1).unwrap();
+    let encoding = IndexCollationDatabaseEncodingSnapshot::new(
+        PostgresDatabaseEncodingObservation::new(ENCODING_UTF8).unwrap(),
+        &stack.key_collations,
+        &expressions,
+    )
+    .unwrap();
+    let material = IndexCollationDefinitionSnapshot::new(
+        &encoding,
+        &stack.key_collations,
+        &expressions,
+        vec![
+            CollationDefinitionObservation::new(
+                catalog_default_collation(-1),
+                PostgresCollationProvider::DatabaseDefault,
+                true,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some("153.80".to_owned()),
+            )
+            .unwrap(),
+        ],
+    )
+    .unwrap();
+    let database_default = |actual_version: &str| {
+        DatabaseDefaultCollationDefinitionObservation::new(
+            PostgresDatabaseLocaleProvider::Icu,
+            Some("C.UTF-8".to_owned()),
+            Some("C.UTF-8".to_owned()),
+            Some("und".to_owned()),
+            None,
+            Some("153.80".to_owned()),
+            Some(actual_version.to_owned()),
+        )
+        .unwrap()
+    };
+    let effective = |actual_version| {
+        IndexEffectiveCollationDefinitionSnapshot::new(
+            &material,
+            &encoding,
+            &stack.key_collations,
+            &expressions,
+            Some(database_default(actual_version)),
+        )
+    };
+    let snapshot = effective("153.80").unwrap();
+    let receipt = snapshot.database_default_source_receipt().unwrap();
+
+    assert_eq!(snapshot.predecessor_digest(), material.snapshot_digest());
+    assert_eq!(receipt.source_id(), "warehouse_primary");
+    assert_eq!(receipt.connection_policy_binding(), POLICY_BINDING);
+    assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(receipt.observed_at_utc(), stack.base.observed_at_utc());
+    assert!(!snapshot.has_database_default_version_mismatch());
+    assert_eq!(
+        effective("154.10"),
+        Err(ObservationError::InvalidObservationField {
+            field: "database_default_collation_actual_version_coherence",
+        })
+    );
+    assert_eq!(
+        IndexEffectiveCollationDefinitionSnapshot::new(
+            &material,
+            &encoding,
+            &stack.key_collations,
+            &expressions,
+            None,
+        ),
+        Err(ObservationError::InvalidObservationField {
+            field: "database_default_collation_definition_presence",
+        })
     );
 }
