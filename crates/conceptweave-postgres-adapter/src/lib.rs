@@ -316,12 +316,32 @@ async fn capture_catalog(
         );
         // PostgreSQL assigns normal user objects OIDs from 16384 onward; even
         // functions and operators installed in pg_catalog need this check.
+        // Late-bound text sequence references lack pg_depend rows, so inspect
+        // server-reconstructed expressions before admitting the snapshot.
         let expression_dependency = bounded(
             request,
             cancellation,
             transaction.query_one(
-                "SELECT EXISTS( \
-                   SELECT 1 FROM pg_catalog.pg_depend d \
+                "WITH captured_object AS MATERIALIZED ( \
+                   SELECT 'pg_constraint'::regclass AS classid, c.oid AS objid \
+                   FROM pg_catalog.pg_constraint c WHERE c.connamespace = $1 \
+                   UNION ALL \
+                   SELECT 'pg_attrdef'::regclass, ad.oid \
+                   FROM pg_catalog.pg_attrdef ad \
+                   JOIN pg_catalog.pg_class c ON c.oid = ad.adrelid \
+                   WHERE c.relnamespace = $1 \
+                   UNION ALL \
+                   SELECT 'pg_class'::regclass, c.oid \
+                   FROM pg_catalog.pg_class c \
+                   WHERE c.relnamespace = $1 AND c.relkind IN ('i','I') \
+                   UNION ALL \
+                   SELECT 'pg_type'::regclass, t.oid \
+                   FROM pg_catalog.pg_type t \
+                   WHERE t.typnamespace = $1 AND t.typtype = 'd' \
+                 ) SELECT EXISTS( \
+                   SELECT 1 FROM captured_object scoped \
+                   JOIN pg_catalog.pg_depend d \
+                     ON d.classid = scoped.classid AND d.objid = scoped.objid \
                    LEFT JOIN pg_catalog.pg_proc p \
                      ON d.refclassid = 'pg_proc'::regclass AND p.oid = d.refobjid \
                    LEFT JOIN pg_catalog.pg_operator o \
@@ -345,23 +365,30 @@ async fn capture_catalog(
                            WHERE d.classid = 'pg_attrdef'::regclass \
                              AND own_default.oid = d.objid \
                              AND own_default.adrelid = d.refobjid))))) \
-                     AND ( \
-                       (d.classid = 'pg_constraint'::regclass AND EXISTS( \
-                         SELECT 1 FROM pg_catalog.pg_constraint c \
-                         WHERE c.oid = d.objid AND c.connamespace = $1)) OR \
-                       (d.classid = 'pg_attrdef'::regclass AND EXISTS( \
-                         SELECT 1 FROM pg_catalog.pg_attrdef ad \
-                         JOIN pg_catalog.pg_class c ON c.oid = ad.adrelid \
-                         WHERE ad.oid = d.objid AND c.relnamespace = $1)) OR \
-                       (d.classid = 'pg_class'::regclass AND EXISTS( \
-                         SELECT 1 FROM pg_catalog.pg_class c \
-                         WHERE c.oid = d.objid AND c.relnamespace = $1 \
-                           AND c.relkind IN ('i','I'))) OR \
-                       (d.classid = 'pg_type'::regclass AND EXISTS( \
-                         SELECT 1 FROM pg_catalog.pg_type t \
-                         WHERE t.oid = d.objid AND t.typnamespace = $1 \
-                           AND t.typtype = 'd')) \
-                     ))",
+                     ) OR EXISTS( \
+                       SELECT 1 FROM ( \
+                         SELECT pg_catalog.pg_get_expr(ad.adbin, ad.adrelid) AS rendered \
+                         FROM captured_object scoped \
+                         JOIN pg_catalog.pg_attrdef ad \
+                           ON scoped.classid = 'pg_attrdef'::regclass \
+                             AND ad.oid = scoped.objid \
+                         UNION ALL \
+                         SELECT pg_catalog.pg_get_expr(t.typdefaultbin, 0) \
+                         FROM captured_object scoped \
+                         JOIN pg_catalog.pg_type t \
+                           ON scoped.classid = 'pg_type'::regclass \
+                             AND t.oid = scoped.objid \
+                         WHERE t.typdefaultbin IS NOT NULL \
+                         UNION ALL \
+                         SELECT pg_catalog.pg_get_expr(c.conbin, c.conrelid) \
+                         FROM captured_object scoped \
+                         JOIN pg_catalog.pg_constraint c \
+                           ON scoped.classid = 'pg_constraint'::regclass \
+                             AND c.oid = scoped.objid \
+                         WHERE c.contype = 'c' AND c.conbin IS NOT NULL \
+                       ) captured_expression \
+                       WHERE rendered ~* '(^|[^[:alnum:]_])(nextval|currval|setval|lastval)[[:space:]]*[(]' \
+                     )",
                 &[&schema_oid],
             ),
         )

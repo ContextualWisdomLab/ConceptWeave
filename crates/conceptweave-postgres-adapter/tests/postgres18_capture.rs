@@ -3356,7 +3356,39 @@ async fn postgres18_cross_schema_sequence_default_fails_closed() {
         .batch_execute(&format!("ALTER SEQUENCE {external}.counter INCREMENT BY 7"))
         .await
         .unwrap();
-    let after = adapter(config)
+    let after = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "ALTER TABLE {schema}.record ALTER COLUMN id \
+             SET DEFAULT nextval('{external}.counter'::text)"
+        ))
+        .await
+        .unwrap();
+    let late_bound = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP TABLE {schema}.record; \
+             CREATE DOMAIN {schema}.generated_id AS bigint \
+               DEFAULT nextval('{external}.counter'::text)"
+        ))
+        .await
+        .unwrap();
+    let late_domain = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP DOMAIN {schema}.generated_id; \
+             CREATE TABLE {schema}.checked \
+               (id bigint, CONSTRAINT positive CHECK (nextval('{external}.counter'::text) > 0))"
+        ))
+        .await
+        .unwrap();
+    let late_check = adapter(config)
         .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
         .await;
     client
@@ -3373,8 +3405,17 @@ async fn postgres18_cross_schema_sequence_default_fails_closed() {
         ) && matches!(
             after,
             Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ) && matches!(
+            late_bound,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ) && matches!(
+            late_domain,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ) && matches!(
+            late_check,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
         ),
-        "external sequence settings cannot be omitted from an immutable default: before={before:?}, after={after:?}"
+        "external sequence settings cannot be omitted from source identity: before={before:?}, after={after:?}, late_bound={late_bound:?}, late_domain={late_domain:?}, late_check={late_check:?}"
     );
 }
 
