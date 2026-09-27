@@ -4882,7 +4882,29 @@ async fn postgres18_session_dependent_checks_fail_closed() {
         ))
         .await
         .unwrap();
-    let observed_coercion = adapter(config)
+    let observed_coercion = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP TABLE {schema}.record; CREATE TABLE {schema}.record \
+             (day date, instant timestamptz, marker integer, other integer, \
+             CONSTRAINT ordered CHECK (ROW(day, marker) < ROW(instant, other)))"
+        ))
+        .await
+        .unwrap();
+    let observed_row_comparison = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP TABLE {schema}.record; CREATE TABLE {schema}.record \
+             (left_id integer, right_id integer, marker integer, other integer, \
+             CONSTRAINT ordered CHECK (ROW(left_id, marker) < ROW(right_id, other)))"
+        ))
+        .await
+        .unwrap();
+    let immutable_row_comparison = adapter(config)
         .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
         .await;
     client
@@ -4918,6 +4940,14 @@ async fn postgres18_session_dependent_checks_fail_closed() {
         ),
         "session-dependent I/O coercion must fail closed: {observed_coercion:?}"
     );
+    assert!(
+        matches!(
+            observed_row_comparison,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "session-dependent row comparison must fail closed: {observed_row_comparison:?}"
+    );
+    assert!(immutable_row_comparison.is_ok());
 }
 
 #[tokio::test]

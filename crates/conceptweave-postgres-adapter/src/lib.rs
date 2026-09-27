@@ -465,6 +465,18 @@ async fn capture_catalog(
                            WHERE p.oid IS NULL OR p.provolatile <> 'i' \
                              OR p.pronamespace <> 'pg_catalog'::regnamespace \
                              OR p.oid >= 16384::oid) \
+                         OR EXISTS( \
+                           SELECT 1 FROM pg_catalog.regexp_matches( \
+                             tree, ':opnos [(]o ([0-9 ]+)[)]', 'g') operator_oids \
+                           CROSS JOIN LATERAL pg_catalog.regexp_split_to_table( \
+                             pg_catalog.btrim(operator_oids[1]), '[[:space:]]+') operator_oid \
+                           LEFT JOIN pg_catalog.pg_operator o ON o.oid = operator_oid::oid \
+                           LEFT JOIN pg_catalog.pg_proc p ON p.oid = o.oprcode \
+                           WHERE o.oid IS NULL OR o.oprnamespace <> 'pg_catalog'::regnamespace \
+                             OR o.oid >= 16384::oid OR p.oid IS NULL \
+                             OR p.provolatile <> 'i' \
+                             OR p.pronamespace <> 'pg_catalog'::regnamespace \
+                             OR p.oid >= 16384::oid) \
                      )",
                 &[&schema_oid, &allowed_schemas],
             ),
