@@ -558,10 +558,10 @@ fn validate_modeled_index_key_collations(
 ) -> Result<(), ObservationError> {
     let child_semantics = child_definition
         .key_semantics()
-        .ok_or_else(|| invalid("index_partition_definition_collation"))?;
+        .ok_or(invalid("index_partition_definition_collation"))?;
     let parent_semantics = parent_definition
         .key_semantics()
-        .ok_or_else(|| invalid("index_partition_definition_collation"))?;
+        .ok_or(invalid("index_partition_definition_collation"))?;
 
     if child_semantics.len() != parent_semantics.len() {
         return Err(invalid("index_partition_definition_collation"));
