@@ -4871,7 +4871,18 @@ async fn postgres18_session_dependent_checks_fail_closed() {
         ))
         .await
         .unwrap();
-    let observed_operator = adapter(config)
+    let observed_operator = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP TABLE {schema}.record; CREATE TABLE {schema}.record \
+             (instant timestamptz, CONSTRAINT formatted CHECK \
+             (instant::text = '2026-01-01 03:00:00+00'))"
+        ))
+        .await
+        .unwrap();
+    let observed_coercion = adapter(config)
         .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
         .await;
     client
@@ -4899,6 +4910,13 @@ async fn postgres18_session_dependent_checks_fail_closed() {
             Err(SourceObservationFailure::InvalidCapturedMetadata)
         ),
         "session-dependent operator must fail closed: {observed_operator:?}"
+    );
+    assert!(
+        matches!(
+            observed_coercion,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "session-dependent I/O coercion must fail closed: {observed_coercion:?}"
     );
 }
 

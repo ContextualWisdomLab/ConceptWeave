@@ -354,6 +354,8 @@ async fn capture_catalog(
         // implementations also lack ordinary pg_depend rows.
         // ponytail: this screen rejects harmless pg_* calls and literal lookalikes;
         // parse expression nodes and vet function semantics if they must be admitted.
+        // ponytail: reject I/O coercions until their source/target type functions
+        // can be bound from a parsed expression tree.
         let expression_dependency = bounded(
             request,
             cancellation,
@@ -455,7 +457,7 @@ async fn capture_catalog(
                            ON scoped.classid = 'pg_class'::regclass AND i.indexrelid = scoped.objid \
                          WHERE i.indpred IS NOT NULL \
                        ) captured_tree \
-                       WHERE tree ~ 'SQLVALUEFUNCTION' \
+                       WHERE tree ~ 'SQLVALUEFUNCTION|COERCEVIAIO' \
                          OR EXISTS( \
                            SELECT 1 FROM pg_catalog.regexp_matches( \
                              tree, ':([[:alnum:]_]*funcid) ([0-9]+)', 'g') function_oid \
