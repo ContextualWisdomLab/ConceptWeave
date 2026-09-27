@@ -1328,6 +1328,30 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
         .unwrap();
 
     let result = async {
+        // Keep table and column definitions fixed during capture and catalog comparison.
+        // Schema-scoped types and index-only metadata still need independent generation proof.
+        client
+            .batch_execute(&format!(
+                "BEGIN; LOCK TABLE \"{schema}\".tenant, \"{schema}\".risk_record, \
+                 \"{schema}\".control_record, \"{schema}\".risk_control_link IN EXCLUSIVE MODE"
+            ))
+            .await
+            .unwrap();
+        let (writer, writer_connection) = config.connect(NoTls).await.unwrap();
+        let writer_task = tokio::spawn(writer_connection);
+        let blocked_change = writer
+            .batch_execute(&format!(
+                "SET lock_timeout = '100ms'; ALTER TABLE \"{schema}\".risk_record \
+                 ALTER COLUMN title SET DEFAULT 'Concurrent change'"
+            ))
+            .await
+            .unwrap_err();
+        assert_eq!(
+            blocked_change.code(),
+            Some(&tokio_postgres::error::SqlState::LOCK_NOT_AVAILABLE)
+        );
+        drop(writer);
+        writer_task.abort();
         let source_adapter = adapter(config.clone());
         let observe = || {
             source_adapter.observe(
@@ -3056,7 +3080,7 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
         assert_eq!(receipt.source_digest(), first.snapshot_digest());
         client
             .batch_execute(&format!(
-                "COMMENT ON COLUMN \"{schema}\".risk_record.title IS 'Revised review title'"
+                "COMMIT; COMMENT ON COLUMN \"{schema}\".risk_record.title IS 'Revised review title'"
             ))
             .await
             .unwrap();
@@ -3122,7 +3146,7 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
     }
     .await;
     client
-        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .batch_execute(&format!("ROLLBACK; DROP SCHEMA \"{schema}\" CASCADE"))
         .await
         .unwrap();
     connection_task.abort();
