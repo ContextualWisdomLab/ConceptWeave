@@ -63,6 +63,12 @@ fn ordinary_exclude_operator_procedure_planner_support_preserves_exact_catalog_s
     assert_eq!(receipt.location().planner_support(), Some(&support));
     assert_eq!(receipt.source_id(), access_control.source_connection_key());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        snapshot.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
     assert!(
         receipt
             .location()

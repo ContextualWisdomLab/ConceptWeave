@@ -266,6 +266,20 @@ fn matching_constraint_and_backing_index_name_is_admitted_and_receipted() {
         "bookings_no_overlap"
     );
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(receipt.source_id(), snapshot.source_connection_key());
+    assert_eq!(
+        receipt.location().canonical_location(),
+        format!(
+            "{}/backing-index-name",
+            coordinate("bookings", "bookings_no_overlap").canonical_location()
+        )
+    );
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        snapshot.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
 }
 
 #[test]
