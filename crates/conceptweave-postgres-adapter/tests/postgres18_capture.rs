@@ -4330,7 +4330,7 @@ async fn postgres18_late_bound_catalog_lookup_fails_closed() {
         ))
         .await
         .unwrap();
-    let role_after = adapter(config)
+    let role_after = adapter(config.clone())
         .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
         .await;
     let looked_up_role: String = client
@@ -4342,6 +4342,48 @@ async fn postgres18_late_bound_catalog_lookup_fails_closed() {
         .unwrap()
         .get(0);
     assert_eq!(looked_up_role, renamed_role);
+    let external_oid: u32 = client
+        .query_one(
+            "SELECT c.oid FROM pg_catalog.pg_class c \
+             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+             WHERE n.nspname = $1 AND c.relname = 'final_name'",
+            &[&external],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    client
+        .batch_execute(&format!(
+            "DROP TABLE {schema}.record; \
+             CREATE TABLE {schema}.record \
+               (external_comment text DEFAULT obj_description({external_oid}::oid, 'pg_class'))"
+        ))
+        .await
+        .unwrap();
+    let comment_before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "COMMENT ON TABLE {external}.final_name IS 'External catalog comment'"
+        ))
+        .await
+        .unwrap();
+    let comment_after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    let looked_up_comment: Option<String> = client
+        .query_one(
+            "SELECT pg_catalog.obj_description($1::oid, 'pg_class')",
+            &[&external_oid],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(
+        looked_up_comment.as_deref(),
+        Some("External catalog comment")
+    );
     client
         .batch_execute(&format!(
             "DROP SCHEMA {schema} CASCADE; DROP SCHEMA {external} CASCADE; \
@@ -4375,8 +4417,14 @@ async fn postgres18_late_bound_catalog_lookup_fails_closed() {
         ) && matches!(
             role_after,
             Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ) && matches!(
+            comment_before,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ) && matches!(
+            comment_after,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
         ),
-        "late-bound relation lookup must not reuse source identity: before={before:?}, after={after:?}, cast_before={cast_before:?}, cast_after={cast_after:?}, serial_before={serial_before:?}, serial_after={serial_after:?}, role_before={role_before:?}, role_after={role_after:?}"
+        "late-bound catalog lookup must not reuse source identity: before={before:?}, after={after:?}, cast_before={cast_before:?}, cast_after={cast_after:?}, serial_before={serial_before:?}, serial_after={serial_after:?}, role_before={role_before:?}, role_after={role_after:?}, comment_before={comment_before:?}, comment_after={comment_after:?}"
     );
 }
 
