@@ -377,9 +377,9 @@ fn validate_exclusion_presence(
             continue;
         };
         let child = find_base_index(base_snapshot, membership.coordinate())
-            .ok_or_else(|| invalid("index_exclusion_semantics_index_binding"))?;
+            .ok_or(invalid("index_exclusion_semantics_index_binding"))?;
         let parent = find_base_index(base_snapshot, parent)
-            .ok_or_else(|| invalid("index_exclusion_semantics_index_binding"))?;
+            .ok_or(invalid("index_exclusion_semantics_index_binding"))?;
         if exclusion_flag(child)? != exclusion_flag(parent)? {
             return Err(invalid("index_partition_definition_exclusion_presence"));
         }
@@ -449,7 +449,7 @@ fn canonicalize_exclusion_semantics(
             continue;
         };
         let child_index = find_base_index(base_snapshot, membership.coordinate())
-            .ok_or_else(|| invalid("index_exclusion_semantics_index_binding"))?;
+            .ok_or(invalid("index_exclusion_semantics_index_binding"))?;
         if !exclusion_flag(child_index)? {
             continue;
         }
@@ -457,10 +457,10 @@ fn canonicalize_exclusion_semantics(
             let position = key.position();
             let child = by_key
                 .get(&(membership.coordinate().clone(), position))
-                .ok_or_else(|| invalid("index_exclusion_semantics_completeness"))?;
+                .ok_or(invalid("index_exclusion_semantics_completeness"))?;
             let parent = by_key
                 .get(&(parent.clone(), position))
-                .ok_or_else(|| invalid("index_exclusion_semantics_completeness"))?;
+                .ok_or(invalid("index_exclusion_semantics_completeness"))?;
             if child.operator() != parent.operator() {
                 return Err(invalid("index_partition_definition_exclusion_operator"));
             }
@@ -482,7 +482,7 @@ fn exclusion_flag(
     index
         .catalog_flags()
         .map(|flags| flags.exclusion())
-        .ok_or_else(|| invalid("index_exclusion_semantics_catalog_flags"))
+        .ok_or(invalid("index_exclusion_semantics_catalog_flags"))
 }
 
 fn find_base_index<'a>(
