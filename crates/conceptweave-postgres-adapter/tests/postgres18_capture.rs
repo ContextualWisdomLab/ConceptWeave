@@ -4233,6 +4233,85 @@ async fn postgres18_cross_schema_sequence_default_fails_closed() {
 }
 
 #[tokio::test]
+async fn postgres18_late_bound_privilege_lookup_fails_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_privilege_owner_{}", std::process::id());
+    let external = format!("cw_privilege_source_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA {schema}; CREATE SCHEMA {external}; \
+             CREATE TABLE {external}.target (id integer)"
+        ))
+        .await
+        .unwrap();
+    let target_oid: u32 = client
+        .query_one(&format!("SELECT '{external}.target'::regclass::oid"), &[])
+        .await
+        .unwrap()
+        .get(0);
+    client
+        .batch_execute(&format!(
+            "CREATE TABLE {schema}.record \
+             (may_read boolean DEFAULT has_table_privilege('public', {target_oid}::oid, 'SELECT'))"
+        ))
+        .await
+        .unwrap();
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    let had_access: bool = client
+        .query_one(
+            "SELECT pg_catalog.has_table_privilege('public', $1::oid, 'SELECT')",
+            &[&target_oid],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    client
+        .batch_execute(&format!("GRANT SELECT ON {external}.target TO PUBLIC"))
+        .await
+        .unwrap();
+    let after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    let has_access: bool = client
+        .query_one(
+            "SELECT pg_catalog.has_table_privilege('public', $1::oid, 'SELECT')",
+            &[&target_oid],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA {schema} CASCADE; DROP SCHEMA {external} CASCADE"
+        ))
+        .await
+        .unwrap();
+    connection_task.abort();
+    assert!(!had_access);
+    assert!(has_access);
+    if let (Ok(before), Ok(after)) = (&before, &after) {
+        assert_eq!(before.snapshot_digest(), after.snapshot_digest());
+    }
+    assert!(
+        matches!(
+            before,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ) && matches!(
+            after,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "external privilege changes must not retain an admitted source identity: before={before:?}, after={after:?}"
+    );
+}
+
+#[tokio::test]
 async fn postgres18_late_bound_catalog_lookup_fails_closed() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
