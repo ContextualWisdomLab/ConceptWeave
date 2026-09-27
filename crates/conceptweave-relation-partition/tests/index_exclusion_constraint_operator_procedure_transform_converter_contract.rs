@@ -140,6 +140,15 @@ fn ordinary_exclude_operator_procedure_transform_converter_preserves_pg_transfor
     assert!(receipt.location().converters()[0].from_sql().is_some());
     assert!(receipt.location().converters()[0].to_sql().is_some());
     assert_eq!(receipt.source_id(), transform_types.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        transform_types.connection_policy_binding()
+    );
+    assert_eq!(
+        receipt.extractor_revision(),
+        transform_types.extractor_revision()
+    );
+    assert_eq!(receipt.observed_at_utc(), transform_types.observed_at_utc());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
     assert!(
         receipt
@@ -518,5 +527,31 @@ fn ordinary_exclude_operator_procedure_transform_converter_snapshot_is_publicly_
     assert!(
         std::mem::size_of::<IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot>()
             > 0
+    );
+}
+
+#[test]
+fn transform_converter_observation_rejects_duplicate_transform_types() {
+    let binding = converter_binding(
+        Some(converter_function(
+            "payload_from_sql",
+            internal_type(),
+            "payload_from_sql_v1",
+        )),
+        None,
+    );
+    assert_eq!(
+        IndexExclusionConstraintOperatorProcedureTransformConverterObservation::new(
+            coordinate(),
+            1,
+            operator("="),
+            procedure("int4eq"),
+            "internal",
+            vec![binding.clone(), binding],
+        )
+        .unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "index_exclusion_constraint_operator_procedure_transform_converter_duplicate",
+        }
     );
 }
