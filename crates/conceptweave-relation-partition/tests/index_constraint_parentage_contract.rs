@@ -136,6 +136,18 @@ fn relation(
 }
 
 fn base_snapshot(parent_constraint: bool) -> PostgresSchemaSnapshotV3 {
+    base_snapshot_with_capture(
+        parent_constraint,
+        "extractor-index-constraint-parentage-v1",
+        "2026-09-16T09:41:00Z",
+    )
+}
+
+fn base_snapshot_with_capture(
+    parent_constraint: bool,
+    revision: &str,
+    time: &str,
+) -> PostgresSchemaSnapshotV3 {
     let mut timings = Vec::new();
     if parent_constraint {
         timings.push(
@@ -162,8 +174,8 @@ fn base_snapshot(parent_constraint: bool) -> PostgresSchemaSnapshotV3 {
 
     PostgresSchemaSnapshotV3::new_with_constraint_timings(
         &authorized_source(),
-        "extractor-index-constraint-parentage-v1",
-        "2026-09-16T09:41:00Z",
+        revision,
+        time,
         vec![
             relation(
                 "events",
@@ -339,4 +351,44 @@ fn child_constraint_below_nonconstraint_parent_index_remains_local() {
 
     assert_eq!(snapshot.observations().len(), 1);
     assert!(snapshot.observations()[0].parent_constraint().is_none());
+}
+
+#[test]
+fn parentage_rejects_index_evidence_from_another_capture() {
+    let original = base_snapshot(true);
+    let original_relations = relation_partitions(&original);
+    let original_indexes = index_partitions(&original, &original_relations);
+    for (revision, time) in [
+        (
+            "extractor-index-constraint-parentage-v2",
+            original.observed_at_utc(),
+        ),
+        (original.extractor_revision(), "2026-09-17T09:41:00Z"),
+    ] {
+        let base = base_snapshot_with_capture(true, revision, time);
+        let relations = relation_partitions(&base);
+        let facts = vec![
+            IndexConstraintParentageObservation::root(parent_constraint()).unwrap(),
+            IndexConstraintParentageObservation::partition(child_constraint(), parent_constraint())
+                .unwrap(),
+        ];
+        assert_eq!(
+            IndexConstraintParentageSnapshot::new(
+                &base,
+                &relations,
+                &original_indexes,
+                facts.clone()
+            )
+            .unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: "index_constraint_parentage_predecessor_binding"
+            }
+        );
+        let indexes = index_partitions(&base, &relations);
+        let accepted =
+            IndexConstraintParentageSnapshot::new(&base, &relations, &indexes, facts).unwrap();
+        let receipt = accepted.source_receipt(child_constraint()).unwrap();
+        assert_eq!(receipt.extractor_revision(), revision);
+        assert_eq!(receipt.observed_at_utc(), time);
+    }
 }
