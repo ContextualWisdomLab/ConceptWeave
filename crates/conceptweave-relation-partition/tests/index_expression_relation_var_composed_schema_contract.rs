@@ -1,20 +1,21 @@
 use conceptweave_observation::{
     ColumnCollationObservation, ColumnObservationV3, IndexAttributeKind, IndexAttributeObservation,
-    IndexCatalogFlags, IndexKeySemantics, IndexObservation, PostgresSchemaSnapshotV3,
-    QualifiedCollationName, QualifiedOperatorClassName, QualifiedTypeName, RelationKind,
-    RelationObservation,
+    IndexCatalogFlags, IndexKeySemantics, IndexObservation, ObservationError,
+    PostgresSchemaSnapshotV3, QualifiedCollationName, QualifiedOperatorClassName,
+    QualifiedTypeName, RelationKind, RelationObservation,
 };
 use conceptweave_relation_partition::{
     CanonicalExpression, CanonicalExpressionField, CanonicalExpressionValue,
     ColumnTypeModifierObservation, IndexExclusionSemanticsSnapshot,
-    IndexExpressionNodeSchemaSnapshot, IndexExpressionRelationVarLocation,
-    IndexExpressionRelationVarNodeSchemaSnapshot, IndexExpressionRelationVarObservation,
-    IndexExpressionRelationVarSnapshot, IndexExpressionSemanticsObservation,
-    IndexExpressionSemanticsSnapshot, IndexKeyOperatorFamilyObservation,
-    IndexOperatorFamilySnapshot, IndexPartitionCoordinate, IndexPartitionObservation,
-    IndexPartitionSnapshot, IndexRelationKind, QualifiedFunctionSignature,
-    QualifiedOperatorFamilyName, RelationPartitionObservation, RelationPartitionSnapshot,
-    RelationPartitionTypeModifierSnapshot, RelationVarRelationRole, RelationVarReturningType,
+    IndexExpressionNodeSchemaSnapshot, IndexExpressionNodeSchemaSnapshotV2,
+    IndexExpressionRelationVarLocation, IndexExpressionRelationVarNodeSchemaSnapshot,
+    IndexExpressionRelationVarObservation, IndexExpressionRelationVarSnapshot,
+    IndexExpressionSemanticsObservation, IndexExpressionSemanticsSnapshot,
+    IndexKeyOperatorFamilyObservation, IndexOperatorFamilySnapshot, IndexPartitionCoordinate,
+    IndexPartitionObservation, IndexPartitionSnapshot, IndexRelationKind,
+    QualifiedFunctionSignature, QualifiedOperatorFamilyName, RelationPartitionObservation,
+    RelationPartitionSnapshot, RelationPartitionTypeModifierSnapshot, RelationVarRelationRole,
+    RelationVarReturningType,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationLimits, ObservationRequest, ObservationRequestBudget,
@@ -325,6 +326,12 @@ fn complete_node_schema_and_relation_var_proofs_compose_into_a_new_successor() {
     let stack = stack(true);
     let node_schema = IndexExpressionNodeSchemaSnapshot::new(&stack.expressions)
         .expect("complete FuncExpr fields must satisfy the historical v1 node schema");
+    assert_eq!(
+        IndexExpressionNodeSchemaSnapshotV2::new(&stack.expressions, &node_schema).unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "canonical_expression_node_schema_v2",
+        }
+    );
     let relation_vars = relation_vars(&stack);
 
     let composed = IndexExpressionRelationVarNodeSchemaSnapshot::new(
