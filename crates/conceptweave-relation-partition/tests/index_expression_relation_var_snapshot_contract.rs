@@ -514,6 +514,72 @@ fn relation_var_successor_is_reachable_without_a_v2_snapshot() {
 }
 
 #[test]
+fn nested_canonical_value_lists_require_exact_relation_var_evidence() {
+    let stack = stack();
+    let root = CanonicalExpression::node(
+        "RowExpr",
+        vec![field(
+            "arguments",
+            CanonicalExpressionValue::ValueList(vec![
+                CanonicalExpressionValue::Null,
+                CanonicalExpressionValue::ValueList(vec![CanonicalExpressionValue::Expression(
+                    Box::new(CanonicalExpression::column("account_email").unwrap()),
+                )]),
+            ]),
+        )],
+    )
+    .unwrap();
+    let expressions = IndexExpressionSemanticsSnapshot::new(
+        &stack.base,
+        &stack.relations,
+        &stack.indexes,
+        &stack.families,
+        &stack.exclusions,
+        vec![
+            IndexExpressionSemanticsObservation::new(parent_index(), 1, root.clone()).unwrap(),
+            IndexExpressionSemanticsObservation::new(child_index(), 1, root).unwrap(),
+        ],
+        stack.expressions.predicate_observations().to_vec(),
+    )
+    .unwrap();
+    let build = |observations| {
+        IndexExpressionRelationVarSnapshot::new(
+            &stack.base,
+            &stack.relations,
+            &stack.indexes,
+            &stack.families,
+            &stack.exclusions,
+            &expressions,
+            &stack.type_modifiers,
+            observations,
+        )
+    };
+    let complete = complete_vars();
+    let snapshot = build(complete.clone()).unwrap();
+    for index in [parent_index(), child_index()] {
+        let location = IndexExpressionRelationVarLocation::expression(index, 1, 1).unwrap();
+        assert_eq!(
+            snapshot
+                .source_receipt(location.clone())
+                .unwrap()
+                .location(),
+            &location
+        );
+        let missing = complete
+            .iter()
+            .filter(|observation| observation.location() != &location)
+            .cloned()
+            .collect();
+        assert_eq!(
+            build(missing).unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: "index_expression_relation_var_completeness",
+            }
+        );
+    }
+}
+
+#[test]
 fn every_canonical_column_leaf_requires_exact_relation_var_evidence() {
     let mut observations = complete_vars();
     observations.pop();
