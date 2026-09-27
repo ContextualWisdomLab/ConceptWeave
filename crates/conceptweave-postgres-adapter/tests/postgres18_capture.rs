@@ -590,7 +590,18 @@ async fn postgres18_range_subtype_changes_source_identity() {
     let receipt = after
         .range_catalog_source_receipt(QualifiedTypeName::new(&schema, "span").unwrap())
         .unwrap();
+    assert_eq!(receipt.source_id(), after.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        after.connection_policy_binding()
+    );
     assert_eq!(receipt.source_digest(), after.snapshot_digest());
+    assert_eq!(receipt.extractor_revision(), after.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), after.observed_at_utc());
+    assert_eq!(
+        receipt.range_type(),
+        &QualifiedTypeName::new(&schema, "span").unwrap()
+    );
     assert_eq!(
         receipt.canonical_location(),
         format!("/schemas/{schema}/ranges/span/catalog")
