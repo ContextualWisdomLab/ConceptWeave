@@ -104,6 +104,12 @@ fn signed_manifest_requires_an_independent_exact_publisher_key() {
         .unwrap_err(),
         ReleaseContractError::DuplicatePublisherKeyId("publisher-1".into())
     );
+    assert_eq!(
+        signed.verify(&[trusted.clone(), trusted.clone()]),
+        Err(ReleaseContractError::DuplicatePublisherKeyId(
+            "publisher-1".into()
+        ))
+    );
     let tampered =
         SignedReleaseManifest::new("publisher-1", "other-release", digest, signature.as_ref())
             .unwrap();
@@ -131,6 +137,10 @@ fn signed_manifest_rejects_invalid_external_identifiers_and_key_material() {
         );
         assert_eq!(
             SignedReleaseManifest::signing_message(invalid, "release", &digest),
+            Err(ReleaseContractError::InvalidSignedManifest)
+        );
+        assert_eq!(
+            SignedReleaseManifest::signing_message("publisher", invalid, &digest),
             Err(ReleaseContractError::InvalidSignedManifest)
         );
         assert_eq!(
