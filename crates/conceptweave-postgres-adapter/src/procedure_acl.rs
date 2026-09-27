@@ -2,7 +2,9 @@
 
 use super::{CaptureMeter, bounded, field};
 use conceptweave_observation::{
-    ProcedureAccessControlObservation, ProcedureAclItem, ReferencedProcedureDefinitionObservation,
+    ProcedureAccessControlObservation, ProcedureAclItem, ProcedureInitialPrivilegeOrigin,
+    ProcedureInitialPrivileges, ProcedureInitialPrivilegesObservation,
+    ReferencedProcedureDefinitionObservation,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, SourceObservationFailure,
@@ -19,20 +21,102 @@ pub(super) async fn capture(
     oids: &[u32],
     definitions: &BTreeMap<u32, ReferencedProcedureDefinitionObservation>,
 ) -> Result<Vec<ProcedureAccessControlObservation>, SourceObservationFailure> {
+    capture_catalog(
+        tx,
+        request,
+        cancellation,
+        meter,
+        oids,
+        definitions,
+        AclSource::Current,
+    )
+    .await?
+    .into_iter()
+    .map(|(oid, item)| {
+        let definition = definitions
+            .get(&oid)
+            .ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
+        Ok(ProcedureAccessControlObservation::new(
+            definition.location().clone(),
+            item.raw_acl,
+        ))
+    })
+    .collect()
+}
+
+pub(super) async fn capture_initial_privileges(
+    tx: &Transaction<'_>,
+    request: &AuthorizedObservationRequest,
+    cancellation: &dyn ObservationCancellation,
+    meter: &mut CaptureMeter,
+    oids: &[u32],
+    definitions: &BTreeMap<u32, ReferencedProcedureDefinitionObservation>,
+) -> Result<Vec<ProcedureInitialPrivilegesObservation>, SourceObservationFailure> {
+    capture_catalog(
+        tx,
+        request,
+        cancellation,
+        meter,
+        oids,
+        definitions,
+        AclSource::Initial,
+    )
+    .await?
+    .into_iter()
+    .map(|(oid, item)| {
+        let definition = definitions
+            .get(&oid)
+            .ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
+        let material = match (item.origin, item.raw_acl) {
+            (None, None) => None,
+            (Some(origin), Some(acl)) => Some(ProcedureInitialPrivileges::new(origin, acl)),
+            _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
+        };
+        Ok(ProcedureInitialPrivilegesObservation::new(
+            definition.location().clone(),
+            material,
+        ))
+    })
+    .collect()
+}
+
+#[derive(Clone, Copy)]
+enum AclSource {
+    Current,
+    Initial,
+}
+struct CapturedAcl {
+    raw_acl: Option<Vec<ProcedureAclItem>>,
+    origin: Option<ProcedureInitialPrivilegeOrigin>,
+}
+
+async fn capture_catalog(
+    tx: &Transaction<'_>,
+    request: &AuthorizedObservationRequest,
+    cancellation: &dyn ObservationCancellation,
+    meter: &mut CaptureMeter,
+    oids: &[u32],
+    definitions: &BTreeMap<u32, ReferencedProcedureDefinitionObservation>,
+    source: AclSource,
+) -> Result<BTreeMap<u32, CapturedAcl>, SourceObservationFailure> {
+    let initial = matches!(source, AclSource::Initial);
     if oids.is_empty() {
-        return Ok(Vec::new());
+        return Ok(BTreeMap::new());
     }
     let max_rows = request.request().limits().max_rows().min(i64::MAX as u64) as i64;
     let headers = bounded(request, cancellation, tx.query_raw(
-        "SELECT ref.oid, p.oid IS NULL, p.proacl IS NULL, \
-         COALESCE(cardinality(p.proacl), 0), array_ndims(p.proacl), \
-         CASE WHEN cardinality(p.proacl)::bigint <= $2 THEN \
-           EXISTS(SELECT 1 FROM unnest(p.proacl) a WHERE a IS NULL) ELSE false END \
-         FROM unnest($1::oid[]) ref(oid) LEFT JOIN pg_catalog.pg_proc p ON p.oid = ref.oid ORDER BY ref.oid",
-        vec![&oids as &(dyn ToSql + Sync), &max_rows],
+        "WITH material AS (SELECT ref.oid, p.oid IS NULL AS missing, \
+         CASE WHEN $3::boolean THEN ip.initprivs ELSE p.proacl END AS raw_acl, ip.privtype::text AS origin, ip.objsubid \
+         FROM unnest($1::oid[]) ref(oid) LEFT JOIN pg_catalog.pg_proc p ON p.oid=ref.oid \
+         LEFT JOIN pg_catalog.pg_init_privs ip ON $3::boolean AND ip.classoid='pg_catalog.pg_proc'::regclass AND ip.objoid=p.oid) \
+         SELECT oid, missing, raw_acl IS NULL, COALESCE(cardinality(raw_acl),0), array_ndims(raw_acl), \
+         CASE WHEN cardinality(raw_acl)::bigint <= $2 THEN \
+         EXISTS(SELECT 1 FROM unnest(raw_acl) a WHERE a IS NULL) ELSE false END, origin, objsubid \
+         FROM material ORDER BY oid",
+        vec![&oids as &(dyn ToSql + Sync), &max_rows, &initial],
     )).await?;
     tokio::pin!(headers);
-    let mut items: BTreeMap<u32, Option<Vec<ProcedureAclItem>>> = BTreeMap::new();
+    let mut items: BTreeMap<u32, CapturedAcl> = BTreeMap::new();
     let mut counts = BTreeMap::new();
     while let Some(row) = bounded(request, cancellation, headers.try_next()).await? {
         let oid: u32 = field(&row, 0)?;
@@ -49,10 +133,29 @@ pub(super) async fn capture(
         {
             return Err(SourceObservationFailure::InvalidCapturedMetadata);
         }
-        meter.add(request, 9)?;
         let is_null: bool = field(&row, 2)?;
+        let origin = match field::<Option<String>>(&row, 6)?.as_deref() {
+            None => None,
+            Some("i") => Some(ProcedureInitialPrivilegeOrigin::Initialization),
+            Some("e") => Some(ProcedureInitialPrivilegeOrigin::Extension),
+            _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
+        };
+        let subobject: Option<i32> = field(&row, 7)?;
+        if initial
+            && ((origin.is_some() && (is_null || subobject != Some(0)))
+                || (origin.is_none() && (!is_null || subobject.is_some())))
+        {
+            return Err(SourceObservationFailure::InvalidCapturedMetadata);
+        }
+        meter.add(request, if initial && origin.is_some() { 14 } else { 9 })?;
         if items
-            .insert(oid, if is_null { None } else { Some(Vec::new()) })
+            .insert(
+                oid,
+                CapturedAcl {
+                    raw_acl: if is_null { None } else { Some(Vec::new()) },
+                    origin,
+                },
+            )
             .is_some()
         {
             return Err(SourceObservationFailure::InvalidCapturedMetadata);
@@ -63,14 +166,16 @@ pub(super) async fn capture(
         return Err(SourceObservationFailure::InvalidCapturedMetadata);
     }
     let stream = bounded(request, cancellation, tx.query_raw(
-        "SELECT p.oid, item.position, acl.grantee, gr.rolname::text, acl.grantor, rr.rolname::text, \
+        "WITH material AS (SELECT p.oid, CASE WHEN $2::boolean THEN ip.initprivs ELSE p.proacl END AS raw_acl \
+         FROM unnest($1::oid[]) ref(oid) JOIN pg_catalog.pg_proc p ON p.oid=ref.oid \
+         LEFT JOIN pg_catalog.pg_init_privs ip ON $2::boolean AND ip.classoid='pg_catalog.pg_proc'::regclass AND ip.objoid=p.oid) \
+         SELECT p.oid, item.position, acl.grantee, gr.rolname::text, acl.grantor, rr.rolname::text, \
          acl.privilege_type, acl.is_grantable, CASE WHEN acl.privilege_type IS NULL THEN item.value::text END \
-         FROM unnest($1::oid[]) ref(oid) JOIN pg_catalog.pg_proc p ON p.oid = ref.oid \
-         CROSS JOIN LATERAL unnest(p.proacl) WITH ORDINALITY item(value, position) \
+         FROM material p CROSS JOIN LATERAL unnest(p.raw_acl) WITH ORDINALITY item(value, position) \
          LEFT JOIN LATERAL pg_catalog.aclexplode(ARRAY[item.value]) acl ON true \
          LEFT JOIN pg_catalog.pg_roles gr ON gr.oid = acl.grantee \
          LEFT JOIN pg_catalog.pg_roles rr ON rr.oid = acl.grantor ORDER BY p.oid, item.position",
-        vec![&oids as &(dyn ToSql + Sync)],
+        vec![&oids as &(dyn ToSql + Sync), &initial],
     )).await?;
     tokio::pin!(stream);
     while let Some(row) = bounded(request, cancellation, stream.try_next()).await? {
@@ -98,34 +203,34 @@ pub(super) async fn capture(
             None => {
                 let text: String = field(&row, 8)?;
                 meter.add(request, text.len() + 10)?;
-                empty_item(tx, request, cancellation, meter, oid, position, &text).await?
+                empty_item(
+                    tx,
+                    request,
+                    cancellation,
+                    meter,
+                    source,
+                    (oid, position),
+                    &text,
+                )
+                .await?
             }
             _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
         };
         let grants = items
             .get_mut(&oid)
-            .and_then(Option::as_mut)
+            .and_then(|item| item.raw_acl.as_mut())
             .ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
         if position != grants.len() as i64 + 1 {
             return Err(SourceObservationFailure::InvalidCapturedMetadata);
         }
         grants.push(entry);
     }
-    items
-        .into_iter()
-        .map(|(oid, grants)| {
-            if grants.as_ref().map_or(0, Vec::len) != counts[&oid] {
-                return Err(SourceObservationFailure::InvalidCapturedMetadata);
-            }
-            let definition = definitions
-                .get(&oid)
-                .ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
-            Ok(ProcedureAccessControlObservation::new(
-                definition.location().clone(),
-                grants,
-            ))
-        })
-        .collect()
+    for (oid, item) in &items {
+        if item.raw_acl.as_ref().map_or(0, Vec::len) != counts[oid] {
+            return Err(SourceObservationFailure::InvalidCapturedMetadata);
+        }
+    }
+    Ok(items)
 }
 
 async fn empty_item(
@@ -133,10 +238,12 @@ async fn empty_item(
     request: &AuthorizedObservationRequest,
     cancellation: &dyn ObservationCancellation,
     meter: &mut CaptureMeter,
-    oid: u32,
-    position: i64,
+    source: AclSource,
+    coordinate: (u32, i64),
     text: &str,
 ) -> Result<ProcedureAclItem, SourceObservationFailure> {
+    let (oid, position) = coordinate;
+    let initial = matches!(source, AclSource::Initial);
     let (grantee, grantor) =
         empty_roles(text).ok_or(SourceObservationFailure::InvalidCapturedMetadata)?;
     let grantees = candidates(tx, request, cancellation, grantee.as_deref()).await?;
@@ -150,12 +257,13 @@ async fn empty_item(
             "SELECT g.oid, r.oid, gr.rolname::text, rr.rolname::text \
          FROM unnest($3::oid[]) g(oid) CROSS JOIN unnest($4::oid[]) r(oid) \
          JOIN pg_catalog.pg_proc p ON p.oid = $1 \
-         CROSS JOIN LATERAL unnest(p.proacl) WITH ORDINALITY item(value, position) \
+         LEFT JOIN pg_catalog.pg_init_privs ip ON $5::boolean AND ip.classoid='pg_catalog.pg_proc'::regclass AND ip.objoid=p.oid \
+         CROSS JOIN LATERAL unnest(CASE WHEN $5::boolean THEN ip.initprivs ELSE p.proacl END) WITH ORDINALITY item(value, position) \
          LEFT JOIN pg_catalog.pg_roles gr ON gr.oid = g.oid \
          LEFT JOIN pg_catalog.pg_roles rr ON rr.oid = r.oid \
          WHERE item.position = $2 \
          AND ARRAY[pg_catalog.makeaclitem(g.oid, r.oid, 'EXECUTE', false)] @> item.value",
-            &[&oid, &position, &grantees, &grantors],
+            &[&oid, &position, &grantees, &grantors, &initial],
         ),
     )
     .await?;

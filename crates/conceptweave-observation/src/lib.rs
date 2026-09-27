@@ -19,6 +19,7 @@ mod foreign_key_catalog;
 mod model;
 mod not_null_constraint;
 mod procedure_access_control;
+mod procedure_initial_privileges;
 mod procedure_security_labels;
 mod range_catalog;
 mod referenced_procedure;
@@ -49,6 +50,10 @@ pub use model::{
 };
 pub use not_null_constraint::{NotNullConstraintObservation, ParentNotNullConstraintCoordinate};
 pub use procedure_access_control::{ProcedureAccessControlObservation, ProcedureAclItem};
+pub use procedure_initial_privileges::{
+    ProcedureInitialPrivilegeOrigin, ProcedureInitialPrivileges,
+    ProcedureInitialPrivilegesObservation,
+};
 pub use procedure_security_labels::{ProcedureSecurityLabel, ProcedureSecurityLabelsObservation};
 pub use range_catalog::{
     QualifiedRangeProcedure, RangeCatalogObservation, RangeCatalogSourceReceipt,
@@ -194,6 +199,7 @@ pub struct PostgresSchemaSnapshotV3 {
     referenced_procedure_definitions: Option<Vec<ReferencedProcedureDefinitionObservation>>,
     procedure_access_control: Option<Vec<ProcedureAccessControlObservation>>,
     procedure_security_labels: Option<Vec<ProcedureSecurityLabelsObservation>>,
+    procedure_initial_privileges: Option<Vec<ProcedureInitialPrivilegesObservation>>,
 }
 
 impl PostgresSchemaSnapshotV3 {
@@ -271,6 +277,7 @@ impl PostgresSchemaSnapshotV3 {
             referenced_procedure_definitions: None,
             procedure_access_control: None,
             procedure_security_labels: None,
+            procedure_initial_privileges: None,
         })
     }
 
@@ -383,6 +390,7 @@ impl PostgresSchemaSnapshotV3 {
             referenced_procedure_definitions: None,
             procedure_access_control: None,
             procedure_security_labels: None,
+            procedure_initial_privileges: None,
         })
     }
 
@@ -685,6 +693,7 @@ impl PostgresSchemaSnapshotV3 {
             referenced_procedure_definitions: None,
             procedure_access_control: None,
             procedure_security_labels: None,
+            procedure_initial_privileges: None,
         })
     }
 
@@ -1515,6 +1524,48 @@ impl PostgresSchemaSnapshotV3 {
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "unobserved_procedure_security_labels",
+            });
+        }
+        self.referenced_procedure_definition_source_receipt(location)
+    }
+
+    /// Binds complete initial-privilege evidence after observed security labels in a new successor digest.
+    pub fn with_observed_procedure_initial_privileges(
+        mut self,
+        items: Vec<ProcedureInitialPrivilegesObservation>,
+    ) -> Result<Self, ObservationError> {
+        if self.procedure_security_labels.is_none() || self.procedure_initial_privileges.is_some() {
+            return Err(ObservationError::InvalidObservationField {
+                field: "procedure_initial_privileges_order",
+            });
+        }
+        let definitions = self.referenced_procedure_definitions.as_deref().ok_or(
+            ObservationError::InvalidObservationField {
+                field: "procedure_initial_privileges_order",
+            },
+        )?;
+        let items = procedure_initial_privileges::canonicalize(definitions, items)?;
+        self.snapshot_digest = procedure_initial_privileges::digest(&self.snapshot_digest, &items);
+        self.procedure_initial_privileges = Some(items);
+        Ok(self)
+    }
+    /// Returns complete initial-privilege evidence; None means the inventory was not observed.
+    #[must_use]
+    pub fn procedure_initial_privileges(&self) -> Option<&[ProcedureInitialPrivilegesObservation]> {
+        self.procedure_initial_privileges.as_deref()
+    }
+    /// Issues procedure-root provenance only for an exactly observed initial-privilege fact.
+    pub fn procedure_initial_privileges_source_receipt(
+        &self,
+        location: ReferencedProcedureLocation,
+    ) -> Result<ReferencedProcedureSourceReceipt, ObservationError> {
+        if !self
+            .procedure_initial_privileges
+            .as_ref()
+            .is_some_and(|items| items.iter().any(|item| item.location() == &location))
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "unobserved_procedure_initial_privileges",
             });
         }
         self.referenced_procedure_definition_source_receipt(location)

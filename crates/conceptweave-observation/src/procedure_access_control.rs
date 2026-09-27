@@ -150,15 +150,19 @@ pub(crate) fn digest(base: &str, items: &[ProcedureAccessControlObservation]) ->
         encode_str(&mut hash, &item.location.canonical_location());
         hash.update([u8::from(item.raw_acl.is_some())]);
         if let Some(acl) = &item.raw_acl {
-            encode_len(&mut hash, acl.len());
-            for grant in acl {
-                encode_role(&mut hash, grant.grantee_oid, grant.grantee_name.as_deref());
-                encode_role(&mut hash, grant.grantor_oid, grant.grantor_name.as_deref());
-                hash.update([u8::from(grant.execute), u8::from(grant.grant_option)]);
-            }
+            encode_acl(&mut hash, acl);
         }
     }
     encode_sha256(hash)
+}
+
+pub(crate) fn encode_acl(hash: &mut Sha256, acl: &[ProcedureAclItem]) {
+    encode_len(hash, acl.len());
+    for grant in acl {
+        encode_role(hash, grant.grantee_oid, grant.grantee_name.as_deref());
+        encode_role(hash, grant.grantor_oid, grant.grantor_name.as_deref());
+        hash.update([u8::from(grant.execute), u8::from(grant.grant_option)]);
+    }
 }
 
 fn encode_role(hash: &mut Sha256, oid: u32, name: Option<&str>) {

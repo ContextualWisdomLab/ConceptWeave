@@ -36,7 +36,7 @@ use ring::{
 use tokio_postgres::{Config, NoTls};
 
 #[tokio::test]
-async fn postgres18_referenced_function_owners_and_acl_bind_immutable_evidence() {
+async fn postgres18_referenced_procedure_evidence_binds_immutable_source() {
     use futures_util::FutureExt;
     use std::panic::AssertUnwindSafe;
 
@@ -175,6 +175,60 @@ async fn postgres18_referenced_function_owners_and_acl_bind_immutable_evidence()
             client.execute("DELETE FROM pg_catalog.pg_seclabel WHERE classoid='pg_catalog.pg_proc'::regclass AND objoid=$1::text::regprocedure AND provider IN ('cw_probe_provider',' provider/~ ')", &[&function]).await.unwrap();
             let restored_labels = adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536), &NotCancelled).await.unwrap();
             assert_eq!(restored_labels.snapshot_digest(), owner_snapshot.snapshot_digest());
+            use conceptweave_observation::ProcedureInitialPrivilegeOrigin;
+            let initial_before = owner_snapshot.procedure_initial_privileges().unwrap().iter().find(|item| item.location() == &location).unwrap();
+            assert!(initial_before.initial_privileges().is_none());
+            let initial_absence_receipt = owner_snapshot.procedure_initial_privileges_source_receipt(location.clone()).unwrap();
+            assert!(owner_snapshot.clone().with_observed_procedure_initial_privileges(vec![]).is_err());
+            client.execute("INSERT INTO pg_catalog.pg_init_privs (objoid,classoid,objsubid,privtype,initprivs) SELECT oid,'pg_catalog.pg_proc'::regclass,0,'e',ARRAY[format('=/%I',pg_catalog.pg_get_userbyid(proowner))::aclitem,pg_catalog.makeaclitem(4000000123::oid,proowner,'EXECUTE',true),format('=/%I',pg_catalog.pg_get_userbyid(proowner))::aclitem] FROM pg_catalog.pg_proc WHERE oid=$1::text::regprocedure", &[&function]).await.unwrap();
+            let initial = adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536), &NotCancelled).await.unwrap();
+            let material = initial.procedure_initial_privileges().unwrap().iter().find(|item| item.location() == &location).unwrap().initial_privileges().unwrap();
+            let native_initial = client.query_one("SELECT privtype::text,cardinality(initprivs) FROM pg_catalog.pg_init_privs WHERE classoid='pg_catalog.pg_proc'::regclass AND objoid=$1::text::regprocedure", &[&function]).await.unwrap();
+            assert_eq!(native_initial.get::<_, String>(0), "e");
+            assert_eq!(material.origin(), ProcedureInitialPrivilegeOrigin::Extension);
+            assert_eq!(material.raw_acl().len(), native_initial.get::<_, i32>(1) as usize);
+            assert_eq!(material.raw_acl().len(), 3);
+            assert_eq!(material.raw_acl()[0], material.raw_acl()[2]);
+            assert_eq!(material.raw_acl()[0].grantee_oid(), 0);
+            assert_eq!(material.raw_acl()[0].grantee_name(), None);
+            assert_eq!(material.raw_acl()[0].grantor_oid(), native_after.get::<_, u32>(0));
+            assert_eq!(material.raw_acl()[0].grantor_name(), Some(native_after.get::<_, String>(1).as_str()));
+            assert!(!material.raw_acl()[0].execute() && !material.raw_acl()[0].grant_option());
+            assert_eq!(material.raw_acl()[1].grantee_oid(),4000000123);
+            assert_eq!(material.raw_acl()[1].grantee_name(),None);
+            assert!(material.raw_acl()[1].execute() && material.raw_acl()[1].grant_option());
+            assert!(!format!("{material:?}").contains("4000000123"));
+            assert_eq!(initial.procedure_access_control(), owner_snapshot.procedure_access_control());
+            assert_eq!(initial.referenced_procedure_definitions(), owner_snapshot.referenced_procedure_definitions());
+            assert_eq!(initial.procedure_security_labels(), owner_snapshot.procedure_security_labels());
+            assert_ne!(initial.snapshot_digest(), owner_snapshot.snapshot_digest());
+            assert_eq!(initial_absence_receipt.source_digest(), owner_snapshot.snapshot_digest());
+            let initial_receipt = initial.procedure_initial_privileges_source_receipt(location.clone()).unwrap();
+            assert_eq!(initial_receipt.source_digest(), initial.snapshot_digest());
+            assert_eq!(initial_receipt.location(), &location);
+            assert!(initial.procedure_initial_privileges_source_receipt(conceptweave_observation::ReferencedProcedureLocation::new("pg_catalog","not_observed",vec![]).unwrap()).is_err());
+            client.execute("UPDATE pg_catalog.pg_init_privs SET initprivs=ARRAY[initprivs[2],initprivs[1],initprivs[3]] WHERE classoid='pg_catalog.pg_proc'::regclass AND objoid=$1::text::regprocedure", &[&function]).await.unwrap();
+            let initial_reordered = adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536), &NotCancelled).await.unwrap();
+            assert_ne!(initial_reordered.snapshot_digest(), initial.snapshot_digest());
+            client.execute("UPDATE pg_catalog.pg_init_privs SET privtype='i' WHERE classoid='pg_catalog.pg_proc'::regclass AND objoid=$1::text::regprocedure", &[&function]).await.unwrap();
+            let initialized = adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536), &NotCancelled).await.unwrap();
+            assert_eq!(initialized.procedure_initial_privileges().unwrap().iter().find(|item| item.location() == &location).unwrap().initial_privileges().unwrap().origin(),ProcedureInitialPrivilegeOrigin::Initialization);
+            assert_ne!(initialized.snapshot_digest(), initial_reordered.snapshot_digest());
+            client.execute("UPDATE pg_catalog.pg_init_privs SET initprivs='{}'::aclitem[] WHERE classoid='pg_catalog.pg_proc'::regclass AND objoid=$1::text::regprocedure", &[&function]).await.unwrap();
+            let initial_empty = adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536), &NotCancelled).await.unwrap();
+            assert!(initial_empty.procedure_initial_privileges().unwrap().iter().find(|item| item.location() == &location).unwrap().initial_privileges().unwrap().raw_acl().is_empty());
+            assert_ne!(initial_empty.snapshot_digest(), owner_snapshot.snapshot_digest());
+            for invalid_initial in ["privtype='z'", "objsubid=1", "initprivs=ARRAY[NULL::aclitem]", "initprivs=ARRAY[[pg_catalog.makeaclitem(0,(SELECT proowner FROM pg_catalog.pg_proc WHERE oid=$1::text::regprocedure),'EXECUTE',false)]]"] {
+                client.execute("UPDATE pg_catalog.pg_init_privs SET privtype='e',objsubid=0,initprivs='{}'::aclitem[] WHERE classoid='pg_catalog.pg_proc'::regclass AND objoid=$1::text::regprocedure", &[&function]).await.unwrap();
+                client.execute(&format!("UPDATE pg_catalog.pg_init_privs SET {invalid_initial} WHERE classoid='pg_catalog.pg_proc'::regclass AND objoid=$1::text::regprocedure"), &[&function]).await.unwrap();
+                assert!(matches!(adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536), &NotCancelled).await,Err(SourceObservationFailure::InvalidCapturedMetadata)), "{function}: {invalid_initial}");
+            }
+            client.execute("UPDATE pg_catalog.pg_init_privs SET privtype='e',objsubid=0,initprivs=array_fill(pg_catalog.makeaclitem(0,(SELECT proowner FROM pg_catalog.pg_proc WHERE oid=$1::text::regprocedure),'EXECUTE',false),ARRAY[513]) WHERE classoid='pg_catalog.pg_proc'::regclass AND objoid=$1::text::regprocedure", &[&function]).await.unwrap();
+            assert!(matches!(adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536), &NotCancelled).await,Err(SourceObservationFailure::RowLimitExceeded { max_rows:512 })));
+            client.execute("DELETE FROM pg_catalog.pg_init_privs WHERE classoid='pg_catalog.pg_proc'::regclass AND objoid=$1::text::regprocedure", &[&function]).await.unwrap();
+            let initial_restored = adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536), &NotCancelled).await.unwrap();
+            assert_eq!(initial_restored.snapshot_digest(),owner_snapshot.snapshot_digest());
+            assert_eq!(initial_receipt.source_digest(),initial.snapshot_digest());
             let was_allowed: bool = client.query_one(
                 "SELECT pg_catalog.has_function_privilege('public', $1::text, 'EXECUTE')", &[&function]
             ).await.unwrap().get(0);
@@ -1334,9 +1388,22 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         Err(ProposalError::IncompleteSourceObservation)
     ));
     assert!(
+        missing_procedure_labels
+            .clone()
+            .with_observed_procedure_initial_privileges(vec![])
+            .is_err()
+    );
+    let missing_initial_privileges = missing_procedure_labels
+        .with_observed_procedure_security_labels(vec![])
+        .unwrap();
+    assert!(matches!(
+        propose_relational_model(&missing_initial_privileges),
+        Err(ProposalError::IncompleteSourceObservation)
+    ));
+    assert!(
         propose_relational_model(
-            &missing_procedure_labels
-                .with_observed_procedure_security_labels(vec![])
+            &missing_initial_privileges
+                .with_observed_procedure_initial_privileges(vec![])
                 .unwrap()
         )
         .is_ok()
@@ -1530,6 +1597,8 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         .with_observed_procedure_access_control(vec![])
         .unwrap()
         .with_observed_procedure_security_labels(vec![])
+        .unwrap()
+        .with_observed_procedure_initial_privileges(vec![])
         .unwrap()
     };
     let type_only = complete_type_only(enums.clone(), "2026-09-25T00:00:00Z");

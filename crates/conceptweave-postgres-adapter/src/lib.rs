@@ -1253,6 +1253,15 @@ async fn capture_catalog(
         &definitions,
     )
     .await?;
+    let initial_privileges = procedure_acl::capture_initial_privileges(
+        &transaction,
+        request,
+        cancellation,
+        &mut meter,
+        &procedure_oids,
+        &definitions,
+    )
+    .await?;
     let security_labels = procedure_security_labels::capture(
         &transaction,
         request,
@@ -1269,6 +1278,9 @@ async fn capture_catalog(
         .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
     let snapshot = snapshot
         .with_observed_procedure_security_labels(security_labels)
+        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+    let snapshot = snapshot
+        .with_observed_procedure_initial_privileges(initial_privileges)
         .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
     bounded(request, cancellation, transaction.commit()).await?;
     Ok(snapshot)
