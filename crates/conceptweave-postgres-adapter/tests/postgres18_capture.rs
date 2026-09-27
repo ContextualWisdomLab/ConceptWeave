@@ -96,6 +96,52 @@ async fn postgres18_referenced_function_acl_fails_before_immutable_success() {
             let before = adapter(config.clone()).observe(
                 authorized_with_limits("source_metadata", 512, 65_536), &NotCancelled
             ).await;
+            let native_before = client.query_one(
+                "SELECT p.proowner, r.rolname::text, p.proname::text FROM pg_catalog.pg_proc p \
+                 JOIN pg_catalog.pg_roles r ON r.oid = p.proowner WHERE p.oid = $1::text::regprocedure",
+                &[&function],
+            ).await.unwrap();
+            let before_snapshot = before.as_ref().unwrap();
+            let definition_before = before_snapshot.referenced_procedure_definitions().unwrap().iter()
+                .find(|item| item.location().procedure_name() == native_before.get::<_, String>(2)).unwrap();
+            assert_eq!(definition_before.owner_oid(), native_before.get::<_, u32>(0));
+            assert_eq!(definition_before.owner_role_name(), native_before.get::<_, String>(1));
+            assert_eq!(definition_before.location().schema_name(), "pg_catalog");
+            assert!(!definition_before.location().input_types().is_empty());
+            assert_eq!(definition_before.return_type().schema_name(), "pg_catalog");
+            assert!(!format!("{definition_before:?}").contains(definition_before.definition()));
+            let old_receipt = before_snapshot.referenced_procedure_definition_source_receipt(definition_before.location().clone()).unwrap();
+            client.batch_execute(&format!("ALTER FUNCTION {function} OWNER TO pg_read_all_data")).await.unwrap();
+            let owner_snapshot = adapter(config.clone()).observe(
+                authorized_with_limits("source_metadata", 512, 65_536), &NotCancelled
+            ).await.unwrap();
+            assert!(owner_snapshot.clone().with_observed_referenced_procedure_definitions(vec![]).is_err());
+            let native_after = client.query_one(
+                "SELECT p.proowner, r.rolname::text FROM pg_catalog.pg_proc p \
+                 JOIN pg_catalog.pg_roles r ON r.oid = p.proowner WHERE p.oid = $1::text::regprocedure",
+                &[&function],
+            ).await.unwrap();
+            let definition_after = owner_snapshot.referenced_procedure_definitions().unwrap().iter()
+                .find(|item| item.location() == definition_before.location()).unwrap();
+            assert_eq!(definition_after.owner_oid(), native_after.get::<_, u32>(0));
+            assert_eq!(definition_after.owner_role_name(), native_after.get::<_, String>(1));
+            assert_ne!(definition_before.owner_oid(), definition_after.owner_oid());
+            assert_eq!(definition_before.definition(), definition_after.definition());
+            assert_ne!(before_snapshot.snapshot_digest(), owner_snapshot.snapshot_digest());
+            assert_eq!(old_receipt.source_digest(), before_snapshot.snapshot_digest());
+            let receipt = owner_snapshot.referenced_procedure_definition_source_receipt(definition_after.location().clone()).unwrap();
+            assert_eq!(receipt.location(), definition_after.location());
+            assert!(receipt.location().canonical_location().starts_with("/referenced-procedures/pg_catalog/"));
+            assert_eq!(receipt.source_id(), owner_snapshot.source_connection_key());
+            assert_eq!(receipt.connection_policy_binding(), owner_snapshot.connection_policy_binding());
+            assert_eq!(receipt.source_digest(), owner_snapshot.snapshot_digest());
+            assert_eq!(receipt.extractor_revision(), owner_snapshot.extractor_revision());
+            assert_eq!(receipt.observed_at_utc(), owner_snapshot.observed_at_utc());
+            let wrong_signature = conceptweave_observation::ReferencedProcedureLocation::new(
+                "pg_catalog", definition_after.location().procedure_name(),
+                vec![QualifiedTypeName::new("pg_catalog", "void").unwrap()],
+            ).unwrap();
+            assert!(owner_snapshot.referenced_procedure_definition_source_receipt(wrong_signature).is_err());
             let was_allowed: bool = client.query_one(
                 "SELECT pg_catalog.has_function_privilege('public', $1::text, 'EXECUTE')", &[&function]
             ).await.unwrap().get(0);
@@ -1150,10 +1196,17 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         propose_relational_model(&missing_collation_owners),
         Err(ProposalError::IncompleteSourceObservation)
     ));
+    let missing_procedure_definitions = missing_collation_owners
+        .with_observed_collation_owners(vec![])
+        .unwrap();
+    assert!(matches!(
+        propose_relational_model(&missing_procedure_definitions),
+        Err(ProposalError::IncompleteSourceObservation)
+    ));
     assert!(
         propose_relational_model(
-            &missing_collation_owners
-                .with_observed_collation_owners(vec![])
+            &missing_procedure_definitions
+                .with_observed_referenced_procedure_definitions(vec![])
                 .unwrap()
         )
         .is_ok()
@@ -1341,6 +1394,8 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         .with_observed_collation_definitions(vec![])
         .unwrap()
         .with_observed_collation_owners(vec![])
+        .unwrap()
+        .with_observed_referenced_procedure_definitions(vec![])
         .unwrap()
     };
     let type_only = complete_type_only(enums.clone(), "2026-09-25T00:00:00Z");

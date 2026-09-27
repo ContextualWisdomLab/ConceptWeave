@@ -19,6 +19,13 @@ fn empty_schema_owner_has_an_exact_receipt_only_after_observation() {
     .unwrap()
     .with_observed_type_owners(vec![])
     .unwrap();
+    assert!(snapshot.referenced_procedure_definitions().is_none());
+    assert!(
+        snapshot
+            .clone()
+            .with_observed_referenced_procedure_definitions(vec![])
+            .is_err()
+    );
     let location = SchemaOwnerLocation::new(schema).unwrap();
     assert_eq!(location.canonical_location(), "/schemas/Sales~1~0North");
     assert!(matches!(

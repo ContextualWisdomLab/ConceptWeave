@@ -19,6 +19,7 @@ mod foreign_key_catalog;
 mod model;
 mod not_null_constraint;
 mod range_catalog;
+mod referenced_procedure;
 mod relation_owner;
 mod relation_tablespace;
 mod representation_v3;
@@ -47,6 +48,10 @@ pub use model::{
 pub use not_null_constraint::{NotNullConstraintObservation, ParentNotNullConstraintCoordinate};
 pub use range_catalog::{
     QualifiedRangeProcedure, RangeCatalogObservation, RangeCatalogSourceReceipt,
+};
+pub use referenced_procedure::{
+    ReferencedProcedureDefinitionObservation, ReferencedProcedureDefinitionSourceReceipt,
+    ReferencedProcedureLocation,
 };
 pub use relation_owner::RelationOwnerObservation;
 pub use relation_tablespace::RelationTablespaceObservation;
@@ -182,6 +187,7 @@ pub struct PostgresSchemaSnapshotV3 {
     collation_definitions_observed: bool,
     collation_owners: Vec<CollationOwnerObservation>,
     collation_owners_observed: bool,
+    referenced_procedure_definitions: Option<Vec<ReferencedProcedureDefinitionObservation>>,
 }
 
 impl PostgresSchemaSnapshotV3 {
@@ -256,6 +262,7 @@ impl PostgresSchemaSnapshotV3 {
             collation_definitions_observed: false,
             collation_owners: Vec::new(),
             collation_owners_observed: false,
+            referenced_procedure_definitions: None,
         })
     }
 
@@ -365,6 +372,7 @@ impl PostgresSchemaSnapshotV3 {
             collation_definitions_observed: false,
             collation_owners: Vec::new(),
             collation_owners_observed: false,
+            referenced_procedure_definitions: None,
         })
     }
 
@@ -664,6 +672,7 @@ impl PostgresSchemaSnapshotV3 {
             collation_definitions_observed: false,
             collation_owners: Vec::new(),
             collation_owners_observed: false,
+            referenced_procedure_definitions: None,
         })
     }
 
@@ -1395,6 +1404,56 @@ impl PostgresSchemaSnapshotV3 {
         self.column_array_dimensions = observations;
         self.column_array_dimensions_observed = true;
         Ok(self)
+    }
+
+    /// Binds a complete referenced-procedure definition inventory in a new successor digest.
+    /// Historical constructors and earlier family digests remain reproducible.
+    pub fn with_observed_referenced_procedure_definitions(
+        mut self,
+        observations: Vec<ReferencedProcedureDefinitionObservation>,
+    ) -> Result<Self, ObservationError> {
+        if !self.collation_owners_observed || self.referenced_procedure_definitions.is_some() {
+            return Err(ObservationError::InvalidObservationField {
+                field: "referenced_procedure_definition_observation_order",
+            });
+        }
+        let observations =
+            referenced_procedure::canonicalize(&self.authorized_schema_names, observations)?;
+        self.snapshot_digest = referenced_procedure::digest(&self.snapshot_digest, &observations);
+        self.referenced_procedure_definitions = Some(observations);
+        Ok(self)
+    }
+
+    /// Returns the observed definition inventory, distinguishing unobserved from observed empty.
+    #[must_use]
+    pub fn referenced_procedure_definitions(
+        &self,
+    ) -> Option<&[ReferencedProcedureDefinitionObservation]> {
+        self.referenced_procedure_definitions.as_deref()
+    }
+
+    /// Issues provenance only for an exact captured overloaded procedure signature.
+    pub fn referenced_procedure_definition_source_receipt(
+        &self,
+        location: ReferencedProcedureLocation,
+    ) -> Result<ReferencedProcedureDefinitionSourceReceipt, ObservationError> {
+        if !self
+            .referenced_procedure_definitions
+            .as_ref()
+            .is_some_and(|items| items.iter().any(|item| item.location() == &location))
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "unobserved_referenced_procedure_definition",
+            });
+        }
+        Ok(ReferencedProcedureDefinitionSourceReceipt::new(
+            self.source_connection_key().to_owned(),
+            self.connection_policy_binding().to_owned(),
+            self.snapshot_digest.clone(),
+            self.extractor_revision().to_owned(),
+            self.observed_at_utc().to_owned(),
+            location,
+        ))
     }
 
     /// Binds the complete owner identity of every referenced collation in a new successor digest.

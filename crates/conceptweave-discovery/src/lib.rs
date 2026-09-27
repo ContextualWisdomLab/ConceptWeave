@@ -539,7 +539,8 @@ pub fn propose_relational_model(
         && (snapshot.array_types().is_none()
             || snapshot.type_kinds().is_none()
             || snapshot.collation_definitions().is_none()
-            || snapshot.collation_owners().is_none())
+            || snapshot.collation_owners().is_none()
+            || snapshot.referenced_procedure_definitions().is_none())
     {
         return Err(ProposalError::IncompleteSourceObservation);
     }

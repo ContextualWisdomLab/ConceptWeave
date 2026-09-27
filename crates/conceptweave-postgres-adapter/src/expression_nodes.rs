@@ -24,7 +24,7 @@ pub(super) async fn validate_dependencies(
     cancellation: &dyn ObservationCancellation,
     meter: &mut CaptureMeter,
     schema_oid: u32,
-) -> Result<(), SourceObservationFailure> {
+) -> Result<Vec<u32>, SourceObservationFailure> {
     let max_bytes = request.request().limits().max_bytes().min(i64::MAX as u64) as i64;
     let stream = bounded(
         request,
@@ -137,7 +137,8 @@ pub(super) async fn validate_dependencies(
              OR output_fn.oid >= 16384::oid OR input_fn.oid >= 16384::oid \
              OR output_fn.pronamespace <> 'pg_catalog'::regnamespace \
              OR input_fn.pronamespace <> 'pg_catalog'::regnamespace \
-             OR output_fn.provolatile <> 'i' OR input_fn.provolatile <> 'i')",
+             OR output_fn.provolatile <> 'i' OR input_fn.provolatile <> 'i'), \
+           (SELECT COALESCE(array_agg(oid ORDER BY oid), '{}'::oid[]) FROM referenced_procedure)",
             &[
                 &functions,
                 &types,
@@ -155,7 +156,9 @@ pub(super) async fn validate_dependencies(
     if field::<bool>(&row, 0)? {
         return Err(SourceObservationFailure::InvalidCapturedMetadata);
     }
-    Ok(())
+    let procedures: Vec<u32> = field(&row, 1)?;
+    meter.add(request, procedures.len() * 4)?;
+    Ok(procedures)
 }
 
 const MAX_DEPTH: usize = 128;

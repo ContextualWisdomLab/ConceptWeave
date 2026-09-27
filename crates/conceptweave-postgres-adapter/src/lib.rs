@@ -10,6 +10,7 @@ mod collations;
 mod expression_nodes;
 mod foreign_keys;
 mod ranges;
+mod referenced_procedures;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -283,6 +284,7 @@ async fn capture_catalog(
     let mut array_types = Vec::new();
     let mut relation_rows = Vec::new();
     let mut expression_collations = BTreeSet::new();
+    let mut referenced_procedures = BTreeSet::new();
     let allowed_schemas = request.request().allowed_schema_names().to_vec();
     for schema in request.request().allowed_schema_names() {
         // ponytail: refuse database-wide user casts between bootstrap types until parsed
@@ -355,14 +357,16 @@ async fn capture_catalog(
         // implementations also lack ordinary pg_depend rows.
         // Parsed nodes bind procedure/type/operator references and I/O argument types.
         // Other dependency screens below remain conservative for unsupported semantics.
-        expression_nodes::validate_dependencies(
-            &transaction,
-            request,
-            cancellation,
-            &mut meter,
-            schema_oid,
-        )
-        .await?;
+        referenced_procedures.extend(
+            expression_nodes::validate_dependencies(
+                &transaction,
+                request,
+                cancellation,
+                &mut meter,
+                schema_oid,
+            )
+            .await?,
+        );
         let expression_dependency = bounded(
             request,
             cancellation,
@@ -1228,6 +1232,17 @@ async fn capture_catalog(
     };
     let snapshot = snapshot
         .with_observed_collation_owners(collation_owners)
+        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+    let definitions = referenced_procedures::capture(
+        &transaction,
+        request,
+        cancellation,
+        &mut meter,
+        referenced_procedures.into_iter().collect(),
+    )
+    .await?;
+    let snapshot = snapshot
+        .with_observed_referenced_procedure_definitions(definitions)
         .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
     bounded(request, cancellation, transaction.commit()).await?;
     Ok(snapshot)
