@@ -4391,7 +4391,7 @@ async fn postgres18_late_bound_catalog_lookup_fails_closed() {
         ))
         .await
         .unwrap();
-    let comment_after = adapter(config)
+    let comment_after = adapter(config.clone())
         .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
         .await;
     let looked_up_comment: Option<String> = client
@@ -4407,6 +4407,56 @@ async fn postgres18_late_bound_catalog_lookup_fails_closed() {
         Some("External catalog comment")
     );
     client
+        .batch_execute(&format!("CREATE TYPE {external}.status AS ENUM ('ready')"))
+        .await
+        .unwrap();
+    let type_oid: u32 = client
+        .query_one(
+            "SELECT t.oid FROM pg_catalog.pg_type t \
+             JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace \
+             WHERE n.nspname = $1 AND t.typname = 'status'",
+            &[&external],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    client
+        .batch_execute(&format!(
+            "DROP TABLE {schema}.record; \
+             CREATE TABLE {schema}.record \
+               (external_type text DEFAULT format_type({type_oid}::oid, NULL::integer))"
+        ))
+        .await
+        .unwrap();
+    let format_before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    let rendered_before: String = client
+        .query_one(
+            "SELECT pg_catalog.format_type($1::oid, NULL::integer)",
+            &[&type_oid],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    client
+        .batch_execute(&format!(
+            "ALTER TYPE {external}.status RENAME TO renamed_status"
+        ))
+        .await
+        .unwrap();
+    let format_after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    let rendered_after: String = client
+        .query_one(
+            "SELECT pg_catalog.format_type($1::oid, NULL::integer)",
+            &[&type_oid],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    client
         .batch_execute(&format!(
             "DROP SCHEMA {schema} CASCADE; DROP SCHEMA {external} CASCADE; \
              DROP ROLE \"{renamed_role}\""
@@ -4414,6 +4464,20 @@ async fn postgres18_late_bound_catalog_lookup_fails_closed() {
         .await
         .unwrap();
     connection_task.abort();
+    assert_ne!(rendered_before, rendered_after);
+    if let (Ok(before), Ok(after)) = (&format_before, &format_after) {
+        assert_eq!(before.snapshot_digest(), after.snapshot_digest());
+    }
+    assert!(
+        matches!(
+            format_before,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ) && matches!(
+            format_after,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "out-of-scope type formatting lookup must fail closed"
+    );
     assert!(
         matches!(
             before,
