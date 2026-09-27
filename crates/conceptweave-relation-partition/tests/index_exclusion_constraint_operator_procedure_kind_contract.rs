@@ -528,6 +528,17 @@ fn parallel_safety_receipt_preserves_capture_and_rejects_absent_position() {
     assert_eq!(receipt.location().operator(), &operator("="));
     assert_eq!(receipt.location().procedure(), &procedure("int4eq"));
     assert_eq!(receipt.location().parallel_safety(), 's');
+    let absent_constraint = IndexExclusionConstraintCoordinate::new(
+        "public",
+        "bookings",
+        RelationKind::Table,
+        "another_constraint",
+    )
+    .unwrap();
+    assert!(matches!(
+        snapshot.source_receipt(absent_constraint, 1),
+        Err(ObservationError::UnknownObservationLocation { .. })
+    ));
     assert!(matches!(
         snapshot.source_receipt(coordinate(), 2),
         Err(ObservationError::UnknownObservationLocation { .. })
