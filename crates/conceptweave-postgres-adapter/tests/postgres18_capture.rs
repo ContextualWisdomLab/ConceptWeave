@@ -4860,7 +4860,18 @@ async fn postgres18_session_dependent_checks_fail_closed() {
         ))
         .await
         .unwrap();
-    let observed_date = adapter(config)
+    let observed_date = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP TABLE {schema}.record; CREATE TABLE {schema}.record \
+             (day date, instant timestamptz, \
+             CONSTRAINT cross_zone CHECK (day < instant))"
+        ))
+        .await
+        .unwrap();
+    let observed_operator = adapter(config)
         .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
         .await;
     client
@@ -4881,6 +4892,13 @@ async fn postgres18_session_dependent_checks_fail_closed() {
             Err(SourceObservationFailure::InvalidCapturedMetadata)
         ),
         "date-dependent CHECK must fail closed: {observed_date:?}"
+    );
+    assert!(
+        matches!(
+            observed_operator,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "session-dependent operator must fail closed: {observed_operator:?}"
     );
 }
 

@@ -350,8 +350,8 @@ async fn capture_catalog(
         // functions and operators installed in pg_catalog need this check.
         // Late-bound object lookups lack pg_depend rows, so inspect
         // server-reconstructed expressions and PostgreSQL 18 expression nodes
-        // before admitting the snapshot. Built-in function calls also lack
-        // ordinary pg_depend rows.
+        // before admitting the snapshot. Built-in functions and operator
+        // implementations also lack ordinary pg_depend rows.
         // ponytail: this screen rejects harmless pg_* calls and literal lookalikes;
         // parse expression nodes and vet function semantics if they must be admitted.
         let expression_dependency = bounded(
@@ -458,8 +458,8 @@ async fn capture_catalog(
                        WHERE tree ~ 'SQLVALUEFUNCTION' \
                          OR EXISTS( \
                            SELECT 1 FROM pg_catalog.regexp_matches( \
-                             tree, ':funcid ([0-9]+)', 'g') function_oid \
-                           LEFT JOIN pg_catalog.pg_proc p ON p.oid = function_oid[1]::oid \
+                             tree, ':([[:alnum:]_]*funcid) ([0-9]+)', 'g') function_oid \
+                           LEFT JOIN pg_catalog.pg_proc p ON p.oid = function_oid[2]::oid \
                            WHERE p.oid IS NULL OR p.provolatile <> 'i' \
                              OR p.pronamespace <> 'pg_catalog'::regnamespace \
                              OR p.oid >= 16384::oid) \
