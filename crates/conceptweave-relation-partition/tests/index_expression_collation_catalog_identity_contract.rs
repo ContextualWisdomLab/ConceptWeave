@@ -761,6 +761,20 @@ fn database_default_effective_definition_binds_material_evidence_and_receipt() {
     let receipt = snapshot.database_default_source_receipt().unwrap();
 
     assert_eq!(snapshot.predecessor_digest(), material.snapshot_digest());
+    assert_eq!(
+        snapshot.source_connection_key(),
+        material.source_connection_key()
+    );
+    assert_eq!(
+        snapshot.connection_policy_binding(),
+        material.connection_policy_binding()
+    );
+    assert_eq!(snapshot.extractor_revision(), material.extractor_revision());
+    assert_eq!(snapshot.observed_at_utc(), material.observed_at_utc());
+    assert_eq!(
+        snapshot.database_default_definition(),
+        Some(&database_default("153.80"))
+    );
     assert_eq!(receipt.source_id(), "warehouse_primary");
     assert_eq!(receipt.connection_policy_binding(), POLICY_BINDING);
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
@@ -902,5 +916,27 @@ fn material_collation_rejects_cross_capture_provenance_even_when_content_matches
                 field: "index_collation_definition_predecessor"
             })
         );
+    }
+}
+
+#[test]
+fn collation_locations_keep_expression_keys_distinct_from_predicates() {
+    let expression =
+        IndexExpressionCollationIdentityLocation::expression(child_index(), 1, 2).unwrap();
+    let predicate = IndexExpressionCollationIdentityLocation::predicate(child_index(), 2).unwrap();
+    assert_eq!(expression.key_position(), Some(1));
+    assert_eq!(predicate.key_position(), None);
+    assert_eq!(expression.occurrence_position(), 2);
+    assert_eq!(predicate.occurrence_position(), 2);
+    assert_ne!(
+        expression.canonical_location(),
+        predicate.canonical_location()
+    );
+    for location in [
+        IndexExpressionCollationIdentityLocation::expression(child_index(), 0, 2),
+        IndexExpressionCollationIdentityLocation::expression(child_index(), 1, 0),
+        IndexExpressionCollationIdentityLocation::predicate(child_index(), 0),
+    ] {
+        assert_eq!(location, Err(ObservationError::InvalidOrdinalPosition));
     }
 }
