@@ -354,8 +354,8 @@ async fn capture_catalog(
         // implementations also lack ordinary pg_depend rows.
         // ponytail: this screen rejects harmless pg_* calls and literal lookalikes;
         // parse expression nodes and vet function semantics if they must be admitted.
-        // ponytail: reject I/O coercions until their source/target type functions
-        // can be bound from a parsed expression tree.
+        // ponytail: only simple column I/O coercions can bind both type functions;
+        // composed coercions remain denied until their expression tree is parsed.
         let expression_dependency = bounded(
             request,
             cancellation,
@@ -457,7 +457,21 @@ async fn capture_catalog(
                            ON scoped.classid = 'pg_class'::regclass AND i.indexrelid = scoped.objid \
                          WHERE i.indpred IS NOT NULL \
                        ) captured_tree \
-                       WHERE tree ~ 'SQLVALUEFUNCTION|COERCEVIAIO' \
+                       WHERE tree ~ 'SQLVALUEFUNCTION' \
+                         OR pg_catalog.regexp_count(tree, 'COERCEVIAIO') <> ( \
+                           SELECT count(*) FROM pg_catalog.regexp_matches( \
+                             tree, 'COERCEVIAIO :arg [{]VAR [^}]*:vartype ([0-9]+)[^}]*[}] :resulttype ([0-9]+)', 'g') io_types \
+                           JOIN pg_catalog.pg_type source_type ON source_type.oid = io_types[1]::oid \
+                           JOIN pg_catalog.pg_type target_type ON target_type.oid = io_types[2]::oid \
+                           JOIN pg_catalog.pg_proc output_fn ON output_fn.oid = source_type.typoutput \
+                           JOIN pg_catalog.pg_proc input_fn ON input_fn.oid = target_type.typinput \
+                           WHERE source_type.oid < 16384::oid AND target_type.oid < 16384::oid \
+                             AND source_type.typnamespace = 'pg_catalog'::regnamespace \
+                             AND target_type.typnamespace = 'pg_catalog'::regnamespace \
+                             AND output_fn.oid < 16384::oid AND input_fn.oid < 16384::oid \
+                             AND output_fn.pronamespace = 'pg_catalog'::regnamespace \
+                             AND input_fn.pronamespace = 'pg_catalog'::regnamespace \
+                             AND output_fn.provolatile = 'i' AND input_fn.provolatile = 'i') \
                          OR EXISTS( \
                            SELECT 1 FROM pg_catalog.regexp_matches( \
                              tree, ':([[:alnum:]_]*funcid) ([0-9]+)', 'g') function_oid \

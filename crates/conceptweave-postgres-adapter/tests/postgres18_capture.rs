@@ -4888,6 +4888,16 @@ async fn postgres18_session_dependent_checks_fail_closed() {
     client
         .batch_execute(&format!(
             "DROP TABLE {schema}.record; CREATE TABLE {schema}.record \
+             (id integer, CONSTRAINT formatted CHECK (id::text <> ''))"
+        ))
+        .await
+        .unwrap();
+    let immutable_coercion = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP TABLE {schema}.record; CREATE TABLE {schema}.record \
              (day date, instant timestamptz, marker integer, other integer, \
              CONSTRAINT ordered CHECK (ROW(day, marker) < ROW(instant, other)))"
         ))
@@ -4940,6 +4950,7 @@ async fn postgres18_session_dependent_checks_fail_closed() {
         ),
         "session-dependent I/O coercion must fail closed: {observed_coercion:?}"
     );
+    assert!(immutable_coercion.is_ok());
     assert!(
         matches!(
             observed_row_comparison,
