@@ -55,10 +55,7 @@ impl IndexExpressionRelationVarNodeSchemaSnapshot {
         relation_var_predecessor: &IndexExpressionRelationVarSnapshot,
     ) -> Result<Self, ObservationError> {
         let rebound_node_schema = IndexExpressionNodeSchemaSnapshot::new(expression_snapshot)?;
-        if rebound_node_schema.snapshot_digest() != node_schema_predecessor.snapshot_digest()
-            || rebound_node_schema.predecessor_digest()
-                != node_schema_predecessor.predecessor_digest()
-        {
+        if rebound_node_schema != *node_schema_predecessor {
             return Err(invalid(
                 "index_expression_relation_var_node_schema_predecessor",
             ));
@@ -74,7 +71,7 @@ impl IndexExpressionRelationVarNodeSchemaSnapshot {
             type_modifier_snapshot,
             relation_var_predecessor.observations().to_vec(),
         )?;
-        if rebound_relation_var.snapshot_digest() != relation_var_predecessor.snapshot_digest() {
+        if rebound_relation_var != *relation_var_predecessor {
             return Err(invalid("index_expression_relation_var_predecessor"));
         }
 

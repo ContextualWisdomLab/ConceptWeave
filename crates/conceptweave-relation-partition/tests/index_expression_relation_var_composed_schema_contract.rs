@@ -23,16 +23,25 @@ use conceptweave_source_port::{
 };
 
 const POLICY_BINDING: &str = "fixture_policy_revision_relation_var_composed_schema";
+const CAPTURE: (&str, &str, &str, &str) = (
+    "warehouse_primary",
+    POLICY_BINDING,
+    "extractor-relation-var-composed-v1",
+    "2026-09-15T00:30:00Z",
+);
 
-struct Registry;
+struct Registry<'a> {
+    source: &'a str,
+    policy: &'a str,
+}
 
-impl SourceConnectionRegistry for Registry {
+impl SourceConnectionRegistry for Registry<'_> {
     fn contains_source_connection(&self, source_connection_key: &str) -> bool {
-        source_connection_key == "warehouse_primary"
+        source_connection_key == self.source
     }
 
     fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
-        (source_connection_key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
+        (source_connection_key == self.source).then(|| self.policy.to_owned())
     }
 
     fn authorizes_schema_scope(
@@ -40,8 +49,8 @@ impl SourceConnectionRegistry for Registry {
         source_connection: &ResolvedSourceConnection,
         allowed_schema_names: &[String],
     ) -> bool {
-        source_connection.source_connection_key() == "warehouse_primary"
-            && source_connection.connection_policy_binding() == POLICY_BINDING
+        source_connection.source_connection_key() == self.source
+            && source_connection.connection_policy_binding() == self.policy
             && allowed_schema_names == ["public"]
     }
 
@@ -50,8 +59,8 @@ impl SourceConnectionRegistry for Registry {
         source_connection: &ResolvedSourceConnection,
         resource_envelope: ObservationResourceEnvelope,
     ) -> bool {
-        source_connection.source_connection_key() == "warehouse_primary"
-            && source_connection.connection_policy_binding() == POLICY_BINDING
+        source_connection.source_connection_key() == self.source
+            && source_connection.connection_policy_binding() == self.policy
             && resource_envelope.request_budget().max_schema_count() <= 1
             && resource_envelope.request_budget().max_schema_bytes() <= 256
             && resource_envelope.limits().operation_timeout_ms() <= 1_000
@@ -62,15 +71,15 @@ impl SourceConnectionRegistry for Registry {
     }
 }
 
-fn authorized_source() -> AuthorizedObservationRequest {
+fn authorized_source(source: &str, policy: &str) -> AuthorizedObservationRequest {
     ObservationRequest::new(
-        "warehouse_primary",
+        source,
         vec!["public".to_owned()],
         ObservationRequestBudget::new(1, 256).unwrap(),
         ObservationLimits::new(1_000, 10, 1_024, 1).unwrap(),
     )
     .unwrap()
-    .authorize(&Registry)
+    .authorize(&Registry { source, policy })
     .unwrap()
 }
 
@@ -140,6 +149,7 @@ fn stack(complete_node_schema: bool) -> Stack {
         "text_ops",
         "text_ops",
         Some(QualifiedCollationName::new("pg_catalog", "default").unwrap()),
+        CAPTURE,
     )
 }
 
@@ -149,6 +159,7 @@ fn stack_with_expression(
     operator_class: &str,
     operator_family: &str,
     collation: Option<QualifiedCollationName>,
+    capture: (&str, &str, &str, &str),
 ) -> Stack {
     let index = IndexObservation::new(
         "accounts_email_idx",
@@ -199,9 +210,9 @@ fn stack_with_expression(
     .unwrap();
 
     let base = PostgresSchemaSnapshotV3::new(
-        &authorized_source(),
-        "extractor-relation-var-composed-v1",
-        "2026-09-15T00:30:00Z",
+        &authorized_source(capture.0, capture.1),
+        capture.2,
+        capture.3,
         vec![relation],
         vec![],
         vec![],
@@ -371,6 +382,94 @@ fn complete_node_schema_and_relation_var_proofs_compose_into_a_new_successor() {
 }
 
 #[test]
+fn composed_schema_rejects_jointly_stale_proofs_even_when_content_is_equal() {
+    let original = stack(true);
+    let old_schema = IndexExpressionNodeSchemaSnapshot::new(&original.expressions).unwrap();
+    let old_vars = relation_vars(&original);
+    let compose = |stack: &Stack,
+                   schema: &IndexExpressionNodeSchemaSnapshot,
+                   vars: &IndexExpressionRelationVarSnapshot| {
+        IndexExpressionRelationVarNodeSchemaSnapshot::new(
+            &stack.base,
+            &stack.relations,
+            &stack.indexes,
+            &stack.families,
+            &stack.exclusions,
+            &stack.expressions,
+            &stack.type_modifiers,
+            schema,
+            vars,
+        )
+    };
+    let original_composed = compose(&original, &old_schema, &old_vars).unwrap();
+    for capture in [
+        ("warehouse_archive", CAPTURE.1, CAPTURE.2, CAPTURE.3),
+        (
+            CAPTURE.0,
+            "fixture_policy_revision_other",
+            CAPTURE.2,
+            CAPTURE.3,
+        ),
+        (
+            CAPTURE.0,
+            CAPTURE.1,
+            "extractor-relation-var-composed-v2",
+            CAPTURE.3,
+        ),
+        (CAPTURE.0, CAPTURE.1, CAPTURE.2, "2026-09-15T00:31:00Z"),
+    ] {
+        let current = stack_with_expression(
+            expression(true),
+            "lower(account_email)",
+            "text_ops",
+            "text_ops",
+            Some(QualifiedCollationName::new("pg_catalog", "default").unwrap()),
+            capture,
+        );
+        if capture.0 == CAPTURE.0 && capture.1 == CAPTURE.1 {
+            assert_eq!(
+                current.base.snapshot_digest(),
+                original.base.snapshot_digest()
+            );
+        }
+        let current_schema = IndexExpressionNodeSchemaSnapshot::new(&current.expressions).unwrap();
+        let current_vars = relation_vars(&current);
+        for (schema, vars, field) in [
+            (
+                &old_schema,
+                &old_vars,
+                "index_expression_relation_var_node_schema_predecessor",
+            ),
+            (
+                &old_schema,
+                &current_vars,
+                "index_expression_relation_var_node_schema_predecessor",
+            ),
+            (
+                &current_schema,
+                &old_vars,
+                "index_expression_relation_var_predecessor",
+            ),
+        ] {
+            let error = compose(&current, schema, vars)
+                .expect_err("stale proof cannot authorize a different capture generation");
+            assert_eq!(error, ObservationError::InvalidObservationField { field });
+        }
+        let composed = compose(&current, &current_schema, &current_vars).unwrap();
+        assert_eq!(composed.source_connection_key(), capture.0);
+        assert_eq!(composed.connection_policy_binding(), capture.1);
+        assert_eq!(composed.extractor_revision(), capture.2);
+        assert_eq!(composed.observed_at_utc(), capture.3);
+        if capture.0 == CAPTURE.0 && capture.1 == CAPTURE.1 {
+            assert_eq!(
+                composed.snapshot_digest(),
+                original_composed.snapshot_digest()
+            );
+        }
+    }
+}
+
+#[test]
 fn complete_var_free_node_schema_issues_a_distinct_v2_identity() {
     let canonical = CanonicalExpression::node(
         "FuncExpr",
@@ -399,7 +498,7 @@ fn complete_var_free_node_schema_issues_a_distinct_v2_identity() {
     )
     .unwrap();
     let other_capture = stack(true);
-    let stack = stack_with_expression(canonical, "pi()", "float8_ops", "float_ops", None);
+    let stack = stack_with_expression(canonical, "pi()", "float8_ops", "float_ops", None, CAPTURE);
     let v1 = IndexExpressionNodeSchemaSnapshot::new(&stack.expressions).unwrap();
     let other_v1 = IndexExpressionNodeSchemaSnapshot::new(&other_capture.expressions).unwrap();
     assert_eq!(
