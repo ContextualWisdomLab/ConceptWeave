@@ -2858,6 +2858,14 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
                 Err(PublicationStoreError::InvalidRecord)
             ));
             std::fs::remove_file(&record_path).unwrap();
+            let oversized = std::fs::File::create(&record_path).unwrap();
+            oversized.set_len(64 * 1024 * 1024).unwrap();
+            assert!(matches!(
+                store.read_verified(&pinned, published.release()),
+                Err(PublicationStoreError::InvalidRecord)
+            ));
+            drop(oversized);
+            std::fs::remove_file(&record_path).unwrap();
             std::fs::rename(&linked_record, &record_path).unwrap();
         }
         let mut record = std::fs::read(&record_path).unwrap();
