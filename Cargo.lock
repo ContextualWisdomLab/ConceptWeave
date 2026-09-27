@@ -138,6 +138,7 @@ dependencies = [
  "conceptweave-discovery",
  "conceptweave-domain",
  "conceptweave-observation",
+ "libc",
  "ring",
  "sha2 0.10.9",
 ]

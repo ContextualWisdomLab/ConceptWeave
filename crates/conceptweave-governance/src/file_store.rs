@@ -179,15 +179,27 @@ impl FilePublicationStore {
             .validate_for_authoritative_use(release)
             .map_err(|_| PublicationStoreError::ReleaseNotAdmitted)?;
         let path = self.release_path(release.release_id());
-        let entry = match fs::symlink_metadata(&path) {
-            Ok(entry) => entry,
+        #[cfg(unix)]
+        let opened = {
+            use std::os::unix::fs::OpenOptionsExt;
+
+            // A swapped symlink or FIFO must not redirect or stall readback.
+            OpenOptions::new()
+                .read(true)
+                .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+                .open(path)
+        };
+        #[cfg(not(unix))]
+        let opened = File::open(path);
+        let file = match opened {
+            Ok(file) => file,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            #[cfg(unix)]
+            Err(error) if error.raw_os_error() == Some(libc::ELOOP) => {
+                return Err(PublicationStoreError::InvalidRecord);
+            }
             Err(error) => return Err(error.into()),
         };
-        if !entry.file_type().is_file() {
-            return Err(PublicationStoreError::InvalidRecord);
-        }
-        let file = File::open(path)?;
         let metadata = file.metadata()?;
         if !metadata.is_file() || metadata.len() > MAX_RECORD_BYTES as u64 {
             return Err(PublicationStoreError::InvalidRecord);
