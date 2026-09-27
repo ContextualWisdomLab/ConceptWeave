@@ -400,6 +400,80 @@ fn index_topology_rejects_duplicate_coordinates_wrong_kinds_and_self_parent() {
 }
 
 #[test]
+fn attachment_requires_partition_owner_and_observed_parent_index() {
+    let base = base_snapshot();
+    let relations = relation_partition_snapshot(&base);
+    let local_relations = RelationPartitionSnapshot::new(
+        &base,
+        vec![
+            RelationPartitionObservation::non_partition(
+                "public",
+                "events",
+                RelationKind::PartitionedTable,
+            )
+            .unwrap(),
+            RelationPartitionObservation::non_partition(
+                "public",
+                "events_2026",
+                RelationKind::Table,
+            )
+            .unwrap(),
+        ],
+    )
+    .unwrap();
+    let attached = |membership: &RelationPartitionSnapshot, parent| {
+        IndexPartitionSnapshot::new(
+            &base,
+            membership,
+            vec![
+                IndexPartitionObservation::non_partition(
+                    parent_index(),
+                    IndexRelationKind::PartitionedIndex,
+                )
+                .unwrap(),
+                IndexPartitionObservation::partition(
+                    child_index(),
+                    IndexRelationKind::Index,
+                    parent,
+                    false,
+                )
+                .unwrap(),
+            ],
+        )
+    };
+
+    attached(&relations, parent_index()).expect("the observed attachment remains admissible");
+    for (membership, parent, field) in [
+        (
+            &local_relations,
+            parent_index(),
+            "index_partition_owner_relation",
+        ),
+        (
+            &relations,
+            IndexPartitionCoordinate::new(
+                "public",
+                "events",
+                RelationKind::PartitionedTable,
+                "unobserved_parent_index",
+            )
+            .unwrap(),
+            "index_partition_parent_coordinate",
+        ),
+        (
+            &relations,
+            IndexPartitionCoordinate::new("public", "events", RelationKind::Table, "events_id_idx")
+                .unwrap(),
+            "index_partition_relation_parent",
+        ),
+    ] {
+        let error = attached(membership, parent)
+            .expect_err("attachment requires matching relation membership and parent evidence");
+        assert_field(error, field);
+    }
+}
+
+#[test]
 fn receipt_is_bound_to_exact_index_coordinate() {
     let base = base_snapshot();
     let relations = relation_partition_snapshot(&base);
