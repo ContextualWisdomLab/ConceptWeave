@@ -23,14 +23,17 @@ use conceptweave_source_port::{
 
 const POLICY_BINDING: &str = "fixture_policy_revision_a";
 
-struct Registry;
+struct Registry {
+    key: &'static str,
+    policy: &'static str,
+}
 impl SourceConnectionRegistry for Registry {
     fn contains_source_connection(&self, key: &str) -> bool {
-        key == "warehouse_primary"
+        key == self.key
     }
 
     fn connection_policy_binding(&self, key: &str) -> Option<String> {
-        (key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
+        (key == self.key).then(|| self.policy.to_owned())
     }
 
     fn authorizes_schema_scope(
@@ -38,8 +41,8 @@ impl SourceConnectionRegistry for Registry {
         source: &ResolvedSourceConnection,
         schemas: &[String],
     ) -> bool {
-        source.source_connection_key() == "warehouse_primary"
-            && source.connection_policy_binding() == POLICY_BINDING
+        source.source_connection_key() == self.key
+            && source.connection_policy_binding() == self.policy
             && schemas == ["public"]
     }
 
@@ -48,8 +51,8 @@ impl SourceConnectionRegistry for Registry {
         source: &ResolvedSourceConnection,
         envelope: ObservationResourceEnvelope,
     ) -> bool {
-        source.source_connection_key() == "warehouse_primary"
-            && source.connection_policy_binding() == POLICY_BINDING
+        source.source_connection_key() == self.key
+            && source.connection_policy_binding() == self.policy
             && envelope.request_budget().max_schema_count() <= 1
             && envelope.request_budget().max_schema_bytes() <= 256
             && envelope.limits().operation_timeout_ms() <= 1_000
@@ -61,14 +64,21 @@ impl SourceConnectionRegistry for Registry {
 }
 
 fn authorized_source() -> AuthorizedObservationRequest {
+    authorized_source_with_binding("warehouse_primary", POLICY_BINDING)
+}
+
+fn authorized_source_with_binding(
+    key: &'static str,
+    policy: &'static str,
+) -> AuthorizedObservationRequest {
     ObservationRequest::new(
-        "warehouse_primary",
+        key,
         vec!["public".to_owned()],
         ObservationRequestBudget::new(1, 256).unwrap(),
         ObservationLimits::new(1_000, 10, 1_024, 1).unwrap(),
     )
     .unwrap()
-    .authorize(&Registry)
+    .authorize(&Registry { key, policy })
     .unwrap()
 }
 
@@ -387,166 +397,196 @@ fn exact_conexclop_issues_domain_separated_provenance() {
 fn ordinary_exclusion_operator_rejects_each_stale_predecessor() {
     let (base, relations, indexes, constraints, period, keys, families, semantics) =
         predecessor_snapshots();
-    let fresh = PostgresSchemaSnapshotV3::new(
-        &authorized_source(),
-        base.extractor_revision(),
-        "2026-09-16T00:00:00Z",
-        base.relations().to_vec(),
-        vec![],
-        vec![],
-    )
-    .unwrap();
-    let fresh_relations =
-        RelationPartitionSnapshot::new(&fresh, relations.observations().to_vec()).unwrap();
-    let fresh_indexes =
-        IndexPartitionSnapshot::new(&fresh, &fresh_relations, indexes.observations().to_vec())
-            .unwrap();
-    let fresh_constraints = IndexExclusionConstraintSnapshot::new(
-        &fresh,
-        &fresh_relations,
-        &fresh_indexes,
-        constraints.observations().to_vec(),
-    )
-    .unwrap();
-    let fresh_period = IndexExclusionConstraintPeriodSnapshot::new(
-        &fresh_constraints,
-        period.observations().to_vec(),
-    )
-    .unwrap();
-    let fresh_keys = IndexExclusionConstraintKeySnapshot::new(
-        &fresh,
-        &fresh_relations,
-        &fresh_indexes,
-        &fresh_constraints,
-        &fresh_period,
-        keys.observations().to_vec(),
-    )
-    .unwrap();
-    assert_eq!(
-        IndexExclusionConstraintSnapshot::new(
-            &fresh,
-            &fresh_relations,
-            &indexes,
-            constraints.observations().to_vec()
-        )
-        .unwrap_err(),
-        ObservationError::InvalidObservationField {
-            field: "index_exclusion_constraint_predecessor_binding"
-        }
-    );
-    for (constraint, period) in [(&constraints, &fresh_period), (&fresh_constraints, &period)] {
-        assert_eq!(
-            IndexExclusionConstraintKeySnapshot::new(
-                &fresh,
-                &fresh_relations,
-                &fresh_indexes,
-                constraint,
-                period,
-                keys.observations().to_vec()
-            )
-            .unwrap_err(),
-            ObservationError::InvalidObservationField {
-                field: "index_exclusion_constraint_key_predecessor_binding"
-            }
-        );
-    }
-    let fresh_families = IndexOperatorFamilySnapshot::new(
-        &fresh,
-        &fresh_relations,
-        &fresh_indexes,
-        families.observations().to_vec(),
-    )
-    .unwrap();
-    let fresh_semantics = IndexExclusionSemanticsSnapshot::new(
-        &fresh,
-        &fresh_relations,
-        &fresh_indexes,
-        &fresh_families,
-        semantics.observations().to_vec(),
-    )
-    .unwrap();
-    let facts = vec![
-        IndexExclusionConstraintOperatorObservation::new(
-            constraint_coordinate(),
-            vec![qualified_operator("=")],
-        )
-        .unwrap(),
-    ];
-    for (constraint, period, keys, family, semantics) in [
+    for (key, policy, revision, time) in [
         (
-            &constraints,
-            &fresh_period,
-            &fresh_keys,
-            &fresh_families,
-            &fresh_semantics,
+            "warehouse_secondary",
+            POLICY_BINDING,
+            base.extractor_revision(),
+            base.observed_at_utc(),
         ),
         (
-            &fresh_constraints,
-            &period,
-            &fresh_keys,
-            &fresh_families,
-            &fresh_semantics,
+            "warehouse_primary",
+            "fixture_policy_revision_b",
+            base.extractor_revision(),
+            base.observed_at_utc(),
         ),
         (
-            &fresh_constraints,
-            &fresh_period,
-            &keys,
-            &fresh_families,
-            &fresh_semantics,
+            "warehouse_primary",
+            POLICY_BINDING,
+            "extractor-ordinary-exclusion-v2",
+            base.observed_at_utc(),
         ),
         (
-            &fresh_constraints,
-            &fresh_period,
-            &fresh_keys,
-            &families,
-            &fresh_semantics,
-        ),
-        (
-            &fresh_constraints,
-            &fresh_period,
-            &fresh_keys,
-            &fresh_families,
-            &semantics,
+            "warehouse_primary",
+            POLICY_BINDING,
+            base.extractor_revision(),
+            "2026-09-16T00:00:00Z",
         ),
     ] {
-        assert_eq!(
-            IndexExclusionConstraintOperatorSnapshot::new(
-                source_lineage(
-                    &fresh,
-                    &fresh_relations,
-                    &fresh_indexes,
-                    constraint,
-                    period,
-                    keys
-                ),
-                semantics_lineage(family, semantics),
-                facts.clone(),
-            )
-            .unwrap_err(),
-            ObservationError::InvalidObservationField {
-                field: "index_exclusion_constraint_operator_predecessor_binding",
-            }
-        );
-    }
-    let accepted = IndexExclusionConstraintOperatorSnapshot::new(
-        source_lineage(
+        let fresh = PostgresSchemaSnapshotV3::new(
+            &authorized_source_with_binding(key, policy),
+            revision,
+            time,
+            base.relations().to_vec(),
+            vec![],
+            vec![],
+        )
+        .unwrap();
+        let fresh_relations =
+            RelationPartitionSnapshot::new(&fresh, relations.observations().to_vec()).unwrap();
+        let fresh_indexes =
+            IndexPartitionSnapshot::new(&fresh, &fresh_relations, indexes.observations().to_vec())
+                .unwrap();
+        let fresh_constraints = IndexExclusionConstraintSnapshot::new(
+            &fresh,
+            &fresh_relations,
+            &fresh_indexes,
+            constraints.observations().to_vec(),
+        )
+        .unwrap();
+        let fresh_period = IndexExclusionConstraintPeriodSnapshot::new(
+            &fresh_constraints,
+            period.observations().to_vec(),
+        )
+        .unwrap();
+        let fresh_keys = IndexExclusionConstraintKeySnapshot::new(
             &fresh,
             &fresh_relations,
             &fresh_indexes,
             &fresh_constraints,
             &fresh_period,
-            &fresh_keys,
-        ),
-        semantics_lineage(&fresh_families, &fresh_semantics),
-        facts,
-    )
-    .unwrap();
-    assert_eq!(accepted.observed_at_utc(), fresh.observed_at_utc());
-    assert_eq!(
-        accepted
-            .source_receipt(constraint_coordinate())
-            .unwrap()
-            .observed_at_utc(),
-        fresh.observed_at_utc()
-    );
+            keys.observations().to_vec(),
+        )
+        .unwrap();
+        assert_eq!(
+            IndexExclusionConstraintSnapshot::new(
+                &fresh,
+                &fresh_relations,
+                &indexes,
+                constraints.observations().to_vec()
+            )
+            .unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: "index_exclusion_constraint_predecessor_binding"
+            }
+        );
+        for (constraint, period) in [(&constraints, &fresh_period), (&fresh_constraints, &period)] {
+            assert_eq!(
+                IndexExclusionConstraintKeySnapshot::new(
+                    &fresh,
+                    &fresh_relations,
+                    &fresh_indexes,
+                    constraint,
+                    period,
+                    keys.observations().to_vec()
+                )
+                .unwrap_err(),
+                ObservationError::InvalidObservationField {
+                    field: "index_exclusion_constraint_key_predecessor_binding"
+                }
+            );
+        }
+        let fresh_families = IndexOperatorFamilySnapshot::new(
+            &fresh,
+            &fresh_relations,
+            &fresh_indexes,
+            families.observations().to_vec(),
+        )
+        .unwrap();
+        let fresh_semantics = IndexExclusionSemanticsSnapshot::new(
+            &fresh,
+            &fresh_relations,
+            &fresh_indexes,
+            &fresh_families,
+            semantics.observations().to_vec(),
+        )
+        .unwrap();
+        let facts = vec![
+            IndexExclusionConstraintOperatorObservation::new(
+                constraint_coordinate(),
+                vec![qualified_operator("=")],
+            )
+            .unwrap(),
+        ];
+        for (constraint, period, keys, family, semantics) in [
+            (
+                &constraints,
+                &fresh_period,
+                &fresh_keys,
+                &fresh_families,
+                &fresh_semantics,
+            ),
+            (
+                &fresh_constraints,
+                &period,
+                &fresh_keys,
+                &fresh_families,
+                &fresh_semantics,
+            ),
+            (
+                &fresh_constraints,
+                &fresh_period,
+                &keys,
+                &fresh_families,
+                &fresh_semantics,
+            ),
+            (
+                &fresh_constraints,
+                &fresh_period,
+                &fresh_keys,
+                &families,
+                &fresh_semantics,
+            ),
+            (
+                &fresh_constraints,
+                &fresh_period,
+                &fresh_keys,
+                &fresh_families,
+                &semantics,
+            ),
+        ] {
+            assert_eq!(
+                IndexExclusionConstraintOperatorSnapshot::new(
+                    source_lineage(
+                        &fresh,
+                        &fresh_relations,
+                        &fresh_indexes,
+                        constraint,
+                        period,
+                        keys
+                    ),
+                    semantics_lineage(family, semantics),
+                    facts.clone(),
+                )
+                .unwrap_err(),
+                ObservationError::InvalidObservationField {
+                    field: "index_exclusion_constraint_operator_predecessor_binding",
+                }
+            );
+        }
+        let accepted = IndexExclusionConstraintOperatorSnapshot::new(
+            source_lineage(
+                &fresh,
+                &fresh_relations,
+                &fresh_indexes,
+                &fresh_constraints,
+                &fresh_period,
+                &fresh_keys,
+            ),
+            semantics_lineage(&fresh_families, &fresh_semantics),
+            facts,
+        )
+        .unwrap();
+        assert_eq!(accepted.observed_at_utc(), fresh.observed_at_utc());
+        assert_eq!(
+            accepted
+                .source_receipt(constraint_coordinate())
+                .unwrap()
+                .observed_at_utc(),
+            fresh.observed_at_utc()
+        );
+        assert_eq!(accepted.source_connection_key(), key);
+        assert_eq!(accepted.connection_policy_binding(), policy);
+        assert_eq!(accepted.extractor_revision(), revision);
+    }
 }
