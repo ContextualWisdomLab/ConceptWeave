@@ -97,7 +97,8 @@ with tempfile.TemporaryDirectory(prefix='conceptweave-pg18-tls-', dir='/tmp') as
                 cwd=repository,
                 stdout=log, stderr=log)
         print('owned PostgreSQL 18 TLS runtime conformance passed')
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as failure:
+        print(f"TLS fixture command failed: {Path(str(failure.cmd[0])).name} (exit {failure.returncode})")
         # Cargo output contains no fixture credentials; setup output stays private.
         test_log = root / 'test.log'
         if test_log.exists():
