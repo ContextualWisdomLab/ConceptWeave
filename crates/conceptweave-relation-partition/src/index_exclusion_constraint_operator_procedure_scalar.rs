@@ -165,7 +165,7 @@ impl IndexExclusionConstraintOperatorProcedureScalarSnapshot {
             result_snapshot,
             kind_snapshot.observations().to_vec(),
         )?;
-        if rebound_kind.snapshot_digest() != kind_snapshot.snapshot_digest() {
+        if rebound_kind != *kind_snapshot {
             return Err(invalid(
                 "index_exclusion_constraint_operator_procedure_scalar_predecessor_binding",
             ));
