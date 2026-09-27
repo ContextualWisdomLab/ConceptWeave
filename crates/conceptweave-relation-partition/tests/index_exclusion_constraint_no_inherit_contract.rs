@@ -324,6 +324,41 @@ fn exact_no_inherit_state_issues_provenance() {
         .expect("observed EXCLUDE no-inherit state must issue provenance");
     assert!(!receipt.location().no_inherit());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(
+        snapshot.source_connection_key(),
+        constraints.source_connection_key()
+    );
+    assert_eq!(
+        snapshot.connection_policy_binding(),
+        constraints.connection_policy_binding()
+    );
+    assert_eq!(
+        snapshot.extractor_revision(),
+        constraints.extractor_revision()
+    );
+    assert_eq!(snapshot.observed_at_utc(), constraints.observed_at_utc());
+    assert_eq!(receipt.source_id(), constraints.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        constraints.connection_policy_binding()
+    );
+    assert_eq!(
+        receipt.extractor_revision(),
+        constraints.extractor_revision()
+    );
+    assert_eq!(receipt.observed_at_utc(), constraints.observed_at_utc());
+    assert!(snapshot.observations().contains(receipt.location()));
+    let absent = IndexExclusionConstraintCoordinate::new(
+        "public",
+        "bookings",
+        RelationKind::Table,
+        "unobserved_constraint",
+    )
+    .unwrap();
+    assert!(matches!(
+        snapshot.source_receipt(absent),
+        Err(ObservationError::UnknownObservationLocation { .. })
+    ));
     assert!(
         receipt
             .location()
