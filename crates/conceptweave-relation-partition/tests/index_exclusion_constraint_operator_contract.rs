@@ -367,6 +367,23 @@ fn ordinary_exclude_constraint_operator_inventory_is_complete() {
             field: "index_exclusion_constraint_operator_completeness",
         }
     );
+    let observation = IndexExclusionConstraintOperatorObservation::new(
+        constraint_coordinate(),
+        vec![qualified_operator("=")],
+    )
+    .unwrap();
+    let duplicate = IndexExclusionConstraintOperatorSnapshot::new(
+        source_lineage(&base, &relations, &indexes, &constraints, &period, &keys),
+        semantics_lineage(&families, &semantics),
+        vec![observation.clone(), observation],
+    )
+    .expect_err("repeated operator evidence cannot satisfy a complete constraint inventory");
+    assert_eq!(
+        duplicate,
+        ObservationError::InvalidObservationField {
+            field: "index_exclusion_constraint_operator_coordinate",
+        }
+    );
 }
 
 #[test]

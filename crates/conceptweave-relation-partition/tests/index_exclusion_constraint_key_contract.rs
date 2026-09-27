@@ -293,6 +293,23 @@ fn exclusion_constraint_key_inventory_must_be_complete() {
             field: "index_exclusion_constraint_key_completeness",
         }
     );
+    let observation =
+        IndexExclusionConstraintKeyObservation::new(constraint_coordinate(), vec![1, 0]).unwrap();
+    let duplicate = IndexExclusionConstraintKeySnapshot::new(
+        &base,
+        &relations,
+        &indexes,
+        &constraints,
+        &period,
+        vec![observation.clone(), observation],
+    )
+    .expect_err("repeated key evidence cannot satisfy a complete constraint inventory");
+    assert_eq!(
+        duplicate,
+        ObservationError::InvalidObservationField {
+            field: "index_exclusion_constraint_key_coordinate",
+        }
+    );
 }
 
 #[test]

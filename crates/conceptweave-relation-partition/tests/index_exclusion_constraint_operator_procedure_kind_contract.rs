@@ -123,7 +123,7 @@ fn index_coordinate() -> IndexPartitionCoordinate {
     .unwrap()
 }
 
-fn parallel_safety_snapshot() -> IndexExclusionConstraintOperatorProcedureParallelSafetySnapshot {
+fn volatility_snapshot() -> IndexExclusionConstraintOperatorProcedureVolatilitySnapshot {
     let index = IndexObservation::new(
         "bookings_no_overlap",
         false,
@@ -324,7 +324,7 @@ fn parallel_safety_snapshot() -> IndexExclusionConstraintOperatorProcedureParall
         ],
     )
     .unwrap();
-    let volatility = IndexExclusionConstraintOperatorProcedureVolatilitySnapshot::new(
+    IndexExclusionConstraintOperatorProcedureVolatilitySnapshot::new(
         &strictness,
         vec![
             IndexExclusionConstraintOperatorProcedureVolatilityObservation::new(
@@ -337,9 +337,12 @@ fn parallel_safety_snapshot() -> IndexExclusionConstraintOperatorProcedureParall
             .unwrap(),
         ],
     )
-    .unwrap();
+    .unwrap()
+}
+
+fn parallel_safety_snapshot() -> IndexExclusionConstraintOperatorProcedureParallelSafetySnapshot {
     IndexExclusionConstraintOperatorProcedureParallelSafetySnapshot::new(
-        &volatility,
+        &volatility_snapshot(),
         vec![
             IndexExclusionConstraintOperatorProcedureParallelSafetyObservation::new(
                 coordinate(),
@@ -543,4 +546,14 @@ fn parallel_safety_receipt_preserves_capture_and_rejects_absent_position() {
         snapshot.source_receipt(coordinate(), 2),
         Err(ObservationError::UnknownObservationLocation { .. })
     ));
+    let observation = snapshot.observations()[0].clone();
+    let duplicate = IndexExclusionConstraintOperatorProcedureParallelSafetySnapshot::new(
+        &volatility_snapshot(),
+        vec![observation.clone(), observation],
+    )
+    .expect_err("repeated procedure evidence cannot satisfy a complete operator inventory");
+    assert_field(
+        duplicate,
+        "index_exclusion_constraint_operator_procedure_parallel_safety_coordinate",
+    );
 }
