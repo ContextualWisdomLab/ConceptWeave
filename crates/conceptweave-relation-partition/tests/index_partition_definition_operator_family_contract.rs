@@ -423,6 +423,13 @@ fn operator_family_receipts_require_exact_key_and_preserve_capture_provenance() 
     assert_eq!(receipt.observed_at_utc(), base.observed_at_utc());
     assert_eq!(receipt.location().index(), &parent_index());
     assert_eq!(receipt.location().key_position(), 1);
+    assert_eq!(
+        receipt.location().canonical_location(),
+        format!(
+            "{}/keys/1/operator-family",
+            parent_index().canonical_location()
+        )
+    );
 }
 
 #[test]
