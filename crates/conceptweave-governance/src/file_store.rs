@@ -509,6 +509,29 @@ mod tests {
             store.read_verified(&pinned, &release),
             Err(PublicationStoreError::InvalidRecord)
         ));
-        fs::remove_dir_all(root).unwrap();
+        let first_sequence = STAGE_SEQUENCE.load(Ordering::Relaxed);
+        let occupied: Vec<_> = (first_sequence..first_sequence + 64)
+            .map(|sequence| root.join(format!(".stage-{}-{sequence}", std::process::id())))
+            .collect();
+        for path in &occupied {
+            fs::write(path, b"occupied stage").unwrap();
+        }
+        assert!(
+            matches!(store.create_stage(), Err(PublicationStoreError::Io(error))
+            if error.kind() == std::io::ErrorKind::AlreadyExists)
+        );
+        for path in &occupied {
+            assert_eq!(fs::read(path).unwrap(), b"occupied stage");
+        }
+        let (fresh_path, fresh_file) = store.create_stage().unwrap();
+        assert!(!occupied.contains(&fresh_path));
+        drop(fresh_file);
+        fs::remove_file(fresh_path).unwrap();
+        fs::remove_dir_all(&root).unwrap();
+        assert!(
+            matches!(store.issue_record(&release, bytes), Err(PublicationStoreError::Io(error))
+            if error.kind() == std::io::ErrorKind::NotFound)
+        );
+        assert!(!root.exists());
     }
 }
