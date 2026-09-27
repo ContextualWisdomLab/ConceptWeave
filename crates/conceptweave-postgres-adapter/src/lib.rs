@@ -281,6 +281,7 @@ async fn capture_catalog(
     let mut schema_owners = Vec::new();
     let mut array_types = Vec::new();
     let mut relation_rows = Vec::new();
+    let mut expression_collations = BTreeSet::new();
     for schema in request.request().allowed_schema_names() {
         let schema_row = bounded(
             request,
@@ -425,6 +426,45 @@ async fn capture_catalog(
         meter.add(request, 1)?;
         if field::<bool>(&expression_dependency, 0)? {
             return Err(SourceObservationFailure::InvalidCapturedMetadata);
+        }
+        let collation_stream = bounded(
+            request,
+            cancellation,
+            transaction.query_raw(
+                "WITH scoped AS ( \
+                   SELECT 'pg_constraint'::regclass AS classid, c.oid AS objid \
+                   FROM pg_catalog.pg_constraint c WHERE c.connamespace = $1 \
+                   UNION ALL SELECT 'pg_attrdef'::regclass, ad.oid \
+                   FROM pg_catalog.pg_attrdef ad \
+                   JOIN pg_catalog.pg_class c ON c.oid = ad.adrelid \
+                   WHERE c.relnamespace = $1 \
+                   UNION ALL SELECT 'pg_class'::regclass, c.oid \
+                   FROM pg_catalog.pg_class c \
+                   WHERE c.relnamespace = $1 AND c.relkind IN ('i','I') \
+                   UNION ALL SELECT 'pg_type'::regclass, t.oid \
+                   FROM pg_catalog.pg_type t \
+                   WHERE t.typnamespace = $1 AND t.typtype = 'd' \
+                 ) SELECT DISTINCT co.oid, n.nspname::text, co.collname::text \
+                 FROM scoped \
+                 JOIN pg_catalog.pg_depend d \
+                   ON d.classid = scoped.classid AND d.objid = scoped.objid \
+                 JOIN pg_catalog.pg_collation co \
+                   ON d.refclassid = 'pg_collation'::regclass AND co.oid = d.refobjid \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = co.collnamespace",
+                vec![&schema_oid as &(dyn ToSql + Sync)],
+            ),
+        )
+        .await?;
+        tokio::pin!(collation_stream);
+        while let Some(row) = bounded(request, cancellation, collation_stream.try_next()).await? {
+            let oid: u32 = field(&row, 0)?;
+            let collation_schema: String = field(&row, 1)?;
+            let collation_name: String = field(&row, 2)?;
+            meter.add(request, collation_schema.len() + collation_name.len() + 4)?;
+            if collation_schema == "pg_catalog" && oid >= 16_384 {
+                return Err(SourceObservationFailure::InvalidCapturedMetadata);
+            }
+            expression_collations.insert((collation_schema, collation_name));
         }
         let relation_stream = bounded(
             request,
@@ -1100,6 +1140,9 @@ async fn capture_catalog(
     let range_catalog = ranges::capture(&transaction, request, cancellation, &mut meter).await?;
     let collation_references =
         collations::references(&domains, &relations, &column_collations, &range_catalog);
+    if !expression_collations.is_subset(&collation_references) {
+        return Err(SourceObservationFailure::InvalidCapturedMetadata);
+    }
     let (collation_definitions, collation_owners) = collations::capture(
         &transaction,
         request,
