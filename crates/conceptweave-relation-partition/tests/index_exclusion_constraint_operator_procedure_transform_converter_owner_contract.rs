@@ -263,6 +263,43 @@ fn ordinary_exclude_transform_converter_owner_rejects_unknown_receipt_coordinate
 }
 
 #[test]
+fn ordinary_exclude_transform_converter_owner_receipts_bind_exact_type_and_direction() {
+    let snapshot = IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot::new(
+        &converter_snapshot(),
+        complete_owner_observations(),
+    )
+    .unwrap();
+
+    for direction in [
+        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::ToSql,
+    ] {
+        let receipt = snapshot
+            .source_receipt(coordinate(), 1, custom_payload_type(), direction)
+            .unwrap();
+        assert_eq!(receipt.location().direction(), direction);
+
+        for (position, transform_type) in [
+            (0, custom_payload_type()),
+            (2, custom_payload_type()),
+            (
+                1,
+                QualifiedTypeName::new("other", "custom_payload").unwrap(),
+            ),
+            (
+                1,
+                QualifiedTypeName::new("public", "other_payload").unwrap(),
+            ),
+        ] {
+            assert!(matches!(
+                snapshot.source_receipt(coordinate(), position, transform_type, direction),
+                Err(ObservationError::UnknownObservationLocation { .. })
+            ));
+        }
+    }
+}
+
+#[test]
 fn ordinary_exclude_transform_converter_owner_snapshot_is_publicly_composed() {
     assert!(
         std::mem::size_of::<IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot>(
