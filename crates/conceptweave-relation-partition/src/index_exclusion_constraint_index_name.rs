@@ -128,7 +128,7 @@ impl IndexExclusionConstraintIndexNameSnapshot {
             index_partition_snapshot,
             constraint_snapshot.observations().to_vec(),
         )?;
-        if rebound_constraint.snapshot_digest() != constraint_snapshot.snapshot_digest() {
+        if rebound_constraint != *constraint_snapshot {
             return Err(invalid(
                 "index_exclusion_constraint_index_name_predecessor_binding",
             ));
@@ -138,7 +138,7 @@ impl IndexExclusionConstraintIndexNameSnapshot {
             &rebound_constraint,
             catalog_shape_snapshot.observations().to_vec(),
         )?;
-        if rebound_catalog_shape.snapshot_digest() != catalog_shape_snapshot.snapshot_digest() {
+        if rebound_catalog_shape != *catalog_shape_snapshot {
             return Err(invalid(
                 "index_exclusion_constraint_index_name_predecessor_binding",
             ));
