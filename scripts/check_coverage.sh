@@ -34,7 +34,7 @@ jq '
 
 jq -r '
   .[] | select(.count == 0)
-  | "FUNCTION_GAP file=\(.file) name=\(.name)"
+  | "FUNCTION_GAP file=\(.file) start=\(.line_start):\(.column_start)"
 ' source-functions.json
 
 jq --arg root "$source_root" '
