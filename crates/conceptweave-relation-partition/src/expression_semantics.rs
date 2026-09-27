@@ -491,7 +491,12 @@ impl IndexExpressionSemanticsSnapshot {
             operator_family_snapshot,
             exclusion_snapshot.observations().to_vec(),
         )?;
-        if rebound.snapshot_digest() != exclusion_snapshot.snapshot_digest() {
+        if rebound.snapshot_digest() != exclusion_snapshot.snapshot_digest()
+            || rebound.source_connection_key() != exclusion_snapshot.source_connection_key()
+            || rebound.connection_policy_binding() != exclusion_snapshot.connection_policy_binding()
+            || rebound.extractor_revision() != exclusion_snapshot.extractor_revision()
+            || rebound.observed_at_utc() != exclusion_snapshot.observed_at_utc()
+        {
             return Err(invalid("index_expression_semantics_predecessor_binding"));
         }
 

@@ -4,11 +4,12 @@ use conceptweave_observation::{
     QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
 };
 use conceptweave_relation_partition::{
-    IndexExclusionSemanticsSnapshot, IndexKeyExclusionSemanticsObservation,
-    IndexKeyOperatorFamilyObservation, IndexOperatorFamilySnapshot, IndexPartitionCoordinate,
-    IndexPartitionObservation, IndexPartitionSnapshot, IndexRelationKind,
-    PartitionParentRelationCoordinate, QualifiedOperatorFamilyName, QualifiedOperatorSignature,
-    QualifiedProcedureSignature, RelationPartitionObservation, RelationPartitionSnapshot,
+    IndexExclusionSemanticsSnapshot, IndexExpressionSemanticsSnapshot,
+    IndexKeyExclusionSemanticsObservation, IndexKeyOperatorFamilyObservation,
+    IndexOperatorFamilySnapshot, IndexPartitionCoordinate, IndexPartitionObservation,
+    IndexPartitionSnapshot, IndexRelationKind, PartitionParentRelationCoordinate,
+    QualifiedOperatorFamilyName, QualifiedOperatorSignature, QualifiedProcedureSignature,
+    RelationPartitionObservation, RelationPartitionSnapshot,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationLimits, ObservationRequest, ObservationRequestBudget,
@@ -313,6 +314,17 @@ fn exclusion_key_requires_nonzero_coordinates_and_exact_procedure_arguments() {
 #[test]
 fn exclusion_snapshot_rejects_a_predecessor_from_another_capture() {
     let (base, relations, indexes, families) = predecessor(Some(true), Some(true));
+    let old_exclusion = IndexExclusionSemanticsSnapshot::new(
+        &base,
+        &relations,
+        &indexes,
+        &families,
+        vec![
+            exclusion(parent_index(), "=", "int4eq", 3),
+            exclusion(child_index(), "=", "int4eq", 3),
+        ],
+    )
+    .unwrap();
     for (revision, observed_at) in [
         (
             "extractor-index-exclusion-equivalence-v2",
@@ -382,6 +394,32 @@ fn exclusion_snapshot_rejects_a_predecessor_from_another_capture() {
             facts,
         )
         .unwrap();
+        assert_eq!(
+            IndexExpressionSemanticsSnapshot::new(
+                &fresh,
+                &fresh_relations,
+                &fresh_indexes,
+                &fresh_families,
+                &old_exclusion,
+                vec![],
+                vec![],
+            ),
+            Err(ObservationError::InvalidObservationField {
+                field: "index_expression_semantics_predecessor_binding",
+            })
+        );
+        let expressions = IndexExpressionSemanticsSnapshot::new(
+            &fresh,
+            &fresh_relations,
+            &fresh_indexes,
+            &fresh_families,
+            &accepted,
+            vec![],
+            vec![],
+        )
+        .unwrap();
+        assert_eq!(expressions.extractor_revision(), revision);
+        assert_eq!(expressions.observed_at_utc(), observed_at);
         let receipt = accepted.source_receipt(&parent_index(), 1).unwrap();
         assert_eq!(receipt.extractor_revision(), revision);
         assert_eq!(receipt.observed_at_utc(), observed_at);
