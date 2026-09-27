@@ -219,6 +219,13 @@ fn ordinary_exclude_converter_transform_types_preserve_location_receipt_and_inpu
         .unwrap();
     assert_eq!(receipt.location().transform_types(), None);
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(receipt.source_id(), snapshot.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        snapshot.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
 
     let dotted_schema = QualifiedTypeName::new("payload.domain", "json").unwrap();
     let dotted_type = QualifiedTypeName::new("payload", "domain.json").unwrap();

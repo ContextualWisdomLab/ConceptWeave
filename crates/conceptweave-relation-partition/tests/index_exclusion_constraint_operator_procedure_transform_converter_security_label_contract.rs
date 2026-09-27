@@ -268,6 +268,13 @@ fn ordinary_exclude_converter_security_labels_preserve_root_location_and_exact_r
         .unwrap();
     assert!(receipt.location().security_labels().is_empty());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(receipt.source_id(), snapshot.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        snapshot.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
 
     let left =
         IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelObservation::new(
