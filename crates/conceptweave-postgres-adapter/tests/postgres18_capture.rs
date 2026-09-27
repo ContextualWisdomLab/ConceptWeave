@@ -1887,28 +1887,35 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
         .unwrap();
 
     let result = async {
-        // Keep table and column definitions fixed during capture and catalog comparison.
-        // Schema-scoped types and index-only metadata still need independent generation proof.
+        // Test-only catalog locks keep fixture types and index metadata fixed for comparison.
+        // Use an isolated test database: these locks cover database-local catalogs.
         client
             .batch_execute(&format!(
-                "BEGIN; LOCK TABLE \"{schema}\".tenant, \"{schema}\".risk_record, \
+                "BEGIN; SET LOCAL lock_timeout = '1s'; \
+                 LOCK TABLE pg_catalog.pg_type, pg_catalog.pg_enum, pg_catalog.pg_index, \
+                 pg_catalog.pg_class, pg_catalog.pg_attribute, pg_catalog.pg_constraint, \
+                 pg_catalog.pg_description, pg_catalog.pg_namespace IN SHARE MODE; \
+                 LOCK TABLE \"{schema}\".tenant, \"{schema}\".risk_record, \
                  \"{schema}\".control_record, \"{schema}\".risk_control_link IN EXCLUSIVE MODE"
             ))
             .await
             .unwrap();
         let (writer, writer_connection) = config.connect(NoTls).await.unwrap();
         let writer_task = tokio::spawn(writer_connection);
-        let blocked_change = writer
-            .batch_execute(&format!(
-                "SET lock_timeout = '100ms'; ALTER TABLE \"{schema}\".risk_record \
-                 ALTER COLUMN title SET DEFAULT 'Concurrent change'"
-            ))
-            .await
-            .unwrap_err();
-        assert_eq!(
-            blocked_change.code(),
-            Some(&tokio_postgres::error::SqlState::LOCK_NOT_AVAILABLE)
-        );
+        writer.batch_execute("SET lock_timeout = '100ms'").await.unwrap();
+        for statement in [
+            format!("ALTER TABLE \"{schema}\".risk_record ALTER COLUMN title SET DEFAULT 'Concurrent change'"),
+            format!("ALTER TYPE \"{schema}\".risk_level ADD VALUE 'critical'"),
+            format!("ALTER DOMAIN \"{schema}\".impact_score SET DEFAULT 50"),
+            format!("COMMENT ON INDEX \"{schema}\".risk_record_title_idx IS 'Concurrent change'"),
+        ] {
+            let blocked_change = writer.batch_execute(&statement).await.unwrap_err();
+            assert_eq!(
+                blocked_change.code(),
+                Some(&tokio_postgres::error::SqlState::LOCK_NOT_AVAILABLE),
+                "catalog comparison must exclude concurrent fixture changes: {statement}"
+            );
+        }
         drop(writer);
         writer_task.abort();
         let source_adapter = adapter(config.clone());
