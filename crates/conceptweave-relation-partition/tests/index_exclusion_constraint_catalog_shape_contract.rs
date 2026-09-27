@@ -278,6 +278,13 @@ fn exact_exclusion_catalog_family_shape_is_retained() {
     assert!(receipt.location().relation_owner_present());
     assert!(!receipt.location().domain_owner_present());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(receipt.source_id(), snapshot.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        snapshot.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
     assert!(
         receipt
             .location()

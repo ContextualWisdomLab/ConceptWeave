@@ -300,6 +300,13 @@ fn enforced_exclusion_constraint_issues_exact_provenance() {
         .expect("observed EXCLUDE enforcement must issue provenance");
     assert!(receipt.location().enforced());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(receipt.source_id(), snapshot.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        snapshot.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
     assert!(
         receipt
             .location()
