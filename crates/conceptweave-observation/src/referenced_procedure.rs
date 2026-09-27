@@ -144,9 +144,11 @@ impl ReferencedProcedureDefinitionObservation {
     }
 }
 
-/// Provenance for one exact captured procedure definition, bound to the final snapshot digest.
+/// Provenance for one exact captured procedure, bound to all observed families in the final digest.
+///
+/// The earlier definition-specific receipt name remains a compatible alias.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ReferencedProcedureDefinitionSourceReceipt {
+pub struct ReferencedProcedureSourceReceipt {
     source_id: String,
     connection_policy_binding: String,
     source_digest: String,
@@ -155,7 +157,7 @@ pub struct ReferencedProcedureDefinitionSourceReceipt {
     location: ReferencedProcedureLocation,
 }
 
-impl ReferencedProcedureDefinitionSourceReceipt {
+impl ReferencedProcedureSourceReceipt {
     pub(crate) fn new(
         source_id: String,
         connection_policy_binding: String,
@@ -257,6 +259,9 @@ fn encode_type(hasher: &mut Sha256, value: &QualifiedTypeName) {
 fn invalid(field: &'static str) -> ObservationError {
     ObservationError::InvalidObservationField { field }
 }
+
+/// Compatible name for existing procedure-definition provenance consumers.
+pub type ReferencedProcedureDefinitionSourceReceipt = ReferencedProcedureSourceReceipt;
 
 #[cfg(test)]
 mod tests {

@@ -36,7 +36,7 @@ use ring::{
 use tokio_postgres::{Config, NoTls};
 
 #[tokio::test]
-async fn postgres18_referenced_function_acl_fails_before_immutable_success() {
+async fn postgres18_referenced_function_owners_and_acl_bind_immutable_evidence() {
     use futures_util::FutureExt;
     use std::panic::AssertUnwindSafe;
 
@@ -150,9 +150,57 @@ async fn postgres18_referenced_function_acl_fails_before_immutable_success() {
             let is_allowed: bool = client.query_one(
                 "SELECT pg_catalog.has_function_privilege('public', $1::text, 'EXECUTE')", &[&function]
             ).await.unwrap().get(0);
-            let after = adapter(config).observe(
+            let after = adapter(config.clone()).observe(
                 authorized_with_limits("source_metadata", 512, 65_536), &NotCancelled
             ).await;
+            let after_snapshot = after.as_ref().unwrap();
+            let expected = client.query(
+                "SELECT a.grantee, g.rolname::text, a.grantor, r.rolname::text, a.is_grantable \
+                 FROM pg_catalog.pg_proc p CROSS JOIN LATERAL unnest(p.proacl) WITH ORDINALITY item(value, position) \
+                 CROSS JOIN LATERAL pg_catalog.aclexplode(ARRAY[item.value]) a \
+                 LEFT JOIN pg_catalog.pg_roles g ON g.oid = a.grantee \
+                 LEFT JOIN pg_catalog.pg_roles r ON r.oid = a.grantor \
+                 WHERE p.oid = $1::text::regprocedure ORDER BY item.position", &[&function]
+            ).await.unwrap();
+            let acl = after_snapshot.procedure_access_control().unwrap().iter().find(|item| item.location() == definition_before.location()).unwrap();
+            let grants = acl.raw_acl().unwrap();
+            assert_eq!(grants.len(), expected.len());
+            for (grant, row) in grants.iter().zip(expected) {
+                assert_eq!(grant.grantee_oid(), row.get::<_, u32>(0));
+                assert_eq!(grant.grantee_name(), row.get::<_, Option<String>>(1).as_deref());
+                assert_eq!(grant.grantor_oid(), row.get::<_, u32>(2));
+                assert_eq!(grant.grantor_name(), row.get::<_, Option<String>>(3).as_deref());
+                assert!(grant.execute());
+                assert_eq!(grant.grant_option(), row.get::<_, bool>(4));
+            }
+            assert!(owner_snapshot.procedure_access_control().unwrap().iter().find(|item| item.location() == definition_before.location()).unwrap().raw_acl().is_none());
+            assert!(client.query_one("SELECT NOT EXISTS(SELECT 1 FROM pg_catalog.pg_roles WHERE oid = 4000000123::oid)", &[]).await.unwrap().get::<_, bool>(0));
+            client.execute(
+                "UPDATE pg_catalog.pg_proc SET proacl = ARRAY[ \
+                 format('=/%I', pg_catalog.pg_get_userbyid(proowner))::aclitem, \
+                 pg_catalog.makeaclitem(4000000123::oid, proowner, 'EXECUTE', true), \
+                 format('=/%I', pg_catalog.pg_get_userbyid(proowner))::aclitem] \
+                 WHERE oid = $1::text::regprocedure", &[&function]
+            ).await.unwrap();
+            let raw = adapter(config.clone()).observe(authorized_with_limits("source_metadata", 512, 65_536), &NotCancelled).await.unwrap();
+            let raw_acl = raw.procedure_access_control().unwrap().iter().find(|item| item.location() == definition_before.location()).unwrap().raw_acl().unwrap();
+            assert_eq!(raw_acl.len(), 3);
+            assert_eq!(raw_acl[0], raw_acl[2]);
+            assert_eq!(raw_acl[0].grantee_oid(), 0);
+            assert_eq!(raw_acl[0].grantee_name(), None);
+            assert!(!raw_acl[0].execute() && !raw_acl[0].grant_option());
+            assert_eq!(raw_acl[1].grantee_oid(), 4000000123);
+            assert_eq!(raw_acl[1].grantee_name(), None);
+            assert!(raw_acl[1].execute() && raw_acl[1].grant_option());
+            assert!(!format!("{raw_acl:?}").contains("4000000123"));
+            assert_ne!(raw.snapshot_digest(), after_snapshot.snapshot_digest());
+            client.execute("UPDATE pg_catalog.pg_proc SET proacl = ARRAY[proacl[2],proacl[1],proacl[3]] WHERE oid = $1::text::regprocedure", &[&function]).await.unwrap();
+            let reordered = adapter(config.clone()).observe(authorized_with_limits("source_metadata", 512, 65_536), &NotCancelled).await.unwrap();
+            assert_ne!(raw.snapshot_digest(), reordered.snapshot_digest());
+            client.execute("UPDATE pg_catalog.pg_proc SET proacl = '{}'::aclitem[] WHERE oid = $1::text::regprocedure", &[&function]).await.unwrap();
+            let empty = adapter(config.clone()).observe(authorized_with_limits("source_metadata", 512, 65_536), &NotCancelled).await.unwrap();
+            assert!(empty.procedure_access_control().unwrap().iter().find(|item| item.location() == definition_before.location()).unwrap().raw_acl().unwrap().is_empty());
+            assert_ne!(empty.snapshot_digest(), owner_snapshot.snapshot_digest());
             (before, after, was_allowed, is_allowed)
         }).catch_unwind().await;
         drop(client);
@@ -165,13 +213,33 @@ async fn postgres18_referenced_function_acl_fails_before_immutable_success() {
         let (before, after, was_allowed, is_allowed) = outcome.unwrap();
         assert!(was_allowed && !is_allowed, "{function}");
         assert!(before.is_ok(), "{function}: {before:?}");
-        assert!(
-            matches!(
-                after,
-                Err(SourceObservationFailure::InvalidCapturedMetadata)
-            ),
-            "unrepresented procedure ACL must fail closed for {function}: {after:?}"
+        let after = after.unwrap();
+        assert_ne!(
+            before.as_ref().unwrap().snapshot_digest(),
+            after.snapshot_digest()
         );
+        let acl = after
+            .procedure_access_control()
+            .unwrap()
+            .iter()
+            .find(|item| {
+                item.location().procedure_name()
+                    == function
+                        .split('(')
+                        .next()
+                        .unwrap()
+                        .strip_prefix("pg_catalog.")
+                        .unwrap()
+            })
+            .unwrap();
+        let grants = acl.raw_acl().unwrap();
+        assert!(!grants.is_empty());
+        assert!(grants.iter().all(|item| item.grantee_oid() != 0));
+        let receipt = after
+            .procedure_access_control_source_receipt(acl.location().clone())
+            .unwrap();
+        assert_eq!(receipt.source_digest(), after.snapshot_digest());
+        assert_eq!(receipt.location(), acl.location());
     }
     drop(admin);
     admin_task.abort();
@@ -1203,10 +1271,17 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         propose_relational_model(&missing_procedure_definitions),
         Err(ProposalError::IncompleteSourceObservation)
     ));
+    let missing_procedure_acl = missing_procedure_definitions
+        .with_observed_referenced_procedure_definitions(vec![])
+        .unwrap();
+    assert!(matches!(
+        propose_relational_model(&missing_procedure_acl),
+        Err(ProposalError::IncompleteSourceObservation)
+    ));
     assert!(
         propose_relational_model(
-            &missing_procedure_definitions
-                .with_observed_referenced_procedure_definitions(vec![])
+            &missing_procedure_acl
+                .with_observed_procedure_access_control(vec![])
                 .unwrap()
         )
         .is_ok()
@@ -1396,6 +1471,8 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         .with_observed_collation_owners(vec![])
         .unwrap()
         .with_observed_referenced_procedure_definitions(vec![])
+        .unwrap()
+        .with_observed_procedure_access_control(vec![])
         .unwrap()
     };
     let type_only = complete_type_only(enums.clone(), "2026-09-25T00:00:00Z");

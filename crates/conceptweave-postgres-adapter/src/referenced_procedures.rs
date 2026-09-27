@@ -8,6 +8,7 @@ use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationCancellation, SourceObservationFailure,
 };
 use futures_util::TryStreamExt;
+use std::collections::BTreeMap;
 use tokio_postgres::{Transaction, types::ToSql};
 
 pub(super) async fn capture(
@@ -15,8 +16,8 @@ pub(super) async fn capture(
     request: &AuthorizedObservationRequest,
     cancellation: &dyn ObservationCancellation,
     meter: &mut CaptureMeter,
-    procedure_oids: Vec<u32>,
-) -> Result<Vec<ReferencedProcedureDefinitionObservation>, SourceObservationFailure> {
+    procedure_oids: &[u32],
+) -> Result<BTreeMap<u32, ReferencedProcedureDefinitionObservation>, SourceObservationFailure> {
     let max_bytes = request.request().limits().max_bytes().min(i64::MAX as u64) as i64;
     let stream = bounded(
         request,
@@ -61,7 +62,7 @@ pub(super) async fn capture(
     )
     .await?;
     tokio::pin!(stream);
-    let mut definitions = Vec::new();
+    let mut definitions = BTreeMap::new();
     while let Some(row) = bounded(request, cancellation, stream.try_next()).await? {
         if field::<Option<bool>>(&row, 0)?
             .ok_or(SourceObservationFailure::InvalidCapturedMetadata)?
@@ -101,16 +102,20 @@ pub(super) async fn capture(
             .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
         let result_type = QualifiedTypeName::new(result_schema, result_name)
             .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
-        definitions.push(
-            ReferencedProcedureDefinitionObservation::new(
-                location,
-                result_type,
-                owner_oid,
-                owner,
-                definition,
-            )
-            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
-        );
+        let observation = ReferencedProcedureDefinitionObservation::new(
+            location,
+            result_type,
+            owner_oid,
+            owner,
+            definition,
+        )
+        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+        if definitions
+            .insert(field::<u32>(&row, 1)?, observation)
+            .is_some()
+        {
+            return Err(SourceObservationFailure::InvalidCapturedMetadata);
+        }
     }
     if definitions.len() != procedure_oids.len() {
         return Err(SourceObservationFailure::InvalidCapturedMetadata);

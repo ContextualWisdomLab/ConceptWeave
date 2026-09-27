@@ -73,8 +73,7 @@ pub(super) async fn validate_dependencies(
     let (operators, cached_functions): (Vec<u32>, Vec<u32>) =
         dependencies.operators.into_iter().unzip();
     let (sources, targets): (Vec<u32>, Vec<u32>) = dependencies.io_coercions.into_iter().unzip();
-    // Function ACL material has no source receipt in the current aggregate. Refuse it for
-    // every explicit, operator-derived and I/O reference until a versioned observation binds it.
+    // The returned procedure closure is captured with definition, owner and raw ACL evidence.
     let row = bounded(
         request,
         cancellation,
@@ -92,10 +91,6 @@ pub(super) async fn validate_dependencies(
            UNION SELECT t.typinput FROM unnest($6::oid[]) referenced(oid) \
              JOIN pg_catalog.pg_type t ON t.oid = referenced.oid \
          ) SELECT EXISTS( \
-           SELECT 1 FROM referenced_procedure referenced \
-           JOIN pg_catalog.pg_proc p ON p.oid = referenced.oid \
-           WHERE p.proacl IS NOT NULL \
-         ) OR EXISTS( \
            SELECT 1 FROM subscript_procedure referenced \
            LEFT JOIN pg_catalog.pg_proc p ON p.oid = referenced.oid \
            WHERE p.oid IS NULL OR p.provolatile <> 'i' \

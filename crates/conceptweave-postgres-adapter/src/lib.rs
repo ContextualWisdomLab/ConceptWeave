@@ -9,6 +9,7 @@
 mod collations;
 mod expression_nodes;
 mod foreign_keys;
+mod procedure_acl;
 mod ranges;
 mod referenced_procedures;
 
@@ -1233,16 +1234,29 @@ async fn capture_catalog(
     let snapshot = snapshot
         .with_observed_collation_owners(collation_owners)
         .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+    let procedure_oids: Vec<u32> = referenced_procedures.into_iter().collect();
     let definitions = referenced_procedures::capture(
         &transaction,
         request,
         cancellation,
         &mut meter,
-        referenced_procedures.into_iter().collect(),
+        &procedure_oids,
+    )
+    .await?;
+    let access_control = procedure_acl::capture(
+        &transaction,
+        request,
+        cancellation,
+        &mut meter,
+        &procedure_oids,
+        &definitions,
     )
     .await?;
     let snapshot = snapshot
-        .with_observed_referenced_procedure_definitions(definitions)
+        .with_observed_referenced_procedure_definitions(definitions.into_values().collect())
+        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+    let snapshot = snapshot
+        .with_observed_procedure_access_control(access_control)
         .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
     bounded(request, cancellation, transaction.commit()).await?;
     Ok(snapshot)

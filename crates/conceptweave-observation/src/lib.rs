@@ -18,6 +18,7 @@ mod constraint_timing;
 mod foreign_key_catalog;
 mod model;
 mod not_null_constraint;
+mod procedure_access_control;
 mod range_catalog;
 mod referenced_procedure;
 mod relation_owner;
@@ -46,12 +47,13 @@ pub use model::{
     TableConstraintObservation, TableObservation, UniqueConstraintObservation,
 };
 pub use not_null_constraint::{NotNullConstraintObservation, ParentNotNullConstraintCoordinate};
+pub use procedure_access_control::{ProcedureAccessControlObservation, ProcedureAclItem};
 pub use range_catalog::{
     QualifiedRangeProcedure, RangeCatalogObservation, RangeCatalogSourceReceipt,
 };
 pub use referenced_procedure::{
     ReferencedProcedureDefinitionObservation, ReferencedProcedureDefinitionSourceReceipt,
-    ReferencedProcedureLocation,
+    ReferencedProcedureLocation, ReferencedProcedureSourceReceipt,
 };
 pub use relation_owner::RelationOwnerObservation;
 pub use relation_tablespace::RelationTablespaceObservation;
@@ -188,6 +190,7 @@ pub struct PostgresSchemaSnapshotV3 {
     collation_owners: Vec<CollationOwnerObservation>,
     collation_owners_observed: bool,
     referenced_procedure_definitions: Option<Vec<ReferencedProcedureDefinitionObservation>>,
+    procedure_access_control: Option<Vec<ProcedureAccessControlObservation>>,
 }
 
 impl PostgresSchemaSnapshotV3 {
@@ -263,6 +266,7 @@ impl PostgresSchemaSnapshotV3 {
             collation_owners: Vec::new(),
             collation_owners_observed: false,
             referenced_procedure_definitions: None,
+            procedure_access_control: None,
         })
     }
 
@@ -373,6 +377,7 @@ impl PostgresSchemaSnapshotV3 {
             collation_owners: Vec::new(),
             collation_owners_observed: false,
             referenced_procedure_definitions: None,
+            procedure_access_control: None,
         })
     }
 
@@ -673,6 +678,7 @@ impl PostgresSchemaSnapshotV3 {
             collation_owners: Vec::new(),
             collation_owners_observed: false,
             referenced_procedure_definitions: None,
+            procedure_access_control: None,
         })
     }
 
@@ -1422,6 +1428,48 @@ impl PostgresSchemaSnapshotV3 {
         self.snapshot_digest = referenced_procedure::digest(&self.snapshot_digest, &observations);
         self.referenced_procedure_definitions = Some(observations);
         Ok(self)
+    }
+
+    /// Binds complete source ACL evidence for every observed procedure in a new successor digest.
+    pub fn with_observed_procedure_access_control(
+        mut self,
+        items: Vec<ProcedureAccessControlObservation>,
+    ) -> Result<Self, ObservationError> {
+        let definitions = self.referenced_procedure_definitions.as_deref().ok_or(
+            ObservationError::InvalidObservationField {
+                field: "procedure_access_control_order",
+            },
+        )?;
+        if self.procedure_access_control.is_some() {
+            return Err(ObservationError::InvalidObservationField {
+                field: "procedure_access_control_order",
+            });
+        }
+        let items = procedure_access_control::canonicalize(definitions, items)?;
+        self.snapshot_digest = procedure_access_control::digest(&self.snapshot_digest, &items);
+        self.procedure_access_control = Some(items);
+        Ok(self)
+    }
+    /// Returns the complete ACL inventory, distinguishing unobserved from observed empty.
+    #[must_use]
+    pub fn procedure_access_control(&self) -> Option<&[ProcedureAccessControlObservation]> {
+        self.procedure_access_control.as_deref()
+    }
+    /// Issues procedure-root provenance only when the exact signature has observed ACL evidence.
+    pub fn procedure_access_control_source_receipt(
+        &self,
+        location: ReferencedProcedureLocation,
+    ) -> Result<ReferencedProcedureSourceReceipt, ObservationError> {
+        if !self
+            .procedure_access_control
+            .as_ref()
+            .is_some_and(|items| items.iter().any(|item| item.location() == &location))
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "unobserved_procedure_access_control",
+            });
+        }
+        self.referenced_procedure_definition_source_receipt(location)
     }
 
     /// Returns the observed definition inventory, distinguishing unobserved from observed empty.
