@@ -331,6 +331,10 @@ fn relation_var_v1_alone_can_exist_when_the_enclosing_node_schema_is_incomplete(
 
 #[test]
 fn complete_node_schema_and_relation_var_proofs_compose_into_a_new_successor() {
+    assert_eq!(
+        IndexExpressionRelationVarNodeSchemaSnapshot::schema_revision(),
+        "postgresql-18-equal-node-schema-plus-relation-var-v1"
+    );
     let stack = stack(true);
     let node_schema = IndexExpressionNodeSchemaSnapshot::new(&stack.expressions)
         .expect("complete FuncExpr fields must satisfy the historical v1 node schema");

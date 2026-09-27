@@ -339,6 +339,13 @@ fn matching_catalog_row_identity_remains_admissible_and_receiptable() {
     assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
     assert_eq!(receipt.index(), &child_index());
     assert_eq!(receipt.key_position(), 1);
+    assert_eq!(
+        snapshot.observations()[0].canonical_location(),
+        format!(
+            "{}/keys/1/collation-catalog-identity",
+            snapshot.observations()[0].index().canonical_location()
+        )
+    );
 
     let zero = snapshot
         .source_receipt(&child_index(), 0)

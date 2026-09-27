@@ -626,6 +626,7 @@ fn database_encoding_binds_the_complete_collation_stack_and_receipt() {
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
     assert_eq!(receipt.observed_at_utc(), stack.base.observed_at_utc());
     assert_eq!(receipt.database_encoding(), encoding);
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
 
     assert_eq!(
         IndexCollationDatabaseEncodingSnapshot::new(
@@ -759,6 +760,7 @@ fn database_default_effective_definition_binds_material_evidence_and_receipt() {
     };
     let snapshot = effective("153.80").unwrap();
     let receipt = snapshot.database_default_source_receipt().unwrap();
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
 
     assert_eq!(snapshot.predecessor_digest(), material.snapshot_digest());
     assert_eq!(
