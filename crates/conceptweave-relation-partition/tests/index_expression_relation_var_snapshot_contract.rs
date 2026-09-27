@@ -743,3 +743,70 @@ fn relation_var_predecessors_reject_each_mixed_provenance_dimension() {
         );
     }
 }
+
+#[test]
+fn relation_var_successor_rejects_whole_rows_and_trees_without_column_leaves() {
+    let stack = stack();
+    let constant = CanonicalExpression::node(
+        "Const",
+        vec![
+            field(
+                "type",
+                CanonicalExpressionValue::Type(
+                    QualifiedTypeName::new("pg_catalog", "int4").unwrap(),
+                ),
+            ),
+            field("value", CanonicalExpressionValue::Text("1".to_owned())),
+        ],
+    )
+    .unwrap();
+    for (root, expected_field) in [
+        (
+            CanonicalExpression::WholeRow,
+            "index_partition_definition_expression_whole_row",
+        ),
+        (constant, "index_expression_relation_var_empty"),
+    ] {
+        let expressions = IndexExpressionSemanticsSnapshot::new(
+            &stack.base,
+            &stack.relations,
+            &stack.indexes,
+            &stack.families,
+            &stack.exclusions,
+            vec![
+                IndexExpressionSemanticsObservation::new(parent_index(), 1, root.clone()).unwrap(),
+                IndexExpressionSemanticsObservation::new(child_index(), 1, root.clone()).unwrap(),
+            ],
+            vec![
+                IndexPredicateSemanticsObservation::new(parent_index(), root.clone()).unwrap(),
+                IndexPredicateSemanticsObservation::new(child_index(), root).unwrap(),
+            ],
+        );
+        if expected_field == "index_partition_definition_expression_whole_row" {
+            assert_eq!(
+                expressions.unwrap_err(),
+                ObservationError::InvalidObservationField {
+                    field: expected_field
+                }
+            );
+            continue;
+        }
+        let expressions = expressions.unwrap();
+        assert_eq!(
+            IndexExpressionRelationVarSnapshot::new(
+                &stack.base,
+                &stack.relations,
+                &stack.indexes,
+                &stack.families,
+                &stack.exclusions,
+                &expressions,
+                &stack.type_modifiers,
+                vec![],
+            )
+            .unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: expected_field
+            }
+        );
+    }
+}

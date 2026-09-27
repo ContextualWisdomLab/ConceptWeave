@@ -575,9 +575,7 @@ fn canonicalize_and_validate(
 
     for observation in &observations {
         let location_key = observation.location().canonical_location();
-        let expected_column = expected
-            .get(&location_key)
-            .ok_or_else(|| invalid("index_expression_relation_var_coordinate"))?;
+        let expected_column = &expected[&location_key];
         if observation.column_name() != expected_column {
             return Err(invalid("index_expression_relation_var_column"));
         }
