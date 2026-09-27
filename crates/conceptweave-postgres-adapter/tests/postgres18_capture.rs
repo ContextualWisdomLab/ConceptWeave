@@ -4233,6 +4233,115 @@ async fn postgres18_cross_schema_sequence_default_fails_closed() {
 }
 
 #[tokio::test]
+async fn postgres18_late_bound_row_security_lookup_fails_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let is_superuser: bool = client
+        .query_one(
+            "SELECT rolsuper FROM pg_catalog.pg_roles WHERE rolname = current_user",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    if !is_superuser {
+        eprintln!("skipping row-security fixture: setup requires a superuser");
+        connection_task.abort();
+        return;
+    }
+    let schema = format!("cw_rls_owner_{}", std::process::id());
+    let external = format!("cw_rls_source_{}", std::process::id());
+    let reader = format!("cw_rls_reader_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE ROLE {reader} NOLOGIN; \
+             CREATE SCHEMA {schema}; CREATE SCHEMA {external}; \
+             CREATE TABLE {external}.target (id integer); \
+             GRANT USAGE ON SCHEMA {external} TO {reader}; \
+             GRANT SELECT ON {external}.target TO {reader}"
+        ))
+        .await
+        .unwrap();
+    let target_oid: u32 = client
+        .query_one(&format!("SELECT '{external}.target'::regclass::oid"), &[])
+        .await
+        .unwrap()
+        .get(0);
+    client
+        .batch_execute(&format!(
+            "CREATE TABLE {schema}.record \
+             (rls_on boolean DEFAULT row_security_active({target_oid}::oid))"
+        ))
+        .await
+        .unwrap();
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("SET ROLE {reader}"))
+        .await
+        .unwrap();
+    let inactive: bool = client
+        .query_one(
+            "SELECT pg_catalog.row_security_active($1::oid)",
+            &[&target_oid],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    client.batch_execute("RESET ROLE").await.unwrap();
+    client
+        .batch_execute(&format!(
+            "ALTER TABLE {external}.target ENABLE ROW LEVEL SECURITY"
+        ))
+        .await
+        .unwrap();
+    let after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("SET ROLE {reader}"))
+        .await
+        .unwrap();
+    let active: bool = client
+        .query_one(
+            "SELECT pg_catalog.row_security_active($1::oid)",
+            &[&target_oid],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    client.batch_execute("RESET ROLE").await.unwrap();
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA {schema} CASCADE; DROP SCHEMA {external} CASCADE; \
+             DROP ROLE {reader}"
+        ))
+        .await
+        .unwrap();
+    connection_task.abort();
+    assert!(!inactive);
+    assert!(active);
+    if let (Ok(before), Ok(after)) = (&before, &after) {
+        assert_eq!(before.snapshot_digest(), after.snapshot_digest());
+    }
+    assert!(
+        matches!(
+            before,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ) && matches!(
+            after,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "external row-security changes must not retain an admitted source identity: before={before:?}, after={after:?}"
+    );
+}
+
+#[tokio::test]
 async fn postgres18_late_bound_privilege_lookup_fails_closed() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
