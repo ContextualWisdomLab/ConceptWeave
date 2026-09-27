@@ -3130,6 +3130,9 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             &authority,
         )
         .unwrap();
+        assert_eq!(reviewed.alignment(), &validated);
+        assert_eq!(reviewed.request().rationale(), "Review GRC mapping");
+        assert_eq!(reviewed.audit_receipt_id(), "fixture-audit-receipt");
         let replay_aligned = align_relational_proposal(
             &replay_proposal,
             replay_proposal.proposal_id(),
@@ -3472,6 +3475,12 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
         let signing_key = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
         let key = TrustedPublisherKey::new("fixture-publisher", signing_key.public_key().as_ref())
             .unwrap();
+        assert_eq!(published.review(), &reviewed);
+        let invalid_signature = sign_published_manifest(&published, "", &signing_key).unwrap_err();
+        assert!(matches!(invalid_signature, GovernanceError::Release(_)));
+        assert!(std::error::Error::source(&invalid_signature).is_some());
+        assert_eq!(invalid_signature.to_string(), "the semantic release could not be created");
+        assert!(std::error::Error::source(&GovernanceError::ReviewDenied).is_none());
         let signed =
             sign_published_manifest(&published, "fixture-publisher", &signing_key).unwrap();
         let pinned = SemanticReleaseClient::with_signed_release_manifests(
