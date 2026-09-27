@@ -61,11 +61,15 @@ pub(super) async fn validate_dependencies(
             .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
         dependencies.functions.extend(captured.functions);
         dependencies.types.extend(captured.types);
+        dependencies
+            .subscript_containers
+            .extend(captured.subscript_containers);
         dependencies.operators.extend(captured.operators);
         dependencies.io_coercions.extend(captured.io_coercions);
     }
     let functions: Vec<u32> = dependencies.functions.into_iter().collect();
     let types: Vec<u32> = dependencies.types.into_iter().collect();
+    let containers: Vec<u32> = dependencies.subscript_containers.into_iter().collect();
     let (operators, cached_functions): (Vec<u32>, Vec<u32>) =
         dependencies.operators.into_iter().unzip();
     let (sources, targets): (Vec<u32>, Vec<u32>) = dependencies.io_coercions.into_iter().unzip();
@@ -75,8 +79,12 @@ pub(super) async fn validate_dependencies(
         request,
         cancellation,
         transaction.query_one(
-            "WITH referenced_procedure AS ( \
+            "WITH subscript_procedure AS ( \
+           SELECT t.typsubscript AS oid FROM unnest($8::oid[]) referenced(oid) \
+           LEFT JOIN pg_catalog.pg_type t ON t.oid = referenced.oid \
+         ), referenced_procedure AS ( \
            SELECT unnest($1::oid[]) AS oid \
+           UNION SELECT oid FROM subscript_procedure \
            UNION SELECT o.oprcode FROM unnest($3::oid[]) referenced(oid) \
              JOIN pg_catalog.pg_operator o ON o.oid = referenced.oid \
            UNION SELECT t.typoutput FROM unnest($5::oid[]) referenced(oid) \
@@ -87,6 +95,12 @@ pub(super) async fn validate_dependencies(
            SELECT 1 FROM referenced_procedure referenced \
            JOIN pg_catalog.pg_proc p ON p.oid = referenced.oid \
            WHERE p.proacl IS NOT NULL \
+         ) OR EXISTS( \
+           SELECT 1 FROM subscript_procedure referenced \
+           LEFT JOIN pg_catalog.pg_proc p ON p.oid = referenced.oid \
+           WHERE p.oid IS NULL OR p.provolatile <> 'i' \
+             OR p.pronamespace <> 'pg_catalog'::regnamespace OR p.oid >= 16384::oid \
+             OR p.proname ~ $7 \
          ) OR EXISTS( \
            SELECT 1 FROM unnest($1::oid[]) f(oid) \
            LEFT JOIN pg_catalog.pg_proc p ON p.oid = f.oid \
@@ -132,6 +146,7 @@ pub(super) async fn validate_dependencies(
                 &sources,
                 &targets,
                 &FORBIDDEN_FUNCTION_NAMES,
+                &containers,
             ],
         ),
     )
@@ -160,6 +175,7 @@ enum Value<'a> {
 struct ExpressionDependencies {
     functions: BTreeSet<u32>,
     types: BTreeSet<u32>,
+    subscript_containers: BTreeSet<u32>,
     operators: BTreeSet<(u32, u32)>,
     io_coercions: BTreeSet<(u32, u32)>,
 }
@@ -187,6 +203,13 @@ fn collect_dependencies(
         Value::Node(kind, fields) => {
             if *kind == "SQLVALUEFUNCTION" {
                 return Err(InvalidExpressionTree);
+            }
+            if *kind == "SUBSCRIPTINGREF" {
+                dependencies
+                    .subscript_containers
+                    .insert(oid(fields, "refcontainertype")?);
+                scalar_oid(fields.get("refelemtype").ok_or(InvalidExpressionTree)?)?;
+                oid(fields, "refrestype")?;
             }
             if *kind == "COERCEVIAIO" {
                 dependencies.io_coercions.insert((
@@ -254,8 +277,18 @@ fn collect_dependencies(
                         | "minmaxtype"
                         | "row_typeid"
                         | "typeId"
+                        | "refcontainertype"
+                        | "refelemtype"
+                        | "refrestype"
                 ) {
-                    dependencies.types.insert(oid(fields, name)?);
+                    let type_oid = scalar_oid(child)?;
+                    // Non-array containers such as jsonb have no separate element type.
+                    if type_oid == 0 && !(*kind == "SUBSCRIPTINGREF" && *name == "refelemtype") {
+                        return Err(InvalidExpressionTree);
+                    }
+                    if type_oid != 0 {
+                        dependencies.types.insert(type_oid);
+                    }
                 }
                 collect_dependencies(child, dependencies)?;
             }
@@ -284,6 +317,7 @@ fn result_type(value: &Value<'_>) -> Result<u32, InvalidExpressionTree> {
     let field = match *kind {
         "VAR" => "vartype",
         "CONST" => "consttype",
+        "SUBSCRIPTINGREF" => "refrestype",
         "FUNCEXPR" => "funcresulttype",
         "OPEXPR" | "DISTINCTEXPR" | "NULLIFEXPR" => "opresulttype",
         "RELABELTYPE" | "COERCEVIAIO" | "ARRAYCOERCEEXPR" | "COERCETODOMAIN" => "resulttype",
@@ -472,6 +506,17 @@ mod tests {
     fn nested_coercion_uses_its_arguments_own_type_and_rejects_ambiguous_input() {
         let composed = "{COERCEVIAIO :arg {OPEXPR :opno 551 :opfuncid 177 :opresulttype 23 :args ({VAR :vartype 20} {CONST :consttype 23 :constvalue 4 [ 1 0 0 0 0 0 0 0 ]})} :resulttype 25}";
         assert_eq!(io_coercion_pairs(composed), Ok(vec![(23, 25)]));
+        let subscript = expression_dependencies(
+            "{COERCEVIAIO :arg {SUBSCRIPTINGREF :refcontainertype 1007 :refelemtype 23 :refrestype 23 :refexpr {VAR :vartype 1007}} :resulttype 25}",
+        ).unwrap();
+        assert_eq!(subscript.io_coercions, BTreeSet::from([(23, 25)]));
+        assert_eq!(subscript.subscript_containers, BTreeSet::from([1007]));
+        assert_eq!(subscript.types, BTreeSet::from([23, 25, 1007]));
+        let json = expression_dependencies(
+            "{COERCEVIAIO :arg {SUBSCRIPTINGREF :refcontainertype 3802 :refelemtype 0 :refrestype 3802} :resulttype 25}",
+        ).unwrap();
+        assert_eq!(json.io_coercions, BTreeSet::from([(3802, 25)]));
+        assert_eq!(json.types, BTreeSet::from([25, 3802]));
         assert_eq!(
             io_coercion_pairs(
                 "{COERCEVIAIO :arg {COERCEVIAIO :arg {VAR :vartype 23} :resulttype 25} :resulttype 1043}"
@@ -493,6 +538,11 @@ mod tests {
             "{COERCEVIAIO :arg {UNKNOWN :args ({VAR :vartype 23})} :resulttype 25}",
             "{COERCEVIAIO :arg {VAR :vartype 0} :resulttype 25}",
             "{COERCEVIAIO :arg {VAR :vartype 4294967296} :resulttype 25}",
+            "{SUBSCRIPTINGREF :refcontainertype 1007 :refelemtype 23}",
+            "{SUBSCRIPTINGREF :refcontainertype 0 :refelemtype 23 :refrestype 23}",
+            "{SUBSCRIPTINGREF :refcontainertype 1007 :refelemtype -1 :refrestype 23}",
+            "{SUBSCRIPTINGREF :refcontainertype 1007 :refelemtype 23 :refrestype 0}",
+            "{SUBSCRIPTINGREF :refcontainertype 1007 :refelemtype 23 :refrestype -1}",
             "{CONST :constvalue 1 [ 256 ]}",
             "{CONST :constvalue 1 [ 0}",
             "{NODE :label bad\\",

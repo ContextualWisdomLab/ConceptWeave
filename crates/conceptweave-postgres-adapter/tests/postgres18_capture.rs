@@ -63,6 +63,10 @@ async fn postgres18_referenced_function_acl_fails_before_immutable_success() {
             "record_id integer, CHECK (record_id::text <> '')",
             "pg_catalog.textin(cstring)",
         ),
+        (
+            "record_ids integer[], CHECK ((record_ids[1])::text <> '')",
+            "pg_catalog.array_subscript_handler(internal)",
+        ),
     ]
     .into_iter()
     .enumerate()
@@ -5188,6 +5192,36 @@ async fn postgres18_session_dependent_checks_fail_closed() {
     client
         .batch_execute(&format!(
             "DROP TABLE {schema}.record; CREATE TABLE {schema}.record \
+             (ids integer[], CONSTRAINT formatted CHECK ((ids[1])::text <> ''))"
+        ))
+        .await
+        .unwrap();
+    let array_element_coercion = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP TABLE {schema}.record; CREATE TABLE {schema}.record \
+             (instants timestamptz[], CONSTRAINT formatted CHECK ((instants[1])::text <> ''))"
+        ))
+        .await
+        .unwrap();
+    let array_session_coercion = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP TABLE {schema}.record; CREATE TABLE {schema}.record \
+             (payload jsonb, CONSTRAINT formatted CHECK ((payload['a'])::text <> ''))"
+        ))
+        .await
+        .unwrap();
+    let json_subscript_coercion = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP TABLE {schema}.record; CREATE TABLE {schema}.record \
              (day date, instant timestamptz, marker integer, other integer, \
              CONSTRAINT ordered CHECK (ROW(day, marker) < ROW(instant, other)))"
         ))
@@ -5242,6 +5276,15 @@ async fn postgres18_session_dependent_checks_fail_closed() {
     );
     assert!(immutable_coercion.is_ok());
     assert!(composed_coercion.is_ok(), "{composed_coercion:?}");
+    assert!(array_element_coercion.is_ok(), "{array_element_coercion:?}");
+    assert!(
+        json_subscript_coercion.is_ok(),
+        "{json_subscript_coercion:?}"
+    );
+    assert!(matches!(
+        array_session_coercion,
+        Err(SourceObservationFailure::InvalidCapturedMetadata)
+    ));
     assert!(
         matches!(
             observed_row_comparison,
