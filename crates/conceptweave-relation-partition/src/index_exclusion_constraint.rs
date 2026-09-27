@@ -278,7 +278,7 @@ impl IndexExclusionConstraintSnapshot {
             relation_partition_snapshot,
             index_partition_snapshot.observations().to_vec(),
         )?;
-        if rebound.snapshot_digest() != index_partition_snapshot.snapshot_digest() {
+        if rebound != *index_partition_snapshot {
             return Err(invalid("index_exclusion_constraint_predecessor_binding"));
         }
 

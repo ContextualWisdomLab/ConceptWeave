@@ -422,6 +422,34 @@ fn ordinary_exclusion_operator_rejects_each_stale_predecessor() {
         keys.observations().to_vec(),
     )
     .unwrap();
+    assert_eq!(
+        IndexExclusionConstraintSnapshot::new(
+            &fresh,
+            &fresh_relations,
+            &indexes,
+            constraints.observations().to_vec()
+        )
+        .unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "index_exclusion_constraint_predecessor_binding"
+        }
+    );
+    for (constraint, period) in [(&constraints, &fresh_period), (&fresh_constraints, &period)] {
+        assert_eq!(
+            IndexExclusionConstraintKeySnapshot::new(
+                &fresh,
+                &fresh_relations,
+                &fresh_indexes,
+                constraint,
+                period,
+                keys.observations().to_vec()
+            )
+            .unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: "index_exclusion_constraint_key_predecessor_binding"
+            }
+        );
+    }
     let fresh_families = IndexOperatorFamilySnapshot::new(
         &fresh,
         &fresh_relations,

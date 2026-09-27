@@ -150,7 +150,7 @@ impl IndexExclusionConstraintKeySnapshot {
             index_partition_snapshot,
             constraint_snapshot.observations().to_vec(),
         )?;
-        if rebound_constraint.snapshot_digest() != constraint_snapshot.snapshot_digest() {
+        if rebound_constraint != *constraint_snapshot {
             return Err(invalid(
                 "index_exclusion_constraint_key_predecessor_binding",
             ));
@@ -159,7 +159,7 @@ impl IndexExclusionConstraintKeySnapshot {
             &rebound_constraint,
             period_snapshot.observations().to_vec(),
         )?;
-        if rebound_period.snapshot_digest() != period_snapshot.snapshot_digest() {
+        if rebound_period != *period_snapshot {
             return Err(invalid(
                 "index_exclusion_constraint_key_predecessor_binding",
             ));
