@@ -3,7 +3,7 @@ set -euo pipefail
 
 coverage_toolchain="${COVERAGE_TOOLCHAIN:-nightly-2026-08-20}"
 source_root="$(pwd -P)/crates/"
-trap 'rm -f coverage.json source-branches.json source-regions.json' EXIT
+trap 'rm -f coverage.json source-branches.json source-regions.json source-functions.json' EXIT
 
 cargo "+${coverage_toolchain}" llvm-cov \
   --workspace \
@@ -24,13 +24,18 @@ jq -r '
   | "COVERAGE_GAP file=\(.filename) lines=\(.summary.lines.percent) functions=\(.summary.functions.percent) regions=\(.summary.regions.percent)"
 ' coverage.json
 
-jq --arg root "$source_root" '
-  [.data[0].files[]
-   | select(.filename | startswith($root) and contains("/src/"))
-   | .summary.functions]
-  | {count: (map(.count) | add), covered: (map(.covered) | add)}
+jq --arg root "$source_root" -f scripts/owned_source_functions.jq \
+  coverage.json > source-functions.json
+
+jq '
+  {count: length, covered: ([.[] | select(.count > 0)] | length)}
   | .percent = (if .count == 0 then 0 else .covered * 100 / .count end)
-' coverage.json
+' source-functions.json
+
+jq -r '
+  .[] | select(.count == 0)
+  | "FUNCTION_GAP file=\(.file) name=\(.name)"
+' source-functions.json
 
 jq --arg root "$source_root" '
   [
@@ -93,12 +98,7 @@ jq -r '
   | "BRANCH_GAP file=\(.file) start=\(.line_start):\(.column_start) end=\(.line_end):\(.column_end) true_count=\(.true_count) false_count=\(.false_count)"
 ' source-branches.json
 
-jq -e --arg root "$source_root" '
-  [.data[0].files[]
-   | select(.filename | startswith($root) and contains("/src/"))
-   | .summary.functions]
-  | length > 0 and all(.[]; .percent == 100)
-' coverage.json >/dev/null
+jq -e 'length > 0 and all(.[]; .count > 0)' source-functions.json >/dev/null
 
 jq -e 'length > 0 and all(.[]; .count > 0)' source-regions.json >/dev/null
 jq -e 'length > 0 and all(.[]; .true_count > 0 and .false_count > 0)' source-branches.json >/dev/null
