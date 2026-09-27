@@ -449,6 +449,22 @@ mod tests {
                 Err(PublicationStoreError::InvalidRecord)
             ));
         }
+        OpenOptions::new()
+            .write(true)
+            .open(&record_path)
+            .unwrap()
+            .set_len(MAX_RECORD_BYTES as u64 + 1)
+            .unwrap();
+        assert!(matches!(
+            store.read_verified(&pinned, &release),
+            Err(PublicationStoreError::InvalidRecord)
+        ));
+        fs::remove_file(&record_path).unwrap();
+        fs::create_dir(&record_path).unwrap();
+        assert!(matches!(
+            store.read_verified(&pinned, &release),
+            Err(PublicationStoreError::InvalidRecord)
+        ));
         fs::remove_dir_all(root).unwrap();
     }
 }
