@@ -699,6 +699,57 @@ fn relation_var_predecessors_reject_each_mixed_provenance_dimension() {
         .with_observed_column_collations(original.base.column_collations().unwrap().to_vec())
         .unwrap();
         let changed = stack_from_base(changed_base);
+        assert_eq!(
+            IndexPartitionSnapshot::new(
+                &changed.base,
+                &original.relations,
+                changed.indexes.observations().to_vec(),
+            )
+            .unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: "index_partition_relation_snapshot_binding",
+            }
+        );
+        assert_eq!(
+            IndexOperatorFamilySnapshot::new(
+                &changed.base,
+                &changed.relations,
+                &original.indexes,
+                changed.families.observations().to_vec(),
+            )
+            .unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: "index_operator_family_predecessor_binding",
+            }
+        );
+        assert_eq!(
+            IndexExclusionSemanticsSnapshot::new(
+                &changed.base,
+                &changed.relations,
+                &changed.indexes,
+                &original.families,
+                changed.exclusions.observations().to_vec(),
+            )
+            .unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: "index_exclusion_semantics_predecessor_binding",
+            }
+        );
+        assert_eq!(
+            IndexExpressionSemanticsSnapshot::new(
+                &changed.base,
+                &changed.relations,
+                &changed.indexes,
+                &changed.families,
+                &original.exclusions,
+                changed.expressions.expression_observations().to_vec(),
+                changed.expressions.predicate_observations().to_vec(),
+            )
+            .unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: "index_expression_semantics_predecessor_binding",
+            }
+        );
         let fresh = IndexExpressionRelationVarSnapshot::new(
             &changed.base,
             &changed.relations,
