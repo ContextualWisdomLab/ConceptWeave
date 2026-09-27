@@ -3570,6 +3570,47 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             Err(PublicationStoreError::InvalidRecord)
         ));
         std::fs::remove_dir_all(&publication_root).unwrap();
+        // Test each endpoint without an orphaned field masking the relationship error.
+        for relation in proposal.relations() {
+            assert_ne!(relation.from_concept_id(), relation.to_concept_id());
+            for endpoint in [relation.from_concept_id(), relation.to_concept_id()] {
+                let selected_relation = relation.candidate().candidate_id();
+                let endpoint_fields = proposal.concepts().iter()
+                    .find(|concept| concept.candidate().candidate_id() == endpoint).unwrap()
+                    .fields().iter().map(|field| field.candidate().candidate_id())
+                    .collect::<BTreeSet<_>>();
+                let isolated_edge = decisions.clone().into_iter().map(|decision| {
+                    let id = decision.candidate_id();
+                    if id == endpoint || endpoint_fields.contains(id)
+                        || proposal.relations().iter().any(|other|
+                            other.candidate().candidate_id() == id && id != selected_relation)
+                    {
+                        AlignmentDecision::exclude(id, "Fixture endpoint or unrelated edge excluded").unwrap()
+                    } else { decision }
+                }).collect();
+                let invalid = align_relational_proposal(&proposal, proposal.proposal_id(), isolated_edge).unwrap();
+                assert_eq!(validate_alignment(&invalid).unwrap_err(), AlignmentError::ExcludedRelationEndpoint);
+            }
+        }
+        let excluded_edges = decisions.clone().into_iter().map(|decision| {
+            if proposal.relations().iter().any(|relation|
+                relation.candidate().candidate_id() == decision.candidate_id())
+            {
+                AlignmentDecision::exclude(decision.candidate_id(), "Fixture relationship deliberately excluded").unwrap()
+            } else { decision }
+        }).collect();
+        let without_edges = validate_alignment(&align_relational_proposal(
+            &proposal, proposal.proposal_id(), excluded_edges,
+        ).unwrap()).unwrap();
+        assert_eq!(without_edges.validation().mapped_relations_with_endpoints(), 0);
+        assert_eq!(without_edges.validation().mapped_fields_with_concepts(), field_count);
+        assert_eq!(without_edges.validation().unique_semantic_ids(), 6 + field_count);
+        for relation in proposal.relations() {
+            let candidate = without_edges.candidates().iter().find(|candidate|
+                candidate.candidate().candidate_id() == relation.candidate().candidate_id()).unwrap();
+            assert_eq!(candidate.candidate().publication_state(), PublicationState::Rejected);
+            assert_eq!(candidate.candidate().evidence()[0].source_digest(), first.snapshot_digest());
+        }
         let excluded_concept_id = proposal.concepts()[0].candidate().candidate_id();
         let excluded_parent = decisions
             .clone()
