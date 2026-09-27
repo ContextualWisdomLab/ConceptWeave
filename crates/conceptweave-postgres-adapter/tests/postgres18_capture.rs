@@ -4445,13 +4445,55 @@ async fn postgres18_late_bound_catalog_lookup_fails_closed() {
         ))
         .await
         .unwrap();
-    let format_after = adapter(config)
+    let format_after = adapter(config.clone())
         .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
         .await;
     let rendered_after: String = client
         .query_one(
             "SELECT pg_catalog.format_type($1::oid, NULL::integer)",
             &[&type_oid],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    let class_oid: u32 = client
+        .query_one("SELECT 'pg_class'::regclass::oid", &[])
+        .await
+        .unwrap()
+        .get(0);
+    client
+        .batch_execute(&format!(
+            "DROP TABLE {schema}.record; \
+             CREATE TABLE {schema}.record \
+               (external_description text DEFAULT \
+                pg_describe_object({class_oid}::oid, {external_oid}::oid, 0))"
+        ))
+        .await
+        .unwrap();
+    let description_before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    let described_before: String = client
+        .query_one(
+            "SELECT pg_catalog.pg_describe_object($1::oid, $2::oid, 0)",
+            &[&class_oid, &external_oid],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    client
+        .batch_execute(&format!(
+            "ALTER TABLE {external}.final_name RENAME TO described_target"
+        ))
+        .await
+        .unwrap();
+    let description_after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    let described_after: String = client
+        .query_one(
+            "SELECT pg_catalog.pg_describe_object($1::oid, $2::oid, 0)",
+            &[&class_oid, &external_oid],
         )
         .await
         .unwrap()
@@ -4465,6 +4507,20 @@ async fn postgres18_late_bound_catalog_lookup_fails_closed() {
         .unwrap();
     connection_task.abort();
     assert_ne!(rendered_before, rendered_after);
+    assert_ne!(described_before, described_after);
+    if let (Ok(before), Ok(after)) = (&description_before, &description_after) {
+        assert_eq!(before.snapshot_digest(), after.snapshot_digest());
+    }
+    assert!(
+        matches!(
+            description_before,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ) && matches!(
+            description_after,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "out-of-scope object description lookup must fail closed"
+    );
     if let (Ok(before), Ok(after)) = (&format_before, &format_after) {
         assert_eq!(before.snapshot_digest(), after.snapshot_digest());
     }

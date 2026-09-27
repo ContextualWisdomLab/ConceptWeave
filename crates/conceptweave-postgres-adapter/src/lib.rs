@@ -344,8 +344,8 @@ async fn capture_catalog(
         // functions and operators installed in pg_catalog need this check.
         // Late-bound object lookups lack pg_depend rows, so inspect
         // server-reconstructed expressions before admitting the snapshot.
-        // ponytail: this screen may reject literal lookalikes; parse expression nodes
-        // if such defaults must be admitted.
+        // ponytail: this screen rejects harmless pg_* calls and literal lookalikes;
+        // parse expression nodes and vet function semantics if they must be admitted.
         let expression_dependency = bounded(
             request,
             cancellation,
@@ -415,7 +415,7 @@ async fn capture_catalog(
                              AND c.oid = scoped.objid \
                          WHERE c.contype = 'c' AND c.conbin IS NOT NULL \
                        ) captured_expression \
-                       WHERE rendered ~* '(^|[^[:alnum:]_])(nextval|currval|setval|lastval|pg_get_[[:alnum:]_]*|to_reg[[:alnum:]_]*|obj_description|col_description|shobj_description|format_type)[[:space:]]*[(]' \
+                       WHERE rendered ~* '(^|[^[:alnum:]_])(nextval|currval|setval|lastval|pg_[[:alnum:]_]*|to_reg[[:alnum:]_]*|obj_description|col_description|shobj_description|format_type)[[:space:]]*[(]' \
                          OR rendered ~* '::[[:space:]]*reg[[:alnum:]_]*([^[:alnum:]_]|$)' \
                      )",
                 &[&schema_oid],
