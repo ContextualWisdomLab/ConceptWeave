@@ -36,6 +36,8 @@ CREATE TABLE "__SCHEMA__".risk_control_link (
         REFERENCES "__SCHEMA__".control_record (tenant_id, control_id)
 );
 CREATE INDEX risk_record_level_idx ON "__SCHEMA__".risk_record (level DESC NULLS LAST);
+CREATE INDEX risk_record_expression_idx ON "__SCHEMA__".risk_record (level, lower(title))
+    INCLUDE (score) WHERE title <> '';
 CREATE INDEX risk_record_title_idx ON "__SCHEMA__".risk_record (title)
     INCLUDE (level) WITH (fillfactor = 80) WHERE title IS NOT NULL;
 COMMENT ON INDEX "__SCHEMA__".risk_record_title_idx IS 'Review index layout';

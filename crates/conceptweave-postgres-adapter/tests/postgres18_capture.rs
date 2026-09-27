@@ -1658,10 +1658,13 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
                  x.indcheckxmin, x.indisreplident, \
                  ARRAY(SELECT a.attname::text \
                    FROM generate_series(0, x.indnatts - 1) AS s(pos) \
-                   JOIN pg_catalog.pg_attribute a ON a.attrelid = t.oid \
+                   LEFT JOIN pg_catalog.pg_attribute a ON a.attrelid = t.oid \
                      AND a.attnum = x.indkey[s.pos] ORDER BY s.pos), \
                  i.reloptions, i.reltablespace = 0, ts.spcname::text, \
-                 pg_catalog.obj_description(i.oid, 'pg_class') \
+                 pg_catalog.obj_description(i.oid, 'pg_class'), \
+                 ARRAY(SELECT CASE WHEN x.indkey[s.pos] = 0 \
+                   THEN pg_catalog.pg_get_indexdef(i.oid, s.pos + 1, false) END \
+                   FROM generate_series(0, x.indnatts - 1) AS s(pos) ORDER BY s.pos) \
                  FROM pg_catalog.pg_index x \
                  JOIN pg_catalog.pg_class t ON t.oid = x.indrelid \
                  JOIN pg_catalog.pg_class i ON i.oid = x.indexrelid \
@@ -1716,14 +1719,24 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
                 if relation_name == "risk_record" && index_name == "risk_record_key" {
                     assert!(flags.replica_identity());
                 }
-                let catalog_key_names: Vec<String> = row.get(18);
+                let catalog_key_names: Vec<Option<String>> = row.get(18);
                 let observed_key_names = index
                     .key_attributes()
                     .iter()
                     .chain(index.include_attributes())
-                    .map(|attribute| attribute.attribute_name().unwrap().to_owned())
+                    .map(|attribute| attribute.attribute_name().map(str::to_owned))
                     .collect::<Vec<_>>();
                 assert_eq!(observed_key_names, catalog_key_names);
+                let observed_key_expressions = index
+                    .key_attributes()
+                    .iter()
+                    .chain(index.include_attributes())
+                    .map(|attribute| attribute.expression_text().map(str::to_owned))
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    observed_key_expressions,
+                    row.get::<_, Vec<Option<String>>>(23)
+                );
                 let mut catalog_options = row.get::<_, Option<Vec<String>>>(19).unwrap_or_default();
                 catalog_options.sort();
                 let mut observed_options = index
