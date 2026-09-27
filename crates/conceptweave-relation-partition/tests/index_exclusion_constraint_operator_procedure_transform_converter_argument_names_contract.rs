@@ -253,6 +253,13 @@ fn ordinary_exclude_transform_converter_argument_names_preserve_location_receipt
         .unwrap();
     assert_eq!(receipt.location().argument_names(), None);
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(receipt.source_id(), snapshot.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        snapshot.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
 
     let dotted_schema =
         conceptweave_observation::QualifiedTypeName::new("payload.domain", "json").unwrap();
