@@ -530,6 +530,11 @@ fn validate_predecessors(
     }
 
     if expression_snapshot.source_connection_key() != type_modifier_snapshot.source_connection_key()
+        || expression_snapshot.source_connection_key() != rebound_expression.source_connection_key()
+        || expression_snapshot.connection_policy_binding()
+            != rebound_expression.connection_policy_binding()
+        || expression_snapshot.extractor_revision() != rebound_expression.extractor_revision()
+        || expression_snapshot.observed_at_utc() != rebound_expression.observed_at_utc()
         || expression_snapshot.connection_policy_binding()
             != type_modifier_snapshot.connection_policy_binding()
         || expression_snapshot.extractor_revision() != type_modifier_snapshot.extractor_revision()

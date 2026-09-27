@@ -724,6 +724,23 @@ fn relation_var_predecessors_reject_each_mixed_provenance_dimension() {
         assert_eq!(fresh.connection_policy_binding(), policy);
         assert_eq!(fresh.extractor_revision(), revision);
         assert_eq!(fresh.observed_at_utc(), time);
+        let stale_pair = IndexExpressionRelationVarSnapshot::new(
+            &changed.base,
+            &changed.relations,
+            &changed.indexes,
+            &changed.families,
+            &changed.exclusions,
+            &original.expressions,
+            &original.type_modifiers,
+            complete_vars(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            stale_pair,
+            ObservationError::InvalidObservationField {
+                field: "index_expression_relation_var_predecessor_provenance",
+            }
+        );
         let mixed = IndexExpressionRelationVarSnapshot::new(
             &original.base,
             &original.relations,
