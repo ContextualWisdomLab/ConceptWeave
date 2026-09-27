@@ -48,13 +48,33 @@ async fn postgres18_function_like_text_literals_remain_source_evidence() {
         .batch_execute(&format!(
             "CREATE SCHEMA {schema}; CREATE TABLE {schema}.record \
              (title text DEFAULT 'pg_sleep(1)::regclass', \
-             CONSTRAINT literal_text CHECK (title <> 'pg_sleep(1)::regclass'))"
+             CONSTRAINT literal_text CHECK (title <> 'pg_sleep(1)::regclass')); \
+             CREATE INDEX literal_predicate ON {schema}.record (title) \
+             WHERE title <> 'pg_sleep(1)::regclass'"
         ))
         .await
         .unwrap();
-    let observed = adapter(config)
+    let observed = adapter(config.clone())
         .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
         .await;
+    let mut alias_results = Vec::new();
+    for (data_type, default_value) in [
+        ("regclass", "'pg_catalog.pg_class'::regclass"),
+        ("regclass[]", "'{}'::regclass[]"),
+    ] {
+        client
+            .batch_execute(&format!(
+                "DROP TABLE {schema}.record; CREATE TABLE {schema}.record \
+                 (target {data_type} DEFAULT {default_value})"
+            ))
+            .await
+            .unwrap();
+        alias_results.push(
+            adapter(config.clone())
+                .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+                .await,
+        );
+    }
     client
         .batch_execute(&format!("DROP SCHEMA {schema} CASCADE"))
         .await
@@ -65,6 +85,12 @@ async fn postgres18_function_like_text_literals_remain_source_evidence() {
         snapshot.column_expressions().unwrap()[0].expression(),
         Some("'pg_sleep(1)::regclass'::text")
     );
+    for result in alias_results {
+        assert_eq!(
+            result,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        );
+    }
 }
 
 #[tokio::test]
