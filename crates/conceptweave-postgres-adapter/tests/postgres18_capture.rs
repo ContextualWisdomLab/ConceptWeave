@@ -1914,12 +1914,20 @@ async fn postgres18_collation_version_drift_changes_source_identity() {
             panic!("one referenced collation definition must be captured");
         };
         assert_eq!(definition.provider(), CollationProvider::Icu);
+        assert_eq!(definition.comment(), None);
         assert_eq!(definition.fields().recorded_version(), Some("0"));
         assert_ne!(
             definition.fields().recorded_version(),
             definition.fields().actual_version()
         );
         let location = SchemaObjectLocation::collation(&schema, "casefold").unwrap();
+        assert_eq!(location.collation_name(), Some("casefold"));
+        assert_eq!(
+            SchemaObjectLocation::relation(&schema, "record", RelationKind::Table)
+                .unwrap()
+                .collation_name(),
+            None
+        );
         let receipt = before.source_receipt(location.clone()).unwrap();
         assert_eq!(receipt.location(), &location);
         assert_eq!(receipt.source_digest(), before.snapshot_digest());
@@ -1945,6 +1953,32 @@ async fn postgres18_collation_version_drift_changes_source_identity() {
             refreshed.fields().recorded_version(),
             refreshed.fields().actual_version()
         );
+        assert_eq!(refreshed.comment(), None);
+        client
+            .batch_execute(&format!(
+                "COMMENT ON COLLATION \"{schema}\".casefold IS 'Exact source description / ~'"
+            ))
+            .await
+            .unwrap();
+        let described = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 128, 16_384), &NotCancelled)
+            .await?;
+        assert_eq!(
+            described.collation_definitions().unwrap()[0].comment(),
+            Some("Exact source description / ~")
+        );
+        assert_ne!(after.snapshot_digest(), described.snapshot_digest());
+        client
+            .batch_execute(&format!(
+                "COMMENT ON COLLATION \"{schema}\".casefold IS NULL"
+            ))
+            .await
+            .unwrap();
+        let restored = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 128, 16_384), &NotCancelled)
+            .await?;
+        assert_eq!(restored.collation_definitions().unwrap()[0].comment(), None);
+        assert_eq!(after.snapshot_digest(), restored.snapshot_digest());
         Ok::<_, SourceObservationFailure>(())
     }
     .await;
