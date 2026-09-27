@@ -4049,6 +4049,86 @@ async fn postgres18_external_expression_type_dependency_fails_closed() {
 }
 
 #[tokio::test]
+async fn postgres18_user_cast_between_builtin_types_fails_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let is_superuser: bool = client
+        .query_one(
+            "SELECT rolsuper FROM pg_catalog.pg_roles WHERE rolname = current_user",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    let cast_exists: bool = client
+        .query_one(
+            "SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_cast \
+             WHERE castsource = 'uuid'::regtype AND casttarget = 'integer'::regtype)",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    if !is_superuser || cast_exists {
+        eprintln!(
+            "skipping built-in cast fixture: setup requires a superuser and unused cast pair"
+        );
+        connection_task.abort();
+        return;
+    }
+    let schema = format!("cw_builtin_cast_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; CREATE CAST (uuid AS integer) WITH INOUT; \
+             CREATE TABLE \"{schema}\".record (id uuid, \
+               CONSTRAINT id_positive CHECK ((id::integer) > 0))"
+        ))
+        .await
+        .unwrap();
+    let inout = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP TABLE \"{schema}\".record; DROP CAST (uuid AS integer); \
+             CREATE CAST (uuid AS integer) WITH FUNCTION pg_catalog.uuid_hash(uuid); \
+             CREATE TABLE \"{schema}\".record (id uuid, \
+               CONSTRAINT id_positive CHECK ((id::integer) > 0))"
+        ))
+        .await
+        .unwrap();
+    let function = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA \"{schema}\" CASCADE; DROP CAST (uuid AS integer)"
+        ))
+        .await
+        .unwrap();
+    let admitted_digests = inout
+        .as_ref()
+        .ok()
+        .zip(function.as_ref().ok())
+        .map(|(first, second)| (first.snapshot_digest(), second.snapshot_digest()));
+    assert!(
+        matches!(
+            inout,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ) && matches!(
+            function,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "user cast semantics must fail closed: {admitted_digests:?}"
+    );
+    connection_task.abort();
+}
+
+#[tokio::test]
 async fn postgres18_user_collation_in_pg_catalog_fails_closed() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;

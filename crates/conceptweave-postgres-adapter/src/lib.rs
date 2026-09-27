@@ -284,6 +284,8 @@ async fn capture_catalog(
     let mut expression_collations = BTreeSet::new();
     let allowed_schemas = request.request().allowed_schema_names().to_vec();
     for schema in request.request().allowed_schema_names() {
+        // ponytail: refuse database-wide user casts between bootstrap types until parsed
+        // expression evidence can bind the exact cast method and function.
         let schema_row = bounded(
             request,
             cancellation,
@@ -299,7 +301,9 @@ async fn capture_catalog(
                    OR EXISTS(SELECT 1 FROM pg_catalog.pg_cast ca \
                      JOIN pg_catalog.pg_type source_type ON source_type.oid = ca.castsource \
                      JOIN pg_catalog.pg_type target_type ON target_type.oid = ca.casttarget \
-                     WHERE (source_type.typnamespace = n.oid OR target_type.typnamespace = n.oid) \
+                     WHERE (source_type.typnamespace = n.oid OR target_type.typnamespace = n.oid \
+                       OR (ca.oid >= 16384::oid AND source_type.oid < 16384::oid \
+                         AND target_type.oid < 16384::oid)) \
                        AND NOT (source_type.typtype = 'r' AND target_type.typtype = 'm' \
                          AND ca.castmethod = 'f' AND ca.castcontext = 'e' \
                          AND EXISTS(SELECT 1 FROM pg_catalog.pg_range rg \
