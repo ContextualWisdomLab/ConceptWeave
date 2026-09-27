@@ -400,18 +400,47 @@ fn matching_exclusion_semantics_are_admissible_and_complete() {
         }
     }
 
-    let missing = IndexExclusionSemanticsSnapshot::new(
-        &base,
-        &relations,
-        &indexes,
-        &families,
-        vec![exclusion(parent_index(), "=", "int4eq", 3)],
-    )
-    .expect_err("every exclusion-index key requires semantic evidence");
-    assert_eq!(
-        missing,
-        ObservationError::InvalidObservationField {
-            field: "index_exclusion_semantics_completeness",
+    let complete = snapshot.observations().to_vec();
+    for position in 0..complete.len() {
+        let mut missing = complete.clone();
+        missing.remove(position);
+        let mut duplicate = complete.clone();
+        duplicate.push(complete[position].clone());
+        let mut extra = complete.clone();
+        let original = &complete[position];
+        extra.push(
+            IndexKeyExclusionSemanticsObservation::new(
+                original.index().clone(),
+                2,
+                original.operator().clone(),
+                original.procedure().clone(),
+                original.strategy(),
+            )
+            .unwrap(),
+        );
+        for (observations, field) in [
+            (missing, "index_exclusion_semantics_completeness"),
+            (duplicate, "index_exclusion_semantics_coordinate"),
+            (extra, "index_exclusion_semantics_completeness"),
+        ] {
+            assert_eq!(
+                IndexExclusionSemanticsSnapshot::new(
+                    &base,
+                    &relations,
+                    &indexes,
+                    &families,
+                    observations,
+                )
+                .unwrap_err(),
+                ObservationError::InvalidObservationField { field }
+            );
         }
+    }
+    let mut reversed = complete;
+    reversed.reverse();
+    assert_eq!(
+        snapshot,
+        IndexExclusionSemanticsSnapshot::new(&base, &relations, &indexes, &families, reversed,)
+            .unwrap()
     );
 }
