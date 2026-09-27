@@ -4834,6 +4834,57 @@ async fn postgres18_late_bound_privilege_lookup_fails_closed() {
 }
 
 #[tokio::test]
+async fn postgres18_session_dependent_checks_fail_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_session_check_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA {schema}; CREATE TABLE {schema}.record \
+             (id integer, CONSTRAINT configured CHECK \
+             (current_setting('application_name') = 'trusted'))"
+        ))
+        .await
+        .unwrap();
+    let observed = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP TABLE {schema}.record; CREATE TABLE {schema}.record \
+             (id integer, CONSTRAINT dated CHECK (CURRENT_DATE > DATE '2000-01-01'))"
+        ))
+        .await
+        .unwrap();
+    let observed_date = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA {schema} CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    assert!(
+        matches!(
+            observed,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "session-dependent CHECK must fail closed: {observed:?}"
+    );
+    assert!(
+        matches!(
+            observed_date,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "date-dependent CHECK must fail closed: {observed_date:?}"
+    );
+}
+
+#[tokio::test]
 async fn postgres18_late_bound_catalog_lookup_fails_closed() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;

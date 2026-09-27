@@ -349,7 +349,9 @@ async fn capture_catalog(
         // PostgreSQL assigns normal user objects OIDs from 16384 onward; even
         // functions and operators installed in pg_catalog need this check.
         // Late-bound object lookups lack pg_depend rows, so inspect
-        // server-reconstructed expressions before admitting the snapshot.
+        // server-reconstructed expressions and PostgreSQL 18 expression nodes
+        // before admitting the snapshot. Built-in function calls also lack
+        // ordinary pg_depend rows.
         // ponytail: this screen rejects harmless pg_* calls and literal lookalikes;
         // parse expression nodes and vet function semantics if they must be admitted.
         let expression_dependency = bounded(
@@ -431,6 +433,36 @@ async fn capture_catalog(
                        ) captured_expression \
                        WHERE rendered ~* '(^|[^[:alnum:]_])(nextval|currval|setval|lastval|pg_[[:alnum:]_]*|to_reg[[:alnum:]_]*|reg[[:alnum:]_]*in|obj_description|col_description|shobj_description|format_type|oidvectortypes|has_[[:alnum:]_]*_privilege|row_security_active)[[:space:]]*[(]' \
                          OR rendered ~* '::[[:space:]]*reg[[:alnum:]_]*([^[:alnum:]_]|$)' \
+                     ) OR EXISTS( \
+                       SELECT 1 FROM ( \
+                         SELECT ad.adbin::text AS tree FROM captured_object scoped \
+                         JOIN pg_catalog.pg_attrdef ad \
+                           ON scoped.classid = 'pg_attrdef'::regclass AND ad.oid = scoped.objid \
+                         UNION ALL SELECT t.typdefaultbin::text FROM captured_object scoped \
+                         JOIN pg_catalog.pg_type t \
+                           ON scoped.classid = 'pg_type'::regclass AND t.oid = scoped.objid \
+                         WHERE t.typdefaultbin IS NOT NULL \
+                         UNION ALL SELECT c.conbin::text FROM captured_object scoped \
+                         JOIN pg_catalog.pg_constraint c \
+                           ON scoped.classid = 'pg_constraint'::regclass AND c.oid = scoped.objid \
+                         WHERE c.conbin IS NOT NULL \
+                         UNION ALL SELECT i.indexprs::text FROM captured_object scoped \
+                         JOIN pg_catalog.pg_index i \
+                           ON scoped.classid = 'pg_class'::regclass AND i.indexrelid = scoped.objid \
+                         WHERE i.indexprs IS NOT NULL \
+                         UNION ALL SELECT i.indpred::text FROM captured_object scoped \
+                         JOIN pg_catalog.pg_index i \
+                           ON scoped.classid = 'pg_class'::regclass AND i.indexrelid = scoped.objid \
+                         WHERE i.indpred IS NOT NULL \
+                       ) captured_tree \
+                       WHERE tree ~ 'SQLVALUEFUNCTION' \
+                         OR EXISTS( \
+                           SELECT 1 FROM pg_catalog.regexp_matches( \
+                             tree, ':funcid ([0-9]+)', 'g') function_oid \
+                           LEFT JOIN pg_catalog.pg_proc p ON p.oid = function_oid[1]::oid \
+                           WHERE p.oid IS NULL OR p.provolatile <> 'i' \
+                             OR p.pronamespace <> 'pg_catalog'::regnamespace \
+                             OR p.oid >= 16384::oid) \
                      )",
                 &[&schema_oid, &allowed_schemas],
             ),
