@@ -310,7 +310,23 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
+        assert!(matches!(
+            FilePublicationStore::new(&root),
+            Err(PublicationStoreError::InvalidRoot)
+        ));
+        assert!(!root.exists(), "opening an absent root must not create it");
+        fs::write(&root, b"not a directory").unwrap();
+        assert!(matches!(
+            FilePublicationStore::new(&root),
+            Err(PublicationStoreError::InvalidRoot)
+        ));
+        fs::remove_file(&root).unwrap();
         fs::create_dir(&root).unwrap();
+        fs::set_permissions(&root, fs::Permissions::from_mode(0o777)).unwrap();
+        assert!(matches!(
+            FilePublicationStore::new(&root),
+            Err(PublicationStoreError::InvalidRoot)
+        ));
         fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
         let store = FilePublicationStore::new(&root).unwrap();
         let bytes = b"immutable model";
@@ -335,6 +351,12 @@ mod tests {
             ],
         )
         .unwrap();
+        let unpinned = SemanticReleaseClient::new("1.0.0").unwrap();
+        assert!(matches!(
+            store.read_verified(&unpinned, &release),
+            Err(PublicationStoreError::ReleaseNotAdmitted)
+        ));
+        assert!(!store.release_path(release.release_id()).exists());
         assert!(store.read_verified(&pinned, &release).unwrap().is_none());
         assert!(matches!(
             store.issue_record(&release, b"changed model"),
