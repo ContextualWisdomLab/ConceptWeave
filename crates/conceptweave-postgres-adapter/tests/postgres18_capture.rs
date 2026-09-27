@@ -36,6 +36,58 @@ use ring::{
 use tokio_postgres::{Config, NoTls};
 
 #[tokio::test]
+async fn postgres18_scalar_array_comparison_preserves_optional_function_slots() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_array_comparison_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA {schema}; CREATE TABLE {schema}.record \
+         (id integer, allowed boolean GENERATED ALWAYS AS (id = ANY (ARRAY[1,2])) STORED, \
+         choice boolean DEFAULT (1 = ANY (ARRAY[1,2])), \
+         CONSTRAINT allowed_values CHECK (id = ANY (ARRAY[1,2])), \
+         CONSTRAINT forbidden_values CHECK (id <> ALL (ARRAY[3,4]))); \
+         CREATE INDEX membership_expression ON {schema}.record ((id = ANY (ARRAY[1,2]))) \
+         WHERE id <> ALL (ARRAY[3,4]); \
+         CREATE DOMAIN {schema}.membership_boolean AS boolean DEFAULT (1 = ANY (ARRAY[1,2]))"
+        ))
+        .await
+        .unwrap();
+    let trees: Vec<String> = client
+        .query(
+            "SELECT c.conbin::text FROM pg_catalog.pg_constraint c \
+         JOIN pg_catalog.pg_namespace n ON n.oid = c.connamespace \
+         WHERE n.nspname = $1 AND c.contype = 'c'",
+            &[&schema],
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|row| row.get(0))
+        .collect();
+    let observed = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA {schema} CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    assert_eq!(trees.len(), 2);
+    assert!(trees.iter().all(|tree| tree.contains("SCALARARRAYOPEXPR")
+        && tree.contains(":hashfuncid 0")
+        && tree.contains(":negfuncid 0")));
+    let snapshot = observed.unwrap();
+    assert_eq!(snapshot.domains().len(), 1);
+    assert_eq!(snapshot.relations()[0].indexes().len(), 1);
+    assert_eq!(snapshot.relations()[0].columns().len(), 3);
+}
+
+#[tokio::test]
 async fn postgres18_function_like_text_literals_remain_source_evidence() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;

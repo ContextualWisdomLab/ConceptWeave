@@ -1,11 +1,11 @@
 //! Bounded reader for PostgreSQL 18's catalog expression serialization.
 //!
 //! Catalog OIDs are transient lookup keys, never governed semantic identities. This reader only
-//! separates node fields and locates I/O coercion types; catalog validation remains the adapter's
+//! separates node fields and locates dependency OIDs; catalog validation remains the adapter's
 //! responsibility. Grammar follows PostgreSQL 18 `outfuncs.c`, including escaped tokens and Datum
 //! byte arrays. Unknown coercion argument types fail rather than borrowing a nested child's type.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::{CaptureMeter, bounded, field};
 use conceptweave_source_port::{
@@ -14,8 +14,11 @@ use conceptweave_source_port::{
 use futures_util::TryStreamExt;
 use tokio_postgres::{Transaction, types::ToSql};
 
-/// Validates parsed I/O coercions against the same transaction's catalog generation.
-pub(super) async fn validate_io_coercions(
+// Catalog-name policy is conservative; expression fields themselves are read structurally.
+const FORBIDDEN_FUNCTION_NAMES: &str = "^(nextval|currval|setval|lastval|pg_.*|to_reg.*|reg.*in|obj_description|col_description|shobj_description|format_type|oidvectortypes|has_.*_privilege|row_security_active)$";
+
+/// Validates parsed dependency fields against the same transaction's catalog generation.
+pub(super) async fn validate_dependencies(
     transaction: &Transaction<'_>,
     request: &AuthorizedObservationRequest,
     cancellation: &dyn ObservationCancellation,
@@ -40,14 +43,13 @@ pub(super) async fn validate_io_coercions(
          UNION ALL SELECT i.indpred::text FROM pg_catalog.pg_index i \
          JOIN pg_catalog.pg_class c ON c.oid = i.indexrelid \
          WHERE c.relnamespace = $1 AND i.indpred IS NOT NULL \
-         ) SELECT CASE WHEN octet_length(tree)::bigint <= $2 THEN tree END FROM trees \
-         WHERE pg_catalog.strpos(tree, '{COERCEVIAIO ') > 0",
+         ) SELECT CASE WHEN octet_length(tree)::bigint <= $2 THEN tree END FROM trees",
             vec![&schema_oid as &(dyn ToSql + Sync), &max_bytes],
         ),
     )
     .await?;
     tokio::pin!(stream);
-    let mut pairs = std::collections::BTreeSet::new();
+    let mut dependencies = ExpressionDependencies::default();
     while let Some(row) = bounded(request, cancellation, stream.try_next()).await? {
         let tree = field::<Option<String>>(&row, 0)?.ok_or(
             SourceObservationFailure::ByteLimitExceeded {
@@ -55,37 +57,73 @@ pub(super) async fn validate_io_coercions(
             },
         )?;
         meter.add(request, tree.len())?;
-        pairs.extend(
-            io_coercion_pairs(&tree)
-                .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?,
-        );
+        let captured = expression_dependencies(&tree)
+            .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+        dependencies.functions.extend(captured.functions);
+        dependencies.types.extend(captured.types);
+        dependencies.operators.extend(captured.operators);
+        dependencies.io_coercions.extend(captured.io_coercions);
     }
-    if pairs.is_empty() {
-        return Ok(());
-    }
-    let (sources, targets): (Vec<u32>, Vec<u32>) = pairs.into_iter().unzip();
+    let functions: Vec<u32> = dependencies.functions.into_iter().collect();
+    let types: Vec<u32> = dependencies.types.into_iter().collect();
+    let (operators, cached_functions): (Vec<u32>, Vec<u32>) =
+        dependencies.operators.into_iter().unzip();
+    let (sources, targets): (Vec<u32>, Vec<u32>) = dependencies.io_coercions.into_iter().unzip();
     let row = bounded(
         request,
         cancellation,
         transaction.query_one(
-            "SELECT count(*) FROM unnest($1::oid[], $2::oid[]) AS pair(source_oid, target_oid) \
-         JOIN pg_catalog.pg_type source_type ON source_type.oid = pair.source_oid \
-         JOIN pg_catalog.pg_type target_type ON target_type.oid = pair.target_oid \
-         JOIN pg_catalog.pg_proc output_fn ON output_fn.oid = source_type.typoutput \
-         JOIN pg_catalog.pg_proc input_fn ON input_fn.oid = target_type.typinput \
-         WHERE source_type.oid < 16384::oid AND target_type.oid < 16384::oid \
-         AND source_type.typnamespace = 'pg_catalog'::regnamespace \
-         AND target_type.typnamespace = 'pg_catalog'::regnamespace \
-         AND output_fn.oid < 16384::oid AND input_fn.oid < 16384::oid \
-         AND output_fn.pronamespace = 'pg_catalog'::regnamespace \
-         AND input_fn.pronamespace = 'pg_catalog'::regnamespace \
-         AND output_fn.provolatile = 'i' AND input_fn.provolatile = 'i'",
-            &[&sources, &targets],
+            "SELECT EXISTS( \
+           SELECT 1 FROM unnest($1::oid[]) f(oid) \
+           LEFT JOIN pg_catalog.pg_proc p ON p.oid = f.oid \
+           WHERE p.oid IS NULL OR p.provolatile <> 'i' \
+             OR p.pronamespace <> 'pg_catalog'::regnamespace OR p.oid >= 16384::oid \
+             OR p.proname ~ $7 \
+         ) OR EXISTS( \
+           SELECT 1 FROM unnest($2::oid[]) referenced(oid) \
+           LEFT JOIN pg_catalog.pg_type t ON t.oid = referenced.oid \
+           LEFT JOIN pg_catalog.pg_type element ON element.oid = t.typelem \
+           WHERE t.oid IS NULL \
+             OR (t.typnamespace = 'pg_catalog'::regnamespace AND t.typname ~ '^reg') \
+             OR (element.typnamespace = 'pg_catalog'::regnamespace AND element.typname ~ '^reg') \
+         ) OR EXISTS( \
+           SELECT 1 FROM unnest($3::oid[], $4::oid[]) pair(operator_oid, cached_function_oid) \
+           LEFT JOIN pg_catalog.pg_operator o ON o.oid = pair.operator_oid \
+           LEFT JOIN pg_catalog.pg_proc p ON p.oid = o.oprcode \
+           WHERE o.oid IS NULL OR o.oprnamespace <> 'pg_catalog'::regnamespace \
+             OR o.oid >= 16384::oid OR p.oid IS NULL OR p.provolatile <> 'i' \
+             OR p.pronamespace <> 'pg_catalog'::regnamespace OR p.oid >= 16384::oid \
+             OR p.proname ~ $7 \
+             OR (pair.cached_function_oid <> 0::oid AND pair.cached_function_oid <> o.oprcode) \
+         ) OR EXISTS( \
+           SELECT 1 FROM unnest($5::oid[], $6::oid[]) pair(source_oid, target_oid) \
+           LEFT JOIN pg_catalog.pg_type source_type ON source_type.oid = pair.source_oid \
+           LEFT JOIN pg_catalog.pg_type target_type ON target_type.oid = pair.target_oid \
+           LEFT JOIN pg_catalog.pg_proc output_fn ON output_fn.oid = source_type.typoutput \
+           LEFT JOIN pg_catalog.pg_proc input_fn ON input_fn.oid = target_type.typinput \
+           WHERE source_type.oid IS NULL OR target_type.oid IS NULL \
+             OR output_fn.oid IS NULL OR input_fn.oid IS NULL \
+             OR source_type.oid >= 16384::oid OR target_type.oid >= 16384::oid \
+             OR source_type.typnamespace <> 'pg_catalog'::regnamespace \
+             OR target_type.typnamespace <> 'pg_catalog'::regnamespace \
+             OR output_fn.oid >= 16384::oid OR input_fn.oid >= 16384::oid \
+             OR output_fn.pronamespace <> 'pg_catalog'::regnamespace \
+             OR input_fn.pronamespace <> 'pg_catalog'::regnamespace \
+             OR output_fn.provolatile <> 'i' OR input_fn.provolatile <> 'i')",
+            &[
+                &functions,
+                &types,
+                &operators,
+                &cached_functions,
+                &sources,
+                &targets,
+                &FORBIDDEN_FUNCTION_NAMES,
+            ],
         ),
     )
     .await?;
-    meter.add(request, 8)?;
-    if field::<i64>(&row, 0)? as usize != sources.len() {
+    meter.add(request, 1)?;
+    if field::<bool>(&row, 0)? {
         return Err(SourceObservationFailure::InvalidCapturedMetadata);
     }
     Ok(())
@@ -104,11 +142,16 @@ enum Value<'a> {
     Datum,
 }
 
-/// Reads all I/O coercions and the exact type of each coercion's immediate argument.
-///
-/// The caller must bound input bytes before invoking this function. Nesting is independently
-/// bounded here. Returned OIDs must be resolved within the same captured catalog transaction.
-fn io_coercion_pairs(tree: &str) -> Result<Vec<(u32, u32)>, InvalidExpressionTree> {
+#[derive(Debug, Default, Eq, PartialEq)]
+struct ExpressionDependencies {
+    functions: BTreeSet<u32>,
+    types: BTreeSet<u32>,
+    operators: BTreeSet<(u32, u32)>,
+    io_coercions: BTreeSet<(u32, u32)>,
+}
+
+/// The caller bounds bytes; nesting is bounded here. OIDs are same-transaction lookup keys.
+fn expression_dependencies(tree: &str) -> Result<ExpressionDependencies, InvalidExpressionTree> {
     let mut reader = Reader {
         input: tree,
         offset: 0,
@@ -117,35 +160,107 @@ fn io_coercion_pairs(tree: &str) -> Result<Vec<(u32, u32)>, InvalidExpressionTre
     if reader.peek().is_some() {
         return Err(InvalidExpressionTree);
     }
-    let mut pairs = Vec::new();
-    collect_pairs(&root, &mut pairs)?;
-    Ok(pairs)
+    let mut dependencies = ExpressionDependencies::default();
+    collect_dependencies(&root, &mut dependencies)?;
+    Ok(dependencies)
 }
 
-fn collect_pairs(
+fn collect_dependencies(
     value: &Value<'_>,
-    pairs: &mut Vec<(u32, u32)>,
+    dependencies: &mut ExpressionDependencies,
 ) -> Result<(), InvalidExpressionTree> {
     match value {
         Value::Node(kind, fields) => {
+            if *kind == "SQLVALUEFUNCTION" {
+                return Err(InvalidExpressionTree);
+            }
             if *kind == "COERCEVIAIO" {
-                pairs.push((
+                dependencies.io_coercions.insert((
                     result_type(fields.get("arg").ok_or(InvalidExpressionTree)?)?,
                     oid(fields, "resulttype")?,
                 ));
             }
-            for child in fields.values() {
-                collect_pairs(child, pairs)?;
+            let operator_node = matches!(
+                *kind,
+                "OPEXPR" | "DISTINCTEXPR" | "NULLIFEXPR" | "SCALARARRAYOPEXPR"
+            );
+            if operator_node {
+                dependencies.operators.insert((
+                    oid(fields, "opno")?,
+                    scalar_oid(fields.get("opfuncid").ok_or(InvalidExpressionTree)?)?,
+                ));
+            }
+            if *kind == "SCALARARRAYOPEXPR" {
+                for slot in ["hashfuncid", "negfuncid"] {
+                    scalar_oid(fields.get(slot).ok_or(InvalidExpressionTree)?)?;
+                }
+            }
+            if *kind == "FUNCEXPR" {
+                oid(fields, "funcid")?;
+            }
+            if *kind == "ROWCOMPAREEXPR" {
+                let Some(Value::List(opnos)) = fields.get("opnos") else {
+                    return Err(InvalidExpressionTree);
+                };
+                if !matches!(opnos.first(), Some(Value::Atom("o"))) || opnos.len() < 2 {
+                    return Err(InvalidExpressionTree);
+                }
+                for value in &opnos[1..] {
+                    let operator = scalar_oid(value)?;
+                    if operator == 0 {
+                        return Err(InvalidExpressionTree);
+                    }
+                    dependencies.operators.insert((operator, 0));
+                }
+            }
+            for (name, child) in fields {
+                if name.ends_with("funcid") {
+                    let function = scalar_oid(child)?;
+                    let optional = (operator_node && *name == "opfuncid")
+                        || (*kind == "SCALARARRAYOPEXPR"
+                            && matches!(*name, "hashfuncid" | "negfuncid"));
+                    if function == 0 && !optional {
+                        return Err(InvalidExpressionTree);
+                    }
+                    if function != 0 {
+                        dependencies.functions.insert(function);
+                    }
+                }
+                if matches!(
+                    *name,
+                    "consttype"
+                        | "vartype"
+                        | "resulttype"
+                        | "funcresulttype"
+                        | "opresulttype"
+                        | "casetype"
+                        | "coalescetype"
+                        | "array_typeid"
+                        | "element_typeid"
+                        | "minmaxtype"
+                        | "row_typeid"
+                        | "typeId"
+                ) {
+                    dependencies.types.insert(oid(fields, name)?);
+                }
+                collect_dependencies(child, dependencies)?;
             }
         }
         Value::List(values) => {
             for child in values {
-                collect_pairs(child, pairs)?;
+                collect_dependencies(child, dependencies)?;
             }
         }
         Value::Atom(_) | Value::Datum => {}
     }
     Ok(())
+}
+
+fn scalar_oid(value: &Value<'_>) -> Result<u32, InvalidExpressionTree> {
+    match value {
+        Value::Atom(token) => token.parse::<u32>().map_err(|_| InvalidExpressionTree),
+        _ => Err(InvalidExpressionTree),
+    }
 }
 
 fn result_type(value: &Value<'_>) -> Result<u32, InvalidExpressionTree> {
@@ -172,14 +287,11 @@ fn result_type(value: &Value<'_>) -> Result<u32, InvalidExpressionTree> {
 }
 
 fn oid(fields: &BTreeMap<&str, Value<'_>>, field: &str) -> Result<u32, InvalidExpressionTree> {
-    match fields.get(field) {
-        Some(Value::Atom(token)) => token
-            .parse::<u32>()
-            .ok()
-            .filter(|value| *value != 0)
-            .ok_or(InvalidExpressionTree),
-        _ => Err(InvalidExpressionTree),
+    let value = scalar_oid(fields.get(field).ok_or(InvalidExpressionTree)?)?;
+    if value == 0 {
+        return Err(InvalidExpressionTree);
     }
+    Ok(value)
 }
 
 struct Reader<'a> {
@@ -297,15 +409,60 @@ impl<'a> Reader<'a> {
 mod tests {
     use super::*;
 
+    fn io_coercion_pairs(tree: &str) -> Result<Vec<(u32, u32)>, InvalidExpressionTree> {
+        Ok(expression_dependencies(tree)?
+            .io_coercions
+            .into_iter()
+            .collect())
+    }
+
+    #[test]
+    fn optional_procedure_slots_require_their_own_operator_context() {
+        let unfilled = expression_dependencies(
+            "{SCALARARRAYOPEXPR :opno 96 :opfuncid 0 :hashfuncid 0 :negfuncid 0 :args ({VAR :vartype 23})}"
+        ).unwrap();
+        assert!(unfilled.functions.is_empty());
+        assert_eq!(unfilled.operators, BTreeSet::from([(96, 0)]));
+        assert_eq!(unfilled.types, BTreeSet::from([23]));
+        let populated = expression_dependencies(
+            "{SCALARARRAYOPEXPR :opno 96 :opfuncid 65 :hashfuncid 450 :negfuncid 65}",
+        )
+        .unwrap();
+        assert_eq!(populated.functions, BTreeSet::from([65, 450]));
+        assert_eq!(populated.operators, BTreeSet::from([(96, 65)]));
+        let row = expression_dependencies("{ROWCOMPAREEXPR :opnos (o 97 97)}").unwrap();
+        assert_eq!(row.operators, BTreeSet::from([(97, 0)]));
+        assert!(expression_dependencies("{NODE :label SQLVALUEFUNCTION}").is_ok());
+        for malformed in [
+            "{FUNCEXPR :funcid 0}",
+            "{FUNCEXPR}",
+            "{NODE :hashfuncid 0}",
+            "{SQLVALUEFUNCTION :type 1082}",
+            "{SCALARARRAYOPEXPR :opno 0 :opfuncid 0 :hashfuncid 0 :negfuncid 0}",
+            "{SCALARARRAYOPEXPR :opno 96 :opfuncid 65 :hashfuncid -1 :negfuncid 0}",
+            "{SCALARARRAYOPEXPR :opno 96 :opfuncid 65 :hashfuncid 0}",
+            "{OPEXPR :opno 96 :opfuncid <>}",
+            "{ROWCOMPAREEXPR :opnos (i 97)}",
+            "{ROWCOMPAREEXPR :opnos (o)}",
+            "{ROWCOMPAREEXPR :opnos (o 0)}",
+        ] {
+            assert_eq!(
+                expression_dependencies(malformed),
+                Err(InvalidExpressionTree),
+                "{malformed}"
+            );
+        }
+    }
+
     #[test]
     fn nested_coercion_uses_its_arguments_own_type_and_rejects_ambiguous_input() {
-        let composed = "{COERCEVIAIO :arg {OPEXPR :opresulttype 23 :args ({VAR :vartype 20} {CONST :consttype 23 :constvalue 4 [ 1 0 0 0 0 0 0 0 ]})} :resulttype 25}";
+        let composed = "{COERCEVIAIO :arg {OPEXPR :opno 551 :opfuncid 177 :opresulttype 23 :args ({VAR :vartype 20} {CONST :consttype 23 :constvalue 4 [ 1 0 0 0 0 0 0 0 ]})} :resulttype 25}";
         assert_eq!(io_coercion_pairs(composed), Ok(vec![(23, 25)]));
         assert_eq!(
             io_coercion_pairs(
                 "{COERCEVIAIO :arg {COERCEVIAIO :arg {VAR :vartype 23} :resulttype 25} :resulttype 1043}"
             ),
-            Ok(vec![(25, 1043), (23, 25)])
+            Ok(vec![(23, 25), (25, 1043)])
         );
         assert_eq!(
             io_coercion_pairs(

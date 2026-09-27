@@ -353,9 +353,9 @@ async fn capture_catalog(
         // server-reconstructed expressions and PostgreSQL 18 expression nodes
         // before admitting the snapshot. Built-in functions and operator
         // implementations also lack ordinary pg_depend rows.
-        // I/O coercions bind their immediate argument type through parsed nodes.
+        // Parsed nodes bind procedure/type/operator references and I/O argument types.
         // Other dependency screens below remain conservative for unsupported semantics.
-        expression_nodes::validate_io_coercions(
+        expression_nodes::validate_dependencies(
             &transaction,
             request,
             cancellation,
@@ -418,56 +418,6 @@ async fn capture_catalog(
                            WHERE d.classid = 'pg_attrdef'::regclass \
                              AND own_default.oid = d.objid \
                              AND own_default.adrelid = d.refobjid))))) \
-                     ) OR EXISTS( \
-                       SELECT 1 FROM ( \
-                         SELECT ad.adbin::text AS tree FROM captured_object scoped \
-                         JOIN pg_catalog.pg_attrdef ad \
-                           ON scoped.classid = 'pg_attrdef'::regclass AND ad.oid = scoped.objid \
-                         UNION ALL SELECT t.typdefaultbin::text FROM captured_object scoped \
-                         JOIN pg_catalog.pg_type t \
-                           ON scoped.classid = 'pg_type'::regclass AND t.oid = scoped.objid \
-                         WHERE t.typdefaultbin IS NOT NULL \
-                         UNION ALL SELECT c.conbin::text FROM captured_object scoped \
-                         JOIN pg_catalog.pg_constraint c \
-                           ON scoped.classid = 'pg_constraint'::regclass AND c.oid = scoped.objid \
-                         WHERE c.conbin IS NOT NULL \
-                         UNION ALL SELECT i.indexprs::text FROM captured_object scoped \
-                         JOIN pg_catalog.pg_index i \
-                           ON scoped.classid = 'pg_class'::regclass AND i.indexrelid = scoped.objid \
-                         WHERE i.indexprs IS NOT NULL \
-                         UNION ALL SELECT i.indpred::text FROM captured_object scoped \
-                         JOIN pg_catalog.pg_index i \
-                           ON scoped.classid = 'pg_class'::regclass AND i.indexrelid = scoped.objid \
-                         WHERE i.indpred IS NOT NULL \
-                       ) captured_tree \
-                       WHERE tree ~ 'SQLVALUEFUNCTION' \
-                         OR EXISTS( \
-                           SELECT 1 FROM pg_catalog.regexp_matches( \
-                             tree, ':([[:alnum:]_]*funcid) ([0-9]+)', 'g') function_oid \
-                           LEFT JOIN pg_catalog.pg_proc p ON p.oid = function_oid[2]::oid \
-                           WHERE p.oid IS NULL OR p.provolatile <> 'i' \
-                             OR p.pronamespace <> 'pg_catalog'::regnamespace \
-                             OR p.oid >= 16384::oid \
-                             OR p.proname ~ '^(nextval|currval|setval|lastval|pg_.*|to_reg.*|reg.*in|obj_description|col_description|shobj_description|format_type|oidvectortypes|has_.*_privilege|row_security_active)$') \
-                         OR EXISTS( \
-                           SELECT 1 FROM pg_catalog.regexp_matches( \
-                             tree, ':(consttype|vartype|resulttype|funcresulttype|opresulttype|casetype|coalescetype|array_typeid|element_typeid) ([0-9]+)', 'g') type_oid \
-                           JOIN pg_catalog.pg_type t ON t.oid = type_oid[2]::oid \
-                           LEFT JOIN pg_catalog.pg_type element ON element.oid = t.typelem \
-                           WHERE (t.typnamespace = 'pg_catalog'::regnamespace AND t.typname ~ '^reg') \
-                             OR (element.typnamespace = 'pg_catalog'::regnamespace AND element.typname ~ '^reg')) \
-                         OR EXISTS( \
-                           SELECT 1 FROM pg_catalog.regexp_matches( \
-                             tree, ':opnos [(]o ([0-9 ]+)[)]', 'g') operator_oids \
-                           CROSS JOIN LATERAL pg_catalog.regexp_split_to_table( \
-                             pg_catalog.btrim(operator_oids[1]), '[[:space:]]+') operator_oid \
-                           LEFT JOIN pg_catalog.pg_operator o ON o.oid = operator_oid::oid \
-                           LEFT JOIN pg_catalog.pg_proc p ON p.oid = o.oprcode \
-                           WHERE o.oid IS NULL OR o.oprnamespace <> 'pg_catalog'::regnamespace \
-                             OR o.oid >= 16384::oid OR p.oid IS NULL \
-                             OR p.provolatile <> 'i' \
-                             OR p.pronamespace <> 'pg_catalog'::regnamespace \
-                             OR p.oid >= 16384::oid) \
                      )",
                 &[&schema_oid, &allowed_schemas],
             ),
