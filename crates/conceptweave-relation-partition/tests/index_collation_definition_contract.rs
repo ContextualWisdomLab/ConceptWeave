@@ -145,3 +145,93 @@ fn postgres18_collation_provider_tokens_fail_closed() {
         }
     );
 }
+
+#[test]
+fn nullable_provider_fields_preserve_exact_evidence_and_reject_mixed_shapes() {
+    let mut digests = std::collections::BTreeSet::new();
+    // Bits describe LC_COLLATE, LC_CTYPE, locale, rules, stored and actual version.
+    for (provider, admitted_masks) in [
+        (PostgresCollationProvider::DatabaseDefault, &[0_u8, 32][..]),
+        (PostgresCollationProvider::Builtin, &[52][..]),
+        (PostgresCollationProvider::Libc, &[3][..]),
+        (PostgresCollationProvider::Icu, &[52, 60][..]),
+    ] {
+        for mask in 0_u8..64 {
+            let raw: [Option<String>; 6] = std::array::from_fn(|slot| {
+                (mask & (1 << slot) != 0).then(|| ["C", "C", "C", "", "1", "1"][slot].into())
+            });
+            for deterministic in [false, true] {
+                let coordinate = if provider == PostgresCollationProvider::DatabaseDefault {
+                    CollationCatalogIdentity::new("pg_catalog", "default", -1).unwrap()
+                } else {
+                    identity()
+                };
+                let [collate, ctype, locale, rules, stored, actual] = raw.clone();
+                let result = CollationDefinitionObservation::new(
+                    coordinate,
+                    provider,
+                    deterministic,
+                    collate,
+                    ctype,
+                    locale,
+                    rules,
+                    stored,
+                    actual,
+                );
+                let admitted = admitted_masks.contains(&mask)
+                    && (deterministic || provider == PostgresCollationProvider::Icu);
+                assert_eq!(
+                    result.is_ok(),
+                    admitted,
+                    "{provider:?}/{mask}/{deterministic}"
+                );
+                if let Ok(observed) = result {
+                    assert_eq!(
+                        [
+                            observed.lc_collate(),
+                            observed.lc_ctype(),
+                            observed.locale(),
+                            observed.icu_rules(),
+                            observed.version(),
+                            observed.actual_version()
+                        ],
+                        raw.each_ref().map(|value| value.as_deref())
+                    );
+                    assert_eq!(observed.deterministic(), deterministic);
+                    assert!(
+                        digests.insert(observed.canonical_digest()),
+                        "distinct admitted comparison evidence must have distinct identity"
+                    );
+                }
+            }
+        }
+    }
+    for slot in 0..6 {
+        let mut raw = [
+            None,
+            None,
+            Some("und".into()),
+            None,
+            Some("1".into()),
+            Some("1".into()),
+        ];
+        raw[slot] = Some("bad\0text".into());
+        let [collate, ctype, locale, rules, stored, actual] = raw;
+        assert_eq!(
+            CollationDefinitionObservation::new(
+                identity(),
+                PostgresCollationProvider::Icu,
+                false,
+                collate,
+                ctype,
+                locale,
+                rules,
+                stored,
+                actual
+            ),
+            Err(ObservationError::InvalidObservationField {
+                field: "index_collation_definition_text"
+            })
+        );
+    }
+}
