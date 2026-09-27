@@ -67,7 +67,7 @@ fn authorized_source() -> AuthorizedObservationRequest {
     .unwrap()
 }
 
-fn base_snapshot() -> PostgresSchemaSnapshotV3 {
+fn base_snapshot(key_column_ordinal: u32) -> PostgresSchemaSnapshotV3 {
     let index = IndexObservation::new(
         "bookings_no_overlap_idx",
         false,
@@ -113,7 +113,7 @@ fn base_snapshot() -> PostgresSchemaSnapshotV3 {
         vec![
             ColumnObservationV3::new(
                 "resource_id",
-                1,
+                key_column_ordinal,
                 "bigint",
                 QualifiedTypeName::new("pg_catalog", "int8").unwrap(),
                 false,
@@ -175,14 +175,16 @@ fn constraint_coordinate() -> IndexExclusionConstraintCoordinate {
     .unwrap()
 }
 
-fn predecessor_snapshots() -> (
+fn predecessor_snapshots(
+    key_column_ordinal: u32,
+) -> (
     PostgresSchemaSnapshotV3,
     RelationPartitionSnapshot,
     IndexPartitionSnapshot,
     IndexExclusionConstraintSnapshot,
     IndexExclusionConstraintPeriodSnapshot,
 ) {
-    let base = base_snapshot();
+    let base = base_snapshot(key_column_ordinal);
     let relations = RelationPartitionSnapshot::new(
         &base,
         vec![
@@ -222,7 +224,7 @@ fn predecessor_snapshots() -> (
 
 #[test]
 fn ordinary_exclude_preserves_exact_conkey_with_expression_zero_and_omits_include() {
-    let (base, relations, indexes, constraints, period) = predecessor_snapshots();
+    let (base, relations, indexes, constraints, period) = predecessor_snapshots(1);
     let snapshot = IndexExclusionConstraintKeySnapshot::new(
         &base,
         &relations,
@@ -248,7 +250,7 @@ fn ordinary_exclude_preserves_exact_conkey_with_expression_zero_and_omits_includ
 
 #[test]
 fn ordinary_exclude_rejects_conkey_that_disagrees_with_backing_index_key_layout() {
-    let (base, relations, indexes, constraints, period) = predecessor_snapshots();
+    let (base, relations, indexes, constraints, period) = predecessor_snapshots(1);
     let error = IndexExclusionConstraintKeySnapshot::new(
         &base,
         &relations,
@@ -274,7 +276,7 @@ fn ordinary_exclude_rejects_conkey_that_disagrees_with_backing_index_key_layout(
 
 #[test]
 fn exclusion_constraint_key_inventory_must_be_complete() {
-    let (base, relations, indexes, constraints, period) = predecessor_snapshots();
+    let (base, relations, indexes, constraints, period) = predecessor_snapshots(1);
     let error = IndexExclusionConstraintKeySnapshot::new(
         &base,
         &relations,
@@ -295,7 +297,7 @@ fn exclusion_constraint_key_inventory_must_be_complete() {
 
 #[test]
 fn exact_conkey_issues_domain_separated_provenance() {
-    let (base, relations, indexes, constraints, period) = predecessor_snapshots();
+    let (base, relations, indexes, constraints, period) = predecessor_snapshots(1);
     let snapshot = IndexExclusionConstraintKeySnapshot::new(
         &base,
         &relations,
@@ -335,5 +337,28 @@ fn exact_conkey_issues_domain_separated_provenance() {
             .location()
             .canonical_location()
             .ends_with("/key-attributes")
+    );
+}
+
+#[test]
+fn exclusion_key_rejects_attribute_number_outside_postgres_catalog_range() {
+    let (base, relations, indexes, constraints, period) = predecessor_snapshots(32_768);
+    let error = IndexExclusionConstraintKeySnapshot::new(
+        &base,
+        &relations,
+        &indexes,
+        &constraints,
+        &period,
+        vec![
+            IndexExclusionConstraintKeyObservation::new(constraint_coordinate(), vec![1, 0])
+                .unwrap(),
+        ],
+    )
+    .expect_err("an out-of-range catalog attribute number must not become immutable key evidence");
+    assert_eq!(
+        error,
+        ObservationError::InvalidObservationField {
+            field: "index_exclusion_constraint_key_attribute_number"
+        }
     );
 }
