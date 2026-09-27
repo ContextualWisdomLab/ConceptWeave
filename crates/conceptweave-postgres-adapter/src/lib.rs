@@ -2216,12 +2216,20 @@ mod tests {
         }
     }
 
-    fn request() -> AuthorizedObservationRequest {
+    struct Cancellation(AtomicBool);
+
+    impl ObservationCancellation for Cancellation {
+        fn is_cancelled(&self) -> bool {
+            self.0.load(Ordering::SeqCst)
+        }
+    }
+
+    fn request(operation_timeout_ms: u64) -> AuthorizedObservationRequest {
         ObservationRequest::new(
             "fixture_source",
             vec!["public".to_owned()],
             ObservationRequestBudget::new(1, 128).unwrap(),
-            ObservationLimits::with_timeouts(100, 100, 64, 8_192, 1).unwrap(),
+            ObservationLimits::with_timeouts(operation_timeout_ms, 100, 64, 8_192, 1).unwrap(),
         )
         .unwrap()
         .authorize(&Registry)
@@ -2230,7 +2238,7 @@ mod tests {
 
     #[tokio::test]
     async fn completed_future_cannot_exceed_the_authorized_operation_budget() {
-        let result = bounded(&request(), &NotCancelled, async {
+        let result = bounded(&request(100), &NotCancelled, async {
             // A non-yielding future can complete after Tokio's timeout without an error.
             std::thread::sleep(Duration::from_millis(125));
             Ok::<_, tokio_postgres::Error>(())
@@ -2241,18 +2249,26 @@ mod tests {
 
     #[tokio::test]
     async fn completed_future_cannot_override_cancellation() {
-        struct Cancellation(AtomicBool);
-        impl ObservationCancellation for Cancellation {
-            fn is_cancelled(&self) -> bool {
-                self.0.load(Ordering::SeqCst)
-            }
-        }
-
         let cancellation = Cancellation(AtomicBool::new(false));
-        let result = bounded(&request(), &cancellation, async {
+        let result = bounded(&request(100), &cancellation, async {
             cancellation.0.store(true, Ordering::SeqCst);
             Ok::<_, tokio_postgres::Error>(())
         })
+        .await;
+        assert_eq!(result, Err(SourceObservationFailure::Cancelled));
+    }
+
+    #[tokio::test]
+    async fn pending_future_stops_after_cancellation() {
+        let cancellation = Cancellation(AtomicBool::new(false));
+        let result = bounded(
+            &request(1_000),
+            &cancellation,
+            std::future::poll_fn(|_| {
+                cancellation.0.store(true, Ordering::SeqCst);
+                std::task::Poll::<Result<(), tokio_postgres::Error>>::Pending
+            }),
+        )
         .await;
         assert_eq!(result, Err(SourceObservationFailure::Cancelled));
     }
