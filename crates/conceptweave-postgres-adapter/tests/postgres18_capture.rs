@@ -201,6 +201,21 @@ async fn postgres18_referenced_function_owners_and_acl_bind_immutable_evidence()
             let empty = adapter(config.clone()).observe(authorized_with_limits("source_metadata", 512, 65_536), &NotCancelled).await.unwrap();
             assert!(empty.procedure_access_control().unwrap().iter().find(|item| item.location() == definition_before.location()).unwrap().raw_acl().unwrap().is_empty());
             assert_ne!(empty.snapshot_digest(), owner_snapshot.snapshot_digest());
+            for invalid_acl in [
+                "ARRAY[NULL::aclitem]",
+                "ARRAY[[pg_catalog.makeaclitem(0, proowner, 'EXECUTE', false)]]",
+            ] {
+                client.execute(&format!("UPDATE pg_catalog.pg_proc SET proacl = {invalid_acl} WHERE oid = $1::text::regprocedure"), &[&function]).await.unwrap();
+                assert!(matches!(
+                    adapter(config.clone()).observe(authorized_with_limits("source_metadata", 512, 65_536), &NotCancelled).await,
+                    Err(SourceObservationFailure::InvalidCapturedMetadata)
+                ), "{function}: {invalid_acl}");
+            }
+            client.execute("UPDATE pg_catalog.pg_proc SET proacl = array_fill(pg_catalog.makeaclitem(0, proowner, 'EXECUTE', false), ARRAY[513]) WHERE oid = $1::text::regprocedure", &[&function]).await.unwrap();
+            assert!(matches!(
+                adapter(config.clone()).observe(authorized_with_limits("source_metadata", 512, 65_536), &NotCancelled).await,
+                Err(SourceObservationFailure::RowLimitExceeded { max_rows: 512 })
+            ), "{function}: oversized ACL must fail before immutable success");
             (before, after, was_allowed, is_allowed)
         }).catch_unwind().await;
         drop(client);
