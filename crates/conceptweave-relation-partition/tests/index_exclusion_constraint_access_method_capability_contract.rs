@@ -361,6 +361,31 @@ fn extension_access_method_is_admitted_from_observed_capability_not_name_allowli
     assert_eq!(receipt.location().access_method_name(), "acme_exclusion_am");
     assert!(receipt.location().can_exclude());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    let base = base_snapshot("acme_exclusion_am");
+    assert_eq!(
+        snapshot.source_connection_key(),
+        base.source_connection_key()
+    );
+    assert_eq!(
+        snapshot.connection_policy_binding(),
+        base.connection_policy_binding()
+    );
+    assert_eq!(snapshot.extractor_revision(), base.extractor_revision());
+    assert_eq!(snapshot.observed_at_utc(), base.observed_at_utc());
+    assert_eq!(receipt.source_id(), base.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        base.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), base.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), base.observed_at_utc());
+    assert!(snapshot.observations().contains(receipt.location()));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/access-method-exclusion-capability")
+    );
 }
 
 #[test]

@@ -347,4 +347,40 @@ fn ordinary_exclusion_requires_nonunique_nonprimary_exclusion_index() {
     assert!(!receipt.location().index_primary());
     assert!(receipt.location().index_exclusion());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    let base = base_snapshot(false, false).unwrap();
+    assert_eq!(
+        snapshot.source_connection_key(),
+        base.source_connection_key()
+    );
+    assert_eq!(
+        snapshot.connection_policy_binding(),
+        base.connection_policy_binding()
+    );
+    assert_eq!(snapshot.extractor_revision(), base.extractor_revision());
+    assert_eq!(snapshot.observed_at_utc(), base.observed_at_utc());
+    assert_eq!(receipt.source_id(), base.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        base.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), base.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), base.observed_at_utc());
+    assert!(snapshot.observations().contains(receipt.location()));
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/backing-index-role")
+    );
+    let absent = IndexExclusionConstraintCoordinate::new(
+        "public",
+        "bookings",
+        RelationKind::Table,
+        "unobserved_constraint",
+    )
+    .unwrap();
+    assert!(matches!(
+        snapshot.source_receipt(absent),
+        Err(ObservationError::UnknownObservationLocation { .. })
+    ));
 }
