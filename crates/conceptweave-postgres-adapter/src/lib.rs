@@ -413,30 +413,6 @@ async fn capture_catalog(
                              AND own_default.adrelid = d.refobjid))))) \
                      ) OR EXISTS( \
                        SELECT 1 FROM ( \
-                         SELECT pg_catalog.pg_get_expr(ad.adbin, ad.adrelid) AS rendered \
-                         FROM captured_object scoped \
-                         JOIN pg_catalog.pg_attrdef ad \
-                           ON scoped.classid = 'pg_attrdef'::regclass \
-                             AND ad.oid = scoped.objid \
-                         UNION ALL \
-                         SELECT pg_catalog.pg_get_expr(t.typdefaultbin, 0) \
-                         FROM captured_object scoped \
-                         JOIN pg_catalog.pg_type t \
-                           ON scoped.classid = 'pg_type'::regclass \
-                             AND t.oid = scoped.objid \
-                         WHERE t.typdefaultbin IS NOT NULL \
-                         UNION ALL \
-                         SELECT pg_catalog.pg_get_expr(c.conbin, c.conrelid) \
-                         FROM captured_object scoped \
-                         JOIN pg_catalog.pg_constraint c \
-                           ON scoped.classid = 'pg_constraint'::regclass \
-                             AND c.oid = scoped.objid \
-                         WHERE c.contype = 'c' AND c.conbin IS NOT NULL \
-                       ) captured_expression \
-                       WHERE rendered ~* '(^|[^[:alnum:]_])(nextval|currval|setval|lastval|pg_[[:alnum:]_]*|to_reg[[:alnum:]_]*|reg[[:alnum:]_]*in|obj_description|col_description|shobj_description|format_type|oidvectortypes|has_[[:alnum:]_]*_privilege|row_security_active)[[:space:]]*[(]' \
-                         OR rendered ~* '::[[:space:]]*reg[[:alnum:]_]*([^[:alnum:]_]|$)' \
-                     ) OR EXISTS( \
-                       SELECT 1 FROM ( \
                          SELECT ad.adbin::text AS tree FROM captured_object scoped \
                          JOIN pg_catalog.pg_attrdef ad \
                            ON scoped.classid = 'pg_attrdef'::regclass AND ad.oid = scoped.objid \
@@ -478,7 +454,15 @@ async fn capture_catalog(
                            LEFT JOIN pg_catalog.pg_proc p ON p.oid = function_oid[2]::oid \
                            WHERE p.oid IS NULL OR p.provolatile <> 'i' \
                              OR p.pronamespace <> 'pg_catalog'::regnamespace \
-                             OR p.oid >= 16384::oid) \
+                             OR p.oid >= 16384::oid \
+                             OR p.proname ~ '^(nextval|currval|setval|lastval|pg_.*|to_reg.*|reg.*in|obj_description|col_description|shobj_description|format_type|oidvectortypes|has_.*_privilege|row_security_active)$') \
+                         OR EXISTS( \
+                           SELECT 1 FROM pg_catalog.regexp_matches( \
+                             tree, ':(consttype|vartype|resulttype|funcresulttype|opresulttype|casetype|coalescetype|array_typeid|element_typeid) ([0-9]+)', 'g') type_oid \
+                           JOIN pg_catalog.pg_type t ON t.oid = type_oid[2]::oid \
+                           LEFT JOIN pg_catalog.pg_type element ON element.oid = t.typelem \
+                           WHERE (t.typnamespace = 'pg_catalog'::regnamespace AND t.typname ~ '^reg') \
+                             OR (element.typnamespace = 'pg_catalog'::regnamespace AND element.typname ~ '^reg')) \
                          OR EXISTS( \
                            SELECT 1 FROM pg_catalog.regexp_matches( \
                              tree, ':opnos [(]o ([0-9 ]+)[)]', 'g') operator_oids \

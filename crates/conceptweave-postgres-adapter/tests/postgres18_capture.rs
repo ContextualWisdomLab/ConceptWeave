@@ -36,6 +36,38 @@ use ring::{
 use tokio_postgres::{Config, NoTls};
 
 #[tokio::test]
+async fn postgres18_function_like_text_literals_remain_source_evidence() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_literal_expression_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA {schema}; CREATE TABLE {schema}.record \
+             (title text DEFAULT 'pg_sleep(1)::regclass', \
+             CONSTRAINT literal_text CHECK (title <> 'pg_sleep(1)::regclass'))"
+        ))
+        .await
+        .unwrap();
+    let observed = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA {schema} CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+    let snapshot = observed.expect("text literals are not function calls or catalog alias values");
+    assert_eq!(
+        snapshot.column_expressions().unwrap()[0].expression(),
+        Some("'pg_sleep(1)::regclass'::text")
+    );
+}
+
+#[tokio::test]
 async fn postgres18_range_subtype_changes_source_identity() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
