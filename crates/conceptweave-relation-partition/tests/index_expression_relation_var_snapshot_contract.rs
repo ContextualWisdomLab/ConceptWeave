@@ -563,3 +563,86 @@ fn exact_relation_var_receipt_is_bound_to_successor_digest() {
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
     assert_eq!(receipt.source_id(), snapshot.source_connection_key());
 }
+
+#[test]
+fn relation_var_coordinates_reject_duplicate_extra_and_mismatched_column_evidence() {
+    let complete = complete_vars();
+    for (position, original) in complete.iter().enumerate() {
+        let mut duplicate = complete.clone();
+        duplicate.push(original.clone());
+        let mut extra = complete.clone();
+        let absent = match original.location() {
+            IndexExpressionRelationVarLocation::Expression {
+                index,
+                key_position,
+                ..
+            } => IndexExpressionRelationVarLocation::expression(index.clone(), *key_position, 2)
+                .unwrap(),
+            IndexExpressionRelationVarLocation::Predicate { index, .. } => {
+                IndexExpressionRelationVarLocation::predicate(index.clone(), 2).unwrap()
+            }
+        };
+        extra.push(var(
+            absent.clone(),
+            original.column_name(),
+            original.value_type().type_name(),
+            original.collation().cloned(),
+        ));
+        let mut wrong_column = complete.clone();
+        wrong_column[position] = var(
+            original.location().clone(),
+            "missing_column",
+            original.value_type().type_name(),
+            original.collation().cloned(),
+        );
+        let mut wrong_modifier = complete.clone();
+        wrong_modifier[position] = IndexExpressionRelationVarObservation::new(
+            original.location().clone(),
+            original.column_name(),
+            original.value_type().clone(),
+            4,
+            original.collation().cloned(),
+            RelationVarRelationRole::IndexRelation,
+            true,
+            0,
+            RelationVarReturningType::Default,
+        )
+        .unwrap();
+        for (observations, field) in [
+            (duplicate, "index_expression_relation_var_coordinate"),
+            (extra, "index_expression_relation_var_completeness"),
+            (wrong_column, "index_expression_relation_var_column"),
+            (
+                wrong_modifier,
+                "index_expression_relation_var_type_modifier",
+            ),
+        ] {
+            assert_eq!(
+                relation_var_snapshot(observations).unwrap_err(),
+                ObservationError::InvalidObservationField { field }
+            );
+        }
+        let snapshot = relation_var_snapshot(complete.clone()).unwrap();
+        assert_eq!(
+            snapshot.source_receipt(absent.clone()).unwrap_err(),
+            ObservationError::UnknownObservationLocation {
+                location: absent.canonical_location()
+            }
+        );
+    }
+    let snapshot = relation_var_snapshot(complete.clone()).unwrap();
+    let mut reversed = complete;
+    reversed.reverse();
+    assert_eq!(snapshot, relation_var_snapshot(reversed).unwrap());
+    for observation in snapshot.observations() {
+        let receipt = snapshot
+            .source_receipt(observation.location().clone())
+            .unwrap();
+        assert_eq!(
+            receipt.connection_policy_binding(),
+            snapshot.connection_policy_binding()
+        );
+        assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+        assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
+    }
+}
