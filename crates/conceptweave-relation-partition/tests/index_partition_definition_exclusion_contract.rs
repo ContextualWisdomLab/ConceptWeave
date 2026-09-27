@@ -333,6 +333,73 @@ fn matching_exclusion_semantics_are_admissible_and_complete() {
     .expect("matching PostgreSQL exclusion arrays should remain admissible");
     assert_eq!(snapshot.observations().len(), 2);
 
+    for observation in snapshot.observations() {
+        let receipt = snapshot
+            .source_receipt(observation.index(), observation.key_position())
+            .unwrap();
+        assert_eq!(receipt.location(), observation);
+        assert_eq!(
+            receipt.location().canonical_location(),
+            observation.canonical_location()
+        );
+        assert_eq!(receipt.source_id(), snapshot.source_connection_key());
+        assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+        assert_eq!(
+            receipt.connection_policy_binding(),
+            snapshot.connection_policy_binding()
+        );
+        assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+        assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
+        for key_position in [0, 2] {
+            assert_eq!(
+                snapshot
+                    .source_receipt(observation.index(), key_position)
+                    .unwrap_err(),
+                ObservationError::UnknownObservationLocation {
+                    location: format!(
+                        "{}/keys/{key_position}/exclusion",
+                        observation.index().canonical_location()
+                    ),
+                }
+            );
+        }
+        let index = observation.index();
+        for (schema, relation, kind, name) in [
+            (
+                "archive",
+                index.relation_name(),
+                index.relation_kind(),
+                index.index_name(),
+            ),
+            (
+                index.schema_name(),
+                "unobserved_relation",
+                index.relation_kind(),
+                index.index_name(),
+            ),
+            (
+                index.schema_name(),
+                index.relation_name(),
+                RelationKind::ForeignTable,
+                index.index_name(),
+            ),
+            (
+                index.schema_name(),
+                index.relation_name(),
+                index.relation_kind(),
+                "unobserved_index",
+            ),
+        ] {
+            let absent = IndexPartitionCoordinate::new(schema, relation, kind, name).unwrap();
+            assert_eq!(
+                snapshot.source_receipt(&absent, 1).unwrap_err(),
+                ObservationError::UnknownObservationLocation {
+                    location: format!("{}/keys/1/exclusion", absent.canonical_location()),
+                }
+            );
+        }
+    }
+
     let missing = IndexExclusionSemanticsSnapshot::new(
         &base,
         &relations,
