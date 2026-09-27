@@ -382,6 +382,44 @@ mod tests {
             store.read_verified(&pinned, &release),
             Err(PublicationStoreError::InvalidRecord)
         ));
+        fs::remove_file(store.release_path(release.release_id())).unwrap();
+        let record_path = store.release_path(release.release_id());
+        assert!(
+            std::process::Command::new("mkfifo")
+                .arg(&record_path)
+                .status()
+                .unwrap()
+                .success()
+        );
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let reader_store = store.clone();
+        let reader_pin = pinned.clone();
+        let reader_release = release.clone();
+        let reader = std::thread::spawn(move || {
+            sender
+                .send(matches!(
+                    reader_store.read_verified(&reader_pin, &reader_release),
+                    Err(PublicationStoreError::InvalidRecord)
+                ))
+                .unwrap();
+        });
+        assert!(
+            receiver
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .unwrap()
+        );
+        reader.join().unwrap();
+        fs::remove_file(&record_path).unwrap();
+        fs::write(&record_path, [0; 7]).unwrap();
+        assert!(matches!(
+            store.read_verified(&pinned, &release),
+            Err(PublicationStoreError::InvalidRecord)
+        ));
+        fs::write(&record_path, u64::MAX.to_be_bytes()).unwrap();
+        assert!(matches!(
+            store.read_verified(&pinned, &release),
+            Err(PublicationStoreError::InvalidRecord)
+        ));
         fs::remove_dir_all(root).unwrap();
     }
 }
