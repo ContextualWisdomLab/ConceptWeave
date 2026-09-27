@@ -105,24 +105,94 @@ fn index_coordinate() -> IndexPartitionCoordinate {
 }
 
 fn operator_snapshot() -> IndexExclusionConstraintOperatorSnapshot {
+    operator_snapshot_for_types(&["int4"])
+}
+
+fn operator_snapshot_for_types(types: &[&str]) -> IndexExclusionConstraintOperatorSnapshot {
+    let columns = types
+        .iter()
+        .enumerate()
+        .map(|(offset, type_name)| {
+            let position = u32::try_from(offset + 1).unwrap();
+            ColumnObservationV3::new(
+                if position == 1 {
+                    "resource_id".to_owned()
+                } else {
+                    format!("resource_id_{position}")
+                },
+                position,
+                if *type_name == "int4" {
+                    "integer"
+                } else {
+                    "bigint"
+                },
+                QualifiedTypeName::new("pg_catalog", *type_name).unwrap(),
+                false,
+                None,
+            )
+            .unwrap()
+        })
+        .collect::<Vec<_>>();
+    let operators = columns
+        .iter()
+        .map(|column| {
+            QualifiedOperatorSignature::new(
+                "pg_catalog",
+                "=",
+                column.type_binding().clone(),
+                column.type_binding().clone(),
+            )
+            .unwrap()
+        })
+        .collect::<Vec<_>>();
+    let procedures = columns
+        .iter()
+        .map(|column| {
+            QualifiedProcedureSignature::new(
+                "pg_catalog",
+                format!("{}eq", column.type_binding().type_name()),
+                vec![column.type_binding().clone(), column.type_binding().clone()],
+            )
+            .unwrap()
+        })
+        .collect::<Vec<_>>();
     let index = IndexObservation::new(
         "bookings_no_overlap",
         false,
         Some(false),
-        vec![IndexAttributeObservation::column(1, IndexAttributeKind::Key, "resource_id").unwrap()],
+        columns
+            .iter()
+            .map(|column| {
+                IndexAttributeObservation::column(
+                    column.ordinal_position(),
+                    IndexAttributeKind::Key,
+                    column.column_name(),
+                )
+                .unwrap()
+            })
+            .collect(),
         vec![],
     )
     .unwrap()
     .with_access_method("btree")
-    .with_key_semantics(vec![
-        IndexKeySemantics::new(
-            1,
-            None,
-            QualifiedOperatorClassName::new("pg_catalog", "int4_ops").unwrap(),
-            0,
-        )
-        .unwrap(),
-    ])
+    .with_key_semantics(
+        columns
+            .iter()
+            .map(|column| {
+                IndexKeySemantics::new(
+                    column.ordinal_position(),
+                    None,
+                    QualifiedOperatorClassName::new(
+                        "pg_catalog",
+                        format!("{}_ops", column.type_binding().type_name()),
+                    )
+                    .unwrap(),
+                    0,
+                )
+                .unwrap()
+            })
+            .collect(),
+    )
     .unwrap()
     .with_catalog_flags(IndexCatalogFlags::new(
         false, true, true, false, false, false,
@@ -131,25 +201,11 @@ fn operator_snapshot() -> IndexExclusionConstraintOperatorSnapshot {
     .with_ready(true)
     .with_valid(true)
     .with_live(true);
-    let relation = RelationObservation::new(
-        "public",
-        "bookings",
-        RelationKind::Table,
-        vec![
-            ColumnObservationV3::new(
-                "resource_id",
-                1,
-                "integer",
-                QualifiedTypeName::new("pg_catalog", "int4").unwrap(),
-                false,
-                None,
-            )
-            .unwrap(),
-        ],
-    )
-    .unwrap()
-    .with_indexes(vec![index])
-    .unwrap();
+    let relation =
+        RelationObservation::new("public", "bookings", RelationKind::Table, columns.clone())
+            .unwrap()
+            .with_indexes(vec![index])
+            .unwrap();
     let base = PostgresSchemaSnapshotV3::new(
         &authorized_source(),
         "extractor-index-exclusion-procedure-v1",
@@ -194,22 +250,38 @@ fn operator_snapshot() -> IndexExclusionConstraintOperatorSnapshot {
         &indexes,
         &constraints,
         &period,
-        vec![IndexExclusionConstraintKeyObservation::new(coordinate(), vec![1]).unwrap()],
+        vec![
+            IndexExclusionConstraintKeyObservation::new(
+                coordinate(),
+                columns
+                    .iter()
+                    .map(|column| i16::try_from(column.ordinal_position()).unwrap())
+                    .collect(),
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
     let families = IndexOperatorFamilySnapshot::new(
         &base,
         &relations,
         &indexes,
-        vec![
-            IndexKeyOperatorFamilyObservation::new(
-                index_coordinate(),
-                1,
-                QualifiedOperatorClassName::new("pg_catalog", "int4_ops").unwrap(),
-                QualifiedOperatorFamilyName::new("btree", "pg_catalog", "integer_ops").unwrap(),
-            )
-            .unwrap(),
-        ],
+        columns
+            .iter()
+            .map(|column| {
+                IndexKeyOperatorFamilyObservation::new(
+                    index_coordinate(),
+                    column.ordinal_position(),
+                    QualifiedOperatorClassName::new(
+                        "pg_catalog",
+                        format!("{}_ops", column.type_binding().type_name()),
+                    )
+                    .unwrap(),
+                    QualifiedOperatorFamilyName::new("btree", "pg_catalog", "integer_ops").unwrap(),
+                )
+                .unwrap()
+            })
+            .collect(),
     )
     .unwrap();
     let semantics = IndexExclusionSemanticsSnapshot::new(
@@ -217,16 +289,20 @@ fn operator_snapshot() -> IndexExclusionConstraintOperatorSnapshot {
         &relations,
         &indexes,
         &families,
-        vec![
-            IndexKeyExclusionSemanticsObservation::new(
-                index_coordinate(),
-                1,
-                operator("="),
-                procedure("int4eq"),
-                3,
-            )
-            .unwrap(),
-        ],
+        columns
+            .iter()
+            .enumerate()
+            .map(|(offset, column)| {
+                IndexKeyExclusionSemanticsObservation::new(
+                    index_coordinate(),
+                    column.ordinal_position(),
+                    operators[offset].clone(),
+                    procedures[offset].clone(),
+                    3,
+                )
+                .unwrap()
+            })
+            .collect(),
     )
     .unwrap();
     IndexExclusionConstraintOperatorSnapshot::new(
@@ -239,10 +315,7 @@ fn operator_snapshot() -> IndexExclusionConstraintOperatorSnapshot {
             &keys,
         ),
         IndexExclusionConstraintOperatorSemanticsLineage::new(&families, &semantics),
-        vec![
-            IndexExclusionConstraintOperatorObservation::new(coordinate(), vec![operator("=")])
-                .unwrap(),
-        ],
+        vec![IndexExclusionConstraintOperatorObservation::new(coordinate(), operators).unwrap()],
     )
     .unwrap()
 }
@@ -378,4 +451,57 @@ fn operator_procedure_receipt_rejects_unknown_key_position() {
         error,
         ObservationError::UnknownObservationLocation { .. }
     ));
+}
+
+#[test]
+fn differently_typed_keys_keep_exact_procedure_positions_under_permutation() {
+    let operators = operator_snapshot_for_types(&["int4", "int8"]);
+    let int8 = QualifiedTypeName::new("pg_catalog", "int8").unwrap();
+    let second_operator =
+        QualifiedOperatorSignature::new("pg_catalog", "=", int8.clone(), int8.clone()).unwrap();
+    let second_procedure =
+        QualifiedProcedureSignature::new("pg_catalog", "int8eq", vec![int8.clone(), int8]).unwrap();
+    let observations = vec![
+        observation(operator("="), procedure("int4eq")),
+        IndexExclusionConstraintOperatorProcedureObservation::new(
+            coordinate(),
+            2,
+            second_operator,
+            second_procedure.clone(),
+        )
+        .unwrap(),
+    ];
+    let snapshot =
+        IndexExclusionConstraintOperatorProcedureSnapshot::new(&operators, observations.clone())
+            .unwrap();
+    let mut reversed = observations.clone();
+    reversed.reverse();
+    assert_eq!(
+        snapshot,
+        IndexExclusionConstraintOperatorProcedureSnapshot::new(&operators, reversed).unwrap()
+    );
+    assert_eq!(
+        snapshot
+            .source_receipt(coordinate(), 2)
+            .unwrap()
+            .location()
+            .procedure(),
+        &second_procedure
+    );
+    let wrong = vec![
+        observations[0].clone(),
+        IndexExclusionConstraintOperatorProcedureObservation::new(
+            coordinate(),
+            2,
+            operator("="),
+            procedure("int4eq"),
+        )
+        .unwrap(),
+    ];
+    assert_eq!(
+        IndexExclusionConstraintOperatorProcedureSnapshot::new(&operators, wrong).unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "index_exclusion_constraint_operator_procedure_binding"
+        }
+    );
 }
