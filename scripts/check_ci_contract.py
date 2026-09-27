@@ -31,6 +31,7 @@ def main() -> int:
         "cargo doc --workspace --all-features --no-deps --locked",
         'rustup toolchain install "$COVERAGE_TOOLCHAIN" --profile minimal --component llvm-tools-preview',
         "cargo metadata --locked --format-version 1 > /dev/null",
+        "python3 scripts/test_coverage_contract.py",
     )
     missing = [fragment for fragment in required_fragments if fragment not in workflow]
     if missing:

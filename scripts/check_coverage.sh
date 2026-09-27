@@ -75,34 +75,8 @@ jq -r '
   | "REGION_GAP file=\(.file) start=\(.line_start):\(.column_start) end=\(.line_end):\(.column_end)"
 ' source-regions.json
 
-jq --arg root "$source_root" '
-  [
-    .data[0].files[]
-    | select(.filename | startswith($root) and contains("/src/"))
-    | .filename as $file
-    | (.branches // [])[]
-    | {
-        file: $file,
-        line_start: .[0],
-        column_start: .[1],
-        line_end: .[2],
-        column_end: .[3],
-        true_count: .[4],
-        false_count: .[5]
-      }
-  ]
-  | sort_by(.file, .line_start, .column_start, .line_end, .column_end)
-  | group_by([.file, .line_start, .column_start, .line_end, .column_end])
-  | map({
-      file: .[0].file,
-      line_start: .[0].line_start,
-      column_start: .[0].column_start,
-      line_end: .[0].line_end,
-      column_end: .[0].column_end,
-      true_count: (map(.true_count) | add),
-      false_count: (map(.false_count) | add)
-    })
-' coverage.json > source-branches.json
+jq --arg root "$source_root" -f scripts/owned_source_branches.jq \
+  coverage.json > source-branches.json
 
 jq '
   {

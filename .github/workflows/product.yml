@@ -91,7 +91,9 @@ jobs:
         run: docker exec --user root "$POSTGRES_CONTAINER_ID" install -d -m 0700 -o postgres -g postgres /tmp/conceptweave-pg18-tablespaces/fixture
 
       - name: Validate Product CI contract
-        run: python3 scripts/check_ci_contract.py
+        run: |
+          python3 scripts/check_ci_contract.py
+          python3 scripts/test_coverage_contract.py
 
       - name: Show pinned Rust toolchain
         run: rustc --version && cargo --version
