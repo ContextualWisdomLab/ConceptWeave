@@ -5435,6 +5435,64 @@ async fn postgres18_nondefault_column_storage_settings_fail_closed() {
 }
 
 #[tokio::test]
+async fn postgres18_toast_storage_settings_fail_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_toast_storage_fixture_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; CREATE TABLE \"{schema}\".record (payload text)"
+        ))
+        .await
+        .unwrap();
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "ALTER TABLE \"{schema}\".record SET (toast.autovacuum_enabled = false)"
+        ))
+        .await
+        .unwrap();
+    let options: (Option<Vec<String>>, Option<Vec<String>>) = {
+        let row = client
+            .query_one(
+                "SELECT parent.reloptions, toast.reloptions \
+                 FROM pg_catalog.pg_class parent \
+                 JOIN pg_catalog.pg_class toast ON toast.oid = parent.reltoastrelid \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = parent.relnamespace \
+                 WHERE n.nspname = $1 AND parent.relname = 'record'",
+                &[&schema],
+            )
+            .await
+            .unwrap();
+        (row.get(0), row.get(1))
+    };
+    let after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    assert!(before.is_ok(), "baseline must be admissible: {before:?}");
+    assert_eq!(options.0, None);
+    assert_eq!(options.1, Some(vec!["autovacuum_enabled=false".to_owned()]));
+    assert!(
+        matches!(
+            after,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "unmodeled TOAST options must fail closed: {after:?}"
+    );
+    connection_task.abort();
+}
+
+#[tokio::test]
 async fn postgres18_user_type_in_pg_catalog_fails_closed() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;

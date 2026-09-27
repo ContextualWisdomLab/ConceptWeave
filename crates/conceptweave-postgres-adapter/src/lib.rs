@@ -459,7 +459,9 @@ async fn capture_catalog(
                      WHERE d.classid = 'pg_type'::regclass AND d.objid = t.oid \
                        AND d.deptype = 'e')), \
                  c.relam = 0 AND c.reltablespace = 0 AND c.reltoastrelid = 0, \
-                 ts.spcname::text, c.reltablespace = 0, c.relowner, owner_role.rolname::text \
+                 ts.spcname::text, c.reltablespace = 0, c.relowner, owner_role.rolname::text, \
+                 EXISTS(SELECT 1 FROM pg_catalog.pg_class toast \
+                   WHERE toast.oid = c.reltoastrelid AND toast.reloptions IS NOT NULL) \
                  FROM pg_catalog.pg_class c \
                  JOIN pg_catalog.pg_database db ON db.datname = pg_catalog.current_database() \
                  LEFT JOIN pg_catalog.pg_tablespace ts \
@@ -511,7 +513,7 @@ async fn capture_catalog(
                 _ => return Err(SourceObservationFailure::InvalidCapturedMetadata),
             };
             if persistence != "p"
-                || [4, 6, 7, 10, 11, 12]
+                || [4, 6, 7, 10, 11, 12, 23]
                     .into_iter()
                     .any(|index| field::<bool>(&row, index) != Ok(false))
                 || match relation_kind {
