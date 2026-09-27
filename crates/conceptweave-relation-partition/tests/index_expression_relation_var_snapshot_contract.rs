@@ -297,7 +297,10 @@ struct Stack {
 }
 
 fn stack() -> Stack {
-    let base = base();
+    stack_from_base(base())
+}
+
+fn stack_from_base(base: PostgresSchemaSnapshotV3) -> Stack {
     let relations = RelationPartitionSnapshot::new(
         &base,
         vec![
@@ -644,5 +647,57 @@ fn relation_var_coordinates_reject_duplicate_extra_and_mismatched_column_evidenc
         );
         assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
         assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
+    }
+}
+
+#[test]
+fn relation_var_predecessors_reject_mixed_extractor_and_observation_time() {
+    let original = stack();
+    for (revision, time) in [
+        ("extractor-relation-var-v2", "2026-09-15T00:30:00Z"),
+        ("extractor-relation-var-v1", "2026-09-15T00:30:01Z"),
+    ] {
+        let changed_base = PostgresSchemaSnapshotV3::new(
+            &authorized_source(),
+            revision,
+            time,
+            original.base.relations().to_vec(),
+            vec![],
+            vec![],
+        )
+        .unwrap()
+        .with_observed_column_collations(original.base.column_collations().unwrap().to_vec())
+        .unwrap();
+        let changed = stack_from_base(changed_base);
+        let fresh = IndexExpressionRelationVarSnapshot::new(
+            &changed.base,
+            &changed.relations,
+            &changed.indexes,
+            &changed.families,
+            &changed.exclusions,
+            &changed.expressions,
+            &changed.type_modifiers,
+            complete_vars(),
+        )
+        .unwrap();
+        assert_eq!(fresh.extractor_revision(), revision);
+        assert_eq!(fresh.observed_at_utc(), time);
+        let mixed = IndexExpressionRelationVarSnapshot::new(
+            &original.base,
+            &original.relations,
+            &original.indexes,
+            &original.families,
+            &original.exclusions,
+            &original.expressions,
+            &changed.type_modifiers,
+            complete_vars(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            mixed,
+            ObservationError::InvalidObservationField {
+                field: "index_expression_relation_var_predecessor_provenance",
+            }
+        );
     }
 }
