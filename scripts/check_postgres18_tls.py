@@ -1,3 +1,4 @@
+import argparse
 import os
 import secrets
 import socket
@@ -6,6 +7,9 @@ import tempfile
 from pathlib import Path
 
 # Run with PostgreSQL 18 and OpenSSL on PATH; clusters and credentials are ephemeral.
+parser = argparse.ArgumentParser()
+parser.add_argument("--coverage", action="store_true", help="append TLS profiles to the workspace coverage run")
+arguments = parser.parse_args()
 pg = Path(subprocess.check_output(['pg_config', '--bindir'], text=True).strip())
 version = subprocess.check_output([pg / 'pg_ctl', '--version'], text=True)
 if not version.startswith('pg_ctl (PostgreSQL) 18.'):
@@ -82,9 +86,14 @@ with tempfile.TemporaryDirectory(prefix='conceptweave-pg18-tls-', dir='/tmp') as
             'CONCEPTWEAVE_PG18_TLS_WRONG_CA_DER': str(root / 'wrong-ca.der'),
         })
         with (root / 'test.log').open('wb') as log:
-            subprocess.run(['cargo', '+1.98.0', 'test', '-p', 'conceptweave-postgres-adapter',
-                '--test', 'postgres18_capture', 'postgres18_tcp_requires_valid_ca_and_host_name',
-                '--locked', '--', '--exact', '--test-threads=1'], check=True, env=environment,
+            cargo_command = (
+                ['cargo', '+' + environment.get('COVERAGE_TOOLCHAIN', 'nightly-2026-08-20'),
+                 'llvm-cov', '--no-report', '--branch']
+                if arguments.coverage else ['cargo', '+1.98.0', 'test']
+            )
+            subprocess.run(cargo_command + ['-p', 'conceptweave-postgres-adapter',
+                '--test', 'postgres18_capture', '--locked', '--',
+                'postgres18_tcp_requires_valid_ca_and_host_name', '--exact', '--test-threads=1'], check=True, env=environment,
                 cwd=repository,
                 stdout=log, stderr=log)
         print('owned PostgreSQL 18 TLS runtime conformance passed')

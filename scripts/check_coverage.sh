@@ -5,13 +5,17 @@ coverage_toolchain="${COVERAGE_TOOLCHAIN:-nightly-2026-08-20}"
 source_root="$(pwd -P)/crates/"
 trap 'rm -f coverage.json source-branches.json source-regions.json source-functions.json' EXIT
 
+cargo "+${coverage_toolchain}" llvm-cov clean --workspace
+
 cargo "+${coverage_toolchain}" llvm-cov \
   --workspace \
   --all-features \
   --branch \
-  --json \
-  --output-path coverage.json \
+  --no-report \
   -- --test-threads=1
+
+COVERAGE_TOOLCHAIN="$coverage_toolchain" python3 scripts/check_postgres18_tls.py --coverage
+cargo "+${coverage_toolchain}" llvm-cov report --json --output-path coverage.json
 
 jq '.data[0].totals' coverage.json
 jq -r '
