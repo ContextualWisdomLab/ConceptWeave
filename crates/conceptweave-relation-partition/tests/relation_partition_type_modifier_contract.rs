@@ -13,15 +13,18 @@ use conceptweave_source_port::{
 
 const POLICY_BINDING: &str = "fixture_policy_revision_a";
 
-struct Registry;
+struct Registry<'a> {
+    source: &'a str,
+    binding: &'a str,
+}
 
-impl SourceConnectionRegistry for Registry {
+impl SourceConnectionRegistry for Registry<'_> {
     fn contains_source_connection(&self, source_connection_key: &str) -> bool {
-        source_connection_key == "warehouse_primary"
+        source_connection_key == self.source
     }
 
     fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
-        (source_connection_key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
+        (source_connection_key == self.source).then(|| self.binding.to_owned())
     }
 
     fn authorizes_schema_scope(
@@ -29,8 +32,8 @@ impl SourceConnectionRegistry for Registry {
         source_connection: &ResolvedSourceConnection,
         allowed_schema_names: &[String],
     ) -> bool {
-        source_connection.source_connection_key() == "warehouse_primary"
-            && source_connection.connection_policy_binding() == POLICY_BINDING
+        source_connection.source_connection_key() == self.source
+            && source_connection.connection_policy_binding() == self.binding
             && allowed_schema_names == ["public"]
     }
 
@@ -39,8 +42,8 @@ impl SourceConnectionRegistry for Registry {
         source_connection: &ResolvedSourceConnection,
         resource_envelope: ObservationResourceEnvelope,
     ) -> bool {
-        source_connection.source_connection_key() == "warehouse_primary"
-            && source_connection.connection_policy_binding() == POLICY_BINDING
+        source_connection.source_connection_key() == self.source
+            && source_connection.connection_policy_binding() == self.binding
             && resource_envelope.request_budget().max_schema_count() <= 1
             && resource_envelope.request_budget().max_schema_bytes() <= 256
             && resource_envelope.limits().operation_timeout_ms() <= 1_000
@@ -52,14 +55,18 @@ impl SourceConnectionRegistry for Registry {
 }
 
 fn authorized_source() -> AuthorizedObservationRequest {
+    authorized_source_with_context("warehouse_primary", POLICY_BINDING)
+}
+
+fn authorized_source_with_context(source: &str, binding: &str) -> AuthorizedObservationRequest {
     ObservationRequest::new(
-        "warehouse_primary",
+        source,
         vec!["public".to_owned()],
         ObservationRequestBudget::new(1, 256).unwrap(),
         ObservationLimits::new(1_000, 10, 1_024, 1).unwrap(),
     )
     .unwrap()
-    .authorize(&Registry)
+    .authorize(&Registry { source, binding })
     .unwrap()
 }
 
@@ -411,5 +418,74 @@ fn modifier_predecessor_cannot_cross_revision_or_observation_time() {
                 field: "relation_partition_type_modifier_predecessor",
             })
         );
+    }
+}
+
+#[test]
+fn modifier_predecessor_cannot_cross_authorized_source_or_policy() {
+    let base = base_snapshot();
+    let predecessor = relation_partition_snapshot(&base);
+    for (source, binding) in [
+        ("warehouse_secondary", POLICY_BINDING),
+        ("warehouse_primary", "fixture_policy_revision_b"),
+    ] {
+        let changed = PostgresSchemaSnapshotV3::new(
+            &authorized_source_with_context(source, binding),
+            base.extractor_revision(),
+            base.observed_at_utc(),
+            base.relations().to_vec(),
+            vec![],
+            vec![],
+        )
+        .unwrap();
+        assert_eq!(changed.snapshot_digest(), base.snapshot_digest());
+        assert_eq!(
+            RelationPartitionTypeModifierSnapshot::new(
+                &changed,
+                &predecessor,
+                complete_modifiers(36, 36),
+            ),
+            Err(ObservationError::InvalidObservationField {
+                field: "relation_partition_type_modifier_predecessor",
+            })
+        );
+    }
+}
+
+#[test]
+fn modifier_and_receipt_coordinates_reject_empty_and_nul_identifiers() {
+    for invalid in ["", "bad\0name"] {
+        for (schema, relation, column, field) in [
+            (invalid, "accounts", "account_code", "schema_name"),
+            ("public", invalid, "account_code", "relation_name"),
+            ("public", "accounts", invalid, "column_name"),
+        ] {
+            let observation = ColumnTypeModifierObservation::new(
+                schema,
+                relation,
+                RelationKind::PartitionedTable,
+                column,
+                -1,
+            );
+            let location = ColumnTypeModifierLocation::new(
+                schema,
+                relation,
+                RelationKind::PartitionedTable,
+                column,
+            );
+            match observation.unwrap_err() {
+                ObservationError::InvalidObservationField { field: actual } => {
+                    assert_eq!(actual, format!("relation_partition_type_modifier_{field}"))
+                }
+                other => panic!("unexpected observation error: {other:?}"),
+            }
+            match location.unwrap_err() {
+                ObservationError::InvalidObservationField { field: actual } => assert_eq!(
+                    actual,
+                    format!("relation_partition_type_modifier_location_{field}")
+                ),
+                other => panic!("unexpected receipt error: {other:?}"),
+            }
+        }
     }
 }
