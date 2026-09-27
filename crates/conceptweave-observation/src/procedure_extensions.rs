@@ -304,6 +304,106 @@ fn invalid() -> ObservationError {
 mod tests {
     use super::*;
     #[test]
+    fn extension_inventory_order_is_canonical_but_configuration_order_is_evidence() {
+        let definitions: Vec<_> = ["a", "b"]
+            .into_iter()
+            .map(|name| {
+                ReferencedProcedureDefinitionObservation::new(
+                    ReferencedProcedureLocation::new("pg_catalog", name, vec![]).unwrap(),
+                    crate::QualifiedTypeName::new("pg_catalog", "int4").unwrap(),
+                    42,
+                    "owner",
+                    "definition",
+                )
+                .unwrap()
+            })
+            .collect();
+        let edges: Vec<_> = ["extension_a", "extension_b"]
+            .into_iter()
+            .map(|name| ProcedureExtensionDependency::new('x', name).unwrap())
+            .collect();
+        let dependencies: Vec<_> = definitions
+            .iter()
+            .map(|definition| {
+                ProcedureExtensionDependenciesObservation::new(
+                    definition.location().clone(),
+                    edges.clone(),
+                )
+                .unwrap()
+            })
+            .collect();
+        let configuration = vec![
+            ExtensionConfigurationTable::new(
+                "s",
+                "first_table",
+                RelationKind::Table,
+                "first filter",
+            )
+            .unwrap(),
+            ExtensionConfigurationTable::new(
+                "s",
+                "second_table",
+                RelationKind::PartitionedTable,
+                "second filter",
+            )
+            .unwrap(),
+        ];
+        let extensions: Vec<_> = ["extension_a", "extension_b"]
+            .into_iter()
+            .map(|name| {
+                SourceExtensionDefinition::new(
+                    name,
+                    42,
+                    Some("owner".into()),
+                    "s",
+                    false,
+                    "v",
+                    Some(configuration.clone()),
+                )
+                .unwrap()
+            })
+            .collect();
+        let original =
+            canonicalize(&definitions, dependencies.clone(), extensions.clone()).unwrap();
+        let mut reordered_dependencies = dependencies.clone();
+        reordered_dependencies.reverse();
+        for item in &mut reordered_dependencies {
+            item.dependencies.reverse();
+            *item = ProcedureExtensionDependenciesObservation::new(
+                item.location.clone(),
+                item.dependencies.clone(),
+            )
+            .unwrap();
+        }
+        let mut reordered_extensions = extensions.clone();
+        reordered_extensions.reverse();
+        let reordered =
+            canonicalize(&definitions, reordered_dependencies, reordered_extensions).unwrap();
+        assert_eq!(digest("base", &original), digest("base", &reordered));
+        assert_ne!(
+            digest("base", &original),
+            digest("other predecessor", &original)
+        );
+
+        let mut changed = original.clone();
+        changed.extensions[0]
+            .configuration
+            .as_mut()
+            .unwrap()
+            .reverse();
+        assert_ne!(digest("base", &original), digest("base", &changed));
+        let mut changed = original.clone();
+        changed.dependencies[0].dependencies.push(edges[0].clone());
+        assert_ne!(digest("base", &original), digest("base", &changed));
+        let mut changed = original.clone();
+        changed.dependencies[0].dependencies[0].dependency_type = 'n';
+        assert_ne!(digest("base", &original), digest("base", &changed));
+        let mut wrong_extensions = extensions;
+        wrong_extensions[1].name = "unreferenced_extension".into();
+        assert!(canonicalize(&definitions, dependencies, wrong_extensions).is_err());
+    }
+
+    #[test]
     fn extension_evidence_keeps_configuration_and_requires_exact_closure() {
         let location = ReferencedProcedureLocation::new("pg_catalog", "f", vec![]).unwrap();
         for kind in ['n', 'a', 'i', 'P', 'S', 'e', 'x'] {
