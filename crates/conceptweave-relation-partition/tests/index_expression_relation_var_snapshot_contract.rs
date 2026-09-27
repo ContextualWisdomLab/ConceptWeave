@@ -572,6 +572,20 @@ fn exact_relation_var_receipt_is_bound_to_successor_digest() {
     assert_eq!(receipt.location(), &location);
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
     assert_eq!(receipt.source_id(), snapshot.source_connection_key());
+    assert_eq!(receipt.location().leaf_position(), 1);
+    assert_eq!(receipt.location().key_position(), None);
+    let expression_location =
+        IndexExpressionRelationVarLocation::expression(child_index(), 1, 1).unwrap();
+    let expression_receipt = snapshot
+        .source_receipt(expression_location.clone())
+        .unwrap();
+    assert_eq!(expression_receipt.location(), &expression_location);
+    assert_eq!(expression_receipt.location().leaf_position(), 1);
+    assert_eq!(expression_receipt.location().key_position(), Some(1));
+    assert_ne!(
+        expression_receipt.location().canonical_location(),
+        receipt.location().canonical_location()
+    );
 }
 
 #[test]
