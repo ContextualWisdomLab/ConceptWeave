@@ -511,3 +511,25 @@ fn ordinary_exclude_operator_procedure_kind_rejects_unknown_receipt_coordinate()
 fn ordinary_exclude_operator_procedure_kind_snapshot_is_publicly_composed() {
     assert!(std::mem::size_of::<IndexExclusionConstraintOperatorProcedureKindSnapshot>() > 0);
 }
+
+#[test]
+fn parallel_safety_receipt_preserves_capture_and_rejects_absent_position() {
+    let snapshot = parallel_safety_snapshot();
+    let receipt = snapshot.source_receipt(coordinate(), 1).unwrap();
+    assert_eq!(receipt.source_id(), snapshot.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        snapshot.connection_policy_binding()
+    );
+    assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
+    assert_eq!(receipt.location(), &snapshot.observations()[0]);
+    assert_eq!(receipt.location().operator(), &operator("="));
+    assert_eq!(receipt.location().procedure(), &procedure("int4eq"));
+    assert_eq!(receipt.location().parallel_safety(), 's');
+    assert!(matches!(
+        snapshot.source_receipt(coordinate(), 2),
+        Err(ObservationError::UnknownObservationLocation { .. })
+    ));
+}
