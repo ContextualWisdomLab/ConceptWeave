@@ -347,6 +347,37 @@ fn both_deferrable_initial_modes_share_non_immediate_index_but_remain_distinct()
     assert!(!receipt.location().index_immediate());
     assert_eq!(receipt.location().backing_index(), &child_index());
     assert_eq!(
+        receipt.source_id(),
+        initially_deferred.source_connection_key()
+    );
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        initially_deferred.connection_policy_binding()
+    );
+    assert_eq!(
+        receipt.extractor_revision(),
+        "extractor-index-exclusion-constraint-immediacy-v1"
+    );
+    assert_eq!(receipt.observed_at_utc(), "2026-09-16T08:42:00Z");
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/timing-index-coherence")
+    );
+    let absent = IndexExclusionConstraintCoordinate::new(
+        "public",
+        "bookings",
+        RelationKind::Table,
+        "unobserved_constraint",
+    )
+    .unwrap();
+    assert!(matches!(
+        initially_deferred.source_receipt(absent),
+        Err(ObservationError::UnknownObservationLocation { .. })
+    ));
+
+    assert_eq!(
         receipt.source_digest(),
         initially_deferred.snapshot_digest()
     );
