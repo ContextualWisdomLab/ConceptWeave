@@ -334,6 +334,32 @@ fn exact_partition_constraint_inheritance_state_is_admitted_and_receipted() {
     assert!(!receipt.location().is_local());
     assert_eq!(receipt.location().inheritance_count(), 1);
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(
+        snapshot.source_connection_key(),
+        parentage.source_connection_key()
+    );
+    assert_eq!(
+        snapshot.connection_policy_binding(),
+        parentage.connection_policy_binding()
+    );
+    assert_eq!(
+        snapshot.extractor_revision(),
+        parentage.extractor_revision()
+    );
+    assert_eq!(snapshot.observed_at_utc(), parentage.observed_at_utc());
+    assert_eq!(receipt.source_id(), parentage.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        parentage.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), parentage.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), parentage.observed_at_utc());
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/inheritance-state")
+    );
 }
 
 #[test]
@@ -352,4 +378,8 @@ fn constraint_child_below_nonconstraint_parent_index_remains_local() {
     assert_eq!(snapshot.observations().len(), 1);
     assert!(snapshot.observations()[0].is_local());
     assert_eq!(snapshot.observations()[0].inheritance_count(), 0);
+    assert!(matches!(
+        snapshot.source_receipt(parent_constraint()),
+        Err(ObservationError::UnknownObservationLocation { .. })
+    ));
 }
