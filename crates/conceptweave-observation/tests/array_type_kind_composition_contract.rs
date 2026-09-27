@@ -285,6 +285,27 @@ fn base_type_kind_resolves_exact_binding_without_inventing_true_array_identity()
 }
 
 #[test]
+fn observed_type_kind_family_cannot_extend_source_identity_twice() {
+    let snapshot = PostgresSchemaSnapshotV3::new_with_type_kinds(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-12T05:11:00Z",
+        vec![ticket_with_status_array_binding()],
+        Vec::new(),
+        vec![status_enum()],
+        status_type_kinds(),
+    )
+    .unwrap();
+
+    assert_eq!(
+        snapshot.with_observed_type_kinds(status_type_kinds()),
+        Err(ObservationError::InvalidObservationField {
+            field: "type_kind_already_observed",
+        })
+    );
+}
+
+#[test]
 fn ordinary_user_defined_base_type_kind_resolves_its_exact_binding() {
     let snapshot = PostgresSchemaSnapshotV3::new_with_type_kinds(
         &support::authorized_source("warehouse_primary", &["public"]),
