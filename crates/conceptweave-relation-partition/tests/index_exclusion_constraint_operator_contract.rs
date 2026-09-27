@@ -502,6 +502,24 @@ fn ordinary_exclusion_operator_rejects_each_stale_predecessor() {
             old_timing.observations().to_vec(),
         )
         .unwrap();
+        for (constraint, timing) in [
+            (&constraints, &fresh_timing),
+            (&fresh_constraints, &old_timing),
+        ] {
+            assert_eq!(
+                IndexExclusionConstraintImmediacySnapshot::new(
+                    &fresh,
+                    &fresh_relations,
+                    &fresh_indexes,
+                    constraint,
+                    timing,
+                )
+                .unwrap_err(),
+                ObservationError::InvalidObservationField {
+                    field: "index_exclusion_constraint_immediacy_predecessor_binding",
+                }
+            );
+        }
         let fresh_immediacy = IndexExclusionConstraintImmediacySnapshot::new(
             &fresh,
             &fresh_relations,

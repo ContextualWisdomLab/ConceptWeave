@@ -141,7 +141,7 @@ impl IndexExclusionConstraintImmediacySnapshot {
             index_partition_snapshot,
             constraint_snapshot.observations().to_vec(),
         )?;
-        if rebound_constraint.snapshot_digest() != constraint_snapshot.snapshot_digest() {
+        if rebound_constraint != *constraint_snapshot {
             return Err(invalid(
                 "index_exclusion_constraint_immediacy_predecessor_binding",
             ));
@@ -151,7 +151,7 @@ impl IndexExclusionConstraintImmediacySnapshot {
             &rebound_constraint,
             timing_snapshot.observations().to_vec(),
         )?;
-        if rebound_timing.snapshot_digest() != timing_snapshot.snapshot_digest() {
+        if rebound_timing != *timing_snapshot {
             return Err(invalid(
                 "index_exclusion_constraint_immediacy_predecessor_binding",
             ));
