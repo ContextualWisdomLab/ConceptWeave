@@ -70,6 +70,11 @@ fn signed_manifest_requires_an_independent_exact_publisher_key() {
         signature.as_ref(),
     )
     .unwrap();
+    assert_eq!(trusted.public_key().as_slice(), key.public_key().as_ref());
+    assert_eq!(signed.key_id(), "publisher-1");
+    assert_eq!(signed.release_id(), release.release_id());
+    assert_eq!(signed.manifest_digest(), &digest);
+    assert_eq!(signed.signature().as_slice(), signature.as_ref());
     let client = SemanticReleaseClient::with_signed_release_manifests(
         "1.0.0",
         vec![],
