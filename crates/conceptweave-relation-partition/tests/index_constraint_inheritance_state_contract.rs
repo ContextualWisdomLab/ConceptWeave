@@ -328,6 +328,35 @@ fn exact_partition_constraint_inheritance_state_is_admitted_and_receipted() {
     )
     .expect("exact pg_constraint inheritance state must be admitted");
 
+    let mut reversed = snapshot.observations().to_vec();
+    reversed.reverse();
+    assert_eq!(
+        IndexConstraintInheritanceSnapshot::new(&parentage, reversed).unwrap(),
+        snapshot
+    );
+    let child = snapshot
+        .observations()
+        .iter()
+        .find(|observation| observation.coordinate() == &child_constraint())
+        .unwrap()
+        .clone();
+    for (observations, field) in [
+        (
+            vec![child.clone()],
+            "index_constraint_inheritance_completeness",
+        ),
+        (
+            vec![child.clone(), child],
+            "index_constraint_inheritance_coordinate",
+        ),
+        (vec![], "index_constraint_inheritance_completeness"),
+    ] {
+        assert_eq!(
+            IndexConstraintInheritanceSnapshot::new(&parentage, observations),
+            Err(ObservationError::InvalidObservationField { field })
+        );
+    }
+
     let receipt = snapshot
         .source_receipt(child_constraint())
         .expect("observed child inheritance state must issue provenance");
