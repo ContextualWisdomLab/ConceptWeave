@@ -134,17 +134,29 @@ struct Stack {
 }
 
 fn stack(complete_node_schema: bool) -> Stack {
+    stack_with_expression(
+        expression(complete_node_schema),
+        "lower(account_email)",
+        "text_ops",
+        "text_ops",
+        Some(QualifiedCollationName::new("pg_catalog", "default").unwrap()),
+    )
+}
+
+fn stack_with_expression(
+    canonical_expression: CanonicalExpression,
+    source_expression: &str,
+    operator_class: &str,
+    operator_family: &str,
+    collation: Option<QualifiedCollationName>,
+) -> Stack {
     let index = IndexObservation::new(
         "accounts_email_idx",
         false,
         Some(false),
         vec![
-            IndexAttributeObservation::expression(
-                1,
-                IndexAttributeKind::Key,
-                "lower(account_email)",
-            )
-            .unwrap(),
+            IndexAttributeObservation::expression(1, IndexAttributeKind::Key, source_expression)
+                .unwrap(),
         ],
         vec![],
     )
@@ -153,8 +165,8 @@ fn stack(complete_node_schema: bool) -> Stack {
     .with_key_semantics(vec![
         IndexKeySemantics::new(
             1,
-            Some(QualifiedCollationName::new("pg_catalog", "default").unwrap()),
-            QualifiedOperatorClassName::new("pg_catalog", "text_ops").unwrap(),
+            collation,
+            QualifiedOperatorClassName::new("pg_catalog", operator_class).unwrap(),
             0,
         )
         .unwrap(),
@@ -233,8 +245,8 @@ fn stack(complete_node_schema: bool) -> Stack {
             IndexKeyOperatorFamilyObservation::new(
                 coordinate(),
                 1,
-                QualifiedOperatorClassName::new("pg_catalog", "text_ops").unwrap(),
-                QualifiedOperatorFamilyName::new("btree", "pg_catalog", "text_ops").unwrap(),
+                QualifiedOperatorClassName::new("pg_catalog", operator_class).unwrap(),
+                QualifiedOperatorFamilyName::new("btree", "pg_catalog", operator_family).unwrap(),
             )
             .unwrap(),
         ],
@@ -250,12 +262,8 @@ fn stack(complete_node_schema: bool) -> Stack {
         &families,
         &exclusions,
         vec![
-            IndexExpressionSemanticsObservation::new(
-                coordinate(),
-                1,
-                expression(complete_node_schema),
-            )
-            .unwrap(),
+            IndexExpressionSemanticsObservation::new(coordinate(), 1, canonical_expression)
+                .unwrap(),
         ],
         vec![],
     )
@@ -356,4 +364,61 @@ fn complete_node_schema_and_relation_var_proofs_compose_into_a_new_successor() {
         relation_vars.snapshot_digest()
     );
     assert!(composed.snapshot_digest().starts_with("sha256:"));
+}
+
+#[test]
+fn complete_var_free_node_schema_issues_a_distinct_v2_identity() {
+    let canonical = CanonicalExpression::node(
+        "FuncExpr",
+        vec![
+            field(
+                "function",
+                CanonicalExpressionValue::Function(
+                    QualifiedFunctionSignature::new(
+                        "pg_catalog",
+                        "pi",
+                        vec![],
+                        QualifiedTypeName::new("pg_catalog", "float8").unwrap(),
+                    )
+                    .unwrap(),
+                ),
+            ),
+            field("returns_set", CanonicalExpressionValue::Boolean(false)),
+            field("variadic", CanonicalExpressionValue::Boolean(false)),
+            field("result_collation", CanonicalExpressionValue::Null),
+            field("input_collation", CanonicalExpressionValue::Null),
+            field(
+                "arguments",
+                CanonicalExpressionValue::ExpressionList(vec![]),
+            ),
+        ],
+    )
+    .unwrap();
+    let other_capture = stack(true);
+    let stack = stack_with_expression(canonical, "pi()", "float8_ops", "float_ops", None);
+    let v1 = IndexExpressionNodeSchemaSnapshot::new(&stack.expressions).unwrap();
+    let other_v1 = IndexExpressionNodeSchemaSnapshot::new(&other_capture.expressions).unwrap();
+    assert_eq!(
+        IndexExpressionNodeSchemaSnapshotV2::new(&stack.expressions, &other_v1).unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "canonical_expression_node_schema_v2",
+        }
+    );
+    let original_v1 = v1.clone();
+    let v2 = IndexExpressionNodeSchemaSnapshotV2::new(&stack.expressions, &v1).unwrap();
+    assert_eq!(v2.source_connection_key(), v1.source_connection_key());
+    assert_eq!(
+        v2.connection_policy_binding(),
+        v1.connection_policy_binding()
+    );
+    assert_eq!(v2.extractor_revision(), v1.extractor_revision());
+    assert_eq!(v2.observed_at_utc(), v1.observed_at_utc());
+    assert_eq!(v2.predecessor_digest(), v1.snapshot_digest());
+    assert_ne!(v2.snapshot_digest(), v1.snapshot_digest());
+    assert!(v2.snapshot_digest().starts_with("sha256:"));
+    assert_eq!(v1, original_v1);
+    assert_eq!(
+        v2,
+        IndexExpressionNodeSchemaSnapshotV2::new(&stack.expressions, &v1).unwrap()
+    );
 }
