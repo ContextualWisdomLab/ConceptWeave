@@ -1726,6 +1726,19 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
     )
     .unwrap();
     assert_eq!(aligned, reversed);
+    assert_eq!(aligned.proposal_id(), type_proposal.proposal_id());
+    assert_eq!(aligned.candidates().len(), 2);
+    for (id, state) in [
+        (first_id, PublicationState::Proposed),
+        (second_id, PublicationState::Rejected),
+    ] {
+        let candidate = aligned
+            .candidates()
+            .iter()
+            .find(|candidate| candidate.candidate().candidate_id() == id)
+            .unwrap();
+        assert_eq!(candidate.candidate().publication_state(), state);
+    }
     let validated = validate_alignment(&aligned).unwrap();
     assert_eq!(validated.proposal_id(), type_proposal.proposal_id());
     assert_eq!(

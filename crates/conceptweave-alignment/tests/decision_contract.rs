@@ -41,3 +41,40 @@ fn decision_text_rejects_blank_and_nul_without_normalizing_valid_descriptions() 
         }
     );
 }
+
+#[test]
+fn alignment_and_discovery_errors_preserve_causes_without_exposing_field_names() {
+    use conceptweave_discovery::ProposalError;
+    use conceptweave_domain::ContractError;
+    use std::error::Error;
+
+    let field_error = AlignmentError::InvalidText("private_alignment_field");
+    assert_eq!(
+        field_error.to_string(),
+        "a required alignment value is missing"
+    );
+    assert!(field_error.source().is_none());
+    let alignment = AlignmentError::from(ContractError::MissingEvidence);
+    assert_eq!(
+        alignment.to_string(),
+        "a candidate could not enter its validation state"
+    );
+    assert_eq!(
+        alignment.source().unwrap().downcast_ref::<ContractError>(),
+        Some(&ContractError::MissingEvidence)
+    );
+    let discovery = ProposalError::from(ContractError::MissingEvidence);
+    assert_eq!(
+        discovery.to_string(),
+        "proposal evidence could not be validated"
+    );
+    assert_eq!(
+        discovery.source().unwrap().downcast_ref::<ContractError>(),
+        Some(&ContractError::MissingEvidence)
+    );
+    assert!(
+        ProposalError::IncompleteSourceObservation
+            .source()
+            .is_none()
+    );
+}
