@@ -1584,6 +1584,46 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             .collect::<BTreeSet<_>>();
         assert_eq!(observed_columns, catalog_columns);
 
+        let catalog_expressions = client
+            .query(
+                "SELECT c.relname::text, a.attname::text, \
+                 pg_catalog.pg_get_expr(d.adbin, d.adrelid) \
+                 FROM pg_catalog.pg_attribute a \
+                 JOIN pg_catalog.pg_class c ON c.oid = a.attrelid \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+                 LEFT JOIN pg_catalog.pg_attrdef d \
+                   ON d.adrelid = a.attrelid AND d.adnum = a.attnum \
+                 WHERE n.nspname = $1 AND c.relkind = 'r' \
+                   AND a.attnum > 0 AND NOT a.attisdropped",
+                &[&schema],
+            )
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| {
+                (
+                    row.get::<_, String>(0),
+                    row.get::<_, String>(1),
+                    row.get::<_, Option<String>>(2),
+                )
+            })
+            .collect::<BTreeSet<_>>();
+        let observed_expressions = first
+            .column_expressions()
+            .unwrap()
+            .iter()
+            .map(|expression| {
+                assert_eq!(expression.is_default_expression(), expression.expression().is_some());
+                assert_eq!(expression.is_no_expression(), expression.expression().is_none());
+                (
+                    expression.relation_name().to_owned(),
+                    expression.column_name().to_owned(),
+                    expression.expression().map(str::to_owned),
+                )
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(observed_expressions, catalog_expressions);
+
         let catalog_indexes = client
             .query(
                 "SELECT t.relname::text, i.relname::text, am.amname::text, \

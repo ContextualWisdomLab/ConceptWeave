@@ -10,7 +10,7 @@ CREATE TABLE "__SCHEMA__".tenant (
 CREATE TABLE "__SCHEMA__".risk_record (
     tenant_id uuid NOT NULL,
     risk_id uuid NOT NULL,
-    title text NOT NULL,
+    title text NOT NULL DEFAULT 'Untitled',
     level "__SCHEMA__".risk_level NOT NULL,
     score "__SCHEMA__".impact_score,
     CONSTRAINT risk_record_key PRIMARY KEY (tenant_id, risk_id),
