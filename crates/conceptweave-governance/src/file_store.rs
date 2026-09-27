@@ -363,6 +363,50 @@ mod tests {
             Err(PublicationStoreError::InvalidRecord)
         ));
         assert!(store.read_verified(&pinned, &release).unwrap().is_none());
+        for truth in [
+            TruthStatus::Observed,
+            TruthStatus::Inferred,
+            TruthStatus::Proposed,
+            TruthStatus::Authoritative,
+            TruthStatus::Superseded,
+            TruthStatus::Rejected,
+        ] {
+            for state in [
+                PublicationState::Draft,
+                PublicationState::Proposed,
+                PublicationState::Validated,
+                PublicationState::Reviewed,
+                PublicationState::Published,
+                PublicationState::Superseded,
+                PublicationState::Rejected,
+            ] {
+                if (truth, state) == (TruthStatus::Authoritative, PublicationState::Published) {
+                    continue;
+                }
+                let unissued = SemanticRelease::new(
+                    ReleaseMetadata::new("unit-release", "1.0.0", "unit-ontology").unwrap(),
+                    truth,
+                    state,
+                    release.artifact_digest().clone(),
+                    release.provenance().to_vec(),
+                    release.concept_ids().to_vec(),
+                )
+                .unwrap();
+                assert!(
+                    matches!(
+                        store.issue_record(&unissued, bytes),
+                        Err(PublicationStoreError::InvalidRecord)
+                    ),
+                    "{truth:?}/{state:?}"
+                );
+                assert!(!store.release_path(release.release_id()).exists());
+                assert_eq!(
+                    fs::read_dir(&root).unwrap().count(),
+                    0,
+                    "denied issuance must not retain a stage"
+                );
+            }
+        }
         store.issue_record(&release, bytes).unwrap();
         assert_eq!(
             store.read_verified(&pinned, &release).unwrap(),
