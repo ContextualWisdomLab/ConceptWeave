@@ -164,7 +164,7 @@ impl IndexExclusionConstraintAccessMethodCapabilitySnapshot {
             index_partition_snapshot,
             constraint_snapshot.observations().to_vec(),
         )?;
-        if rebound_constraint.snapshot_digest() != constraint_snapshot.snapshot_digest() {
+        if rebound_constraint != *constraint_snapshot {
             return Err(invalid(
                 "index_exclusion_constraint_access_method_capability_predecessor_binding",
             ));

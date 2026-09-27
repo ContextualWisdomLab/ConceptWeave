@@ -4,17 +4,18 @@ use conceptweave_observation::{
     QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
 };
 use conceptweave_relation_partition::{
-    IndexExclusionConstraintCoordinate, IndexExclusionConstraintKeyObservation,
-    IndexExclusionConstraintKeySnapshot, IndexExclusionConstraintObservation,
-    IndexExclusionConstraintOperatorObservation, IndexExclusionConstraintOperatorSemanticsLineage,
-    IndexExclusionConstraintOperatorSnapshot, IndexExclusionConstraintOperatorSourceLineage,
-    IndexExclusionConstraintPeriodObservation, IndexExclusionConstraintPeriodSnapshot,
-    IndexExclusionConstraintSnapshot, IndexExclusionSemanticsSnapshot,
-    IndexKeyExclusionSemanticsObservation, IndexKeyOperatorFamilyObservation,
-    IndexOperatorFamilySnapshot, IndexPartitionCoordinate, IndexPartitionObservation,
-    IndexPartitionSnapshot, IndexRelationKind, QualifiedOperatorFamilyName,
-    QualifiedOperatorSignature, QualifiedProcedureSignature, RelationPartitionObservation,
-    RelationPartitionSnapshot,
+    IndexExclusionConstraintAccessMethodCapabilityObservation,
+    IndexExclusionConstraintAccessMethodCapabilitySnapshot, IndexExclusionConstraintCoordinate,
+    IndexExclusionConstraintKeyObservation, IndexExclusionConstraintKeySnapshot,
+    IndexExclusionConstraintObservation, IndexExclusionConstraintOperatorObservation,
+    IndexExclusionConstraintOperatorSemanticsLineage, IndexExclusionConstraintOperatorSnapshot,
+    IndexExclusionConstraintOperatorSourceLineage, IndexExclusionConstraintPeriodObservation,
+    IndexExclusionConstraintPeriodSnapshot, IndexExclusionConstraintSnapshot,
+    IndexExclusionSemanticsSnapshot, IndexKeyExclusionSemanticsObservation,
+    IndexKeyOperatorFamilyObservation, IndexOperatorFamilySnapshot, IndexPartitionCoordinate,
+    IndexPartitionObservation, IndexPartitionSnapshot, IndexRelationKind,
+    QualifiedOperatorFamilyName, QualifiedOperatorSignature, QualifiedProcedureSignature,
+    RelationPartitionObservation, RelationPartitionSnapshot,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationLimits, ObservationRequest, ObservationRequestBudget,
@@ -444,6 +445,40 @@ fn ordinary_exclusion_operator_rejects_each_stale_predecessor() {
             constraints.observations().to_vec(),
         )
         .unwrap();
+        let capability_facts = vec![
+            IndexExclusionConstraintAccessMethodCapabilityObservation::new(
+                constraint_coordinate(),
+                index_coordinate(),
+                "btree",
+                true,
+            )
+            .unwrap(),
+        ];
+        assert_eq!(
+            IndexExclusionConstraintAccessMethodCapabilitySnapshot::new(
+                &fresh,
+                &fresh_relations,
+                &fresh_indexes,
+                &constraints,
+                capability_facts.clone(),
+            )
+            .unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: "index_exclusion_constraint_access_method_capability_predecessor_binding",
+            }
+        );
+        let capability = IndexExclusionConstraintAccessMethodCapabilitySnapshot::new(
+            &fresh,
+            &fresh_relations,
+            &fresh_indexes,
+            &fresh_constraints,
+            capability_facts,
+        )
+        .unwrap();
+        assert_eq!(capability.source_connection_key(), key);
+        assert_eq!(capability.connection_policy_binding(), policy);
+        assert_eq!(capability.extractor_revision(), revision);
+        assert_eq!(capability.observed_at_utc(), time);
         let fresh_period = IndexExclusionConstraintPeriodSnapshot::new(
             &fresh_constraints,
             period.observations().to_vec(),
