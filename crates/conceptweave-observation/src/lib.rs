@@ -19,6 +19,7 @@ mod foreign_key_catalog;
 mod model;
 mod not_null_constraint;
 mod procedure_access_control;
+mod procedure_security_labels;
 mod range_catalog;
 mod referenced_procedure;
 mod relation_owner;
@@ -48,6 +49,7 @@ pub use model::{
 };
 pub use not_null_constraint::{NotNullConstraintObservation, ParentNotNullConstraintCoordinate};
 pub use procedure_access_control::{ProcedureAccessControlObservation, ProcedureAclItem};
+pub use procedure_security_labels::{ProcedureSecurityLabel, ProcedureSecurityLabelsObservation};
 pub use range_catalog::{
     QualifiedRangeProcedure, RangeCatalogObservation, RangeCatalogSourceReceipt,
 };
@@ -191,6 +193,7 @@ pub struct PostgresSchemaSnapshotV3 {
     collation_owners_observed: bool,
     referenced_procedure_definitions: Option<Vec<ReferencedProcedureDefinitionObservation>>,
     procedure_access_control: Option<Vec<ProcedureAccessControlObservation>>,
+    procedure_security_labels: Option<Vec<ProcedureSecurityLabelsObservation>>,
 }
 
 impl PostgresSchemaSnapshotV3 {
@@ -267,6 +270,7 @@ impl PostgresSchemaSnapshotV3 {
             collation_owners_observed: false,
             referenced_procedure_definitions: None,
             procedure_access_control: None,
+            procedure_security_labels: None,
         })
     }
 
@@ -378,6 +382,7 @@ impl PostgresSchemaSnapshotV3 {
             collation_owners_observed: false,
             referenced_procedure_definitions: None,
             procedure_access_control: None,
+            procedure_security_labels: None,
         })
     }
 
@@ -679,6 +684,7 @@ impl PostgresSchemaSnapshotV3 {
             collation_owners_observed: false,
             referenced_procedure_definitions: None,
             procedure_access_control: None,
+            procedure_security_labels: None,
         })
     }
 
@@ -1467,6 +1473,48 @@ impl PostgresSchemaSnapshotV3 {
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "unobserved_procedure_access_control",
+            });
+        }
+        self.referenced_procedure_definition_source_receipt(location)
+    }
+
+    /// Binds complete provider-owned security labels after observed ACL evidence in a new successor digest.
+    pub fn with_observed_procedure_security_labels(
+        mut self,
+        items: Vec<ProcedureSecurityLabelsObservation>,
+    ) -> Result<Self, ObservationError> {
+        if self.procedure_access_control.is_none() || self.procedure_security_labels.is_some() {
+            return Err(ObservationError::InvalidObservationField {
+                field: "procedure_security_labels_order",
+            });
+        }
+        let definitions = self.referenced_procedure_definitions.as_deref().ok_or(
+            ObservationError::InvalidObservationField {
+                field: "procedure_security_labels_order",
+            },
+        )?;
+        let items = procedure_security_labels::canonicalize(definitions, items)?;
+        self.snapshot_digest = procedure_security_labels::digest(&self.snapshot_digest, &items);
+        self.procedure_security_labels = Some(items);
+        Ok(self)
+    }
+    /// Returns complete source label evidence; None means unobserved, not observed absence.
+    #[must_use]
+    pub fn procedure_security_labels(&self) -> Option<&[ProcedureSecurityLabelsObservation]> {
+        self.procedure_security_labels.as_deref()
+    }
+    /// Issues procedure-root provenance only for an exactly observed security-label map.
+    pub fn procedure_security_labels_source_receipt(
+        &self,
+        location: ReferencedProcedureLocation,
+    ) -> Result<ReferencedProcedureSourceReceipt, ObservationError> {
+        if !self
+            .procedure_security_labels
+            .as_ref()
+            .is_some_and(|items| items.iter().any(|item| item.location() == &location))
+        {
+            return Err(ObservationError::InvalidObservationField {
+                field: "unobserved_procedure_security_labels",
             });
         }
         self.referenced_procedure_definition_source_receipt(location)

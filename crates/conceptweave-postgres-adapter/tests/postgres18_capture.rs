@@ -142,6 +142,39 @@ async fn postgres18_referenced_function_owners_and_acl_bind_immutable_evidence()
                 vec![QualifiedTypeName::new("pg_catalog", "void").unwrap()],
             ).unwrap();
             assert!(owner_snapshot.referenced_procedure_definition_source_receipt(wrong_signature).is_err());
+            let location = definition_after.location().clone();
+            let labels_before = owner_snapshot.procedure_security_labels().unwrap().iter().find(|item| item.location() == &location).unwrap();
+            assert!(labels_before.labels().is_empty());
+            let absence_receipt = owner_snapshot.procedure_security_labels_source_receipt(location.clone()).unwrap();
+            assert!(owner_snapshot.clone().with_observed_procedure_security_labels(vec![]).is_err());
+            client.execute("INSERT INTO pg_catalog.pg_seclabel (objoid,classoid,objsubid,provider,label) VALUES ($1::text::regprocedure,'pg_catalog.pg_proc'::regclass,0,'cw_probe_provider',' private label '), ($1::text::regprocedure,'pg_catalog.pg_proc'::regclass,0,' provider/~ ','')", &[&function]).await.unwrap();
+            let labelled = adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536), &NotCancelled).await.unwrap();
+            let labels = labelled.procedure_security_labels().unwrap().iter().find(|item| item.location() == &location).unwrap();
+            let native_labels = client.query("SELECT provider,label FROM pg_catalog.pg_seclabel WHERE classoid='pg_catalog.pg_proc'::regclass AND objoid=$1::text::regprocedure ORDER BY provider COLLATE \"C\"", &[&function]).await.unwrap();
+            assert_eq!(labels.labels().len(), native_labels.len());
+            for (label,row) in labels.labels().iter().zip(native_labels) {
+                assert_eq!(label.provider(), row.get::<_, String>(0));
+                assert_eq!(label.label(), row.get::<_, String>(1));
+            }
+            assert!(!format!("{labels:?}").contains("private label"));
+            assert_ne!(labelled.snapshot_digest(), owner_snapshot.snapshot_digest());
+            assert_eq!(absence_receipt.source_digest(), owner_snapshot.snapshot_digest());
+            let label_receipt = labelled.procedure_security_labels_source_receipt(location.clone()).unwrap();
+            assert_eq!(label_receipt.location(), &location);
+            assert_eq!(label_receipt.source_digest(), labelled.snapshot_digest());
+            let missing = conceptweave_observation::ReferencedProcedureLocation::new("pg_catalog","not_observed",vec![]).unwrap();
+            assert!(labelled.procedure_security_labels_source_receipt(missing).is_err());
+            client.execute("UPDATE pg_catalog.pg_seclabel SET label='changed label' WHERE classoid='pg_catalog.pg_proc'::regclass AND objoid=$1::text::regprocedure AND provider='cw_probe_provider'", &[&function]).await.unwrap();
+            let changed_label = adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536), &NotCancelled).await.unwrap();
+            assert_ne!(changed_label.snapshot_digest(), labelled.snapshot_digest());
+            assert_eq!(label_receipt.source_digest(), labelled.snapshot_digest());
+            client.execute("UPDATE pg_catalog.pg_seclabel SET objsubid=1 WHERE classoid='pg_catalog.pg_proc'::regclass AND objoid=$1::text::regprocedure AND provider='cw_probe_provider'", &[&function]).await.unwrap();
+            assert!(matches!(adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536), &NotCancelled).await, Err(SourceObservationFailure::InvalidCapturedMetadata)));
+            client.execute("UPDATE pg_catalog.pg_seclabel SET objsubid=0,label=repeat('x',65537) WHERE classoid='pg_catalog.pg_proc'::regclass AND objoid=$1::text::regprocedure AND provider='cw_probe_provider'", &[&function]).await.unwrap();
+            assert!(matches!(adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536), &NotCancelled).await, Err(SourceObservationFailure::ByteLimitExceeded { max_bytes: 65536 })));
+            client.execute("DELETE FROM pg_catalog.pg_seclabel WHERE classoid='pg_catalog.pg_proc'::regclass AND objoid=$1::text::regprocedure AND provider IN ('cw_probe_provider',' provider/~ ')", &[&function]).await.unwrap();
+            let restored_labels = adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536), &NotCancelled).await.unwrap();
+            assert_eq!(restored_labels.snapshot_digest(), owner_snapshot.snapshot_digest());
             let was_allowed: bool = client.query_one(
                 "SELECT pg_catalog.has_function_privilege('public', $1::text, 'EXECUTE')", &[&function]
             ).await.unwrap().get(0);
@@ -1293,10 +1326,17 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         propose_relational_model(&missing_procedure_acl),
         Err(ProposalError::IncompleteSourceObservation)
     ));
+    let missing_procedure_labels = missing_procedure_acl
+        .with_observed_procedure_access_control(vec![])
+        .unwrap();
+    assert!(matches!(
+        propose_relational_model(&missing_procedure_labels),
+        Err(ProposalError::IncompleteSourceObservation)
+    ));
     assert!(
         propose_relational_model(
-            &missing_procedure_acl
-                .with_observed_procedure_access_control(vec![])
+            &missing_procedure_labels
+                .with_observed_procedure_security_labels(vec![])
                 .unwrap()
         )
         .is_ok()
@@ -1488,6 +1528,8 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         .with_observed_referenced_procedure_definitions(vec![])
         .unwrap()
         .with_observed_procedure_access_control(vec![])
+        .unwrap()
+        .with_observed_procedure_security_labels(vec![])
         .unwrap()
     };
     let type_only = complete_type_only(enums.clone(), "2026-09-25T00:00:00Z");
