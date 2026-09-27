@@ -382,3 +382,143 @@ fn exact_conexclop_issues_domain_separated_provenance() {
             .ends_with("/exclusion-operators")
     );
 }
+
+#[test]
+fn ordinary_exclusion_operator_rejects_each_stale_predecessor() {
+    let (base, relations, indexes, constraints, period, keys, families, semantics) =
+        predecessor_snapshots();
+    let fresh = PostgresSchemaSnapshotV3::new(
+        &authorized_source(),
+        base.extractor_revision(),
+        "2026-09-16T00:00:00Z",
+        base.relations().to_vec(),
+        vec![],
+        vec![],
+    )
+    .unwrap();
+    let fresh_relations =
+        RelationPartitionSnapshot::new(&fresh, relations.observations().to_vec()).unwrap();
+    let fresh_indexes =
+        IndexPartitionSnapshot::new(&fresh, &fresh_relations, indexes.observations().to_vec())
+            .unwrap();
+    let fresh_constraints = IndexExclusionConstraintSnapshot::new(
+        &fresh,
+        &fresh_relations,
+        &fresh_indexes,
+        constraints.observations().to_vec(),
+    )
+    .unwrap();
+    let fresh_period = IndexExclusionConstraintPeriodSnapshot::new(
+        &fresh_constraints,
+        period.observations().to_vec(),
+    )
+    .unwrap();
+    let fresh_keys = IndexExclusionConstraintKeySnapshot::new(
+        &fresh,
+        &fresh_relations,
+        &fresh_indexes,
+        &fresh_constraints,
+        &fresh_period,
+        keys.observations().to_vec(),
+    )
+    .unwrap();
+    let fresh_families = IndexOperatorFamilySnapshot::new(
+        &fresh,
+        &fresh_relations,
+        &fresh_indexes,
+        families.observations().to_vec(),
+    )
+    .unwrap();
+    let fresh_semantics = IndexExclusionSemanticsSnapshot::new(
+        &fresh,
+        &fresh_relations,
+        &fresh_indexes,
+        &fresh_families,
+        semantics.observations().to_vec(),
+    )
+    .unwrap();
+    let facts = vec![
+        IndexExclusionConstraintOperatorObservation::new(
+            constraint_coordinate(),
+            vec![qualified_operator("=")],
+        )
+        .unwrap(),
+    ];
+    for (constraint, period, keys, family, semantics) in [
+        (
+            &constraints,
+            &fresh_period,
+            &fresh_keys,
+            &fresh_families,
+            &fresh_semantics,
+        ),
+        (
+            &fresh_constraints,
+            &period,
+            &fresh_keys,
+            &fresh_families,
+            &fresh_semantics,
+        ),
+        (
+            &fresh_constraints,
+            &fresh_period,
+            &keys,
+            &fresh_families,
+            &fresh_semantics,
+        ),
+        (
+            &fresh_constraints,
+            &fresh_period,
+            &fresh_keys,
+            &families,
+            &fresh_semantics,
+        ),
+        (
+            &fresh_constraints,
+            &fresh_period,
+            &fresh_keys,
+            &fresh_families,
+            &semantics,
+        ),
+    ] {
+        assert_eq!(
+            IndexExclusionConstraintOperatorSnapshot::new(
+                source_lineage(
+                    &fresh,
+                    &fresh_relations,
+                    &fresh_indexes,
+                    constraint,
+                    period,
+                    keys
+                ),
+                semantics_lineage(family, semantics),
+                facts.clone(),
+            )
+            .unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: "index_exclusion_constraint_operator_predecessor_binding",
+            }
+        );
+    }
+    let accepted = IndexExclusionConstraintOperatorSnapshot::new(
+        source_lineage(
+            &fresh,
+            &fresh_relations,
+            &fresh_indexes,
+            &fresh_constraints,
+            &fresh_period,
+            &fresh_keys,
+        ),
+        semantics_lineage(&fresh_families, &fresh_semantics),
+        facts,
+    )
+    .unwrap();
+    assert_eq!(accepted.observed_at_utc(), fresh.observed_at_utc());
+    assert_eq!(
+        accepted
+            .source_receipt(constraint_coordinate())
+            .unwrap()
+            .observed_at_utc(),
+        fresh.observed_at_utc()
+    );
+}
