@@ -3563,6 +3563,11 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&record_path, std::fs::Permissions::from_mode(0o600)).unwrap();
         }
+        for length in 0..8 {
+            std::fs::write(&record_path, &record[..length]).unwrap();
+            assert!(matches!(store.read_verified(&pinned, published.release()),
+                Err(PublicationStoreError::InvalidRecord)));
+        }
         for header_length in [u64::MAX - 8, u64::MAX - 7, u64::MAX] {
             let mut malformed = record.clone();
             malformed[..8].copy_from_slice(&header_length.to_be_bytes());
