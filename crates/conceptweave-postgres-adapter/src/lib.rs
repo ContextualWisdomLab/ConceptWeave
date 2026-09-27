@@ -282,6 +282,7 @@ async fn capture_catalog(
     let mut array_types = Vec::new();
     let mut relation_rows = Vec::new();
     let mut expression_collations = BTreeSet::new();
+    let allowed_schemas = request.request().allowed_schema_names().to_vec();
     for schema in request.request().allowed_schema_names() {
         let schema_row = bounded(
             request,
@@ -375,11 +376,19 @@ async fn capture_catalog(
                      ON d.refclassid = 'pg_proc'::regclass AND p.oid = d.refobjid \
                    LEFT JOIN pg_catalog.pg_operator o \
                      ON d.refclassid = 'pg_operator'::regclass AND o.oid = d.refobjid \
+                   LEFT JOIN pg_catalog.pg_type referenced_type \
+                     ON d.refclassid = 'pg_type'::regclass \
+                       AND referenced_type.oid = d.refobjid \
+                   LEFT JOIN pg_catalog.pg_namespace type_schema \
+                     ON type_schema.oid = referenced_type.typnamespace \
                    LEFT JOIN pg_catalog.pg_class referenced_relation \
                      ON d.refclassid = 'pg_class'::regclass \
                        AND referenced_relation.oid = d.refobjid \
                    WHERE ((p.pronamespace <> 'pg_catalog'::regnamespace OR p.oid >= 16384::oid) \
                      OR (o.oprnamespace <> 'pg_catalog'::regnamespace OR o.oid >= 16384::oid) \
+                     OR (referenced_type.oid >= 16384::oid \
+                       AND (type_schema.nspname = 'pg_catalog' \
+                         OR type_schema.nspname <> ALL($2::text[]))) \
                      OR (referenced_relation.oid >= 16384::oid AND d.deptype = 'n' \
                        AND (d.classid <> 'pg_constraint'::regclass OR EXISTS( \
                          SELECT 1 FROM pg_catalog.pg_constraint expression_constraint \
@@ -419,7 +428,7 @@ async fn capture_catalog(
                        WHERE rendered ~* '(^|[^[:alnum:]_])(nextval|currval|setval|lastval|pg_[[:alnum:]_]*|to_reg[[:alnum:]_]*|reg[[:alnum:]_]*in|obj_description|col_description|shobj_description|format_type|oidvectortypes|has_[[:alnum:]_]*_privilege|row_security_active)[[:space:]]*[(]' \
                          OR rendered ~* '::[[:space:]]*reg[[:alnum:]_]*([^[:alnum:]_]|$)' \
                      )",
-                &[&schema_oid],
+                &[&schema_oid, &allowed_schemas],
             ),
         )
         .await?;

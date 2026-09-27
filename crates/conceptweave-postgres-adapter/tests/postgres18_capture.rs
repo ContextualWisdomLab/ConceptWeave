@@ -3953,6 +3953,102 @@ async fn postgres18_expression_collation_requires_observed_definition() {
 }
 
 #[tokio::test]
+async fn postgres18_external_expression_type_dependency_fails_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let suffix = std::process::id();
+    let schema = format!("cw_expression_type_{suffix}");
+    let external = format!("cw_expression_type_external_{suffix}");
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; CREATE SCHEMA \"{external}\"; \
+             CREATE DOMAIN \"{external}\".nonblank AS text CHECK (VALUE <> ''); \
+             CREATE TABLE \"{schema}\".record (title text, \
+               CONSTRAINT title_check CHECK (title::\"{external}\".nonblank IS NOT NULL))"
+        ))
+        .await
+        .unwrap();
+    let dependency: bool = client
+        .query_one(
+            "SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_depend d \
+             JOIN pg_catalog.pg_constraint c ON c.oid = d.objid \
+             JOIN pg_catalog.pg_type t ON t.oid = d.refobjid \
+             JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace \
+             WHERE d.classid = 'pg_constraint'::regclass \
+               AND d.refclassid = 'pg_type'::regclass \
+               AND c.conrelid = $1::text::regclass AND n.nspname = $2)",
+            &[&format!("\"{schema}\".record"), &external],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "ALTER DOMAIN \"{external}\".nonblank \
+             ADD CONSTRAINT forbid_x CHECK (VALUE <> 'x')"
+        ))
+        .await
+        .unwrap();
+    let after = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP TABLE \"{schema}\".record; DROP SCHEMA \"{external}\" CASCADE; \
+             CREATE DOMAIN \"{schema}\".nonblank AS text CHECK (VALUE <> ''); \
+             CREATE TABLE \"{schema}\".record (title text, \
+               CONSTRAINT title_check CHECK (title::\"{schema}\".nonblank IS NOT NULL))"
+        ))
+        .await
+        .unwrap();
+    let local_before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await
+        .unwrap();
+    client
+        .batch_execute(&format!(
+            "ALTER DOMAIN \"{schema}\".nonblank \
+             ADD CONSTRAINT forbid_x CHECK (VALUE <> 'x')"
+        ))
+        .await
+        .unwrap();
+    let local_after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await
+        .unwrap();
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    assert!(
+        dependency,
+        "PostgreSQL must record the expression type dependency"
+    );
+    assert!(
+        matches!(
+            before,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ) && matches!(
+            after,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "external expression type must fail closed before and after mutation: {before:?}, {after:?}"
+    );
+    assert_ne!(
+        local_before.snapshot_digest(),
+        local_after.snapshot_digest()
+    );
+    connection_task.abort();
+}
+
+#[tokio::test]
 async fn postgres18_user_collation_in_pg_catalog_fails_closed() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
