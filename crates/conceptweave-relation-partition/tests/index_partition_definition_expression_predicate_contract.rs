@@ -6,12 +6,13 @@ use conceptweave_observation::{
 };
 use conceptweave_relation_partition::{
     CanonicalExpression, CanonicalExpressionField, CanonicalExpressionValue,
-    IndexExclusionSemanticsSnapshot, IndexExpressionSemanticsObservation,
-    IndexExpressionSemanticsSnapshot, IndexKeyOperatorFamilyObservation,
-    IndexOperatorFamilySnapshot, IndexPartitionCoordinate, IndexPartitionObservation,
-    IndexPartitionSnapshot, IndexPredicateSemanticsObservation, IndexRelationKind,
-    PartitionParentRelationCoordinate, QualifiedFunctionSignature, QualifiedOperatorFamilyName,
-    QualifiedOperatorSignature, RelationPartitionObservation, RelationPartitionSnapshot,
+    IndexExclusionSemanticsSnapshot, IndexExpressionSemanticsLocation,
+    IndexExpressionSemanticsObservation, IndexExpressionSemanticsSnapshot,
+    IndexKeyOperatorFamilyObservation, IndexOperatorFamilySnapshot, IndexPartitionCoordinate,
+    IndexPartitionObservation, IndexPartitionSnapshot, IndexPredicateSemanticsObservation,
+    IndexRelationKind, PartitionParentRelationCoordinate, QualifiedFunctionSignature,
+    QualifiedOperatorFamilyName, QualifiedOperatorSignature, RelationPartitionObservation,
+    RelationPartitionSnapshot,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationLimits, ObservationRequest, ObservationRequestBudget,
@@ -429,6 +430,95 @@ fn stable_column_identity_survives_different_physical_attribute_order() {
 
     assert_eq!(snapshot.expression_observations().len(), 2);
     assert_eq!(snapshot.predicate_observations().len(), 2);
+
+    for index in [parent_index(), child_index()] {
+        for location in [
+            IndexExpressionSemanticsLocation::Expression {
+                index: index.clone(),
+                key_position: 1,
+            },
+            IndexExpressionSemanticsLocation::Predicate {
+                index: index.clone(),
+            },
+        ] {
+            let receipt = snapshot.source_receipt(location.clone()).unwrap();
+            assert_eq!(receipt.location(), &location);
+            assert_eq!(receipt.source_id(), snapshot.source_connection_key());
+            assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+            assert_eq!(
+                receipt.connection_policy_binding(),
+                snapshot.connection_policy_binding()
+            );
+            assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+            assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
+        }
+        for key_position in [0, 2] {
+            assert_eq!(
+                snapshot
+                    .source_receipt(IndexExpressionSemanticsLocation::Expression {
+                        index: index.clone(),
+                        key_position,
+                    })
+                    .unwrap_err(),
+                ObservationError::UnknownObservationLocation {
+                    location: format!(
+                        "{}/keys/{key_position}/expression-semantics",
+                        index.canonical_location()
+                    ),
+                }
+            );
+        }
+        for (schema, relation, kind, name) in [
+            (
+                "archive",
+                index.relation_name(),
+                index.relation_kind(),
+                index.index_name(),
+            ),
+            (
+                index.schema_name(),
+                "unobserved_relation",
+                index.relation_kind(),
+                index.index_name(),
+            ),
+            (
+                index.schema_name(),
+                index.relation_name(),
+                RelationKind::ForeignTable,
+                index.index_name(),
+            ),
+            (
+                index.schema_name(),
+                index.relation_name(),
+                index.relation_kind(),
+                "unobserved_index",
+            ),
+        ] {
+            let absent = IndexPartitionCoordinate::new(schema, relation, kind, name).unwrap();
+            for (location, suffix) in [
+                (
+                    IndexExpressionSemanticsLocation::Expression {
+                        index: absent.clone(),
+                        key_position: 1,
+                    },
+                    "keys/1/expression-semantics",
+                ),
+                (
+                    IndexExpressionSemanticsLocation::Predicate {
+                        index: absent.clone(),
+                    },
+                    "predicate-semantics",
+                ),
+            ] {
+                assert_eq!(
+                    snapshot.source_receipt(location).unwrap_err(),
+                    ObservationError::UnknownObservationLocation {
+                        location: format!("{}/{suffix}", absent.canonical_location()),
+                    }
+                );
+            }
+        }
+    }
 }
 
 #[test]
