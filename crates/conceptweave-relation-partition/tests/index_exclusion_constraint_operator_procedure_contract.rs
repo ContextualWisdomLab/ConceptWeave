@@ -274,6 +274,13 @@ fn ordinary_exclude_preserves_independent_operator_procedure_binding() {
     assert_eq!(receipt.location().operator(), &operator("="));
     assert_eq!(receipt.location().procedure(), &procedure("int4eq"));
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(receipt.source_id(), operators.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        operators.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), operators.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), operators.observed_at_utc());
     assert!(
         receipt
             .location()

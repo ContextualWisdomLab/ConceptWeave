@@ -97,6 +97,16 @@ fn ordinary_exclude_transform_converter_acl_preserves_proacl_state_and_execute_g
     assert!(!receipt.location().access_control().proacl_was_null());
     assert_eq!(receipt.location().access_control().grant_count(), 2);
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(receipt.source_id(), predecessor.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        predecessor.connection_policy_binding()
+    );
+    assert_eq!(
+        receipt.extractor_revision(),
+        predecessor.extractor_revision()
+    );
+    assert_eq!(receipt.observed_at_utc(), predecessor.observed_at_utc());
 }
 
 #[test]
