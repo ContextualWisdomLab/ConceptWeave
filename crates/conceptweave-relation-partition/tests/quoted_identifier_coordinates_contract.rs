@@ -78,12 +78,10 @@ fn quoted_catalog_identifiers_survive_independent_partition_and_exclusion_coordi
             .function_name(),
         " "
     );
-    assert_eq!(
-        QualifiedUnaryOperatorSignature::new(" ", "+", type_name.clone())
-            .unwrap()
-            .schema_name(),
-        " "
-    );
+    let unary = QualifiedUnaryOperatorSignature::new(" ", "+", type_name.clone()).unwrap();
+    assert_eq!(unary.schema_name(), " ");
+    assert_eq!(unary.operator_name(), "+");
+    assert_eq!(unary.operand_type(), &type_name);
     CanonicalExpression::column(" ").unwrap();
     assert!(QualifiedUnaryOperatorSignature::new(" ", " ", type_name.clone()).is_err());
     assert!(QualifiedOperatorSignature::new(" ", " ", type_name.clone(), type_name).is_err());

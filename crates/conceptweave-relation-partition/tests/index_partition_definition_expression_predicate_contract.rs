@@ -430,6 +430,24 @@ fn stable_column_identity_survives_different_physical_attribute_order() {
 
     assert_eq!(snapshot.expression_observations().len(), 2);
     assert_eq!(snapshot.predicate_observations().len(), 2);
+    for observation in snapshot.expression_observations() {
+        assert_eq!(
+            observation.canonical_location(),
+            format!(
+                "{}/keys/1/expression-semantics",
+                observation.index().canonical_location()
+            )
+        );
+    }
+    for observation in snapshot.predicate_observations() {
+        assert_eq!(
+            observation.canonical_location(),
+            format!(
+                "{}/predicate-semantics",
+                observation.index().canonical_location()
+            )
+        );
+    }
 
     for index in [parent_index(), child_index()] {
         for location in [
