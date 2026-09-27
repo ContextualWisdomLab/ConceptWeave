@@ -331,6 +331,23 @@ fn exclusion_snapshot_rejects_a_predecessor_from_another_capture() {
         .unwrap();
         let fresh_relations =
             RelationPartitionSnapshot::new(&fresh, relations.observations().to_vec()).unwrap();
+        assert_eq!(
+            IndexPartitionSnapshot::new(&fresh, &relations, indexes.observations().to_vec()),
+            Err(ObservationError::InvalidObservationField {
+                field: "index_partition_relation_snapshot_binding",
+            })
+        );
+        assert_eq!(
+            IndexOperatorFamilySnapshot::new(
+                &fresh,
+                &fresh_relations,
+                &indexes,
+                families.observations().to_vec(),
+            ),
+            Err(ObservationError::InvalidObservationField {
+                field: "index_operator_family_predecessor_binding",
+            })
+        );
         let fresh_indexes =
             IndexPartitionSnapshot::new(&fresh, &fresh_relations, indexes.observations().to_vec())
                 .unwrap();

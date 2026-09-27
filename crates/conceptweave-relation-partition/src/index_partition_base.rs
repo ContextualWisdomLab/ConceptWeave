@@ -307,7 +307,14 @@ impl IndexPartitionSnapshot {
             base_snapshot,
             relation_partition_snapshot.observations().to_vec(),
         )?;
-        if rebound.snapshot_digest() != relation_partition_snapshot.snapshot_digest() {
+        if rebound.snapshot_digest() != relation_partition_snapshot.snapshot_digest()
+            || rebound.source_connection_key()
+                != relation_partition_snapshot.source_connection_key()
+            || rebound.connection_policy_binding()
+                != relation_partition_snapshot.connection_policy_binding()
+            || rebound.extractor_revision() != relation_partition_snapshot.extractor_revision()
+            || rebound.observed_at_utc() != relation_partition_snapshot.observed_at_utc()
+        {
             return Err(invalid("index_partition_relation_snapshot_binding"));
         }
 

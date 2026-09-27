@@ -212,7 +212,13 @@ impl IndexOperatorFamilySnapshot {
             relation_partition_snapshot,
             index_partition_snapshot.observations().to_vec(),
         )?;
-        if rebound.snapshot_digest() != index_partition_snapshot.snapshot_digest() {
+        if rebound.snapshot_digest() != index_partition_snapshot.snapshot_digest()
+            || rebound.source_connection_key() != index_partition_snapshot.source_connection_key()
+            || rebound.connection_policy_binding()
+                != index_partition_snapshot.connection_policy_binding()
+            || rebound.extractor_revision() != index_partition_snapshot.extractor_revision()
+            || rebound.observed_at_utc() != index_partition_snapshot.observed_at_utc()
+        {
             return Err(invalid("index_operator_family_predecessor_binding"));
         }
 
