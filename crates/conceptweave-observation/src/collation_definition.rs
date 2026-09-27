@@ -575,6 +575,198 @@ mod tests {
     }
 
     #[test]
+    fn provider_shapes_preserve_supported_null_fields_and_reject_mixed_shapes() {
+        let database = DatabaseLocaleDefinition::new(
+            CollationProvider::Libc,
+            CollationLocaleFields::new(Some("C".into()), Some("C".into()), None, None, None, None)
+                .unwrap(),
+        )
+        .unwrap();
+        let mut observed_digests = BTreeSet::new();
+        // Bits describe LC_COLLATE, LC_CTYPE, locale, rules, recorded and actual version.
+        for (provider, admitted_masks) in [
+            (CollationProvider::DatabaseDefault, &[0_u8, 32][..]),
+            (CollationProvider::Builtin, &[20, 52][..]),
+            (CollationProvider::Libc, &[3, 19, 35, 51][..]),
+            (CollationProvider::Icu, &[52, 60][..]),
+        ] {
+            for mask in 0_u8..64 {
+                let [collate, ctype, locale, rules, recorded, actual] =
+                    std::array::from_fn(|slot| {
+                        (mask & (1 << slot) != 0)
+                            .then(|| ["C", "C", "C", "", "1", "1"][slot].into())
+                    });
+                let fields =
+                    CollationLocaleFields::new(collate, ctype, locale, rules, recorded, actual)
+                        .unwrap();
+                for deterministic in [false, true] {
+                    let is_default = provider == CollationProvider::DatabaseDefault;
+                    let observed = CollationDefinitionObservation::new(
+                        QualifiedCollationName::new(
+                            if is_default { "pg_catalog" } else { "public" },
+                            if is_default { "default" } else { "comparison" },
+                        )
+                        .unwrap(),
+                        -1,
+                        6,
+                        provider,
+                        deterministic,
+                        fields.clone(),
+                        is_default.then(|| database.clone()),
+                        None,
+                    );
+                    let admitted = admitted_masks.contains(&mask)
+                        && (deterministic || provider == CollationProvider::Icu);
+                    assert_eq!(
+                        observed.is_ok(),
+                        admitted,
+                        "{provider:?}/{mask}/{deterministic}"
+                    );
+                    match observed {
+                        Ok(observed) => {
+                            assert_eq!(observed.fields(), &fields);
+                            assert_eq!(observed.deterministic(), deterministic);
+                            assert!(
+                                observed_digests
+                                    .insert(digest("base", std::slice::from_ref(&observed))),
+                                "distinct admitted locale evidence must have distinct content identity"
+                            );
+                        }
+                        Err(error) => assert_eq!(
+                            error,
+                            ObservationError::InvalidObservationField {
+                                field: "collation_definition_shape",
+                            }
+                        ),
+                    }
+                }
+            }
+        }
+        for slot in 0..6 {
+            let mut raw = [None, None, None, None, None, None];
+            raw[slot] = Some("bad\0text".into());
+            let [collate, ctype, locale, rules, recorded, actual] = raw;
+            assert_eq!(
+                CollationLocaleFields::new(collate, ctype, locale, rules, recorded, actual),
+                Err(ObservationError::InvalidObservationField {
+                    field: "collation_locale_text"
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn definition_encoding_and_default_coordinate_boundaries_fail_closed() {
+        let baseline = definition("1", "1");
+        let mut cases = vec![baseline.clone(); 7];
+        cases[0].encoding = -2;
+        cases[1].database_encoding = -1;
+        cases[2].encoding = 0;
+        cases[3].collation = QualifiedCollationName::new("pg_catalog", "default").unwrap();
+        cases[4].comment = Some("bad\0comment".into());
+        cases[5].database_default = Some(
+            DatabaseLocaleDefinition::new(CollationProvider::Icu, baseline.fields.clone()).unwrap(),
+        );
+        cases[6].collation = QualifiedCollationName::new("pg_catalog", "default").unwrap();
+        cases[6].provider = CollationProvider::DatabaseDefault;
+        cases[6].encoding = 0;
+        cases[6].deterministic = true;
+        cases[6].fields = CollationLocaleFields::new(None, None, None, None, None, None).unwrap();
+        cases[6].database_default = cases[5].database_default.clone();
+        for invalid in cases {
+            assert_eq!(
+                CollationDefinitionObservation::new(
+                    invalid.collation,
+                    invalid.encoding,
+                    invalid.database_encoding,
+                    invalid.provider,
+                    invalid.deterministic,
+                    invalid.fields,
+                    invalid.database_default,
+                    invalid.comment
+                ),
+                Err(ObservationError::InvalidObservationField {
+                    field: "collation_definition_shape"
+                })
+            );
+        }
+        for locale in ["C", "C.UTF-8", "PG_UNICODE_FAST", "unsupported"] {
+            let builtin_fields = CollationLocaleFields::new(
+                None,
+                None,
+                Some(locale.into()),
+                None,
+                Some("1".into()),
+                Some("1".into()),
+            )
+            .unwrap();
+            assert_eq!(
+                CollationDefinitionObservation::new(
+                    baseline.collation.clone(),
+                    6,
+                    6,
+                    CollationProvider::Builtin,
+                    true,
+                    builtin_fields,
+                    None,
+                    Some(String::new())
+                )
+                .is_ok(),
+                locale != "unsupported"
+            );
+        }
+    }
+
+    #[test]
+    fn referenced_definitions_require_exact_complete_coherent_coverage() {
+        let first = definition("1", "1");
+        let mut second = first.clone();
+        second.collation = QualifiedCollationName::new("public", "other").unwrap();
+        let column = |definition: &CollationDefinitionObservation, deterministic| {
+            ColumnCollationObservation::collatable(
+                "public",
+                "records",
+                crate::RelationKind::Table,
+                definition.collation().collation_name(),
+                definition.collation().clone(),
+                deterministic,
+            )
+            .unwrap()
+        };
+        let columns = [column(&first, false), column(&second, false)];
+        let canonical = |definitions| canonicalize(&[], &[], Some(&columns), None, definitions);
+        let forward = canonical(vec![first.clone(), second.clone()]).unwrap();
+        let reverse = canonical(vec![second.clone(), first.clone()]).unwrap();
+        assert_eq!(forward, reverse);
+        assert_eq!(digest("base", &forward), digest("base", &reverse));
+        let mut foreign = second.clone();
+        foreign.collation = QualifiedCollationName::new("archive", "other").unwrap();
+        let mut mismatched_encoding = second.clone();
+        mismatched_encoding.database_encoding = 0;
+        for incomplete in [
+            vec![],
+            vec![first.clone()],
+            vec![first.clone(), first.clone(), second.clone()],
+            vec![first.clone(), foreign],
+            vec![first.clone(), mismatched_encoding],
+        ] {
+            assert_eq!(
+                canonical(incomplete),
+                Err(ObservationError::InvalidObservationField {
+                    field: "collation_definition_coverage",
+                })
+            );
+        }
+        let columns = [column(&first, true), column(&second, false)];
+        assert_eq!(
+            canonicalize(&[], &[], Some(&columns), None, vec![first, second]),
+            Err(ObservationError::InvalidObservationField {
+                field: "collation_definition_determinism"
+            })
+        );
+    }
+
+    #[test]
     fn recorded_and_effective_versions_have_distinct_source_identity() {
         let baseline = digest("base", &[definition("153.120", "153.120")]);
         assert_ne!(baseline, digest("base", &[definition("0", "153.120")]));
@@ -585,6 +777,12 @@ mod tests {
     fn collation_owner_digest_requires_complete_exact_coverage() {
         let definitions = vec![definition("153.120", "153.120")];
         let coordinate = definitions[0].collation().clone();
+        assert_eq!(
+            CollationOwnerObservation::new(coordinate.clone(), 0, "postgres"),
+            Err(ObservationError::InvalidObservationField {
+                field: "collation_owner_oid"
+            })
+        );
         let original = CollationOwnerObservation::new(coordinate.clone(), 10, "postgres").unwrap();
         let renamed = CollationOwnerObservation::new(coordinate.clone(), 10, "steward").unwrap();
         let changed = CollationOwnerObservation::new(coordinate, 11, "steward").unwrap();
@@ -661,7 +859,30 @@ mod tests {
             None,
         )
         .unwrap();
-        assert!(DatabaseLocaleDefinition::new(CollationProvider::Libc, libc).is_ok());
+        assert!(DatabaseLocaleDefinition::new(CollationProvider::Libc, libc.clone()).is_ok());
+        let mut incomplete = [libc.clone(), libc.clone(), libc];
+        incomplete[0].lc_collate = None;
+        incomplete[1].lc_ctype = None;
+        incomplete[2].icu_rules = Some(String::new());
+        for fields in incomplete {
+            assert_eq!(
+                DatabaseLocaleDefinition::new(CollationProvider::Libc, fields),
+                Err(ObservationError::InvalidObservationField {
+                    field: "database_locale_provider"
+                })
+            );
+        }
+        let builtin_with_rules = CollationLocaleFields {
+            locale: Some("C".into()),
+            icu_rules: Some(String::new()),
+            ..fields("1", "1")
+        };
+        assert_eq!(
+            DatabaseLocaleDefinition::new(CollationProvider::Builtin, builtin_with_rules),
+            Err(ObservationError::InvalidObservationField {
+                field: "database_locale_provider"
+            })
+        );
     }
 
     #[test]
