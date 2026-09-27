@@ -255,6 +255,62 @@ fn exclusion(
 }
 
 #[test]
+fn exclusion_key_requires_nonzero_coordinates_and_exact_procedure_arguments() {
+    let int4 = QualifiedTypeName::new("pg_catalog", "int4").unwrap();
+    let int8 = QualifiedTypeName::new("pg_catalog", "int8").unwrap();
+    let operator =
+        QualifiedOperatorSignature::new("pg_catalog", "=", int4.clone(), int8.clone()).unwrap();
+    let procedure =
+        QualifiedProcedureSignature::new("pg_catalog", "int48eq", vec![int4.clone(), int8.clone()])
+            .unwrap();
+    let make = |position, procedure, strategy| {
+        IndexKeyExclusionSemanticsObservation::new(
+            parent_index(),
+            position,
+            operator.clone(),
+            procedure,
+            strategy,
+        )
+    };
+    assert_eq!(
+        make(0, procedure.clone(), 1),
+        Err(ObservationError::InvalidOrdinalPosition)
+    );
+    assert_eq!(
+        make(1, procedure.clone(), 0),
+        Err(ObservationError::InvalidObservationField {
+            field: "exclusion_strategy"
+        })
+    );
+    for arguments in [vec![], vec![int4.clone(), int8.clone(), int4.clone()]] {
+        assert_eq!(
+            QualifiedProcedureSignature::new("pg_catalog", "int48eq", arguments),
+            Err(ObservationError::InvalidObservationField {
+                field: "exclusion_procedure_argument_types",
+            })
+        );
+    }
+    for arguments in [
+        vec![int4.clone()],
+        vec![int8.clone(), int4.clone()],
+        vec![int4.clone(), int4.clone()],
+    ] {
+        let wrong = QualifiedProcedureSignature::new("pg_catalog", "int48eq", arguments).unwrap();
+        assert_eq!(
+            make(1, wrong, 1),
+            Err(ObservationError::InvalidObservationField {
+                field: "exclusion_operator_procedure_signature",
+            })
+        );
+    }
+    let accepted = make(1, procedure.clone(), 1).unwrap();
+    assert_eq!(accepted.operator(), &operator);
+    assert_eq!(accepted.procedure(), &procedure);
+    assert_eq!(accepted.key_position(), 1);
+    assert_eq!(accepted.strategy(), 1);
+}
+
+#[test]
 fn attached_child_must_preserve_exclusion_presence() {
     let (base, relations, indexes, families) = predecessor(Some(true), Some(false));
 
