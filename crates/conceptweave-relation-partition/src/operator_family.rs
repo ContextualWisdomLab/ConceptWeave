@@ -365,19 +365,19 @@ fn canonicalize_operator_families(
     let mut family_by_class = BTreeMap::new();
     for observation in &observations {
         let index = find_base_index(base_snapshot, observation.index())
-            .ok_or_else(|| invalid("index_operator_family_index_binding"))?;
+            .ok_or(invalid("index_operator_family_index_binding"))?;
         let access_method = index
             .access_method()
-            .ok_or_else(|| invalid("index_operator_family_access_method_binding"))?;
+            .ok_or(invalid("index_operator_family_access_method_binding"))?;
         if access_method != observation.operator_family().access_method_name() {
             return Err(invalid("index_operator_family_access_method_binding"));
         }
         let semantics = index
             .key_semantics()
-            .ok_or_else(|| invalid("index_operator_family_class_binding"))?
+            .ok_or(invalid("index_operator_family_class_binding"))?
             .iter()
             .find(|semantics| semantics.position() == observation.key_position())
-            .ok_or_else(|| invalid("index_operator_family_class_binding"))?;
+            .ok_or(invalid("index_operator_family_class_binding"))?;
         if semantics.operator_class() != observation.operator_class() {
             return Err(invalid("index_operator_family_class_binding"));
         }
@@ -403,15 +403,15 @@ fn canonicalize_operator_families(
             continue;
         };
         let child_index = find_base_index(base_snapshot, membership.coordinate())
-            .ok_or_else(|| invalid("index_operator_family_index_binding"))?;
+            .ok_or(invalid("index_operator_family_index_binding"))?;
         for key_attribute in child_index.key_attributes() {
             let position = key_attribute.position();
             let child_family = by_key
                 .get(&(membership.coordinate().clone(), position))
-                .ok_or_else(|| invalid("index_operator_family_completeness"))?;
+                .ok_or(invalid("index_operator_family_completeness"))?;
             let parent_family = by_key
                 .get(&(parent.clone(), position))
-                .ok_or_else(|| invalid("index_operator_family_completeness"))?;
+                .ok_or(invalid("index_operator_family_completeness"))?;
             if child_family.operator_family() != parent_family.operator_family() {
                 return Err(invalid("index_partition_definition_operator_family"));
             }
