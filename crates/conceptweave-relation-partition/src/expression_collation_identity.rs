@@ -273,7 +273,7 @@ impl IndexExpressionCollationIdentitySnapshot {
             node_schema_predecessor,
             relation_var_predecessor,
         )?;
-        if rebound_whole_tree.snapshot_digest() != whole_tree_predecessor.snapshot_digest() {
+        if rebound_whole_tree != *whole_tree_predecessor {
             return Err(invalid("index_expression_collation_whole_tree_predecessor"));
         }
 
@@ -283,7 +283,7 @@ impl IndexExpressionCollationIdentitySnapshot {
             index_partition_snapshot,
             key_collation_predecessor.observations().to_vec(),
         )?;
-        if rebound_key_collation.snapshot_digest() != key_collation_predecessor.snapshot_digest() {
+        if rebound_key_collation != *key_collation_predecessor {
             return Err(invalid("index_expression_collation_key_predecessor"));
         }
 

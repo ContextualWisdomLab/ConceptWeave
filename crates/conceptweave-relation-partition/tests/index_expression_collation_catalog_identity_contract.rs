@@ -822,8 +822,30 @@ fn material_collation_rejects_cross_capture_provenance_even_when_content_matches
             "2026-09-15T01:10:01Z",
         ),
     ] {
-        let other = stack_with_capture_context(-1, source_key, binding, revision, observed_at);
+        let mut other = stack_with_capture_context(-1, source_key, binding, revision, observed_at);
         let other_expressions = compose(&other, -1, -1, -1, -1).unwrap();
+        let current_composed = other.composed.clone();
+        let current_keys = other.key_collations.clone();
+        other.composed = baseline.composed.clone();
+        other.key_collations = baseline.key_collations.clone();
+        assert_eq!(
+            compose(&other, -1, -1, -1, -1),
+            Err(ObservationError::InvalidObservationField {
+                field: "index_expression_collation_whole_tree_predecessor"
+            })
+        );
+        other.composed = current_composed;
+        assert_eq!(
+            compose(&other, -1, -1, -1, -1),
+            Err(ObservationError::InvalidObservationField {
+                field: "index_expression_collation_key_predecessor"
+            })
+        );
+        other.key_collations = current_keys;
+        assert_eq!(other_expressions.source_connection_key(), source_key);
+        assert_eq!(other_expressions.connection_policy_binding(), binding);
+        assert_eq!(other_expressions.extractor_revision(), revision);
+        assert_eq!(other_expressions.observed_at_utc(), observed_at);
         assert_eq!(
             baseline.base.snapshot_digest(),
             other.base.snapshot_digest()
