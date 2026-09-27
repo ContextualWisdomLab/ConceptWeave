@@ -4233,6 +4233,84 @@ async fn postgres18_cross_schema_sequence_default_fails_closed() {
 }
 
 #[tokio::test]
+async fn postgres18_late_bound_oid_vector_type_names_fail_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_oid_vector_owner_{}", std::process::id());
+    let external = format!("cw_oid_vector_source_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA {schema}; CREATE SCHEMA {external}; \
+             CREATE TYPE {external}.status AS ENUM ('new')"
+        ))
+        .await
+        .unwrap();
+    let type_oid: u32 = client
+        .query_one(&format!("SELECT '{external}.status'::regtype::oid"), &[])
+        .await
+        .unwrap()
+        .get(0);
+    client
+        .batch_execute(&format!(
+            "CREATE TABLE {schema}.record \
+             (external_type text DEFAULT oidvectortypes('{type_oid}'::oidvector))"
+        ))
+        .await
+        .unwrap();
+    let type_name_before: String = client
+        .query_one(
+            &format!("SELECT pg_catalog.oidvectortypes('{type_oid}'::oidvector)"),
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!("ALTER TYPE {external}.status RENAME TO changed"))
+        .await
+        .unwrap();
+    let type_name_after: String = client
+        .query_one(
+            &format!("SELECT pg_catalog.oidvectortypes('{type_oid}'::oidvector)"),
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    let after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA {schema} CASCADE; DROP SCHEMA {external} CASCADE"
+        ))
+        .await
+        .unwrap();
+    connection_task.abort();
+    assert_ne!(type_name_before, type_name_after);
+    if let (Ok(before), Ok(after)) = (&before, &after) {
+        assert_eq!(before.snapshot_digest(), after.snapshot_digest());
+    }
+    assert!(
+        matches!(
+            before,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ) && matches!(
+            after,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ),
+        "OID-vector type-name lookup must not retain an admitted source identity: before={before:?}, after={after:?}"
+    );
+}
+
+#[tokio::test]
 async fn postgres18_late_bound_oid_alias_input_fails_closed() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;

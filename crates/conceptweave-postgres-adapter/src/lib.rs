@@ -415,7 +415,7 @@ async fn capture_catalog(
                              AND c.oid = scoped.objid \
                          WHERE c.contype = 'c' AND c.conbin IS NOT NULL \
                        ) captured_expression \
-                       WHERE rendered ~* '(^|[^[:alnum:]_])(nextval|currval|setval|lastval|pg_[[:alnum:]_]*|to_reg[[:alnum:]_]*|reg[[:alnum:]_]*in|obj_description|col_description|shobj_description|format_type|has_[[:alnum:]_]*_privilege|row_security_active)[[:space:]]*[(]' \
+                       WHERE rendered ~* '(^|[^[:alnum:]_])(nextval|currval|setval|lastval|pg_[[:alnum:]_]*|to_reg[[:alnum:]_]*|reg[[:alnum:]_]*in|obj_description|col_description|shobj_description|format_type|oidvectortypes|has_[[:alnum:]_]*_privilege|row_security_active)[[:space:]]*[(]' \
                          OR rendered ~* '::[[:space:]]*reg[[:alnum:]_]*([^[:alnum:]_]|$)' \
                      )",
                 &[&schema_oid],
