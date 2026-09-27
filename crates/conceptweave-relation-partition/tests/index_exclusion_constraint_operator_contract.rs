@@ -6,11 +6,13 @@ use conceptweave_observation::{
 use conceptweave_relation_partition::{
     IndexExclusionConstraintAccessMethodCapabilityObservation,
     IndexExclusionConstraintAccessMethodCapabilitySnapshot, IndexExclusionConstraintCoordinate,
+    IndexExclusionConstraintImmediacySnapshot, IndexExclusionConstraintIndexRoleSnapshot,
     IndexExclusionConstraintKeyObservation, IndexExclusionConstraintKeySnapshot,
     IndexExclusionConstraintObservation, IndexExclusionConstraintOperatorObservation,
     IndexExclusionConstraintOperatorSemanticsLineage, IndexExclusionConstraintOperatorSnapshot,
     IndexExclusionConstraintOperatorSourceLineage, IndexExclusionConstraintPeriodObservation,
     IndexExclusionConstraintPeriodSnapshot, IndexExclusionConstraintSnapshot,
+    IndexExclusionConstraintTimingObservation, IndexExclusionConstraintTimingSnapshot,
     IndexExclusionSemanticsSnapshot, IndexKeyExclusionSemanticsObservation,
     IndexKeyOperatorFamilyObservation, IndexOperatorFamilySnapshot, IndexPartitionCoordinate,
     IndexPartitionObservation, IndexPartitionSnapshot, IndexRelationKind,
@@ -398,6 +400,22 @@ fn exact_conexclop_issues_domain_separated_provenance() {
 fn ordinary_exclusion_operator_rejects_each_stale_predecessor() {
     let (base, relations, indexes, constraints, period, keys, families, semantics) =
         predecessor_snapshots();
+    let old_timing = IndexExclusionConstraintTimingSnapshot::new(
+        &constraints,
+        vec![
+            IndexExclusionConstraintTimingObservation::new(constraint_coordinate(), false, false)
+                .unwrap(),
+        ],
+    )
+    .unwrap();
+    let old_immediacy = IndexExclusionConstraintImmediacySnapshot::new(
+        &base,
+        &relations,
+        &indexes,
+        &constraints,
+        &old_timing,
+    )
+    .unwrap();
     for (key, policy, revision, time) in [
         (
             "warehouse_secondary",
@@ -479,6 +497,52 @@ fn ordinary_exclusion_operator_rejects_each_stale_predecessor() {
         assert_eq!(capability.connection_policy_binding(), policy);
         assert_eq!(capability.extractor_revision(), revision);
         assert_eq!(capability.observed_at_utc(), time);
+        let fresh_timing = IndexExclusionConstraintTimingSnapshot::new(
+            &fresh_constraints,
+            old_timing.observations().to_vec(),
+        )
+        .unwrap();
+        let fresh_immediacy = IndexExclusionConstraintImmediacySnapshot::new(
+            &fresh,
+            &fresh_relations,
+            &fresh_indexes,
+            &fresh_constraints,
+            &fresh_timing,
+        )
+        .unwrap();
+        for (constraint, timing, immediacy) in [
+            (&constraints, &fresh_timing, &fresh_immediacy),
+            (&fresh_constraints, &old_timing, &fresh_immediacy),
+            (&fresh_constraints, &fresh_timing, &old_immediacy),
+        ] {
+            assert_eq!(
+                IndexExclusionConstraintIndexRoleSnapshot::new(
+                    &fresh,
+                    &fresh_relations,
+                    &fresh_indexes,
+                    constraint,
+                    timing,
+                    immediacy
+                )
+                .unwrap_err(),
+                ObservationError::InvalidObservationField {
+                    field: "index_exclusion_constraint_index_role_predecessor_binding"
+                }
+            );
+        }
+        let role = IndexExclusionConstraintIndexRoleSnapshot::new(
+            &fresh,
+            &fresh_relations,
+            &fresh_indexes,
+            &fresh_constraints,
+            &fresh_timing,
+            &fresh_immediacy,
+        )
+        .unwrap();
+        assert_eq!(role.source_connection_key(), key);
+        assert_eq!(role.connection_policy_binding(), policy);
+        assert_eq!(role.extractor_revision(), revision);
+        assert_eq!(role.observed_at_utc(), time);
         let fresh_period = IndexExclusionConstraintPeriodSnapshot::new(
             &fresh_constraints,
             period.observations().to_vec(),
