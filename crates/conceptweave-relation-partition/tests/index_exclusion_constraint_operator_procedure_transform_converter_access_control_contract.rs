@@ -107,6 +107,50 @@ fn ordinary_exclude_transform_converter_acl_preserves_proacl_state_and_execute_g
         predecessor.extractor_revision()
     );
     assert_eq!(receipt.observed_at_utc(), predecessor.observed_at_utc());
+    for (direction, token) in [
+        (
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+            "from_sql",
+        ),
+        (
+            IndexExclusionConstraintOperatorProcedureTransformConverterDirection::ToSql,
+            "to_sql",
+        ),
+    ] {
+        assert_eq!(
+            snapshot
+                .source_receipt(coordinate(), 1, custom_payload_type(), direction)
+                .unwrap()
+                .location()
+                .direction(),
+            direction
+        );
+        for (position, transform_type) in [
+            (0, custom_payload_type()),
+            (2, custom_payload_type()),
+            (
+                1,
+                QualifiedTypeName::new("types", "custom_payload").unwrap(),
+            ),
+            (
+                1,
+                QualifiedTypeName::new("public", "unobserved_payload").unwrap(),
+            ),
+        ] {
+            let location = format!(
+                "{}/exclusion-operators/{position}/procedure-transform-converters/{}.{}/{token}/access-control",
+                coordinate().canonical_location(),
+                transform_type.schema_name(),
+                transform_type.type_name()
+            );
+            assert_eq!(
+                snapshot
+                    .source_receipt(coordinate(), position, transform_type, direction)
+                    .unwrap_err(),
+                ObservationError::UnknownObservationLocation { location }
+            );
+        }
+    }
 }
 
 #[test]

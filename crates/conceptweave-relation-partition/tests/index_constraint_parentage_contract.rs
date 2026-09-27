@@ -343,6 +343,41 @@ fn exact_constraint_parentage_is_admitted_and_receipted() {
         Some(&parent_constraint())
     );
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    let observed = child_constraint();
+    for (schema, relation, relation_kind, name) in [
+        (
+            "unobserved_schema",
+            observed.relation_name(),
+            observed.relation_kind(),
+            observed.constraint_name(),
+        ),
+        (
+            observed.schema_name(),
+            "unobserved_relation",
+            observed.relation_kind(),
+            observed.constraint_name(),
+        ),
+        (
+            observed.schema_name(),
+            observed.relation_name(),
+            RelationKind::PartitionedTable,
+            observed.constraint_name(),
+        ),
+        (
+            observed.schema_name(),
+            observed.relation_name(),
+            observed.relation_kind(),
+            "unobserved/constraint~",
+        ),
+    ] {
+        let absent =
+            IndexConstraintParentageCoordinate::new(schema, relation, relation_kind, name).unwrap();
+        let location = absent.canonical_location();
+        assert_eq!(
+            snapshot.source_receipt(absent).unwrap_err(),
+            ObservationError::UnknownObservationLocation { location }
+        );
+    }
 }
 
 #[test]

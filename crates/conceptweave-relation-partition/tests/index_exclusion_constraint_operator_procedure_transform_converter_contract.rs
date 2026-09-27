@@ -156,6 +156,15 @@ fn ordinary_exclude_operator_procedure_transform_converter_preserves_pg_transfor
             .canonical_location()
             .ends_with("/1/procedure-transform-converters")
     );
+    assert_field(
+        IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot::new(
+            &transform_types,
+            &definition,
+            vec![snapshot.observations()[0].clone(); 2],
+        )
+        .unwrap_err(),
+        "index_exclusion_constraint_operator_procedure_transform_converter_coordinate",
+    );
 }
 
 #[test]
