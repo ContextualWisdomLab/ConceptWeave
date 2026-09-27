@@ -371,9 +371,21 @@ fn receipt_is_bound_to_exact_index_coordinate() {
     .unwrap();
 
     let receipt = governed.source_receipt(child_index()).unwrap();
+    assert_eq!(receipt.location(), &child_index());
     assert_eq!(receipt.source_id(), "warehouse_primary");
     assert_eq!(receipt.connection_policy_binding(), POLICY_BINDING);
     assert_eq!(receipt.source_digest(), governed.snapshot_digest());
     assert_eq!(receipt.extractor_revision(), "extractor-index-partition-v1");
     assert_eq!(receipt.observed_at_utc(), "2026-09-14T14:45:00Z");
+    let absent = IndexPartitionCoordinate::new(
+        "public",
+        "accounts_2026",
+        RelationKind::Table,
+        "unobserved_index",
+    )
+    .unwrap();
+    assert!(matches!(
+        governed.source_receipt(absent),
+        Err(ObservationError::UnknownObservationLocation { .. })
+    ));
 }
