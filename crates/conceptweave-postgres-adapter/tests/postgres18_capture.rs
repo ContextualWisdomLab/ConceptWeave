@@ -6421,16 +6421,36 @@ async fn postgres18_catalog_is_observed_in_one_read_only_transaction() {
             .iter()
             .find(|index| index.index_name() == "item_expr_idx")
             .unwrap();
+        let catalog_index = client
+            .query_one(
+                "SELECT ARRAY(SELECT i.indkey[position] \
+                   FROM pg_catalog.generate_series(0, i.indnatts - 1) position \
+                   ORDER BY position), i.indnkeyatts, \
+                 pg_catalog.pg_get_indexdef(i.indexrelid, 2, false), \
+                 pg_catalog.pg_get_expr(i.indpred, i.indrelid, false) \
+                 FROM pg_catalog.pg_index i \
+                 JOIN pg_catalog.pg_class c ON c.oid = i.indexrelid \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+                 WHERE n.nspname = $1 AND c.relname = 'item_expr_idx'",
+                &[&schema],
+            )
+            .await
+            .unwrap();
+        assert_eq!(catalog_index.get::<_, Vec<i16>>(0), [1, 0, 2]);
+        assert_eq!(catalog_index.get::<_, i16>(1), 2);
         assert_eq!(expression_index.key_attributes()[0].attribute_name(), Some("id"));
-        assert!(expression_index.key_attributes()[1]
-            .expression_text()
-            .unwrap()
-            .contains("other"));
+        assert_eq!(
+            expression_index.key_attributes()[1].expression_text(),
+            Some(catalog_index.get::<_, String>(2).as_str())
+        );
         assert_eq!(
             expression_index.include_attributes()[0].attribute_name(),
             Some("other")
         );
-        assert!(expression_index.predicate().unwrap().contains("id"));
+        assert_eq!(
+            expression_index.predicate(),
+            Some(catalog_index.get::<_, String>(3).as_str())
+        );
         with_expression_index
             .source_receipt(
                 SchemaObjectLocation::index(&schema, "item", RelationKind::Table, "item_expr_idx")
