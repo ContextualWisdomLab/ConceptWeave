@@ -2846,6 +2846,20 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
                     .is_some_and(|extension| extension == "release")
             })
             .unwrap();
+        #[cfg(unix)]
+        {
+            let stored_bytes = std::fs::read(&record_path).unwrap();
+            let linked_record = record_path.with_extension("linked");
+            std::fs::rename(&record_path, &linked_record).unwrap();
+            std::os::unix::fs::symlink(&linked_record, &record_path).unwrap();
+            assert_eq!(std::fs::read(&record_path).unwrap(), stored_bytes);
+            assert!(matches!(
+                store.read_verified(&pinned, published.release()),
+                Err(PublicationStoreError::InvalidRecord)
+            ));
+            std::fs::remove_file(&record_path).unwrap();
+            std::fs::rename(&linked_record, &record_path).unwrap();
+        }
         let mut record = std::fs::read(&record_path).unwrap();
         *record.last_mut().unwrap() ^= 1;
         #[cfg(unix)]
