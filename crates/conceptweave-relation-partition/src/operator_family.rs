@@ -198,6 +198,9 @@ pub struct IndexOperatorFamilySnapshot {
 
 impl IndexOperatorFamilySnapshot {
     /// Creates complete key-level operator-family evidence over an exact predecessor stack.
+    ///
+    /// Repeated operator classes must name one family within their access method and schema.
+    /// Contradictory class-to-family evidence is rejected before an immutable snapshot is issued.
     pub fn new(
         base_snapshot: &PostgresSchemaSnapshotV3,
         relation_partition_snapshot: &RelationPartitionSnapshot,
@@ -353,6 +356,7 @@ fn canonicalize_operator_families(
         })
         .collect::<BTreeMap<_, _>>();
 
+    let mut family_by_class = BTreeMap::new();
     for observation in &observations {
         let index = find_base_index(base_snapshot, observation.index())
             .ok_or_else(|| invalid("index_operator_family_index_binding"))?;
@@ -369,6 +373,21 @@ fn canonicalize_operator_families(
             .find(|semantics| semantics.position() == observation.key_position())
             .ok_or_else(|| invalid("index_operator_family_class_binding"))?;
         if semantics.operator_class() != observation.operator_class() {
+            return Err(invalid("index_operator_family_class_binding"));
+        }
+        // PostgreSQL class names are scoped by access method as well as namespace.
+        let class = observation.operator_class();
+        if family_by_class
+            .insert(
+                (
+                    access_method,
+                    class.schema_name(),
+                    class.operator_class_name(),
+                ),
+                observation.operator_family(),
+            )
+            .is_some_and(|family| family != observation.operator_family())
+        {
             return Err(invalid("index_operator_family_class_binding"));
         }
     }
