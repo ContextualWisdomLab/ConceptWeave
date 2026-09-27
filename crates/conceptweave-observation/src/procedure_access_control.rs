@@ -176,6 +176,33 @@ fn invalid(field: &'static str) -> ObservationError {
 mod tests {
     use super::*;
     #[test]
+    fn acl_inventory_requires_every_exact_procedure_signature_once() {
+        let location = ReferencedProcedureLocation::new("pg_catalog", "f", vec![]).unwrap();
+        let definition = ReferencedProcedureDefinitionObservation::new(
+            location.clone(),
+            crate::QualifiedTypeName::new("pg_catalog", "int4").unwrap(),
+            42,
+            "owner",
+            "definition",
+        )
+        .unwrap();
+        let definitions = [definition];
+        let item = ProcedureAccessControlObservation::new(location, None);
+        assert!(canonicalize(&definitions, vec![]).is_err());
+        assert!(canonicalize(&definitions, vec![item.clone(), item.clone()]).is_err());
+        let wrong = ProcedureAccessControlObservation::new(
+            ReferencedProcedureLocation::new("pg_catalog", "g", vec![]).unwrap(),
+            None,
+        );
+        assert!(canonicalize(&definitions, vec![wrong]).is_err());
+        assert_eq!(
+            canonicalize(&definitions, vec![item.clone()]).unwrap(),
+            vec![item]
+        );
+        assert!(canonicalize(&[], vec![]).unwrap().is_empty());
+    }
+
+    #[test]
     fn acl_items_keep_dangling_identities_and_reject_impossible_role_bits() {
         let public = ProcedureAclItem::new(0, None, 42, Some(" ".into()), false, false).unwrap();
         assert_eq!(public.grantee_oid(), 0);
