@@ -6231,6 +6231,28 @@ async fn postgres18_catalog_is_observed_in_one_read_only_transaction() {
             .unwrap();
         client
             .batch_execute(&format!(
+                "COMMENT ON TABLE \"{schema}\".item IS '{}'",
+                "x".repeat(8_193)
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            adapter(config.clone())
+                .observe(authorized(&schema), &NotCancelled)
+                .await
+                .err(),
+            Some(SourceObservationFailure::ByteLimitExceeded { max_bytes: 8_192 })
+        );
+        client
+            .batch_execute(&format!("COMMENT ON TABLE \"{schema}\".item IS 'items'"))
+            .await
+            .unwrap();
+        let restored = adapter(config.clone())
+            .observe(authorized(&schema), &NotCancelled)
+            .await?;
+        assert_eq!(restored.snapshot_digest(), with_table.snapshot_digest());
+        client
+            .batch_execute(&format!(
                 "COMMENT ON COLUMN \"{schema}\".item.id IS 'identifier'"
             ))
             .await
