@@ -347,6 +347,59 @@ fn complete_index_family_and_stable_attachment_are_required() {
 }
 
 #[test]
+fn index_topology_rejects_duplicate_coordinates_wrong_kinds_and_self_parent() {
+    let base = base_snapshot();
+    let relations = relation_partition_snapshot(&base);
+    let parent = IndexPartitionObservation::non_partition(
+        parent_index(),
+        IndexRelationKind::PartitionedIndex,
+    )
+    .unwrap();
+    let child =
+        IndexPartitionObservation::non_partition(child_index(), IndexRelationKind::Index).unwrap();
+
+    IndexPartitionSnapshot::new(&base, &relations, vec![parent.clone(), child.clone()])
+        .expect("complete local topology remains admissible");
+
+    let duplicate = IndexPartitionSnapshot::new(
+        &base,
+        &relations,
+        vec![parent.clone(), child.clone(), child.clone()],
+    )
+    .expect_err("repeated coordinates cannot stand for independent observations");
+    assert_field(duplicate, "index_partition_coordinate");
+
+    for observations in [
+        vec![
+            IndexPartitionObservation::non_partition(parent_index(), IndexRelationKind::Index)
+                .unwrap(),
+            child,
+        ],
+        vec![
+            parent,
+            IndexPartitionObservation::non_partition(
+                child_index(),
+                IndexRelationKind::PartitionedIndex,
+            )
+            .unwrap(),
+        ],
+    ] {
+        let wrong_kind = IndexPartitionSnapshot::new(&base, &relations, observations)
+            .expect_err("physical index kind must agree with its owning relation");
+        assert_field(wrong_kind, "index_partition_relation_kind");
+    }
+
+    let self_parent = IndexPartitionObservation::partition(
+        child_index(),
+        IndexRelationKind::Index,
+        child_index(),
+        false,
+    )
+    .expect_err("an index cannot attach to itself");
+    assert_field(self_parent, "index_partition_parent");
+}
+
+#[test]
 fn receipt_is_bound_to_exact_index_coordinate() {
     let base = base_snapshot();
     let relations = relation_partition_snapshot(&base);
