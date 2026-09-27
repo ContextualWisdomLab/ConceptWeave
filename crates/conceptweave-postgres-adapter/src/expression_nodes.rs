@@ -69,11 +69,25 @@ pub(super) async fn validate_dependencies(
     let (operators, cached_functions): (Vec<u32>, Vec<u32>) =
         dependencies.operators.into_iter().unzip();
     let (sources, targets): (Vec<u32>, Vec<u32>) = dependencies.io_coercions.into_iter().unzip();
+    // Function ACL material has no source receipt in the current aggregate. Refuse it for
+    // every explicit, operator-derived and I/O reference until a versioned observation binds it.
     let row = bounded(
         request,
         cancellation,
         transaction.query_one(
-            "SELECT EXISTS( \
+            "WITH referenced_procedure AS ( \
+           SELECT unnest($1::oid[]) AS oid \
+           UNION SELECT o.oprcode FROM unnest($3::oid[]) referenced(oid) \
+             JOIN pg_catalog.pg_operator o ON o.oid = referenced.oid \
+           UNION SELECT t.typoutput FROM unnest($5::oid[]) referenced(oid) \
+             JOIN pg_catalog.pg_type t ON t.oid = referenced.oid \
+           UNION SELECT t.typinput FROM unnest($6::oid[]) referenced(oid) \
+             JOIN pg_catalog.pg_type t ON t.oid = referenced.oid \
+         ) SELECT EXISTS( \
+           SELECT 1 FROM referenced_procedure referenced \
+           JOIN pg_catalog.pg_proc p ON p.oid = referenced.oid \
+           WHERE p.proacl IS NOT NULL \
+         ) OR EXISTS( \
            SELECT 1 FROM unnest($1::oid[]) f(oid) \
            LEFT JOIN pg_catalog.pg_proc p ON p.oid = f.oid \
            WHERE p.oid IS NULL OR p.provolatile <> 'i' \

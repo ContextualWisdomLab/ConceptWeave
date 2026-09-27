@@ -36,6 +36,99 @@ use ring::{
 use tokio_postgres::{Config, NoTls};
 
 #[tokio::test]
+async fn postgres18_referenced_function_acl_fails_before_immutable_success() {
+    use futures_util::FutureExt;
+    use std::panic::AssertUnwindSafe;
+
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let base_config = Config::from_str(&dsn).unwrap();
+    let (admin, connection) = base_config.connect(NoTls).await.unwrap();
+    let admin_task = tokio::spawn(connection);
+    for (position, (columns, function)) in [
+        (
+            "record_label text, CHECK (pg_catalog.length(record_label) > 0)",
+            "pg_catalog.length(text)",
+        ),
+        (
+            "record_id integer, CHECK ((record_id + 1) > record_id)",
+            "pg_catalog.int4pl(integer,integer)",
+        ),
+        (
+            "record_id integer, CHECK (record_id::text <> '')",
+            "pg_catalog.int4out(integer)",
+        ),
+        (
+            "record_id integer, CHECK (record_id::text <> '')",
+            "pg_catalog.textin(cstring)",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        // Mutate catalog permissions only in this fixture's new database.
+        let database = format!("cw_procedure_acl_{}_{}", std::process::id(), position);
+        admin
+            .batch_execute(&format!("CREATE DATABASE {database}"))
+            .await
+            .unwrap();
+        let mut config = base_config.clone();
+        config.dbname(&database);
+        let connected = config.connect(NoTls).await;
+        if let Err(error) = &connected {
+            admin
+                .batch_execute(&format!("DROP DATABASE {database}"))
+                .await
+                .unwrap();
+            panic!("owned database connection failed: {error}");
+        }
+        let (client, connection) = connected.unwrap();
+        let connection_task = tokio::spawn(connection);
+        let outcome = AssertUnwindSafe(async {
+            client.batch_execute(&format!(
+                "CREATE SCHEMA source_metadata; CREATE TABLE source_metadata.source_record ({columns})"
+            )).await.unwrap();
+            let before = adapter(config.clone()).observe(
+                authorized_with_limits("source_metadata", 512, 65_536), &NotCancelled
+            ).await;
+            let was_allowed: bool = client.query_one(
+                "SELECT pg_catalog.has_function_privilege('public', $1::text, 'EXECUTE')", &[&function]
+            ).await.unwrap().get(0);
+            client.batch_execute(&format!("REVOKE EXECUTE ON FUNCTION {function} FROM PUBLIC"))
+                .await.unwrap();
+            let is_allowed: bool = client.query_one(
+                "SELECT pg_catalog.has_function_privilege('public', $1::text, 'EXECUTE')", &[&function]
+            ).await.unwrap().get(0);
+            let after = adapter(config).observe(
+                authorized_with_limits("source_metadata", 512, 65_536), &NotCancelled
+            ).await;
+            (before, after, was_allowed, is_allowed)
+        }).catch_unwind().await;
+        drop(client);
+        connection_task.abort();
+        let _ = connection_task.await;
+        admin
+            .batch_execute(&format!("DROP DATABASE {database}"))
+            .await
+            .unwrap();
+        let (before, after, was_allowed, is_allowed) = outcome.unwrap();
+        assert!(was_allowed && !is_allowed, "{function}");
+        assert!(before.is_ok(), "{function}: {before:?}");
+        assert!(
+            matches!(
+                after,
+                Err(SourceObservationFailure::InvalidCapturedMetadata)
+            ),
+            "unrepresented procedure ACL must fail closed for {function}: {after:?}"
+        );
+    }
+    drop(admin);
+    admin_task.abort();
+    let _ = admin_task.await;
+}
+
+#[tokio::test]
 async fn postgres18_scalar_array_comparison_preserves_optional_function_slots() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
