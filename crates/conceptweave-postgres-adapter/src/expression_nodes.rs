@@ -480,6 +480,17 @@ mod tests {
         assert_eq!(row.operators, BTreeSet::from([(97, 0)]));
         assert!(expression_dependencies("{NODE :label SQLVALUEFUNCTION}").is_ok());
         for malformed in [
+            "{COERCEVIAIO :resulttype 25}",
+            "{COERCEVIAIO :arg {VAR :vartype 23}}",
+            "{SUBSCRIPTINGREF :refelemtype 23 :refrestype 23}",
+            "{SUBSCRIPTINGREF :refcontainertype 1007 :refrestype 23}",
+            "{ROWCOMPAREEXPR}",
+            "{OPEXPR :opfuncid 65}",
+            "{OPEXPR :opno 96}",
+            "{NODE :funcid (o 65)}",
+            "{NODE :funcid 4294967296}",
+            "{NODE :consttype 0}",
+            "{NODE :vartype (o 23)}",
             "{FUNCEXPR :funcid 0}",
             "{FUNCEXPR}",
             "{NODE :hashfuncid 0}",
