@@ -3082,6 +3082,43 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             .unwrap_err(),
             GovernanceError::ReviewDenied
         );
+        struct ReviewResponse {
+            response: std::cell::RefCell<Option<Result<Option<String>, GovernanceError>>>,
+            calls: std::cell::Cell<usize>,
+        }
+        impl StewardReviewAuthority for ReviewResponse {
+            fn authorize_review(&self, _: &ReviewRequest) -> Result<Option<String>, GovernanceError> {
+                self.calls.set(self.calls.get() + 1);
+                self.response.borrow_mut().take().expect("one authorization attempt")
+            }
+        }
+        for (steward, rationale, expected) in [
+            (" ".to_owned(), "Review GRC mapping".to_owned(), GovernanceError::InvalidText),
+            ("fixture-steward".to_owned(), "bad\0rationale".to_owned(), GovernanceError::InvalidText),
+            ("fixture-steward".to_owned(), "x".repeat(4097), GovernanceError::ArtifactTooLarge),
+            ("x".repeat(4097), "Review GRC mapping".to_owned(), GovernanceError::ArtifactTooLarge),
+        ] {
+            let authority = ReviewResponse {
+                response: std::cell::RefCell::new(Some(Ok(Some("valid-receipt".into())))),
+                calls: std::cell::Cell::new(0),
+            };
+            assert_eq!(review(&validated, &steward, &rationale, &authority).unwrap_err(), expected);
+            assert_eq!(authority.calls.get(), 0, "invalid review must not reach authorization");
+        }
+        for (response, expected) in [
+            (Err(GovernanceError::AuthorityUnavailable), GovernanceError::AuthorityUnavailable),
+            (Ok(None), GovernanceError::ReviewDenied),
+            (Ok(Some(" ".into())), GovernanceError::InvalidAuditReceipt),
+            (Ok(Some("bad\0receipt".into())), GovernanceError::InvalidAuditReceipt),
+            (Ok(Some("x".repeat(4097))), GovernanceError::InvalidAuditReceipt),
+        ] {
+            let authority = ReviewResponse {
+                response: std::cell::RefCell::new(Some(response)),
+                calls: std::cell::Cell::new(0),
+            };
+            assert_eq!(review(&validated, "fixture-steward", "Review GRC mapping", &authority).unwrap_err(), expected);
+            assert_eq!(authority.calls.get(), 1);
+        }
         let authority = FixtureSteward {
             proposal_id: proposal.proposal_id(),
             source_digest: first.snapshot_digest(),
