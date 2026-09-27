@@ -667,3 +667,64 @@ fn put_raw(bytes: &mut Vec<u8>, value: &[u8]) -> Result<(), GovernanceError> {
 fn sha256(bytes: &[u8]) -> String {
     format!("sha256:{:x}", Sha256::digest(bytes))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn publication_envelope_accepts_its_boundary_and_rejects_excess() {
+        assert_eq!(valid_text(&"x".repeat(4096)), Ok(()));
+        assert_eq!(
+            valid_text(&"é".repeat(2049)),
+            Err(GovernanceError::ArtifactTooLarge)
+        );
+        for invalid in ["", " \t\n", "audit\0receipt"] {
+            assert_eq!(valid_text(invalid), Err(GovernanceError::InvalidText));
+        }
+        let mut bytes = vec![7; MAX_ARTIFACT_BYTES - 1];
+        put_raw(&mut bytes, &[8]).unwrap();
+        let before = bytes.clone();
+        put_raw(&mut bytes, &[]).unwrap();
+        assert_eq!(
+            put_raw(&mut bytes, &[9]),
+            Err(GovernanceError::ArtifactTooLarge)
+        );
+        assert_eq!(bytes.len(), MAX_ARTIFACT_BYTES);
+        assert_eq!(
+            bytes, before,
+            "a rejected payload must not overwrite accepted bytes"
+        );
+    }
+
+    #[test]
+    fn optional_publication_fields_preserve_absence_empty_values_and_numeric_sign() {
+        let mut absent = Vec::new();
+        put_optional_text(&mut absent, None).unwrap();
+        assert_eq!(absent, [0]);
+        let mut empty = Vec::new();
+        put_optional_text(&mut empty, Some("")).unwrap();
+        assert_eq!(empty, [1, 0, 0, 0, 0, 0, 0, 0, 0]);
+        assert_ne!(absent, empty);
+        let mut absent_list = Vec::new();
+        put_optional_strings(&mut absent_list, None).unwrap();
+        assert_eq!(absent_list, absent);
+        let mut empty_list = Vec::new();
+        put_optional_strings(&mut empty_list, Some(&[])).unwrap();
+        assert_eq!(empty_list, empty);
+        let mut ordered = Vec::new();
+        put_optional_strings(&mut ordered, Some(&["a".into(), "b".into()])).unwrap();
+        let mut reversed = Vec::new();
+        put_optional_strings(&mut reversed, Some(&["b".into(), "a".into()])).unwrap();
+        assert_ne!(ordered, reversed);
+        let mut numbers = Vec::new();
+        put_optional_i32(&mut numbers, None).unwrap();
+        put_optional_i32(&mut numbers, Some(-1)).unwrap();
+        put_optional_u32(&mut numbers, None).unwrap();
+        put_optional_u32(&mut numbers, Some(u32::MAX)).unwrap();
+        assert_eq!(
+            numbers,
+            [0, 1, 255, 255, 255, 255, 0, 1, 255, 255, 255, 255]
+        );
+    }
+}
