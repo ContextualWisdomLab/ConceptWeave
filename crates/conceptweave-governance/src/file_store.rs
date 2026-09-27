@@ -420,6 +420,13 @@ mod tests {
             store.read_verified(&pinned, &release),
             Err(PublicationStoreError::InvalidRecord)
         ));
+        for declared_header_len in [0_u64, 1] {
+            fs::write(&record_path, declared_header_len.to_be_bytes()).unwrap();
+            assert!(matches!(
+                store.read_verified(&pinned, &release),
+                Err(PublicationStoreError::InvalidRecord)
+            ));
+        }
         fs::remove_dir_all(root).unwrap();
     }
 }
