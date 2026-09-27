@@ -2757,6 +2757,7 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
                     .find(|entry| entry.relation_name() == relation_name && entry.constraint_name() == constraint_name)
                     .unwrap();
                 assert_eq!(catalog.referenced_index_name(), row.get::<_, String>(4));
+                assert_eq!(catalog.schema_name(), schema);
                 let receipt = first
                     .source_receipt(
                         SchemaObjectLocation::constraint(
