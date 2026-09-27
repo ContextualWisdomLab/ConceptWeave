@@ -311,6 +311,67 @@ fn exclusion_key_requires_nonzero_coordinates_and_exact_procedure_arguments() {
 }
 
 #[test]
+fn exclusion_snapshot_rejects_a_predecessor_from_another_capture() {
+    let (base, relations, indexes, families) = predecessor(Some(true), Some(true));
+    for (revision, observed_at) in [
+        (
+            "extractor-index-exclusion-equivalence-v2",
+            base.observed_at_utc(),
+        ),
+        (base.extractor_revision(), "2026-09-15T17:08:00Z"),
+    ] {
+        let fresh = PostgresSchemaSnapshotV3::new(
+            &authorized_source(),
+            revision,
+            observed_at,
+            base.relations().to_vec(),
+            vec![],
+            vec![],
+        )
+        .unwrap();
+        let fresh_relations =
+            RelationPartitionSnapshot::new(&fresh, relations.observations().to_vec()).unwrap();
+        let fresh_indexes =
+            IndexPartitionSnapshot::new(&fresh, &fresh_relations, indexes.observations().to_vec())
+                .unwrap();
+        let facts = vec![
+            exclusion(parent_index(), "=", "int4eq", 3),
+            exclusion(child_index(), "=", "int4eq", 3),
+        ];
+        assert_eq!(
+            IndexExclusionSemanticsSnapshot::new(
+                &fresh,
+                &fresh_relations,
+                &fresh_indexes,
+                &families,
+                facts.clone(),
+            ),
+            Err(ObservationError::InvalidObservationField {
+                field: "index_exclusion_semantics_predecessor_binding",
+            })
+        );
+        let fresh_families = IndexOperatorFamilySnapshot::new(
+            &fresh,
+            &fresh_relations,
+            &fresh_indexes,
+            families.observations().to_vec(),
+        )
+        .unwrap();
+        let accepted = IndexExclusionSemanticsSnapshot::new(
+            &fresh,
+            &fresh_relations,
+            &fresh_indexes,
+            &fresh_families,
+            facts,
+        )
+        .unwrap();
+        let receipt = accepted.source_receipt(&parent_index(), 1).unwrap();
+        assert_eq!(receipt.extractor_revision(), revision);
+        assert_eq!(receipt.observed_at_utc(), observed_at);
+    }
+}
+
+#[test]
 fn attached_child_must_preserve_exclusion_presence() {
     let (base, relations, indexes, families) = predecessor(Some(true), Some(false));
 

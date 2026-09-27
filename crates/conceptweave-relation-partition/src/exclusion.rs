@@ -273,7 +273,13 @@ impl IndexExclusionSemanticsSnapshot {
             index_partition_snapshot,
             operator_family_snapshot.observations().to_vec(),
         )?;
-        if rebound.snapshot_digest() != operator_family_snapshot.snapshot_digest() {
+        if rebound.snapshot_digest() != operator_family_snapshot.snapshot_digest()
+            || rebound.source_connection_key() != operator_family_snapshot.source_connection_key()
+            || rebound.connection_policy_binding()
+                != operator_family_snapshot.connection_policy_binding()
+            || rebound.extractor_revision() != operator_family_snapshot.extractor_revision()
+            || rebound.observed_at_utc() != operator_family_snapshot.observed_at_utc()
+        {
             return Err(invalid("index_exclusion_semantics_predecessor_binding"));
         }
 
