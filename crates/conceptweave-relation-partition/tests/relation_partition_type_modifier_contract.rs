@@ -16,6 +16,7 @@ const POLICY_BINDING: &str = "fixture_policy_revision_a";
 struct Registry<'a> {
     source: &'a str,
     binding: &'a str,
+    schemas: &'a [&'a str],
 }
 
 impl SourceConnectionRegistry for Registry<'_> {
@@ -34,7 +35,10 @@ impl SourceConnectionRegistry for Registry<'_> {
     ) -> bool {
         source_connection.source_connection_key() == self.source
             && source_connection.connection_policy_binding() == self.binding
-            && allowed_schema_names == ["public"]
+            && allowed_schema_names
+                .iter()
+                .map(String::as_str)
+                .eq(self.schemas.iter().copied())
     }
 
     fn authorizes_resource_envelope(
@@ -44,7 +48,7 @@ impl SourceConnectionRegistry for Registry<'_> {
     ) -> bool {
         source_connection.source_connection_key() == self.source
             && source_connection.connection_policy_binding() == self.binding
-            && resource_envelope.request_budget().max_schema_count() <= 1
+            && resource_envelope.request_budget().max_schema_count() <= self.schemas.len()
             && resource_envelope.request_budget().max_schema_bytes() <= 256
             && resource_envelope.limits().operation_timeout_ms() <= 1_000
             && resource_envelope.limits().statement_timeout_ms() <= 1_000
@@ -59,14 +63,26 @@ fn authorized_source() -> AuthorizedObservationRequest {
 }
 
 fn authorized_source_with_context(source: &str, binding: &str) -> AuthorizedObservationRequest {
+    authorized_source_with_scope(source, binding, &["public"])
+}
+
+fn authorized_source_with_scope(
+    source: &str,
+    binding: &str,
+    schemas: &[&str],
+) -> AuthorizedObservationRequest {
     ObservationRequest::new(
         source,
-        vec!["public".to_owned()],
-        ObservationRequestBudget::new(1, 256).unwrap(),
+        schemas.iter().map(|schema| (*schema).to_owned()).collect(),
+        ObservationRequestBudget::new(schemas.len(), 256).unwrap(),
         ObservationLimits::new(1_000, 10, 1_024, 1).unwrap(),
     )
     .unwrap()
-    .authorize(&Registry { source, binding })
+    .authorize(&Registry {
+        source,
+        binding,
+        schemas,
+    })
     .unwrap()
 }
 
@@ -527,4 +543,98 @@ fn modifier_predecessor_cannot_reuse_changed_source_content() {
         )
         .is_ok()
     );
+}
+
+#[test]
+fn cross_schema_same_name_partitions_bind_modifiers_to_exact_parent_coordinates() {
+    let base = PostgresSchemaSnapshotV3::new(
+        &authorized_source_with_scope("warehouse_primary", POLICY_BINDING, &["archive", "public"]),
+        "extractor-relation-partition-atttypmod-v1",
+        "2026-09-15T04:44:00Z",
+        vec![
+            RelationObservation::new(
+                "public",
+                "accounts",
+                RelationKind::PartitionedTable,
+                vec![column("account_code", 1, "character varying", "varchar")],
+            )
+            .unwrap(),
+            RelationObservation::new(
+                "archive",
+                "accounts",
+                RelationKind::Table,
+                vec![column("account_code", 1, "character varying", "varchar")],
+            )
+            .unwrap(),
+        ],
+        vec![],
+        vec![],
+    )
+    .unwrap();
+    let predecessor = RelationPartitionSnapshot::new(
+        &base,
+        vec![
+            RelationPartitionObservation::non_partition(
+                "public",
+                "accounts",
+                RelationKind::PartitionedTable,
+            )
+            .unwrap(),
+            RelationPartitionObservation::partition(
+                "archive",
+                "accounts",
+                RelationKind::Table,
+                PartitionParentRelationCoordinate::new("public", "accounts").unwrap(),
+                false,
+            )
+            .unwrap(),
+        ],
+    )
+    .unwrap();
+    for child_modifier in [36, 68] {
+        let result = RelationPartitionTypeModifierSnapshot::new(
+            &base,
+            &predecessor,
+            vec![
+                ColumnTypeModifierObservation::new(
+                    "public",
+                    "accounts",
+                    RelationKind::PartitionedTable,
+                    "account_code",
+                    36,
+                )
+                .unwrap(),
+                ColumnTypeModifierObservation::new(
+                    "archive",
+                    "accounts",
+                    RelationKind::Table,
+                    "account_code",
+                    child_modifier,
+                )
+                .unwrap(),
+            ],
+        );
+        if child_modifier == 68 {
+            assert_eq!(
+                result,
+                Err(ObservationError::InvalidObservationField {
+                    field: "relation_partition_column_type_modifier",
+                })
+            );
+        } else {
+            let snapshot = result.unwrap();
+            assert_eq!(snapshot.observations().len(), 2);
+            for (schema, kind) in [
+                ("archive", RelationKind::Table),
+                ("public", RelationKind::PartitionedTable),
+            ] {
+                let location =
+                    ColumnTypeModifierLocation::new(schema, "accounts", kind, "account_code")
+                        .unwrap();
+                let receipt = snapshot.source_receipt(location.clone()).unwrap();
+                assert_eq!(receipt.location(), &location);
+                assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+            }
+        }
+    }
 }
