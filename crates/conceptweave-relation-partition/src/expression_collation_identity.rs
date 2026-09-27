@@ -442,7 +442,7 @@ fn canonicalize_expression_collations(
     for observation in &observations {
         let expected_name = expected
             .get(&observation.location().canonical_location())
-            .ok_or_else(|| invalid("index_expression_collation_catalog_coordinate"))?;
+            .ok_or(invalid("index_expression_collation_catalog_coordinate"))?;
         if observation.collation().schema_name() != expected_name.schema_name()
             || observation.collation().collation_name() != expected_name.collation_name()
         {
@@ -481,7 +481,7 @@ fn canonicalize_relation_var_collations(
     for observation in &observations {
         let expected_name = expected
             .get(&observation.location().canonical_location())
-            .ok_or_else(|| invalid("index_relation_var_collation_catalog_coordinate"))?;
+            .ok_or(invalid("index_relation_var_collation_catalog_coordinate"))?;
         let actual_name = observation
             .collation()
             .map(|collation| (collation.schema_name(), collation.collation_name()));
@@ -568,7 +568,7 @@ fn validate_attached_expression_collations(
             let parent_location = child.location().with_index(parent_index.clone());
             let parent = by_location
                 .get(&parent_location.canonical_location())
-                .ok_or_else(|| invalid("index_expression_collation_catalog_completeness"))?;
+                .ok_or(invalid("index_expression_collation_catalog_completeness"))?;
             if *parent != child.collation() {
                 return Err(invalid("index_expression_collation_catalog_identity"));
             }
@@ -607,7 +607,7 @@ fn validate_attached_relation_var_collations(
                 relation_var_location_with_index(child.location(), parent_index.clone());
             let parent = by_location
                 .get(&parent_location.canonical_location())
-                .ok_or_else(|| invalid("index_relation_var_collation_catalog_completeness"))?;
+                .ok_or(invalid("index_relation_var_collation_catalog_completeness"))?;
             if *parent != child.collation() {
                 return Err(invalid("index_relation_var_collation_catalog_identity"));
             }

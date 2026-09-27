@@ -720,7 +720,7 @@ fn validate_expression_columns(
                 && relation.relation_name() == index.relation_name()
                 && relation.kind() == index.relation_kind()
         })
-        .ok_or_else(|| invalid("index_expression_semantics_index_binding"))?;
+        .ok_or(invalid("index_expression_semantics_index_binding"))?;
 
     if !relation
         .indexes()
@@ -774,7 +774,7 @@ fn validate_attached_expression_equivalence(
             let child_expression = observation.expression();
             let parent_expression = expressions
                 .get(&(parent.clone(), observation.key_position()))
-                .ok_or_else(|| invalid("index_expression_semantics_completeness"))?;
+                .ok_or(invalid("index_expression_semantics_completeness"))?;
             if child_expression.contains_whole_row() {
                 return Err(invalid("index_partition_definition_expression_whole_row"));
             }

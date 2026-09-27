@@ -203,11 +203,12 @@ impl IndexExclusionConstraintOperatorCommutatorSnapshot {
                 .key_position()
                 .checked_sub(1)
                 .and_then(|position| usize::try_from(position).ok())
-                .ok_or_else(|| invalid("index_exclusion_constraint_operator_commutator_binding"))?;
-            let expected_operator = predecessor
-                .operators()
-                .get(zero_based)
-                .ok_or_else(|| invalid("index_exclusion_constraint_operator_commutator_binding"))?;
+                .ok_or(invalid(
+                    "index_exclusion_constraint_operator_commutator_binding",
+                ))?;
+            let expected_operator = predecessor.operators().get(zero_based).ok_or(invalid(
+                "index_exclusion_constraint_operator_commutator_binding",
+            ))?;
             if observation.operator() != expected_operator {
                 return Err(invalid(
                     "index_exclusion_constraint_operator_commutator_binding",

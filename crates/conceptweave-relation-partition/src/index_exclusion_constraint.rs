@@ -399,7 +399,7 @@ fn reject_relation_constraint_name_collisions(
                     && relation.relation_name() == coordinate.relation_name()
                     && relation.kind() == coordinate.relation_kind()
             })
-            .ok_or_else(|| invalid("index_exclusion_constraint_relation"))?;
+            .ok_or(invalid("index_exclusion_constraint_relation"))?;
         let relation_constraint_collision = relation
             .constraints()
             .iter()
@@ -434,7 +434,7 @@ fn expected_exclusion_backing_indexes(
         for index in relation.indexes() {
             let flags = index
                 .catalog_flags()
-                .ok_or_else(|| invalid("index_exclusion_constraint_catalog_flags"))?;
+                .ok_or(invalid("index_exclusion_constraint_catalog_flags"))?;
             let temporal_key_backing = relation.constraints().iter().any(|constraint| {
                 is_key_constraint(constraint) && constraint.constraint_name() == index.index_name()
             });
@@ -460,14 +460,14 @@ fn expected_parent_constraint(
         .observations()
         .iter()
         .find(|candidate| candidate.coordinate() == observation.backing_index())
-        .ok_or_else(|| invalid("index_exclusion_constraint_backing_index"))?;
+        .ok_or(invalid("index_exclusion_constraint_backing_index"))?;
     let Some(parent_index) = membership.parent_index() else {
         return Ok(None);
     };
     let parent = observations
         .iter()
         .find(|candidate| candidate.backing_index() == parent_index)
-        .ok_or_else(|| invalid("index_exclusion_constraint_parent_index"))?;
+        .ok_or(invalid("index_exclusion_constraint_parent_index"))?;
     Ok(Some(parent.coordinate().clone()))
 }
 

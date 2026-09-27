@@ -293,7 +293,7 @@ impl IndexExclusionConstraintOperatorSnapshot {
                 .observations()
                 .iter()
                 .find(|candidate| candidate.coordinate() == observation.coordinate())
-                .ok_or_else(|| invalid("index_exclusion_constraint_operator_completeness"))?;
+                .ok_or(invalid("index_exclusion_constraint_operator_completeness"))?;
             let mut backing = rebound_semantics
                 .observations()
                 .iter()

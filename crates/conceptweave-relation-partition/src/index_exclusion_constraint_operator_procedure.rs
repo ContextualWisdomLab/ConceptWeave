@@ -208,7 +208,9 @@ impl IndexExclusionConstraintOperatorProcedureSnapshot {
             }
             let expected_procedure = operator_snapshot
                 .backing_procedure(observation.coordinate(), observation.key_position())
-                .ok_or_else(|| invalid("index_exclusion_constraint_operator_procedure_binding"))?;
+                .ok_or(invalid(
+                    "index_exclusion_constraint_operator_procedure_binding",
+                ))?;
             if observation.procedure() != expected_procedure {
                 return Err(invalid(
                     "index_exclusion_constraint_operator_procedure_state",

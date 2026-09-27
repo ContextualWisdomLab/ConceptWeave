@@ -574,9 +574,9 @@ fn canonicalize_and_validate(
         return Err(invalid("index_expression_relation_var_completeness"));
     }
 
-    let column_collations = base_snapshot
-        .column_collations()
-        .ok_or_else(|| invalid("index_expression_relation_var_column_collation_evidence"))?;
+    let column_collations = base_snapshot.column_collations().ok_or(invalid(
+        "index_expression_relation_var_column_collation_evidence",
+    ))?;
 
     for observation in &observations {
         let location_key = observation.location().canonical_location();
@@ -594,12 +594,12 @@ fn canonicalize_and_validate(
                     && relation.relation_name() == index.relation_name()
                     && relation.kind() == index.relation_kind()
             })
-            .ok_or_else(|| invalid("index_expression_relation_var_owner"))?;
+            .ok_or(invalid("index_expression_relation_var_owner"))?;
         let column = relation
             .columns()
             .iter()
             .find(|column| column.column_name() == observation.column_name())
-            .ok_or_else(|| invalid("index_expression_relation_var_column"))?;
+            .ok_or(invalid("index_expression_relation_var_column"))?;
         if column.type_binding() != observation.value_type() {
             return Err(invalid("index_expression_relation_var_value_type"));
         }
@@ -613,7 +613,9 @@ fn canonicalize_and_validate(
                     && candidate.relation_kind() == index.relation_kind()
                     && candidate.column_name() == observation.column_name()
             })
-            .ok_or_else(|| invalid("index_expression_relation_var_type_modifier_evidence"))?;
+            .ok_or(invalid(
+                "index_expression_relation_var_type_modifier_evidence",
+            ))?;
         if type_modifier.type_modifier() != observation.type_modifier() {
             return Err(invalid("index_expression_relation_var_type_modifier"));
         }
@@ -626,7 +628,9 @@ fn canonicalize_and_validate(
                     && candidate.relation_kind() == index.relation_kind()
                     && candidate.column_name() == observation.column_name()
             })
-            .ok_or_else(|| invalid("index_expression_relation_var_column_collation_evidence"))?;
+            .ok_or(invalid(
+                "index_expression_relation_var_column_collation_evidence",
+            ))?;
         if column_collation.collation() != observation.collation() {
             return Err(invalid("index_expression_relation_var_collation"));
         }
@@ -741,7 +745,7 @@ fn validate_attached_var_equivalence(
             let parent_location = child.location().with_index(parent_index.clone());
             let parent = by_location
                 .get(&parent_location.canonical_location())
-                .ok_or_else(|| invalid("index_expression_relation_var_parent_evidence"))?;
+                .ok_or(invalid("index_expression_relation_var_parent_evidence"))?;
             if !child.semantic_equal(parent) {
                 return Err(invalid(
                     "index_expression_relation_var_attached_equivalence",
