@@ -432,48 +432,96 @@ fn stable_column_identity_survives_different_physical_attribute_order() {
 }
 
 #[test]
-fn every_raw_expression_and_predicate_requires_semantic_evidence() {
+fn every_raw_expression_and_predicate_requires_exact_semantic_evidence() {
     let (base, relations, indexes, families, exclusions) = predecessor();
-
-    let missing_expression = IndexExpressionSemanticsSnapshot::new(
-        &base,
-        &relations,
-        &indexes,
-        &families,
-        &exclusions,
-        vec![expression(parent_index(), function_expression("lower"))],
-        vec![
-            predicate(parent_index(), predicate_expression(">")),
-            predicate(child_index(), predicate_expression(">")),
-        ],
-    )
-    .expect_err("every zero-indkey expression needs semantic evidence");
-
-    assert_eq!(
-        missing_expression,
-        ObservationError::InvalidObservationField {
-            field: "index_expression_semantics_completeness",
+    let build = |expressions, predicates| {
+        IndexExpressionSemanticsSnapshot::new(
+            &base,
+            &relations,
+            &indexes,
+            &families,
+            &exclusions,
+            expressions,
+            predicates,
+        )
+    };
+    let expressions = vec![
+        expression(parent_index(), function_expression("lower")),
+        expression(child_index(), function_expression("lower")),
+    ];
+    let predicates = vec![
+        predicate(parent_index(), predicate_expression(">")),
+        predicate(child_index(), predicate_expression(">")),
+    ];
+    for position in 0..2 {
+        let mut missing = expressions.clone();
+        missing.remove(position);
+        let mut duplicate = expressions.clone();
+        duplicate.push(expressions[position].clone());
+        let mut extra = expressions.clone();
+        extra.push(
+            IndexExpressionSemanticsObservation::new(
+                expressions[position].index().clone(),
+                2,
+                function_expression("lower"),
+            )
+            .unwrap(),
+        );
+        let mut wrong_column = expressions.clone();
+        wrong_column[position] = expression(
+            expressions[position].index().clone(),
+            CanonicalExpression::column("unobserved_column").unwrap(),
+        );
+        for (observations, field) in [
+            (missing, "index_expression_semantics_completeness"),
+            (duplicate, "index_expression_semantics_coordinate"),
+            (extra, "index_expression_semantics_completeness"),
+            (wrong_column, "index_expression_semantics_column_binding"),
+        ] {
+            assert_eq!(
+                build(observations, predicates.clone()).unwrap_err(),
+                ObservationError::InvalidObservationField { field }
+            );
         }
-    );
-
-    let missing_predicate = IndexExpressionSemanticsSnapshot::new(
-        &base,
-        &relations,
-        &indexes,
-        &families,
-        &exclusions,
-        vec![
-            expression(parent_index(), function_expression("lower")),
-            expression(child_index(), function_expression("lower")),
-        ],
-        vec![predicate(parent_index(), predicate_expression(">"))],
-    )
-    .expect_err("every partial-index predicate needs semantic evidence");
-
-    assert_eq!(
-        missing_predicate,
-        ObservationError::InvalidObservationField {
-            field: "index_predicate_semantics_completeness",
+        let mut missing = predicates.clone();
+        missing.remove(position);
+        let mut duplicate = predicates.clone();
+        duplicate.push(predicates[position].clone());
+        let mut extra = predicates.clone();
+        extra.push(predicate(
+            IndexPartitionCoordinate::new(
+                "public",
+                "accounts",
+                RelationKind::PartitionedTable,
+                "unobserved_index",
+            )
+            .unwrap(),
+            predicate_expression(">"),
+        ));
+        let mut wrong_column = predicates.clone();
+        wrong_column[position] = predicate(
+            predicates[position].index().clone(),
+            CanonicalExpression::column("unobserved_column").unwrap(),
+        );
+        for (observations, field) in [
+            (missing, "index_predicate_semantics_completeness"),
+            (duplicate, "index_predicate_semantics_coordinate"),
+            (extra, "index_predicate_semantics_completeness"),
+            (wrong_column, "index_expression_semantics_column_binding"),
+        ] {
+            assert_eq!(
+                build(expressions.clone(), observations).unwrap_err(),
+                ObservationError::InvalidObservationField { field }
+            );
         }
+    }
+    let snapshot = build(expressions.clone(), predicates.clone()).unwrap();
+    let mut reversed_expressions = expressions;
+    let mut reversed_predicates = predicates;
+    reversed_expressions.reverse();
+    reversed_predicates.reverse();
+    assert_eq!(
+        snapshot,
+        build(reversed_expressions, reversed_predicates).unwrap()
     );
 }
