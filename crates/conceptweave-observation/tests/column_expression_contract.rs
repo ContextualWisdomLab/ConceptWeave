@@ -97,7 +97,22 @@ fn generation_snapshot() -> PostgresSchemaSnapshotV3 {
 fn expression_snapshot(
     expressions: Vec<ColumnExpressionObservation>,
 ) -> Result<PostgresSchemaSnapshotV3, ObservationError> {
-    generation_snapshot().with_observed_column_expressions(expressions)
+    let predecessor = generation_snapshot();
+    let incremental = predecessor
+        .clone()
+        .with_observed_column_expressions(expressions.clone());
+    let combined = PostgresSchemaSnapshotV3::new_with_column_expressions(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        predecessor.extractor_revision(),
+        predecessor.observed_at_utc(),
+        predecessor.relations().to_vec(),
+        predecessor.domains().to_vec(),
+        predecessor.enums().to_vec(),
+        predecessor.column_generations().unwrap().to_vec(),
+        expressions,
+    );
+    assert_eq!(combined, incremental);
+    combined
 }
 
 #[test]
