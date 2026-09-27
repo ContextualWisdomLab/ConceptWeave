@@ -311,3 +311,105 @@ fn exact_column_receipt_uses_structured_modifier_successor_digest() {
             .ends_with("/columns/account_code/type-modifier")
     );
 }
+
+#[test]
+fn modifier_receipts_require_every_exact_coordinate_component() {
+    let base = base_snapshot();
+    let predecessor = relation_partition_snapshot(&base);
+    let snapshot =
+        RelationPartitionTypeModifierSnapshot::new(&base, &predecessor, complete_modifiers(36, 36))
+            .unwrap();
+    for (schema, relation, kind, column) in [
+        (
+            "other",
+            "accounts_2026",
+            RelationKind::Table,
+            "account_code",
+        ),
+        ("public", "other", RelationKind::Table, "account_code"),
+        (
+            "public",
+            "accounts_2026",
+            RelationKind::PartitionedTable,
+            "account_code",
+        ),
+        ("public", "accounts_2026", RelationKind::Table, "other"),
+    ] {
+        let location = ColumnTypeModifierLocation::new(schema, relation, kind, column).unwrap();
+        assert_eq!(
+            snapshot.source_receipt(location.clone()),
+            Err(ObservationError::UnknownObservationLocation {
+                location: location.canonical_location()
+            })
+        );
+    }
+    let location = ColumnTypeModifierLocation::new(
+        "public",
+        "accounts_2026",
+        RelationKind::Table,
+        "account_code",
+    )
+    .unwrap();
+    let receipt = snapshot.source_receipt(location).unwrap();
+    assert_eq!(receipt.source_id(), base.source_connection_key());
+    assert_eq!(receipt.connection_policy_binding(), POLICY_BINDING);
+    assert_eq!(receipt.extractor_revision(), base.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), base.observed_at_utc());
+}
+
+#[test]
+fn duplicate_modifier_inventory_is_rejected_and_order_is_not_identity() {
+    let base = base_snapshot();
+    let predecessor = relation_partition_snapshot(&base);
+    let observations = complete_modifiers(36, 36);
+    let snapshot =
+        RelationPartitionTypeModifierSnapshot::new(&base, &predecessor, observations.clone())
+            .unwrap();
+    let mut reversed = observations.clone();
+    reversed.reverse();
+    assert_eq!(
+        snapshot.snapshot_digest(),
+        RelationPartitionTypeModifierSnapshot::new(&base, &predecessor, reversed,)
+            .unwrap()
+            .snapshot_digest()
+    );
+    let mut duplicate = observations;
+    duplicate.push(duplicate[0].clone());
+    assert_eq!(
+        RelationPartitionTypeModifierSnapshot::new(&base, &predecessor, duplicate),
+        Err(ObservationError::InvalidObservationField {
+            field: "relation_partition_column_type_modifier_coordinate",
+        })
+    );
+}
+
+#[test]
+fn modifier_predecessor_cannot_cross_revision_or_observation_time() {
+    let base = base_snapshot();
+    let predecessor = relation_partition_snapshot(&base);
+    for (revision, time) in [
+        ("different-extractor", base.observed_at_utc()),
+        (base.extractor_revision(), "2026-09-15T04:44:01Z"),
+    ] {
+        let changed = PostgresSchemaSnapshotV3::new(
+            &authorized_source(),
+            revision,
+            time,
+            base.relations().to_vec(),
+            vec![],
+            vec![],
+        )
+        .unwrap();
+        assert_eq!(changed.snapshot_digest(), base.snapshot_digest());
+        assert_eq!(
+            RelationPartitionTypeModifierSnapshot::new(
+                &changed,
+                &predecessor,
+                complete_modifiers(36, 36),
+            ),
+            Err(ObservationError::InvalidObservationField {
+                field: "relation_partition_type_modifier_predecessor",
+            })
+        );
+    }
+}
