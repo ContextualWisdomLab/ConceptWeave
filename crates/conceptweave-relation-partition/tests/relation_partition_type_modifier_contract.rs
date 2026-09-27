@@ -489,3 +489,42 @@ fn modifier_and_receipt_coordinates_reject_empty_and_nul_identifiers() {
         }
     }
 }
+
+#[test]
+fn modifier_predecessor_cannot_reuse_changed_source_content() {
+    let base = base_snapshot();
+    let predecessor = relation_partition_snapshot(&base);
+    let mut relations = base.relations().to_vec();
+    relations[0] = relations[0]
+        .clone()
+        .with_source_comment("changed observed relation comment");
+    let changed = PostgresSchemaSnapshotV3::new(
+        &authorized_source(),
+        base.extractor_revision(),
+        base.observed_at_utc(),
+        relations,
+        vec![],
+        vec![],
+    )
+    .unwrap();
+    assert_ne!(changed.snapshot_digest(), base.snapshot_digest());
+    assert_eq!(
+        RelationPartitionTypeModifierSnapshot::new(
+            &changed,
+            &predecessor,
+            complete_modifiers(36, 36),
+        ),
+        Err(ObservationError::InvalidObservationField {
+            field: "relation_partition_type_modifier_predecessor",
+        })
+    );
+    let changed_predecessor = relation_partition_snapshot(&changed);
+    assert!(
+        RelationPartitionTypeModifierSnapshot::new(
+            &changed,
+            &changed_predecessor,
+            complete_modifiers(36, 36),
+        )
+        .is_ok()
+    );
+}
