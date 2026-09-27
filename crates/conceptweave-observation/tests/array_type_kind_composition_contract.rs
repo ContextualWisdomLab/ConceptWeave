@@ -212,9 +212,11 @@ fn referenced_catalog_array_pair_is_source_evidence_without_catalog_schema_autho
 
 #[test]
 fn domain_over_catalog_array_keeps_original_base_and_canonical_digest() {
-    let authorized = support::authorized_source("warehouse_primary", &["public"]);
+    let authorized = support::authorized_source("warehouse_primary", &["public", "types"]);
     let domain =
         DomainObservation::new("public", "labels", type_name("pg_catalog", "_text")).unwrap();
+    let other_domain =
+        DomainObservation::new("types", "labels", type_name("pg_catalog", "_text")).unwrap();
     let pair = ArrayTypeObservation::new(
         type_name("pg_catalog", "_text"),
         type_name("pg_catalog", "text"),
@@ -224,31 +226,45 @@ fn domain_over_catalog_array_keeps_original_base_and_canonical_digest() {
         type_name("public", "labels"),
         type_name("pg_catalog", "_text"),
     );
+    let other_kind = TypeKindObservation::domain(
+        type_name("types", "labels"),
+        type_name("pg_catalog", "_text"),
+    );
     let composed = PostgresSchemaSnapshotV3::new_with_array_types(
         &authorized,
         "postgres_introspector_v3",
         "2026-09-12T05:10:00Z",
         Vec::new(),
-        vec![domain.clone()],
+        vec![other_domain.clone(), domain.clone()],
         Vec::new(),
         vec![pair.clone()],
     )
     .unwrap()
-    .with_observed_type_kinds(vec![kind.clone()])
+    .with_observed_type_kinds(vec![other_kind.clone(), kind.clone()])
     .unwrap();
     let direct = PostgresSchemaSnapshotV3::new_with_array_types_and_type_kinds(
         &authorized,
         "postgres_introspector_v3",
         "2026-09-12T05:10:00Z",
         Vec::new(),
-        vec![domain],
+        vec![domain, other_domain],
         Vec::new(),
         vec![pair],
-        vec![kind],
+        vec![kind, other_kind],
     )
     .unwrap();
-    assert_eq!(direct.domains()[0].base_type().type_name(), "_text");
-    assert_eq!(direct.snapshot_digest(), composed.snapshot_digest());
+    assert_eq!(
+        direct
+            .domains()
+            .iter()
+            .map(|domain| (domain.schema_name(), domain.domain_name()))
+            .collect::<Vec<_>>(),
+        [("public", "labels"), ("types", "labels")],
+    );
+    for domain in direct.domains() {
+        assert_eq!(domain.base_type(), &type_name("pg_catalog", "_text"));
+    }
+    assert_eq!(direct, composed);
 }
 
 #[test]
