@@ -100,6 +100,34 @@ fn ordinary_exclude_transform_converter_owner_preserves_exact_pg_proc_owner() {
     assert_eq!(receipt.location().owner_oid(), 16_384);
     assert_eq!(receipt.location().owner_role_name(), "transform_runtime");
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(
+        snapshot.source_connection_key(),
+        predecessor.source_connection_key()
+    );
+    assert_eq!(
+        snapshot.connection_policy_binding(),
+        predecessor.connection_policy_binding()
+    );
+    assert_eq!(
+        snapshot.extractor_revision(),
+        predecessor.extractor_revision()
+    );
+    assert_eq!(snapshot.observed_at_utc(), predecessor.observed_at_utc());
+    assert_eq!(receipt.source_id(), predecessor.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        predecessor.connection_policy_binding()
+    );
+    assert_eq!(
+        receipt.extractor_revision(),
+        predecessor.extractor_revision()
+    );
+    assert_eq!(receipt.observed_at_utc(), predecessor.observed_at_utc());
+    assert_eq!(receipt.location().owner().owner_oid(), 16_384);
+    assert_eq!(
+        receipt.location().owner().owner_role_name(),
+        "transform_runtime"
+    );
     assert!(
         receipt
             .location()

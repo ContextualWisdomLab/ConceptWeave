@@ -301,6 +301,38 @@ fn ordinary_exclude_transform_extension_membership_preserves_collision_safe_loca
         .unwrap();
     assert_eq!(receipt.location().extension_name(), None);
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(
+        snapshot.source_connection_key(),
+        function_lifecycle.source_connection_key()
+    );
+    assert_eq!(
+        snapshot.connection_policy_binding(),
+        function_lifecycle.connection_policy_binding()
+    );
+    assert_eq!(
+        snapshot.extractor_revision(),
+        function_lifecycle.extractor_revision()
+    );
+    assert_eq!(
+        snapshot.observed_at_utc(),
+        function_lifecycle.observed_at_utc()
+    );
+    assert_eq!(
+        receipt.source_id(),
+        function_lifecycle.source_connection_key()
+    );
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        function_lifecycle.connection_policy_binding()
+    );
+    assert_eq!(
+        receipt.extractor_revision(),
+        function_lifecycle.extractor_revision()
+    );
+    assert_eq!(
+        receipt.observed_at_utc(),
+        function_lifecycle.observed_at_utc()
+    );
 
     let missing = snapshot
         .source_receipt(coordinate(), 2, custom_payload_type(), "internal")
