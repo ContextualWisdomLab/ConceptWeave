@@ -543,7 +543,8 @@ pub fn propose_relational_model(
             || snapshot.referenced_procedure_definitions().is_none()
             || snapshot.procedure_access_control().is_none()
             || snapshot.procedure_security_labels().is_none()
-            || snapshot.procedure_initial_privileges().is_none())
+            || snapshot.procedure_initial_privileges().is_none()
+            || snapshot.procedure_extension_dependencies().is_none())
     {
         return Err(ProposalError::IncompleteSourceObservation);
     }

@@ -10,6 +10,7 @@ mod collations;
 mod expression_nodes;
 mod foreign_keys;
 mod procedure_acl;
+mod procedure_extensions;
 mod procedure_security_labels;
 mod ranges;
 mod referenced_procedures;
@@ -1270,6 +1271,14 @@ async fn capture_catalog(
         &definitions,
     )
     .await?;
+    let (extension_dependencies, extensions) = procedure_extensions::capture(
+        &transaction,
+        request,
+        cancellation,
+        &mut meter,
+        &definitions,
+    )
+    .await?;
     let snapshot = snapshot
         .with_observed_referenced_procedure_definitions(definitions.into_values().collect())
         .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
@@ -1281,6 +1290,9 @@ async fn capture_catalog(
         .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
     let snapshot = snapshot
         .with_observed_procedure_initial_privileges(initial_privileges)
+        .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
+    let snapshot = snapshot
+        .with_observed_procedure_extensions(extension_dependencies, extensions)
         .map_err(|_| SourceObservationFailure::InvalidCapturedMetadata)?;
     bounded(request, cancellation, transaction.commit()).await?;
     Ok(snapshot)

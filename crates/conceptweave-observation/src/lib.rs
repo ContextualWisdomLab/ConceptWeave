@@ -19,6 +19,7 @@ mod foreign_key_catalog;
 mod model;
 mod not_null_constraint;
 mod procedure_access_control;
+mod procedure_extensions;
 mod procedure_initial_privileges;
 mod procedure_security_labels;
 mod range_catalog;
@@ -50,6 +51,10 @@ pub use model::{
 };
 pub use not_null_constraint::{NotNullConstraintObservation, ParentNotNullConstraintCoordinate};
 pub use procedure_access_control::{ProcedureAccessControlObservation, ProcedureAclItem};
+pub use procedure_extensions::{
+    ExtensionConfigurationTable, ProcedureExtensionDependenciesObservation,
+    ProcedureExtensionDependency, SourceExtensionDefinition,
+};
 pub use procedure_initial_privileges::{
     ProcedureInitialPrivilegeOrigin, ProcedureInitialPrivileges,
     ProcedureInitialPrivilegesObservation,
@@ -200,6 +205,7 @@ pub struct PostgresSchemaSnapshotV3 {
     procedure_access_control: Option<Vec<ProcedureAccessControlObservation>>,
     procedure_security_labels: Option<Vec<ProcedureSecurityLabelsObservation>>,
     procedure_initial_privileges: Option<Vec<ProcedureInitialPrivilegesObservation>>,
+    procedure_extensions: Option<procedure_extensions::ProcedureExtensionEvidence>,
 }
 
 impl PostgresSchemaSnapshotV3 {
@@ -278,6 +284,7 @@ impl PostgresSchemaSnapshotV3 {
             procedure_access_control: None,
             procedure_security_labels: None,
             procedure_initial_privileges: None,
+            procedure_extensions: None,
         })
     }
 
@@ -391,6 +398,7 @@ impl PostgresSchemaSnapshotV3 {
             procedure_access_control: None,
             procedure_security_labels: None,
             procedure_initial_privileges: None,
+            procedure_extensions: None,
         })
     }
 
@@ -694,6 +702,7 @@ impl PostgresSchemaSnapshotV3 {
             procedure_access_control: None,
             procedure_security_labels: None,
             procedure_initial_privileges: None,
+            procedure_extensions: None,
         })
     }
 
@@ -1566,6 +1575,61 @@ impl PostgresSchemaSnapshotV3 {
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "unobserved_procedure_initial_privileges",
+            });
+        }
+        self.referenced_procedure_definition_source_receipt(location)
+    }
+
+    /// Binds complete procedure dependency edges and installed extension definitions in a new successor.
+    pub fn with_observed_procedure_extensions(
+        mut self,
+        dependencies: Vec<ProcedureExtensionDependenciesObservation>,
+        extensions: Vec<SourceExtensionDefinition>,
+    ) -> Result<Self, ObservationError> {
+        if self.procedure_initial_privileges.is_none() || self.procedure_extensions.is_some() {
+            return Err(ObservationError::InvalidObservationField {
+                field: "procedure_extensions_order",
+            });
+        }
+        let definitions = self.referenced_procedure_definitions.as_deref().ok_or(
+            ObservationError::InvalidObservationField {
+                field: "procedure_extensions_order",
+            },
+        )?;
+        let evidence = procedure_extensions::canonicalize(definitions, dependencies, extensions)?;
+        self.snapshot_digest = procedure_extensions::digest(&self.snapshot_digest, &evidence);
+        self.procedure_extensions = Some(evidence);
+        Ok(self)
+    }
+    /// Returns complete extension dependencies; None means the inventory was not observed.
+    #[must_use]
+    pub fn procedure_extension_dependencies(
+        &self,
+    ) -> Option<&[ProcedureExtensionDependenciesObservation]> {
+        self.procedure_extensions
+            .as_ref()
+            .map(|evidence| evidence.dependencies.as_slice())
+    }
+    /// Returns complete definitions of the extensions referenced by observed procedures.
+    #[must_use]
+    pub fn referenced_extensions(&self) -> Option<&[SourceExtensionDefinition]> {
+        self.procedure_extensions
+            .as_ref()
+            .map(|evidence| evidence.extensions.as_slice())
+    }
+    /// Issues exact procedure-root provenance for its observed extension dependencies and definitions.
+    pub fn procedure_extensions_source_receipt(
+        &self,
+        location: ReferencedProcedureLocation,
+    ) -> Result<ReferencedProcedureSourceReceipt, ObservationError> {
+        if !self.procedure_extensions.as_ref().is_some_and(|evidence| {
+            evidence
+                .dependencies
+                .iter()
+                .any(|item| item.location() == &location)
+        }) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "unobserved_procedure_extensions",
             });
         }
         self.referenced_procedure_definition_source_receipt(location)

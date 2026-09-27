@@ -229,6 +229,85 @@ async fn postgres18_referenced_procedure_evidence_binds_immutable_source() {
             let initial_restored = adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536), &NotCancelled).await.unwrap();
             assert_eq!(initial_restored.snapshot_digest(),owner_snapshot.snapshot_digest());
             assert_eq!(initial_receipt.source_digest(),initial.snapshot_digest());
+            let extension_before=owner_snapshot.procedure_extension_dependencies().unwrap().iter().find(|item|item.location()==&location).unwrap();
+            assert!(extension_before.dependencies().is_empty());
+            assert!(owner_snapshot.referenced_extensions().unwrap().is_empty());
+            let extension_absence_receipt=owner_snapshot.procedure_extensions_source_receipt(location.clone()).unwrap();
+            client.batch_execute(&format!("ALTER EXTENSION plpgsql ADD FUNCTION {function}")).await.unwrap();
+            let member=adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536),&NotCancelled).await.unwrap();
+            let dependencies=member.procedure_extension_dependencies().unwrap().iter().find(|item|item.location()==&location).unwrap();
+            assert_eq!(dependencies.dependencies().len(),1);
+            assert_eq!(dependencies.dependencies()[0].dependency_type(),'e');
+            assert_eq!(dependencies.dependencies()[0].extension_name(),"plpgsql");
+            let [extension]=member.referenced_extensions().unwrap() else { panic!("one referenced extension"); };
+            let native_extension=client.query_one("SELECT e.extname::text,e.extowner,r.rolname::text,n.nspname::text,e.extrelocatable,e.extversion,e.extconfig IS NULL,e.extcondition IS NULL FROM pg_catalog.pg_extension e LEFT JOIN pg_catalog.pg_roles r ON r.oid=e.extowner JOIN pg_catalog.pg_namespace n ON n.oid=e.extnamespace WHERE e.extname='plpgsql'",&[]).await.unwrap();
+            assert_eq!(extension.name(),native_extension.get::<_,String>(0));
+            assert_eq!(extension.owner_oid(),native_extension.get::<_,u32>(1));
+            assert_eq!(extension.owner_name(),native_extension.get::<_,Option<String>>(2).as_deref());
+            assert_eq!(extension.object_schema(),native_extension.get::<_,String>(3));
+            assert_eq!(extension.relocatable(),native_extension.get::<_,bool>(4));
+            assert_eq!(extension.version(),native_extension.get::<_,String>(5));
+            assert!(native_extension.get::<_,bool>(6)&&native_extension.get::<_,bool>(7));
+            assert!(extension.configuration().is_none());
+            assert_eq!(member.referenced_procedure_definitions(),owner_snapshot.referenced_procedure_definitions());
+            assert_eq!(member.procedure_access_control(),owner_snapshot.procedure_access_control());
+            assert_eq!(member.procedure_security_labels(),owner_snapshot.procedure_security_labels());
+            assert_eq!(member.procedure_initial_privileges(),owner_snapshot.procedure_initial_privileges());
+            assert_ne!(member.snapshot_digest(),owner_snapshot.snapshot_digest());
+            assert_eq!(extension_absence_receipt.source_digest(),owner_snapshot.snapshot_digest());
+            let extension_receipt=member.procedure_extensions_source_receipt(location.clone()).unwrap();
+            assert_eq!(extension_receipt.source_digest(),member.snapshot_digest());
+            assert_eq!(extension_receipt.location(),&location);
+            assert!(member.clone().with_observed_procedure_extensions(vec![],vec![]).is_err());
+            assert!(member.procedure_extensions_source_receipt(conceptweave_observation::ReferencedProcedureLocation::new("pg_catalog","not_observed",vec![]).unwrap()).is_err());
+            client.batch_execute(&format!("ALTER FUNCTION {function} DEPENDS ON EXTENSION plpgsql")).await.unwrap();
+            let automatic=adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536),&NotCancelled).await.unwrap();
+            let edges=automatic.procedure_extension_dependencies().unwrap().iter().find(|item|item.location()==&location).unwrap().dependencies();
+            assert_eq!(edges.len(),2); assert_eq!(edges[0].dependency_type(),'e'); assert_eq!(edges[1].dependency_type(),'x');
+            assert_ne!(automatic.snapshot_digest(),member.snapshot_digest());
+            for damage in ["objsubid=1","refobjsubid=1","deptype='z'","refobjid=4000000123::oid","refclassid='pg_catalog.pg_class'::regclass"] {
+                let row_locator: String=client.query_one(&format!("UPDATE pg_catalog.pg_depend SET {damage} WHERE classid='pg_catalog.pg_proc'::regclass AND objid=$1::text::regprocedure AND refclassid='pg_catalog.pg_extension'::regclass AND deptype='e' RETURNING ctid::text"),&[&function]).await.unwrap().get(0);
+                let damaged=adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536),&NotCancelled).await;
+                client.execute("UPDATE pg_catalog.pg_depend SET objsubid=0,refobjsubid=0,deptype='e',refclassid='pg_catalog.pg_extension'::regclass,refobjid=(SELECT oid FROM pg_catalog.pg_extension WHERE extname='plpgsql') WHERE ctid=$1::text::tid",&[&row_locator]).await.unwrap();
+                assert!(matches!(damaged,Err(SourceObservationFailure::InvalidCapturedMetadata)),"{function}: invalid extension dependency {damage}: {damaged:?}");
+            }
+            let mut previous_digest=automatic.snapshot_digest().to_owned();
+            for change in ["extversion=' fixture version /~ '","extrelocatable=NOT extrelocatable","extowner=(SELECT oid FROM pg_catalog.pg_roles WHERE rolname='pg_read_all_data')","extnamespace='source_metadata'::regnamespace"] {
+                client.execute(&format!("UPDATE pg_catalog.pg_extension SET {change} WHERE extname='plpgsql'"),&[]).await.unwrap();
+                let changed=adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536),&NotCancelled).await.unwrap();
+                assert_ne!(changed.snapshot_digest(),previous_digest,"{change}"); previous_digest=changed.snapshot_digest().to_owned();
+            }
+            client.batch_execute("CREATE SCHEMA extension_metadata; CREATE TABLE extension_metadata.configuration_record (record_id integer); ALTER EXTENSION plpgsql ADD TABLE extension_metadata.configuration_record; UPDATE pg_catalog.pg_extension SET extconfig=ARRAY['extension_metadata.configuration_record'::regclass::oid],extcondition=ARRAY[' WHERE false '] WHERE extname='plpgsql'").await.unwrap();
+            let configured=adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536),&NotCancelled).await.unwrap();
+            let config_tables=configured.referenced_extensions().unwrap()[0].configuration().unwrap();
+            assert_eq!(config_tables.len(),1);
+            assert_eq!(config_tables[0].location(),&SchemaObjectLocation::relation("extension_metadata","configuration_record",RelationKind::Table).unwrap());
+            assert_eq!(config_tables[0].condition()," WHERE false ");
+            assert!(!format!("{config_tables:?}").contains("WHERE false"));
+            assert_ne!(configured.snapshot_digest(),previous_digest);
+            client.execute("UPDATE pg_catalog.pg_extension SET extcondition=ARRAY[' WHERE true '] WHERE extname='plpgsql'",&[]).await.unwrap();
+            let changed_condition=adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536),&NotCancelled).await.unwrap();
+            assert_ne!(changed_condition.snapshot_digest(),configured.snapshot_digest());
+            client.execute("UPDATE pg_catalog.pg_extension SET extconfig='{}'::oid[],extcondition='{}'::text[] WHERE extname='plpgsql'",&[]).await.unwrap();
+            let empty_configuration=adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536),&NotCancelled).await.unwrap();
+            assert!(empty_configuration.referenced_extensions().unwrap()[0].configuration().unwrap().is_empty());
+            client.execute("UPDATE pg_catalog.pg_extension SET extconfig=NULL,extcondition=NULL WHERE extname='plpgsql'",&[]).await.unwrap();
+            let absent_configuration=adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536),&NotCancelled).await.unwrap();
+            assert!(absent_configuration.referenced_extensions().unwrap()[0].configuration().is_none());
+            assert_ne!(absent_configuration.snapshot_digest(),empty_configuration.snapshot_digest());
+            for invalid in ["extconfig=ARRAY['extension_metadata.configuration_record'::regclass::oid],extcondition='{}'::text[]","extconfig=ARRAY[NULL::oid],extcondition=ARRAY['']","extconfig=ARRAY[4000000123::oid],extcondition=ARRAY['']","extconfig=ARRAY['pg_catalog.pg_views'::regclass::oid],extcondition=ARRAY['']","extconfig=ARRAY[['extension_metadata.configuration_record'::regclass::oid]],extcondition=ARRAY['']"] {
+                client.execute(&format!("UPDATE pg_catalog.pg_extension SET {invalid} WHERE extname='plpgsql'"),&[]).await.unwrap();
+                assert!(matches!(adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536),&NotCancelled).await,Err(SourceObservationFailure::InvalidCapturedMetadata)),"{function}: {invalid}");
+            }
+            client.execute("UPDATE pg_catalog.pg_extension SET extconfig=array_fill('extension_metadata.configuration_record'::regclass::oid,ARRAY[513]),extcondition=array_fill(''::text,ARRAY[513]) WHERE extname='plpgsql'",&[]).await.unwrap();
+            assert!(matches!(adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536),&NotCancelled).await,Err(SourceObservationFailure::RowLimitExceeded{max_rows:512})));
+            client.execute("UPDATE pg_catalog.pg_extension SET extconfig=NULL,extcondition=NULL,extversion=repeat('x',65537) WHERE extname='plpgsql'",&[]).await.unwrap();
+            assert!(matches!(adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536),&NotCancelled).await,Err(SourceObservationFailure::ByteLimitExceeded{max_bytes:65536})));
+            client.execute("UPDATE pg_catalog.pg_extension SET extversion=$1,extowner=$2,extnamespace=$3::text::regnamespace,extrelocatable=$4 WHERE extname='plpgsql'",&[&native_extension.get::<_,String>(5),&native_extension.get::<_,u32>(1),&native_extension.get::<_,String>(3),&native_extension.get::<_,bool>(4)]).await.unwrap();
+            client.batch_execute(&format!("ALTER FUNCTION {function} NO DEPENDS ON EXTENSION plpgsql; ALTER EXTENSION plpgsql DROP FUNCTION {function}")).await.unwrap();
+            let restored_extension=adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536),&NotCancelled).await.unwrap();
+            assert_eq!(restored_extension.snapshot_digest(),owner_snapshot.snapshot_digest());
+            assert_eq!(extension_receipt.source_digest(),member.snapshot_digest());
             let was_allowed: bool = client.query_one(
                 "SELECT pg_catalog.has_function_privilege('public', $1::text, 'EXECUTE')", &[&function]
             ).await.unwrap().get(0);
@@ -1401,9 +1480,22 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         Err(ProposalError::IncompleteSourceObservation)
     ));
     assert!(
+        missing_initial_privileges
+            .clone()
+            .with_observed_procedure_extensions(vec![], vec![])
+            .is_err()
+    );
+    let missing_extensions = missing_initial_privileges
+        .with_observed_procedure_initial_privileges(vec![])
+        .unwrap();
+    assert!(matches!(
+        propose_relational_model(&missing_extensions),
+        Err(ProposalError::IncompleteSourceObservation)
+    ));
+    assert!(
         propose_relational_model(
-            &missing_initial_privileges
-                .with_observed_procedure_initial_privileges(vec![])
+            &missing_extensions
+                .with_observed_procedure_extensions(vec![], vec![])
                 .unwrap()
         )
         .is_ok()
@@ -1599,6 +1691,8 @@ fn relational_proposal_rejects_unmodeled_shapes_and_incomplete_references() {
         .with_observed_procedure_security_labels(vec![])
         .unwrap()
         .with_observed_procedure_initial_privileges(vec![])
+        .unwrap()
+        .with_observed_procedure_extensions(vec![], vec![])
         .unwrap()
     };
     let type_only = complete_type_only(enums.clone(), "2026-09-25T00:00:00Z");
