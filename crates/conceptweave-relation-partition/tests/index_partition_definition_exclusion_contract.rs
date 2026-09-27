@@ -67,8 +67,8 @@ fn authorized_source() -> AuthorizedObservationRequest {
     .unwrap()
 }
 
-fn index(name: &str, exclusion: bool) -> IndexObservation {
-    IndexObservation::new(
+fn index(name: &str, exclusion: Option<bool>) -> IndexObservation {
+    let index = IndexObservation::new(
         name,
         false,
         Some(false),
@@ -87,18 +87,22 @@ fn index(name: &str, exclusion: bool) -> IndexObservation {
         .unwrap(),
     ])
     .unwrap()
-    .with_catalog_flags(IndexCatalogFlags::new(
-        false, exclusion, true, false, false, false,
-    ))
-    .unwrap()
-    .with_valid(true)
+    .with_valid(true);
+    match exclusion {
+        Some(exclusion) => index
+            .with_catalog_flags(IndexCatalogFlags::new(
+                false, exclusion, true, false, false, false,
+            ))
+            .unwrap(),
+        None => index,
+    }
 }
 
 fn relation(
     name: &str,
     kind: RelationKind,
     index_name: &str,
-    exclusion: bool,
+    exclusion: Option<bool>,
 ) -> RelationObservation {
     RelationObservation::new(
         "public",
@@ -142,8 +146,8 @@ fn child_index() -> IndexPartitionCoordinate {
 }
 
 fn predecessor(
-    parent_exclusion: bool,
-    child_exclusion: bool,
+    parent_exclusion: Option<bool>,
+    child_exclusion: Option<bool>,
 ) -> (
     PostgresSchemaSnapshotV3,
     RelationPartitionSnapshot,
@@ -252,7 +256,7 @@ fn exclusion(
 
 #[test]
 fn attached_child_must_preserve_exclusion_presence() {
-    let (base, relations, indexes, families) = predecessor(true, false);
+    let (base, relations, indexes, families) = predecessor(Some(true), Some(false));
 
     let error =
         IndexExclusionSemanticsSnapshot::new(&base, &relations, &indexes, &families, vec![])
@@ -268,7 +272,7 @@ fn attached_child_must_preserve_exclusion_presence() {
 
 #[test]
 fn attached_child_must_preserve_exclusion_operator_procedure_and_strategy() {
-    let (base, relations, indexes, families) = predecessor(true, true);
+    let (base, relations, indexes, families) = predecessor(Some(true), Some(true));
 
     for (child_operator, child_procedure, child_strategy, expected_field) in [
         (
@@ -318,7 +322,7 @@ fn attached_child_must_preserve_exclusion_operator_procedure_and_strategy() {
 
 #[test]
 fn matching_exclusion_semantics_are_admissible_and_complete() {
-    let (base, relations, indexes, families) = predecessor(true, true);
+    let (base, relations, indexes, families) = predecessor(Some(true), Some(true));
 
     let snapshot = IndexExclusionSemanticsSnapshot::new(
         &base,
@@ -442,5 +446,26 @@ fn matching_exclusion_semantics_are_admissible_and_complete() {
         snapshot,
         IndexExclusionSemanticsSnapshot::new(&base, &relations, &indexes, &families, reversed,)
             .unwrap()
+    );
+}
+
+#[test]
+fn unknown_exclusion_flags_cannot_be_promoted_to_observed_false() {
+    for (parent, child) in [(None, Some(false)), (Some(false), None)] {
+        let (base, relations, indexes, families) = predecessor(parent, child);
+        assert_eq!(
+            IndexExclusionSemanticsSnapshot::new(&base, &relations, &indexes, &families, vec![],)
+                .unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: "index_exclusion_semantics_catalog_flags",
+            }
+        );
+    }
+    let (base, relations, indexes, families) = predecessor(Some(false), Some(false));
+    assert!(
+        IndexExclusionSemanticsSnapshot::new(&base, &relations, &indexes, &families, vec![],)
+            .unwrap()
+            .observations()
+            .is_empty()
     );
 }
