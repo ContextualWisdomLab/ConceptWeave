@@ -4211,7 +4211,7 @@ async fn postgres18_cross_schema_sequence_default_fails_closed() {
 }
 
 #[tokio::test]
-async fn postgres18_late_bound_relation_lookup_fails_closed() {
+async fn postgres18_late_bound_catalog_lookup_fails_closed() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
     };
@@ -4287,7 +4287,7 @@ async fn postgres18_late_bound_relation_lookup_fails_closed() {
         ))
         .await
         .unwrap();
-    let serial_after = adapter(config)
+    let serial_after = adapter(config.clone())
         .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
         .await;
     let linked_after: Option<String> = client
@@ -4299,9 +4299,53 @@ async fn postgres18_late_bound_relation_lookup_fails_closed() {
         .unwrap()
         .get(0);
     assert_eq!(linked_after, None);
+    let role = format!("cw_lookup_role_{}", std::process::id());
+    let renamed_role = format!("cw_lookup_renamed_role_{}", std::process::id());
+    client
+        .batch_execute(&format!("CREATE ROLE \"{role}\" NOLOGIN"))
+        .await
+        .unwrap();
+    let role_oid: u32 = client
+        .query_one(
+            "SELECT oid FROM pg_catalog.pg_roles WHERE rolname = $1",
+            &[&role],
+        )
+        .await
+        .unwrap()
+        .get(0);
     client
         .batch_execute(&format!(
-            "DROP SCHEMA {schema} CASCADE; DROP SCHEMA {external} CASCADE"
+            "DROP TABLE {schema}.record; \
+             CREATE TABLE {schema}.record \
+               (role_name text DEFAULT pg_get_userbyid({role_oid}::oid)::text)"
+        ))
+        .await
+        .unwrap();
+    let role_before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "ALTER ROLE \"{role}\" RENAME TO \"{renamed_role}\""
+        ))
+        .await
+        .unwrap();
+    let role_after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    let looked_up_role: String = client
+        .query_one(
+            "SELECT pg_catalog.pg_get_userbyid($1::oid)::text",
+            &[&role_oid],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(looked_up_role, renamed_role);
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA {schema} CASCADE; DROP SCHEMA {external} CASCADE; \
+             DROP ROLE \"{renamed_role}\""
         ))
         .await
         .unwrap();
@@ -4325,8 +4369,14 @@ async fn postgres18_late_bound_relation_lookup_fails_closed() {
         ) && matches!(
             serial_after,
             Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ) && matches!(
+            role_before,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
+        ) && matches!(
+            role_after,
+            Err(SourceObservationFailure::InvalidCapturedMetadata)
         ),
-        "late-bound relation lookup must not reuse source identity: before={before:?}, after={after:?}, cast_before={cast_before:?}, cast_after={cast_after:?}, serial_before={serial_before:?}, serial_after={serial_after:?}"
+        "late-bound relation lookup must not reuse source identity: before={before:?}, after={after:?}, cast_before={cast_before:?}, cast_after={cast_after:?}, serial_before={serial_before:?}, serial_after={serial_after:?}, role_before={role_before:?}, role_after={role_after:?}"
     );
 }
 
