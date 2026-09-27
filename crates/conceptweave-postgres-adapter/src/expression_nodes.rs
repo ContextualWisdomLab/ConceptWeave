@@ -503,6 +503,47 @@ mod tests {
     }
 
     #[test]
+    fn coercion_result_comes_from_the_declared_node_not_a_nested_variable() {
+        for (kind, result_field, other_fields) in [
+            ("FUNCEXPR", "funcresulttype", ":funcid 123"),
+            ("DISTINCTEXPR", "opresulttype", ":opno 96 :opfuncid 0"),
+            ("NULLIFEXPR", "opresulttype", ":opno 96 :opfuncid 0"),
+            ("RELABELTYPE", "resulttype", ""),
+            ("ARRAYCOERCEEXPR", "resulttype", ""),
+            ("COERCETODOMAIN", "resulttype", ""),
+            ("CASEEXPR", "casetype", ""),
+            ("COALESCEEXPR", "coalescetype", ""),
+            ("MINMAXEXPR", "minmaxtype", ""),
+            ("ARRAYEXPR", "array_typeid", ""),
+            ("ROWEXPR", "row_typeid", ""),
+            ("CASETESTEXPR", "typeId", ""),
+            ("COERCETODOMAINVALUE", "typeId", ""),
+        ] {
+            let tree = format!(
+                "{{COERCEVIAIO :arg {{{kind} :{result_field} 20 {other_fields} :arg {{VAR :vartype 23}}}} :resulttype 25}}"
+            );
+            assert_eq!(io_coercion_pairs(&tree), Ok(vec![(20, 25)]), "{kind}");
+            let missing = tree.replace(&format!(":{result_field} 20"), "");
+            assert_eq!(
+                io_coercion_pairs(&missing),
+                Err(InvalidExpressionTree),
+                "{kind}"
+            );
+        }
+        assert_eq!(
+            io_coercion_pairs(
+                "{COERCEVIAIO :arg {COLLATEEXPR :arg {VAR :vartype 23}} :resulttype 25}"
+            ),
+            Ok(vec![(23, 25)])
+        );
+        for kind in ["BOOLEXPR", "NULLTEST", "BOOLEANTEST"] {
+            let tree =
+                format!("{{COERCEVIAIO :arg {{{kind} :arg {{VAR :vartype 23}}}} :resulttype 25}}");
+            assert_eq!(io_coercion_pairs(&tree), Ok(vec![(16, 25)]), "{kind}");
+        }
+    }
+
+    #[test]
     fn nested_coercion_uses_its_arguments_own_type_and_rejects_ambiguous_input() {
         let composed = "{COERCEVIAIO :arg {OPEXPR :opno 551 :opfuncid 177 :opresulttype 23 :args ({VAR :vartype 20} {CONST :consttype 23 :constvalue 4 [ 1 0 0 0 0 0 0 0 ]})} :resulttype 25}";
         assert_eq!(io_coercion_pairs(composed), Ok(vec![(23, 25)]));
@@ -543,6 +584,18 @@ mod tests {
             "{SUBSCRIPTINGREF :refcontainertype 1007 :refelemtype -1 :refrestype 23}",
             "{SUBSCRIPTINGREF :refcontainertype 1007 :refelemtype 23 :refrestype 0}",
             "{SUBSCRIPTINGREF :refcontainertype 1007 :refelemtype 23 :refrestype -1}",
+            "{:NODE}",
+            "{NODE : value}",
+            "{NODE field 23}",
+            "{NODE :value )}",
+            "{NODE :value (}",
+            "{ROWCOMPAREEXPR :opnos 97}",
+            "{ROWCOMPAREEXPR :opnos (o -1)}",
+            "{COERCEVIAIO :arg <> :resulttype 25}",
+            "{COERCEVIAIO :arg {VAR :vartype (o 23)} :resulttype 25}",
+            "{COERCEVIAIO :arg {COLLATEEXPR} :resulttype 25}",
+            "{CONST :constvalue nope}",
+            "{CONST :constvalue 1 0}",
             "{CONST :constvalue 1 [ 256 ]}",
             "{CONST :constvalue 1 [ 0}",
             "{NODE :label bad\\",
