@@ -3751,6 +3751,47 @@ async fn postgres18_anonymized_governance_shape_replays_without_business_rows() 
             assert_eq!(candidate.candidate().publication_state(), PublicationState::Rejected);
             assert_eq!(candidate.candidate().evidence()[0].source_digest(), first.snapshot_digest());
         }
+        let reviewed_without_edges = review(
+            &without_edges,
+            "fixture-steward",
+            "Publish concepts and attributes with relationships explicitly excluded",
+            &FixtureSteward {
+                proposal_id: proposal.proposal_id(),
+                source_digest: first.snapshot_digest(),
+            },
+        ).unwrap();
+        std::fs::create_dir(&publication_root).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&publication_root, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        let excluded_store = FilePublicationStore::new(&publication_root).unwrap();
+        let published_without_edges = excluded_store.publish(
+            &reviewed_without_edges,
+            ReleaseMetadata::new("fixture-without-edges", "1.0.0", "fixture-ontology").unwrap(),
+        ).unwrap();
+        assert_eq!(published_without_edges.release().concept_ids(), published.release().concept_ids());
+        for relation in proposal.relations() {
+            for evidence in relation.candidate().evidence() {
+                assert!(!published_without_edges.release().provenance().contains(evidence));
+            }
+        }
+        let excluded_key = TrustedPublisherKey::new(
+            "fixture-publisher", signing_key.public_key().as_ref(),
+        ).unwrap();
+        let excluded_signed = sign_published_manifest(
+            &published_without_edges, "fixture-publisher", &signing_key,
+        ).unwrap();
+        let excluded_client = SemanticReleaseClient::with_signed_release_manifests(
+            "1.0.0", vec![], &[excluded_key], &[excluded_signed],
+        ).unwrap();
+        excluded_client.validate_for_authoritative_use(published_without_edges.release()).unwrap();
+        assert_eq!(
+            excluded_store.read_verified(&excluded_client, published_without_edges.release()).unwrap().unwrap(),
+            published_without_edges.artifact_bytes(),
+        );
+        std::fs::remove_dir_all(&publication_root).unwrap();
         let excluded_concept_id = proposal.concepts()[0].candidate().candidate_id();
         let excluded_parent = decisions
             .clone()
