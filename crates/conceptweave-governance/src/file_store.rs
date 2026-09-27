@@ -301,6 +301,76 @@ mod tests {
     use super::*;
 
     #[test]
+    fn write_failure_removes_owned_staging_files() {
+        if std::env::var("CW_PUBLICATION_WRITE_FAULT_CHILD").as_deref() != Ok("1") {
+            let parent_root = std::env::temp_dir().join(format!(
+                "cw-write-fault-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            fs::create_dir(&parent_root).unwrap();
+            fs::set_permissions(&parent_root, fs::Permissions::from_mode(0o700)).unwrap();
+            // Keep the quota above LLVM profile size and below the complete record size.
+            let mut child = std::process::Command::new("/bin/sh")
+                .args([
+                    "-c",
+                    "trap '' XFSZ; ulimit -f 8192; exec \"$1\" --exact \"$2\"",
+                    "cw-write-fault",
+                ])
+                .arg(std::env::current_exe().unwrap())
+                .arg("file_store::tests::write_failure_removes_owned_staging_files")
+                .env("CW_PUBLICATION_WRITE_FAULT_CHILD", "1")
+                .env(
+                    "CW_PUBLICATION_WRITE_FAULT_ROOT",
+                    parent_root.join("record_store"),
+                )
+                .spawn()
+                .unwrap();
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+            loop {
+                if let Some(status) = child.try_wait().unwrap() {
+                    fs::remove_dir_all(&parent_root).unwrap();
+                    assert!(status.success());
+                    return;
+                }
+                if std::time::Instant::now() >= deadline {
+                    child.kill().unwrap();
+                    child.wait().unwrap();
+                    fs::remove_dir_all(&parent_root).unwrap();
+                    panic!("owned publication fault child timed out");
+                }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+        }
+        let root = PathBuf::from(std::env::var_os("CW_PUBLICATION_WRITE_FAULT_ROOT").unwrap());
+        fs::create_dir(&root).unwrap();
+        fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
+        let store = FilePublicationStore::new(&root).unwrap();
+        let bytes = vec![7; 8 * 1024 * 1024];
+        let release = SemanticRelease::new(
+            ReleaseMetadata::new("fault-release", "1.0.0", "unit-ontology").unwrap(),
+            TruthStatus::Authoritative,
+            PublicationState::Published,
+            ReleaseDigest::new(&sha256(&bytes)).unwrap(),
+            vec![EvidenceReference::new("source", "digest", "location").unwrap()],
+            vec!["unit.concept".into()],
+        )
+        .unwrap();
+        let result = store.issue_record(&release, &bytes);
+        let retained = fs::read_dir(&root).unwrap().count();
+        fs::remove_dir_all(&root).unwrap();
+        assert!(matches!(result, Err(PublicationStoreError::Io(error))
+            if error.raw_os_error() == Some(libc::EFBIG)));
+        assert_eq!(
+            retained, 0,
+            "failed writes must retain neither a record nor a stage"
+        );
+    }
+
+    #[test]
     fn issuance_is_unique_and_readback_rejects_changed_bytes_without_a_database() {
         let root = std::env::temp_dir().join(format!(
             "cw-store-unit-{}-{}",
