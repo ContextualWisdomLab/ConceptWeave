@@ -47,6 +47,12 @@ fn array_type_receipt_verifies_exact_coordinate_and_public_digest() {
     assert_eq!(receipt.location(), &location);
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
     assert_eq!(receipt.source_id(), "warehouse_primary");
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        snapshot.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
 }
 
 #[test]

@@ -35,6 +35,66 @@ use ring::{
 };
 use tokio_postgres::{Config, NoTls};
 
+#[test]
+fn proposal_and_publication_errors_preserve_causes_without_exposing_private_details() {
+    use conceptweave_client::ReleaseContractError;
+    use conceptweave_observation::ObservationError;
+    use std::error::Error;
+
+    let source = ObservationError::UnknownObservationLocation {
+        location: "private/source/location".to_owned(),
+    };
+    let proposal = ProposalError::from(source.clone());
+    assert_eq!(
+        proposal.to_string(),
+        "source evidence could not be verified"
+    );
+    assert_eq!(
+        proposal
+            .source()
+            .unwrap()
+            .downcast_ref::<ObservationError>(),
+        Some(&source)
+    );
+    let governance = GovernanceError::from(ReleaseContractError::MissingProvenance);
+    assert_eq!(
+        governance.to_string(),
+        "the semantic release could not be created"
+    );
+    assert_eq!(
+        governance
+            .source()
+            .unwrap()
+            .downcast_ref::<ReleaseContractError>(),
+        Some(&ReleaseContractError::MissingProvenance)
+    );
+    let store = PublicationStoreError::from(governance);
+    assert_eq!(
+        store.to_string(),
+        "the governed release could not be created"
+    );
+    assert!(matches!(
+        store.source().unwrap().downcast_ref::<GovernanceError>(),
+        Some(GovernanceError::Release(
+            ReleaseContractError::MissingProvenance
+        ))
+    ));
+    let io = PublicationStoreError::from(std::io::Error::new(
+        std::io::ErrorKind::PermissionDenied,
+        "private/filesystem/path",
+    ));
+    assert_eq!(io.to_string(), "the release could not be stored or read");
+    assert_eq!(
+        io.source()
+            .unwrap()
+            .downcast_ref::<std::io::Error>()
+            .unwrap()
+            .kind(),
+        std::io::ErrorKind::PermissionDenied
+    );
+    assert!(PublicationStoreError::InvalidRecord.source().is_none());
+}
+
 #[tokio::test]
 async fn postgres18_referenced_procedure_evidence_binds_immutable_source() {
     use futures_util::FutureExt;
