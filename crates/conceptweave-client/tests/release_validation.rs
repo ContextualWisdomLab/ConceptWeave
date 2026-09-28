@@ -277,6 +277,9 @@ fn trusted_manifest_binds_provenance_and_concepts_independently_of_input_order()
     )
     .unwrap();
     assert_eq!(client.validate_for_authoritative_use(&reordered), Ok(()));
+    let diff = client.diff(&with_two_sources, &reordered).unwrap();
+    assert!(diff.added_concept_ids().is_empty());
+    assert!(diff.removed_concept_ids().is_empty());
     assert_eq!(
         client.validate_for_authoritative_use(&original),
         Err(ReleaseContractError::UntrustedRelease)
