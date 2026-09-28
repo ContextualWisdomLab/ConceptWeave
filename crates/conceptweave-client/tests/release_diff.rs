@@ -101,3 +101,40 @@ fn release_diff_fails_closed_when_either_release_is_not_admissible() {
     assert_eq!(client.diff(&reviewed_previous, &published), expected);
     assert_eq!(client.diff(&published, &reviewed_current), expected);
 }
+
+#[test]
+fn release_diff_accepts_order_permutations_of_one_trusted_release() {
+    let previous = release(
+        "semantic-release-grc-v1",
+        &["control.evidence", "control.owner"],
+        PublicationState::Published,
+    );
+    let reordered = release(
+        "semantic-release-grc-v1",
+        &["control.owner", "control.evidence"],
+        PublicationState::Published,
+    );
+    assert_eq!(previous.manifest_digest(), reordered.manifest_digest());
+    let client = SemanticReleaseClient::with_trusted_release_manifests(
+        "1.0.0",
+        vec![],
+        vec![
+            TrustedReleaseManifest::new(previous.release_id(), previous.manifest_digest()).unwrap(),
+        ],
+    )
+    .unwrap();
+
+    let diff = client.diff(&previous, &reordered).unwrap();
+    assert!(diff.added_concept_ids().is_empty());
+    assert!(diff.removed_concept_ids().is_empty());
+
+    let conflicting = release(
+        previous.release_id(),
+        &["control.evidence", "control.other"],
+        PublicationState::Published,
+    );
+    assert_eq!(
+        client.diff(&previous, &conflicting),
+        Err(ReleaseContractError::UntrustedRelease)
+    );
+}

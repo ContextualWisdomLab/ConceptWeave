@@ -703,7 +703,9 @@ impl SemanticReleaseClient {
         self.validate_for_authoritative_use(previous)?;
         self.validate_for_authoritative_use(current)?;
 
-        if previous.release_id() == current.release_id() && previous != current {
+        if previous.release_id() == current.release_id()
+            && previous.manifest_digest() != current.manifest_digest()
+        {
             return Err(ReleaseContractError::ConflictingReleaseIdentity(
                 previous.release_id().to_owned(),
             ));
