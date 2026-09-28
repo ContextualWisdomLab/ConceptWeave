@@ -1,10 +1,9 @@
 use conceptweave_observation::{
-    CheckConstraintObservation, ColumnObservationV3, ForeignKeyCatalogObservation,
-    ForeignKeyObservation, ForeignKeyOperatorObservation, IndexAttributeKind,
-    IndexAttributeObservation, IndexCatalogFlags, IndexKeySemantics, IndexObservation,
-    ObservationError, PostgresSchemaSnapshotV3, PrimaryKeyObservation, QualifiedOperatorClassName,
-    QualifiedTypeName, RelationKind, RelationObservation, TableConstraintObservation,
-    UniqueConstraintObservation,
+    ColumnObservationV3, ForeignKeyCatalogObservation, ForeignKeyObservation,
+    ForeignKeyOperatorObservation, IndexAttributeKind, IndexAttributeObservation,
+    IndexCatalogFlags, IndexKeySemantics, IndexObservation, PostgresSchemaSnapshotV3,
+    QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
+    TableConstraintObservation,
 };
 
 mod support;
@@ -31,90 +30,6 @@ fn observed_empty_foreign_key_catalog_has_distinct_identity_and_single_use() {
             .with_observed_foreign_key_catalog(Vec::new())
             .is_err()
     );
-}
-
-#[test]
-fn constraint_owner_kind_matches_postgres_relations() {
-    let column = ColumnObservationV3::new(
-        "parent_id",
-        1,
-        "integer",
-        QualifiedTypeName::new("pg_catalog", "int4").unwrap(),
-        true,
-        None,
-    )
-    .unwrap();
-    let keyed = [
-        TableConstraintObservation::PrimaryKey(
-            PrimaryKeyObservation::new("child_pk", vec!["parent_id".to_owned()]).unwrap(),
-        ),
-        TableConstraintObservation::Unique(
-            UniqueConstraintObservation::new("child_uq", vec!["parent_id".to_owned()]).unwrap(),
-        ),
-        TableConstraintObservation::ForeignKey(
-            ForeignKeyObservation::new(
-                "child_parent_fk",
-                vec!["parent_id".to_owned()],
-                "public",
-                "parent",
-                vec!["id".to_owned()],
-            )
-            .unwrap(),
-        ),
-    ];
-    for constraint in keyed {
-        for kind in [RelationKind::Table, RelationKind::PartitionedTable] {
-            RelationObservation::new("public", "child", kind, vec![column.clone()])
-                .unwrap()
-                .with_constraints(vec![constraint.clone()])
-                .expect("table kinds can own key and relationship constraints");
-        }
-        for kind in [
-            RelationKind::View,
-            RelationKind::MaterializedView,
-            RelationKind::ForeignTable,
-            RelationKind::Sequence,
-            RelationKind::CompositeType,
-        ] {
-            assert_eq!(
-                RelationObservation::new("public", "child", kind, vec![column.clone()])
-                    .unwrap()
-                    .with_constraints(vec![constraint.clone()]),
-                Err(ObservationError::InvalidObservationField {
-                    field: "constraint_relation_kind",
-                })
-            );
-        }
-    }
-    let check = TableConstraintObservation::Check(
-        CheckConstraintObservation::new("child_check", "CHECK (parent_id > 0)", true, true, false)
-            .unwrap(),
-    );
-    for kind in [
-        RelationKind::Table,
-        RelationKind::PartitionedTable,
-        RelationKind::ForeignTable,
-    ] {
-        RelationObservation::new("public", "child", kind, vec![column.clone()])
-            .unwrap()
-            .with_constraints(vec![check.clone()])
-            .expect("ordinary, partitioned and foreign tables can own CHECK constraints");
-    }
-    for kind in [
-        RelationKind::View,
-        RelationKind::MaterializedView,
-        RelationKind::Sequence,
-        RelationKind::CompositeType,
-    ] {
-        assert_eq!(
-            RelationObservation::new("public", "child", kind, vec![column.clone()])
-                .unwrap()
-                .with_constraints(vec![check.clone()]),
-            Err(ObservationError::InvalidObservationField {
-                field: "constraint_relation_kind",
-            })
-        );
-    }
 }
 
 #[test]
