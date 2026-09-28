@@ -1179,6 +1179,40 @@ fn type_only_authorized_schema_succeeds_without_relations() {
 }
 
 #[test]
+fn quoted_type_only_schema_requires_exact_authorization_and_keeps_receipt() {
+    let domain = DomainObservation::new(" ", " ", catalog_type("numeric")).unwrap();
+    let authorized = support::authorized_source("warehouse_primary", &[" "]);
+    let snapshot = PostgresSchemaSnapshotV3::new(
+        &authorized,
+        "postgres_introspector_v3",
+        "2026-09-25T00:00:00Z",
+        vec![],
+        vec![domain.clone()],
+        vec![],
+    )
+    .unwrap();
+    let location = SchemaObjectLocation::domain(" ", " ").unwrap();
+    let receipt = snapshot.source_receipt(location.clone()).unwrap();
+    assert_eq!(receipt.location(), &location);
+    assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+
+    let denied = PostgresSchemaSnapshotV3::new(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-25T00:00:00Z",
+        vec![],
+        vec![domain],
+        vec![],
+    );
+    assert_eq!(
+        denied,
+        Err(ObservationError::InvalidObservationField {
+            field: "unauthorized_schema_name"
+        })
+    );
+}
+
+#[test]
 fn successor_snapshot_rejects_duplicate_schema_object_coordinates() {
     let duplicate_relation = snapshot_v3(
         vec![

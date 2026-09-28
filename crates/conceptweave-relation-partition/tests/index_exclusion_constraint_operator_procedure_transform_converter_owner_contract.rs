@@ -100,6 +100,34 @@ fn ordinary_exclude_transform_converter_owner_preserves_exact_pg_proc_owner() {
     assert_eq!(receipt.location().owner_oid(), 16_384);
     assert_eq!(receipt.location().owner_role_name(), "transform_runtime");
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(
+        snapshot.source_connection_key(),
+        predecessor.source_connection_key()
+    );
+    assert_eq!(
+        snapshot.connection_policy_binding(),
+        predecessor.connection_policy_binding()
+    );
+    assert_eq!(
+        snapshot.extractor_revision(),
+        predecessor.extractor_revision()
+    );
+    assert_eq!(snapshot.observed_at_utc(), predecessor.observed_at_utc());
+    assert_eq!(receipt.source_id(), predecessor.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        predecessor.connection_policy_binding()
+    );
+    assert_eq!(
+        receipt.extractor_revision(),
+        predecessor.extractor_revision()
+    );
+    assert_eq!(receipt.observed_at_utc(), predecessor.observed_at_utc());
+    assert_eq!(receipt.location().owner().owner_oid(), 16_384);
+    assert_eq!(
+        receipt.location().owner().owner_role_name(),
+        "transform_runtime"
+    );
     assert!(
         receipt
             .location()
@@ -187,10 +215,9 @@ fn ordinary_exclude_transform_converter_owner_rejects_zero_owner_oid() {
 
 #[test]
 fn ordinary_exclude_transform_converter_owner_rejects_blank_owner_role_name() {
-    let error = IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity::new(
-        16_384, "   ",
-    )
-    .expect_err("owner OID resolution must retain a nonblank same-generation role name");
+    let error =
+        IndexExclusionConstraintOperatorProcedureTransformConverterOwnerIdentity::new(16_384, "")
+            .expect_err("owner OID resolution must retain a nonblank same-generation role name");
     assert_field(
         error,
         "index_exclusion_constraint_operator_procedure_transform_converter_owner_role_name",
@@ -233,6 +260,43 @@ fn ordinary_exclude_transform_converter_owner_rejects_unknown_receipt_coordinate
         error,
         ObservationError::UnknownObservationLocation { .. }
     ));
+}
+
+#[test]
+fn ordinary_exclude_transform_converter_owner_receipts_bind_exact_type_and_direction() {
+    let snapshot = IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot::new(
+        &converter_snapshot(),
+        complete_owner_observations(),
+    )
+    .unwrap();
+
+    for direction in [
+        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
+        IndexExclusionConstraintOperatorProcedureTransformConverterDirection::ToSql,
+    ] {
+        let receipt = snapshot
+            .source_receipt(coordinate(), 1, custom_payload_type(), direction)
+            .unwrap();
+        assert_eq!(receipt.location().direction(), direction);
+
+        for (position, transform_type) in [
+            (0, custom_payload_type()),
+            (2, custom_payload_type()),
+            (
+                1,
+                QualifiedTypeName::new("other", "custom_payload").unwrap(),
+            ),
+            (
+                1,
+                QualifiedTypeName::new("public", "other_payload").unwrap(),
+            ),
+        ] {
+            assert!(matches!(
+                snapshot.source_receipt(coordinate(), position, transform_type, direction),
+                Err(ObservationError::UnknownObservationLocation { .. })
+            ));
+        }
+    }
 }
 
 #[test]

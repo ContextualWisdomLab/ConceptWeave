@@ -165,7 +165,7 @@ impl IndexExclusionConstraintOperatorProcedureScalarSnapshot {
             result_snapshot,
             kind_snapshot.observations().to_vec(),
         )?;
-        if rebound_kind.snapshot_digest() != kind_snapshot.snapshot_digest() {
+        if rebound_kind != *kind_snapshot {
             return Err(invalid(
                 "index_exclusion_constraint_operator_procedure_scalar_predecessor_binding",
             ));
@@ -205,9 +205,9 @@ impl IndexExclusionConstraintOperatorProcedureScalarSnapshot {
                     candidate.coordinate() == observation.coordinate()
                         && candidate.key_position() == observation.key_position()
                 })
-                .ok_or_else(|| {
-                    invalid("index_exclusion_constraint_operator_procedure_scalar_completeness")
-                })?;
+                .ok_or(invalid(
+                    "index_exclusion_constraint_operator_procedure_scalar_completeness",
+                ))?;
             if predecessor.operator() != observation.operator()
                 || predecessor.procedure() != observation.procedure()
             {

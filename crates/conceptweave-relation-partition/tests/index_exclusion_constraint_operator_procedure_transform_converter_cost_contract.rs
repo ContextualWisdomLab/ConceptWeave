@@ -263,7 +263,7 @@ fn ordinary_exclude_transform_converter_cost_rejects_blank_converter_identifiers
             1,
             custom_payload_type(),
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
-            " ",
+            "",
             "payload_from_sql",
             1.0,
         )
@@ -280,7 +280,7 @@ fn ordinary_exclude_transform_converter_cost_rejects_blank_converter_identifiers
             custom_payload_type(),
             IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
             "public",
-            "\t",
+            "",
             1.0,
         )
         .expect_err("converter function name is part of the exact function binding");

@@ -530,6 +530,11 @@ fn validate_predecessors(
     }
 
     if expression_snapshot.source_connection_key() != type_modifier_snapshot.source_connection_key()
+        || expression_snapshot.source_connection_key() != rebound_expression.source_connection_key()
+        || expression_snapshot.connection_policy_binding()
+            != rebound_expression.connection_policy_binding()
+        || expression_snapshot.extractor_revision() != rebound_expression.extractor_revision()
+        || expression_snapshot.observed_at_utc() != rebound_expression.observed_at_utc()
         || expression_snapshot.connection_policy_binding()
             != type_modifier_snapshot.connection_policy_binding()
         || expression_snapshot.extractor_revision() != type_modifier_snapshot.extractor_revision()
@@ -569,15 +574,13 @@ fn canonicalize_and_validate(
         return Err(invalid("index_expression_relation_var_completeness"));
     }
 
-    let column_collations = base_snapshot
-        .column_collations()
-        .ok_or_else(|| invalid("index_expression_relation_var_column_collation_evidence"))?;
+    let column_collations = base_snapshot.column_collations().ok_or(invalid(
+        "index_expression_relation_var_column_collation_evidence",
+    ))?;
 
     for observation in &observations {
         let location_key = observation.location().canonical_location();
-        let expected_column = expected
-            .get(&location_key)
-            .ok_or_else(|| invalid("index_expression_relation_var_coordinate"))?;
+        let expected_column = &expected[&location_key];
         if observation.column_name() != expected_column {
             return Err(invalid("index_expression_relation_var_column"));
         }
@@ -591,12 +594,12 @@ fn canonicalize_and_validate(
                     && relation.relation_name() == index.relation_name()
                     && relation.kind() == index.relation_kind()
             })
-            .ok_or_else(|| invalid("index_expression_relation_var_owner"))?;
+            .ok_or(invalid("index_expression_relation_var_owner"))?;
         let column = relation
             .columns()
             .iter()
             .find(|column| column.column_name() == observation.column_name())
-            .ok_or_else(|| invalid("index_expression_relation_var_column"))?;
+            .ok_or(invalid("index_expression_relation_var_column"))?;
         if column.type_binding() != observation.value_type() {
             return Err(invalid("index_expression_relation_var_value_type"));
         }
@@ -610,7 +613,9 @@ fn canonicalize_and_validate(
                     && candidate.relation_kind() == index.relation_kind()
                     && candidate.column_name() == observation.column_name()
             })
-            .ok_or_else(|| invalid("index_expression_relation_var_type_modifier_evidence"))?;
+            .ok_or(invalid(
+                "index_expression_relation_var_type_modifier_evidence",
+            ))?;
         if type_modifier.type_modifier() != observation.type_modifier() {
             return Err(invalid("index_expression_relation_var_type_modifier"));
         }
@@ -623,7 +628,9 @@ fn canonicalize_and_validate(
                     && candidate.relation_kind() == index.relation_kind()
                     && candidate.column_name() == observation.column_name()
             })
-            .ok_or_else(|| invalid("index_expression_relation_var_column_collation_evidence"))?;
+            .ok_or(invalid(
+                "index_expression_relation_var_column_collation_evidence",
+            ))?;
         if column_collation.collation() != observation.collation() {
             return Err(invalid("index_expression_relation_var_collation"));
         }
@@ -641,8 +648,7 @@ fn expected_var_leaves(
         let mut leaves = Vec::new();
         collect_var_leaves(observation.expression(), &mut leaves)?;
         for (offset, column_name) in leaves.into_iter().enumerate() {
-            let leaf_position = u32::try_from(offset + 1)
-                .map_err(|_| invalid("index_expression_relation_var_leaf_position"))?;
+            let leaf_position = checked_leaf_position(offset)?;
             let location = IndexExpressionRelationVarLocation::expression(
                 observation.index().clone(),
                 observation.key_position(),
@@ -656,8 +662,7 @@ fn expected_var_leaves(
         let mut leaves = Vec::new();
         collect_var_leaves(observation.predicate(), &mut leaves)?;
         for (offset, column_name) in leaves.into_iter().enumerate() {
-            let leaf_position = u32::try_from(offset + 1)
-                .map_err(|_| invalid("index_expression_relation_var_leaf_position"))?;
+            let leaf_position = checked_leaf_position(offset)?;
             let location = IndexExpressionRelationVarLocation::predicate(
                 observation.index().clone(),
                 leaf_position,
@@ -738,7 +743,7 @@ fn validate_attached_var_equivalence(
             let parent_location = child.location().with_index(parent_index.clone());
             let parent = by_location
                 .get(&parent_location.canonical_location())
-                .ok_or_else(|| invalid("index_expression_relation_var_parent_evidence"))?;
+                .ok_or(invalid("index_expression_relation_var_parent_evidence"))?;
             if !child.semantic_equal(parent) {
                 return Err(invalid(
                     "index_expression_relation_var_attached_equivalence",
@@ -798,7 +803,7 @@ fn encode_u64(hasher: &mut Sha256, value: u64) {
 }
 
 fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
-    if value.trim().is_empty() {
+    if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }
     Ok(())
@@ -806,4 +811,27 @@ fn validate_nonblank(value: &str, field: &'static str) -> Result<(), Observation
 
 fn invalid(field: &'static str) -> ObservationError {
     ObservationError::InvalidObservationField { field }
+}
+
+fn checked_leaf_position(offset: usize) -> Result<u32, ObservationError> {
+    let field = "index_expression_relation_var_leaf_position";
+    let zero_based = u32::try_from(offset).map_err(|_| invalid(field))?;
+    zero_based.checked_add(1).ok_or(invalid(field))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn leaf_position_rejects_unrepresentable_offsets() {
+        assert_eq!(checked_leaf_position(0), Ok(1));
+        assert_eq!(checked_leaf_position(u32::MAX as usize - 1), Ok(u32::MAX));
+        for offset in [u32::MAX as usize, usize::MAX] {
+            assert_eq!(
+                checked_leaf_position(offset),
+                Err(invalid("index_expression_relation_var_leaf_position"))
+            );
+        }
+    }
 }

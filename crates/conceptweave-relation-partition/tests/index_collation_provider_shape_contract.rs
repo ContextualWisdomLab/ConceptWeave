@@ -199,3 +199,45 @@ fn database_default_catalog_row_uses_the_bootstrap_shape_and_coordinate() {
         None,
     ));
 }
+
+#[test]
+fn database_default_catalog_coordinate_cannot_claim_another_provider() {
+    for (provider, lc_collate, lc_ctype, locale, version, actual_version) in [
+        (
+            PostgresCollationProvider::Libc,
+            Some("C"),
+            Some("C"),
+            None,
+            None,
+            None,
+        ),
+        (
+            PostgresCollationProvider::Builtin,
+            None,
+            None,
+            Some("C"),
+            Some("1"),
+            Some("1"),
+        ),
+        (
+            PostgresCollationProvider::Icu,
+            None,
+            None,
+            Some("und"),
+            Some("153.80"),
+            Some("153.80"),
+        ),
+    ] {
+        assert_provider_shape_error(CollationDefinitionObservation::new(
+            identity("default", -1),
+            provider,
+            true,
+            lc_collate.map(str::to_owned),
+            lc_ctype.map(str::to_owned),
+            locale.map(str::to_owned),
+            None,
+            version.map(str::to_owned),
+            actual_version.map(str::to_owned),
+        ));
+    }
+}

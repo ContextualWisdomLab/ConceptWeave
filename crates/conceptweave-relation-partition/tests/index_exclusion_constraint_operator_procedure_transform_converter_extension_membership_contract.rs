@@ -100,7 +100,7 @@ fn ordinary_exclude_converter_extension_membership_rejects_blank_member_name() {
         IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
         "public",
         "payload_from_sql",
-        Some(" \t".to_owned()),
+        Some("".to_owned()),
     )
     .expect_err("an extension membership edge needs an exact nonblank pg_extension name");
     assert_field(
@@ -200,6 +200,13 @@ fn ordinary_exclude_converter_extension_membership_preserves_location_receipt_an
         .unwrap();
     assert_eq!(receipt.location().extension_name(), None);
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(receipt.source_id(), snapshot.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        snapshot.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
 
     let dotted_schema = QualifiedTypeName::new("payload.domain", "json").unwrap();
     let dotted_type = QualifiedTypeName::new("payload", "domain.json").unwrap();
@@ -229,13 +236,13 @@ fn ordinary_exclude_converter_extension_membership_preserves_location_receipt_an
 
     for (schema, function, field) in [
         (
-            " ",
+            "",
             "payload_from_sql",
             "index_exclusion_constraint_operator_procedure_transform_converter_extension_membership_function_schema",
         ),
         (
             "public",
-            "\t",
+            "",
             "index_exclusion_constraint_operator_procedure_transform_converter_extension_membership_function_name",
         ),
     ] {

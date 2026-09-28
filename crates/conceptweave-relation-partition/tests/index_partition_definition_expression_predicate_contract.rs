@@ -6,12 +6,13 @@ use conceptweave_observation::{
 };
 use conceptweave_relation_partition::{
     CanonicalExpression, CanonicalExpressionField, CanonicalExpressionValue,
-    IndexExclusionSemanticsSnapshot, IndexExpressionSemanticsObservation,
-    IndexExpressionSemanticsSnapshot, IndexKeyOperatorFamilyObservation,
-    IndexOperatorFamilySnapshot, IndexPartitionCoordinate, IndexPartitionObservation,
-    IndexPartitionSnapshot, IndexPredicateSemanticsObservation, IndexRelationKind,
-    PartitionParentRelationCoordinate, QualifiedFunctionSignature, QualifiedOperatorFamilyName,
-    QualifiedOperatorSignature, RelationPartitionObservation, RelationPartitionSnapshot,
+    IndexExclusionSemanticsSnapshot, IndexExpressionSemanticsLocation,
+    IndexExpressionSemanticsObservation, IndexExpressionSemanticsSnapshot,
+    IndexKeyOperatorFamilyObservation, IndexOperatorFamilySnapshot, IndexPartitionCoordinate,
+    IndexPartitionObservation, IndexPartitionSnapshot, IndexPredicateSemanticsObservation,
+    IndexRelationKind, PartitionParentRelationCoordinate, QualifiedFunctionSignature,
+    QualifiedOperatorFamilyName, QualifiedOperatorSignature, RelationPartitionObservation,
+    RelationPartitionSnapshot,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationLimits, ObservationRequest, ObservationRequestBudget,
@@ -429,51 +430,206 @@ fn stable_column_identity_survives_different_physical_attribute_order() {
 
     assert_eq!(snapshot.expression_observations().len(), 2);
     assert_eq!(snapshot.predicate_observations().len(), 2);
+    for observation in snapshot.expression_observations() {
+        assert_eq!(
+            observation.canonical_location(),
+            format!(
+                "{}/keys/1/expression-semantics",
+                observation.index().canonical_location()
+            )
+        );
+    }
+    for observation in snapshot.predicate_observations() {
+        assert_eq!(
+            observation.canonical_location(),
+            format!(
+                "{}/predicate-semantics",
+                observation.index().canonical_location()
+            )
+        );
+    }
+
+    for index in [parent_index(), child_index()] {
+        for location in [
+            IndexExpressionSemanticsLocation::Expression {
+                index: index.clone(),
+                key_position: 1,
+            },
+            IndexExpressionSemanticsLocation::Predicate {
+                index: index.clone(),
+            },
+        ] {
+            let receipt = snapshot.source_receipt(location.clone()).unwrap();
+            assert_eq!(receipt.location(), &location);
+            assert_eq!(receipt.source_id(), snapshot.source_connection_key());
+            assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+            assert_eq!(
+                receipt.connection_policy_binding(),
+                snapshot.connection_policy_binding()
+            );
+            assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+            assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
+        }
+        for key_position in [0, 2] {
+            assert_eq!(
+                snapshot
+                    .source_receipt(IndexExpressionSemanticsLocation::Expression {
+                        index: index.clone(),
+                        key_position,
+                    })
+                    .unwrap_err(),
+                ObservationError::UnknownObservationLocation {
+                    location: format!(
+                        "{}/keys/{key_position}/expression-semantics",
+                        index.canonical_location()
+                    ),
+                }
+            );
+        }
+        for (schema, relation, kind, name) in [
+            (
+                "archive",
+                index.relation_name(),
+                index.relation_kind(),
+                index.index_name(),
+            ),
+            (
+                index.schema_name(),
+                "unobserved_relation",
+                index.relation_kind(),
+                index.index_name(),
+            ),
+            (
+                index.schema_name(),
+                index.relation_name(),
+                RelationKind::ForeignTable,
+                index.index_name(),
+            ),
+            (
+                index.schema_name(),
+                index.relation_name(),
+                index.relation_kind(),
+                "unobserved_index",
+            ),
+        ] {
+            let absent = IndexPartitionCoordinate::new(schema, relation, kind, name).unwrap();
+            for (location, suffix) in [
+                (
+                    IndexExpressionSemanticsLocation::Expression {
+                        index: absent.clone(),
+                        key_position: 1,
+                    },
+                    "keys/1/expression-semantics",
+                ),
+                (
+                    IndexExpressionSemanticsLocation::Predicate {
+                        index: absent.clone(),
+                    },
+                    "predicate-semantics",
+                ),
+            ] {
+                assert_eq!(
+                    snapshot.source_receipt(location).unwrap_err(),
+                    ObservationError::UnknownObservationLocation {
+                        location: format!("{}/{suffix}", absent.canonical_location()),
+                    }
+                );
+            }
+        }
+    }
 }
 
 #[test]
-fn every_raw_expression_and_predicate_requires_semantic_evidence() {
+fn every_raw_expression_and_predicate_requires_exact_semantic_evidence() {
     let (base, relations, indexes, families, exclusions) = predecessor();
-
-    let missing_expression = IndexExpressionSemanticsSnapshot::new(
-        &base,
-        &relations,
-        &indexes,
-        &families,
-        &exclusions,
-        vec![expression(parent_index(), function_expression("lower"))],
-        vec![
-            predicate(parent_index(), predicate_expression(">")),
-            predicate(child_index(), predicate_expression(">")),
-        ],
-    )
-    .expect_err("every zero-indkey expression needs semantic evidence");
-
-    assert_eq!(
-        missing_expression,
-        ObservationError::InvalidObservationField {
-            field: "index_expression_semantics_completeness",
+    let build = |expressions, predicates| {
+        IndexExpressionSemanticsSnapshot::new(
+            &base,
+            &relations,
+            &indexes,
+            &families,
+            &exclusions,
+            expressions,
+            predicates,
+        )
+    };
+    let expressions = vec![
+        expression(parent_index(), function_expression("lower")),
+        expression(child_index(), function_expression("lower")),
+    ];
+    let predicates = vec![
+        predicate(parent_index(), predicate_expression(">")),
+        predicate(child_index(), predicate_expression(">")),
+    ];
+    for position in 0..2 {
+        let mut missing = expressions.clone();
+        missing.remove(position);
+        let mut duplicate = expressions.clone();
+        duplicate.push(expressions[position].clone());
+        let mut extra = expressions.clone();
+        extra.push(
+            IndexExpressionSemanticsObservation::new(
+                expressions[position].index().clone(),
+                2,
+                function_expression("lower"),
+            )
+            .unwrap(),
+        );
+        let mut wrong_column = expressions.clone();
+        wrong_column[position] = expression(
+            expressions[position].index().clone(),
+            CanonicalExpression::column("unobserved_column").unwrap(),
+        );
+        for (observations, field) in [
+            (missing, "index_expression_semantics_completeness"),
+            (duplicate, "index_expression_semantics_coordinate"),
+            (extra, "index_expression_semantics_completeness"),
+            (wrong_column, "index_expression_semantics_column_binding"),
+        ] {
+            assert_eq!(
+                build(observations, predicates.clone()).unwrap_err(),
+                ObservationError::InvalidObservationField { field }
+            );
         }
-    );
-
-    let missing_predicate = IndexExpressionSemanticsSnapshot::new(
-        &base,
-        &relations,
-        &indexes,
-        &families,
-        &exclusions,
-        vec![
-            expression(parent_index(), function_expression("lower")),
-            expression(child_index(), function_expression("lower")),
-        ],
-        vec![predicate(parent_index(), predicate_expression(">"))],
-    )
-    .expect_err("every partial-index predicate needs semantic evidence");
-
-    assert_eq!(
-        missing_predicate,
-        ObservationError::InvalidObservationField {
-            field: "index_predicate_semantics_completeness",
+        let mut missing = predicates.clone();
+        missing.remove(position);
+        let mut duplicate = predicates.clone();
+        duplicate.push(predicates[position].clone());
+        let mut extra = predicates.clone();
+        extra.push(predicate(
+            IndexPartitionCoordinate::new(
+                "public",
+                "accounts",
+                RelationKind::PartitionedTable,
+                "unobserved_index",
+            )
+            .unwrap(),
+            predicate_expression(">"),
+        ));
+        let mut wrong_column = predicates.clone();
+        wrong_column[position] = predicate(
+            predicates[position].index().clone(),
+            CanonicalExpression::column("unobserved_column").unwrap(),
+        );
+        for (observations, field) in [
+            (missing, "index_predicate_semantics_completeness"),
+            (duplicate, "index_predicate_semantics_coordinate"),
+            (extra, "index_predicate_semantics_completeness"),
+            (wrong_column, "index_expression_semantics_column_binding"),
+        ] {
+            assert_eq!(
+                build(expressions.clone(), observations).unwrap_err(),
+                ObservationError::InvalidObservationField { field }
+            );
         }
+    }
+    let snapshot = build(expressions.clone(), predicates.clone()).unwrap();
+    let mut reversed_expressions = expressions;
+    let mut reversed_predicates = predicates;
+    reversed_expressions.reverse();
+    reversed_predicates.reverse();
+    assert_eq!(
+        snapshot,
+        build(reversed_expressions, reversed_predicates).unwrap()
     );
 }

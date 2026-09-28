@@ -1,0 +1,26 @@
+[package]
+name = "conceptweave-postgres-adapter"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "Bounded PostgreSQL 18 Source Observation adapter"
+
+[dependencies]
+conceptweave-observation = { path = "../conceptweave-observation" }
+conceptweave-source-port = { path = "../conceptweave-source-port" }
+futures-util = "=0.3.31"
+rustls = { version = "=0.23.45", default-features = false, features = ["ring", "std"] }
+tokio = { version = "=1.53.1", features = ["macros", "time", "rt"] }
+tokio-postgres = "=0.7.18"
+tokio-postgres-rustls = { version = "=0.14.0", default-features = false, features = ["ring"] }
+
+[dev-dependencies]
+conceptweave-alignment = { path = "../conceptweave-alignment" }
+conceptweave-domain = { path = "../conceptweave-domain" }
+conceptweave-discovery = { path = "../conceptweave-discovery" }
+conceptweave-governance = { path = "../conceptweave-governance" }
+conceptweave-client = { path = "../conceptweave-client" }
+ring = "=0.17.14"
+tokio = { version = "=1.53.1", features = ["macros", "rt-multi-thread", "time"] }

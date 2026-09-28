@@ -183,7 +183,9 @@ impl IndexExclusionConstraintOperatorKindSnapshot {
                     candidate.coordinate() == observation.coordinate()
                         && candidate.key_position() == observation.key_position()
                 })
-                .ok_or_else(|| invalid("index_exclusion_constraint_operator_kind_completeness"))?;
+                .ok_or(invalid(
+                    "index_exclusion_constraint_operator_kind_completeness",
+                ))?;
             if predecessor.operator() != observation.operator() {
                 return Err(invalid("index_exclusion_constraint_operator_kind_binding"));
             }

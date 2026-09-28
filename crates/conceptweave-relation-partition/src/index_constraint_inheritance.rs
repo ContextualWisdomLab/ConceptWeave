@@ -156,12 +156,8 @@ impl IndexConstraintInheritanceSnapshot {
             return Err(invalid("index_constraint_inheritance_completeness"));
         }
 
-        for observation in &observations {
-            let parentage = parentage_snapshot
-                .observations()
-                .iter()
-                .find(|candidate| candidate.coordinate() == observation.coordinate())
-                .ok_or_else(|| invalid("index_constraint_inheritance_coordinate"))?;
+        // Both lists are coordinate-sorted and duplicate-free; the complete-set check binds each pair.
+        for (observation, parentage) in observations.iter().zip(parentage_snapshot.observations()) {
             let expected_state = if parentage.parent_constraint().is_some() {
                 (false, 1)
             } else {

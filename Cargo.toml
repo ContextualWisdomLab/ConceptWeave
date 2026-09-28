@@ -1,8 +1,12 @@
 [workspace]
 members = [
-    "crates/conceptweave-domain",
+    "crates/conceptweave-alignment",
     "crates/conceptweave-client",
+    "crates/conceptweave-discovery",
+    "crates/conceptweave-domain",
+    "crates/conceptweave-governance",
     "crates/conceptweave-observation",
+    "crates/conceptweave-postgres-adapter",
     "crates/conceptweave-relation-partition",
     "crates/conceptweave-source-port",
 ]

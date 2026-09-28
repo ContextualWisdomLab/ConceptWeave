@@ -1,6 +1,6 @@
 use conceptweave_client::{
     ContractVersionCompatibility, ReleaseContractError, ReleaseDigest, ReleaseMetadata,
-    SemanticRelease, SemanticReleaseClient,
+    SemanticRelease, SemanticReleaseClient, TrustedReleaseManifest,
 };
 use conceptweave_domain::{EvidenceReference, PublicationState, TruthStatus};
 
@@ -65,16 +65,15 @@ fn client_explicitly_distinguishes_current_supported_legacy_and_unknown_versions
 
 #[test]
 fn supported_legacy_release_passes_the_same_authoritative_use_gate() {
-    let client = SemanticReleaseClient::with_supported_legacy_contract_versions(
+    let release = release("1.0.0");
+    let client = SemanticReleaseClient::with_trusted_release_manifests(
         "2.0.0",
         vec!["1.0.0".to_owned()],
+        vec![TrustedReleaseManifest::new(release.release_id(), release.manifest_digest()).unwrap()],
     )
     .expect("explicit compatibility policy is valid");
 
-    assert_eq!(
-        client.validate_for_authoritative_use(&release("1.0.0")),
-        Ok(())
-    );
+    assert_eq!(client.validate_for_authoritative_use(&release), Ok(()));
 }
 
 #[test]

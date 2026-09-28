@@ -237,11 +237,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterArgumentNamesSna
                         && candidate.transform_type() == observation.transform_type()
                         && candidate.direction() == observation.direction()
                 })
-                .ok_or_else(|| {
-                    invalid(
-                        "index_exclusion_constraint_operator_procedure_transform_converter_argument_names_completeness",
-                    )
-                })?;
+                .ok_or(invalid("index_exclusion_constraint_operator_procedure_transform_converter_argument_names_completeness"))?;
             if predecessor.converter_schema_name() != observation.converter_schema_name()
                 || predecessor.converter_function_name() != observation.converter_function_name()
             {
@@ -514,7 +510,7 @@ fn encode_str(hasher: &mut Sha256, value: &str) {
 }
 
 fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
-    if value.trim().is_empty() {
+    if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }
     Ok(())

@@ -69,6 +69,13 @@ fn ordinary_exclude_transform_converter_return_set_preserves_required_false_pror
     assert!(!receipt.location().returns_set());
     assert_ne!(snapshot.snapshot_digest(), predecessor.snapshot_digest());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(receipt.source_id(), snapshot.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        snapshot.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
 }
 
 #[test]
@@ -202,13 +209,13 @@ fn ordinary_exclude_transform_converter_return_set_keeps_collision_safe_location
 
     for (schema, function, field) in [
         (
-            " ",
+            "",
             "payload_from_sql",
             "index_exclusion_constraint_operator_procedure_transform_converter_return_set_function_schema",
         ),
         (
             "public",
-            "\t",
+            "",
             "index_exclusion_constraint_operator_procedure_transform_converter_return_set_function_name",
         ),
     ] {

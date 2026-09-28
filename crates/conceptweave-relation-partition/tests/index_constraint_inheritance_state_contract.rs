@@ -328,12 +328,67 @@ fn exact_partition_constraint_inheritance_state_is_admitted_and_receipted() {
     )
     .expect("exact pg_constraint inheritance state must be admitted");
 
+    let mut reversed = snapshot.observations().to_vec();
+    reversed.reverse();
+    assert_eq!(
+        IndexConstraintInheritanceSnapshot::new(&parentage, reversed).unwrap(),
+        snapshot
+    );
+    let child = snapshot
+        .observations()
+        .iter()
+        .find(|observation| observation.coordinate() == &child_constraint())
+        .unwrap()
+        .clone();
+    for (observations, field) in [
+        (
+            vec![child.clone()],
+            "index_constraint_inheritance_completeness",
+        ),
+        (
+            vec![child.clone(), child],
+            "index_constraint_inheritance_coordinate",
+        ),
+        (vec![], "index_constraint_inheritance_completeness"),
+    ] {
+        assert_eq!(
+            IndexConstraintInheritanceSnapshot::new(&parentage, observations),
+            Err(ObservationError::InvalidObservationField { field })
+        );
+    }
+
     let receipt = snapshot
         .source_receipt(child_constraint())
         .expect("observed child inheritance state must issue provenance");
     assert!(!receipt.location().is_local());
     assert_eq!(receipt.location().inheritance_count(), 1);
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(
+        snapshot.source_connection_key(),
+        parentage.source_connection_key()
+    );
+    assert_eq!(
+        snapshot.connection_policy_binding(),
+        parentage.connection_policy_binding()
+    );
+    assert_eq!(
+        snapshot.extractor_revision(),
+        parentage.extractor_revision()
+    );
+    assert_eq!(snapshot.observed_at_utc(), parentage.observed_at_utc());
+    assert_eq!(receipt.source_id(), parentage.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        parentage.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), parentage.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), parentage.observed_at_utc());
+    assert!(
+        receipt
+            .location()
+            .canonical_location()
+            .ends_with("/inheritance-state")
+    );
 }
 
 #[test]
@@ -352,4 +407,8 @@ fn constraint_child_below_nonconstraint_parent_index_remains_local() {
     assert_eq!(snapshot.observations().len(), 1);
     assert!(snapshot.observations()[0].is_local());
     assert_eq!(snapshot.observations()[0].inheritance_count(), 0);
+    assert!(matches!(
+        snapshot.source_receipt(parent_constraint()),
+        Err(ObservationError::UnknownObservationLocation { .. })
+    ));
 }

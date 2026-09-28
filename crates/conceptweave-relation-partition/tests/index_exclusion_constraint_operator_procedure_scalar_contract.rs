@@ -119,6 +119,19 @@ fn result_and_kind_snapshots() -> (
     IndexExclusionConstraintOperatorResultSnapshot,
     IndexExclusionConstraintOperatorKindSnapshot,
 ) {
+    result_and_kind_snapshots_for_capture(
+        "extractor-index-exclusion-procedure-scalar-v1",
+        "2026-09-16T20:45:40Z",
+    )
+}
+
+fn result_and_kind_snapshots_for_capture(
+    revision: &str,
+    observed_at: &str,
+) -> (
+    IndexExclusionConstraintOperatorResultSnapshot,
+    IndexExclusionConstraintOperatorKindSnapshot,
+) {
     let index = IndexObservation::new(
         "bookings_no_overlap",
         false,
@@ -156,8 +169,8 @@ fn result_and_kind_snapshots() -> (
     .unwrap();
     let base = PostgresSchemaSnapshotV3::new(
         &authorized_source(),
-        "extractor-index-exclusion-procedure-scalar-v1",
-        "2026-09-16T20:45:40Z",
+        revision,
+        observed_at,
         vec![relation],
         vec![],
         vec![],
@@ -463,4 +476,41 @@ fn procedure_scalar_receipt_rejects_unknown_position() {
         error,
         ObservationError::UnknownObservationLocation { .. }
     ));
+}
+
+#[test]
+fn procedure_scalar_rejects_kind_from_another_capture() {
+    let (_, original_kind) = result_and_kind_snapshots();
+    for (revision, observed_at) in [
+        (
+            "extractor-index-exclusion-procedure-scalar-v2",
+            "2026-09-16T20:45:40Z",
+        ),
+        (
+            "extractor-index-exclusion-procedure-scalar-v1",
+            "2026-09-17T20:45:40Z",
+        ),
+    ] {
+        let (results, current_kind) = result_and_kind_snapshots_for_capture(revision, observed_at);
+        let observation = scalar_observation(operator("="), procedure("int4eq"), false);
+        let error = IndexExclusionConstraintOperatorProcedureScalarSnapshot::new(
+            &results,
+            &original_kind,
+            vec![observation.clone()],
+        )
+        .expect_err("scalar evidence must reject a kind from another capture");
+        assert_field(
+            error,
+            "index_exclusion_constraint_operator_procedure_scalar_predecessor_binding",
+        );
+        let current = IndexExclusionConstraintOperatorProcedureScalarSnapshot::new(
+            &results,
+            &current_kind,
+            vec![observation],
+        )
+        .unwrap();
+        let receipt = current.source_receipt(coordinate(), 1).unwrap();
+        assert_eq!(receipt.extractor_revision(), revision);
+        assert_eq!(receipt.observed_at_utc(), observed_at);
+    }
 }

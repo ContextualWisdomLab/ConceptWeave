@@ -307,7 +307,14 @@ impl IndexPartitionSnapshot {
             base_snapshot,
             relation_partition_snapshot.observations().to_vec(),
         )?;
-        if rebound.snapshot_digest() != relation_partition_snapshot.snapshot_digest() {
+        if rebound.snapshot_digest() != relation_partition_snapshot.snapshot_digest()
+            || rebound.source_connection_key()
+                != relation_partition_snapshot.source_connection_key()
+            || rebound.connection_policy_binding()
+                != relation_partition_snapshot.connection_policy_binding()
+            || rebound.extractor_revision() != relation_partition_snapshot.extractor_revision()
+            || rebound.observed_at_utc() != relation_partition_snapshot.observed_at_utc()
+        {
             return Err(invalid("index_partition_relation_snapshot_binding"));
         }
 
@@ -443,7 +450,7 @@ fn canonicalize_index_partitions(
                     && relation.relation_name() == coordinate.relation_name()
                     && relation.kind() == coordinate.relation_kind()
             })
-            .ok_or_else(|| invalid("index_partition_owner_coordinate"))?;
+            .ok_or(invalid("index_partition_owner_coordinate"))?;
 
         let expected_kind = if owner.kind() == RelationKind::PartitionedTable {
             IndexRelationKind::PartitionedIndex
@@ -461,7 +468,7 @@ fn canonicalize_index_partitions(
                     && membership.relation_name() == coordinate.relation_name()
                     && membership.relation_kind() == coordinate.relation_kind()
             })
-            .ok_or_else(|| invalid("index_partition_owner_membership"))?;
+            .ok_or(invalid("index_partition_owner_membership"))?;
 
         if let Some(parent_index) = observation.parent_index() {
             if !owner_membership.is_partition() {
@@ -469,7 +476,7 @@ fn canonicalize_index_partitions(
             }
             let parent_relation = owner_membership
                 .parent_relation()
-                .ok_or_else(|| invalid("index_partition_owner_relation"))?;
+                .ok_or(invalid("index_partition_owner_relation"))?;
             if parent_relation.schema_name() != parent_index.schema_name()
                 || parent_relation.relation_name() != parent_index.relation_name()
                 || parent_index.relation_kind() != RelationKind::PartitionedTable
@@ -479,15 +486,15 @@ fn canonicalize_index_partitions(
 
             let parent_observation = by_coordinate
                 .get(parent_index)
-                .ok_or_else(|| invalid("index_partition_parent_coordinate"))?;
+                .ok_or(invalid("index_partition_parent_coordinate"))?;
             if parent_observation.index_relation_kind() != IndexRelationKind::PartitionedIndex {
                 return Err(invalid("index_partition_parent_kind"));
             }
 
             let child_definition = find_base_index(base_snapshot, coordinate)
-                .ok_or_else(|| invalid("index_partition_owner_coordinate"))?;
+                .ok_or(invalid("index_partition_owner_coordinate"))?;
             let parent_definition = find_base_index(base_snapshot, parent_index)
-                .ok_or_else(|| invalid("index_partition_parent_coordinate"))?;
+                .ok_or(invalid("index_partition_parent_coordinate"))?;
             if child_definition.is_unique() != parent_definition.is_unique() {
                 return Err(invalid("index_partition_definition_uniqueness"));
             }
@@ -551,10 +558,10 @@ fn validate_modeled_index_key_collations(
 ) -> Result<(), ObservationError> {
     let child_semantics = child_definition
         .key_semantics()
-        .ok_or_else(|| invalid("index_partition_definition_collation"))?;
+        .ok_or(invalid("index_partition_definition_collation"))?;
     let parent_semantics = parent_definition
         .key_semantics()
-        .ok_or_else(|| invalid("index_partition_definition_collation"))?;
+        .ok_or(invalid("index_partition_definition_collation"))?;
 
     if child_semantics.len() != parent_semantics.len() {
         return Err(invalid("index_partition_definition_collation"));
@@ -592,7 +599,7 @@ fn relation_has_key_constraint_for_index(
                 && relation.relation_name() == coordinate.relation_name()
                 && relation.kind() == coordinate.relation_kind()
         })
-        .ok_or_else(|| invalid("index_partition_owner_coordinate"))?;
+        .ok_or(invalid("index_partition_owner_coordinate"))?;
 
     Ok(relation.constraints().iter().any(|constraint| {
         matches!(
@@ -613,7 +620,7 @@ fn validate_valid_partitioned_index_children(
             continue;
         }
         let parent_index = find_base_index(base_snapshot, parent_coordinate)
-            .ok_or_else(|| invalid("index_partition_owner_coordinate"))?;
+            .ok_or(invalid("index_partition_owner_coordinate"))?;
         if parent_index.valid() != Some(true) {
             continue;
         }
@@ -644,7 +651,7 @@ fn validate_valid_partitioned_index_children(
             };
 
             let child_index = find_base_index(base_snapshot, attached_child.coordinate())
-                .ok_or_else(|| invalid("index_partition_owner_coordinate"))?;
+                .ok_or(invalid("index_partition_owner_coordinate"))?;
             if child_index.valid() != Some(true) {
                 return Err(invalid("index_partition_child_validity"));
             }
@@ -736,7 +743,7 @@ fn coordinate_key(coordinate: &IndexPartitionCoordinate) -> (String, String, Str
 }
 
 fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
-    if value.trim().is_empty() {
+    if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }
     Ok(())

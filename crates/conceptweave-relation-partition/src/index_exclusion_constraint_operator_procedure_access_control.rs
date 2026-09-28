@@ -325,11 +325,9 @@ impl IndexExclusionConstraintOperatorProcedureAccessControlSnapshot {
                     candidate.coordinate() == observation.coordinate()
                         && candidate.key_position() == observation.key_position()
                 })
-                .ok_or_else(|| {
-                    invalid(
-                        "index_exclusion_constraint_operator_procedure_access_control_completeness",
-                    )
-                })?;
+                .ok_or(invalid(
+                    "index_exclusion_constraint_operator_procedure_access_control_completeness",
+                ))?;
             if predecessor.operator() != observation.operator()
                 || predecessor.procedure() != observation.procedure()
             {
@@ -490,7 +488,7 @@ fn encode_str(hasher: &mut Sha256, value: &str) {
 }
 
 fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
-    if value.trim().is_empty() {
+    if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }
     Ok(())

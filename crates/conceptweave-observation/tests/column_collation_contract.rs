@@ -310,3 +310,104 @@ fn foreign_key_allows_the_same_nondeterministic_collation() {
     )
     .expect("PostgreSQL permits the same nondeterministic collation on both FK sides");
 }
+
+#[test]
+fn bounded_foreign_key_rejects_missing_referenced_column_without_panicking() {
+    let child = child_relation()
+        .with_constraints(vec![TableConstraintObservation::ForeignKey(
+            ForeignKeyObservation::new(
+                "child_parent_fk",
+                vec!["parent_id".to_owned()],
+                "public",
+                "parent",
+                vec!["absent".to_owned()],
+            )
+            .unwrap(),
+        )])
+        .unwrap();
+    let relations = vec![parent_relation(), child.clone()];
+    assert_eq!(
+        PostgresSchemaSnapshotV3::new(
+            &support::authorized_source("warehouse_primary", &["public"]),
+            "postgres_introspector_v3",
+            "2026-09-13T05:12:00Z",
+            relations.clone(),
+            Vec::new(),
+            Vec::new(),
+        ),
+        Err(ObservationError::InvalidObservationField {
+            field: "foreign_key_referenced_column",
+        })
+    );
+    assert_eq!(
+        snapshot(
+            relations,
+            vec![
+                collatable("parent", "id", "shared", true),
+                collatable("child", "parent_id", "shared", true),
+            ],
+        ),
+        Err(ObservationError::InvalidObservationField {
+            field: "foreign_key_referenced_column",
+        })
+    );
+    snapshot(
+        vec![child],
+        vec![collatable("child", "parent_id", "shared", true)],
+    )
+    .expect("an unobserved referenced relation must remain external evidence");
+}
+
+#[test]
+fn column_collation_evidence_cannot_follow_a_later_observed_family() {
+    let base = PostgresSchemaSnapshotV3::new(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-13T05:12:00Z",
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    )
+    .unwrap();
+    let later = [
+        (
+            "generation",
+            base.clone().with_observed_column_generations(Vec::new()),
+        ),
+        (
+            "identity",
+            base.clone().with_observed_column_identities(Vec::new()),
+        ),
+        (
+            "NOT NULL",
+            base.clone().with_observed_not_null_constraints(Vec::new()),
+        ),
+        (
+            "timing",
+            base.clone().with_observed_constraint_timings(Vec::new()),
+        ),
+        (
+            "period",
+            base.clone().with_observed_constraint_periods(Vec::new()),
+        ),
+        (
+            "foreign-key catalog",
+            base.clone().with_observed_foreign_key_catalog(Vec::new()),
+        ),
+        (
+            "collation definition",
+            base.with_observed_collation_definitions(Vec::new()),
+        ),
+    ];
+
+    for (family, snapshot) in later {
+        let snapshot = snapshot.unwrap_or_else(|error| panic!("{family}: {error}"));
+        assert_eq!(
+            snapshot.with_observed_column_collations(Vec::new()),
+            Err(ObservationError::InvalidObservationField {
+                field: "column_collation_observation_order",
+            }),
+            "{family} must fix the earlier source identity order"
+        );
+    }
+}

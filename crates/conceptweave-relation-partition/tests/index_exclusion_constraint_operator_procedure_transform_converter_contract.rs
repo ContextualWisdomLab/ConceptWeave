@@ -140,6 +140,15 @@ fn ordinary_exclude_operator_procedure_transform_converter_preserves_pg_transfor
     assert!(receipt.location().converters()[0].from_sql().is_some());
     assert!(receipt.location().converters()[0].to_sql().is_some());
     assert_eq!(receipt.source_id(), transform_types.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        transform_types.connection_policy_binding()
+    );
+    assert_eq!(
+        receipt.extractor_revision(),
+        transform_types.extractor_revision()
+    );
+    assert_eq!(receipt.observed_at_utc(), transform_types.observed_at_utc());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
     assert!(
         receipt
@@ -147,6 +156,82 @@ fn ordinary_exclude_operator_procedure_transform_converter_preserves_pg_transfor
             .canonical_location()
             .ends_with("/1/procedure-transform-converters")
     );
+    assert_field(
+        IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot::new(
+            &transform_types,
+            &definition,
+            vec![snapshot.observations()[0].clone(); 2],
+        )
+        .unwrap_err(),
+        "index_exclusion_constraint_operator_procedure_transform_converter_coordinate",
+    );
+}
+
+#[test]
+fn quoted_converter_function_identifiers_reach_the_source_receipt() {
+    let transform_types = selected_transform_types_predecessor();
+    let definition = definition_snapshot();
+    let snapshot_for = |name: &str| {
+        let material =
+            IndexExclusionConstraintOperatorProcedureTransformConverterFunctionDefinition::new(
+                " ",
+                "payload_from_sql",
+                None,
+                None,
+            )
+            .unwrap();
+        let function = IndexExclusionConstraintOperatorProcedureTransformConverterFunction::new(
+            " ",
+            name,
+            internal_type(),
+            internal_type(),
+            material,
+        )
+        .unwrap();
+        IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot::new(
+            &transform_types,
+            &definition,
+            vec![converter_observation(
+                operator("="),
+                procedure("int4eq"),
+                "internal",
+                vec![converter_binding(Some(function), None)],
+            )],
+        )
+        .unwrap()
+    };
+
+    let quoted = snapshot_for(" ");
+    let receipt = quoted.source_receipt(coordinate(), 1).unwrap();
+    let function = receipt.location().converters()[0].from_sql().unwrap();
+    assert_eq!(function.schema_name(), " ");
+    assert_eq!(function.function_name(), " ");
+    assert_eq!(function.implementation_language_name(), " ");
+    assert_ne!(
+        quoted.snapshot_digest(),
+        snapshot_for("  ").snapshot_digest()
+    );
+
+    for name in ["", "bad\0name"] {
+        let error = IndexExclusionConstraintOperatorProcedureTransformConverterFunction::new(
+            "public",
+            name,
+            internal_type(),
+            internal_type(),
+            converter_definition("body"),
+        )
+        .expect_err("empty and NUL-containing function names cannot come from PostgreSQL");
+        assert_field(
+            error,
+            "index_exclusion_constraint_operator_procedure_transform_converter_function_name",
+        );
+        assert!(
+            IndexExclusionConstraintOperatorProcedureTransformConverterFunctionDefinition::new(
+                name, "body", None, None,
+            )
+            .is_err()
+        );
+    }
 }
 
 #[test]
@@ -451,5 +536,31 @@ fn ordinary_exclude_operator_procedure_transform_converter_snapshot_is_publicly_
     assert!(
         std::mem::size_of::<IndexExclusionConstraintOperatorProcedureTransformConverterSnapshot>()
             > 0
+    );
+}
+
+#[test]
+fn transform_converter_observation_rejects_duplicate_transform_types() {
+    let binding = converter_binding(
+        Some(converter_function(
+            "payload_from_sql",
+            internal_type(),
+            "payload_from_sql_v1",
+        )),
+        None,
+    );
+    assert_eq!(
+        IndexExclusionConstraintOperatorProcedureTransformConverterObservation::new(
+            coordinate(),
+            1,
+            operator("="),
+            procedure("int4eq"),
+            "internal",
+            vec![binding.clone(), binding],
+        )
+        .unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "index_exclusion_constraint_operator_procedure_transform_converter_duplicate",
+        }
     );
 }

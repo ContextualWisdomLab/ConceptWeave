@@ -167,6 +167,8 @@ The standards/research register and design implications live in [`docs/doctoring
 
 Before changing the domain contract or lifecycle, read [`AGENTS.md`](AGENTS.md), the PRD/TRD, architecture, applicable ADRs, and the current product-gap baseline. Behavioral changes should preserve the repository's test-first and evidence-bound publication discipline and update the matching public contracts/documentation in the same change.
 
+The Product workflow checks dependency advisories, licenses and sources, then publishes a CycloneDX SBOM for each workspace crate. `scripts/check_sbom.py` verifies that their combined package inventory matches `Cargo.lock`.
+
 ## License
 
 ConceptWeave is licensed under the [Apache License 2.0](LICENSE). Third-party tools and future adapters retain their own licenses and must satisfy the repository's commercial-use and attribution policy before incorporation.

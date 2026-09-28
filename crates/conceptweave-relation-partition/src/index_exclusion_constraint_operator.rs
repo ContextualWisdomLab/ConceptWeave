@@ -215,7 +215,7 @@ impl IndexExclusionConstraintOperatorSnapshot {
             index_partition_snapshot,
             constraint_snapshot.observations().to_vec(),
         )?;
-        if rebound_constraint.snapshot_digest() != constraint_snapshot.snapshot_digest() {
+        if rebound_constraint != *constraint_snapshot {
             return Err(invalid(
                 "index_exclusion_constraint_operator_predecessor_binding",
             ));
@@ -225,7 +225,7 @@ impl IndexExclusionConstraintOperatorSnapshot {
             &rebound_constraint,
             period_snapshot.observations().to_vec(),
         )?;
-        if rebound_period.snapshot_digest() != period_snapshot.snapshot_digest() {
+        if rebound_period != *period_snapshot {
             return Err(invalid(
                 "index_exclusion_constraint_operator_predecessor_binding",
             ));
@@ -239,7 +239,7 @@ impl IndexExclusionConstraintOperatorSnapshot {
             &rebound_period,
             key_snapshot.observations().to_vec(),
         )?;
-        if rebound_key.snapshot_digest() != key_snapshot.snapshot_digest() {
+        if rebound_key != *key_snapshot {
             return Err(invalid(
                 "index_exclusion_constraint_operator_predecessor_binding",
             ));
@@ -251,7 +251,7 @@ impl IndexExclusionConstraintOperatorSnapshot {
             index_partition_snapshot,
             operator_family_snapshot.observations().to_vec(),
         )?;
-        if rebound_families.snapshot_digest() != operator_family_snapshot.snapshot_digest() {
+        if rebound_families != *operator_family_snapshot {
             return Err(invalid(
                 "index_exclusion_constraint_operator_predecessor_binding",
             ));
@@ -264,7 +264,7 @@ impl IndexExclusionConstraintOperatorSnapshot {
             &rebound_families,
             exclusion_semantics_snapshot.observations().to_vec(),
         )?;
-        if rebound_semantics.snapshot_digest() != exclusion_semantics_snapshot.snapshot_digest() {
+        if rebound_semantics != *exclusion_semantics_snapshot {
             return Err(invalid(
                 "index_exclusion_constraint_operator_predecessor_binding",
             ));
@@ -293,7 +293,7 @@ impl IndexExclusionConstraintOperatorSnapshot {
                 .observations()
                 .iter()
                 .find(|candidate| candidate.coordinate() == observation.coordinate())
-                .ok_or_else(|| invalid("index_exclusion_constraint_operator_completeness"))?;
+                .ok_or(invalid("index_exclusion_constraint_operator_completeness"))?;
             let mut backing = rebound_semantics
                 .observations()
                 .iter()

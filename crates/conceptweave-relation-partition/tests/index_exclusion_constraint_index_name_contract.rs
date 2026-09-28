@@ -266,6 +266,20 @@ fn matching_constraint_and_backing_index_name_is_admitted_and_receipted() {
         "bookings_no_overlap"
     );
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(receipt.source_id(), snapshot.source_connection_key());
+    assert_eq!(
+        receipt.location().canonical_location(),
+        format!(
+            "{}/backing-index-name",
+            coordinate("bookings", "bookings_no_overlap").canonical_location()
+        )
+    );
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        snapshot.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
 }
 
 #[test]
@@ -350,4 +364,59 @@ fn unknown_index_name_receipt_fails_closed() {
         snapshot.source_receipt(unknown),
         Err(ObservationError::UnknownObservationLocation { .. })
     ));
+}
+
+#[test]
+fn index_name_rejects_each_predecessor_from_another_capture() {
+    let specs = [("bookings", "bookings_no_overlap", "bookings_no_overlap")];
+    let original = stack(&specs);
+    for (revision, time) in [
+        (
+            "extractor-index-exclusion-index-name-v2",
+            original.base.observed_at_utc(),
+        ),
+        (original.base.extractor_revision(), "2026-09-17T13:42:00Z"),
+    ] {
+        let base = PostgresSchemaSnapshotV3::new(
+            &authorized_source(),
+            revision,
+            time,
+            original.base.relations().to_vec(),
+            vec![],
+            vec![],
+        )
+        .unwrap();
+        let fresh = stack_from_base(&base, &specs);
+        for (constraints, shapes) in [
+            (&original.constraints, &fresh.shapes),
+            (&fresh.constraints, &original.shapes),
+        ] {
+            assert_eq!(
+                IndexExclusionConstraintIndexNameSnapshot::new(
+                    &fresh.base,
+                    &fresh.relations,
+                    &fresh.indexes,
+                    constraints,
+                    shapes,
+                )
+                .unwrap_err(),
+                ObservationError::InvalidObservationField {
+                    field: "index_exclusion_constraint_index_name_predecessor_binding",
+                }
+            );
+        }
+        let accepted = IndexExclusionConstraintIndexNameSnapshot::new(
+            &fresh.base,
+            &fresh.relations,
+            &fresh.indexes,
+            &fresh.constraints,
+            &fresh.shapes,
+        )
+        .unwrap();
+        let receipt = accepted
+            .source_receipt(coordinate("bookings", "bookings_no_overlap"))
+            .unwrap();
+        assert_eq!(receipt.extractor_revision(), revision);
+        assert_eq!(receipt.observed_at_utc(), time);
+    }
 }

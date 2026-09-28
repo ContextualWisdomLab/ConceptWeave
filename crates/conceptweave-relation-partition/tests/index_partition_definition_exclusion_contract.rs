@@ -4,11 +4,12 @@ use conceptweave_observation::{
     QualifiedOperatorClassName, QualifiedTypeName, RelationKind, RelationObservation,
 };
 use conceptweave_relation_partition::{
-    IndexExclusionSemanticsSnapshot, IndexKeyExclusionSemanticsObservation,
-    IndexKeyOperatorFamilyObservation, IndexOperatorFamilySnapshot, IndexPartitionCoordinate,
-    IndexPartitionObservation, IndexPartitionSnapshot, IndexRelationKind,
-    PartitionParentRelationCoordinate, QualifiedOperatorFamilyName, QualifiedOperatorSignature,
-    QualifiedProcedureSignature, RelationPartitionObservation, RelationPartitionSnapshot,
+    IndexExclusionSemanticsSnapshot, IndexExpressionSemanticsSnapshot,
+    IndexKeyExclusionSemanticsObservation, IndexKeyOperatorFamilyObservation,
+    IndexOperatorFamilySnapshot, IndexPartitionCoordinate, IndexPartitionObservation,
+    IndexPartitionSnapshot, IndexRelationKind, PartitionParentRelationCoordinate,
+    QualifiedOperatorFamilyName, QualifiedOperatorSignature, QualifiedProcedureSignature,
+    RelationPartitionObservation, RelationPartitionSnapshot,
 };
 use conceptweave_source_port::{
     AuthorizedObservationRequest, ObservationLimits, ObservationRequest, ObservationRequestBudget,
@@ -67,8 +68,8 @@ fn authorized_source() -> AuthorizedObservationRequest {
     .unwrap()
 }
 
-fn index(name: &str, exclusion: bool) -> IndexObservation {
-    IndexObservation::new(
+fn index(name: &str, exclusion: Option<bool>) -> IndexObservation {
+    let index = IndexObservation::new(
         name,
         false,
         Some(false),
@@ -87,18 +88,22 @@ fn index(name: &str, exclusion: bool) -> IndexObservation {
         .unwrap(),
     ])
     .unwrap()
-    .with_catalog_flags(IndexCatalogFlags::new(
-        false, exclusion, true, false, false, false,
-    ))
-    .unwrap()
-    .with_valid(true)
+    .with_valid(true);
+    match exclusion {
+        Some(exclusion) => index
+            .with_catalog_flags(IndexCatalogFlags::new(
+                false, exclusion, true, false, false, false,
+            ))
+            .unwrap(),
+        None => index,
+    }
 }
 
 fn relation(
     name: &str,
     kind: RelationKind,
     index_name: &str,
-    exclusion: bool,
+    exclusion: Option<bool>,
 ) -> RelationObservation {
     RelationObservation::new(
         "public",
@@ -142,8 +147,8 @@ fn child_index() -> IndexPartitionCoordinate {
 }
 
 fn predecessor(
-    parent_exclusion: bool,
-    child_exclusion: bool,
+    parent_exclusion: Option<bool>,
+    child_exclusion: Option<bool>,
 ) -> (
     PostgresSchemaSnapshotV3,
     RelationPartitionSnapshot,
@@ -251,8 +256,179 @@ fn exclusion(
 }
 
 #[test]
+fn exclusion_key_requires_nonzero_coordinates_and_exact_procedure_arguments() {
+    let int4 = QualifiedTypeName::new("pg_catalog", "int4").unwrap();
+    let int8 = QualifiedTypeName::new("pg_catalog", "int8").unwrap();
+    let operator =
+        QualifiedOperatorSignature::new("pg_catalog", "=", int4.clone(), int8.clone()).unwrap();
+    let procedure =
+        QualifiedProcedureSignature::new("pg_catalog", "int48eq", vec![int4.clone(), int8.clone()])
+            .unwrap();
+    let make = |position, procedure, strategy| {
+        IndexKeyExclusionSemanticsObservation::new(
+            parent_index(),
+            position,
+            operator.clone(),
+            procedure,
+            strategy,
+        )
+    };
+    assert_eq!(
+        make(0, procedure.clone(), 1),
+        Err(ObservationError::InvalidOrdinalPosition)
+    );
+    assert_eq!(
+        make(1, procedure.clone(), 0),
+        Err(ObservationError::InvalidObservationField {
+            field: "exclusion_strategy"
+        })
+    );
+    for arguments in [vec![], vec![int4.clone(), int8.clone(), int4.clone()]] {
+        assert_eq!(
+            QualifiedProcedureSignature::new("pg_catalog", "int48eq", arguments),
+            Err(ObservationError::InvalidObservationField {
+                field: "exclusion_procedure_argument_types",
+            })
+        );
+    }
+    for arguments in [
+        vec![int4.clone()],
+        vec![int8.clone(), int4.clone()],
+        vec![int4.clone(), int4.clone()],
+    ] {
+        let wrong = QualifiedProcedureSignature::new("pg_catalog", "int48eq", arguments).unwrap();
+        assert_eq!(
+            make(1, wrong, 1),
+            Err(ObservationError::InvalidObservationField {
+                field: "exclusion_operator_procedure_signature",
+            })
+        );
+    }
+    let accepted = make(1, procedure.clone(), 1).unwrap();
+    assert_eq!(accepted.operator(), &operator);
+    assert_eq!(accepted.procedure(), &procedure);
+    assert_eq!(accepted.key_position(), 1);
+    assert_eq!(accepted.strategy(), 1);
+}
+
+#[test]
+fn exclusion_snapshot_rejects_a_predecessor_from_another_capture() {
+    let (base, relations, indexes, families) = predecessor(Some(true), Some(true));
+    let old_exclusion = IndexExclusionSemanticsSnapshot::new(
+        &base,
+        &relations,
+        &indexes,
+        &families,
+        vec![
+            exclusion(parent_index(), "=", "int4eq", 3),
+            exclusion(child_index(), "=", "int4eq", 3),
+        ],
+    )
+    .unwrap();
+    for (revision, observed_at) in [
+        (
+            "extractor-index-exclusion-equivalence-v2",
+            base.observed_at_utc(),
+        ),
+        (base.extractor_revision(), "2026-09-15T17:08:00Z"),
+    ] {
+        let fresh = PostgresSchemaSnapshotV3::new(
+            &authorized_source(),
+            revision,
+            observed_at,
+            base.relations().to_vec(),
+            vec![],
+            vec![],
+        )
+        .unwrap();
+        let fresh_relations =
+            RelationPartitionSnapshot::new(&fresh, relations.observations().to_vec()).unwrap();
+        assert_eq!(
+            IndexPartitionSnapshot::new(&fresh, &relations, indexes.observations().to_vec()),
+            Err(ObservationError::InvalidObservationField {
+                field: "index_partition_relation_snapshot_binding",
+            })
+        );
+        assert_eq!(
+            IndexOperatorFamilySnapshot::new(
+                &fresh,
+                &fresh_relations,
+                &indexes,
+                families.observations().to_vec(),
+            ),
+            Err(ObservationError::InvalidObservationField {
+                field: "index_operator_family_predecessor_binding",
+            })
+        );
+        let fresh_indexes =
+            IndexPartitionSnapshot::new(&fresh, &fresh_relations, indexes.observations().to_vec())
+                .unwrap();
+        let facts = vec![
+            exclusion(parent_index(), "=", "int4eq", 3),
+            exclusion(child_index(), "=", "int4eq", 3),
+        ];
+        assert_eq!(
+            IndexExclusionSemanticsSnapshot::new(
+                &fresh,
+                &fresh_relations,
+                &fresh_indexes,
+                &families,
+                facts.clone(),
+            ),
+            Err(ObservationError::InvalidObservationField {
+                field: "index_exclusion_semantics_predecessor_binding",
+            })
+        );
+        let fresh_families = IndexOperatorFamilySnapshot::new(
+            &fresh,
+            &fresh_relations,
+            &fresh_indexes,
+            families.observations().to_vec(),
+        )
+        .unwrap();
+        let accepted = IndexExclusionSemanticsSnapshot::new(
+            &fresh,
+            &fresh_relations,
+            &fresh_indexes,
+            &fresh_families,
+            facts,
+        )
+        .unwrap();
+        assert_eq!(
+            IndexExpressionSemanticsSnapshot::new(
+                &fresh,
+                &fresh_relations,
+                &fresh_indexes,
+                &fresh_families,
+                &old_exclusion,
+                vec![],
+                vec![],
+            ),
+            Err(ObservationError::InvalidObservationField {
+                field: "index_expression_semantics_predecessor_binding",
+            })
+        );
+        let expressions = IndexExpressionSemanticsSnapshot::new(
+            &fresh,
+            &fresh_relations,
+            &fresh_indexes,
+            &fresh_families,
+            &accepted,
+            vec![],
+            vec![],
+        )
+        .unwrap();
+        assert_eq!(expressions.extractor_revision(), revision);
+        assert_eq!(expressions.observed_at_utc(), observed_at);
+        let receipt = accepted.source_receipt(&parent_index(), 1).unwrap();
+        assert_eq!(receipt.extractor_revision(), revision);
+        assert_eq!(receipt.observed_at_utc(), observed_at);
+    }
+}
+
+#[test]
 fn attached_child_must_preserve_exclusion_presence() {
-    let (base, relations, indexes, families) = predecessor(true, false);
+    let (base, relations, indexes, families) = predecessor(Some(true), Some(false));
 
     let error =
         IndexExclusionSemanticsSnapshot::new(&base, &relations, &indexes, &families, vec![])
@@ -268,7 +444,7 @@ fn attached_child_must_preserve_exclusion_presence() {
 
 #[test]
 fn attached_child_must_preserve_exclusion_operator_procedure_and_strategy() {
-    let (base, relations, indexes, families) = predecessor(true, true);
+    let (base, relations, indexes, families) = predecessor(Some(true), Some(true));
 
     for (child_operator, child_procedure, child_strategy, expected_field) in [
         (
@@ -318,7 +494,7 @@ fn attached_child_must_preserve_exclusion_operator_procedure_and_strategy() {
 
 #[test]
 fn matching_exclusion_semantics_are_admissible_and_complete() {
-    let (base, relations, indexes, families) = predecessor(true, true);
+    let (base, relations, indexes, families) = predecessor(Some(true), Some(true));
 
     let snapshot = IndexExclusionSemanticsSnapshot::new(
         &base,
@@ -333,18 +509,135 @@ fn matching_exclusion_semantics_are_admissible_and_complete() {
     .expect("matching PostgreSQL exclusion arrays should remain admissible");
     assert_eq!(snapshot.observations().len(), 2);
 
-    let missing = IndexExclusionSemanticsSnapshot::new(
-        &base,
-        &relations,
-        &indexes,
-        &families,
-        vec![exclusion(parent_index(), "=", "int4eq", 3)],
-    )
-    .expect_err("every exclusion-index key requires semantic evidence");
-    assert_eq!(
-        missing,
-        ObservationError::InvalidObservationField {
-            field: "index_exclusion_semantics_completeness",
+    for observation in snapshot.observations() {
+        let receipt = snapshot
+            .source_receipt(observation.index(), observation.key_position())
+            .unwrap();
+        assert_eq!(receipt.location(), observation);
+        assert_eq!(
+            receipt.location().canonical_location(),
+            observation.canonical_location()
+        );
+        assert_eq!(receipt.source_id(), snapshot.source_connection_key());
+        assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+        assert_eq!(
+            receipt.connection_policy_binding(),
+            snapshot.connection_policy_binding()
+        );
+        assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+        assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
+        for key_position in [0, 2] {
+            assert_eq!(
+                snapshot
+                    .source_receipt(observation.index(), key_position)
+                    .unwrap_err(),
+                ObservationError::UnknownObservationLocation {
+                    location: format!(
+                        "{}/keys/{key_position}/exclusion",
+                        observation.index().canonical_location()
+                    ),
+                }
+            );
         }
+        let index = observation.index();
+        for (schema, relation, kind, name) in [
+            (
+                "archive",
+                index.relation_name(),
+                index.relation_kind(),
+                index.index_name(),
+            ),
+            (
+                index.schema_name(),
+                "unobserved_relation",
+                index.relation_kind(),
+                index.index_name(),
+            ),
+            (
+                index.schema_name(),
+                index.relation_name(),
+                RelationKind::ForeignTable,
+                index.index_name(),
+            ),
+            (
+                index.schema_name(),
+                index.relation_name(),
+                index.relation_kind(),
+                "unobserved_index",
+            ),
+        ] {
+            let absent = IndexPartitionCoordinate::new(schema, relation, kind, name).unwrap();
+            assert_eq!(
+                snapshot.source_receipt(&absent, 1).unwrap_err(),
+                ObservationError::UnknownObservationLocation {
+                    location: format!("{}/keys/1/exclusion", absent.canonical_location()),
+                }
+            );
+        }
+    }
+
+    let complete = snapshot.observations().to_vec();
+    for position in 0..complete.len() {
+        let mut missing = complete.clone();
+        missing.remove(position);
+        let mut duplicate = complete.clone();
+        duplicate.push(complete[position].clone());
+        let mut extra = complete.clone();
+        let original = &complete[position];
+        extra.push(
+            IndexKeyExclusionSemanticsObservation::new(
+                original.index().clone(),
+                2,
+                original.operator().clone(),
+                original.procedure().clone(),
+                original.strategy(),
+            )
+            .unwrap(),
+        );
+        for (observations, field) in [
+            (missing, "index_exclusion_semantics_completeness"),
+            (duplicate, "index_exclusion_semantics_coordinate"),
+            (extra, "index_exclusion_semantics_completeness"),
+        ] {
+            assert_eq!(
+                IndexExclusionSemanticsSnapshot::new(
+                    &base,
+                    &relations,
+                    &indexes,
+                    &families,
+                    observations,
+                )
+                .unwrap_err(),
+                ObservationError::InvalidObservationField { field }
+            );
+        }
+    }
+    let mut reversed = complete;
+    reversed.reverse();
+    assert_eq!(
+        snapshot,
+        IndexExclusionSemanticsSnapshot::new(&base, &relations, &indexes, &families, reversed,)
+            .unwrap()
+    );
+}
+
+#[test]
+fn unknown_exclusion_flags_cannot_be_promoted_to_observed_false() {
+    for (parent, child) in [(None, Some(false)), (Some(false), None)] {
+        let (base, relations, indexes, families) = predecessor(parent, child);
+        assert_eq!(
+            IndexExclusionSemanticsSnapshot::new(&base, &relations, &indexes, &families, vec![],)
+                .unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: "index_exclusion_semantics_catalog_flags",
+            }
+        );
+    }
+    let (base, relations, indexes, families) = predecessor(Some(false), Some(false));
+    assert!(
+        IndexExclusionSemanticsSnapshot::new(&base, &relations, &indexes, &families, vec![],)
+            .unwrap()
+            .observations()
+            .is_empty()
     );
 }

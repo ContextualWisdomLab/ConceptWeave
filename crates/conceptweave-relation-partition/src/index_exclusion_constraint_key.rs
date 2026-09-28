@@ -150,7 +150,7 @@ impl IndexExclusionConstraintKeySnapshot {
             index_partition_snapshot,
             constraint_snapshot.observations().to_vec(),
         )?;
-        if rebound_constraint.snapshot_digest() != constraint_snapshot.snapshot_digest() {
+        if rebound_constraint != *constraint_snapshot {
             return Err(invalid(
                 "index_exclusion_constraint_key_predecessor_binding",
             ));
@@ -159,7 +159,7 @@ impl IndexExclusionConstraintKeySnapshot {
             &rebound_constraint,
             period_snapshot.observations().to_vec(),
         )?;
-        if rebound_period.snapshot_digest() != period_snapshot.snapshot_digest() {
+        if rebound_period != *period_snapshot {
             return Err(invalid(
                 "index_exclusion_constraint_key_predecessor_binding",
             ));
@@ -187,7 +187,7 @@ impl IndexExclusionConstraintKeySnapshot {
                 .observations()
                 .iter()
                 .find(|candidate| candidate.coordinate() == observation.coordinate())
-                .ok_or_else(|| invalid("index_exclusion_constraint_key_completeness"))?;
+                .ok_or(invalid("index_exclusion_constraint_key_completeness"))?;
             let expected_key = expected_constraint_key(base_snapshot, constraint)?;
             if observation.attribute_numbers() != expected_key.as_slice() {
                 return Err(invalid("index_exclusion_constraint_key_state"));
@@ -277,12 +277,12 @@ fn expected_constraint_key(
                 && relation.relation_name() == coordinate.relation_name()
                 && relation.kind() == coordinate.relation_kind()
         })
-        .ok_or_else(|| invalid("index_exclusion_constraint_key_relation"))?;
+        .ok_or(invalid("index_exclusion_constraint_key_relation"))?;
     let index = relation
         .indexes()
         .iter()
         .find(|index| index.index_name() == constraint.backing_index().index_name())
-        .ok_or_else(|| invalid("index_exclusion_constraint_key_backing_index"))?;
+        .ok_or(invalid("index_exclusion_constraint_key_backing_index"))?;
 
     index
         .key_attributes()
@@ -295,7 +295,7 @@ fn expected_constraint_key(
                 .columns()
                 .iter()
                 .find(|column| column.column_name() == attribute_name)
-                .ok_or_else(|| invalid("index_exclusion_constraint_key_attribute"))?;
+                .ok_or(invalid("index_exclusion_constraint_key_attribute"))?;
             i16::try_from(column.ordinal_position())
                 .map_err(|_| invalid("index_exclusion_constraint_key_attribute_number"))
         })

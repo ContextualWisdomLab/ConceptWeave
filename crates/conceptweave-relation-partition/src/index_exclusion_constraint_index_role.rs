@@ -151,7 +151,7 @@ impl IndexExclusionConstraintIndexRoleSnapshot {
             index_partition_snapshot,
             constraint_snapshot.observations().to_vec(),
         )?;
-        if rebound_constraint.snapshot_digest() != constraint_snapshot.snapshot_digest() {
+        if rebound_constraint != *constraint_snapshot {
             return Err(invalid(
                 "index_exclusion_constraint_index_role_predecessor_binding",
             ));
@@ -161,7 +161,7 @@ impl IndexExclusionConstraintIndexRoleSnapshot {
             &rebound_constraint,
             timing_snapshot.observations().to_vec(),
         )?;
-        if rebound_timing.snapshot_digest() != timing_snapshot.snapshot_digest() {
+        if rebound_timing != *timing_snapshot {
             return Err(invalid(
                 "index_exclusion_constraint_index_role_predecessor_binding",
             ));
@@ -174,7 +174,7 @@ impl IndexExclusionConstraintIndexRoleSnapshot {
             &rebound_constraint,
             &rebound_timing,
         )?;
-        if rebound_immediacy.snapshot_digest() != immediacy_snapshot.snapshot_digest() {
+        if rebound_immediacy != *immediacy_snapshot {
             return Err(invalid(
                 "index_exclusion_constraint_index_role_predecessor_binding",
             ));
@@ -183,9 +183,9 @@ impl IndexExclusionConstraintIndexRoleSnapshot {
         let mut observations = Vec::with_capacity(rebound_constraint.observations().len());
         for constraint in rebound_constraint.observations() {
             let backing_index = find_backing_index(base_snapshot, constraint.backing_index())?;
-            let flags = backing_index
-                .catalog_flags()
-                .ok_or_else(|| invalid("index_exclusion_constraint_index_role_catalog_flags"))?;
+            let flags = backing_index.catalog_flags().ok_or(invalid(
+                "index_exclusion_constraint_index_role_catalog_flags",
+            ))?;
             let index_unique = backing_index.is_unique();
             let index_primary = flags.primary();
             let index_exclusion = flags.exclusion();
@@ -291,7 +291,9 @@ fn find_backing_index<'a>(
                 .iter()
                 .find(|index| index.index_name() == coordinate.index_name())
         })
-        .ok_or_else(|| invalid("index_exclusion_constraint_index_role_backing_index"))
+        .ok_or(invalid(
+            "index_exclusion_constraint_index_role_backing_index",
+        ))
 }
 
 fn compute_index_role_digest(

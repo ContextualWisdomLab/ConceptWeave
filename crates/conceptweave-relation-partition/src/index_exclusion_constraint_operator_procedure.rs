@@ -195,23 +195,12 @@ impl IndexExclusionConstraintOperatorProcedureSnapshot {
             ));
         }
 
-        for observation in &observations {
-            let predecessor = operator_snapshot
-                .observations()
-                .iter()
-                .find(|candidate| candidate.coordinate() == observation.coordinate())
-                .ok_or_else(|| {
-                    invalid("index_exclusion_constraint_operator_procedure_completeness")
-                })?;
-            let zero_based = observation
-                .key_position()
-                .checked_sub(1)
-                .and_then(|position| usize::try_from(position).ok())
-                .ok_or_else(|| invalid("index_exclusion_constraint_operator_procedure_binding"))?;
-            let expected_operator = predecessor
-                .operators()
-                .get(zero_based)
-                .ok_or_else(|| invalid("index_exclusion_constraint_operator_procedure_binding"))?;
+        // Complete, duplicate-free coordinates bind these sorted operator/key sequences.
+        let expected_operators = operator_snapshot
+            .observations()
+            .iter()
+            .flat_map(|predecessor| predecessor.operators());
+        for (observation, expected_operator) in observations.iter().zip(expected_operators) {
             if observation.operator() != expected_operator {
                 return Err(invalid(
                     "index_exclusion_constraint_operator_procedure_binding",
@@ -219,7 +208,9 @@ impl IndexExclusionConstraintOperatorProcedureSnapshot {
             }
             let expected_procedure = operator_snapshot
                 .backing_procedure(observation.coordinate(), observation.key_position())
-                .ok_or_else(|| invalid("index_exclusion_constraint_operator_procedure_binding"))?;
+                .ok_or(invalid(
+                    "index_exclusion_constraint_operator_procedure_binding",
+                ))?;
             if observation.procedure() != expected_procedure {
                 return Err(invalid(
                     "index_exclusion_constraint_operator_procedure_state",

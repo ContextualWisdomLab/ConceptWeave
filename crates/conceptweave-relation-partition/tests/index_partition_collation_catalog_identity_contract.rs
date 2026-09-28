@@ -208,8 +208,10 @@ fn catalog_identity_preserves_the_unique_pg_collation_coordinate() {
     assert_eq!(identity.collation_name(), "C");
     assert_eq!(identity.encoding(), 6);
 
-    let blank_schema = CollationCatalogIdentity::new(" ", "C", 6)
-        .expect_err("collation namespace must be a real catalog coordinate");
+    let quoted_schema = CollationCatalogIdentity::new(" ", "C", 6).unwrap();
+    assert_eq!(quoted_schema.schema_name(), " ");
+    let blank_schema = CollationCatalogIdentity::new("", "C", 6)
+        .expect_err("collation namespace must be a nonempty catalog coordinate");
     assert_eq!(
         blank_schema,
         ObservationError::InvalidObservationField {
@@ -337,6 +339,13 @@ fn matching_catalog_row_identity_remains_admissible_and_receiptable() {
     assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
     assert_eq!(receipt.index(), &child_index());
     assert_eq!(receipt.key_position(), 1);
+    assert_eq!(
+        snapshot.observations()[0].canonical_location(),
+        format!(
+            "{}/keys/1/collation-catalog-identity",
+            snapshot.observations()[0].index().canonical_location()
+        )
+    );
 
     let zero = snapshot
         .source_receipt(&child_index(), 0)

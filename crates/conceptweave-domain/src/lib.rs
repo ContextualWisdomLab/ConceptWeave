@@ -43,7 +43,7 @@ pub enum CandidateKind {
     Dimension,
     /// A governed analytical measure or metric definition.
     Measure,
-    /// A mapping between a physical source element and a semantic concept.
+    /// A mapping between a physical source element and a proposed semantic element.
     PhysicalMapping,
 }
 

@@ -308,5 +308,47 @@ fn exact_period_state_issues_provenance() {
         .expect("observed EXCLUDE conperiod state must issue provenance");
     assert!(!receipt.location().has_period_semantics());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(receipt.source_id(), snapshot.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        snapshot.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
     assert!(receipt.location().canonical_location().ends_with("/period"));
+    let observed = child_constraint();
+    for (schema, relation, relation_kind, name) in [
+        (
+            "unobserved_schema",
+            observed.relation_name(),
+            observed.relation_kind(),
+            observed.constraint_name(),
+        ),
+        (
+            observed.schema_name(),
+            "unobserved_relation",
+            observed.relation_kind(),
+            observed.constraint_name(),
+        ),
+        (
+            observed.schema_name(),
+            observed.relation_name(),
+            RelationKind::PartitionedTable,
+            observed.constraint_name(),
+        ),
+        (
+            observed.schema_name(),
+            observed.relation_name(),
+            observed.relation_kind(),
+            "unobserved/constraint~",
+        ),
+    ] {
+        let absent =
+            IndexExclusionConstraintCoordinate::new(schema, relation, relation_kind, name).unwrap();
+        let location = format!("{}/period", absent.canonical_location());
+        assert_eq!(
+            snapshot.source_receipt(absent).unwrap_err(),
+            ObservationError::UnknownObservationLocation { location }
+        );
+    }
 }

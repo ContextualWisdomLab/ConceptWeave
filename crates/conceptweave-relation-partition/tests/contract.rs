@@ -428,6 +428,11 @@ fn receipt_is_bound_to_exact_observed_relation_coordinate() {
     assert_eq!(receipt.connection_policy_binding(), POLICY_BINDING);
     assert_eq!(receipt.source_digest(), governed.snapshot_digest());
     assert_eq!(
+        receipt.location(),
+        &RelationPartitionLocation::new("public", "events", RelationKind::PartitionedTable)
+            .unwrap()
+    );
+    assert_eq!(
         receipt.extractor_revision(),
         "extractor-relation-partition-v1"
     );

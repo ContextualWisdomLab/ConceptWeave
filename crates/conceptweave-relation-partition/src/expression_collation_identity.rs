@@ -273,7 +273,7 @@ impl IndexExpressionCollationIdentitySnapshot {
             node_schema_predecessor,
             relation_var_predecessor,
         )?;
-        if rebound_whole_tree.snapshot_digest() != whole_tree_predecessor.snapshot_digest() {
+        if rebound_whole_tree != *whole_tree_predecessor {
             return Err(invalid("index_expression_collation_whole_tree_predecessor"));
         }
 
@@ -283,7 +283,7 @@ impl IndexExpressionCollationIdentitySnapshot {
             index_partition_snapshot,
             key_collation_predecessor.observations().to_vec(),
         )?;
-        if rebound_key_collation.snapshot_digest() != key_collation_predecessor.snapshot_digest() {
+        if rebound_key_collation != *key_collation_predecessor {
             return Err(invalid("index_expression_collation_key_predecessor"));
         }
 
@@ -405,8 +405,7 @@ fn canonicalize_expression_collations(
         let mut collations = Vec::new();
         collect_expression_collations(observation.expression(), &mut collations);
         for (offset, collation) in collations.into_iter().enumerate() {
-            let occurrence_position = u32::try_from(offset + 1)
-                .map_err(|_| invalid("index_expression_collation_occurrence_position"))?;
+            let occurrence_position = checked_occurrence_position(offset)?;
             let location = IndexExpressionCollationIdentityLocation::expression(
                 observation.index().clone(),
                 observation.key_position(),
@@ -419,8 +418,7 @@ fn canonicalize_expression_collations(
         let mut collations = Vec::new();
         collect_expression_collations(observation.predicate(), &mut collations);
         for (offset, collation) in collations.into_iter().enumerate() {
-            let occurrence_position = u32::try_from(offset + 1)
-                .map_err(|_| invalid("index_expression_collation_occurrence_position"))?;
+            let occurrence_position = checked_occurrence_position(offset)?;
             let location = IndexExpressionCollationIdentityLocation::predicate(
                 observation.index().clone(),
                 occurrence_position,
@@ -442,7 +440,7 @@ fn canonicalize_expression_collations(
     for observation in &observations {
         let expected_name = expected
             .get(&observation.location().canonical_location())
-            .ok_or_else(|| invalid("index_expression_collation_catalog_coordinate"))?;
+            .ok_or(invalid("index_expression_collation_catalog_coordinate"))?;
         if observation.collation().schema_name() != expected_name.schema_name()
             || observation.collation().collation_name() != expected_name.collation_name()
         {
@@ -481,7 +479,7 @@ fn canonicalize_relation_var_collations(
     for observation in &observations {
         let expected_name = expected
             .get(&observation.location().canonical_location())
-            .ok_or_else(|| invalid("index_relation_var_collation_catalog_coordinate"))?;
+            .ok_or(invalid("index_relation_var_collation_catalog_coordinate"))?;
         let actual_name = observation
             .collation()
             .map(|collation| (collation.schema_name(), collation.collation_name()));
@@ -568,7 +566,7 @@ fn validate_attached_expression_collations(
             let parent_location = child.location().with_index(parent_index.clone());
             let parent = by_location
                 .get(&parent_location.canonical_location())
-                .ok_or_else(|| invalid("index_expression_collation_catalog_completeness"))?;
+                .ok_or(invalid("index_expression_collation_catalog_completeness"))?;
             if *parent != child.collation() {
                 return Err(invalid("index_expression_collation_catalog_identity"));
             }
@@ -607,7 +605,7 @@ fn validate_attached_relation_var_collations(
                 relation_var_location_with_index(child.location(), parent_index.clone());
             let parent = by_location
                 .get(&parent_location.canonical_location())
-                .ok_or_else(|| invalid("index_relation_var_collation_catalog_completeness"))?;
+                .ok_or(invalid("index_relation_var_collation_catalog_completeness"))?;
             if *parent != child.collation() {
                 return Err(invalid("index_relation_var_collation_catalog_identity"));
             }
@@ -682,4 +680,30 @@ fn encode_len(hasher: &mut Sha256, value: usize) {
 
 fn invalid(field: &'static str) -> ObservationError {
     ObservationError::InvalidObservationField { field }
+}
+
+fn checked_occurrence_position(offset: usize) -> Result<u32, ObservationError> {
+    let field = "index_expression_collation_occurrence_position";
+    let zero_based = u32::try_from(offset).map_err(|_| invalid(field))?;
+    zero_based.checked_add(1).ok_or(invalid(field))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn occurrence_position_rejects_unrepresentable_offsets() {
+        assert_eq!(checked_occurrence_position(0), Ok(1));
+        assert_eq!(
+            checked_occurrence_position(u32::MAX as usize - 1),
+            Ok(u32::MAX)
+        );
+        for offset in [u32::MAX as usize, usize::MAX] {
+            assert_eq!(
+                checked_occurrence_position(offset),
+                Err(invalid("index_expression_collation_occurrence_position"))
+            );
+        }
+    }
 }

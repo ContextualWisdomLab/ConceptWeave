@@ -1,0 +1,15 @@
+[package]
+name = "conceptweave-alignment"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "Explicit semantic alignment and deterministic validation for ConceptWeave proposals"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+conceptweave-discovery = { path = "../conceptweave-discovery" }
+conceptweave-domain = { path = "../conceptweave-domain" }

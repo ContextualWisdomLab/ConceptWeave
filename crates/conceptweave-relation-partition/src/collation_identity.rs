@@ -372,7 +372,7 @@ fn canonicalize_and_validate(
         let key = (observation.index().clone(), observation.key_position());
         let expected_name = expected
             .get(&key)
-            .ok_or_else(|| invalid("index_partition_collation_catalog_coordinate"))?;
+            .ok_or(invalid("index_partition_collation_catalog_coordinate"))?;
         let actual_name = observation.collation().map(|collation| {
             (
                 collation.schema_name().to_owned(),
@@ -415,7 +415,7 @@ fn validate_attached_collation_identity(
         {
             let parent = by_key
                 .get(&(parent_index.clone(), child.key_position()))
-                .ok_or_else(|| invalid("index_partition_collation_catalog_completeness"))?;
+                .ok_or(invalid("index_partition_collation_catalog_completeness"))?;
             if *parent != child.collation() {
                 return Err(invalid("index_partition_collation_catalog_identity"));
             }
@@ -452,7 +452,7 @@ fn compute_digest(
 }
 
 fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
-    if value.trim().is_empty() {
+    if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }
     Ok(())

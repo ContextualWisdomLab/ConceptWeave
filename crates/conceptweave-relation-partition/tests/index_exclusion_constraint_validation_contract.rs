@@ -309,6 +309,41 @@ fn validated_exclusion_constraint_issues_exact_provenance() {
         .expect("observed EXCLUDE validation must issue provenance");
     assert!(receipt.location().validated());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(
+        snapshot.source_connection_key(),
+        enforcement.source_connection_key()
+    );
+    assert_eq!(
+        snapshot.connection_policy_binding(),
+        enforcement.connection_policy_binding()
+    );
+    assert_eq!(
+        snapshot.extractor_revision(),
+        enforcement.extractor_revision()
+    );
+    assert_eq!(snapshot.observed_at_utc(), enforcement.observed_at_utc());
+    assert_eq!(receipt.source_id(), enforcement.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        enforcement.connection_policy_binding()
+    );
+    assert_eq!(
+        receipt.extractor_revision(),
+        enforcement.extractor_revision()
+    );
+    assert_eq!(receipt.observed_at_utc(), enforcement.observed_at_utc());
+    assert!(snapshot.observations().contains(receipt.location()));
+    let absent = IndexExclusionConstraintCoordinate::new(
+        "public",
+        "bookings",
+        RelationKind::Table,
+        "unobserved_constraint",
+    )
+    .unwrap();
+    assert!(matches!(
+        snapshot.source_receipt(absent),
+        Err(ObservationError::UnknownObservationLocation { .. })
+    ));
     assert!(
         receipt
             .location()

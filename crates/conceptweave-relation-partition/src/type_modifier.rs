@@ -445,9 +445,9 @@ fn validate_partition_type_modifiers(
                 RelationKind::PartitionedTable.token().to_owned(),
                 child.column_name().to_owned(),
             );
-            let parent_type_modifier = by_coordinate
-                .get(&parent_key)
-                .ok_or_else(|| invalid("relation_partition_column_type_modifier_completeness"))?;
+            let parent_type_modifier = by_coordinate.get(&parent_key).ok_or(invalid(
+                "relation_partition_column_type_modifier_completeness",
+            ))?;
             if *parent_type_modifier != child.type_modifier() {
                 return Err(invalid("relation_partition_column_type_modifier"));
             }
@@ -475,7 +475,7 @@ fn compute_type_modifier_digest(
 }
 
 fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
-    if value.trim().is_empty() {
+    if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }
     Ok(())

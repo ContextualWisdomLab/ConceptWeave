@@ -33,9 +33,9 @@ impl QualifiedOperatorFamilyName {
         let access_method_name = access_method_name.into();
         let schema_name = schema_name.into();
         let operator_family_name = operator_family_name.into();
-        validate_nonblank(&access_method_name, "operator_family_access_method_name")?;
-        validate_nonblank(&schema_name, "operator_family_schema_name")?;
-        validate_nonblank(&operator_family_name, "operator_family_name")?;
+        validate_identifier(&access_method_name, "operator_family_access_method_name")?;
+        validate_identifier(&schema_name, "operator_family_schema_name")?;
+        validate_identifier(&operator_family_name, "operator_family_name")?;
         Ok(Self {
             access_method_name,
             schema_name,
@@ -198,6 +198,9 @@ pub struct IndexOperatorFamilySnapshot {
 
 impl IndexOperatorFamilySnapshot {
     /// Creates complete key-level operator-family evidence over an exact predecessor stack.
+    ///
+    /// Repeated operator classes must name one family within their access method and schema.
+    /// Contradictory class-to-family evidence is rejected before an immutable snapshot is issued.
     pub fn new(
         base_snapshot: &PostgresSchemaSnapshotV3,
         relation_partition_snapshot: &RelationPartitionSnapshot,
@@ -209,7 +212,13 @@ impl IndexOperatorFamilySnapshot {
             relation_partition_snapshot,
             index_partition_snapshot.observations().to_vec(),
         )?;
-        if rebound.snapshot_digest() != index_partition_snapshot.snapshot_digest() {
+        if rebound.snapshot_digest() != index_partition_snapshot.snapshot_digest()
+            || rebound.source_connection_key() != index_partition_snapshot.source_connection_key()
+            || rebound.connection_policy_binding()
+                != index_partition_snapshot.connection_policy_binding()
+            || rebound.extractor_revision() != index_partition_snapshot.extractor_revision()
+            || rebound.observed_at_utc() != index_partition_snapshot.observed_at_utc()
+        {
             return Err(invalid("index_operator_family_predecessor_binding"));
         }
 
@@ -353,22 +362,38 @@ fn canonicalize_operator_families(
         })
         .collect::<BTreeMap<_, _>>();
 
+    let mut family_by_class = BTreeMap::new();
     for observation in &observations {
         let index = find_base_index(base_snapshot, observation.index())
-            .ok_or_else(|| invalid("index_operator_family_index_binding"))?;
+            .ok_or(invalid("index_operator_family_index_binding"))?;
         let access_method = index
             .access_method()
-            .ok_or_else(|| invalid("index_operator_family_access_method_binding"))?;
+            .ok_or(invalid("index_operator_family_access_method_binding"))?;
         if access_method != observation.operator_family().access_method_name() {
             return Err(invalid("index_operator_family_access_method_binding"));
         }
         let semantics = index
             .key_semantics()
-            .ok_or_else(|| invalid("index_operator_family_class_binding"))?
+            .ok_or(invalid("index_operator_family_class_binding"))?
             .iter()
             .find(|semantics| semantics.position() == observation.key_position())
-            .ok_or_else(|| invalid("index_operator_family_class_binding"))?;
+            .ok_or(invalid("index_operator_family_class_binding"))?;
         if semantics.operator_class() != observation.operator_class() {
+            return Err(invalid("index_operator_family_class_binding"));
+        }
+        // PostgreSQL class names are scoped by access method as well as namespace.
+        let class = observation.operator_class();
+        if family_by_class
+            .insert(
+                (
+                    access_method,
+                    class.schema_name(),
+                    class.operator_class_name(),
+                ),
+                observation.operator_family(),
+            )
+            .is_some_and(|family| family != observation.operator_family())
+        {
             return Err(invalid("index_operator_family_class_binding"));
         }
     }
@@ -378,15 +403,15 @@ fn canonicalize_operator_families(
             continue;
         };
         let child_index = find_base_index(base_snapshot, membership.coordinate())
-            .ok_or_else(|| invalid("index_operator_family_index_binding"))?;
+            .ok_or(invalid("index_operator_family_index_binding"))?;
         for key_attribute in child_index.key_attributes() {
             let position = key_attribute.position();
             let child_family = by_key
                 .get(&(membership.coordinate().clone(), position))
-                .ok_or_else(|| invalid("index_operator_family_completeness"))?;
+                .ok_or(invalid("index_operator_family_completeness"))?;
             let parent_family = by_key
                 .get(&(parent.clone(), position))
-                .ok_or_else(|| invalid("index_operator_family_completeness"))?;
+                .ok_or(invalid("index_operator_family_completeness"))?;
             if child_family.operator_family() != parent_family.operator_family() {
                 return Err(invalid("index_partition_definition_operator_family"));
             }
@@ -449,8 +474,8 @@ fn compute_operator_family_digest(
     format!("{SHA256_DIGEST_PREFIX}{:x}", hasher.finalize())
 }
 
-fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
-    if value.trim().is_empty() {
+fn validate_identifier(value: &str, field: &'static str) -> Result<(), ObservationError> {
+    if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }
     Ok(())

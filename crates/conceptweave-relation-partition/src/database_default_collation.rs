@@ -353,7 +353,7 @@ impl IndexEffectiveCollationDefinitionSnapshot {
             definition
                 .validate_database_encoding(database_encoding_predecessor.database_encoding())?;
             let material_default_definition = material_default_definition
-                .ok_or_else(|| invalid("database_default_collation_material_definition"))?;
+                .ok_or(invalid("database_default_collation_material_definition"))?;
             definition.validate_material_default_collation(material_default_definition)?;
         }
 

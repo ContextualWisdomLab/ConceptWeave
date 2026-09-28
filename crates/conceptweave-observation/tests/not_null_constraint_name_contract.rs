@@ -1,7 +1,7 @@
 use conceptweave_observation::{
     CheckConstraintObservation, ColumnObservationV3, NotNullConstraintObservation,
     ObservationError, PostgresSchemaSnapshotV3, QualifiedTypeName, RelationKind,
-    RelationObservation, TableConstraintObservation,
+    RelationObservation, SchemaObjectLocation, TableConstraintObservation,
 };
 
 mod support;
@@ -32,6 +32,44 @@ fn constraint_for(
 
 fn constraint(column_name: &str) -> NotNullConstraintObservation {
     constraint_for("metric", "metric_required", column_name)
+}
+
+#[test]
+fn observed_not_null_row_has_an_exact_receipt_and_unobserved_name_does_not() {
+    let snapshot = PostgresSchemaSnapshotV3::new_with_not_null_constraints(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-14T09:20:00Z",
+        vec![relation("metric", "raw_value", false, None)],
+        Vec::new(),
+        Vec::new(),
+        vec![constraint("raw_value")],
+    )
+    .unwrap();
+    let location = SchemaObjectLocation::constraint(
+        "public",
+        "metric",
+        RelationKind::Table,
+        "metric_required",
+    )
+    .unwrap();
+    assert_eq!(
+        snapshot.source_receipt(location).unwrap().source_digest(),
+        snapshot.snapshot_digest()
+    );
+    assert!(
+        snapshot
+            .source_receipt(
+                SchemaObjectLocation::constraint(
+                    "public",
+                    "metric",
+                    RelationKind::Table,
+                    "unknown_required",
+                )
+                .unwrap()
+            )
+            .is_err()
+    );
 }
 
 fn relation(

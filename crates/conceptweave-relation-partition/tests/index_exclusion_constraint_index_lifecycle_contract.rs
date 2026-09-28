@@ -248,6 +248,30 @@ fn exact_backing_index_lifecycle_is_retained_and_receipted() {
     assert!(receipt.location().index_valid());
     assert!(receipt.location().index_live());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(
+        snapshot.source_connection_key(),
+        stack.base.source_connection_key()
+    );
+    assert_eq!(
+        snapshot.connection_policy_binding(),
+        stack.base.connection_policy_binding()
+    );
+    assert_eq!(
+        snapshot.extractor_revision(),
+        stack.base.extractor_revision()
+    );
+    assert_eq!(snapshot.observed_at_utc(), stack.base.observed_at_utc());
+    assert_eq!(receipt.source_id(), stack.base.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        stack.base.connection_policy_binding()
+    );
+    assert_eq!(
+        receipt.extractor_revision(),
+        stack.base.extractor_revision()
+    );
+    assert_eq!(receipt.observed_at_utc(), stack.base.observed_at_utc());
+    assert!(snapshot.observations().contains(receipt.location()));
     assert!(
         receipt
             .location()

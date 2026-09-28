@@ -5,6 +5,42 @@ use conceptweave_observation::{
 
 mod support;
 
+#[test]
+fn combined_array_and_timing_constructor_preserves_composition_and_refusal() {
+    use conceptweave_observation::{
+        ConstraintDeferrability, ConstraintTimingObservation, RelationKind,
+    };
+
+    let predecessor = array_aware_snapshot();
+    let absent_constraint = ConstraintTimingObservation::new(
+        "public",
+        "missing",
+        RelationKind::Table,
+        "missing_key",
+        ConstraintDeferrability::NotDeferrable,
+    )
+    .unwrap();
+    for (timings, accepted) in [(vec![], true), (vec![absent_constraint], false)] {
+        let combined = PostgresSchemaSnapshotV3::new_with_array_types_and_constraint_timings(
+            &support::authorized_source("warehouse_primary", &["public"]),
+            predecessor.extractor_revision(),
+            predecessor.observed_at_utc(),
+            predecessor.relations().to_vec(),
+            predecessor.domains().to_vec(),
+            predecessor.enums().to_vec(),
+            predecessor.array_types().unwrap().to_vec(),
+            timings.clone(),
+        );
+        assert_eq!(combined.is_ok(), accepted);
+        assert_eq!(
+            combined,
+            predecessor
+                .clone()
+                .with_observed_constraint_timings(timings)
+        );
+    }
+}
+
 fn type_name(schema: &str, name: &str) -> QualifiedTypeName {
     QualifiedTypeName::new(schema, name).expect("qualified type coordinate is valid")
 }
@@ -47,6 +83,12 @@ fn array_type_receipt_verifies_exact_coordinate_and_public_digest() {
     assert_eq!(receipt.location(), &location);
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
     assert_eq!(receipt.source_id(), "warehouse_primary");
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        snapshot.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
 }
 
 #[test]

@@ -386,6 +386,26 @@ fn exact_exclusion_constraint_partition_state_is_admitted_and_receipted() {
     assert!(!receipt.location().is_local());
     assert_eq!(receipt.location().inheritance_count(), 1);
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(receipt.source_id(), base.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        base.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), base.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), base.observed_at_utc());
+    let absent = IndexExclusionConstraintCoordinate::new(
+        "public",
+        "bookings_2026",
+        RelationKind::Table,
+        "unobserved_constraint",
+    )
+    .unwrap();
+    assert_eq!(
+        snapshot.source_receipt(absent.clone()).unwrap_err(),
+        ObservationError::UnknownObservationLocation {
+            location: absent.canonical_location()
+        }
+    );
 }
 
 #[test]

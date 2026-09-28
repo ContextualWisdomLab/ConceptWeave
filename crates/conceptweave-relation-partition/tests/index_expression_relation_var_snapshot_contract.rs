@@ -23,15 +23,18 @@ use conceptweave_source_port::{
 
 const POLICY_BINDING: &str = "fixture_policy_revision_relation_var";
 
-struct Registry;
+struct Registry<'a> {
+    key: &'a str,
+    policy: &'a str,
+}
 
-impl SourceConnectionRegistry for Registry {
+impl SourceConnectionRegistry for Registry<'_> {
     fn contains_source_connection(&self, source_connection_key: &str) -> bool {
-        source_connection_key == "warehouse_primary"
+        source_connection_key == self.key
     }
 
     fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
-        (source_connection_key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
+        (source_connection_key == self.key).then(|| self.policy.to_owned())
     }
 
     fn authorizes_schema_scope(
@@ -39,8 +42,8 @@ impl SourceConnectionRegistry for Registry {
         source_connection: &ResolvedSourceConnection,
         allowed_schema_names: &[String],
     ) -> bool {
-        source_connection.source_connection_key() == "warehouse_primary"
-            && source_connection.connection_policy_binding() == POLICY_BINDING
+        source_connection.source_connection_key() == self.key
+            && source_connection.connection_policy_binding() == self.policy
             && allowed_schema_names == ["public"]
     }
 
@@ -49,8 +52,8 @@ impl SourceConnectionRegistry for Registry {
         source_connection: &ResolvedSourceConnection,
         resource_envelope: ObservationResourceEnvelope,
     ) -> bool {
-        source_connection.source_connection_key() == "warehouse_primary"
-            && source_connection.connection_policy_binding() == POLICY_BINDING
+        source_connection.source_connection_key() == self.key
+            && source_connection.connection_policy_binding() == self.policy
             && resource_envelope.request_budget().max_schema_count() <= 1
             && resource_envelope.request_budget().max_schema_bytes() <= 256
             && resource_envelope.limits().operation_timeout_ms() <= 1_000
@@ -62,14 +65,18 @@ impl SourceConnectionRegistry for Registry {
 }
 
 fn authorized_source() -> AuthorizedObservationRequest {
+    authorized_source_with_binding("warehouse_primary", POLICY_BINDING)
+}
+
+fn authorized_source_with_binding(key: &str, policy: &str) -> AuthorizedObservationRequest {
     ObservationRequest::new(
-        "warehouse_primary",
+        key,
         vec!["public".to_owned()],
         ObservationRequestBudget::new(1, 256).unwrap(),
         ObservationLimits::new(1_000, 10, 1_024, 1).unwrap(),
     )
     .unwrap()
-    .authorize(&Registry)
+    .authorize(&Registry { key, policy })
     .unwrap()
 }
 
@@ -297,7 +304,10 @@ struct Stack {
 }
 
 fn stack() -> Stack {
-    let base = base();
+    stack_from_base(base())
+}
+
+fn stack_from_base(base: PostgresSchemaSnapshotV3) -> Stack {
     let relations = RelationPartitionSnapshot::new(
         &base,
         vec![
@@ -504,6 +514,72 @@ fn relation_var_successor_is_reachable_without_a_v2_snapshot() {
 }
 
 #[test]
+fn nested_canonical_value_lists_require_exact_relation_var_evidence() {
+    let stack = stack();
+    let root = CanonicalExpression::node(
+        "RowExpr",
+        vec![field(
+            "arguments",
+            CanonicalExpressionValue::ValueList(vec![
+                CanonicalExpressionValue::Null,
+                CanonicalExpressionValue::ValueList(vec![CanonicalExpressionValue::Expression(
+                    Box::new(CanonicalExpression::column("account_email").unwrap()),
+                )]),
+            ]),
+        )],
+    )
+    .unwrap();
+    let expressions = IndexExpressionSemanticsSnapshot::new(
+        &stack.base,
+        &stack.relations,
+        &stack.indexes,
+        &stack.families,
+        &stack.exclusions,
+        vec![
+            IndexExpressionSemanticsObservation::new(parent_index(), 1, root.clone()).unwrap(),
+            IndexExpressionSemanticsObservation::new(child_index(), 1, root).unwrap(),
+        ],
+        stack.expressions.predicate_observations().to_vec(),
+    )
+    .unwrap();
+    let build = |observations| {
+        IndexExpressionRelationVarSnapshot::new(
+            &stack.base,
+            &stack.relations,
+            &stack.indexes,
+            &stack.families,
+            &stack.exclusions,
+            &expressions,
+            &stack.type_modifiers,
+            observations,
+        )
+    };
+    let complete = complete_vars();
+    let snapshot = build(complete.clone()).unwrap();
+    for index in [parent_index(), child_index()] {
+        let location = IndexExpressionRelationVarLocation::expression(index, 1, 1).unwrap();
+        assert_eq!(
+            snapshot
+                .source_receipt(location.clone())
+                .unwrap()
+                .location(),
+            &location
+        );
+        let missing = complete
+            .iter()
+            .filter(|observation| observation.location() != &location)
+            .cloned()
+            .collect();
+        assert_eq!(
+            build(missing).unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: "index_expression_relation_var_completeness",
+            }
+        );
+    }
+}
+
+#[test]
 fn every_canonical_column_leaf_requires_exact_relation_var_evidence() {
     let mut observations = complete_vars();
     observations.pop();
@@ -562,4 +638,323 @@ fn exact_relation_var_receipt_is_bound_to_successor_digest() {
     assert_eq!(receipt.location(), &location);
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
     assert_eq!(receipt.source_id(), snapshot.source_connection_key());
+    assert_eq!(receipt.location().leaf_position(), 1);
+    assert_eq!(receipt.location().key_position(), None);
+    let expression_location =
+        IndexExpressionRelationVarLocation::expression(child_index(), 1, 1).unwrap();
+    let expression_receipt = snapshot
+        .source_receipt(expression_location.clone())
+        .unwrap();
+    assert_eq!(expression_receipt.location(), &expression_location);
+    assert_eq!(expression_receipt.location().leaf_position(), 1);
+    assert_eq!(expression_receipt.location().key_position(), Some(1));
+    assert_ne!(
+        expression_receipt.location().canonical_location(),
+        receipt.location().canonical_location()
+    );
+}
+
+#[test]
+fn relation_var_coordinates_reject_duplicate_extra_and_mismatched_column_evidence() {
+    let complete = complete_vars();
+    for (position, original) in complete.iter().enumerate() {
+        let mut duplicate = complete.clone();
+        duplicate.push(original.clone());
+        let mut extra = complete.clone();
+        let absent = match original.location() {
+            IndexExpressionRelationVarLocation::Expression {
+                index,
+                key_position,
+                ..
+            } => IndexExpressionRelationVarLocation::expression(index.clone(), *key_position, 2)
+                .unwrap(),
+            IndexExpressionRelationVarLocation::Predicate { index, .. } => {
+                IndexExpressionRelationVarLocation::predicate(index.clone(), 2).unwrap()
+            }
+        };
+        extra.push(var(
+            absent.clone(),
+            original.column_name(),
+            original.value_type().type_name(),
+            original.collation().cloned(),
+        ));
+        let mut wrong_column = complete.clone();
+        wrong_column[position] = var(
+            original.location().clone(),
+            "missing_column",
+            original.value_type().type_name(),
+            original.collation().cloned(),
+        );
+        let mut wrong_modifier = complete.clone();
+        wrong_modifier[position] = IndexExpressionRelationVarObservation::new(
+            original.location().clone(),
+            original.column_name(),
+            original.value_type().clone(),
+            4,
+            original.collation().cloned(),
+            RelationVarRelationRole::IndexRelation,
+            true,
+            0,
+            RelationVarReturningType::Default,
+        )
+        .unwrap();
+        for (observations, field) in [
+            (duplicate, "index_expression_relation_var_coordinate"),
+            (extra, "index_expression_relation_var_completeness"),
+            (wrong_column, "index_expression_relation_var_column"),
+            (
+                wrong_modifier,
+                "index_expression_relation_var_type_modifier",
+            ),
+        ] {
+            assert_eq!(
+                relation_var_snapshot(observations).unwrap_err(),
+                ObservationError::InvalidObservationField { field }
+            );
+        }
+        let snapshot = relation_var_snapshot(complete.clone()).unwrap();
+        assert_eq!(
+            snapshot.source_receipt(absent.clone()).unwrap_err(),
+            ObservationError::UnknownObservationLocation {
+                location: absent.canonical_location()
+            }
+        );
+    }
+    let snapshot = relation_var_snapshot(complete.clone()).unwrap();
+    let mut reversed = complete;
+    reversed.reverse();
+    assert_eq!(snapshot, relation_var_snapshot(reversed).unwrap());
+    for observation in snapshot.observations() {
+        let receipt = snapshot
+            .source_receipt(observation.location().clone())
+            .unwrap();
+        assert_eq!(
+            receipt.connection_policy_binding(),
+            snapshot.connection_policy_binding()
+        );
+        assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+        assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
+    }
+}
+
+#[test]
+fn relation_var_predecessors_reject_each_mixed_provenance_dimension() {
+    let original = stack();
+    let baseline = relation_var_snapshot(complete_vars()).unwrap();
+    for (key, policy, revision, time) in [
+        (
+            "warehouse_secondary",
+            POLICY_BINDING,
+            "extractor-relation-var-v1",
+            "2026-09-15T00:30:00Z",
+        ),
+        (
+            "warehouse_primary",
+            "fixture_policy_revision_relation_var_v2",
+            "extractor-relation-var-v1",
+            "2026-09-15T00:30:00Z",
+        ),
+        (
+            "warehouse_primary",
+            POLICY_BINDING,
+            "extractor-relation-var-v2",
+            "2026-09-15T00:30:00Z",
+        ),
+        (
+            "warehouse_primary",
+            POLICY_BINDING,
+            "extractor-relation-var-v1",
+            "2026-09-15T00:30:01Z",
+        ),
+    ] {
+        let changed_base = PostgresSchemaSnapshotV3::new(
+            &authorized_source_with_binding(key, policy),
+            revision,
+            time,
+            original.base.relations().to_vec(),
+            vec![],
+            vec![],
+        )
+        .unwrap()
+        .with_observed_column_collations(original.base.column_collations().unwrap().to_vec())
+        .unwrap();
+        let changed = stack_from_base(changed_base);
+        assert_eq!(
+            IndexPartitionSnapshot::new(
+                &changed.base,
+                &original.relations,
+                changed.indexes.observations().to_vec(),
+            )
+            .unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: "index_partition_relation_snapshot_binding",
+            }
+        );
+        assert_eq!(
+            IndexOperatorFamilySnapshot::new(
+                &changed.base,
+                &changed.relations,
+                &original.indexes,
+                changed.families.observations().to_vec(),
+            )
+            .unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: "index_operator_family_predecessor_binding",
+            }
+        );
+        assert_eq!(
+            IndexExclusionSemanticsSnapshot::new(
+                &changed.base,
+                &changed.relations,
+                &changed.indexes,
+                &original.families,
+                changed.exclusions.observations().to_vec(),
+            )
+            .unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: "index_exclusion_semantics_predecessor_binding",
+            }
+        );
+        assert_eq!(
+            IndexExpressionSemanticsSnapshot::new(
+                &changed.base,
+                &changed.relations,
+                &changed.indexes,
+                &changed.families,
+                &original.exclusions,
+                changed.expressions.expression_observations().to_vec(),
+                changed.expressions.predicate_observations().to_vec(),
+            )
+            .unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: "index_expression_semantics_predecessor_binding",
+            }
+        );
+        let fresh = IndexExpressionRelationVarSnapshot::new(
+            &changed.base,
+            &changed.relations,
+            &changed.indexes,
+            &changed.families,
+            &changed.exclusions,
+            &changed.expressions,
+            &changed.type_modifiers,
+            complete_vars(),
+        )
+        .unwrap();
+        assert_eq!(fresh.snapshot_digest(), baseline.snapshot_digest());
+        for observation in fresh.observations() {
+            let receipt = fresh
+                .source_receipt(observation.location().clone())
+                .unwrap();
+            assert_eq!(receipt.source_id(), key);
+            assert_eq!(receipt.connection_policy_binding(), policy);
+            assert_eq!(receipt.extractor_revision(), revision);
+            assert_eq!(receipt.observed_at_utc(), time);
+        }
+        assert_eq!(fresh.source_connection_key(), key);
+        assert_eq!(fresh.connection_policy_binding(), policy);
+        assert_eq!(fresh.extractor_revision(), revision);
+        assert_eq!(fresh.observed_at_utc(), time);
+        let stale_pair = IndexExpressionRelationVarSnapshot::new(
+            &changed.base,
+            &changed.relations,
+            &changed.indexes,
+            &changed.families,
+            &changed.exclusions,
+            &original.expressions,
+            &original.type_modifiers,
+            complete_vars(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            stale_pair,
+            ObservationError::InvalidObservationField {
+                field: "index_expression_relation_var_predecessor_provenance",
+            }
+        );
+        let mixed = IndexExpressionRelationVarSnapshot::new(
+            &original.base,
+            &original.relations,
+            &original.indexes,
+            &original.families,
+            &original.exclusions,
+            &original.expressions,
+            &changed.type_modifiers,
+            complete_vars(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            mixed,
+            ObservationError::InvalidObservationField {
+                field: "index_expression_relation_var_predecessor_provenance",
+            }
+        );
+    }
+}
+
+#[test]
+fn relation_var_successor_rejects_whole_rows_and_trees_without_column_leaves() {
+    let stack = stack();
+    let constant = CanonicalExpression::node(
+        "Const",
+        vec![
+            field(
+                "type",
+                CanonicalExpressionValue::Type(
+                    QualifiedTypeName::new("pg_catalog", "int4").unwrap(),
+                ),
+            ),
+            field("value", CanonicalExpressionValue::Text("1".to_owned())),
+        ],
+    )
+    .unwrap();
+    for (root, expected_field) in [
+        (
+            CanonicalExpression::WholeRow,
+            "index_partition_definition_expression_whole_row",
+        ),
+        (constant, "index_expression_relation_var_empty"),
+    ] {
+        let expressions = IndexExpressionSemanticsSnapshot::new(
+            &stack.base,
+            &stack.relations,
+            &stack.indexes,
+            &stack.families,
+            &stack.exclusions,
+            vec![
+                IndexExpressionSemanticsObservation::new(parent_index(), 1, root.clone()).unwrap(),
+                IndexExpressionSemanticsObservation::new(child_index(), 1, root.clone()).unwrap(),
+            ],
+            vec![
+                IndexPredicateSemanticsObservation::new(parent_index(), root.clone()).unwrap(),
+                IndexPredicateSemanticsObservation::new(child_index(), root).unwrap(),
+            ],
+        );
+        if expected_field == "index_partition_definition_expression_whole_row" {
+            assert_eq!(
+                expressions.unwrap_err(),
+                ObservationError::InvalidObservationField {
+                    field: expected_field
+                }
+            );
+            continue;
+        }
+        let expressions = expressions.unwrap();
+        assert_eq!(
+            IndexExpressionRelationVarSnapshot::new(
+                &stack.base,
+                &stack.relations,
+                &stack.indexes,
+                &stack.families,
+                &stack.exclusions,
+                &expressions,
+                &stack.type_modifiers,
+                vec![],
+            )
+            .unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: expected_field
+            }
+        );
+    }
 }

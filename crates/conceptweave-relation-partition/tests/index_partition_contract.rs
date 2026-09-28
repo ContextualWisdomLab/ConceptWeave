@@ -347,6 +347,133 @@ fn complete_index_family_and_stable_attachment_are_required() {
 }
 
 #[test]
+fn index_topology_rejects_duplicate_coordinates_wrong_kinds_and_self_parent() {
+    let base = base_snapshot();
+    let relations = relation_partition_snapshot(&base);
+    let parent = IndexPartitionObservation::non_partition(
+        parent_index(),
+        IndexRelationKind::PartitionedIndex,
+    )
+    .unwrap();
+    let child =
+        IndexPartitionObservation::non_partition(child_index(), IndexRelationKind::Index).unwrap();
+
+    IndexPartitionSnapshot::new(&base, &relations, vec![parent.clone(), child.clone()])
+        .expect("complete local topology remains admissible");
+
+    let duplicate = IndexPartitionSnapshot::new(
+        &base,
+        &relations,
+        vec![parent.clone(), child.clone(), child.clone()],
+    )
+    .expect_err("repeated coordinates cannot stand for independent observations");
+    assert_field(duplicate, "index_partition_coordinate");
+
+    for observations in [
+        vec![
+            IndexPartitionObservation::non_partition(parent_index(), IndexRelationKind::Index)
+                .unwrap(),
+            child,
+        ],
+        vec![
+            parent,
+            IndexPartitionObservation::non_partition(
+                child_index(),
+                IndexRelationKind::PartitionedIndex,
+            )
+            .unwrap(),
+        ],
+    ] {
+        let wrong_kind = IndexPartitionSnapshot::new(&base, &relations, observations)
+            .expect_err("physical index kind must agree with its owning relation");
+        assert_field(wrong_kind, "index_partition_relation_kind");
+    }
+
+    let self_parent = IndexPartitionObservation::partition(
+        child_index(),
+        IndexRelationKind::Index,
+        child_index(),
+        false,
+    )
+    .expect_err("an index cannot attach to itself");
+    assert_field(self_parent, "index_partition_parent");
+}
+
+#[test]
+fn attachment_requires_partition_owner_and_observed_parent_index() {
+    let base = base_snapshot();
+    let relations = relation_partition_snapshot(&base);
+    let local_relations = RelationPartitionSnapshot::new(
+        &base,
+        vec![
+            RelationPartitionObservation::non_partition(
+                "public",
+                "events",
+                RelationKind::PartitionedTable,
+            )
+            .unwrap(),
+            RelationPartitionObservation::non_partition(
+                "public",
+                "events_2026",
+                RelationKind::Table,
+            )
+            .unwrap(),
+        ],
+    )
+    .unwrap();
+    let attached = |membership: &RelationPartitionSnapshot, parent| {
+        IndexPartitionSnapshot::new(
+            &base,
+            membership,
+            vec![
+                IndexPartitionObservation::non_partition(
+                    parent_index(),
+                    IndexRelationKind::PartitionedIndex,
+                )
+                .unwrap(),
+                IndexPartitionObservation::partition(
+                    child_index(),
+                    IndexRelationKind::Index,
+                    parent,
+                    false,
+                )
+                .unwrap(),
+            ],
+        )
+    };
+
+    attached(&relations, parent_index()).expect("the observed attachment remains admissible");
+    for (membership, parent, field) in [
+        (
+            &local_relations,
+            parent_index(),
+            "index_partition_owner_relation",
+        ),
+        (
+            &relations,
+            IndexPartitionCoordinate::new(
+                "public",
+                "events",
+                RelationKind::PartitionedTable,
+                "unobserved_parent_index",
+            )
+            .unwrap(),
+            "index_partition_parent_coordinate",
+        ),
+        (
+            &relations,
+            IndexPartitionCoordinate::new("public", "events", RelationKind::Table, "events_id_idx")
+                .unwrap(),
+            "index_partition_relation_parent",
+        ),
+    ] {
+        let error = attached(membership, parent)
+            .expect_err("attachment requires matching relation membership and parent evidence");
+        assert_field(error, field);
+    }
+}
+
+#[test]
 fn receipt_is_bound_to_exact_index_coordinate() {
     let base = base_snapshot();
     let relations = relation_partition_snapshot(&base);
@@ -371,9 +498,21 @@ fn receipt_is_bound_to_exact_index_coordinate() {
     .unwrap();
 
     let receipt = governed.source_receipt(child_index()).unwrap();
+    assert_eq!(receipt.location(), &child_index());
     assert_eq!(receipt.source_id(), "warehouse_primary");
     assert_eq!(receipt.connection_policy_binding(), POLICY_BINDING);
     assert_eq!(receipt.source_digest(), governed.snapshot_digest());
     assert_eq!(receipt.extractor_revision(), "extractor-index-partition-v1");
     assert_eq!(receipt.observed_at_utc(), "2026-09-14T14:45:00Z");
+    let absent = IndexPartitionCoordinate::new(
+        "public",
+        "accounts_2026",
+        RelationKind::Table,
+        "unobserved_index",
+    )
+    .unwrap();
+    assert!(matches!(
+        governed.source_receipt(absent),
+        Err(ObservationError::UnknownObservationLocation { .. })
+    ));
 }

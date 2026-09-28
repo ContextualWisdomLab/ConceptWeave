@@ -491,7 +491,7 @@ fn validate_partition_rowtypes(
                     && relation.relation_name() == membership.relation_name()
                     && relation.kind() == membership.relation_kind()
             })
-            .ok_or_else(|| invalid("relation_partition_child_coordinate"))?;
+            .ok_or(invalid("relation_partition_child_coordinate"))?;
         let parent_relation = base_snapshot
             .relations()
             .iter()
@@ -500,7 +500,7 @@ fn validate_partition_rowtypes(
                     && relation.relation_name() == parent_coordinate.relation_name()
                     && relation.kind() == RelationKind::PartitionedTable
             })
-            .ok_or_else(|| invalid("relation_partition_parent_coordinate"))?;
+            .ok_or(invalid("relation_partition_parent_coordinate"))?;
 
         let parent_columns = parent_relation
             .columns()
@@ -565,7 +565,7 @@ fn validate_partition_column_collations(
                         && collation.relation_kind() == membership.relation_kind()
                         && collation.column_name() == parent_collation.column_name()
                 })
-                .ok_or_else(|| invalid("relation_partition_column_collation"))?;
+                .ok_or(invalid("relation_partition_column_collation"))?;
 
             if parent_collation.collation() != child_collation.collation()
                 || parent_collation.deterministic() != child_collation.deterministic()
@@ -603,7 +603,7 @@ fn validate_partition_column_declarations(
                             && identity.relation_kind() == membership.relation_kind()
                             && identity.column_name() == parent_identity.column_name()
                     })
-                    .ok_or_else(|| invalid("relation_partition_column_identity"))?;
+                    .ok_or(invalid("relation_partition_column_identity"))?;
                 if !same_identity_mode(parent_identity, child_identity) {
                     return Err(invalid("relation_partition_column_identity"));
                 }
@@ -632,7 +632,7 @@ fn validate_partition_column_declarations(
                             && generation.relation_kind() == membership.relation_kind()
                             && generation.column_name() == parent_generation.column_name()
                     })
-                    .ok_or_else(|| invalid("relation_partition_column_generation"))?;
+                    .ok_or(invalid("relation_partition_column_generation"))?;
                 if !same_generation_mode(parent_generation, child_generation) {
                     return Err(invalid("relation_partition_column_generation"));
                 }
@@ -802,7 +802,7 @@ fn compute_relation_partition_digest(
 }
 
 fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
-    if value.trim().is_empty() {
+    if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }
     Ok(())

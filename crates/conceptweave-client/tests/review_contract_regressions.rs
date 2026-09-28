@@ -1,6 +1,6 @@
 use conceptweave_client::{
     ReleaseDigest, ReleaseMetadata, ReleaseSupersession, SemanticRelease, SemanticReleaseClient,
-    SemanticReleaseReference,
+    SemanticReleaseReference, TrustedReleaseManifest,
 };
 use conceptweave_domain::{EvidenceReference, PublicationState, TruthStatus};
 use std::{fs, path::PathBuf};
@@ -49,6 +49,21 @@ fn repository_root() -> PathBuf {
         .to_path_buf()
 }
 
+fn trusted_client(releases: &[&SemanticRelease]) -> SemanticReleaseClient {
+    SemanticReleaseClient::with_trusted_release_manifests(
+        "1.0.0",
+        vec![],
+        releases
+            .iter()
+            .map(|release| {
+                TrustedReleaseManifest::new(release.release_id(), release.manifest_digest())
+                    .unwrap()
+            })
+            .collect(),
+    )
+    .unwrap()
+}
+
 #[test]
 fn diff_fails_closed_when_one_release_id_names_conflicting_immutable_content() {
     let client = SemanticReleaseClient::new("1.0.0").expect("client policy must be valid");
@@ -75,7 +90,6 @@ fn diff_fails_closed_when_one_release_id_names_conflicting_immutable_content() {
 
 #[test]
 fn supersession_accepts_the_governed_superseded_predecessor_state() {
-    let client = SemanticReleaseClient::new("1.0.0").expect("client policy must be valid");
     let previous = release(
         "semantic_release_previous",
         'b',
@@ -90,6 +104,7 @@ fn supersession_accepts_the_governed_superseded_predecessor_state() {
         PublicationState::Published,
         &["control.evidence", "control.owner"],
     );
+    let client = trusted_client(&[&previous, &successor]);
     let declaration = ReleaseSupersession::new(
         SemanticReleaseReference::from_release(&previous),
         SemanticReleaseReference::from_release(&successor),
@@ -175,7 +190,6 @@ fn supersession_rejects_an_incompatible_governed_predecessor() {
 
 #[test]
 fn diff_accepts_reusing_the_same_release_object() {
-    let client = SemanticReleaseClient::new("1.0.0").expect("client policy must be valid");
     let release = release(
         "semantic_release_same_id",
         'b',
@@ -183,6 +197,7 @@ fn diff_accepts_reusing_the_same_release_object() {
         PublicationState::Published,
         &["control.evidence"],
     );
+    let client = trusted_client(&[&release]);
     assert!(client.diff(&release, &release).is_ok());
 }
 
@@ -195,6 +210,8 @@ fn public_contract_and_coverage_gates_encode_the_reviewed_fail_closed_rules() {
         .expect("Product workflow must exist");
     let coverage_gate = fs::read_to_string(root.join("scripts/check_coverage.sh"))
         .expect("coverage gate must exist");
+    let owned_regions = fs::read_to_string(root.join("scripts/owned_source_regions.jq"))
+        .expect("owned production region selector must exist");
 
     assert!(
         release_schema.contains("\"contract_version\"")
@@ -208,7 +225,11 @@ fn public_contract_and_coverage_gates_encode_the_reviewed_fail_closed_rules() {
     );
     assert!(
         !coverage_gate.contains(".data[0].totals.regions.percent == 100")
-            && coverage_gate.contains("select(.name | contains(\"5tests\") | not)")
+            && coverage_gate.contains("-f scripts/owned_source_regions.jq")
+            && owned_regions.contains("contains(\"5tests\")")
+            && owned_regions.contains("contains(\"20internal_model_tests\")")
+            && owned_regions
+                .contains("group_by([.file, .line_start, .column_start, .line_end, .column_end])")
             && coverage_gate.contains("all(.[]; .count > 0)"),
         "coverage must aggregate owned production source coordinates instead of double-counting test-crate monomorphizations"
     );

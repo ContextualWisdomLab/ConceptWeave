@@ -296,3 +296,293 @@ fn operator_family_evidence_must_be_complete_and_bound_to_the_observed_class() {
         }
     );
 }
+
+#[test]
+fn quoted_operator_family_identifiers_keep_exact_whitespace() {
+    for (access_method, schema, name) in [
+        (" ", "pg_catalog", "text_ops"),
+        ("btree", " ", "text_ops"),
+        ("btree", "pg_catalog", " "),
+    ] {
+        let family = QualifiedOperatorFamilyName::new(access_method, schema, name).unwrap();
+        assert_eq!(family.access_method_name(), access_method);
+        assert_eq!(family.schema_name(), schema);
+        assert_eq!(family.operator_family_name(), name);
+    }
+
+    for (access_method, schema, name) in [
+        ("", "pg_catalog", "text_ops"),
+        ("btree", "", "text_ops"),
+        ("btree", "pg_catalog", ""),
+        ("\0", "pg_catalog", "text_ops"),
+        ("btree", "\0", "text_ops"),
+        ("btree", "pg_catalog", "\0"),
+    ] {
+        assert!(QualifiedOperatorFamilyName::new(access_method, schema, name).is_err());
+    }
+
+    let (base, relations, indexes) = snapshots("text_ops", "varchar_ops");
+    let evidence = IndexOperatorFamilySnapshot::new(
+        &base,
+        &relations,
+        &indexes,
+        vec![
+            family(parent_index(), "text_ops", " "),
+            family(child_index(), "varchar_ops", " "),
+        ],
+    )
+    .unwrap();
+    assert_eq!(
+        evidence.observations()[0]
+            .operator_family()
+            .operator_family_name(),
+        " "
+    );
+    assert_eq!(
+        evidence
+            .source_receipt(&parent_index(), 1)
+            .unwrap()
+            .source_digest(),
+        evidence.snapshot_digest()
+    );
+}
+
+#[test]
+fn operator_family_key_positions_and_complete_inventory_fail_closed() {
+    assert_eq!(
+        IndexKeyOperatorFamilyObservation::new(
+            parent_index(),
+            0,
+            QualifiedOperatorClassName::new("pg_catalog", "text_ops").unwrap(),
+            QualifiedOperatorFamilyName::new("btree", "pg_catalog", "text_ops").unwrap(),
+        ),
+        Err(ObservationError::InvalidOrdinalPosition)
+    );
+    let (base, relations, indexes) = snapshots("text_ops", "text_ops");
+    let parent = family(parent_index(), "text_ops", "text_ops");
+    let child = family(child_index(), "text_ops", "text_ops");
+    assert_eq!(
+        IndexOperatorFamilySnapshot::new(
+            &base,
+            &relations,
+            &indexes,
+            vec![parent.clone(), child.clone(), parent]
+        ),
+        Err(ObservationError::InvalidObservationField {
+            field: "index_operator_family_coordinate"
+        })
+    );
+    let wrong_method = IndexKeyOperatorFamilyObservation::new(
+        parent_index(),
+        1,
+        QualifiedOperatorClassName::new("pg_catalog", "text_ops").unwrap(),
+        QualifiedOperatorFamilyName::new("hash", "pg_catalog", "text_ops").unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        IndexOperatorFamilySnapshot::new(&base, &relations, &indexes, vec![wrong_method, child]),
+        Err(ObservationError::InvalidObservationField {
+            field: "index_operator_family_access_method_binding"
+        })
+    );
+}
+
+#[test]
+fn operator_family_receipts_require_exact_key_and_preserve_capture_provenance() {
+    let (base, relations, indexes) = snapshots("text_ops", "text_ops");
+    let observations = vec![
+        family(parent_index(), "text_ops", "text_ops"),
+        family(child_index(), "text_ops", "text_ops"),
+    ];
+    let snapshot =
+        IndexOperatorFamilySnapshot::new(&base, &relations, &indexes, observations.clone())
+            .unwrap();
+    let mut reversed = observations;
+    reversed.reverse();
+    assert_eq!(
+        snapshot.snapshot_digest(),
+        IndexOperatorFamilySnapshot::new(&base, &relations, &indexes, reversed)
+            .unwrap()
+            .snapshot_digest()
+    );
+    for position in [0, 2] {
+        assert_eq!(
+            snapshot.source_receipt(&parent_index(), position),
+            Err(ObservationError::UnknownObservationLocation {
+                location: format!(
+                    "{}/keys/{position}/operator-family",
+                    parent_index().canonical_location()
+                ),
+            })
+        );
+    }
+    let receipt = snapshot.source_receipt(&parent_index(), 1).unwrap();
+    assert_eq!(receipt.source_id(), base.source_connection_key());
+    assert_eq!(receipt.connection_policy_binding(), POLICY_BINDING);
+    assert_eq!(receipt.extractor_revision(), base.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), base.observed_at_utc());
+    assert_eq!(receipt.location().index(), &parent_index());
+    assert_eq!(receipt.location().key_position(), 1);
+    assert_eq!(
+        receipt.location().canonical_location(),
+        format!(
+            "{}/keys/1/operator-family",
+            parent_index().canonical_location()
+        )
+    );
+}
+
+#[test]
+fn operator_family_predecessor_cannot_bind_changed_source_content() {
+    let (base, relations, indexes) = snapshots("text_ops", "text_ops");
+    let mut changed_relations = base.relations().to_vec();
+    changed_relations[0] = changed_relations[0]
+        .clone()
+        .with_source_comment("changed observed comment");
+    let changed = PostgresSchemaSnapshotV3::new(
+        &authorized_source(),
+        base.extractor_revision(),
+        base.observed_at_utc(),
+        changed_relations,
+        vec![],
+        vec![],
+    )
+    .unwrap();
+    let changed_relations =
+        RelationPartitionSnapshot::new(&changed, relations.observations().to_vec()).unwrap();
+    let observations = vec![
+        family(parent_index(), "text_ops", "text_ops"),
+        family(child_index(), "text_ops", "text_ops"),
+    ];
+    assert_eq!(
+        IndexOperatorFamilySnapshot::new(
+            &changed,
+            &changed_relations,
+            &indexes,
+            observations.clone()
+        ),
+        Err(ObservationError::InvalidObservationField {
+            field: "index_operator_family_predecessor_binding"
+        })
+    );
+    let changed_indexes = IndexPartitionSnapshot::new(
+        &changed,
+        &changed_relations,
+        indexes.observations().to_vec(),
+    )
+    .unwrap();
+    assert!(
+        IndexOperatorFamilySnapshot::new(
+            &changed,
+            &changed_relations,
+            &changed_indexes,
+            observations
+        )
+        .is_ok()
+    );
+}
+
+#[test]
+fn one_operator_class_cannot_claim_two_families_in_the_same_capture() {
+    for method in ["btree", "hash"] {
+        let relation = relation(
+            "events",
+            RelationKind::Table,
+            "events_label_idx",
+            "text_ops",
+        )
+        .with_indexes(vec![
+            index("events_label_idx", "text_ops"),
+            index("alternate_label_idx", "text_ops").with_access_method(method),
+        ])
+        .unwrap();
+        let base = PostgresSchemaSnapshotV3::new(
+            &authorized_source(),
+            "extractor-index-operator-family-equivalence-v1",
+            "2026-09-14T16:40:00Z",
+            vec![relation],
+            vec![],
+            vec![],
+        )
+        .unwrap();
+        let relations = RelationPartitionSnapshot::new(
+            &base,
+            vec![
+                RelationPartitionObservation::non_partition(
+                    "public",
+                    "events",
+                    RelationKind::Table,
+                )
+                .unwrap(),
+            ],
+        )
+        .unwrap();
+        let coordinates = ["events_label_idx", "alternate_label_idx"].map(|name| {
+            IndexPartitionCoordinate::new("public", "events", RelationKind::Table, name).unwrap()
+        });
+        let indexes = IndexPartitionSnapshot::new(
+            &base,
+            &relations,
+            coordinates
+                .iter()
+                .map(|coordinate| {
+                    IndexPartitionObservation::non_partition(
+                        coordinate.clone(),
+                        IndexRelationKind::Index,
+                    )
+                    .unwrap()
+                })
+                .collect(),
+        )
+        .unwrap();
+        let second_family = |name| {
+            IndexKeyOperatorFamilyObservation::new(
+                coordinates[1].clone(),
+                1,
+                QualifiedOperatorClassName::new("pg_catalog", "text_ops").unwrap(),
+                QualifiedOperatorFamilyName::new(method, "pg_catalog", name).unwrap(),
+            )
+            .unwrap()
+        };
+        let result = IndexOperatorFamilySnapshot::new(
+            &base,
+            &relations,
+            &indexes,
+            vec![
+                family(coordinates[0].clone(), "text_ops", "text_ops"),
+                second_family("text_pattern_ops"),
+            ],
+        );
+        if method == "btree" {
+            assert_eq!(
+                result,
+                Err(ObservationError::InvalidObservationField {
+                    field: "index_operator_family_class_binding",
+                })
+            );
+        } else {
+            assert!(
+                result.is_ok(),
+                "same class name in distinct access methods is distinct identity"
+            );
+        }
+        let consistent = IndexOperatorFamilySnapshot::new(
+            &base,
+            &relations,
+            &indexes,
+            vec![
+                family(coordinates[0].clone(), "text_ops", "text_ops"),
+                second_family("text_ops"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            consistent
+                .source_receipt(&coordinates[1], 1)
+                .unwrap()
+                .location()
+                .index(),
+            &coordinates[1]
+        );
+    }
+}

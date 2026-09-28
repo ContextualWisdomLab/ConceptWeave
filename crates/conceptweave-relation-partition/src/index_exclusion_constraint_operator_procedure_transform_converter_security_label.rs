@@ -31,7 +31,8 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLa
 impl IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabel {
     /// Creates one exact provider/label pair.
     ///
-    /// Provider identity must be nonblank. Label text is intentionally not trimmed, parsed, or
+    /// Provider identity must be nonempty and contain no NUL; quoted whitespace is preserved.
+    /// Label text is intentionally not trimmed, parsed, or
     /// otherwise normalized because the registered PostgreSQL label provider owns its validity and
     /// semantics; an empty string remains observable if a provider accepts it.
     pub fn new(
@@ -40,7 +41,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabel {
     ) -> Result<Self, ObservationError> {
         let provider = provider.into();
         let label = label.into();
-        validate_nonblank(
+        validate_identifier(
             &provider,
             "index_exclusion_constraint_operator_procedure_transform_converter_security_label_provider",
         )?;
@@ -90,11 +91,11 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelObs
         }
         let converter_schema_name = converter_schema_name.into();
         let converter_function_name = converter_function_name.into();
-        validate_nonblank(
+        validate_identifier(
             &converter_schema_name,
             "index_exclusion_constraint_operator_procedure_transform_converter_security_label_function_schema",
         )?;
-        validate_nonblank(
+        validate_identifier(
             &converter_function_name,
             "index_exclusion_constraint_operator_procedure_transform_converter_security_label_function_name",
         )?;
@@ -289,11 +290,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelSna
                         && candidate.transform_type() == observation.transform_type()
                         && candidate.direction() == observation.direction()
                 })
-                .ok_or_else(|| {
-                    invalid(
-                        "index_exclusion_constraint_operator_procedure_transform_converter_security_label_completeness",
-                    )
-                })?;
+                .ok_or(invalid("index_exclusion_constraint_operator_procedure_transform_converter_security_label_completeness"))?;
             if predecessor.converter_schema_name() != observation.converter_schema_name()
                 || predecessor.converter_function_name() != observation.converter_function_name()
             {
@@ -545,8 +542,8 @@ fn encode_str(hasher: &mut Sha256, value: &str) {
     hasher.update(value.as_bytes());
 }
 
-fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
-    if value.trim().is_empty() {
+fn validate_identifier(value: &str, field: &'static str) -> Result<(), ObservationError> {
+    if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }
     Ok(())

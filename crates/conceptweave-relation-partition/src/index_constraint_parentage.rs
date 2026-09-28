@@ -247,7 +247,7 @@ impl IndexConstraintParentageSnapshot {
             relation_partition_snapshot,
             index_partition_snapshot.observations().to_vec(),
         )?;
-        if rebound.snapshot_digest() != index_partition_snapshot.snapshot_digest() {
+        if rebound != *index_partition_snapshot {
             return Err(invalid("index_constraint_parentage_predecessor_binding"));
         }
 
@@ -392,7 +392,7 @@ fn expected_parent_constraint(
         .observations()
         .iter()
         .find(|membership| membership.coordinate() == &child_index)
-        .ok_or_else(|| invalid("index_constraint_parentage_backing_index"))?;
+        .ok_or(invalid("index_constraint_parentage_backing_index"))?;
     let Some(parent_index) = membership.parent_index() else {
         return Ok(None);
     };
@@ -405,7 +405,7 @@ fn expected_parent_constraint(
                 && relation.relation_name() == parent_index.relation_name()
                 && relation.kind() == parent_index.relation_kind()
         })
-        .ok_or_else(|| invalid("index_constraint_parentage_parent_coordinate"))?;
+        .ok_or(invalid("index_constraint_parentage_parent_coordinate"))?;
     let parent_is_key_constraint = parent_relation.constraints().iter().any(|constraint| {
         is_key_constraint(constraint) && constraint.constraint_name() == parent_index.index_name()
     });
@@ -468,7 +468,7 @@ fn encode_coordinate(hasher: &mut Sha256, coordinate: &IndexConstraintParentageC
 }
 
 fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
-    if value.trim().is_empty() {
+    if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }
     Ok(())

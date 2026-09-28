@@ -31,7 +31,7 @@ impl QualifiedOperatorSignature {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let operator_name = operator_name.into();
-        validate_nonblank(&schema_name, "exclusion_operator_schema_name")?;
+        validate_identifier(&schema_name, "exclusion_operator_schema_name")?;
         validate_nonblank(&operator_name, "exclusion_operator_name")?;
         Ok(Self {
             schema_name,
@@ -83,8 +83,8 @@ impl QualifiedProcedureSignature {
     ) -> Result<Self, ObservationError> {
         let schema_name = schema_name.into();
         let procedure_name = procedure_name.into();
-        validate_nonblank(&schema_name, "exclusion_procedure_schema_name")?;
-        validate_nonblank(&procedure_name, "exclusion_procedure_name")?;
+        validate_identifier(&schema_name, "exclusion_procedure_schema_name")?;
+        validate_identifier(&procedure_name, "exclusion_procedure_name")?;
         if !(1..=2).contains(&argument_types.len()) {
             return Err(invalid("exclusion_procedure_argument_types"));
         }
@@ -273,7 +273,13 @@ impl IndexExclusionSemanticsSnapshot {
             index_partition_snapshot,
             operator_family_snapshot.observations().to_vec(),
         )?;
-        if rebound.snapshot_digest() != operator_family_snapshot.snapshot_digest() {
+        if rebound.snapshot_digest() != operator_family_snapshot.snapshot_digest()
+            || rebound.source_connection_key() != operator_family_snapshot.source_connection_key()
+            || rebound.connection_policy_binding()
+                != operator_family_snapshot.connection_policy_binding()
+            || rebound.extractor_revision() != operator_family_snapshot.extractor_revision()
+            || rebound.observed_at_utc() != operator_family_snapshot.observed_at_utc()
+        {
             return Err(invalid("index_exclusion_semantics_predecessor_binding"));
         }
 
@@ -371,9 +377,9 @@ fn validate_exclusion_presence(
             continue;
         };
         let child = find_base_index(base_snapshot, membership.coordinate())
-            .ok_or_else(|| invalid("index_exclusion_semantics_index_binding"))?;
+            .ok_or(invalid("index_exclusion_semantics_index_binding"))?;
         let parent = find_base_index(base_snapshot, parent)
-            .ok_or_else(|| invalid("index_exclusion_semantics_index_binding"))?;
+            .ok_or(invalid("index_exclusion_semantics_index_binding"))?;
         if exclusion_flag(child)? != exclusion_flag(parent)? {
             return Err(invalid("index_partition_definition_exclusion_presence"));
         }
@@ -443,7 +449,7 @@ fn canonicalize_exclusion_semantics(
             continue;
         };
         let child_index = find_base_index(base_snapshot, membership.coordinate())
-            .ok_or_else(|| invalid("index_exclusion_semantics_index_binding"))?;
+            .ok_or(invalid("index_exclusion_semantics_index_binding"))?;
         if !exclusion_flag(child_index)? {
             continue;
         }
@@ -451,10 +457,10 @@ fn canonicalize_exclusion_semantics(
             let position = key.position();
             let child = by_key
                 .get(&(membership.coordinate().clone(), position))
-                .ok_or_else(|| invalid("index_exclusion_semantics_completeness"))?;
+                .ok_or(invalid("index_exclusion_semantics_completeness"))?;
             let parent = by_key
                 .get(&(parent.clone(), position))
-                .ok_or_else(|| invalid("index_exclusion_semantics_completeness"))?;
+                .ok_or(invalid("index_exclusion_semantics_completeness"))?;
             if child.operator() != parent.operator() {
                 return Err(invalid("index_partition_definition_exclusion_operator"));
             }
@@ -476,7 +482,7 @@ fn exclusion_flag(
     index
         .catalog_flags()
         .map(|flags| flags.exclusion())
-        .ok_or_else(|| invalid("index_exclusion_semantics_catalog_flags"))
+        .ok_or(invalid("index_exclusion_semantics_catalog_flags"))
 }
 
 fn find_base_index<'a>(
@@ -543,7 +549,14 @@ fn encode_type(hasher: &mut Sha256, qualified_type: &QualifiedTypeName) {
 }
 
 fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
-    if value.trim().is_empty() {
+    if value.trim().is_empty() || value.contains('\0') {
+        return Err(invalid(field));
+    }
+    Ok(())
+}
+
+fn validate_identifier(value: &str, field: &'static str) -> Result<(), ObservationError> {
+    if value.is_empty() || value.contains('\0') {
         return Err(invalid(field));
     }
     Ok(())

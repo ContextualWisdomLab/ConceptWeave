@@ -250,6 +250,13 @@ fn ordinary_exclude_transform_converter_argument_modes_preserve_location_receipt
         .unwrap();
     assert_eq!(receipt.location().argument_modes(), None);
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(receipt.source_id(), snapshot.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        snapshot.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
 
     let dotted_schema =
         conceptweave_observation::QualifiedTypeName::new("payload.domain", "json").unwrap();
@@ -283,13 +290,13 @@ fn ordinary_exclude_transform_converter_argument_modes_preserve_location_receipt
 
     for (schema, function, field) in [
         (
-            " ",
+            "",
             "payload_from_sql",
             "index_exclusion_constraint_operator_procedure_transform_converter_argument_modes_function_schema",
         ),
         (
             "public",
-            "\t",
+            "",
             "index_exclusion_constraint_operator_procedure_transform_converter_argument_modes_function_name",
         ),
     ] {

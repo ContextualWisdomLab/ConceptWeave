@@ -1,5 +1,6 @@
 use conceptweave_client::{
     ReleaseContractError, ReleaseDigest, ReleaseMetadata, SemanticRelease, SemanticReleaseClient,
+    TrustedReleaseManifest,
 };
 use conceptweave_domain::{EvidenceReference, PublicationState, TruthStatus};
 
@@ -37,8 +38,13 @@ fn published_release(digest: &str) -> SemanticRelease {
 
 #[test]
 fn detached_artifact_digest_verification_accepts_exact_bytes_offline() {
-    let client = SemanticReleaseClient::new("1.0.0").unwrap();
     let release = published_release(DETACHED_ARTIFACT_DIGEST);
+    let client = SemanticReleaseClient::with_trusted_release_manifests(
+        "1.0.0",
+        vec![],
+        vec![TrustedReleaseManifest::new(release.release_id(), release.manifest_digest()).unwrap()],
+    )
+    .unwrap();
 
     assert_eq!(
         client.verify_detached_artifact(&release, DETACHED_ARTIFACT_BYTES),
@@ -48,8 +54,13 @@ fn detached_artifact_digest_verification_accepts_exact_bytes_offline() {
 
 #[test]
 fn detached_artifact_digest_verification_rejects_changed_bytes() {
-    let client = SemanticReleaseClient::new("1.0.0").unwrap();
     let release = published_release(DETACHED_ARTIFACT_DIGEST);
+    let client = SemanticReleaseClient::with_trusted_release_manifests(
+        "1.0.0",
+        vec![],
+        vec![TrustedReleaseManifest::new(release.release_id(), release.manifest_digest()).unwrap()],
+    )
+    .unwrap();
 
     let result = client.verify_detached_artifact(
         &release,

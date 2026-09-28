@@ -97,7 +97,22 @@ fn generation_snapshot() -> PostgresSchemaSnapshotV3 {
 fn expression_snapshot(
     expressions: Vec<ColumnExpressionObservation>,
 ) -> Result<PostgresSchemaSnapshotV3, ObservationError> {
-    generation_snapshot().with_observed_column_expressions(expressions)
+    let predecessor = generation_snapshot();
+    let incremental = predecessor
+        .clone()
+        .with_observed_column_expressions(expressions.clone());
+    let combined = PostgresSchemaSnapshotV3::new_with_column_expressions(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        predecessor.extractor_revision(),
+        predecessor.observed_at_utc(),
+        predecessor.relations().to_vec(),
+        predecessor.domains().to_vec(),
+        predecessor.enums().to_vec(),
+        predecessor.column_generations().unwrap().to_vec(),
+        expressions,
+    );
+    assert_eq!(combined, incremental);
+    combined
 }
 
 #[test]
@@ -293,4 +308,62 @@ fn generation_mode_and_expression_kind_must_agree() {
             field: "column_expression_generation",
         }
     );
+}
+
+#[test]
+fn expression_evidence_has_one_canonical_position_after_generation() {
+    let base = PostgresSchemaSnapshotV3::new(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-13T05:12:00Z",
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    )
+    .unwrap()
+    .with_observed_column_generations(Vec::new())
+    .unwrap();
+    assert_eq!(
+        base.clone()
+            .with_observed_column_expressions(Vec::new())
+            .unwrap()
+            .with_observed_column_expressions(Vec::new()),
+        Err(ObservationError::InvalidObservationField {
+            field: "column_expression_already_observed",
+        })
+    );
+
+    let later = [
+        (
+            "NOT NULL",
+            base.clone().with_observed_not_null_constraints(Vec::new()),
+        ),
+        (
+            "timing",
+            base.clone().with_observed_constraint_timings(Vec::new()),
+        ),
+        (
+            "period",
+            base.clone().with_observed_constraint_periods(Vec::new()),
+        ),
+        (
+            "foreign-key catalog",
+            base.clone().with_observed_foreign_key_catalog(Vec::new()),
+        ),
+        (
+            "collation definition",
+            base.with_observed_collation_definitions(Vec::new()),
+        ),
+    ];
+
+    for (family, snapshot) in later {
+        let snapshot = snapshot.unwrap_or_else(|error| panic!("{family}: {error}"));
+        assert_eq!(
+            snapshot.with_observed_column_expressions(Vec::new()),
+            Err(ObservationError::InvalidObservationField {
+                field: "column_expression_observation_order",
+            }),
+            "{family} must fix the earlier source identity order"
+        );
+    }
 }

@@ -77,6 +77,12 @@ fn ordinary_exclude_operator_procedure_access_control_preserves_effective_execut
     assert_eq!(receipt.location().procedure(), &procedure("int4eq"));
     assert_eq!(receipt.source_id(), configuration.source_connection_key());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        snapshot.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
     assert!(
         receipt
             .location()
@@ -234,13 +240,18 @@ fn ordinary_exclude_operator_procedure_access_control_rejects_duplicate_effectiv
 }
 
 #[test]
-fn ordinary_exclude_operator_procedure_access_control_rejects_blank_role_identity() {
-    let error = IndexExclusionConstraintOperatorProcedureExecuteGrant::role(" ", "postgres", false)
-        .expect_err("grantee role identity must be explicit");
-    assert_field(
-        error,
-        "index_exclusion_constraint_operator_procedure_access_control_grantee_role_name",
-    );
+fn ordinary_exclude_operator_procedure_access_control_preserves_quoted_role_identity() {
+    IndexExclusionConstraintOperatorProcedureExecuteGrant::role(" ", " ", false).unwrap();
+    IndexExclusionConstraintOperatorProcedureExecuteGrant::public(" ", false).unwrap();
+    for name in ["", "bad\0name"] {
+        let error =
+            IndexExclusionConstraintOperatorProcedureExecuteGrant::role(name, "postgres", false)
+                .expect_err("empty and NUL-containing role names cannot come from PostgreSQL");
+        assert_field(
+            error,
+            "index_exclusion_constraint_operator_procedure_access_control_grantee_role_name",
+        );
+    }
 }
 
 #[test]

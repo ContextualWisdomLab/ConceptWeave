@@ -1,0 +1,15 @@
+[package]
+name = "conceptweave-discovery"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "Receipt-bound relational semantic proposals for ConceptWeave"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+conceptweave-domain = { path = "../conceptweave-domain" }
+conceptweave-observation = { path = "../conceptweave-observation" }

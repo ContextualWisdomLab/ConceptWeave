@@ -17,15 +17,18 @@ use conceptweave_source_port::{
 
 const POLICY_BINDING: &str = "fixture_policy_revision_a";
 
-struct Registry;
+struct Registry {
+    key: &'static str,
+    policy: &'static str,
+}
 
 impl SourceConnectionRegistry for Registry {
     fn contains_source_connection(&self, source_connection_key: &str) -> bool {
-        source_connection_key == "warehouse_primary"
+        source_connection_key == self.key
     }
 
     fn connection_policy_binding(&self, source_connection_key: &str) -> Option<String> {
-        (source_connection_key == "warehouse_primary").then(|| POLICY_BINDING.to_owned())
+        (source_connection_key == self.key).then(|| self.policy.to_owned())
     }
 
     fn authorizes_schema_scope(
@@ -33,8 +36,8 @@ impl SourceConnectionRegistry for Registry {
         source_connection: &ResolvedSourceConnection,
         allowed_schema_names: &[String],
     ) -> bool {
-        source_connection.source_connection_key() == "warehouse_primary"
-            && source_connection.connection_policy_binding() == POLICY_BINDING
+        source_connection.source_connection_key() == self.key
+            && source_connection.connection_policy_binding() == self.policy
             && allowed_schema_names == ["public"]
     }
 
@@ -43,8 +46,8 @@ impl SourceConnectionRegistry for Registry {
         source_connection: &ResolvedSourceConnection,
         resource_envelope: ObservationResourceEnvelope,
     ) -> bool {
-        source_connection.source_connection_key() == "warehouse_primary"
-            && source_connection.connection_policy_binding() == POLICY_BINDING
+        source_connection.source_connection_key() == self.key
+            && source_connection.connection_policy_binding() == self.policy
             && resource_envelope.request_budget().max_schema_count() <= 1
             && resource_envelope.request_budget().max_schema_bytes() <= 256
             && resource_envelope.limits().operation_timeout_ms() <= 1_000
@@ -56,14 +59,21 @@ impl SourceConnectionRegistry for Registry {
 }
 
 fn authorized_source() -> AuthorizedObservationRequest {
+    authorized_source_with_binding("warehouse_primary", POLICY_BINDING)
+}
+
+fn authorized_source_with_binding(
+    key: &'static str,
+    policy: &'static str,
+) -> AuthorizedObservationRequest {
     ObservationRequest::new(
-        "warehouse_primary",
+        key,
         vec!["public".to_owned()],
         ObservationRequestBudget::new(1, 256).unwrap(),
         ObservationLimits::new(1_000, 10, 1_024, 1).unwrap(),
     )
     .unwrap()
-    .authorize(&Registry)
+    .authorize(&Registry { key, policy })
     .unwrap()
 }
 
@@ -136,6 +146,20 @@ fn relation(
 }
 
 fn base_snapshot(parent_constraint: bool) -> PostgresSchemaSnapshotV3 {
+    base_snapshot_with_capture(
+        parent_constraint,
+        &authorized_source(),
+        "extractor-index-constraint-parentage-v1",
+        "2026-09-16T09:41:00Z",
+    )
+}
+
+fn base_snapshot_with_capture(
+    parent_constraint: bool,
+    source: &AuthorizedObservationRequest,
+    revision: &str,
+    time: &str,
+) -> PostgresSchemaSnapshotV3 {
     let mut timings = Vec::new();
     if parent_constraint {
         timings.push(
@@ -161,9 +185,9 @@ fn base_snapshot(parent_constraint: bool) -> PostgresSchemaSnapshotV3 {
     );
 
     PostgresSchemaSnapshotV3::new_with_constraint_timings(
-        &authorized_source(),
-        "extractor-index-constraint-parentage-v1",
-        "2026-09-16T09:41:00Z",
+        source,
+        revision,
+        time,
         vec![
             relation(
                 "events",
@@ -319,6 +343,41 @@ fn exact_constraint_parentage_is_admitted_and_receipted() {
         Some(&parent_constraint())
     );
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    let observed = child_constraint();
+    for (schema, relation, relation_kind, name) in [
+        (
+            "unobserved_schema",
+            observed.relation_name(),
+            observed.relation_kind(),
+            observed.constraint_name(),
+        ),
+        (
+            observed.schema_name(),
+            "unobserved_relation",
+            observed.relation_kind(),
+            observed.constraint_name(),
+        ),
+        (
+            observed.schema_name(),
+            observed.relation_name(),
+            RelationKind::PartitionedTable,
+            observed.constraint_name(),
+        ),
+        (
+            observed.schema_name(),
+            observed.relation_name(),
+            observed.relation_kind(),
+            "unobserved/constraint~",
+        ),
+    ] {
+        let absent =
+            IndexConstraintParentageCoordinate::new(schema, relation, relation_kind, name).unwrap();
+        let location = absent.canonical_location();
+        assert_eq!(
+            snapshot.source_receipt(absent).unwrap_err(),
+            ObservationError::UnknownObservationLocation { location }
+        );
+    }
 }
 
 #[test]
@@ -339,4 +398,70 @@ fn child_constraint_below_nonconstraint_parent_index_remains_local() {
 
     assert_eq!(snapshot.observations().len(), 1);
     assert!(snapshot.observations()[0].parent_constraint().is_none());
+}
+
+#[test]
+fn parentage_rejects_index_evidence_from_another_capture() {
+    let original = base_snapshot(true);
+    let original_relations = relation_partitions(&original);
+    let original_indexes = index_partitions(&original, &original_relations);
+    for (key, policy, revision, time) in [
+        (
+            "warehouse_secondary",
+            POLICY_BINDING,
+            original.extractor_revision(),
+            original.observed_at_utc(),
+        ),
+        (
+            "warehouse_primary",
+            "fixture_policy_revision_b",
+            original.extractor_revision(),
+            original.observed_at_utc(),
+        ),
+        (
+            "warehouse_primary",
+            POLICY_BINDING,
+            "extractor-index-constraint-parentage-v2",
+            original.observed_at_utc(),
+        ),
+        (
+            "warehouse_primary",
+            POLICY_BINDING,
+            original.extractor_revision(),
+            "2026-09-17T09:41:00Z",
+        ),
+    ] {
+        let base = base_snapshot_with_capture(
+            true,
+            &authorized_source_with_binding(key, policy),
+            revision,
+            time,
+        );
+        let relations = relation_partitions(&base);
+        let facts = vec![
+            IndexConstraintParentageObservation::root(parent_constraint()).unwrap(),
+            IndexConstraintParentageObservation::partition(child_constraint(), parent_constraint())
+                .unwrap(),
+        ];
+        assert_eq!(
+            IndexConstraintParentageSnapshot::new(
+                &base,
+                &relations,
+                &original_indexes,
+                facts.clone()
+            )
+            .unwrap_err(),
+            ObservationError::InvalidObservationField {
+                field: "index_constraint_parentage_predecessor_binding"
+            }
+        );
+        let indexes = index_partitions(&base, &relations);
+        let accepted =
+            IndexConstraintParentageSnapshot::new(&base, &relations, &indexes, facts).unwrap();
+        let receipt = accepted.source_receipt(child_constraint()).unwrap();
+        assert_eq!(receipt.source_id(), key);
+        assert_eq!(receipt.connection_policy_binding(), policy);
+        assert_eq!(receipt.extractor_revision(), revision);
+        assert_eq!(receipt.observed_at_utc(), time);
+    }
 }

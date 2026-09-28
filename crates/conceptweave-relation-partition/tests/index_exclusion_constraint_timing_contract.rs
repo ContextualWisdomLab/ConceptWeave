@@ -287,6 +287,25 @@ fn exclusion_constraint_initial_timing_changes_governed_identity() {
     assert!(receipt.location().deferrable());
     assert!(receipt.location().initially_deferred());
     assert_eq!(receipt.source_digest(), deferred.snapshot_digest());
+    assert_eq!(receipt.source_id(), base.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        base.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), base.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), base.observed_at_utc());
+    assert!(receipt.location().canonical_location().ends_with("/timing"));
+    let absent = IndexExclusionConstraintCoordinate::new(
+        "public",
+        "bookings",
+        RelationKind::Table,
+        "unobserved_constraint",
+    )
+    .unwrap();
+    assert!(matches!(
+        deferred.source_receipt(absent),
+        Err(ObservationError::UnknownObservationLocation { .. })
+    ));
 }
 
 #[test]

@@ -223,6 +223,13 @@ fn exact_backing_index_namespace_is_retained_and_receipted() {
     assert_eq!(receipt.location().index_schema_name(), "public");
     assert_eq!(receipt.location().backing_index(), &index_coordinate());
     assert_eq!(receipt.source_digest(), snapshot.snapshot_digest());
+    assert_eq!(receipt.source_id(), snapshot.source_connection_key());
+    assert_eq!(
+        receipt.connection_policy_binding(),
+        snapshot.connection_policy_binding()
+    );
+    assert_eq!(receipt.extractor_revision(), snapshot.extractor_revision());
+    assert_eq!(receipt.observed_at_utc(), snapshot.observed_at_utc());
     assert!(
         receipt
             .location()
@@ -254,11 +261,11 @@ fn mismatched_backing_index_namespace_fails_closed() {
 }
 
 #[test]
-fn blank_backing_index_namespace_fails_closed() {
+fn empty_backing_index_namespace_fails_closed() {
     let error = IndexExclusionConstraintIndexNamespaceObservation::new(
         coordinate(),
         index_coordinate(),
-        "   ",
+        "",
     )
     .expect_err("resolved pg_class.relnamespace must be present");
     assert_eq!(

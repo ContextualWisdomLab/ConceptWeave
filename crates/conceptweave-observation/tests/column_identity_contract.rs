@@ -1,6 +1,8 @@
 use conceptweave_observation::{
-    ColumnIdentityObservation, ColumnObservationV3, ObservationError, PostgresSchemaSnapshotV3,
-    QualifiedTypeName, RelationKind, RelationObservation,
+    ColumnIdentityObservation, ColumnObservationV3, IdentitySequenceObservation,
+    IndexAttributeKind, IndexAttributeObservation, IndexKeySemantics, IndexObservation,
+    ObservationError, PostgresSchemaSnapshotV3, QualifiedOperatorClassName, QualifiedTypeName,
+    RelationKind, RelationObservation,
 };
 
 mod support;
@@ -88,6 +90,254 @@ fn snapshot(
         Vec::new(),
         column_identities,
     )
+}
+
+fn sequence(increment: i64) -> IdentitySequenceObservation {
+    sequence_named("account_id_seq", increment)
+}
+
+fn sequence_named(name: &str, increment: i64) -> IdentitySequenceObservation {
+    IdentitySequenceObservation::new(
+        QualifiedTypeName::new("public", name).unwrap(),
+        catalog_type("int8"),
+        5,
+        increment,
+        2,
+        100,
+        7,
+        true,
+        None,
+    )
+    .unwrap()
+}
+
+#[test]
+fn identity_sequence_cannot_reuse_its_parent_relation_name() {
+    assert_eq!(
+        snapshot(
+            vec![one_column_relation()],
+            vec![
+                always("account_id")
+                    .with_sequence(sequence_named("account", 3))
+                    .unwrap()
+            ],
+        )
+        .unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "schema_relation_namespace"
+        }
+    );
+}
+
+#[test]
+fn identity_sequence_cannot_reuse_an_index_name() {
+    let index = IndexObservation::new(
+        "account_id_seq",
+        false,
+        Some(false),
+        vec![IndexAttributeObservation::new(1, IndexAttributeKind::Key, "account_id").unwrap()],
+        Vec::new(),
+    )
+    .unwrap()
+    .with_access_method("btree")
+    .with_key_semantics(vec![
+        IndexKeySemantics::new(
+            1,
+            None,
+            QualifiedOperatorClassName::new("pg_catalog", "int8_ops").unwrap(),
+            0,
+        )
+        .unwrap(),
+    ])
+    .unwrap();
+    let relation = one_column_relation().with_indexes(vec![index]).unwrap();
+    assert_eq!(
+        snapshot(
+            vec![relation],
+            vec![always("account_id").with_sequence(sequence(3)).unwrap()],
+        )
+        .unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "schema_relation_namespace"
+        }
+    );
+}
+
+#[test]
+fn identity_sequence_name_is_scoped_to_its_schema() {
+    let archive = RelationObservation::new(
+        "archive",
+        "account_id_seq",
+        RelationKind::Table,
+        vec![ColumnObservationV3::new("id", 1, "int8", catalog_type("int8"), true, None).unwrap()],
+    )
+    .unwrap();
+    let observed = PostgresSchemaSnapshotV3::new_with_column_identities(
+        &support::authorized_source("warehouse_primary", &["public", "archive"]),
+        "postgres_introspector_v3",
+        "2026-09-13T06:42:00Z",
+        vec![one_column_relation(), archive],
+        Vec::new(),
+        Vec::new(),
+        vec![
+            always("account_id").with_sequence(sequence(3)).unwrap(),
+            ColumnIdentityObservation::not_identity(
+                "archive",
+                "account_id_seq",
+                RelationKind::Table,
+                "id",
+            )
+            .unwrap(),
+        ],
+    );
+    assert!(
+        observed.is_ok(),
+        "a different schema has a separate pg_class namespace"
+    );
+}
+
+#[test]
+fn identity_sequence_can_share_its_exact_sequence_relation_coordinate() {
+    let sequence_relation = RelationObservation::new(
+        "public",
+        "account_id_seq",
+        RelationKind::Sequence,
+        vec![
+            ColumnObservationV3::new("last_value", 1, "int8", catalog_type("int8"), false, None)
+                .unwrap(),
+        ],
+    )
+    .unwrap();
+    let observed = snapshot(
+        vec![one_column_relation(), sequence_relation],
+        vec![
+            always("account_id").with_sequence(sequence(3)).unwrap(),
+            ColumnIdentityObservation::not_identity(
+                "public",
+                "account_id_seq",
+                RelationKind::Sequence,
+                "last_value",
+            )
+            .unwrap(),
+        ],
+    );
+    assert!(
+        observed.is_ok(),
+        "one sequence may appear as both relation evidence and identity settings: {:?}",
+        observed.err()
+    );
+}
+
+#[test]
+fn exact_identity_sequence_settings_extend_legacy_declaration_identity() {
+    let declaration = snapshot(vec![one_column_relation()], vec![always("account_id")]).unwrap();
+    let first = snapshot(
+        vec![one_column_relation()],
+        vec![always("account_id").with_sequence(sequence(3)).unwrap()],
+    )
+    .unwrap();
+    let changed = snapshot(
+        vec![one_column_relation()],
+        vec![always("account_id").with_sequence(sequence(4)).unwrap()],
+    )
+    .unwrap();
+    assert_ne!(first.snapshot_digest(), declaration.snapshot_digest());
+    assert_ne!(first.snapshot_digest(), changed.snapshot_digest());
+    assert_eq!(
+        first.column_identities().unwrap()[0]
+            .sequence()
+            .unwrap()
+            .increment(),
+        3
+    );
+    assert_eq!(
+        not_identity("account_id")
+            .with_sequence(sequence(3))
+            .unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "identity_sequence_binding"
+        }
+    );
+    assert_eq!(
+        IdentitySequenceObservation::new(
+            QualifiedTypeName::new("public", "account_id_seq").unwrap(),
+            catalog_type("int2"),
+            5,
+            3,
+            2,
+            100_000,
+            7,
+            true,
+            None,
+        )
+        .unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "identity_sequence_settings"
+        }
+    );
+}
+
+#[test]
+fn identity_sequence_rejects_equal_minimum_and_maximum() {
+    assert_eq!(
+        IdentitySequenceObservation::new(
+            QualifiedTypeName::new("public", "account_id_seq").unwrap(),
+            catalog_type("int8"),
+            1,
+            1,
+            1,
+            1,
+            1,
+            false,
+            None,
+        )
+        .unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "identity_sequence_settings"
+        }
+    );
+}
+
+#[test]
+fn identity_sequence_evidence_must_cover_every_identity_column_when_present() {
+    let relation = RelationObservation::new(
+        "public",
+        "account",
+        RelationKind::Table,
+        vec![
+            ColumnObservationV3::new("account_id", 1, "int8", catalog_type("int8"), false, None)
+                .unwrap(),
+            ColumnObservationV3::new("other_id", 2, "int8", catalog_type("int8"), false, None)
+                .unwrap(),
+        ],
+    )
+    .unwrap();
+    assert_eq!(
+        snapshot(
+            vec![relation.clone()],
+            vec![
+                always("account_id").with_sequence(sequence(3)).unwrap(),
+                always("other_id"),
+            ],
+        )
+        .unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "identity_sequence_completeness"
+        }
+    );
+    assert_eq!(
+        snapshot(
+            vec![relation],
+            vec![
+                always("account_id").with_sequence(sequence(3)).unwrap(),
+                always("other_id").with_sequence(sequence(3)).unwrap(),
+            ],
+        )
+        .unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "identity_sequence_binding"
+        }
+    );
 }
 
 #[test]
