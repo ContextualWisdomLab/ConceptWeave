@@ -4203,6 +4203,32 @@ async fn postgres18_foreign_key_preserves_comparison_and_referential_evidence() 
         );
         client
             .batch_execute(&format!(
+                "COMMENT ON CONSTRAINT child_parent_fk ON \"{schema}\".child IS 'unmodeled source comment'"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            adapter(config.clone())
+                .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+                .await
+                .err(),
+            Some(SourceObservationFailure::InvalidCapturedMetadata)
+        );
+        client
+            .batch_execute(&format!(
+                "COMMENT ON CONSTRAINT child_parent_fk ON \"{schema}\".child IS NULL"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            set_default.snapshot_digest(),
+            adapter(config.clone())
+                .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+                .await?
+                .snapshot_digest()
+        );
+        client
+            .batch_execute(&format!(
                 "CREATE SCHEMA \"{external_schema}\"; \
              CREATE TABLE \"{external_schema}\".other_parent (id integer PRIMARY KEY); \
              ALTER TABLE \"{schema}\".child ADD COLUMN outside_id integer; \
