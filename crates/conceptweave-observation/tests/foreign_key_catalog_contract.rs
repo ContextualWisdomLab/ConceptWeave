@@ -64,63 +64,65 @@ fn captured_foreign_key_requires_matching_referenced_index_and_changes_digest() 
     .with_ready(true)
     .with_valid(true)
     .with_live(true);
-    let parent =
-        RelationObservation::new("public", "parent", RelationKind::Table, vec![column("id")])
+    for parent_kind in [RelationKind::Table, RelationKind::PartitionedTable] {
+        let parent = RelationObservation::new("public", "parent", parent_kind, vec![column("id")])
             .unwrap()
-            .with_indexes(vec![parent_index])
+            .with_indexes(vec![parent_index.clone()])
             .unwrap();
-    let child = RelationObservation::new(
-        "public",
-        "child",
-        RelationKind::Table,
-        vec![column("parent_id")],
-    )
-    .unwrap()
-    .with_constraints(vec![TableConstraintObservation::ForeignKey(
-        ForeignKeyObservation::new(
-            "child_parent_fk",
-            vec!["parent_id".to_owned()],
-            "public",
-            "parent",
-            vec!["id".to_owned()],
-        )
-        .unwrap(),
-    )])
-    .unwrap();
-    let snapshot = PostgresSchemaSnapshotV3::new(
-        &support::authorized_source("warehouse_primary", &["public"]),
-        "postgres_introspector_v3",
-        "2026-09-25T00:00:00Z",
-        vec![parent, child],
-        Vec::new(),
-        Vec::new(),
-    )
-    .unwrap();
-    let operator =
-        ForeignKeyOperatorObservation::new("pg_catalog", "=", int4.clone(), int4).unwrap();
-    let catalog = |index_name: &str| {
-        ForeignKeyCatalogObservation::new(
+        let child = RelationObservation::new(
             "public",
             "child",
-            "child_parent_fk",
-            index_name,
-            vec![operator.clone()],
-            vec![operator.clone()],
-            vec![operator.clone()],
+            RelationKind::Table,
+            vec![column("parent_id")],
         )
         .unwrap()
-    };
-    assert!(
-        snapshot
-            .clone()
-            .with_observed_foreign_key_catalog(vec![catalog("missing")])
-            .is_err()
-    );
-    let base_digest = snapshot.snapshot_digest().to_owned();
-    let digest = snapshot
-        .with_observed_foreign_key_catalog(vec![catalog("parent_key")])
-        .unwrap()
-        .snapshot_digest()
-        .to_owned();
-    assert_ne!(digest, base_digest);
+        .with_constraints(vec![TableConstraintObservation::ForeignKey(
+            ForeignKeyObservation::new(
+                "child_parent_fk",
+                vec!["parent_id".to_owned()],
+                "public",
+                "parent",
+                vec!["id".to_owned()],
+            )
+            .unwrap(),
+        )])
+        .unwrap();
+        let snapshot = PostgresSchemaSnapshotV3::new(
+            &support::authorized_source("warehouse_primary", &["public"]),
+            "postgres_introspector_v3",
+            "2026-09-25T00:00:00Z",
+            vec![parent, child],
+            Vec::new(),
+            Vec::new(),
+        )
+        .unwrap();
+        let operator =
+            ForeignKeyOperatorObservation::new("pg_catalog", "=", int4.clone(), int4.clone())
+                .unwrap();
+        let catalog = |index_name: &str| {
+            ForeignKeyCatalogObservation::new(
+                "public",
+                "child",
+                "child_parent_fk",
+                index_name,
+                vec![operator.clone()],
+                vec![operator.clone()],
+                vec![operator.clone()],
+            )
+            .unwrap()
+        };
+        assert!(
+            snapshot
+                .clone()
+                .with_observed_foreign_key_catalog(vec![catalog("missing")])
+                .is_err()
+        );
+        let base_digest = snapshot.snapshot_digest().to_owned();
+        let digest = snapshot
+            .with_observed_foreign_key_catalog(vec![catalog("parent_key")])
+            .unwrap()
+            .snapshot_digest()
+            .to_owned();
+        assert_ne!(digest, base_digest);
+    }
 }

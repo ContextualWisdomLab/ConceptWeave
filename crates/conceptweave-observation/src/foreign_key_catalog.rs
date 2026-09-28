@@ -207,7 +207,10 @@ pub(crate) fn canonicalize(
             .find(|candidate| {
                 candidate.schema_name() == foreign_key.referenced_schema_name()
                     && candidate.relation_name() == foreign_key.referenced_table_name()
-                    && candidate.kind() == RelationKind::Table
+                    && matches!(
+                        candidate.kind(),
+                        RelationKind::Table | RelationKind::PartitionedTable
+                    )
             })
             .ok_or(ObservationError::InvalidObservationField {
                 field: "foreign_key_reference_scope",
