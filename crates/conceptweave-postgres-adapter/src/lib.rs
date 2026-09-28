@@ -2348,6 +2348,17 @@ mod tests {
         .unwrap()
     }
 
+    #[test]
+    fn cumulative_metadata_bytes_cannot_exceed_the_authorized_limit() {
+        let request = request(100);
+        let mut meter = CaptureMeter::default();
+        assert_eq!(meter.add(&request, 8_192), Ok(()));
+        assert_eq!(
+            meter.add(&request, 1),
+            Err(SourceObservationFailure::ByteLimitExceeded { max_bytes: 8_192 })
+        );
+    }
+
     #[tokio::test]
     async fn completed_future_cannot_exceed_the_authorized_operation_budget() {
         let result = bounded(&request(100), &NotCancelled, async {
