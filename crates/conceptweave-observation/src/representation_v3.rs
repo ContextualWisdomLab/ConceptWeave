@@ -1390,13 +1390,35 @@ impl RelationObservation {
     /// Replaces constraint evidence, preserving exact local-column coordinates.
     ///
     /// Constraints are canonicalized into deterministic source-name order. Constraints that expose
-    /// local-column coordinates must refer to columns in this same relation observation.
+    /// local-column coordinates must refer to columns in this same relation observation. Key and
+    /// relationship constraints require a table; `CHECK` also permits a foreign table.
     pub fn with_constraints(
         mut self,
         mut constraints: Vec<TableConstraintObservation>,
     ) -> Result<Self, ObservationError> {
         let mut constraint_names = BTreeSet::new();
         for constraint in &constraints {
+            let allowed_kind = match constraint {
+                TableConstraintObservation::Check(_) => matches!(
+                    self.kind,
+                    RelationKind::Table
+                        | RelationKind::PartitionedTable
+                        | RelationKind::ForeignTable
+                ),
+                TableConstraintObservation::PrimaryKey(_)
+                | TableConstraintObservation::Unique(_)
+                | TableConstraintObservation::ForeignKey(_) => {
+                    matches!(
+                        self.kind,
+                        RelationKind::Table | RelationKind::PartitionedTable
+                    )
+                }
+            };
+            if !allowed_kind {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "constraint_relation_kind",
+                });
+            }
             let constraint_name = constraint.constraint_name();
             if !constraint_names.insert(constraint_name.to_owned()) {
                 return Err(ObservationError::DuplicateConstraintName {
