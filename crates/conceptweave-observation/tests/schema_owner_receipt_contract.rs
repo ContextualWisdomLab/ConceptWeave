@@ -105,4 +105,71 @@ fn empty_schema_owner_has_an_exact_receipt_only_after_observation() {
     );
     assert!(SchemaOwnerLocation::new("").is_err());
     assert!(SchemaOwnerLocation::new("bad\0schema").is_err());
+    assert!(SchemaOwnerObservation::new("bad\0schema", 42, "owner").is_err());
+    assert!(SchemaOwnerObservation::new("public", 42, "bad\0owner").is_err());
+    assert_eq!(
+        SchemaOwnerObservation::new("public", 0, "owner"),
+        Err(ObservationError::InvalidObservationField {
+            field: "schema_owner_oid"
+        })
+    );
+}
+
+#[test]
+fn schema_owner_inventory_covers_every_authorized_schema_without_tables() {
+    let snapshot = PostgresSchemaSnapshotV3::new_with_type_kinds(
+        &support::authorized_source("warehouse_primary", &["public", "archive"]),
+        "postgres_introspector_v3",
+        "2026-09-26T00:00:00Z",
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+    )
+    .unwrap()
+    .with_observed_type_owners(vec![])
+    .unwrap();
+    let public = SchemaOwnerObservation::new("public", 42, "public_owner").unwrap();
+    let archive = SchemaOwnerObservation::new("archive", 43, "archive_owner").unwrap();
+    let invalid = ObservationError::InvalidObservationField {
+        field: "schema_owner_coverage",
+    };
+
+    for incomplete in [
+        vec![public.clone()],
+        vec![public.clone(), archive.clone(), public.clone()],
+        vec![
+            public.clone(),
+            archive.clone(),
+            SchemaOwnerObservation::new("other", 44, "other_owner").unwrap(),
+        ],
+    ] {
+        assert_eq!(
+            snapshot
+                .clone()
+                .with_observed_schema_owners(incomplete)
+                .unwrap_err(),
+            invalid
+        );
+    }
+
+    let first = snapshot
+        .clone()
+        .with_observed_schema_owners(vec![public.clone(), archive.clone()])
+        .unwrap();
+    let reordered = snapshot
+        .clone()
+        .with_observed_schema_owners(vec![archive.clone(), public.clone()])
+        .unwrap();
+    assert_eq!(first.snapshot_digest(), reordered.snapshot_digest());
+    assert_ne!(
+        first.snapshot_digest(),
+        snapshot
+            .with_observed_schema_owners(vec![
+                archive,
+                SchemaOwnerObservation::new("public", 45, "public_owner").unwrap(),
+            ])
+            .unwrap()
+            .snapshot_digest()
+    );
 }
