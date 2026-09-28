@@ -207,11 +207,12 @@ async fn postgres18_referenced_procedure_evidence_binds_immutable_source() {
             assert!(labels_before.labels().is_empty());
             let absence_receipt = owner_snapshot.procedure_security_labels_source_receipt(location.clone()).unwrap();
             assert!(owner_snapshot.clone().with_observed_procedure_security_labels(vec![]).is_err());
-            client.execute("INSERT INTO pg_catalog.pg_seclabel (objoid,classoid,objsubid,provider,label) VALUES ($1::text::regprocedure,'pg_catalog.pg_proc'::regclass,0,'cw_probe_provider',' private label '), ($1::text::regprocedure,'pg_catalog.pg_proc'::regclass,0,' provider/~ ','')", &[&function]).await.unwrap();
+            client.execute("INSERT INTO pg_catalog.pg_seclabel (objoid,classoid,objsubid,provider,label) VALUES ($1::text::regprocedure,'pg_catalog.pg_proc'::regclass,0,'cw_probe_provider',' private label '), ($1::text::regprocedure,'pg_catalog.pg_proc'::regclass,0,' ','')", &[&function]).await.unwrap();
             let labelled = adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536), &NotCancelled).await.unwrap();
             let labels = labelled.procedure_security_labels().unwrap().iter().find(|item| item.location() == &location).unwrap();
             let native_labels = client.query("SELECT provider,label FROM pg_catalog.pg_seclabel WHERE classoid='pg_catalog.pg_proc'::regclass AND objoid=$1::text::regprocedure ORDER BY provider COLLATE \"C\"", &[&function]).await.unwrap();
             assert_eq!(labels.labels().len(), native_labels.len());
+            assert!(labels.labels().iter().any(|label| label.provider() == " "));
             for (label,row) in labels.labels().iter().zip(native_labels) {
                 assert_eq!(label.provider(), row.get::<_, String>(0));
                 assert_eq!(label.label(), row.get::<_, String>(1));
@@ -232,7 +233,7 @@ async fn postgres18_referenced_procedure_evidence_binds_immutable_source() {
             assert!(matches!(adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536), &NotCancelled).await, Err(SourceObservationFailure::InvalidCapturedMetadata)));
             client.execute("UPDATE pg_catalog.pg_seclabel SET objsubid=0,label=repeat('x',65537) WHERE classoid='pg_catalog.pg_proc'::regclass AND objoid=$1::text::regprocedure AND provider='cw_probe_provider'", &[&function]).await.unwrap();
             assert!(matches!(adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536), &NotCancelled).await, Err(SourceObservationFailure::ByteLimitExceeded { max_bytes: 65536 })));
-            client.execute("DELETE FROM pg_catalog.pg_seclabel WHERE classoid='pg_catalog.pg_proc'::regclass AND objoid=$1::text::regprocedure AND provider IN ('cw_probe_provider',' provider/~ ')", &[&function]).await.unwrap();
+            client.execute("DELETE FROM pg_catalog.pg_seclabel WHERE classoid='pg_catalog.pg_proc'::regclass AND objoid=$1::text::regprocedure AND provider IN ('cw_probe_provider',' ')", &[&function]).await.unwrap();
             let restored_labels = adapter(config.clone()).observe(authorized_with_limits("source_metadata",512,65_536), &NotCancelled).await.unwrap();
             assert_eq!(restored_labels.snapshot_digest(), owner_snapshot.snapshot_digest());
             use conceptweave_observation::ProcedureInitialPrivilegeOrigin;
