@@ -4392,6 +4392,91 @@ async fn postgres18_disabled_row_security_policy_fails_closed() {
 }
 
 #[tokio::test]
+async fn postgres18_missing_column_value_fails_closed_after_default_is_removed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_missing_value_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; \
+             CREATE TABLE \"{schema}\".record (id integer); \
+             INSERT INTO \"{schema}\".record VALUES (1)"
+        ))
+        .await
+        .unwrap();
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await
+        .unwrap();
+    client
+        .batch_execute(&format!(
+            "ALTER TABLE \"{schema}\".record ADD COLUMN stored_value integer DEFAULT 7; \
+             ALTER TABLE \"{schema}\".record ALTER COLUMN stored_value DROP DEFAULT"
+        ))
+        .await
+        .unwrap();
+    let missing = client
+        .query_one(
+            "SELECT a.atthasmissing, a.attmissingval IS NOT NULL, a.atthasdef \
+             FROM pg_catalog.pg_attribute a \
+             JOIN pg_catalog.pg_class c ON c.oid = a.attrelid \
+             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+             WHERE n.nspname = $1 AND c.relname = 'record' AND a.attname = 'stored_value'",
+            &[&schema],
+        )
+        .await
+        .unwrap();
+    assert!(missing.get::<_, bool>(0));
+    assert!(missing.get::<_, bool>(1));
+    assert!(!missing.get::<_, bool>(2));
+    let value: i32 = client
+        .query_one(
+            &format!("SELECT stored_value FROM \"{schema}\".record"),
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(value, 7);
+    assert_eq!(
+        adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await
+            .err(),
+        Some(SourceObservationFailure::InvalidCapturedMetadata)
+    );
+    client
+        .batch_execute(&format!("VACUUM FULL \"{schema}\".record"))
+        .await
+        .unwrap();
+    let rewritten = client
+        .query_one(
+            "SELECT a.atthasmissing FROM pg_catalog.pg_attribute a \
+             JOIN pg_catalog.pg_class c ON c.oid = a.attrelid \
+             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+             WHERE n.nspname = $1 AND c.relname = 'record' AND a.attname = 'stored_value'",
+            &[&schema],
+        )
+        .await
+        .unwrap();
+    assert!(!rewritten.get::<_, bool>(0));
+    let after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await
+        .unwrap();
+    assert_ne!(before.snapshot_digest(), after.snapshot_digest());
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+}
+
+#[tokio::test]
 async fn postgres18_unenforced_foreign_key_retains_false_state_without_ri_triggers() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
