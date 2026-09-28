@@ -2348,6 +2348,27 @@ mod tests {
         .unwrap()
     }
 
+    #[tokio::test]
+    async fn tls_rejects_unbound_source_and_invalid_trust_anchor_before_io() {
+        let empty = PostgresTlsAdapter::new(BTreeMap::new()).unwrap();
+        assert_eq!(
+            empty.observe(request(100), &NotCancelled).await.err(),
+            Some(SourceObservationFailure::SourceUnavailable)
+        );
+        let config = "host=localhost".parse::<Config>().unwrap();
+        assert!(matches!(
+            PostgresTlsAdapter::new(BTreeMap::from([(
+                "fixture_source".to_owned(),
+                (
+                    "fixture_policy".to_owned(),
+                    config,
+                    b"invalid certificate".to_vec(),
+                ),
+            )])),
+            Err(SourceObservationFailure::SourceUnavailable)
+        ));
+    }
+
     #[test]
     fn cumulative_metadata_bytes_cannot_exceed_the_authorized_limit() {
         let request = request(100);
