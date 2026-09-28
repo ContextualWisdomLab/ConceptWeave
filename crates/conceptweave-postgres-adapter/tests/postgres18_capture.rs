@@ -1060,7 +1060,7 @@ async fn postgres18_quoted_identifiers_keep_exact_source_coordinates() {
             "CREATE SCHEMA \"{schema}\"; \
              CREATE DOMAIN \"{schema}\".\" domain/~ \" AS integer \
                CONSTRAINT \" domain check \" CHECK (VALUE >= 0); \
-             CREATE TYPE \"{schema}\".\" enum/~ \" AS ENUM ('first'); \
+             CREATE TYPE \"{schema}\".\" enum/~ \" AS ENUM ('', ' ', 'first'); \
              CREATE TABLE \"{schema}\".\" table/~ \" \
                (\" /~ \" \"{schema}\".\" domain/~ \" NOT NULL, \
                 \" ~1~0 \" text, \
@@ -1069,7 +1069,16 @@ async fn postgres18_quoted_identifiers_keep_exact_source_coordinates() {
         ))
         .await
         .unwrap();
-    let result = adapter(config)
+    let result = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await;
+    client
+        .batch_execute(&format!(
+            "ALTER TYPE \"{schema}\".\" enum/~ \" RENAME VALUE ' ' TO '  '"
+        ))
+        .await
+        .unwrap();
+    let changed = adapter(config)
         .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
         .await;
     client
@@ -1079,6 +1088,18 @@ async fn postgres18_quoted_identifiers_keep_exact_source_coordinates() {
     connection_task.abort();
 
     let snapshot = result.unwrap();
+    let changed = changed.unwrap();
+    assert_eq!(snapshot.enums()[0].labels(), &["", " ", "first"]);
+    assert_eq!(changed.enums()[0].labels(), &["", "  ", "first"]);
+    assert_ne!(snapshot.snapshot_digest(), changed.snapshot_digest());
+    assert_ne!(
+        propose_relational_model(&snapshot).unwrap().proposal_id(),
+        propose_relational_model(&changed).unwrap().proposal_id()
+    );
+    let enum_receipt = changed
+        .source_receipt(SchemaObjectLocation::enum_(&schema, " enum/~ ").unwrap())
+        .unwrap();
+    assert_eq!(enum_receipt.source_digest(), changed.snapshot_digest());
     let relation = &snapshot.relations()[0];
     assert_eq!(relation.schema_name(), schema);
     assert_eq!(relation.relation_name(), " table/~ ");
