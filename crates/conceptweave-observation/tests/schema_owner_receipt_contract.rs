@@ -5,6 +5,43 @@ use conceptweave_observation::{
 mod support;
 
 #[test]
+fn schema_owner_evidence_requires_its_type_owner_predecessor_and_is_single_use() {
+    let owner = SchemaOwnerObservation::new("public", 42, "fixture_owner").unwrap();
+    let snapshot = PostgresSchemaSnapshotV3::new_with_type_kinds(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-26T00:00:00Z",
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+    )
+    .unwrap();
+    assert_eq!(
+        snapshot
+            .clone()
+            .with_observed_schema_owners(vec![owner.clone()])
+            .unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "schema_owner_observation_order"
+        }
+    );
+    let observed = snapshot
+        .with_observed_type_owners(vec![])
+        .unwrap()
+        .with_observed_schema_owners(vec![owner.clone()])
+        .unwrap();
+    assert_eq!(
+        observed
+            .with_observed_schema_owners(vec![owner])
+            .unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "schema_owner_observation_order"
+        }
+    );
+}
+
+#[test]
 fn empty_schema_owner_has_an_exact_receipt_only_after_observation() {
     let schema = "Sales/~North";
     let snapshot = PostgresSchemaSnapshotV3::new_with_type_kinds(
