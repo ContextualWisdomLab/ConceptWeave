@@ -648,8 +648,7 @@ fn expected_var_leaves(
         let mut leaves = Vec::new();
         collect_var_leaves(observation.expression(), &mut leaves)?;
         for (offset, column_name) in leaves.into_iter().enumerate() {
-            let leaf_position = u32::try_from(offset + 1)
-                .map_err(|_| invalid("index_expression_relation_var_leaf_position"))?;
+            let leaf_position = checked_leaf_position(offset)?;
             let location = IndexExpressionRelationVarLocation::expression(
                 observation.index().clone(),
                 observation.key_position(),
@@ -663,8 +662,7 @@ fn expected_var_leaves(
         let mut leaves = Vec::new();
         collect_var_leaves(observation.predicate(), &mut leaves)?;
         for (offset, column_name) in leaves.into_iter().enumerate() {
-            let leaf_position = u32::try_from(offset + 1)
-                .map_err(|_| invalid("index_expression_relation_var_leaf_position"))?;
+            let leaf_position = checked_leaf_position(offset)?;
             let location = IndexExpressionRelationVarLocation::predicate(
                 observation.index().clone(),
                 leaf_position,
@@ -813,4 +811,27 @@ fn validate_nonblank(value: &str, field: &'static str) -> Result<(), Observation
 
 fn invalid(field: &'static str) -> ObservationError {
     ObservationError::InvalidObservationField { field }
+}
+
+fn checked_leaf_position(offset: usize) -> Result<u32, ObservationError> {
+    let field = "index_expression_relation_var_leaf_position";
+    let zero_based = u32::try_from(offset).map_err(|_| invalid(field))?;
+    zero_based.checked_add(1).ok_or(invalid(field))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn leaf_position_rejects_unrepresentable_offsets() {
+        assert_eq!(checked_leaf_position(0), Ok(1));
+        assert_eq!(checked_leaf_position(u32::MAX as usize - 1), Ok(u32::MAX));
+        for offset in [u32::MAX as usize, usize::MAX] {
+            assert_eq!(
+                checked_leaf_position(offset),
+                Err(invalid("index_expression_relation_var_leaf_position"))
+            );
+        }
+    }
 }

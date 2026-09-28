@@ -405,8 +405,7 @@ fn canonicalize_expression_collations(
         let mut collations = Vec::new();
         collect_expression_collations(observation.expression(), &mut collations);
         for (offset, collation) in collations.into_iter().enumerate() {
-            let occurrence_position = u32::try_from(offset + 1)
-                .map_err(|_| invalid("index_expression_collation_occurrence_position"))?;
+            let occurrence_position = checked_occurrence_position(offset)?;
             let location = IndexExpressionCollationIdentityLocation::expression(
                 observation.index().clone(),
                 observation.key_position(),
@@ -419,8 +418,7 @@ fn canonicalize_expression_collations(
         let mut collations = Vec::new();
         collect_expression_collations(observation.predicate(), &mut collations);
         for (offset, collation) in collations.into_iter().enumerate() {
-            let occurrence_position = u32::try_from(offset + 1)
-                .map_err(|_| invalid("index_expression_collation_occurrence_position"))?;
+            let occurrence_position = checked_occurrence_position(offset)?;
             let location = IndexExpressionCollationIdentityLocation::predicate(
                 observation.index().clone(),
                 occurrence_position,
@@ -682,4 +680,30 @@ fn encode_len(hasher: &mut Sha256, value: usize) {
 
 fn invalid(field: &'static str) -> ObservationError {
     ObservationError::InvalidObservationField { field }
+}
+
+fn checked_occurrence_position(offset: usize) -> Result<u32, ObservationError> {
+    let field = "index_expression_collation_occurrence_position";
+    let zero_based = u32::try_from(offset).map_err(|_| invalid(field))?;
+    zero_based.checked_add(1).ok_or(invalid(field))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn occurrence_position_rejects_unrepresentable_offsets() {
+        assert_eq!(checked_occurrence_position(0), Ok(1));
+        assert_eq!(
+            checked_occurrence_position(u32::MAX as usize - 1),
+            Ok(u32::MAX)
+        );
+        for offset in [u32::MAX as usize, usize::MAX] {
+            assert_eq!(
+                checked_occurrence_position(offset),
+                Err(invalid("index_expression_collation_occurrence_position"))
+            );
+        }
+    }
 }
