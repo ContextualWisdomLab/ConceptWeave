@@ -197,4 +197,30 @@ fn superseded_predecessor_still_requires_its_exact_trusted_manifest() {
         client.validate_supersession(&declaration, &previous, &successor),
         Err(ReleaseContractError::UntrustedRelease)
     );
+
+    let client = trusted_client(&[&previous, &successor]);
+    assert_eq!(
+        client.validate_supersession(&declaration, &previous, &successor),
+        Ok(())
+    );
+    let wrong_previous = ReleaseSupersession::new(
+        SemanticReleaseReference::new(previous.release_id(), digest('d')).unwrap(),
+        SemanticReleaseReference::from_release(&successor),
+        "steward-approved correction",
+    )
+    .unwrap();
+    assert_eq!(
+        client.validate_supersession(&wrong_previous, &previous, &successor),
+        Err(ReleaseContractError::SupersededReleaseReferenceMismatch)
+    );
+    let wrong_successor = ReleaseSupersession::new(
+        SemanticReleaseReference::from_release(&previous),
+        SemanticReleaseReference::new(successor.release_id(), digest('e')).unwrap(),
+        "steward-approved correction",
+    )
+    .unwrap();
+    assert_eq!(
+        client.validate_supersession(&wrong_successor, &previous, &successor),
+        Err(ReleaseContractError::SuccessorReleaseReferenceMismatch)
+    );
 }
