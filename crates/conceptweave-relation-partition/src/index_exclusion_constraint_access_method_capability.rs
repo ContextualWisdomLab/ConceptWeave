@@ -196,21 +196,20 @@ impl IndexExclusionConstraintAccessMethodCapabilitySnapshot {
                 .observations()
                 .iter()
                 .find(|candidate| candidate.coordinate() == observation.coordinate())
-                .ok_or_else(|| {
-                    invalid("index_exclusion_constraint_access_method_capability_completeness")
-                })?;
+                .ok_or(invalid(
+                    "index_exclusion_constraint_access_method_capability_completeness",
+                ))?;
             if constraint.backing_index() != observation.backing_index() {
                 return Err(invalid(
                     "index_exclusion_constraint_access_method_capability_binding",
                 ));
             }
-            let index =
-                find_base_index(base_snapshot, observation.backing_index()).ok_or_else(|| {
-                    invalid("index_exclusion_constraint_access_method_capability_binding")
-                })?;
-            let access_method = index.access_method().ok_or_else(|| {
-                invalid("index_exclusion_constraint_access_method_capability_binding")
-            })?;
+            let index = find_base_index(base_snapshot, observation.backing_index()).ok_or(
+                invalid("index_exclusion_constraint_access_method_capability_binding"),
+            )?;
+            let access_method = index.access_method().ok_or(invalid(
+                "index_exclusion_constraint_access_method_capability_binding",
+            ))?;
             if access_method != observation.access_method_name() {
                 return Err(invalid(
                     "index_exclusion_constraint_access_method_capability_binding",

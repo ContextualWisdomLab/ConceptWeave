@@ -365,11 +365,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterAccessControlSna
                         && candidate.transform_type() == observation.transform_type()
                         && candidate.direction() == observation.direction()
                 })
-                .ok_or_else(|| {
-                    invalid(
-                        "index_exclusion_constraint_operator_procedure_transform_converter_access_control_completeness",
-                    )
-                })?;
+                .ok_or(invalid("index_exclusion_constraint_operator_procedure_transform_converter_access_control_completeness"))?;
             if predecessor.converter_schema_name() != observation.converter_schema_name()
                 || predecessor.converter_function_name() != observation.converter_function_name()
             {

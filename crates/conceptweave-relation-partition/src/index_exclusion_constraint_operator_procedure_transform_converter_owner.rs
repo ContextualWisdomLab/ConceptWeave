@@ -317,20 +317,12 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot {
                     candidate.coordinate() == observation.coordinate()
                         && candidate.key_position() == observation.key_position()
                 })
-                .ok_or_else(|| {
-                    invalid(
-                        "index_exclusion_constraint_operator_procedure_transform_converter_owner_completeness",
-                    )
-                })?;
+                .ok_or(invalid("index_exclusion_constraint_operator_procedure_transform_converter_owner_completeness"))?;
             let binding = predecessor
                 .converters()
                 .iter()
                 .find(|candidate| candidate.transform_type() == observation.transform_type())
-                .ok_or_else(|| {
-                    invalid(
-                        "index_exclusion_constraint_operator_procedure_transform_converter_owner_completeness",
-                    )
-                })?;
+                .ok_or(invalid("index_exclusion_constraint_operator_procedure_transform_converter_owner_completeness"))?;
             let converter = match observation.direction() {
                 IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql => {
                     binding.from_sql()
@@ -339,11 +331,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterOwnerSnapshot {
                     binding.to_sql()
                 }
             }
-            .ok_or_else(|| {
-                invalid(
-                    "index_exclusion_constraint_operator_procedure_transform_converter_owner_completeness",
-                )
-            })?;
+            .ok_or(invalid("index_exclusion_constraint_operator_procedure_transform_converter_owner_completeness"))?;
             if converter.schema_name() != observation.converter_schema_name()
                 || converter.function_name() != observation.converter_function_name()
             {

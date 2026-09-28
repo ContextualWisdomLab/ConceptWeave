@@ -196,9 +196,9 @@ impl IndexExclusionConstraintOperatorCommutatorSnapshot {
                 .observations()
                 .iter()
                 .find(|candidate| candidate.coordinate() == observation.coordinate())
-                .ok_or_else(|| {
-                    invalid("index_exclusion_constraint_operator_commutator_completeness")
-                })?;
+                .ok_or(invalid(
+                    "index_exclusion_constraint_operator_commutator_completeness",
+                ))?;
             let zero_based = observation
                 .key_position()
                 .checked_sub(1)

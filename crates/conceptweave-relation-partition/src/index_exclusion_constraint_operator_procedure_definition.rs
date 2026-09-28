@@ -261,9 +261,9 @@ impl IndexExclusionConstraintOperatorProcedureDefinitionSnapshot {
                     candidate.coordinate() == observation.coordinate()
                         && candidate.key_position() == observation.key_position()
                 })
-                .ok_or_else(|| {
-                    invalid("index_exclusion_constraint_operator_procedure_definition_completeness")
-                })?;
+                .ok_or(invalid(
+                    "index_exclusion_constraint_operator_procedure_definition_completeness",
+                ))?;
             if predecessor.operator() != observation.operator()
                 || predecessor.procedure() != observation.procedure()
             {
