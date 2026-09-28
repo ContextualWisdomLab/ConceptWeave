@@ -1133,6 +1133,124 @@ async fn postgres18_quoted_identifiers_keep_exact_source_coordinates() {
 }
 
 #[tokio::test]
+async fn postgres18_relation_names_are_scoped_to_the_source_schema() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let suffix = format!(
+        "{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+    let first_schema = format!("cw_namespace_first_{suffix}");
+    let second_schema = format!("cw_namespace_second_{suffix}");
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{first_schema}\"; CREATE SCHEMA \"{second_schema}\"; \
+             CREATE TABLE \"{first_schema}\".item (id integer); \
+             CREATE TABLE \"{second_schema}\".item (id integer); \
+             CREATE INDEX shared_idx ON \"{first_schema}\".item (id); \
+             CREATE INDEX shared_idx ON \"{second_schema}\".item (id)"
+        ))
+        .await
+        .unwrap();
+    let same_schema_collision = client
+        .batch_execute(&format!(
+            "CREATE TABLE \"{first_schema}\".shared_idx (id integer)"
+        ))
+        .await
+        .unwrap_err();
+    assert_eq!(
+        same_schema_collision.code(),
+        Some(&tokio_postgres::error::SqlState::DUPLICATE_TABLE)
+    );
+
+    let forward = adapter(config.clone())
+        .observe(
+            authorized_two([&first_schema, &second_schema]),
+            &NotCancelled,
+        )
+        .await;
+    let reverse = adapter(config.clone())
+        .observe(
+            authorized_two([&second_schema, &first_schema]),
+            &NotCancelled,
+        )
+        .await;
+    client
+        .batch_execute(&format!(
+            "ALTER INDEX \"{second_schema}\".shared_idx RENAME TO changed_idx"
+        ))
+        .await
+        .unwrap();
+    let changed = adapter(config)
+        .observe(
+            authorized_two([&first_schema, &second_schema]),
+            &NotCancelled,
+        )
+        .await;
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA \"{first_schema}\" CASCADE; DROP SCHEMA \"{second_schema}\" CASCADE"
+        ))
+        .await
+        .unwrap();
+    connection_task.abort();
+
+    let forward = forward.unwrap();
+    let reverse = reverse.unwrap();
+    let changed = changed.unwrap();
+    assert_eq!(forward.snapshot_digest(), reverse.snapshot_digest());
+    assert_ne!(forward.snapshot_digest(), changed.snapshot_digest());
+    assert_eq!(forward.relations().len(), 2);
+    for schema in [&first_schema, &second_schema] {
+        let relation = SchemaObjectLocation::relation(schema, "item", RelationKind::Table).unwrap();
+        let index =
+            SchemaObjectLocation::index(schema, "item", RelationKind::Table, "shared_idx").unwrap();
+        assert_eq!(
+            forward.source_receipt(relation).unwrap().source_digest(),
+            forward.snapshot_digest()
+        );
+        assert_eq!(
+            forward.source_receipt(index).unwrap().source_digest(),
+            forward.snapshot_digest()
+        );
+    }
+    assert!(
+        changed
+            .source_receipt(
+                SchemaObjectLocation::index(
+                    &second_schema,
+                    "item",
+                    RelationKind::Table,
+                    "shared_idx"
+                )
+                .unwrap()
+            )
+            .is_err()
+    );
+    assert!(
+        changed
+            .source_receipt(
+                SchemaObjectLocation::index(
+                    &first_schema,
+                    "item",
+                    RelationKind::Table,
+                    "shared_idx"
+                )
+                .unwrap()
+            )
+            .is_ok()
+    );
+}
+
+#[tokio::test]
 async fn postgres18_dropped_column_tombstone_does_not_hide_live_columns() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
