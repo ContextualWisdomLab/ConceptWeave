@@ -60,7 +60,7 @@ impl IdentitySequenceObservation {
             || type_bounds.is_none_or(|(lower, upper)| minimum < lower || maximum > upper)
             || increment == 0
             || cache <= 0
-            || minimum > maximum
+            || minimum >= maximum
             || start < minimum
             || start > maximum
         {

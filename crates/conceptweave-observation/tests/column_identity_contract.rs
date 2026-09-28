@@ -278,6 +278,27 @@ fn exact_identity_sequence_settings_extend_legacy_declaration_identity() {
 }
 
 #[test]
+fn identity_sequence_rejects_equal_minimum_and_maximum() {
+    assert_eq!(
+        IdentitySequenceObservation::new(
+            QualifiedTypeName::new("public", "account_id_seq").unwrap(),
+            catalog_type("int8"),
+            1,
+            1,
+            1,
+            1,
+            1,
+            false,
+            None,
+        )
+        .unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "identity_sequence_settings"
+        }
+    );
+}
+
+#[test]
 fn identity_sequence_evidence_must_cover_every_identity_column_when_present() {
     let relation = RelationObservation::new(
         "public",
