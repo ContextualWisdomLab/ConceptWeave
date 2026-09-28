@@ -15,7 +15,7 @@ use conceptweave_client::{
     TrustedReleaseManifest,
 };
 use conceptweave_discovery::{ProposedSourceType, RelationalProposal};
-use conceptweave_domain::{CandidateKind, PublicationState, TruthStatus};
+use conceptweave_domain::{CandidateKind, EvidenceReference, PublicationState, TruthStatus};
 use conceptweave_observation::{ForeignKeyAction, ForeignKeyDeferrability, ForeignKeyMatchType};
 use ring::signature::Ed25519KeyPair;
 use sha2::{Digest, Sha256};
@@ -382,7 +382,14 @@ fn encode_candidate(
             put_text(bytes, rationale)?;
         }
     }
-    let mut evidence = candidate.evidence().iter().collect::<Vec<_>>();
+    encode_candidate_evidence(bytes, candidate.evidence())
+}
+
+fn encode_candidate_evidence(
+    bytes: &mut Vec<u8>,
+    evidence: &[EvidenceReference],
+) -> Result<(), GovernanceError> {
+    let mut evidence = evidence.iter().collect::<Vec<_>>();
     evidence.sort_by_key(|item| (item.source_id(), item.source_digest(), item.location()));
     put_len(bytes, evidence.len())?;
     for item in evidence {
@@ -671,6 +678,22 @@ fn sha256(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn candidate_evidence_bytes_are_independent_of_receipt_order() {
+        let first = EvidenceReference::new("source", "sha256:abc", "public.a").unwrap();
+        let second = EvidenceReference::new("source", "sha256:abc", "public.b").unwrap();
+        let mut forward = Vec::new();
+        encode_candidate_evidence(&mut forward, &[first.clone(), second.clone()]).unwrap();
+        let mut reversed = Vec::new();
+        encode_candidate_evidence(&mut reversed, &[second, first.clone()]).unwrap();
+        assert_eq!(forward, reversed);
+
+        let changed = EvidenceReference::new("source", "sha256:abc", "public.c").unwrap();
+        let mut different = Vec::new();
+        encode_candidate_evidence(&mut different, &[changed, first]).unwrap();
+        assert_ne!(forward, different);
+    }
 
     #[test]
     fn publication_envelope_accepts_its_boundary_and_rejects_excess() {
