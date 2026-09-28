@@ -1,6 +1,8 @@
 use conceptweave_observation::{
-    ColumnIdentityObservation, ColumnObservationV3, IdentitySequenceObservation, ObservationError,
-    PostgresSchemaSnapshotV3, QualifiedTypeName, RelationKind, RelationObservation,
+    ColumnIdentityObservation, ColumnObservationV3, IdentitySequenceObservation,
+    IndexAttributeKind, IndexAttributeObservation, IndexKeySemantics, IndexObservation,
+    ObservationError, PostgresSchemaSnapshotV3, QualifiedOperatorClassName, QualifiedTypeName,
+    RelationKind, RelationObservation,
 };
 
 mod support;
@@ -91,8 +93,12 @@ fn snapshot(
 }
 
 fn sequence(increment: i64) -> IdentitySequenceObservation {
+    sequence_named("account_id_seq", increment)
+}
+
+fn sequence_named(name: &str, increment: i64) -> IdentitySequenceObservation {
     IdentitySequenceObservation::new(
-        QualifiedTypeName::new("public", "account_id_seq").unwrap(),
+        QualifiedTypeName::new("public", name).unwrap(),
         catalog_type("int8"),
         5,
         increment,
@@ -103,6 +109,91 @@ fn sequence(increment: i64) -> IdentitySequenceObservation {
         None,
     )
     .unwrap()
+}
+
+#[test]
+fn identity_sequence_cannot_reuse_its_parent_relation_name() {
+    assert_eq!(
+        snapshot(
+            vec![one_column_relation()],
+            vec![
+                always("account_id")
+                    .with_sequence(sequence_named("account", 3))
+                    .unwrap()
+            ],
+        )
+        .unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "schema_relation_namespace"
+        }
+    );
+}
+
+#[test]
+fn identity_sequence_cannot_reuse_an_index_name() {
+    let index = IndexObservation::new(
+        "account_id_seq",
+        false,
+        Some(false),
+        vec![IndexAttributeObservation::new(1, IndexAttributeKind::Key, "account_id").unwrap()],
+        Vec::new(),
+    )
+    .unwrap()
+    .with_access_method("btree")
+    .with_key_semantics(vec![
+        IndexKeySemantics::new(
+            1,
+            None,
+            QualifiedOperatorClassName::new("pg_catalog", "int8_ops").unwrap(),
+            0,
+        )
+        .unwrap(),
+    ])
+    .unwrap();
+    let relation = one_column_relation().with_indexes(vec![index]).unwrap();
+    assert_eq!(
+        snapshot(
+            vec![relation],
+            vec![always("account_id").with_sequence(sequence(3)).unwrap()],
+        )
+        .unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "schema_relation_namespace"
+        }
+    );
+}
+
+#[test]
+fn identity_sequence_name_is_scoped_to_its_schema() {
+    let archive = RelationObservation::new(
+        "archive",
+        "account_id_seq",
+        RelationKind::Table,
+        vec![ColumnObservationV3::new("id", 1, "int8", catalog_type("int8"), true, None).unwrap()],
+    )
+    .unwrap();
+    let observed = PostgresSchemaSnapshotV3::new_with_column_identities(
+        &support::authorized_source("warehouse_primary", &["public", "archive"]),
+        "postgres_introspector_v3",
+        "2026-09-13T06:42:00Z",
+        vec![one_column_relation(), archive],
+        Vec::new(),
+        Vec::new(),
+        vec![
+            always("account_id").with_sequence(sequence(3)).unwrap(),
+            ColumnIdentityObservation::not_identity(
+                "archive",
+                "account_id_seq",
+                RelationKind::Table,
+                "id",
+            )
+            .unwrap(),
+        ],
+    );
+    assert!(
+        observed.is_ok(),
+        "a different schema has a separate pg_class namespace"
+    );
 }
 
 #[test]

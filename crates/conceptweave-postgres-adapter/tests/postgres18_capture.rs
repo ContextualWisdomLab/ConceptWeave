@@ -5484,6 +5484,15 @@ async fn postgres18_identity_sequence_settings_change_source_identity() {
         ))
         .await
         .unwrap();
+    for statement in [
+        format!("ALTER SEQUENCE \"{schema}\".record_id_seq RENAME TO record"),
+        format!("CREATE INDEX record_id_seq ON \"{schema}\".record (title)"),
+    ] {
+        assert_eq!(
+            client.batch_execute(&statement).await.unwrap_err().code(),
+            Some(&tokio_postgres::error::SqlState::DUPLICATE_TABLE)
+        );
+    }
     let result = async {
         let first = adapter(config.clone())
             .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)

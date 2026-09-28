@@ -355,6 +355,17 @@ pub(crate) fn canonicalize_column_identities(
         })
         .collect::<BTreeSet<_>>();
     let mut observed_coordinates = BTreeSet::new();
+    let occupied_relation_names = relations
+        .iter()
+        .flat_map(|relation| {
+            std::iter::once((relation.schema_name(), relation.relation_name())).chain(
+                relation
+                    .indexes()
+                    .iter()
+                    .map(move |index| (relation.schema_name(), index.index_name())),
+            )
+        })
+        .collect::<BTreeSet<_>>();
 
     let mut observed_sequences = BTreeSet::new();
     for observation in &column_identities {
@@ -398,6 +409,16 @@ pub(crate) fn canonicalize_column_identities(
         {
             return Err(ObservationError::InvalidObservationField {
                 field: "identity_sequence_binding",
+            });
+        }
+        if observation.sequence().is_some_and(|sequence| {
+            occupied_relation_names.contains(&(
+                sequence.sequence_name().schema_name(),
+                sequence.sequence_name().type_name(),
+            ))
+        }) {
+            return Err(ObservationError::InvalidObservationField {
+                field: "schema_relation_namespace",
             });
         }
 
