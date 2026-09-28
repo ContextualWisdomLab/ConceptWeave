@@ -4425,6 +4425,32 @@ async fn missing_binding_and_tcp_transport_fail_before_source_io() {
         Some(SourceObservationFailure::SourceUnavailable)
     );
 
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let mut disguised_tcp = Config::from_str("host=/tmp dbname=postgres").unwrap();
+    disguised_tcp
+        .hostaddr("127.0.0.1".parse().unwrap())
+        .port(listener.local_addr().unwrap().port());
+    let disguised_adapter = adapter(disguised_tcp);
+    let tcp_attempt = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        tokio::select! {
+            biased;
+            accepted = listener.accept() => {
+                accepted.unwrap();
+                true
+            }
+            result = disguised_adapter.observe(authorized("public"), &NotCancelled) => {
+                assert_eq!(result.err(), Some(SourceObservationFailure::SourceUnavailable));
+                false
+            }
+        }
+    })
+    .await
+    .unwrap();
+    assert!(
+        !tcp_attempt,
+        "Unix-only adapter must not connect through hostaddr"
+    );
+
     let stale = PostgresUnixAdapter::new(BTreeMap::from([(
         "fixture_source".to_owned(),
         (

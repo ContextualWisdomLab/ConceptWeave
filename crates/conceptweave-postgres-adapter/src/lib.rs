@@ -145,6 +145,7 @@ impl SourceObservationPort for PostgresUnixAdapter {
             return Err(SourceObservationFailure::SourceUnavailable);
         }
         if config.get_hosts().is_empty()
+            || !config.get_hostaddrs().is_empty()
             || config
                 .get_hosts()
                 .iter()
