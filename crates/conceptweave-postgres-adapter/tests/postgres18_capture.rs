@@ -7495,6 +7495,68 @@ async fn postgres18_table_owner_changes_source_identity() {
 }
 
 #[tokio::test]
+async fn postgres18_empty_authorized_schemas_have_complete_owner_receipts() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let suffix = std::process::id();
+    let first = format!("cw_empty_owner_first_{suffix}");
+    let second = format!("cw_empty_owner_second_{suffix}");
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{first}\"; CREATE SCHEMA \"{second}\""
+        ))
+        .await
+        .unwrap();
+    let result: Result<(), SourceObservationFailure> = async {
+        let forward = adapter(config.clone())
+            .observe(authorized_two([&first, &second]), &NotCancelled)
+            .await?;
+        let reverse = adapter(config)
+            .observe(authorized_two([&second, &first]), &NotCancelled)
+            .await?;
+        assert!(forward.relations().is_empty());
+        assert_eq!(forward.schema_owners().unwrap().len(), 2);
+        assert_eq!(forward.snapshot_digest(), reverse.snapshot_digest());
+        for schema in [&first, &second] {
+            let row = client
+                .query_one(
+                    "SELECT n.nspowner, r.rolname::text FROM pg_catalog.pg_namespace n \
+                     JOIN pg_catalog.pg_roles r ON r.oid = n.nspowner WHERE n.nspname = $1",
+                    &[schema],
+                )
+                .await
+                .unwrap();
+            let owner = forward
+                .schema_owners()
+                .unwrap()
+                .iter()
+                .find(|owner| owner.schema_name() == schema)
+                .unwrap();
+            assert_eq!(owner.owner_oid(), row.get::<_, u32>(0));
+            assert_eq!(owner.owner_role_name(), row.get::<_, String>(1));
+            let receipt = forward
+                .schema_owner_source_receipt(SchemaOwnerLocation::new(schema).unwrap())
+                .unwrap();
+            assert_eq!(receipt.source_digest(), forward.snapshot_digest());
+        }
+        Ok(())
+    }
+    .await;
+    client
+        .batch_execute(&format!(
+            "DROP SCHEMA \"{first}\"; DROP SCHEMA \"{second}\""
+        ))
+        .await
+        .unwrap();
+    connection_task.abort();
+    result.unwrap();
+}
+
+#[tokio::test]
 async fn postgres18_whitespace_schema_owner_changes_source_identity() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
