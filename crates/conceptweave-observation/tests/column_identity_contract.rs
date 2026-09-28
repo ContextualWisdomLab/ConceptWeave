@@ -197,6 +197,38 @@ fn identity_sequence_name_is_scoped_to_its_schema() {
 }
 
 #[test]
+fn identity_sequence_can_share_its_exact_sequence_relation_coordinate() {
+    let sequence_relation = RelationObservation::new(
+        "public",
+        "account_id_seq",
+        RelationKind::Sequence,
+        vec![
+            ColumnObservationV3::new("last_value", 1, "int8", catalog_type("int8"), false, None)
+                .unwrap(),
+        ],
+    )
+    .unwrap();
+    let observed = snapshot(
+        vec![one_column_relation(), sequence_relation],
+        vec![
+            always("account_id").with_sequence(sequence(3)).unwrap(),
+            ColumnIdentityObservation::not_identity(
+                "public",
+                "account_id_seq",
+                RelationKind::Sequence,
+                "last_value",
+            )
+            .unwrap(),
+        ],
+    );
+    assert!(
+        observed.is_ok(),
+        "one sequence may appear as both relation evidence and identity settings: {:?}",
+        observed.err()
+    );
+}
+
+#[test]
 fn exact_identity_sequence_settings_extend_legacy_declaration_identity() {
     let declaration = snapshot(vec![one_column_relation()], vec![always("account_id")]).unwrap();
     let first = snapshot(

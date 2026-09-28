@@ -357,6 +357,7 @@ pub(crate) fn canonicalize_column_identities(
     let mut observed_coordinates = BTreeSet::new();
     let occupied_relation_names = relations
         .iter()
+        .filter(|relation| relation.kind() != RelationKind::Sequence)
         .flat_map(|relation| {
             std::iter::once((relation.schema_name(), relation.relation_name())).chain(
                 relation
