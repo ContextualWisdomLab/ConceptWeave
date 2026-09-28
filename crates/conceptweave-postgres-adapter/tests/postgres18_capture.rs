@@ -5446,6 +5446,39 @@ async fn postgres18_identity_sequence_settings_change_source_identity() {
             .unwrap()
             .is_generated_by_default());
         client
+            .batch_execute(&format!(
+                "ALTER SEQUENCE \"{schema}\".record_id_seq RENAME TO \" \""
+            ))
+            .await
+            .unwrap();
+        let renamed = adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await?;
+        assert_ne!(by_default.snapshot_digest(), renamed.snapshot_digest());
+        assert_eq!(
+            renamed
+                .column_identities()
+                .unwrap()
+                .iter()
+                .find(|identity| identity.column_name() == "id")
+                .unwrap()
+                .sequence()
+                .unwrap()
+                .sequence_name()
+                .type_name(),
+            " "
+        );
+        assert_eq!(
+            renamed
+                .source_receipt(
+                    SchemaObjectLocation::column(&schema, "record", RelationKind::Table, "id")
+                        .unwrap(),
+                )
+                .unwrap()
+                .source_digest(),
+            renamed.snapshot_digest()
+        );
+        client
             .batch_execute(&format!("CREATE SEQUENCE \"{schema}\".standalone"))
             .await
             .unwrap();
