@@ -4472,6 +4472,15 @@ async fn postgres18_tcp_requires_valid_ca_and_host_name() {
             ("fixture_policy".to_owned(), config, ca),
         )]))
     };
+    let stale = PostgresTlsAdapter::new(BTreeMap::from([(
+        "fixture_source".to_owned(),
+        ("stale_policy".to_owned(), config.clone(), ca.clone()),
+    )]))
+    .unwrap();
+    assert_eq!(
+        stale.observe(authorized("public"), &Cancelled).await.err(),
+        Some(SourceObservationFailure::SourceUnavailable)
+    );
     assert!(connection(config.clone(), b"invalid certificate".to_vec()).is_err());
     assert!(
         connection(
