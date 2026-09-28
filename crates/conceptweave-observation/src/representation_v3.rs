@@ -2089,6 +2089,24 @@ fn canonicalize_snapshot_objects(
                 });
             }
         }
+        for constraint in &relation.constraints {
+            let TableConstraintObservation::ForeignKey(foreign_key) = constraint else {
+                continue;
+            };
+            if let Some(referenced_relation) = relations.iter().find(|candidate| {
+                candidate.schema_name() == foreign_key.referenced_schema_name()
+                    && candidate.relation_name() == foreign_key.referenced_table_name()
+            }) && foreign_key.referenced_column_names().iter().any(|name| {
+                !referenced_relation
+                    .columns()
+                    .iter()
+                    .any(|column| column.column_name() == name)
+            }) {
+                return Err(ObservationError::InvalidObservationField {
+                    field: "foreign_key_referenced_column",
+                });
+            }
+        }
     }
 
     Ok(CanonicalSnapshotObjects {
