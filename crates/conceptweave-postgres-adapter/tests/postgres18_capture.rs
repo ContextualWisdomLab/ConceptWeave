@@ -4333,6 +4333,65 @@ async fn postgres18_missing_authorized_schema_fails_without_a_snapshot() {
 }
 
 #[tokio::test]
+async fn postgres18_disabled_row_security_policy_fails_closed() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let config = Config::from_str(&dsn).unwrap();
+    let (client, connection) = config.connect(NoTls).await.unwrap();
+    let connection_task = tokio::spawn(connection);
+    let schema = format!("cw_disabled_policy_{}", std::process::id());
+    client
+        .batch_execute(&format!(
+            "CREATE SCHEMA \"{schema}\"; CREATE TABLE \"{schema}\".record (id integer)"
+        ))
+        .await
+        .unwrap();
+    let before = adapter(config.clone())
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await
+        .unwrap();
+    client
+        .batch_execute(&format!(
+            "CREATE POLICY hidden_rule ON \"{schema}\".record FOR SELECT USING (id > 0)"
+        ))
+        .await
+        .unwrap();
+    let flags = client
+        .query_one(
+            "SELECT c.relrowsecurity, EXISTS(SELECT 1 FROM pg_catalog.pg_policy p WHERE p.polrelid = c.oid) \
+             FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+             WHERE n.nspname = $1 AND c.relname = 'record'",
+            &[&schema],
+        )
+        .await
+        .unwrap();
+    assert!(!flags.get::<_, bool>(0));
+    assert!(flags.get::<_, bool>(1));
+    assert_eq!(
+        adapter(config.clone())
+            .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+            .await
+            .err(),
+        Some(SourceObservationFailure::InvalidCapturedMetadata)
+    );
+    client
+        .batch_execute(&format!("DROP POLICY hidden_rule ON \"{schema}\".record"))
+        .await
+        .unwrap();
+    let after = adapter(config)
+        .observe(authorized_with_limits(&schema, 256, 65_536), &NotCancelled)
+        .await
+        .unwrap();
+    assert_eq!(before.snapshot_digest(), after.snapshot_digest());
+    client
+        .batch_execute(&format!("DROP SCHEMA \"{schema}\" CASCADE"))
+        .await
+        .unwrap();
+    connection_task.abort();
+}
+
+#[tokio::test]
 async fn postgres18_unenforced_foreign_key_retains_false_state_without_ri_triggers() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
