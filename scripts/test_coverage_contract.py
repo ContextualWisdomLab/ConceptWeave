@@ -14,6 +14,8 @@ functions = [
     {"name": "_RNvCowner7capture", "filenames": [foreign, source], "branches": [branch]},
     {"name": "_RNvCowner7capture_instance", "filenames": [source], "branches": [[10, 2, 10, 8, 2, 0, 0, 0, 4]]},
     {"name": "_RNvCowner5tests7fixture", "filenames": [foreign, source], "branches": [test_branch]},
+    {"name": "_RNvCowner20internal_model_tests7fixture", "filenames": [source],
+     "branches": [[25, 2, 25, 8, 1, 0, 0, 0, 4]]},
     {"name": "_RNvCforeign7capture", "filenames": [foreign], "branches": [[30, 2, 30, 8, 0, 0, 0, 0, 4]]},
 ]
 report = {"data": [{"functions": functions, "files": [
@@ -50,9 +52,15 @@ function_rows = [
      "regions": [[13, 1, 15, 1, 0, 0, 0, 0]]},
     {"name": "_RNvCowner5tests7fixture", "count": 0, "filenames": [source],
      "regions": [[20, 1, 22, 1, 0, 0, 0, 0]]},
+    {"name": "_RNvCowner20internal_model_tests7fixture", "count": 1, "filenames": [source],
+     "regions": [[25, 1, 27, 1, 1, 0, 0, 0]]},
     {"name": "foreign", "count": 0, "filenames": [foreign, source],
      "regions": [[30, 1, 32, 1, 0, 0, 0, 0], [31, 1, 31, 8, 0, 1, 0, 0]]},
 ]
+region_rows = extract({"data": [{"functions": function_rows}]},
+                      Path(__file__).with_name("owned_source_regions.jq"))
+assert any(row["file"] == source and row["line_start"] == 10 for row in region_rows)
+assert all(row["line_start"] not in {20, 25} for row in region_rows)
 rows = extract({"data": [{"functions": function_rows}]}, function_filter)
 assert rows == [{"file": source, "line_start": 10, "column_start": 1, "count": 3},
                 {"file": source, "line_start": 13, "column_start": 1, "count": 0}]

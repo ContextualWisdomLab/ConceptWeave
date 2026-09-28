@@ -1,7 +1,7 @@
 # Match LLVM instantiation groups: main file and first region start location.
 [
   .data[0].functions[]
-  | select(.name | contains("5tests") | not)
+  | select(.name | (contains("5tests") or contains("20internal_model_tests")) | not)
   | [.regions[] | select(.[7] == 1) | .[6]] as $expanded
   | ([range(0; .filenames | length)
       | select(. as $id | $expanded | index($id) | not)][0]) as $main
