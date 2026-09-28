@@ -325,6 +325,31 @@ mod tests {
     }
 
     #[test]
+    fn ordered_foreign_key_operator_arrays_change_source_identity() {
+        let operators = vec![operator("="), operator("custom_eq")];
+        let original = ForeignKeyCatalogObservation::new(
+            "public",
+            "child",
+            "parent_fk",
+            "parent_pkey",
+            operators.clone(),
+            operators.clone(),
+            operators,
+        )
+        .unwrap();
+        let expected = digest("base", std::slice::from_ref(&original));
+        let mut reordered = original.clone();
+        reordered.primary_foreign_operators.swap(0, 1);
+        assert_ne!(digest("base", &[reordered]), expected);
+        let mut reordered = original.clone();
+        reordered.primary_primary_operators.swap(0, 1);
+        assert_ne!(digest("base", &[reordered]), expected);
+        let mut reordered = original;
+        reordered.foreign_foreign_operators.swap(0, 1);
+        assert_ne!(digest("base", &[reordered]), expected);
+    }
+
+    #[test]
     fn incomplete_operator_arrays_are_rejected() {
         assert!(
             ForeignKeyCatalogObservation::new(
