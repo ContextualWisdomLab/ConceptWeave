@@ -4268,6 +4268,14 @@ async fn missing_binding_and_tcp_transport_fail_before_source_io() {
         Some(SourceObservationFailure::SourceUnavailable)
     );
 
+    assert_eq!(
+        adapter(Config::new())
+            .observe(authorized("public"), &NotCancelled)
+            .await
+            .err(),
+        Some(SourceObservationFailure::SourceUnavailable)
+    );
+
     let tcp = Config::from_str("host=127.0.0.1 dbname=postgres").unwrap();
     assert_eq!(
         adapter(tcp)
