@@ -110,7 +110,7 @@ fn ordinary_exclude_converter_security_labels_preserve_provider_order_independen
                     "payload_from_sql",
                     vec![
                         converter_security_label("z_provider", ""),
-                        converter_security_label("a_provider", " raw label \t"),
+                        converter_security_label(" \t", " raw label \t"),
                     ],
                 ),
                 converter_security_label_observation(
@@ -129,7 +129,7 @@ fn ordinary_exclude_converter_security_labels_preserve_provider_order_independen
                     IndexExclusionConstraintOperatorProcedureTransformConverterDirection::FromSql,
                     "payload_from_sql",
                     vec![
-                        converter_security_label("a_provider", " raw label \t"),
+                        converter_security_label(" \t", " raw label \t"),
                         converter_security_label("z_provider", ""),
                     ],
                 ),
@@ -145,7 +145,7 @@ fn ordinary_exclude_converter_security_labels_preserve_provider_order_independen
     assert_eq!(left.snapshot_digest(), right.snapshot_digest());
     assert_eq!(
         left.observations()[0].security_labels()[0].provider(),
-        "a_provider"
+        " \t"
     );
     assert_eq!(
         left.observations()[0].security_labels()[0].label(),
@@ -159,17 +159,24 @@ fn ordinary_exclude_converter_security_labels_preserve_provider_order_independen
 }
 
 #[test]
-fn ordinary_exclude_converter_security_labels_reject_blank_or_duplicate_providers_without_normalizing_labels()
+fn ordinary_exclude_converter_security_labels_preserve_spaced_providers_and_reject_invalid_or_duplicate_providers()
  {
-    let blank = IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabel::new(
+    let spaced = IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabel::new(
         " \t",
         "provider-owned-value",
     )
-    .expect_err("provider identity must be nonblank");
-    assert_field(
-        blank,
-        "index_exclusion_constraint_operator_procedure_transform_converter_security_label_provider",
-    );
+    .expect("registered provider names retain quoted whitespace");
+    assert_eq!(spaced.provider(), " \t");
+    for invalid in ["", "bad\0provider"] {
+        assert_field(
+            IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabel::new(
+                invalid,
+                "provider-owned-value",
+            )
+            .expect_err("empty or NUL-containing provider names are invalid"),
+            "index_exclusion_constraint_operator_procedure_transform_converter_security_label_provider",
+        );
+    }
 
     let duplicate =
         IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabelObservation::new(

@@ -31,7 +31,8 @@ pub struct IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLa
 impl IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabel {
     /// Creates one exact provider/label pair.
     ///
-    /// Provider identity must be nonblank. Label text is intentionally not trimmed, parsed, or
+    /// Provider identity must be nonempty and contain no NUL; quoted whitespace is preserved.
+    /// Label text is intentionally not trimmed, parsed, or
     /// otherwise normalized because the registered PostgreSQL label provider owns its validity and
     /// semantics; an empty string remains observable if a provider accepts it.
     pub fn new(
@@ -40,7 +41,7 @@ impl IndexExclusionConstraintOperatorProcedureTransformConverterSecurityLabel {
     ) -> Result<Self, ObservationError> {
         let provider = provider.into();
         let label = label.into();
-        validate_nonblank(
+        validate_identifier(
             &provider,
             "index_exclusion_constraint_operator_procedure_transform_converter_security_label_provider",
         )?;
@@ -539,13 +540,6 @@ fn encode_len(hasher: &mut Sha256, value: usize) {
 fn encode_str(hasher: &mut Sha256, value: &str) {
     encode_len(hasher, value.len());
     hasher.update(value.as_bytes());
-}
-
-fn validate_nonblank(value: &str, field: &'static str) -> Result<(), ObservationError> {
-    if value.trim().is_empty() {
-        return Err(invalid(field));
-    }
-    Ok(())
 }
 
 fn validate_identifier(value: &str, field: &'static str) -> Result<(), ObservationError> {
