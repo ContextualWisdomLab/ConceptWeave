@@ -306,6 +306,71 @@ fn observed_type_kind_family_cannot_extend_source_identity_twice() {
 }
 
 #[test]
+fn type_kind_evidence_cannot_follow_any_later_observed_family() {
+    let base = PostgresSchemaSnapshotV3::new(
+        &support::authorized_source("warehouse_primary", &["public"]),
+        "postgres_introspector_v3",
+        "2026-09-12T05:11:00Z",
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    )
+    .unwrap();
+    let later = [
+        (
+            "column collation",
+            base.clone().with_observed_column_collations(Vec::new()),
+        ),
+        (
+            "column generation",
+            base.clone().with_observed_column_generations(Vec::new()),
+        ),
+        (
+            "column expression",
+            base.clone()
+                .with_observed_column_generations(Vec::new())
+                .unwrap()
+                .with_observed_column_expressions(Vec::new()),
+        ),
+        (
+            "column identity",
+            base.clone().with_observed_column_identities(Vec::new()),
+        ),
+        (
+            "NOT NULL constraint",
+            base.clone().with_observed_not_null_constraints(Vec::new()),
+        ),
+        (
+            "constraint timing",
+            base.clone().with_observed_constraint_timings(Vec::new()),
+        ),
+        (
+            "constraint period",
+            base.clone().with_observed_constraint_periods(Vec::new()),
+        ),
+        (
+            "foreign-key catalog",
+            base.clone().with_observed_foreign_key_catalog(Vec::new()),
+        ),
+        (
+            "collation definition",
+            base.with_observed_collation_definitions(Vec::new()),
+        ),
+    ];
+
+    for (family, snapshot) in later {
+        let snapshot = snapshot.unwrap_or_else(|error| panic!("{family}: {error}"));
+        assert_eq!(
+            snapshot.with_observed_type_kinds(Vec::new()),
+            Err(ObservationError::InvalidObservationField {
+                field: "type_kind_observation_order",
+            }),
+            "{family} must fix the earlier source identity order"
+        );
+    }
+}
+
+#[test]
 fn ordinary_user_defined_base_type_kind_resolves_its_exact_binding() {
     let snapshot = PostgresSchemaSnapshotV3::new_with_type_kinds(
         &support::authorized_source("warehouse_primary", &["public"]),

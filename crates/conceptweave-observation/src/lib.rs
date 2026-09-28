@@ -869,7 +869,6 @@ impl PostgresSchemaSnapshotV3 {
         }
         if self.column_collations_observed
             || self.column_generations_observed
-            || self.column_expressions_observed
             || self.column_identities_observed
             || self.not_null_constraints_observed
             || self.constraint_timings_observed
@@ -923,7 +922,6 @@ impl PostgresSchemaSnapshotV3 {
             });
         }
         if self.column_generations_observed
-            || self.column_expressions_observed
             || self.column_identities_observed
             || self.not_null_constraints_observed
             || self.constraint_timings_observed
@@ -961,8 +959,7 @@ impl PostgresSchemaSnapshotV3 {
                 field: "column_generation_already_observed",
             });
         }
-        if self.column_expressions_observed
-            || self.column_identities_observed
+        if self.column_identities_observed
             || self.not_null_constraints_observed
             || self.constraint_timings_observed
             || self.constraint_periods_observed
@@ -1212,7 +1209,6 @@ impl PostgresSchemaSnapshotV3 {
             || self.range_catalog_observed
             || self.column_collations_observed
             || self.column_generations_observed
-            || self.column_expressions_observed
             || self.column_identities_observed
             || self.not_null_constraints_observed
             || self.constraint_timings_observed
@@ -1247,7 +1243,6 @@ impl PostgresSchemaSnapshotV3 {
             || self.range_catalog_observed
             || self.column_collations_observed
             || self.column_generations_observed
-            || self.column_expressions_observed
             || self.column_identities_observed
             || self.not_null_constraints_observed
             || self.constraint_timings_observed
@@ -1278,7 +1273,6 @@ impl PostgresSchemaSnapshotV3 {
             || self.range_catalog_observed
             || self.column_collations_observed
             || self.column_generations_observed
-            || self.column_expressions_observed
             || self.column_identities_observed
             || self.not_null_constraints_observed
             || self.constraint_timings_observed
@@ -1308,7 +1302,6 @@ impl PostgresSchemaSnapshotV3 {
             || self.range_catalog_observed
             || self.column_collations_observed
             || self.column_generations_observed
-            || self.column_expressions_observed
             || self.column_identities_observed
             || self.not_null_constraints_observed
             || self.constraint_timings_observed
@@ -1337,7 +1330,6 @@ impl PostgresSchemaSnapshotV3 {
             || self.range_catalog_observed
             || self.column_collations_observed
             || self.column_generations_observed
-            || self.column_expressions_observed
             || self.column_identities_observed
             || self.not_null_constraints_observed
             || self.constraint_timings_observed
