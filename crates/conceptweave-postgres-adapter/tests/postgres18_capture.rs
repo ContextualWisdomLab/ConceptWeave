@@ -7288,7 +7288,7 @@ async fn postgres18_table_owner_changes_source_identity() {
 }
 
 #[tokio::test]
-async fn postgres18_schema_owner_changes_source_identity() {
+async fn postgres18_whitespace_schema_owner_changes_source_identity() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
     };
@@ -7309,7 +7309,7 @@ async fn postgres18_schema_owner_changes_source_identity() {
         return;
     }
     let suffix = std::process::id();
-    let schema = format!("cw_schema_owner_fixture_{suffix}");
+    let schema = " ".to_owned();
     let owner = format!("cw_schema_owner_{suffix}");
     let renamed_owner = format!("cw_schema_owner_renamed_{suffix}");
     client
