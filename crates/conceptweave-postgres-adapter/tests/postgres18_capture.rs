@@ -4311,6 +4311,28 @@ async fn missing_binding_and_tcp_transport_fail_before_source_io() {
 }
 
 #[tokio::test]
+async fn postgres18_missing_authorized_schema_fails_without_a_snapshot() {
+    let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
+        return;
+    };
+    let schema = format!(
+        "cw_absent_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+    let result = adapter(Config::from_str(&dsn).unwrap())
+        .observe(authorized(&schema), &NotCancelled)
+        .await;
+    assert_eq!(
+        result.err(),
+        Some(SourceObservationFailure::SourceUnavailable)
+    );
+}
+
+#[tokio::test]
 async fn postgres18_unenforced_foreign_key_retains_false_state_without_ri_triggers() {
     let Ok(dsn) = std::env::var("CONCEPTWEAVE_PG18_TEST_DSN") else {
         return;
