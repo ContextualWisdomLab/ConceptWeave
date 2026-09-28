@@ -26,9 +26,19 @@ fn schema_owner_evidence_requires_its_type_owner_predecessor_and_is_single_use()
             field: "schema_owner_observation_order"
         }
     );
-    let observed = snapshot
-        .with_observed_type_owners(vec![])
-        .unwrap()
+    let predecessor = snapshot.with_observed_type_owners(vec![]).unwrap();
+    assert_eq!(
+        predecessor
+            .clone()
+            .with_observed_range_catalog(vec![])
+            .unwrap()
+            .with_observed_schema_owners(vec![owner.clone()])
+            .unwrap_err(),
+        ObservationError::InvalidObservationField {
+            field: "schema_owner_observation_order"
+        }
+    );
+    let observed = predecessor
         .with_observed_schema_owners(vec![owner.clone()])
         .unwrap();
     assert_eq!(
