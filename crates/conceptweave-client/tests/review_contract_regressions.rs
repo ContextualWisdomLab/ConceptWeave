@@ -228,7 +228,8 @@ fn public_contract_and_coverage_gates_encode_the_reviewed_fail_closed_rules() {
             && coverage_gate.contains("-f scripts/owned_source_regions.jq")
             && owned_regions.contains("contains(\"5tests\")")
             && owned_regions.contains("contains(\"20internal_model_tests\")")
-            && owned_regions.contains("group_by([.file, .line_start, .column_start, .line_end, .column_end])")
+            && owned_regions
+                .contains("group_by([.file, .line_start, .column_start, .line_end, .column_end])")
             && coverage_gate.contains("all(.[]; .count > 0)"),
         "coverage must aggregate owned production source coordinates instead of double-counting test-crate monomorphizations"
     );
